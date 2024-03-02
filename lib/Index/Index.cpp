@@ -1589,8 +1589,22 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
           return false;
       }
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (!reportInheritedTypeRefs(NTD->getInherited(), NTD))
-        return false;
+      auto *PD = dyn_cast<ProtocolDecl>(D);
+      if (PD && PD->wasDeserialized()) {
+        // Deserialized protocols don't have an inheritance clause.
+        for (auto *inherited : PD->getInheritedProtocols()) {
+          // FIXME(noncopyable_generics): Do we want to include these?
+          if (inherited->getInvertibleProtocolKind())
+            continue;
+
+          if (!reportRelatedRef(inherited, SourceLoc(), /*isImplicit=*/false,
+                                (SymbolRoleSet) SymbolRole::RelationBaseOf, PD))
+            return false;
+        }
+      } else {
+        if (!reportInheritedTypeRefs(NTD->getInherited(), NTD))
+          return false;
+      }
     }
   } else {
     // Even if we don't record a local property we still need to walk its

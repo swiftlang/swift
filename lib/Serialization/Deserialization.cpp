@@ -3216,21 +3216,6 @@ class DeclDeserializer {
       decl.get<ExtensionDecl *>()->setInherited(inherited);
   }
 
-  void handleInherited(ProtocolDecl *P,
-                       ArrayRef<ProtocolDecl *> inherited) {
-    SmallVector<InheritedEntry, 2> inheritedTypes;
-    llvm::transform(inherited, std::back_inserter(inheritedTypes), [](auto *I) {
-      return InheritedEntry(TypeLoc::withoutLoc(I->getDeclaredInterfaceType()),
-                            /*isUnchecked=*/false,
-                            /*isRetroactive=*/false,
-                            /*isPreconcurrency=*/false);
-    });
-
-    P->setInherited(ctx.AllocateCopy(inheritedTypes));
-    ctx.evaluator.cacheOutput(InheritedProtocolsRequest{P},
-                              ctx.AllocateCopy(inherited));
-  }
-
 public:
   DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
       : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset) {}
@@ -4517,7 +4502,8 @@ public:
     if (!MF.readInheritedProtocols(inherited))
       return MF.diagnoseFatal();
 
-    handleInherited(proto, inherited);
+    ctx.evaluator.cacheOutput(InheritedProtocolsRequest{proto},
+                              ctx.AllocateCopy(inherited));
 
     auto genericParams = MF.maybeReadGenericParams(DC);
     assert(genericParams && "protocol with no generic parameters?");
@@ -8256,7 +8242,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto maybeConformance = getConformanceChecked(conformanceID);
     if (maybeConformance) {
       reqConformances.push_back(maybeConformance.get());
-    } else if (allowCompilerErrors()) {
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
       diagnoseAndConsumeError(maybeConformance.takeError());
       reqConformances.push_back(ProtocolConformanceRef::forInvalid());
     } else {
