@@ -136,6 +136,10 @@ enum class TypeCheckExprFlags {
 
   /// Don't expand macros.
   DisableMacroExpansions = 0x08,
+
+  /// If set, typeCheckExpression will avoid invalidating the AST if
+  /// type-checking fails. Do not add new uses of this.
+  AvoidInvalidatingAST = 0x10,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
