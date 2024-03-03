@@ -187,6 +187,7 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @inlinable
+  @_alwaysEmitIntoClient
   public func map<U>(
     _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
@@ -248,6 +249,7 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @inlinable
+  @_alwaysEmitIntoClient
   public func flatMap<U>(
     _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
