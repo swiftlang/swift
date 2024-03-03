@@ -398,6 +398,7 @@ extension Optional where Wrapped: ~Copyable {
 @_unavailableInEmbedded
 extension Optional: CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
+  @_alwaysEmitIntoClient
   public var debugDescription: String {
     switch self {
     case .some(let value):
