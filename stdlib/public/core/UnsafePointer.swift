@@ -1142,6 +1142,7 @@ extension UnsafeMutablePointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
+  @_alwaysEmitIntoClient
   public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.initialize with negative count")
