@@ -221,7 +221,7 @@ func testEraseInheritingSyncMainActorClosure() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a19EraseInheritingSyncC7ClosureyyF
 // CHECK:         // function_ref closure #1
-// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a19EraseInheritingSyncC7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed Optional<any Actor>, @guaranteed MyActor) -> ()
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a19EraseInheritingSyncC7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed MyActor) -> ()
 // CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $MyActor
 // CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $MyActor
 // CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $MyActor : $MyActor, $any Actor
@@ -332,7 +332,7 @@ func testEraseInheritingAsyncMainActorClosure() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a20EraseInheritingAsyncC7ClosureyyF
 // CHECK:         // function_ref closure #1
-// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a20EraseInheritingAsyncC7ClosureyyFyyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>, @guaranteed MyActor) -> ()
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a20EraseInheritingAsyncC7ClosureyyFyyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed MyActor) -> ()
 // CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $MyActor
 // CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $MyActor
 // CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $MyActor : $MyActor, $any Actor
@@ -362,7 +362,7 @@ func takeInheritingAsyncIsolatedAny_optionalResult(@_inheritActorContext fn: @es
 // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a20EraseInheritingAsyncC18Closure_noPeepholeyyF
 //   We emit the closure itself with just the erasure conversion.
 // CHECK:         // function_ref closure #1
-// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a20EraseInheritingAsyncC18Closure_noPeepholeyyFSiyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>, @guaranteed MyActor) -> Int
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a20EraseInheritingAsyncC18Closure_noPeepholeyyFSiyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed MyActor) -> Int
 // CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $MyActor
 // CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $MyActor
 // CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $MyActor : $MyActor, $any Actor

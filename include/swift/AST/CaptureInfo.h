@@ -100,6 +100,12 @@ public:
     return Value.getPointer().is<OpaqueValueExpr *>();
   }
 
+  /// Returns true if this captured value is a local capture.
+  ///
+  /// NOTE: This implies that the value is not dynamic self metadata, since
+  /// values with decls are the only values that are able to be local captures.
+  bool isLocalCapture() const;
+
   CapturedValue mergeFlags(CapturedValue cv) {
     assert(Value.getPointer() == cv.Value.getPointer() &&
            "merging flags on two different value decls");

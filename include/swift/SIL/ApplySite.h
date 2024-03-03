@@ -571,6 +571,16 @@ public:
     return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
   }
 
+  /// Return the SILParameterInfo for this operand in the callee function.
+  SILParameterInfo getArgumentParameterInfo(const Operand &oper) const {
+    assert(!getArgumentConvention(oper).isIndirectOutParameter() &&
+           "Can only be applied to non-out parameters");
+
+    // The ParameterInfo is going to be the parameter in the caller.
+    unsigned calleeArgIndex = getCalleeArgIndex(oper);
+    return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
+  }
+
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
 
   friend bool operator==(ApplySite lhs, ApplySite rhs) {
@@ -799,15 +809,6 @@ public:
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(**this)->getIsolationCrossing();
     }
-  }
-
-  SILParameterInfo getArgumentParameterInfo(const Operand &oper) const {
-    assert(!getArgumentConvention(oper).isIndirectOutParameter() &&
-           "Can only be applied to non-out parameters");
-
-    // The ParameterInfo is going to be the parameter in the caller.
-    unsigned calleeArgIndex = getCalleeArgIndex(oper);
-    return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
