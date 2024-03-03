@@ -404,6 +404,28 @@ func gatherBorrowIntroducers(for value: Value,
                            &cache, context)
 }
 
+/// Compute the live range for the borrow scopes of a guaranteed value. This returns a separate instruction range for
+/// each of the value's borrow introducers. Unioning those ranges would be incorrect. We typically want their
+/// intersection.
+func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
+  -> SingleInlineArray<(BeginBorrowValue, InstructionRange)> {
+  assert(value.ownership == .guaranteed)
+
+  var ranges = SingleInlineArray<(BeginBorrowValue, InstructionRange)>()
+  var introducers = Stack<BeginBorrowValue>(context)
+  defer { introducers.deinitialize() }
+  gatherBorrowIntroducers(for: value, in: &introducers, context)
+  // If introducers is empty, then the dependence is on a trivial value, so
+  // there is no ownership range.
+  while let beginBorrow = introducers.pop() {
+    /// FIXME: Remove calls to computeInteriorLiveness as soon as lifetime completion runs immediately after
+    /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
+    /// like LifetimeDependenc.Scope.computeRange().
+    ranges.push((beginBorrow, computeInteriorLiveness(for: beginBorrow.value, context)))
+  }
+  return ranges
+}
+
 private struct BorrowIntroducers {
   typealias CachedIntroducers = SingleInlineArray<BeginBorrowValue>
   struct Cache {
