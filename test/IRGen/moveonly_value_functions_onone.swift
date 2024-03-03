@@ -290,7 +290,7 @@ public func takeGenericContext_1OuterNC_1<T : P>(_ e: consuming GenericContext_1
 public func takeOuterSinglePayloadNC_1<T>(_ e: consuming OuterSinglePayloadNC_1<T>) {}
 
 // CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone26takeOuterSinglePayloadNC_2yyAA0fghI2_2OyxGnlF"(
-// CHECK-SAME:      ptr noalias nocapture dereferenceable(64) %0, 
+//           :      ptr noalias nocapture dereferenceable(64) %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone22OuterSinglePayloadNC_2OyxGlWOh"(
@@ -385,7 +385,7 @@ public func takeOuterMultiPayloadNC_1<T>(_ e: consuming OuterMultiPayloadNC_1<T>
 // CHECK:       }
 public func takeOuterMultiPayloadNC_2<T>(_ e: consuming OuterMultiPayloadNC_2<T>) {}
 // CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone25takeOuterMultiPayloadNC_3yyAA0fghI2_3OyxGnlF"(
-// CHECK-SAME:      ptr noalias nocapture dereferenceable(64) %0, 
+//           :      ptr noalias nocapture dereferenceable(64) %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone21OuterMultiPayloadNC_3OyxGlWOh"(
