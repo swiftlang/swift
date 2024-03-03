@@ -3027,29 +3027,12 @@ static void suppressingFeatureSpecializeAttributeWithAvailability(
   action();
 }
 
-static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::UnsafeInheritExecutor);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
 static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
   bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
   options.PrintPrimaryAssociatedTypes = false;
   action();
   options.PrintPrimaryAssociatedTypes = originalPrintPrimaryAssociatedTypes;
-}
-
-static void
-suppressingFeatureUnavailableFromAsync(PrintOptions &options,
-                                       llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::UnavailableFromAsync);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 static void
@@ -3076,14 +3059,6 @@ suppressingFeatureLexicalLifetimes(PrintOptions &options,
   options.ExcludeAttrList.push_back(DeclAttrKind::LexicalLifetimes);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
-static void
-suppressingFeatureNoAsyncAvailability(PrintOptions &options,
-                                      llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
-  options.SuppressNoAsyncAvailabilityAttr = true;
-  action();
 }
 
 static void suppressingFeatureRetroactiveAttribute(
