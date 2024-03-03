@@ -301,12 +301,12 @@ public func takeOuterSinglePayloadNC_1<T>(_ e: consuming OuterSinglePayloadNC_1<
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         [[RESPONSE:%[^,]+]] = call swiftcc %swift.metadata_response @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVMa"(
-// CHECK-SAME:        i64 0, 
+// CHECK-SAME:        [[INT]] 0,
 // CHECK-SAME:        ptr %T)
 // CHECK:         [[METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK:         call swiftcc void @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVfD"(
 // CHECK-SAME:        ptr [[METADATA]],
-// CHECK-SAME:        ptr noalias nocapture swiftself dereferenceable(64) %0)
+//                    ptr noalias nocapture swiftself dereferenceable(64) %0)
 // CHECK:       }
 public func takeOuterSinglePayloadNC_2<T>(_ e: consuming OuterSinglePayloadNC_2<T>) {}
 
