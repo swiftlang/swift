@@ -27,7 +27,7 @@ VirtualMethodsTestSuite.test("value type") {
   expectEqual(789, d6.getPureInt())
 }
 
-if #available(macOS 13.3, *) {
+if #available(SwiftStdlib 5.8, *) {
   VirtualMethodsTestSuite.test("immortal reference type") {
     let i = Immortal.create()
     expectEqual(42, i.get42())

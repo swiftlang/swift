@@ -14,14 +14,14 @@ let _ = DerivedFromDerived2()
 
 VirtualNonAbstractBase().nonAbstractMethod()
 
-@available(macOS 13.3, *)
+@available(SwiftStdlib 5.8, *)
 func takesImmortalBase(_ i: ImmortalBase) {
   let _ = i.get42()
   let _ = i.getOverridden42()
   let _ = i.getIntValue()
 }
 
-@available(macOS 13.3, *)
+@available(SwiftStdlib 5.8, *)
 func takesImmortal(_ i: Immortal) {
   let _ = i.get42()
   let _ = i.getOverridden42()
@@ -29,7 +29,7 @@ func takesImmortal(_ i: Immortal) {
   i.setIntValue(1)
 }
 
-@available(macOS 13.3, *)
+@available(SwiftStdlib 5.8, *)
 func takesDerivedFromImmortal(_ i: DerivedFromImmortal) {
   let _ = i.get42()
   let _ = i.getOverridden42()
