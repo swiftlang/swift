@@ -61,7 +61,7 @@ actor MyActor {
   // CHECK: } // end sil function '$s4test7MyActorC0A7ClosureSiyYaF'
 
   ///// closure #1 in MyActor.testClosure()
-  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A7ClosureSiyYaFSiyYaXEfU_ : $@convention(thin) @async (@guaranteed MyActor) -> Int {
+  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A7ClosureSiyYaFSiyYaXEfU_ : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> Int {
   // CHECK:        [[COPIED_SELF:%[0-9]+]] = copy_value %0 : $MyActor
   // CHECK:        [[BORROWED_SELF:%[0-9]+]] = begin_borrow [[COPIED_SELF]] : $MyActor
   // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor 

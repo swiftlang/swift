@@ -1693,18 +1693,19 @@ public:
     }
 
     SILMultiAssignOptions options;
-    for (auto arg : pai->getOperandValues()) {
-      if (auto value = tryToTrackValue(arg)) {
+    for (auto &op : pai->getAllOperands()) {
+      if (auto value = tryToTrackValue(op.get())) {
         if (value->isActorDerived()) {
           options |= SILMultiAssignFlags::PropagatesActorSelf;
         }
       } else {
-        // NOTE: One may think that only sendable things can enter
-        // here... but we treat things like function_ref/class_method which
-        // are non-Sendable as sendable for our purposes.
-        if (arg->getType().isActor()) {
+        // We only treat Sendable values as propagating actor self if the
+        // partial apply has operand as an sil_isolated parameter.
+        ApplySite applySite(pai);
+        if (applySite.isArgumentOperand(op) &&
+            ApplySite(pai).getArgumentParameterInfo(op).hasOption(
+                SILParameterInfo::Isolated))
           options |= SILMultiAssignFlags::PropagatesActorSelf;
-        }
       }
     }
 
