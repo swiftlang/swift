@@ -891,6 +891,7 @@ extension UnsafeMutablePointer {
   ///   - count: The number of consecutive copies of `newValue` to initialize.
   ///     `count` must not be negative. 
   @inlinable
+  @_alwaysEmitIntoClient
   public func initialize(repeating repeatedValue: Pointee, count: Int) {
     // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
