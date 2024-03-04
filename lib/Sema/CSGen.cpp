@@ -4708,8 +4708,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 }
 
 static std::optional<SyntacticElementTarget>
-generateForEachStmtConstraints(ConstraintSystem &cs,
-                               SyntacticElementTarget target) {
+generateForEachPreambleConstraints(ConstraintSystem &cs,
+                                   SyntacticElementTarget target) {
   ForEachStmt *stmt = target.getAsForEachStmt();
   auto *forEachExpr = stmt->getParsedSequence();
   auto *dc = target.getDeclContext();
@@ -4952,7 +4952,7 @@ bool ConstraintSystem::generateConstraints(
     }
   }
 
-  case SyntacticElementTarget::Kind::forEachStmt: {
+  case SyntacticElementTarget::Kind::forEachPreamble: {
 
     // Cache the outer generic environment, if it exists.
     if (target.getPackElementEnv()) {
@@ -4961,7 +4961,7 @@ bool ConstraintSystem::generateConstraints(
 
     // For a for-each statement, generate constraints for the pattern, where
     // clause, and sequence traversal.
-    auto resultTarget = generateForEachStmtConstraints(*this, target);
+    auto resultTarget = generateForEachPreambleConstraints(*this, target);
     if (!resultTarget)
       return true;
 

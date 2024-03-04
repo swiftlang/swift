@@ -7188,7 +7188,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
     }
   } else if (auto *var = target.getAsUninitializedVar()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else if (target.isForEachStmt()) {
+  } else if (target.isForEachPreamble()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else {
     // Emit a poor fallback message.
