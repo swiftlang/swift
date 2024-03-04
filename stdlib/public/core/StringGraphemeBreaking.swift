@@ -266,8 +266,7 @@ extension _StringGuts {
     return _opaqueComplexCharacterStride(endingAt: i)
   }
 
-  @usableFromInline @inline(never)
-  @_effects(releasenone)
+  @_effects(releasenone) @inline(never)
   internal func _opaqueComplexCharacterStride(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(endingAt: i)
