@@ -51,6 +51,7 @@ enum SingletonTypeSynthesizer {
   _rawUnsafeContinuation,
   _void,
   _word,
+  _swiftInt,       // Swift.Int
   _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
   _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
   _actor,          // the '_Concurrency.Actor' protocol
@@ -70,6 +71,7 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _void: return SC.Context.TheEmptyTupleType;
   case _word: return BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                              SC.Context);
+  case _swiftInt: return SC.Context.getIntType();
   case _serialExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
       ->getDeclaredInterfaceType();
@@ -87,6 +89,11 @@ inline Type synthesizeType(SynthesisContext &SC,
         ->getDeclaredInterfaceType();
   }
 }
+
+enum RepresentationSynthesizer {
+  _thin,
+  _thick
+};
 
 /// A synthesizer which generates an integer type.
 struct IntegerTypeSynthesizer {
@@ -131,6 +138,23 @@ Type synthesizeType(SynthesisContext &SC,
   return MetatypeType::get(synthesizeType(SC, M.Sub));
 }
 
+template <class S>
+struct RepMetatypeTypeSynthesizer {
+  S Sub;
+  RepresentationSynthesizer Rep;
+};
+template <class S>
+constexpr RepMetatypeTypeSynthesizer<S>
+_metatype(S sub, RepresentationSynthesizer rep ) {
+  return {sub, rep};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const RepMetatypeTypeSynthesizer<S> &M) {
+  auto instanceType = synthesizeType(SC, M.Sub);
+  return MetatypeType::get(instanceType, synthesizeMetatypeRepresentation(M.Rep));
+}
+
 /// A synthesizer which generates an existential type from a requirement type.
 template <class S>
 struct ExistentialTypeSynthesizer {
@@ -146,6 +170,16 @@ Type synthesizeType(SynthesisContext &SC,
   return ExistentialType::get(synthesizeType(SC, M.Sub));
 }
 
+MetatypeRepresentation
+synthesizeMetatypeRepresentation(RepresentationSynthesizer rep) {
+  switch (rep) {
+  case _thin: return MetatypeRepresentation::Thin;
+  case _thick: return MetatypeRepresentation::Thick;
+  // TOOD: maybe add _objc?
+  }
+  llvm_unreachable("bad kind");
+}
+
 /// A synthesizer which generates an existential metatype type.
 template <class S>
 struct ExistentialMetatypeTypeSynthesizer {
@@ -159,6 +193,22 @@ template <class S>
 Type synthesizeType(SynthesisContext &SC,
                     const ExistentialMetatypeTypeSynthesizer<S> &M) {
   return ExistentialMetatypeType::get(synthesizeType(SC, M.Sub));
+}
+template <class S>
+struct RepExistentialMetatypeTypeSynthesizer {
+  S Sub;
+  RepresentationSynthesizer Rep;
+};
+template <class S>
+constexpr RepExistentialMetatypeTypeSynthesizer<S>
+_existentialMetatype(S sub, RepresentationSynthesizer rep) {
+  return {sub, rep};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const RepExistentialMetatypeTypeSynthesizer<S> &M) {
+  return ExistentialMetatypeType::get(synthesizeType(SC, M.Sub),
+                                      synthesizeMetatypeRepresentation(M.Rep));
 }
 
 /// A synthesizer that generates a MoveOnly wrapper of a type.
@@ -341,22 +391,21 @@ void synthesizeParameterTypes(SynthesisContext &SC,
 }
 
 /// Synthesize function ExtInfo.
-enum FunctionRepresentationSynthesizer {
-  _thin,
-  _thick
-};
 template <class S> struct ThrowsSynthesizer { S sub; };
 template <class S> struct AsyncSynthesizer { S sub; };
 template <class S> struct NoescapeSynthesizer { S sub; };
+template <class S> struct SendableModSynthesizer { S sub; };
 template <class S>
 constexpr ThrowsSynthesizer<S> _throws(S sub) { return {sub}; }
 template <class S>
 constexpr AsyncSynthesizer<S> _async(S sub) { return {sub}; }
 template <class S>
 constexpr NoescapeSynthesizer<S> _noescape(S sub) { return {sub}; }
+template <class S>
+constexpr SendableModSynthesizer<S> _sendable(S sub) { return {sub}; }
 
 inline ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
-                                    FunctionRepresentationSynthesizer kind) {
+                                    RepresentationSynthesizer kind) {
   switch (kind) {
   case _thin: return ASTExtInfo().withRepresentation(
                                             FunctionTypeRepresentation::Thin);
@@ -378,6 +427,11 @@ template <class S>
 ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
                              const NoescapeSynthesizer<S> &s) {
   return synthesizeExtInfo(SC, s.sub).withNoEscape();
+}
+template <class S>
+ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
+                             const SendableModSynthesizer<S> &s) {
+  return synthesizeExtInfo(SC, s.sub).withConcurrent();
 }
 
 /// Synthesize a function type.

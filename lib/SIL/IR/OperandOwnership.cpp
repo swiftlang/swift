@@ -924,63 +924,14 @@ OperandOwnershipBuiltinClassifier
   return OperandOwnership::Borrow;
 }
 
-const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
-const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;
-const int PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_FUTURE_FUNCTION = 3;
-const int PARAMETER_INDEX_CREATE_ASYNC_TASK_WITH_EXECUTOR_FUNCTION = 3;
-const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION = 4;
-const int PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_WITH_EXECUTOR_FUNCTION = 4;
-
-OperandOwnership OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(
-    BuiltinInst *bi, StringRef attr, int paramIndex) {
-  // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(paramIndex))
-    return OperandOwnership::DestroyingConsume;
-
-  return OperandOwnership::InstantaneousUse;
-}
-
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
                                                         StringRef attr) {
-  return visitCreateAsyncTask(
-      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION);
-}
+  // The function operand is consumed by the new task.
+  if (&op == &bi->getArgumentOperands().back())
+    return OperandOwnership::DestroyingConsume;
 
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroup(BuiltinInst *bi,
-                                                               StringRef attr) {
-  return visitCreateAsyncTask(
-      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION);
-}
-
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncDiscardingTaskInGroup(
-    BuiltinInst *bi, StringRef attr) {
-  return visitCreateAsyncTask(
-      bi, attr,
-      PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_FUTURE_FUNCTION);
-}
-
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskWithExecutor(
-    BuiltinInst *bi, StringRef attr) {
-  return visitCreateAsyncTask(
-      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_WITH_EXECUTOR_FUNCTION);
-}
-
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroupWithExecutor(
-    BuiltinInst *bi, StringRef attr) {
-  return visitCreateAsyncTask(
-      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION);
-}
-
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncDiscardingTaskInGroupWithExecutor(
-    BuiltinInst *bi, StringRef attr) {
-  return visitCreateAsyncTask(
-      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_WITH_EXECUTOR_FUNCTION);
+  return OperandOwnership::InstantaneousUse;
 }
 
 OperandOwnership OperandOwnershipBuiltinClassifier::

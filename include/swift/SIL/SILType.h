@@ -755,6 +755,11 @@ public:
   /// otherwise, return the null type.
   SILType getOptionalObjectType() const;
 
+  /// Wraps this in one level of optional ype.
+  SILType wrapInOptionalType() const {
+    return SILType::getOptionalType(*this);
+  }
+
   /// Unwraps one level of optional type.
   /// Returns the lowered T if the given type is Optional<T>.
   /// Otherwise directly returns the given type.

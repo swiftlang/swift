@@ -1789,6 +1789,10 @@ public:
   
   ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
 
+  ManagedValue emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
+                                       ManagedValue flags,
+                                       ManagedValue mainFunctionRef);
+
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
                                        Type selfInterfaceType, Type selfType,

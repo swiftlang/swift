@@ -4103,6 +4103,12 @@ public:
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
   }
+  ArrayRef<Operand> getArgumentOperands() const {
+    return getAllOperands();
+  }
+  MutableArrayRef<Operand> getArgumentOperands() {
+    return getAllOperands();
+  }
 };
 
 /// Increments a given profiler counter for a given PGO function name. This is

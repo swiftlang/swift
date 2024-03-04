@@ -320,56 +320,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor) {
-
-    auto flags = args.claimNext();
-    auto taskGroup =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
-            ? args.claimNext()
-            : nullptr;
-
-    // ExecutorRef is two pointers: {Identity, Implementation}
-    std::pair<llvm::Value *, llvm::Value *> executorRef =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
-            ? std::pair(args.claimNext(), args.claimNext())
-            : std::pair(nullptr, nullptr);
-
-    // In embedded Swift, futureResultType is a thin metatype, not backed by any
-    // actual value.
-    llvm::Value *futureResultType =
-        llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
-    // FIXME: We pass a metatype of result type even if it's statically known to
-    // be discarded (`Void`) just to keep the existing behavior.
-    if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-      futureResultType = args.claimNext();
-    }
-    auto taskFunction = args.claimNext();
-    auto taskContext = args.claimNext();
-
-    auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, taskGroup, executorRef.first, executorRef.second,
-        futureResultType, taskFunction, taskContext, substitutions);
-
-    // Cast back to NativeObject/RawPointer.
-    auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });
-    newTask = IGF.Builder.CreateBitCast(newTask, IGF.IGM.RefCountedPtrTy);
-    auto newContext = IGF.Builder.CreateExtractValue(newTaskAndContext, { 1 });
-    newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
-    out.add(newTask);
-    out.add(newContext);
-    return;
-  }
-
   if (Builtin.ID == BuiltinValueKind::ConvertTaskToJob) {
     auto task = args.claimNext();
     // The job object starts at the beginning of the task.
