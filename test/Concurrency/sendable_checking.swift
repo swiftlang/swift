@@ -367,4 +367,12 @@ final class UseNonisolatedUnsafe: Sendable {
   nonisolated(unsafe) var x1: NonSendable = .init()
   nonisolated(unsafe) let x2: NonSendable = .init()
   nonisolated(unsafe) var x3: Int = 0
+
+  func captureInTask() {
+    nonisolated(unsafe) var x = NonSendable()
+    Task {
+      print(x)
+      x = NonSendable()
+    }
+  }
 }
