@@ -1487,7 +1487,8 @@ public:
           require(It != ItEnd && (It++)->getKind() == OpK,
                   "di-expression operand kind mismatch");
 
-        if (Op == SILDIExprOperator::Fragment)
+        if (Op == SILDIExprOperator::Fragment ||
+            Op == SILDIExprOperator::TupleFragment)
           HasFragment = true;
         else
           require(!HasFragment, "no directive allowed after op_fragment"

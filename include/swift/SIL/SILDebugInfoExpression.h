@@ -40,7 +40,7 @@ enum class SILDIExprOperator : unsigned {
   /// associated source variable. This operator takes a single
   /// VarDecl operand pointing to the field declaration.
   /// Note that this directive can only appear at the end of an
-  /// expression.
+  /// expression, along with `TupleFragment`.
   Fragment,
   /// Perform arithmetic addition on the top two elements of the
   /// expression stack and push the result back to the stack.
@@ -51,7 +51,13 @@ enum class SILDIExprOperator : unsigned {
   /// Push an unsigned integer constant onto the stack.
   ConstUInt,
   /// Push a signed integer constant onto the stack.
-  ConstSInt
+  ConstSInt,
+  /// Specifies that the SSA value is an element of the
+  /// associated tuple. This operator takes a TupleType
+  /// operand pointing to the tuple type, and the index of the element.
+  /// Note that this directive can only appear at the end of an
+  /// expression, along with `Fragment`.
+  TupleFragment
 };
 
 /// Represents a single component in a debug info expression.
@@ -64,7 +70,9 @@ struct SILDIExprElement {
     DeclKind,
     /// An integer constant value. Note that
     /// we don't specify its signedness here.
-    ConstIntKind
+    ConstIntKind,
+    /// An operand that has `Type` type.
+    TypeKind
   };
 
 private:
@@ -74,6 +82,7 @@ private:
     SILDIExprOperator Operator;
     Decl *Declaration;
     uint64_t ConstantInt;
+    Type TypePtr;
   };
 
   explicit SILDIExprElement(Kind OpK) : OpKind(OpK) {}
@@ -94,6 +103,8 @@ public:
       return {};
   }
 
+  Type getAsType() const { return OpKind == TypeKind ? TypePtr : nullptr; }
+
   static SILDIExprElement createOperator(SILDIExprOperator Op) {
     SILDIExprElement DIOp(OperatorKind);
     DIOp.Operator = Op;
@@ -109,6 +120,12 @@ public:
   static SILDIExprElement createConstInt(uint64_t V) {
     SILDIExprElement DIOp(ConstIntKind);
     DIOp.ConstantInt = V;
+    return DIOp;
+  }
+
+  static SILDIExprElement createType(Type T) {
+    SILDIExprElement DIOp(TypeKind);
+    DIOp.TypePtr = T;
     return DIOp;
   }
 };
@@ -267,8 +284,12 @@ public:
   /// Return true if this expression is not empty
   inline operator bool() const { return Elements.size(); }
 
-  /// Create a op_fragment expression
+  /// Create a `op_fragment` expression
   static SILDebugInfoExpression createFragment(VarDecl *Field);
+
+  /// Create a `op_tuple_fragment` expression
+  static
+  SILDebugInfoExpression createTupleFragment(TupleType *TypePtr, unsigned Idx);
 
   /// Return true if this DIExpression starts with op_deref
   bool startsWithDeref() const {
@@ -276,11 +297,14 @@ public:
            Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
   }
 
-  /// Return true if this DIExpression has op_fragment (at the end)
+  /// Return true if this DIExpression has a fragment (at the end)
   bool hasFragment() const {
-    return Elements.size() >= 2 &&
+    return (Elements.size() >= 2 &&
            Elements[Elements.size() - 2].getAsOperator() ==
-            SILDIExprOperator::Fragment;
+            SILDIExprOperator::Fragment) ||
+            (Elements.size() >= 3 &&
+             Elements[Elements.size() - 3].getAsOperator() ==
+             SILDIExprOperator::TupleFragment);
   }
 };
 
