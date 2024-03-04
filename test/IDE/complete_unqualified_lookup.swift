@@ -104,3 +104,13 @@ enum MyEnum {
     #^ENUM_STATIC_SUBSCRIPT_BODY?check=ENUM_STATIC^#
   }
 }
+
+// rdar://123790296
+func testBindingFromDefer(_ x: Int?) {
+  guard let bar = x else { return }
+  defer {
+    #^BINDING_FROM_DEFER^#
+    // BINDING_FROM_DEFER-DAG: Decl[LocalVar]/Local: x[#Int?#]; name=x
+    // BINDING_FROM_DEFER-DAG: Decl[LocalVar]/Local: bar[#Int#]; name=bar
+  }
+}
