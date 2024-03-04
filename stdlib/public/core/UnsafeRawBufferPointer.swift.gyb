@@ -1288,10 +1288,23 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @inlinable
-public func withUnsafeBytes<T, Result>(
+@_alwaysEmitIntoClient
+public func withUnsafeBytes<T, E: Error, Result>(
+  of value: T,
+  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+  let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
+  return try body(.init(start: addr, count: MemoryLayout<T>.size))
+}
+
+/// ABI: Historical withUnsafeBytes(of:_:) rethrows,
+/// expressed as "throws", which is ABI-compatible with "rethrows".
+@_silgen_name("$ss15withUnsafeBytes2of_q_x_q_SWKXEtKr0_lF")
+@usableFromInline
+func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result {
+) throws -> Result {
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
@@ -1303,10 +1316,10 @@ public func withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeBytes<T, Result>(
+public func _withUnprotectedUnsafeBytes<T, E: Error, Result>(
   of value: T,
-  _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result {
+  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
   let addr = UnsafeRawPointer(Builtin.unprotectedAddressOfBorrow(value))
 #else
