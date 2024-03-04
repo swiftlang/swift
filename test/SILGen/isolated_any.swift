@@ -325,7 +325,41 @@ func testEraseInheritingAsyncNonIsolatedClosure() {
 // CHECK-NEXT:    return
 @MainActor
 func testEraseInheritingAsyncMainActorClosure() {
-  takeInheritingAsyncIsolatedAny { @MainActor in
+  takeInheritingAsyncIsolatedAny {
+    await asyncAction()
+  }
+}
+
+// Define a global actor that doesn't use Self as its instance type
+actor MyGlobalActorInstance {}
+@globalActor struct MyGlobalActor {
+  // Make sure this doesn't confuse things.
+  let shared = 0
+
+  static let shared = MyGlobalActorInstance()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A38EraseInheritingAsyncGlobalActorClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A38EraseInheritingAsyncGlobalActorClosureyyFyyYacfU_ :
+// CHECK-NEXT:    [[GLOBAL_ACTOR_METATYPE:%.*]] = metatype $@thin MyGlobalActor.Type
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[GLOBAL_ACTOR_SHARED_FN:%.]] = function_ref @$s4test13MyGlobalActorV6sharedAA0bcD8InstanceCvau :
+// CHECK-NEXT:    [[GLOBAL_ACTOR_PTR:%.*]] = apply [[GLOBAL_ACTOR_SHARED_FN]]()
+// CHECK-NEXT:    [[GLOBAL_ACTOR_ADDR:%.*]] = pointer_to_address [[GLOBAL_ACTOR_PTR]] : $Builtin.RawPointer to [strict] $*MyGlobalActorInstance
+// CHECK-NEXT:    [[GLOBAL_ACTOR:%.*]] = load [copy] [[GLOBAL_ACTOR_ADDR]] : $*MyGlobalActorInstance
+// CHECK-NEXT:    [[ERASED_GLOBAL_ACTOR:%.*]] = init_existential_ref [[GLOBAL_ACTOR]] :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_GLOBAL_ACTOR]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+@MyGlobalActor
+func testEraseInheritingAsyncGlobalActorClosure() {
+  takeInheritingAsyncIsolatedAny {
     await asyncAction()
   }
 }

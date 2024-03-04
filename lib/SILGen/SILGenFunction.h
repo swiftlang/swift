@@ -932,6 +932,10 @@ public:
                                             ArgumentSource &&fnSource,
                                             SGFContext C);
 
+  ManagedValue emitDistributedActorAsAnyActor(SILLocation loc,
+                                          SubstitutionMap distributedActorSubs,
+                                              ManagedValue actor);
+
   /// Generate a nullary function that returns the given value.
   /// If \p emitProfilerIncrement is set, emit a profiler increment for
   /// \p value.
@@ -1182,8 +1186,10 @@ public:
   SILValue emitLoadGlobalActorExecutor(Type globalActor);
 
   /// Call `.shared` on the given global actor type.
-  ManagedValue emitLoadOfGlobalActorShared(SILLocation loc,
-                                           CanType globalActorType);
+  ///
+  /// Returns the value of the property and the formal instance type.
+  std::pair<ManagedValue, CanType>
+  emitLoadOfGlobalActorShared(SILLocation loc, CanType globalActorType);
 
   /// Emit a reference to the given global actor as an opaque isolation.
   ManagedValue emitGlobalActorIsolation(SILLocation loc,
