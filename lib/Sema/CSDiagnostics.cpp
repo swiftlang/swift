@@ -8221,13 +8221,14 @@ bool UnableToInferGenericPackElementType::diagnoseAsError() {
     if (auto *calleeLocator = getSolution().getCalleeLocator(locator)) {
       if (const auto choice = getOverloadChoiceIfAvailable(calleeLocator)) {
         if (auto *decl = choice->choice.getDeclOrNull()) {
-          const auto applyArgToParamElt =
-              (path.end() - 2)->getAs<LocatorPathElt::ApplyArgToParam>();
-          if (auto paramDecl =
-                  getParameterAt(decl, applyArgToParamElt->getParamIdx())) {
-            emitDiagnosticAt(
-                paramDecl->getLoc(), diag::note_in_opening_pack_element,
-                packElementElt->getIndex(), paramDecl->getNameStr());
+          if (auto applyArgToParamElt =
+                  locator->findFirst<LocatorPathElt::ApplyArgToParam>()) {
+            if (auto paramDecl =
+                    getParameterAt(decl, applyArgToParamElt->getParamIdx())) {
+              emitDiagnosticAt(
+                  paramDecl->getLoc(), diag::note_in_opening_pack_element,
+                  packElementElt->getIndex(), paramDecl->getNameStr());
+            }
           }
         }
       }
