@@ -157,7 +157,7 @@ public enum OuterMultiPayloadNC_4<T>: ~Copyable {
 // CHECK:         [[OUTER_DEINITING_NC_1_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone18OuterDeinitingNC_1VfD"(
 // CHECK-SAME:        ptr [[OUTER_DEINITING_NC_1_METADATA]],
-// CHECK-SAME:        ptr{{.*}} %t)
+//           :        ptr{{.*}} %t)
 // CHECK:       }
 public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
   external_symbol()
