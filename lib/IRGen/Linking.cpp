@@ -528,7 +528,7 @@ std::string LinkEntity::mangleAsString() const {
 
     auto thunk = dyn_cast<AbstractFunctionDecl>(DC);
     if (thunk && thunk->isDistributedThunk()) {
-      ASTMangler mangler;
+      IRGenMangler mangler;
       return mangler.mangleDistributedThunkRecord(thunk);
     }
 
