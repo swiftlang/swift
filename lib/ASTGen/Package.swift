@@ -31,9 +31,6 @@ let swiftSetttings: [SwiftSetting] = [
     "-Xcc", "-I../../../build/Default/swift/include",
     "-Xcc", "-I../../../build/Default/llvm/include",
     "-Xcc", "-I../../../build/Default/llvm/tools/clang/include",
-
-    // FIXME: Needed to work around an availability issue with CxxStdlib
-    "-Xfrontend", "-disable-target-os-checking",
   ]),
 ]
 

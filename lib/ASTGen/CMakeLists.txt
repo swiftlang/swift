@@ -107,9 +107,6 @@ set(compile_options
   "SHELL: ${cxx_interop_flag}"
   "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
 
-  # FIXME: Needed to work around an availability issue with CxxStdlib
-  "SHELL: -Xfrontend -disable-target-os-checking"
-
   # Necessary to avoid treating IBOutlet and IBAction as keywords
   "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
 
