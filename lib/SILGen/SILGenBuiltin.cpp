@@ -1919,54 +1919,6 @@ static ManagedValue emitBuiltinInjectEnumTag(SILGenFunction &SGF, SILLocation lo
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
 }
 
-/// Find the extension on DistributedActor that defines __actorUnownedExecutor.
-static ExtensionDecl *findDistributedActorAsActorExtension(
-    ProtocolDecl *distributedActorProto, ModuleDecl *module) {
-  ASTContext &ctx = distributedActorProto->getASTContext();
-  auto name = ctx.getIdentifier("__actorUnownedExecutor");
-  auto results = distributedActorProto->lookupDirect(
-      name, SourceLoc(),
-      NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
-  for (auto result : results) {
-    if (auto var = dyn_cast<VarDecl>(result)) {
-      return dyn_cast<ExtensionDecl>(var->getDeclContext());
-    }
-  }
-
-  return nullptr;
-}
-
-ProtocolConformanceRef
-SILGenModule::getDistributedActorAsActorConformance(SubstitutionMap subs) {
-  ASTContext &ctx = M.getASTContext();
-  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
-  Type distributedActorType = subs.getReplacementTypes()[0];
-
-  if (!distributedActorAsActorConformance) {
-    auto distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-    if (!distributedActorProto)
-      return ProtocolConformanceRef();
-
-    auto ext = findDistributedActorAsActorExtension(
-        distributedActorProto, M.getSwiftModule());
-    if (!ext)
-      return ProtocolConformanceRef();
-
-    // Conformance of DistributedActor to Actor.
-    auto genericParam = subs.getGenericSignature().getGenericParams()[0];
-    distributedActorAsActorConformance = ctx.getNormalConformance(
-        Type(genericParam), actorProto, SourceLoc(), ext,
-        ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
-        /*isPreconcurrency=*/false);
-  }
-
-  return ProtocolConformanceRef(
-      actorProto,
-      ctx.getSpecializedConformance(distributedActorType,
-                                    distributedActorAsActorConformance,
-                                    subs));
-}
-
 void SILGenModule::noteMemberRefExpr(MemberRefExpr *e) {
   VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
 
@@ -1989,25 +1941,7 @@ void SILGenModule::noteMemberRefExpr(MemberRefExpr *e) {
 static ManagedValue emitBuiltinDistributedActorAsAnyActor(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
-  auto &ctx = SGF.getASTContext();
-  auto distributedActor = args[0];
-  ProtocolConformanceRef conformances[1] = {
-    SGF.SGM.getDistributedActorAsActorConformance(subs)
-  };
-
-  // Erase the distributed actor instance into an `any Actor` existential with
-  // the special conformance.
-  CanType distributedActorType =
-      subs.getReplacementTypes()[0]->getCanonicalType();
-  auto &distributedActorTL = SGF.getTypeLowering(distributedActorType);
-  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
-  auto &anyActorTL = SGF.getTypeLowering(actorProto->getDeclaredExistentialType());
-  return SGF.emitExistentialErasure(
-      loc, distributedActorType, distributedActorTL, anyActorTL, 
-      ctx.AllocateCopy(conformances),
-      C, [&distributedActor](SGFContext) {
-        return distributedActor;
-      });
+  return SGF.emitDistributedActorAsAnyActor(loc, subs, args[0]);
 }
 
 std::optional<SpecializedEmitter>

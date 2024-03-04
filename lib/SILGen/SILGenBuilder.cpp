@@ -1061,10 +1061,13 @@ ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(SILLocation loc,
 ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,
                                             bool isLexical) {
   assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
-  CleanupCloner cloner(*this, value);
   auto *mdi =
       createMoveValue(loc, value.forward(getSILGenFunction()), isLexical);
-  return cloner.clone(mdi);
+  // We always want a generic destroy_value cleanup on the moved value, even
+  // if the original had a more specialized cleanup (because it was a trivial
+  // case of an enum or something like that), so that the move checker does
+  // the right thing with the moved value.
+  return SGF.emitManagedRValueWithCleanup(mdi);
 }
 
 ManagedValue
