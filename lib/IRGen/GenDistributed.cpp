@@ -30,6 +30,7 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
+#include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
@@ -206,6 +207,8 @@ public:
   DistributedAccessor(IRGenFunction &IGF, ThunkOrRequirement target,
                       CanSILFunctionType accessorTy);
 
+  CanSILFunctionType getTargetType() const { return Target.getType(); }
+
   void emit();
 
 private:
@@ -357,14 +360,26 @@ IRGenModule::getAddrOfDistributedTargetAccessor(LinkEntity accessor,
 }
 
 void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
-  auto *f = getAddrOfDistributedTargetAccessor(getAccessorLinking(target),
+  LinkEntity accessorRef = getAccessorLinking(target);
+  auto *f = getAddrOfDistributedTargetAccessor(accessorRef,
                                                ForDefinition);
 
   if (!f->isDeclaration())
     return;
 
   IRGenFunction IGF(*this, f);
-  DistributedAccessor(IGF, target, getAccessorType(*this)).emit();
+  auto accessor = DistributedAccessor(IGF, target, getAccessorType(*this));
+  accessor.emit();
+
+  auto targetDecl = cast<AbstractFunctionDecl>(accessorRef.getDecl());
+
+  IRGenMangler mangler;
+
+  addAccessibleFunction(AccessibleFunction::forDistributed(
+      mangler.mangleDistributedThunkRecord(targetDecl),
+      mangler.mangleDistributedThunk(targetDecl),
+      accessor.getTargetType(),
+      getAddrOfAsyncFunctionPointer(accessorRef)));
 }
 
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
