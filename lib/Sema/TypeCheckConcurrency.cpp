@@ -5490,13 +5490,18 @@ static bool checkSendableInstanceStorage(
 
     /// Handle a stored property.
     bool operator()(VarDecl *property, Type propertyType) override {
+      ActorIsolation isolation = getActorIsolation(property);
+
+      // 'nonisolated' properties are always okay in 'Sendable' types because
+      // they can be accessed from anywhere. Note that 'nonisolated' without
+      // '(unsafe)' can only be applied to immutable, 'Sendable' properties.
+      if (isolation.isNonisolated())
+        return false;
+
       // Classes with mutable properties are Sendable if property is
       // actor-isolated
       if (isa<ClassDecl>(nominal)) {
-        ActorIsolation isolation = getActorIsolation(property);
-
-        if (property->supportsMutation() &&
-            (isolation.isNonisolated() || isolation.isUnspecified())) {
+        if (property->supportsMutation() && isolation.isUnspecified()) {
           auto behavior =
               SendableCheckContext(dc, check).defaultDiagnosticBehavior();
           if (behavior != DiagnosticBehavior::Ignore) {
