@@ -1296,7 +1296,7 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
-  if (nominal->isDistributedActor()) {
+  if (canSynthesizeDistributedActorCodableConformance(nominal)) {
     trySynthesize(KnownProtocolKind::Encodable);
     trySynthesize(KnownProtocolKind::Decodable);
   }
