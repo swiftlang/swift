@@ -168,7 +168,7 @@ protected:
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
-    llvm::StringSet<> headerImports;
+    std::string headerImport;
   };
 
   static llvm::ErrorOr<BinaryModuleImports>

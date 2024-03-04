@@ -403,7 +403,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
     return moduleBuf.getError();
 
   llvm::StringSet<> importedModuleNames;
-  llvm::StringSet<> importedHeaders;
+  std::string importedHeader = "";
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
@@ -413,7 +413,9 @@ SerializedModuleLoaderBase::getImportsOfModule(
 
   for (const auto &dependency : loadedModuleFile->getDependencies()) {
     if (dependency.isHeader()) {
-      importedHeaders.insert(dependency.RawPath);
+      assert(importedHeader.empty() &&
+             "Unexpected more than one header dependency");
+      importedHeader = dependency.RawPath;
       continue;
     }
 
@@ -436,7 +438,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
     importedModuleNames.insert(moduleName);
   }
 
-  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames, importedHeaders};
+  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames, importedHeader};
 }
 
 llvm::ErrorOr<ModuleDependencyInfo>
@@ -479,22 +481,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
                      return N.str();
                   });
 
-  auto importedHeaderSet = binaryModuleImports.get().headerImports;
-  std::vector<std::string> importedHeaders;
-  // FIXME: We only record these dependencies in CAS mode, because
-  // we require explicit PCH tasks to be produced for imported header
-  // of binary module dependencies. In the meantime, in non-CAS mode
-  // loading clients will consume the `.h` files encoded in the `.swiftmodules`
-  // directly.
-  if (Ctx.CASOpts.EnableCaching) {
-    importedHeaders.reserve(importedHeaderSet.size());
-    llvm::transform(importedHeaderSet.keys(),
-                    std::back_inserter(importedHeaders),
-                    [](llvm::StringRef N) {
-      return N.str();
-    });
-  }
-
+  auto importedHeader = binaryModuleImports.get().headerImport;
   auto &importedOptionalModuleSet = binaryModuleOptionalImports.get().moduleImports;
   std::vector<std::string> importedOptionalModuleNames;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
@@ -505,7 +492,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
        modulePath.str(), moduleDocPath, sourceInfoPath,
        importedModuleNames, importedOptionalModuleNames,
-       importedHeaders, isFramework, /*module-cache-key*/ "");
+       importedHeader, isFramework, /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }

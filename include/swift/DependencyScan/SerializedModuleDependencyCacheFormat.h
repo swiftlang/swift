@@ -141,7 +141,7 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDField,                         // bridgingHeaderFile
                    FileIDArrayIDField,                  // sourceFiles
                    FileIDArrayIDField,                  // bridgingSourceFiles
-                   FileIDArrayIDField,                  // bridgingModuleDependencies
+                   IdentifierIDField,                  // bridgingModuleDependencies
                    DependencyIDArrayIDField,            // swiftOverlayDependencies
                    IdentifierIDField,                   // CASFileSystemRootID
                    IdentifierIDField,                   // bridgingHeaderIncludeTree
@@ -168,7 +168,9 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
                    DependencyIDArrayIDField,         // swiftOverlayDependencies
-                   ImportArrayIDField,               // headerImports
+                   FileIDField,                      // headerImport
+                   IdentifierIDField,                // headerModuleDependencies
+                   FileIDArrayIDField,               // headerSourceFiles
                    IsFrameworkField,                 // isFramework
                    IdentifierIDField                 // moduleCacheKey
                    >;

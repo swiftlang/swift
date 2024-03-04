@@ -267,12 +267,6 @@ static llvm::Error resolveExplicitModuleInputs(
                        : binaryDepDetails->moduleCacheKey;
       commandLine.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
                             path);
-      for (const auto &headerDep : binaryDepDetails->preCompiledBridgingHeaderPaths) {
-        commandLine.push_back("-Xcc");
-        commandLine.push_back("-include-pch");
-        commandLine.push_back("-Xcc");
-        commandLine.push_back(remapPath(headerDep));
-      }
     } break;
     case swift::ModuleDependencyKind::SwiftPlaceholder: {
       auto placeholderDetails = depInfo->getAsPlaceholderDependencyModule();
@@ -966,9 +960,21 @@ static void writeJSON(llvm::raw_ostream &out,
       }
 
       // Module Header Dependencies
-      if (swiftBinaryDeps->header_dependencies->count != 0)
-        writeJSONSingleField(out, "headerDependencies",
-                             swiftBinaryDeps->header_dependencies, 5,
+      if (swiftBinaryDeps->header_dependency.length != 0)
+        writeJSONSingleField(out, "headerDependency",
+                             swiftBinaryDeps->header_dependency, 5,
+                             /*trailingComma=*/true);
+
+      // Module Header Module Dependencies
+      if (swiftBinaryDeps->header_dependencies_module_dependnecies->count != 0)
+        writeJSONSingleField(out, "headerModuleDependencies",
+                             swiftBinaryDeps->header_dependencies_module_dependnecies, 5,
+                             /*trailingComma=*/true);
+
+      // Module Header Source Files
+      if (swiftBinaryDeps->header_dependencies_source_files->count != 0)
+        writeJSONSingleField(out, "headerDependenciesSourceFiles",
+                             swiftBinaryDeps->header_dependencies_source_files, 5,
                              /*trailingComma=*/true);
 
       if (hasOverlayDependencies) {
@@ -1251,7 +1257,9 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
             create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
             create_set(bridgedOverlayDependencyNames),
-            create_set(swiftBinaryDeps->preCompiledBridgingHeaderPaths),
+            create_clone(swiftBinaryDeps->headerImport.c_str()),
+            create_set(swiftBinaryDeps->headerModuleDependencies),
+            create_set(swiftBinaryDeps->headerSourceFiles),
             swiftBinaryDeps->isFramework,
             create_clone(swiftBinaryDeps->moduleCacheKey.c_str())};
       } else {
