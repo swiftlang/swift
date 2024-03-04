@@ -1413,7 +1413,7 @@ public:
     GenericEnvironment *genericSignature =
         genericSigStack.empty() ? nullptr : genericSigStack.back();
 
-    if (TypeChecker::typeCheckForEachBinding(DC, S, genericSignature))
+    if (TypeChecker::typeCheckForEachPreamble(DC, S, genericSignature))
       return nullptr;
 
     // Type-check the body of the loop.

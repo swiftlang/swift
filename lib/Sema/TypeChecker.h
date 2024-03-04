@@ -750,11 +750,12 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
                              Type patternType = Type(),
                              TypeCheckExprOptions options = {});
 
-/// Type-check a for-each loop's pattern binding and sequence together.
+/// Type-check a for-each loop's pattern binding, sequence, and where clause
+/// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt,
-                             GenericEnvironment *packElementEnv);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                              GenericEnvironment *packElementEnv);
 
 /// Compute the set of captures for the given function or closure.
 void computeCaptures(AnyFunctionRef AFR);
