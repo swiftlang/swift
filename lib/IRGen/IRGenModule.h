@@ -1813,10 +1813,14 @@ public:
   Address getAddrOfObjCISAMask();
 
   llvm::Function *
-  getAddrOfDistributedTargetAccessor(SILFunction *F,
+  getAddrOfDistributedTargetAccessor(LinkEntity accessor,
                                      ForDefinition_t forDefinition);
 
-  void emitDistributedTargetAccessor(SILFunction *method);
+  /// Emit a distributed accessor function for the given distributed thunk or
+  /// protocol requirement.
+  void emitDistributedTargetAccessor(
+      llvm::PointerUnion<SILFunction *, AbstractFunctionDecl *>
+          thunkOrRequirement);
 
   llvm::Constant *getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn);
 

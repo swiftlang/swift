@@ -70,6 +70,19 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 
 namespace {
 
+using ThunkOrRequirement = llvm::PointerUnion<SILFunction *, AbstractFunctionDecl *>;
+
+static LinkEntity
+getAccessorLinking(ThunkOrRequirement accessorFor) {
+  if (auto *method = accessorFor.dyn_cast<SILFunction *>()) {
+    assert(method->isDistributed());
+    return LinkEntity::forDistributedTargetAccessor(method);
+  }
+
+  auto *requirement = accessorFor.get<AbstractFunctionDecl *>();
+  return LinkEntity::forDistributedTargetAccessor(requirement);
+}
+
 struct ArgumentDecoderInfo {
   /// The instance of the decoder this information belongs to.
   llvm::Value *Decoder;
@@ -128,32 +141,47 @@ struct ArgumentDecoderInfo {
 struct AccessorTarget {
 private:
   IRGenFunction &IGF;
-  SILFunction *Target;
+  ThunkOrRequirement Target;
 
   CanSILFunctionType Type;
 
-public:
-  AccessorTarget(IRGenFunction &IGF, SILFunction *target)
-      : IGF(IGF), Target(target), Type(target->getLoweredFunctionType()) {}
+  mutable std::optional<WitnessMetadata> Witness;
 
-  DeclContext *getDeclContext() const { return Target->getDeclContext(); }
+public:
+  AccessorTarget(IRGenFunction &IGF, ThunkOrRequirement target)
+      : IGF(IGF), Target(target) {
+    if (auto *thunk = target.dyn_cast<SILFunction *>()) {
+      Type = thunk->getLoweredFunctionType();
+    } else {
+      auto *requirement = target.get<AbstractFunctionDecl *>();
+      Type = IGF.IGM.getSILTypes().getConstantFunctionType(
+          IGF.IGM.getMaximalTypeExpansionContext(),
+          SILDeclRef(requirement).asDistributed());
+    }
+  }
+
+  DeclContext *getDeclContext() const {
+    if (auto *thunk = Target.dyn_cast<SILFunction *>())
+      return thunk->getDeclContext();
+    return Target.get<AbstractFunctionDecl *>();
+  }
 
   CanSILFunctionType getType() const { return Type; }
 
-  bool isGeneric() const { return Target->isGeneric(); }
-
-  Callee getCallee(llvm::Value *actorSelf) const;
-
-  LinkEntity getLinking() const {
-    return LinkEntity::forDistributedTargetAccessor(Target);
+  bool isGeneric() const {
+    auto sig = Type->getInvocationGenericSignature();
+    return sig && !sig->areAllParamsConcrete();
   }
 
-  WitnessMetadata *getWitnessMetadata() const {
-    return nullptr;
-  }
+  Callee getCallee(llvm::Value *actorSelf);
+
+  LinkEntity getLinking() const { return getAccessorLinking(Target); }
+
+  /// Witness metadata is computed lazily upon the first request.
+  WitnessMetadata *getWitnessMetadata(llvm::Value *actorSelf);
 
 public:
-  FunctionPointer getPointerToTarget() const;
+  FunctionPointer getPointerToTarget(llvm::Value *actorSelf);
 };
 
 class DistributedAccessor {
@@ -175,7 +203,7 @@ class DistributedAccessor {
   SmallVector<std::pair<Address, /*type=*/llvm::Value *>, 4> LoadedArguments;
 
 public:
-  DistributedAccessor(IRGenFunction &IGF, SILFunction *target,
+  DistributedAccessor(IRGenFunction &IGF, ThunkOrRequirement target,
                       CanSILFunctionType accessorTy);
 
   void emit();
@@ -313,27 +341,24 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
 }
 
 llvm::Function *
-IRGenModule::getAddrOfDistributedTargetAccessor(SILFunction *F,
+IRGenModule::getAddrOfDistributedTargetAccessor(LinkEntity accessor,
                                                 ForDefinition_t forDefinition) {
-  auto entity = LinkEntity::forDistributedTargetAccessor(F);
-
-  llvm::Function *&entry = GlobalFuncs[entity];
+  llvm::Function *&entry = GlobalFuncs[accessor];
   if (entry) {
     if (forDefinition)
-      updateLinkageForDefinition(*this, entry, entity);
+      updateLinkageForDefinition(*this, entry, accessor);
     return entry;
   }
 
   Signature signature = getSignature(getAccessorType(*this));
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  LinkInfo link = LinkInfo::get(*this, accessor, forDefinition);
 
   return createFunction(*this, link, signature);
 }
 
-void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
-  assert(target->isDistributed());
-
-  auto *f = getAddrOfDistributedTargetAccessor(target, ForDefinition);
+void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
+  auto *f = getAddrOfDistributedTargetAccessor(getAccessorLinking(target),
+                                               ForDefinition);
 
   if (!f->isDeclaration())
     return;
@@ -343,7 +368,7 @@ void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
 }
 
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
-                                         SILFunction *target,
+                                         ThunkOrRequirement target,
                                          CanSILFunctionType accessorTy)
     : IGM(IGF.IGM), IGF(IGF), Target(IGF, target), AccessorType(accessorTy),
       AsyncLayout(getAsyncContextLayout(IGM, AccessorType, AccessorType,
@@ -540,6 +565,35 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   }
 }
 
+static llvm::Value *lookupWitnessTable(IRGenFunction &IGF, llvm::Value *witness,
+                                       ProtocolDecl *protocol) {
+  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+
+  auto &IGM = IGF.IGM;
+  auto *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
+  auto *witnessTable = IGF.Builder.CreateCall(
+      IGM.getConformsToProtocolFunctionPointer(), {witness, protocolDescriptor});
+
+  auto failBB = IGF.createBasicBlock("missing-witness");
+  auto contBB = IGF.createBasicBlock("");
+
+  auto isNull = IGF.Builder.CreateICmpEQ(
+    witnessTable, llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+  IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+
+  // This operation shouldn't fail because the compuler should have
+  // checked that the given witness conforms to the protocol. If it
+  // does fail then accessor should trap.
+  {
+    IGF.Builder.emitBlock(failBB);
+    IGF.emitTrap("missing witness table", /*EmitUnreachable=*/true);
+  }
+
+  IGF.Builder.emitBlock(contBB);
+
+  return witnessTable;
+}
+
 void DistributedAccessor::lookupWitnessTables(
     llvm::Value *value, ArrayRef<ProtocolDecl *> protocols,
     Explosion &witnessTables) {
@@ -552,28 +606,7 @@ void DistributedAccessor::lookupWitnessTables(
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
       continue;
 
-    auto *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
-    auto *witnessTable =
-        IGF.Builder.CreateCall(conformsToProtocol, {value, protocolDescriptor});
-
-    auto failBB = IGF.createBasicBlock("missing-witness");
-    auto contBB = IGF.createBasicBlock("");
-
-    auto isNull = IGF.Builder.CreateICmpEQ(
-        witnessTable, llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-    IGF.Builder.CreateCondBr(isNull, failBB, contBB);
-
-    // This operation shouldn't fail because runtime should have checked that
-    // a particular argument type conforms to `SerializationRequirement`
-    // of the distributed actor the decoder is used for. If it does fail
-    // then accessor should trap.
-    {
-      IGF.Builder.emitBlock(failBB);
-      IGF.emitTrap("missing witness table", /*EmitUnreachable=*/true);
-    }
-
-    IGF.Builder.emitBlock(contBB);
-    witnessTables.add(witnessTable);
+    witnessTables.add(lookupWitnessTable(IGF, value, protocol));
   }
 }
 
@@ -759,7 +792,7 @@ void DistributedAccessor::emit() {
 
     emission->begin();
     emission->setArgs(arguments, /*isOutlined=*/false,
-                      Target.getWitnessMetadata());
+                      Target.getWitnessMetadata(actorSelf));
 
     // Load result of the thunk into the location provided by the caller.
     // This would only generate code for direct results, if thunk has an
@@ -790,39 +823,75 @@ void DistributedAccessor::emit() {
   }
 }
 
-FunctionPointer AccessorTarget::getPointerToTarget() const {
+FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
   auto &IGM = IGF.IGM;
-  auto fpKind = classifyFunctionPointerKind(Target);
-  auto signature = IGM.getSignature(Type, fpKind);
 
-  auto *fnPtr =
-    llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(Target),
-                                   signature.getType()->getPointerTo());
+  if (auto *thunk = Target.dyn_cast<SILFunction *>()) {
+    auto fpKind = classifyFunctionPointerKind(thunk);
+    auto signature = IGM.getSignature(Type, fpKind);
 
-  return FunctionPointer::forDirect(
-      FunctionPointer::Kind(Type), fnPtr,
-      IGM.getAddrOfSILFunction(Target, NotForDefinition), signature);
+    auto *fnPtr =
+        llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(thunk),
+                                       signature.getType()->getPointerTo());
+
+    return FunctionPointer::forDirect(
+        FunctionPointer::Kind(Type), fnPtr,
+        IGM.getAddrOfSILFunction(thunk, NotForDefinition), signature);
+  }
+
+  auto *requirementDecl = Target.get<AbstractFunctionDecl *>();
+  auto *protocol = requirementDecl->getDeclContext()->getSelfProtocolDecl();
+  SILDeclRef requirementRef = SILDeclRef(requirementDecl).asDistributed();
+
+  if (!IGM.isResilient(protocol, ResilienceExpansion::Maximal)) {
+    auto *witness = getWitnessMetadata(actorSelf);
+    return emitWitnessMethodValue(IGF, witness->SelfWitnessTable,
+                                  requirementRef);
+  }
+
+  auto fnPtr = IGM.getAddrOfDispatchThunk(requirementRef, NotForDefinition);
+  auto sig = IGM.getSignature(Type);
+  return FunctionPointer::forDirect(Type, fnPtr,
+                                    /*secondaryValue=*/nullptr, sig, true);
 }
 
-Callee AccessorTarget::getCallee(llvm::Value *actorSelf) const {
+Callee AccessorTarget::getCallee(llvm::Value *actorSelf) {
   CalleeInfo info{Type, Type, SubstitutionMap()};
-  return {std::move(info), getPointerToTarget(), actorSelf};
+  return {std::move(info), getPointerToTarget(actorSelf), actorSelf};
+}
+
+WitnessMetadata *AccessorTarget::getWitnessMetadata(llvm::Value *actorSelf) {
+  if (Target.is<SILFunction *>())
+    return nullptr;
+
+  if (!Witness) {
+    WitnessMetadata witness;
+
+    auto *requirement = Target.get<AbstractFunctionDecl *>();
+    auto *protocol = requirement->getDeclContext()->getSelfProtocolDecl();
+    assert(protocol);
+
+    witness.SelfMetadata = actorSelf;
+    witness.SelfWitnessTable = lookupWitnessTable(
+        IGF, emitHeapMetadataRefForUnknownHeapObject(IGF, actorSelf), protocol);
+
+    Witness = witness;
+  }
+
+  return &(*Witness);
 }
 
 ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     llvm::Value *decoder, llvm::Value *decoderTy, llvm::Value *witnessTable) {
   auto &C = IGM.Context;
-  DeclContext *targetContext = Target.getDeclContext();
+  auto *thunk = cast<AbstractFunctionDecl>(Target.getDeclContext());
   auto expansionContext = IGM.getMaximalTypeExpansionContext();
 
   /// If the context was a function, unwrap it and look for the decode method
   /// based off a concrete class; If we're not in a concrete class, we'll be
   /// using a witness for the decoder so returning null is okey.
-  FuncDecl *decodeFn = nullptr;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(targetContext)) {
-    decodeFn = C.getDistributedActorArgumentDecodingMethod(
-        func->getDeclContext()->getSelfNominalTypeDecl());
-  }
+  FuncDecl *decodeFn = C.getDistributedActorArgumentDecodingMethod(
+      thunk->getDeclContext()->getSelfNominalTypeDecl());
 
   // If distributed actor is generic over actor system, we have to
   // use witness to reference `decodeNextArgument`.
