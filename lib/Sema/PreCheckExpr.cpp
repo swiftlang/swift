@@ -2366,7 +2366,7 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
     target.setExpr(expr);
   }
 
-  if (target.isForEachStmt()) {
+  if (target.isForEachPreamble()) {
     auto *stmt = target.getAsForEachStmt();
 
     auto *sequenceExpr = stmt->getParsedSequence();
