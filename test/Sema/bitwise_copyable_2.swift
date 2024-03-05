@@ -48,3 +48,17 @@ func passBuiltinFloat16(_ f: Builtin.FPIEEE16) { take(f) }
 @available(SwiftStdlib 5.3, *)
 func passFloat16(_ f: Float16) { take(f) }
 #endif
+
+enum E_Raw_Int : Int {
+  case one = 1
+  case sixty_three = 63
+}
+
+func passE_Raw_Int(_ e: E_Raw_Int) { take(e) }
+
+enum E_Raw_String : String {
+  case one = "one"
+  case sixty_three = "sixty three"
+}
+
+func passE_Raw_String(_ e: E_Raw_String) { take(e) }
