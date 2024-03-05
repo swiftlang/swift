@@ -2427,6 +2427,8 @@ namespace {
     }
 
     void checkDefaultArgument(DefaultArgumentExpr *expr) {
+      getCurrentContextIsolation(expr);
+
       // Check the context isolation against the required isolation for
       // evaluating the default argument synchronously. If the default
       // argument must be evaluated asynchronously, record that in the
@@ -3378,19 +3380,8 @@ namespace {
 
         // FIXME: CurrentContextIsolationExpr does not have its actor set
         // at this point.
-        if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(arg)) {
-          // Look through caller-side default arguments for #isolation.
-          if (defaultArg->isCallerSide()) {
-            arg = defaultArg->getCallerSideDefaultExpr();
-          }
-        }
-        if (auto *macro = dyn_cast<MacroExpansionExpr>(arg)) {
-          auto *expansion = macro->getRewritten();
-          if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expansion)) {
-            recordCurrentContextIsolation(isolation);
-            arg = isolation->getActor();
-          }
-        }
+        if (auto isolation = getCurrentContextIsolation(arg))
+          arg = isolation;
 
         argForIsolatedParam = arg;
         unsatisfiedIsolation = std::nullopt;
@@ -3551,6 +3542,25 @@ namespace {
         return true;
 
       return false;
+    }
+
+    Expr *getCurrentContextIsolation(Expr *expr) {
+      // Look through caller-side default arguments for #isolation.
+      auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr);
+      if (defaultArg && defaultArg->isCallerSide()) {
+        expr = defaultArg->getCallerSideDefaultExpr();
+      }
+
+      if (auto *macro = dyn_cast<MacroExpansionExpr>(expr)) {
+        expr = macro->getRewritten();
+      }
+
+      if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expr)) {
+        recordCurrentContextIsolation(isolation);
+        return isolation->getActor();
+      }
+
+      return nullptr;
     }
 
     void recordCurrentContextIsolation(

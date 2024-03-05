@@ -482,6 +482,11 @@ public func useDefaultIsolation(
   _ isolation: isolated (any Actor)? = #isolation
 ) {}
 
+public func useDefaultIsolationWithoutIsolatedParam(
+  _ isolation: (any Actor)? = #isolation
+) {}
+
 @MainActor func callUseDefaultIsolation() async {
   useDefaultIsolation()
+  useDefaultIsolationWithoutIsolatedParam()
 }
