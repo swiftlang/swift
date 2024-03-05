@@ -2319,6 +2319,11 @@ NodePointer Demangler::demangleImplFunctionType() {
       Param = addChild(Param, Transferring);
     ++NumTypesToAdd;
   }
+
+  if (nextIf('T')) {
+    type->addChild(createNode(Node::Kind::ImplTransferringResult), *this);
+  }
+
   while (NodePointer Result = demangleImplResultConvention(
                                                     Node::Kind::ImplResult)) {
     type = addChild(type, Result);
