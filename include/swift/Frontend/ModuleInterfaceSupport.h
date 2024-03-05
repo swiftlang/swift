@@ -22,6 +22,8 @@
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 #define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY                               \
+  "swift-module-flags-ignorable-private"
 
 namespace swift {
 
