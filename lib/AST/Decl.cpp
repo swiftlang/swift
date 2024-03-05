@@ -1083,7 +1083,7 @@ bool Decl::hasUnderscoredNaming() const {
   }
 
   if (!VD->getBaseName().isSpecial() &&
-      VD->getBaseIdentifier().str().startswith("_")) {
+      VD->getBaseIdentifier().hasUnderscoredNaming()) {
     return true;
   }
 

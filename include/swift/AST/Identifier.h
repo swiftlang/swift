@@ -177,6 +177,10 @@ public:
     return str().startswith("$") && !(getLength() == 1);
   }
   
+  bool hasUnderscoredNaming() const {
+    return str().startswith("_");
+  }
+  
   const void *getAsOpaquePointer() const {
       return static_cast<const void *>(Pointer);
   }

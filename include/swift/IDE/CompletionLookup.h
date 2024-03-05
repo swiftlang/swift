@@ -304,7 +304,7 @@ public:
   void includeInstanceMembers() { IncludeInstanceMembers = true; }
 
   bool isHiddenModuleName(Identifier Name) {
-    return (Name.str().startswith("_") || Name == Ctx.SwiftShimsModuleName ||
+    return (Name.hasUnderscoredNaming() || Name == Ctx.SwiftShimsModuleName ||
             Name.str() == SWIFT_ONONE_SUPPORT);
   }
 

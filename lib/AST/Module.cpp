@@ -2297,7 +2297,7 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
         for (Identifier overlay: overlays) {
           // We don't present non-underscored overlays as part of the underlying
           // module, so ignore them.
-          if (!overlay.str().startswith("_"))
+          if (!overlay.hasUnderscoredNaming())
             continue;
           ModuleDecl *overlayMod =
               getASTContext().getModuleByName(overlay.str());
