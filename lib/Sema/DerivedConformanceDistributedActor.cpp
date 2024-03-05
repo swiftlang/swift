@@ -86,6 +86,9 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
   auto idType = getDistributedActorIDType(decl);
   auto actorSystemType = getDistributedActorSystemType(decl);
 
+  if (!idType || !actorSystemType)
+    return nullptr;
+
   // (id: Self.ID, using system: Self.ActorSystem)
   auto *params = ParameterList::create(
       C,

@@ -275,7 +275,12 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   if (!actorProtocol)
-    return ErrorType::get(ctx);
+    return Type();
+
+  auto actorConformance = actor->getParentModule()->lookupConformance(
+      actor->getDeclaredInterfaceType(), actorProtocol);
+  if (!actorConformance || actorConformance.isInvalid())
+    return Type();
 
   AssociatedTypeDecl *actorSystemDecl =
       actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
@@ -286,37 +291,20 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
   if (!actorSystemProtocol)
     return Type();
 
-  AssociatedTypeDecl *assocTypeDecl =
+  AssociatedTypeDecl *memberTypeDecl =
       actorSystemProtocol->getAssociatedType(member);
-  if (!assocTypeDecl)
+  if (!memberTypeDecl)
     return Type();
 
-  auto module = actor->getParentModule();
+  auto depMemTy = DependentMemberType::get(
+      DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
+                               actorSystemDecl),
+      memberTypeDecl);
 
-  // In case of protocol, let's find a concrete `ActorSystem`
-  if (auto *protocol = dyn_cast<ProtocolDecl>(actor)) {
-    auto signature = protocol->getGenericSignatureOfContext();
+  auto subs = SubstitutionMap::getProtocolSubstitutions(
+      actorProtocol, actor->getDeclaredInterfaceType(), actorConformance);
 
-    auto systemTy =
-        signature->getConcreteType(actorSystemDecl->getDeclaredInterfaceType());
-    if (!systemTy)
-      return Type();
-
-    auto conformance = module->lookupConformance(systemTy, actorSystemProtocol);
-    if (conformance.isInvalid())
-      return Type();
-
-    return conformance.getTypeWitnessByName(systemTy, member);
-  }
-
-  Type selfType = actor->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, actorProtocol);
-  Type dependentType = actorProtocol->getSelfInterfaceType();
-  dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
-  dependentType = DependentMemberType::get(dependentType, assocTypeDecl);
-
-  return dependentType.subst(SubstitutionMap::getProtocolSubstitutions(
-      actorProtocol, selfType, conformance));
+  return Type(depMemTy).subst(subs);
 }
 
 /******************************************************************************/

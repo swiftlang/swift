@@ -860,7 +860,7 @@ GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
   auto &ctx = actor->getASTContext();
   auto decoderTy =
       ctx.getAssociatedTypeOfDistributedSystemOfActor(actor, ctx.Id_InvocationDecoder);
-  return decoderTy->hasError() ? nullptr : decoderTy->getAnyNominal();
+  return decoderTy ? decoderTy->getAnyNominal() : nullptr;
 }
 
 FuncDecl *
