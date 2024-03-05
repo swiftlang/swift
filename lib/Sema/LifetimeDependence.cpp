@@ -178,12 +178,20 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       }
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-      auto *bitwiseCopyableProtocol =
-          ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
-      if (bitwiseCopyableProtocol && mod->checkConformance(type, bitwiseCopyableProtocol)) {
-        diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
-        return true;
+    // Diagnose when we have lifetime dependence on a type that is
+    // BitwiseCopyable & Escapable.
+    // ~Escapable types are non-trivial in SIL and we should not raise this
+    // error.
+    // TODO: Diagnose ~Escapable types are always non-trivial in SIL.
+    if (type->isEscapable()) {
+      if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+        auto *bitwiseCopyableProtocol =
+            ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+        if (bitwiseCopyableProtocol &&
+            mod->checkConformance(type, bitwiseCopyableProtocol)) {
+          diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
+          return true;
+        }
       }
     }
 
