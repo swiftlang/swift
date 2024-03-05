@@ -197,6 +197,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::HAS_CXX_INTEROPERABILITY_ENABLED:
       extendedInfo.setHasCxxInteroperability(true);
       break;
+    case options_block::ALLOW_NON_RESILIENT_ACCESS:
+      extendedInfo.setAllowNonResilientAccess(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -695,6 +698,8 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
      << "', built from "
      << (Bits.IsBuiltFromInterface? "swiftinterface": "source")
      << ", " << (resilient? "resilient": "non-resilient");
+  if (Bits.AllowNonResilientAccess)
+    os << ", built with -experimental-allow-non-resilient-access";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)
@@ -1457,6 +1462,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       Bits.HasCxxInteroperability = extInfo.hasCxxInteroperability();
+      Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       MiscVersion = info.miscVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();

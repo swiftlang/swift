@@ -524,6 +524,10 @@ def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-b
   Flags<[FrontendOption]>,
   HelpText<"Enable optimization to bypass resilience within a package">;
 
+def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-non-resilient-access">,
+  Flags<[FrontendOption]>,
+  HelpText<"Allow non-resilient access by generating all contents besides exportable decls">;
+
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
