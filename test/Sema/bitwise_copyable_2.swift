@@ -40,3 +40,11 @@ func passMemoryLayout<T>(_ m: MemoryLayout<T>) { take(m) } // expected-error{{co
 func passCommandLine(_ m: CommandLine) { take(m) } // expected-error{{conformance_availability_unavailable}}
 
 func passUnicode(_ m: Unicode) { take(m) } // expected-error{{conformance_availability_unavailable}}
+
+import Builtin
+
+#if arch(arm)
+func passBuiltinFloat16(_ f: Builtin.FPIEEE16) { take(f) }
+@available(SwiftStdlib 5.3, *)
+func passFloat16(_ f: Float16) { take(f) }
+#endif
