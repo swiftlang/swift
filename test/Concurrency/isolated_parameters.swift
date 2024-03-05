@@ -477,3 +477,11 @@ nonisolated func fromNonisolated(ns: NotSendable) async -> NotSendable {
 func invalidIsolatedClosureParam<A: AnyActor> (
   _: (isolated A) async throws -> Void // expected-error {{'isolated' parameter type 'A' does not conform to 'Actor' or 'DistributedActor'}}
 ) {}
+
+public func useDefaultIsolation(
+  _ isolation: isolated (any Actor)? = #isolation
+) {}
+
+@MainActor func callUseDefaultIsolation() async {
+  useDefaultIsolation()
+}

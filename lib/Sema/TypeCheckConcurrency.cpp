@@ -3378,6 +3378,12 @@ namespace {
 
         // FIXME: CurrentContextIsolationExpr does not have its actor set
         // at this point.
+        if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(arg)) {
+          // Look through caller-side default arguments for #isolation.
+          if (defaultArg->isCallerSide()) {
+            arg = defaultArg->getCallerSideDefaultExpr();
+          }
+        }
         if (auto *macro = dyn_cast<MacroExpansionExpr>(arg)) {
           auto *expansion = macro->getRewritten();
           if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expansion)) {
