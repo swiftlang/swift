@@ -302,6 +302,9 @@ internal struct __CocoaSet {
   }
 }
 
+@available(*, unavailable)
+extension __CocoaSet: Sendable {}
+
 extension __CocoaSet {
   @usableFromInline
   @_effects(releasenone)
@@ -558,6 +561,9 @@ extension __CocoaSet: Sequence {
     return Iterator(self)
   }
 }
+
+@available(*, unavailable)
+extension __CocoaSet.Iterator: Sendable {}
 
 extension __CocoaSet.Iterator: IteratorProtocol {
   @usableFromInline

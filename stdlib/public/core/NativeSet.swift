@@ -65,6 +65,9 @@ internal struct _NativeSet<Element: Hashable> {
 #endif
 }
 
+@available(*, unavailable)
+extension _NativeSet: Sendable {}
+
 extension _NativeSet { // Primitive fields
   @usableFromInline
   internal typealias Bucket = _HashTable.Bucket
@@ -590,6 +593,9 @@ extension _NativeSet: Sequence {
     return Iterator(self)
   }
 }
+
+@available(*, unavailable)
+extension _NativeSet.Iterator: Sendable {}
 
 extension _NativeSet.Iterator: IteratorProtocol {
   @inlinable

@@ -188,6 +188,8 @@ public struct LazySequence<Base: Sequence> {
   }
 }
 
+extension LazySequence: Sendable where Base: Sendable {}
+
 extension LazySequence: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = Base.Iterator

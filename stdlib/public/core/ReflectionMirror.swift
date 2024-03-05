@@ -213,6 +213,9 @@ public struct _EachFieldOptions: OptionSet {
   public static var ignoreUnknown = _EachFieldOptions(rawValue: 1 << 1)
 }
 
+@available(SwiftStdlib 5.2, *)
+extension _EachFieldOptions: Sendable {}
+
 /// The metadata "kind" for a type.
 @available(SwiftStdlib 5.2, *)
 @_spi(Reflection)
@@ -248,6 +251,9 @@ public enum _MetadataKind: UInt {
     }
   }
 }
+
+@available(SwiftStdlib 5.2, *)
+extension _MetadataKind: Sendable {}
 
 /// Calls the given closure on every field of the specified type.
 ///
