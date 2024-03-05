@@ -98,10 +98,17 @@ function(add_swift_compiler_modules_library name)
                         "DEPENDS"
                         ${ARGN})
 
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    set(cxx_interop_flag "-enable-experimental-cxx-interop")
+  else()
+    set(cxx_interop_flag "-cxx-interoperability-mode=default")
+  endif()
+
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "-Xfrontend" "-enable-experimental-cxx-interop"
+      "${cxx_interop_flag}"
       "-Xfrontend" "-disable-target-os-checking"
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
