@@ -188,6 +188,7 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
+  
   /// Return the length of the extended grapheme cluster starting at offset `i`,
   /// assuming it falls on a grapheme cluster boundary.
   ///
@@ -196,13 +197,32 @@ extension _StringGuts {
   /// inconsistent with `_opaqueCharacterStride(endingAt:)`. On the other hand,
   /// this behavior makes this suitable for use in substrings whose start index
   /// itself does not fall on a cluster boundary.
-  @usableFromInline @inline(never)
-  @_effects(releasenone)
+  @usableFromInline
+  @_effects(releasenone) @inline(__always)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
+    _internalInvariant(i < endIndex._encodedOffset)
+    if isFastUTF8 {
+      let fast = withFastUTF8 { utf8 in
+        let first = utf8[_unchecked: i]
+        if UTF8.isASCII(first) && first != _CR {
+          return i &+ 1 == utf8.count || UTF8.isASCII(utf8[_unchecked: i &+ 1])
+        }
+        return false
+      }
+      if _fastPath(fast) {
+        return 1
+      }
+    }
+    
+    return _opaqueComplexCharacterStride(startingAt: i)
+  }
+  
+  @_effects(releasenone) @inline(never)
+  internal func _opaqueComplexCharacterStride(startingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(startingAt: i)
     }
-
+    
     let nextIdx = withFastUTF8 { utf8 in
       nextBoundary(startingAt: i) { j in
         _internalInvariant(j >= 0)
@@ -211,7 +231,7 @@ extension _StringGuts {
         return (scalar, j &+ len)
       }
     }
-
+    
     return nextIdx &- i
   }
 
@@ -221,7 +241,7 @@ extension _StringGuts {
   ///
   /// Note: unlike `_opaqueCharacterStride(startingAt:)`, this method always
   /// finds a correct grapheme cluster boundary.
-  @usableFromInline @inline(never)
+  @usableFromInline
   @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
@@ -474,9 +494,10 @@ extension Unicode {
       between scalar1: Unicode.Scalar,
       and scalar2: Unicode.Scalar
     ) -> Bool? {
-      if scalar1.value == 0xD, scalar2.value == 0xA {
+      if scalar1.value == _CR, scalar2.value == _LF {
         return false
       }
+      
       if _hasGraphemeBreakBetween(scalar1, scalar2) {
         return true
       }
@@ -660,10 +681,10 @@ extension _GraphemeBreakingState {
     and scalar2: Unicode.Scalar
   ) -> Bool {
     // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
+    if scalar1.value == _CR, scalar2.value == _LF {
       return false
     }
-
+    
     if _hasGraphemeBreakBetween(scalar1, scalar2) {
       return true
     }
@@ -815,11 +836,10 @@ extension _StringGuts {
     at index: Int,
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
+    if scalar1.value == _CR, scalar2.value == _LF {
       return false
     }
-
+    
     if _hasGraphemeBreakBetween(scalar1, scalar2) {
       return true
     }
