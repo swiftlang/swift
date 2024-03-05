@@ -31,11 +31,11 @@ func test_NotAtAll_NoImplicit(_ actor: SerReqNotCodable) {
 
 // ==== ------------------------------------------------------------------------
 
-distributed actor NotAtAll_NothingCodable { // expected-error{{type 'NotAtAll_NothingCodable' does not conform to protocol 'Decodable'}}
+distributed actor NotAtAll_NothingCodable {
   typealias ActorSystem = FakeIdIsNotCodableActorSystem
 }
 func test_NotAtAll_NoImplicit(_ actor: NotAtAll_NothingCodable) {
-  let _: any Codable = actor
+  let _: any Codable = actor // expected-error{{value of type 'NotAtAll_NothingCodable' does not conform to specified type 'Decodable'}}
 
   // no implicit conformance
   let _: any CustomSerializationProtocol = actor // expected-error{{value of type 'NotAtAll_NothingCodable' does not conform to specified type 'CustomSerializationProtocol'}}
