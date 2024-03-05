@@ -63,3 +63,17 @@ func localCompareExchange() -> (exchanged: Bool, original: Int) {
     ordering: .sequentiallyConsistent
   )
 }
+
+//===----------------------------------------------------------------------===//
+// Dead Object Elimination
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil {{.*}} @deadAtomic {{.*}} {
+// CHECK:         %0 = tuple ()
+// CHECK-NEXT:    return %0 : $()
+// CHECK-LABEL: } // end sil function 'deadAtomic'
+@_silgen_name("deadAtomic")
+func deadAtomic() {
+  let _ = Atomic(0)
+  let _ = Atomic<UnsafeRawPointer?>(nil)
+}
