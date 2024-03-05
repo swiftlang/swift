@@ -181,8 +181,10 @@ public:
   /// Witness metadata is computed lazily upon the first request.
   WitnessMetadata *getWitnessMetadata(llvm::Value *actorSelf);
 
-public:
+private:
   FunctionPointer getPointerToTarget(llvm::Value *actorSelf);
+
+  llvm::Value *emitMetadataRef(llvm::Value *actorSelf) const;
 };
 
 class DistributedAccessor {
@@ -596,7 +598,7 @@ static llvm::Value *lookupWitnessTable(IRGenFunction &IGF, llvm::Value *witness,
     witnessTable, llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   IGF.Builder.CreateCondBr(isNull, failBB, contBB);
 
-  // This operation shouldn't fail because the compuler should have
+  // This operation shouldn't fail because the compiler should have
   // checked that the given witness conforms to the protocol. If it
   // does fail then accessor should trap.
   {
@@ -870,6 +872,19 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
                                     /*secondaryValue=*/nullptr, sig, true);
 }
 
+llvm::Value *AccessorTarget::emitMetadataRef(llvm::Value *actorSelf) const {
+  auto &IGM = IGF.IGM;
+
+  if (!IGM.ObjCInterop) {
+    llvm::Value *slot =
+      IGF.Builder.CreateBitCast(actorSelf, IGM.TypeMetadataPtrPtrTy);
+    return IGF.Builder.CreateLoad(
+      Address(slot, IGM.TypeMetadataPtrTy, IGM.getPointerAlignment()));
+  }
+
+  return emitHeapMetadataRefForUnknownHeapObject(IGF, actorSelf);
+}
+
 Callee AccessorTarget::getCallee(llvm::Value *actorSelf) {
   CalleeInfo info{Type, Type, SubstitutionMap()};
   return {std::move(info), getPointerToTarget(actorSelf), actorSelf};
@@ -887,8 +902,8 @@ WitnessMetadata *AccessorTarget::getWitnessMetadata(llvm::Value *actorSelf) {
     assert(protocol);
 
     witness.SelfMetadata = actorSelf;
-    witness.SelfWitnessTable = lookupWitnessTable(
-        IGF, emitHeapMetadataRefForUnknownHeapObject(IGF, actorSelf), protocol);
+    witness.SelfWitnessTable =
+        lookupWitnessTable(IGF, emitMetadataRef(actorSelf), protocol);
 
     Witness = witness;
   }
