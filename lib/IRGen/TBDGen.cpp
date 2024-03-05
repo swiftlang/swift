@@ -233,7 +233,12 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
 }
 
 static LinkerPlatformId
-getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
+getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
+                    ASTContext &Ctx) {
+  auto target =
+      Ver.ForTargetVariant ? Ctx.LangOpts.TargetVariant : Ctx.LangOpts.Target;
+  bool isSimulator = target ? target->isSimulatorEnvironment() : false;
+
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
@@ -243,16 +248,16 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::iOS:
   case swift::PlatformKind::iOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::iOS_sim:
-                             LinkerPlatformId::iOS;
+    if (target && target->isMacCatalystEnvironment())
+      return LinkerPlatformId::macCatalyst;
+    return isSimulator ? LinkerPlatformId::iOS_sim : LinkerPlatformId::iOS;
   case swift::PlatformKind::tvOS:
   case swift::PlatformKind::tvOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::tvOS_sim:
-                             LinkerPlatformId::tvOS;
+    return isSimulator ? LinkerPlatformId::tvOS_sim : LinkerPlatformId::tvOS;
   case swift::PlatformKind::watchOS:
   case swift::PlatformKind::watchOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
-                             LinkerPlatformId::watchOS;
+    return isSimulator ? LinkerPlatformId::watchOS_sim
+                       : LinkerPlatformId::watchOS;
   case swift::PlatformKind::macOS:
   case swift::PlatformKind::macOSApplicationExtension:
     return LinkerPlatformId::macOS;
@@ -264,8 +269,9 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
 }
 
 static StringRef
-getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
-  return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
+getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver,
+                      ASTContext &Ctx) {
+  return getLinkerPlatformName(getLinkerPlatformId(Ver, Ctx));
 }
 
 /// Find the most relevant introducing version of the decl stack we have visited
@@ -313,17 +319,17 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     // so we don't need the linker directives.
     if (*IntroVer >= Ver.Version)
       continue;
-    auto PlatformNumber = getLinkerPlatformId(Ver);
+    auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
     auto It = previousInstallNameMap->find(Ver.ModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver));
+                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver));
+                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;
