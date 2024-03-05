@@ -674,3 +674,6 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
 @frozen
 public enum Unicode {}
 
+@available(*, unavailable)
+extension Unicode : _BitwiseCopyable {}
+
