@@ -4600,8 +4600,8 @@ static ActorIsolation getActorIsolationFromWrappedProperty(VarDecl *var) {
   return ActorIsolation::forUnspecified();
 }
 
-static std::optional<ActorIsolation>
-getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
+std::optional<ActorIsolation>
+swift::getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
   // Ensure that the base type that this function is declared in has @main
   // attribute
   NominalTypeDecl *declContext =
@@ -4839,7 +4839,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   // If this declaration has an isolated parameter, it's isolated to that
   // parameter.
-  if (auto paramIdx = getIsolatedParamIndex(value)) { // might need to add this to interface request
+  if (auto paramIdx = getIsolatedParamIndex(value)) {
     checkDeclWithIsolatedParameter(value);
 
     ParamDecl *param = getParameterList(value)->get(*paramIdx);
@@ -4894,7 +4894,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return isolation;
   };
 
-  auto isolationFromAttr = getIsolationFromAttributes(value);      // add to interface request
+  // Look for explicit annotions to determine isolation
+  auto isolationFromAttr = getIsolationFromAttributes(value);
   if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
     auto preconcurrency =
@@ -4902,21 +4903,15 @@ ActorIsolation ActorIsolationRequest::evaluate(
     value->getAttrs().add(preconcurrency);
   }
 
-  if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) { // add to interface request
+  if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
     // Main.main() and Main.$main are implicitly MainActor-protected.
     // Any other isolation is an error.
     std::optional<ActorIsolation> mainIsolation =
         getActorIsolationForMainFuncDecl(fd);
-    if (mainIsolation) {
-      if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
-        if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
-                           mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
-        }
-      }
+    
+    if (mainIsolation)
       return *mainIsolation;
-    }
+    
   }
   // If this declaration has one of the actor isolation attributes, report
   // that.
@@ -4930,8 +4925,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return checkGlobalIsolation(*isolationFromAttr);
   }
 
-  // Determine the default isolation for this declaration, which may still be
-  // overridden by other inference rules.
+  // If no explicit annotation is provided, determine the default isolation
+  // for this declaration, which may still be overridden by other inference rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -4942,7 +4937,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // When no other isolation applies, an actor's non-async init is independent
-  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) // some member , add to interface request
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
     if (nominal->isAnyActor())
       if (auto ctor = dyn_cast<ConstructorDecl>(value))
         if (!ctor->hasAsync())

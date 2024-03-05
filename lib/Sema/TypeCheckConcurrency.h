@@ -498,6 +498,8 @@ void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
                            ArrayRef<CustomAttr *> attrs);
+std::optional<ActorIsolation>
+getActorIsolationForMainFuncDecl(FuncDecl *fnDecl);
 
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);

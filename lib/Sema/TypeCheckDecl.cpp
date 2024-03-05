@@ -2560,23 +2560,31 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       auto &ctx = AFD->getASTContext();
 
+      // Check for explicit global actor attribute
       auto isolationFromAttr = getIsolationFromAttributes(AFD);
-      if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
-          !AFD->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
-        auto preconcurrency =
-            new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
-        AFD->getAttrs().add(preconcurrency);
-      }
 
-      if (isolationFromAttr) {
-        // Global actors should be added to interface type.
-        if (isolationFromAttr->isGlobalActor()) {
-          auto isolation  = FunctionTypeIsolation::forGlobalActor(isolationFromAttr->getGlobalActor());
-          infoBuilder = infoBuilder.withIsolation(isolation);
+      // Main.main() and Main.$main are implicitly MainActor-protected.
+      // Any other isolation is an error.
+      if (FuncDecl *fd = dyn_cast<FuncDecl>(AFD)) {
+        std::optional<ActorIsolation> mainIsolation =
+        getActorIsolationForMainFuncDecl(fd);
+        if (mainIsolation) {
+          if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
+            if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
+                               mainIsolation->getGlobalActor())) {
+              fd->getASTContext().Diags.diagnose(
+                  fd->getLoc(), diag::main_function_must_be_mainActor);
+            }
+            auto isolation  = FunctionTypeIsolation::forGlobalActor(mainIsolation->getGlobalActor());
+            infoBuilder = infoBuilder.withIsolation(isolation);
+          }
         }
       }
-      infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
+
+      // TO-DO: If no isolation attribute provided, compute inferred isolation
+
       infoBuilder = infoBuilder.withConcurrent(AFD->isSendable());
+      infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
       // Defer bodies must not escape.

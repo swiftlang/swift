@@ -113,6 +113,7 @@ struct SomeStruct {
   @MainActor init(asyncMainActor: Int) async {}
   @MainActor init(mainActor: Int) {} // expected-note {{calls to initializer 'init(mainActor:)' from outside of its actor context are implicitly asynchronous}}
 
+  // expected-complete-and-tns-warning@+2 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
   // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
   @MainActor(unsafe) init(asyncMainActorUnsafe: Int) async {}
 
