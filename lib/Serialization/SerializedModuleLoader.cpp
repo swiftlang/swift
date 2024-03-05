@@ -652,12 +652,21 @@ SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs,
   if (!fs.exists(interfacePath))
     return std::nullopt;
 
-  // If in the same package, try return the package interface path if not
-  // preferring the interface file.
-  if (!ctx.LangOpts.AllowNonPackageInterfaceImportFromSamePackage) {
-    if (auto packageName = getPackageNameFromInterface(interfacePath, fs)) {
-      if (*packageName == ctx.LangOpts.PackageName)
-        return getPackageInterfacePathIfInSamePackage(fs, ctx);
+  // If there is a package name, try look for the package interface.
+  if (!ctx.LangOpts.PackageName.empty()) {
+    if (auto maybePackageInterface =
+            getPackageInterfacePathIfInSamePackage(fs, ctx))
+      return *maybePackageInterface;
+
+    // If package interface is not found, check if we can load the
+    // public/private interface file by checking:
+    // * if AllowNonPackageInterfaceImportFromSamePackage is true
+    // * if the package name is not equal so not in the same package.
+    if (!ctx.LangOpts.AllowNonPackageInterfaceImportFromSamePackage) {
+      if (auto packageName = getPackageNameFromInterface(interfacePath, fs)) {
+        if (*packageName == ctx.LangOpts.PackageName)
+          return std::nullopt;
+      }
     }
   }
 
