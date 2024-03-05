@@ -1203,7 +1203,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,
-        // The cast is now from the the MetatypeInst, so get the source formal
+        // The cast is now from the MetatypeInst, so get the source formal
         // type from it.
         mi->getType().getASTType(),
         dynamicCast.getTargetLoweredType(),

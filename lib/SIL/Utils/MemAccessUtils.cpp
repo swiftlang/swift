@@ -1595,7 +1595,7 @@ class AccessPathDefUseTraversal {
   // apply. For other storage, it is the same as accessPath.getRoot().
   //
   // 'base' is typically invalid, maning that all uses of 'storage' for the
-  // access path will be visited. When 'base' is set, the the visitor is
+  // access path will be visited. When 'base' is set, the visitor is
   // restricted to a specific access base, such as a particular
   // ref_element_addr.
   SILValue base;

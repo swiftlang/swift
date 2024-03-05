@@ -906,7 +906,7 @@ ClangTypeConverter::getClangTemplateArguments(
   }
   if (failedTypes.empty())
     return nullptr;
-  // Clear "templateArgs" to prevent the clients from accidently reading a
+  // Clear "templateArgs" to prevent the clients from accidentally reading a
   // partially converted set of template arguments.
   templateArgs.clear();
   auto errorInfo = std::make_unique<TemplateInstantiationError>();

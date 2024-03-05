@@ -225,7 +225,7 @@ struct EscapeUtilityTypes {
     ///   store %other to %2   // 4. ignore (followStores == false): %other doesn't impact the "escapeness" of %1
     /// \endcode
     ///
-    /// But once the the up-walk sees a load, it has to follow stores from that point on.
+    /// But once the up-walk sees a load, it has to follow stores from that point on.
     /// Example:
     /// \code
     /// bb0(%function_arg):            // 7. escaping! %1 escapes through %function_arg

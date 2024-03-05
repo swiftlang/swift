@@ -1015,7 +1015,7 @@ public struct WrapInType: PeerMacro {
     }
 
     // Build a new function with the same signature that forwards arguments
-    // to the the original function.
+    // to the original function.
     let parameterList = funcDecl.signature.parameterClause.parameters
     let callArguments: [String] = parameterList.map { param in
       let argName = param.secondName ?? param.firstName

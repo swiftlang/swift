@@ -578,7 +578,7 @@ bool AsyncConverter::walkToStmtPost(Stmt *S) {
     if (ClosedScopeWasWrappedInContinuation &&
         !Scopes.back().isWrappedInContination()) {
       // The nested scope was wrapped in a continuation but the current one
-      // isn't anymore. Add the '}' that corresponds to the the call to
+      // isn't anymore. Add the '}' that corresponds to the call to
       // withChecked(Throwing)Continuation.
       insertCustom(S->getEndLoc(), [&]() { OS << tok::r_brace << '\n'; });
     }

@@ -1770,7 +1770,7 @@ namespace {
       auto *base = expr->getChainBase();
       assert(base == TypeChecker::getUnresolvedMemberChainBase(tail));
 
-      // The result type of the chain is is represented by a new type variable.
+      // The result type of the chain is represented by a new type variable.
       auto locator = CS.getConstraintLocator(
           expr, ConstraintLocator::UnresolvedMemberChainResult);
       auto chainResultTy = CS.createTypeVariable(
