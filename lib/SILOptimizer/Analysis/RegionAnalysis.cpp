@@ -3057,6 +3057,7 @@ void RegionAnalysisFunctionInfo::runDataflow() {
 
     for (auto *block : pofi->getReversePostOrder()) {
       auto &blockState = (*blockStates)[block];
+      blockState.isLive = true;
 
       LLVM_DEBUG(llvm::dbgs() << "Block: bb" << block->getDebugID() << "\n");
       if (!blockState.needsUpdate) {
