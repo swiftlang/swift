@@ -61,4 +61,7 @@ public enum CommandLine {
     = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
 }
 
+@available(*, unavailable)
+extension CommandLine : _BitwiseCopyable {}
+
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE

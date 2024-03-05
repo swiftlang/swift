@@ -36,3 +36,5 @@ func passInternalUsableStruct(_ s: InternalUsableStruct) { take(s) } // expected
                                                                      // expected-note@-8{{where_requirement_failure_one_subst}}
 
 func passMemoryLayout<T>(_ m: MemoryLayout<T>) { take(m) } // expected-error{{conformance_availability_unavailable}}
+
+func passCommandLine(_ m: CommandLine) { take(m) } // expected-error{{conformance_availability_unavailable}}
