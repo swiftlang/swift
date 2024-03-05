@@ -38,3 +38,5 @@ func passInternalUsableStruct(_ s: InternalUsableStruct) { take(s) } // expected
 func passMemoryLayout<T>(_ m: MemoryLayout<T>) { take(m) } // expected-error{{conformance_availability_unavailable}}
 
 func passCommandLine(_ m: CommandLine) { take(m) } // expected-error{{conformance_availability_unavailable}}
+
+func passUnicode(_ m: Unicode) { take(m) } // expected-error{{conformance_availability_unavailable}}
