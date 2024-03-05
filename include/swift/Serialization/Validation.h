@@ -144,6 +144,7 @@ class ExtendedValidationInfo {
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
+    unsigned AllowNonResilientAccess: 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -207,6 +208,10 @@ public:
   bool isBuiltFromInterface() const { return Bits.IsBuiltFromInterface; }
   void setIsBuiltFromInterface(bool val) {
     Bits.IsBuiltFromInterface = val;
+  }
+  bool allowNonResilientAccess() const { return Bits.AllowNonResilientAccess; }
+  void setAllowNonResilientAccess(bool val) {
+    Bits.AllowNonResilientAccess = val;
   }
   bool isAllowModuleWithCompilerErrorsEnabled() {
     return Bits.IsAllowModuleWithCompilerErrorsEnabled;
