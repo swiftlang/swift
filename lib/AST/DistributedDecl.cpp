@@ -163,7 +163,7 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   auto &C = actor->getASTContext();
-  return C.getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
+  return getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
 }
 
 Type swift::getDistributedActorSystemActorIDType(NominalTypeDecl *system) {
@@ -247,8 +247,6 @@ AbstractFunctionDecl *
 swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
     ValueDecl *thunk) {
   assert(thunk);
-  auto &C = thunk->getASTContext();
-
   auto *actor = thunk->getDeclContext()->getSelfNominalTypeDecl();
   if (!actor)
     return nullptr;
@@ -265,12 +263,12 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
   if (!decoderTy)
     return nullptr;
 
-  return C.getDecodeNextArgumentOnDistributedInvocationDecoder(
+  return getDecodeNextArgumentOnDistributedInvocationDecoder(
       decoderTy->getAnyNominal());
 }
 
-Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
-    NominalTypeDecl *actor, Identifier member) {
+Type swift::getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
+                                                        Identifier member) {
   auto &ctx = actor->getASTContext();
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
@@ -311,19 +309,23 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
 /******** Functions on DistributedActorSystem and friends *********************/
 /******************************************************************************/
 
-FuncDecl*
-ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
+FuncDecl *
+swift::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
+  auto &ctx = actor->getASTContext();
   return evaluateOrDefault(
-      evaluator, GetDistributedActorConcreteArgumentDecodingMethodRequest{actor}, nullptr);
+      ctx.evaluator,
+      GetDistributedActorConcreteArgumentDecodingMethodRequest{actor}, nullptr);
 }
 
-NominalTypeDecl*
-ASTContext::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
+NominalTypeDecl *
+swift::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
   if (!actor->isDistributedActor())
     return nullptr;
 
-  return evaluateOrDefault(
-      evaluator, GetDistributedActorInvocationDecoderRequest{actor}, nullptr);
+  auto &ctx = actor->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           GetDistributedActorInvocationDecoderRequest{actor},
+                           nullptr);
 }
 
 bool
@@ -1288,8 +1290,9 @@ NominalTypeDecl::getDistributedRemoteCallArgumentInitFunction() const {
       nullptr);
 }
 
-AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
+AbstractFunctionDecl *
+swift::getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
+                                             bool isVoidReturn) {
   assert(actorOrSystem && "distributed actor (or system) decl must be provided");
   const NominalTypeDecl *system = actorOrSystem;
   if (actorOrSystem->isDistributedActor()) {
@@ -1299,15 +1302,17 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
     }
   }
 
+  auto &ctx = actorOrSystem->getASTContext();
+
   // If no concrete system was found, return the general protocol:
   if (!system)
-    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
+    system = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
 
   auto mutableSystem = const_cast<NominalTypeDecl *>(system);
-  return evaluateOrDefault(
-      system->getASTContext().evaluator,
-      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
-      nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           GetDistributedActorSystemRemoteCallFunctionRequest{
+                               mutableSystem, /*isVoidReturn=*/isVoidReturn},
+                           nullptr);
 }
 
 /******************************************************************************/
@@ -1357,4 +1362,126 @@ NominalTypeDecl::getDistributedActorIDProperty() const {
       getASTContext().evaluator,
       GetDistributedActorIDPropertyRequest{mutableThis},
       nullptr);
+}
+
+FuncDecl *swift::getMakeInvocationEncoderOnDistributedActorSystem(
+    AbstractFunctionDecl *thunk) {
+  auto &ctx = thunk->getASTContext();
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
+  assert(systemTy && "No specific ActorSystem type found!");
+
+  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  assert(systemNominal && "No system nominal type found!");
+
+  for (auto result :
+       systemNominal->lookupDirect(ctx.Id_makeInvocationEncoder)) {
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func && func->isDistributedActorSystemMakeInvocationEncoder()) {
+      return func;
+    }
+  }
+
+  return nullptr;
+}
+
+FuncDecl *swift::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  auto &ctx = nominal->getASTContext();
+  for (auto result : nominal->lookupDirect(ctx.Id_recordGenericSubstitution)) {
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func &&
+        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
+      return func;
+    }
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *swift::getRecordArgumentOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *swift::getRecordReturnTypeOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *swift::getRecordErrorTypeOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *
+swift::getDecodeNextArgumentOnDistributedInvocationDecoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *
+swift::getOnReturnOnDistributedTargetInvocationResultHandler(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+FuncDecl *swift::getDoneRecordingOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  auto &ctx = nominal->getASTContext();
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  nominal->lookupQualified(nominal, DeclNameRef(ctx.Id_doneRecording),
+                           SourceLoc(), NL_QualifiedDefault, results);
+  for (auto result : results) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+
+    if (fd->getParameters()->size() != 0)
+      continue;
+
+    if (fd->getResultInterfaceType()->isVoid() && fd->hasThrows() &&
+        !fd->hasAsync())
+      return fd;
+  }
+
+  return nullptr;
 }

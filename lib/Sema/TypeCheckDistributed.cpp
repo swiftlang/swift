@@ -306,7 +306,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
     // - remoteCall
     auto remoteCallDecl =
-        C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/false);
+        getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/false);
     if (!remoteCallDecl && diagnose) {
       anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_remoteCall, decl);
     }
@@ -316,7 +316,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
 
     // - remoteCallVoid
     auto remoteCallVoidDecl =
-        C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/true);
+        getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/true);
     if (!remoteCallVoidDecl && diagnose) {
       anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_remoteCallVoid, decl);
     }
@@ -331,7 +331,8 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   // Check the ad-hoc requirements of 'DistributedTargetInvocationEncoder'
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder)) {
     // - recordArgument
-    auto recordArgumentDecl = C.getRecordArgumentOnDistributedInvocationEncoder(decl);
+    auto recordArgumentDecl =
+        getRecordArgumentOnDistributedInvocationEncoder(decl);
     if (!recordArgumentDecl) {
       anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_recordArgument, decl);
     }
@@ -340,7 +341,8 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     }
 
     // - recordReturnType
-    auto recordReturnTypeDecl = C.getRecordReturnTypeOnDistributedInvocationEncoder(decl);
+    auto recordReturnTypeDecl =
+        getRecordReturnTypeOnDistributedInvocationEncoder(decl);
     if (!recordReturnTypeDecl) {
       anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_recordReturnType, decl);
     }
@@ -355,7 +357,8 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   // Check the ad-hoc requirements of 'DistributedTargetInvocationDecoder'
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)) {
     // - decodeNextArgument
-    auto decodeNextArgumentDecl = C.getDecodeNextArgumentOnDistributedInvocationDecoder(decl);
+    auto decodeNextArgumentDecl =
+        getDecodeNextArgumentOnDistributedInvocationDecoder(decl);
     if (!decodeNextArgumentDecl) {
       anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_decodeNextArgument, decl);
     }
@@ -370,7 +373,8 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   // Check the ad-hoc requirements of 'DistributedTargetInvocationResultHandler'
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
     // - onReturn
-    auto onReturnDecl = C.getOnReturnOnDistributedTargetInvocationResultHandler(decl);
+    auto onReturnDecl =
+        getOnReturnOnDistributedTargetInvocationResultHandler(decl);
     if (!onReturnDecl) {
       anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_onReturn, decl);
     }
@@ -858,8 +862,8 @@ NominalTypeDecl *
 GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
                                                       NominalTypeDecl *actor) const {
   auto &ctx = actor->getASTContext();
-  auto decoderTy =
-      ctx.getAssociatedTypeOfDistributedSystemOfActor(actor, ctx.Id_InvocationDecoder);
+  auto decoderTy = getAssociatedTypeOfDistributedSystemOfActor(
+      actor, ctx.Id_InvocationDecoder);
   return decoderTy ? decoderTy->getAnyNominal() : nullptr;
 }
 
@@ -869,7 +873,7 @@ GetDistributedActorConcreteArgumentDecodingMethodRequest::evaluate(
   auto &ctx = decl->getASTContext();
 
   if (auto actor = dyn_cast<ClassDecl>(decl)) {
-    auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);
+    auto *decoder = getDistributedActorInvocationDecoder(actor);
     // If distributed actor is generic over actor system, there is not
     // going to be a concrete decoder.
     if (!decoder)

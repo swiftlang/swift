@@ -55,8 +55,8 @@ bool DerivedConformance::canDeriveDistributedActorSystem(
   // Make sure ad-hoc requirements that we'll use in synthesis are present, before we try to use them.
   // This leads to better error reporting because we already have errors happening (missing witnesses).
   if (auto handlerType = getDistributedActorSystemResultHandlerType(nominal)) {
-    if (!C.getOnReturnOnDistributedTargetInvocationResultHandler(
-        handlerType->getAnyNominal()))
+    if (!getOnReturnOnDistributedTargetInvocationResultHandler(
+            handlerType->getAnyNominal()))
       return false;
   }
 
@@ -179,7 +179,7 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
   // call the ad-hoc `handler.onReturn`
   {
     // Find the ad-hoc requirement ensured function on the concrete handler:
-    auto onReturnFunc = C.getOnReturnOnDistributedTargetInvocationResultHandler(
+    auto onReturnFunc = getOnReturnOnDistributedTargetInvocationResultHandler(
         context->handlerParam->getInterfaceType()->getAnyNominal());
     assert(onReturnFunc && "did not find ad-hoc requirement witness!");
 

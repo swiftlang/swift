@@ -726,68 +726,6 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
-  /// Retrieve the declaration of DistributedActorSystem.remoteCall(Void)(...).
-  ///
-  /// \param actorOrSystem distributed actor or actor system to get the
-  /// remoteCall function for. Since the method we're looking for is an ad-hoc
-  /// requirement, a specific type MUST be passed here as it is not possible
-  /// to obtain the decl from just the `DistributedActorSystem` protocol type.
-  /// \param isVoidReturn true if the call will be returning `Void`.
-  AbstractFunctionDecl *getRemoteCallOnDistributedActorSystem(
-      NominalTypeDecl *actorOrSystem,
-      bool isVoidReturn) const;
-
-  /// Retrieve the declaration of DistributedActorSystem.make().
-  ///
-  /// \param thunk the function from which we'll be invoking things on the obtained
-  /// actor system; This way we'll always get the right type, taking care of any
-  /// where clauses etc.
-  FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
-      AbstractFunctionDecl *thunk) const;
-
-  // Retrieve the declaration of
-  // DistributedInvocationEncoder.recordGenericSubstitution(_:).
-  //
-  // \param nominal optionally provide a 'NominalTypeDecl' from which the
-  // function decl shall be extracted. This is useful to avoid witness calls
-  // through the protocol which is looked up when nominal is null.
-  FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordArgument(_:).
-  //
-  // \param nominal optionally provide a 'NominalTypeDecl' from which the
-  // function decl shall be extracted. This is useful to avoid witness calls
-  // through the protocol which is looked up when nominal is null.
-  AbstractFunctionDecl *getRecordArgumentOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordReturnType(_:).
-  AbstractFunctionDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordErrorType(_:).
-  AbstractFunctionDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of
-  // DistributedTargetInvocationDecoder.getDecodeNextArgumentOnDistributedInvocationDecoder(_:).
-  AbstractFunctionDecl *getDecodeNextArgumentOnDistributedInvocationDecoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of
-  // getOnReturnOnDistributedTargetInvocationResultHandler.onReturn(_:).
-  AbstractFunctionDecl *getOnReturnOnDistributedTargetInvocationResultHandler(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
-  //
-  // \param nominal optionally provide a 'NominalTypeDecl' from which the
-  // function decl shall be extracted. This is useful to avoid witness calls
-  // through the protocol which is looked up when nominal is null.
-  FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,
@@ -1526,17 +1464,6 @@ public:
   /// Retrieve the name of to be used for the entry point, either main or an
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
-
-  Type getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
-                                            Identifier member);
-
-  /// Find the concrete invocation decoder associated with the given actor.
-  NominalTypeDecl *
-  getDistributedActorInvocationDecoder(NominalTypeDecl *);
-
-  /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
-  /// invocation decoder of the given distributed actor.
-  FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
 
   /// The special Builtin.TheTupleType, which parents tuple extensions and
   /// conformances.
