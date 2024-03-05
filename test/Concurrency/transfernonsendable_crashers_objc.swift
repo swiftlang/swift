@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -disable-availability-checking %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_crashers_objc.h
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -disable-availability-checking %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_crashers_objc.h
 
 // REQUIRES: objc_interop
 // REQUIRES: asserts
