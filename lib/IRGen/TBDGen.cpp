@@ -100,24 +100,23 @@ getAllMovedPlatformVersions(Decl *D) {
   return Results;
 }
 
-static StringRef getLinkerPlatformName(uint8_t Id) {
+static StringRef getLinkerPlatformName(LinkerPlatformId Id) {
   switch (Id) {
-#define LD_PLATFORM(Name, Id) case Id: return #Name;
+#define LD_PLATFORM(Name, Id) case LinkerPlatformId::Name: return #Name;
 #include "ldPlatformKinds.def"
-  default:
-    llvm_unreachable("unrecognized platform id");
   }
+  llvm_unreachable("unrecognized platform id");
 }
 
-static std::optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
-  return llvm::StringSwitch<std::optional<uint8_t>>(Platform)
-#define LD_PLATFORM(Name, Id) .Case(#Name, Id)
+static std::optional<LinkerPlatformId> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<std::optional<LinkerPlatformId>>(Platform)
+#define LD_PLATFORM(Name, Id) .Case(#Name, LinkerPlatformId::Name)
 #include "ldPlatformKinds.def"
       .Default(std::nullopt);
 }
 
 StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
-  auto It = PlatformInstallName.find((uint8_t)Id);
+  auto It = PlatformInstallName.find(Id);
   if (It == PlatformInstallName.end())
     return InstallName;
   else
@@ -129,8 +128,9 @@ static std::string getScalaNodeText(Node *N) {
   return cast<ScalarNode>(N)->getValue(Buffer).str();
 }
 
-static std::set<int8_t> getSequenceNodePlatformList(ASTContext &Ctx, Node *N) {
-  std::set<int8_t> Results;
+static std::set<LinkerPlatformId> getSequenceNodePlatformList(ASTContext &Ctx,
+                                                              Node *N) {
+  std::set<LinkerPlatformId> Results;
   for (auto &E: *cast<SequenceNode>(N)) {
     auto Platform = getScalaNodeText(&E);
     auto Id = getLinkerPlatformId(Platform);
@@ -158,7 +158,7 @@ parseEntry(ASTContext &Ctx,
       auto *MN = cast<MappingNode>(&*It);
       std::string ModuleName;
       std::string InstallName;
-      std::optional<std::set<int8_t>> Platforms;
+      std::optional<std::set<LinkerPlatformId>> Platforms;
       for (auto &Pair: *MN) {
         auto Key = getScalaNodeText(Pair.getKey());
         auto* Value = Pair.getValue();
@@ -333,7 +333,7 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     OS << "$ld$previous$";
     OS << InstallName << "$";
     OS << ComptibleVersion << "$";
-    OS << std::to_string((uint8_t)PlatformNumber) << "$";
+    OS << std::to_string(static_cast<uint8_t>(PlatformNumber)) << "$";
     static auto getMinor = [](std::optional<unsigned> Minor) {
       return Minor.has_value() ? *Minor : 0;
     };
