@@ -2130,19 +2130,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     // Make the variable which will contain our temporary value.
     auto InterpolationVar =
-      new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
-                            /*NameLoc=*/SourceLoc(),
-                            Context.Id_dollarInterpolation, CurDeclContext);
-    InterpolationVar->setImplicit(true);
-    InterpolationVar->setUserAccessible(false);
-    
+        VarDecl::createImplicitStringInterpolationVar(CurDeclContext);
+
     Stmts.push_back(InterpolationVar);
 
     // Collect all string segments.
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
-    auto Body = BraceStmt::create(Context, Loc, Stmts, /*endLoc=*/Loc,
+    auto Body = BraceStmt::create(Context, /*LBLoc=*/SourceLoc(), Stmts,
+                                  /*RBLoc=*/SourceLoc(),
                                   /*implicit=*/true);
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }

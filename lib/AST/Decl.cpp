@@ -7903,6 +7903,17 @@ bool VarDecl::isOrdinaryStoredProperty() const {
   return hasStorage() && !hasObservers();
 }
 
+VarDecl *VarDecl::createImplicitStringInterpolationVar(DeclContext *DC) {
+  // Make the variable which will contain our temporary value.
+  ASTContext &C = DC->getASTContext();
+  auto var =
+      new (C) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
+                      /*NameLoc=*/SourceLoc(), C.Id_dollarInterpolation, DC);
+  var->setImplicit(true);
+  var->setUserAccessible(false);
+  return var;
+}
+
 void ParamDecl::setSpecifier(Specifier specifier) {
   VarDecl::Introducer introducer;
   switch (specifier) {

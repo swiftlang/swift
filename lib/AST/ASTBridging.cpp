@@ -1321,6 +1321,12 @@ BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createExpr(
   return new (context) TopLevelCodeDecl(declContext, Brace);
 }
 
+BridgedVarDecl BridgedVarDec_createImplicitStringInterpolationVar(
+    BridgedDeclContext cDeclContext) {
+  return VarDecl::createImplicitStringInterpolationVar(
+      cDeclContext.unbridged());
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: AbstractStorageDecl
 //===----------------------------------------------------------------------===//
@@ -1358,6 +1364,13 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
 //===----------------------------------------------------------------------===//
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
+
+BridgedArgumentList
+BridgedArgumentList_createImplicitUnlabeled(BridgedASTContext cContext,
+                                            BridgedArrayRef cExprs) {
+  return ArgumentList::forImplicitUnlabeled(cContext.unbridged(),
+                                            cExprs.unbridged<Expr *>());
+}
 
 BridgedArgumentList BridgedArgumentList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
@@ -1485,6 +1498,14 @@ BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
       CopyExpr(cCopyLoc.unbridged(), cSubExpr.unbridged());
 }
 
+BridgedDeclRefExpr BridgedDeclRefExpr_create(BridgedASTContext cContext,
+                                             BridgedDecl cDecl,
+                                             BridgedDeclNameLoc cLoc,
+                                             bool IsImplicit) {
+  return new (cContext.unbridged()) DeclRefExpr(
+      cast<ValueDecl>(cDecl.unbridged()), cLoc.unbridged(), IsImplicit);
+}
+
 BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLBracketLoc,
     BridgedArrayRef cElements, BridgedArrayRef cCommaLocs,
@@ -1534,6 +1555,15 @@ BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
   ASTContext &context = cContext.unbridged();
   auto str = context.AllocateCopy(cStr.unbridged());
   return new (context) IntegerLiteralExpr(str, cTokenLoc.unbridged());
+}
+
+BridgedInterpolatedStringLiteralExpr
+BridgedInterpolatedStringLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLoc, size_t literalCapacity,
+    size_t interpolationCount, BridgedTapExpr cAppendingExpr) {
+  return new (cContext.unbridged()) InterpolatedStringLiteralExpr(
+      cLoc.unbridged(), literalCapacity, interpolationCount,
+      cAppendingExpr.unbridged());
 }
 
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
@@ -1608,6 +1638,11 @@ BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
   ASTContext &context = cContext.unbridged();
   auto str = context.AllocateCopy(cStr.unbridged());
   return new (context) StringLiteralExpr(str, cTokenLoc.unbridged());
+}
+
+BridgedTapExpr BridgedTapExpr_create(BridgedASTContext cContext,
+                                     BridgedBraceStmt cBody) {
+  return new (cContext.unbridged()) TapExpr(nullptr, cBody.unbridged());
 }
 
 BridgedTernaryExpr BridgedTernaryExpr_createParsed(

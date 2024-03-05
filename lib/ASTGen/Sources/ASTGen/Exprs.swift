@@ -48,15 +48,6 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
       .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr,
       .unresolvedIsExpr, .unresolvedTernaryExpr:
-
-      // `generate(stringLiteralExpr:)` doesn't support interpolations.
-      if let str = current.as(StringLiteralExprSyntax.self) {
-        if str.segments.count != 1 {
-          return false
-        }
-        assert(str.segments.first!.is(StringSegmentSyntax.self))
-      }
-
       break
 
     // Known unimplemented kinds.
@@ -176,7 +167,7 @@ extension ASTGenVisitor {
     case .simpleStringLiteralExpr:
       break
     case .stringLiteralExpr(let node):
-      return self.generate(stringLiteralExpr: node).asExpr
+      return self.generate(stringLiteralExpr: node)
     case .subscriptCallExpr:
       break
     case .superExpr:
