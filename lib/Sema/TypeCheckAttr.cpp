@@ -6970,6 +6970,15 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
           return;
         }
       }
+
+      // 'nonisolated(unsafe)' is redundant for 'Sendable' immutables.
+      if (attr->isUnsafe() &&
+          type->isSendableType() &&
+          var->isLet()) {
+        diagnose(attr->getLocation(),
+                 diag::nonisolated_unsafe_sendable_constant, type)
+            .fixItRemove(attr->getRange());
+      }
     }
 
     // Using 'nonisolated' with wrapped properties is unsupported, because
