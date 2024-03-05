@@ -3055,7 +3055,7 @@ namespace {
       ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value)
           .limitBehaviorUntilSwiftVersion(limit, 6)
           // Preconcurrency global variables are warnings even in Swift 6
-          .limitBehaviorIf(isPreconcurrencyImport, DiagnosticBehavior::Warning);
+          .limitBehaviorIf(isPreconcurrencyImport, limit);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       if (const auto sourceFile = getDeclContext()->getParentSourceFile();
           sourceFile && isPreconcurrencyImport) {
