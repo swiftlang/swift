@@ -2420,7 +2420,7 @@ static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
     return;
 
   if ((!baseName.getIdentifier().str().startswith("$") &&
-       !baseName.getIdentifier().str().startswith("_")) ||
+       !baseName.getIdentifier().hasUnderscoredNaming()) ||
       baseName.getIdentifier().str().size() <= 1) {
     return;
   }
