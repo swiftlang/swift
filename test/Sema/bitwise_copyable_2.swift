@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift                       \
-// RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-experimental-feature BitwiseCopyable     \
 // RUN:     -enable-builtin-module                           \
@@ -35,3 +34,5 @@ func take<T : _BitwiseCopyable>(_ t: T) {}
 
 func passInternalUsableStruct(_ s: InternalUsableStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
                                                                      // expected-note@-8{{where_requirement_failure_one_subst}}
+
+func passMemoryLayout<T>(_ m: MemoryLayout<T>) { take(m) } // expected-error{{conformance_availability_unavailable}}

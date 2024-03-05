@@ -76,6 +76,9 @@ public enum MemoryLayout<T> {
   }
 }
 
+@available(*, unavailable)
+extension MemoryLayout : _BitwiseCopyable {}
+
 extension MemoryLayout {
   /// Returns the contiguous memory footprint of the given instance.
   ///
