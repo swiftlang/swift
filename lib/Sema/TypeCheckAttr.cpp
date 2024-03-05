@@ -6975,9 +6975,28 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       if (attr->isUnsafe() &&
           type->isSendableType() &&
           var->isLet()) {
-        diagnose(attr->getLocation(),
-                 diag::nonisolated_unsafe_sendable_constant, type)
-            .fixItRemove(attr->getRange());
+
+        // '(unsafe)' is redundant for a public actor-isolated 'Sendable'
+        // immutable.
+        auto nominal = dyn_cast<NominalTypeDecl>(dc);
+        if (nominal && nominal->isActor()) {
+          auto access = nominal->getFormalAccessScope(
+              /*useDC=*/nullptr,
+              /*treatUsableFromInlineAsPublic=*/true);
+          if (access.isPublic()) {
+            // Get the location where '(unsafe)' starts.
+            SourceLoc unsafeStart = Lexer::getLocForEndOfToken(
+                Ctx.SourceMgr, attr->getRange().Start);
+            diagnose(unsafeStart, diag::unsafe_sendable_actor_constant, type)
+                .fixItRemoveChars(unsafeStart,
+                                  attr->getRange().End.getAdvancedLoc(1));
+          }
+
+        } else {
+          diagnose(attr->getLocation(),
+                   diag::nonisolated_unsafe_sendable_constant, type)
+              .fixItRemove(attr->getRange());
+        }
       }
     }
 

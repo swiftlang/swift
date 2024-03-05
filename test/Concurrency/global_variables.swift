@@ -56,6 +56,11 @@ struct TestStatics {
   // expected-note@-1{{isolate 'wrapped' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 }
 
+public actor TestPublicActor {
+  nonisolated(unsafe) let immutableNonisolatedUnsafeSendable = TestSendable()
+  // expected-warning@-1 {{'(unsafe)' is unnecessary for a constant public actor property with 'Sendable' type 'TestSendable', consider removing it}} {{14-22=}}
+}
+
 @TestGlobalActor
 func f() {
   print(TestStatics.immutableExplicitSendable)
