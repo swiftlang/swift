@@ -203,6 +203,9 @@ private:
     if (!AFD->isDistributed())
       return;
 
+    if (isa<ProtocolDecl>(AFD->getDeclContext()))
+      return;
+
     // Add another which will be witnessed by the 'distributed thunk'
     SILDeclRef declRef(AFD, kind);
     asDerived().addMethod(declRef.asDistributed());

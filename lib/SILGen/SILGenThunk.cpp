@@ -120,7 +120,7 @@ void SILGenModule::emitDistributedThunkForDecl(
   if (!thunkDecl)
     return;
 
-  if (thunkDecl->isBodySkipped())
+  if (!thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;
 
   auto thunk = SILDeclRef(thunkDecl).asDistributed();

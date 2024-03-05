@@ -521,6 +521,11 @@ bool CheckDistributedFunctionRequest::evaluate(
   if (!C.getLoadedModule(C.Id_Distributed))
     return true;
 
+  // No checking for protocol requirements because they are not required
+  // to have `SerializationRequirement`.
+  if (isa<ProtocolDecl>(func->getDeclContext()))
+    return false;
+
   Type serializationReqType =
       getDistributedActorSerializationType(func->getDeclContext());
 
