@@ -17,6 +17,7 @@ sil_stage raw
 
 import Swift
 import Builtin
+import _Concurrency
 
 class NonSendableKlass {}
 
@@ -1541,6 +1542,22 @@ bb0(%index : $Builtin.Word):
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") U_1>(%elt2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
   dealloc_stack %tuple : $*(NonSendableKlass, T, T, Int)
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil @function_extract_isolation_test_closure : $@convention(thin) (@guaranteed Optional<any Actor>, Int) -> ()
+
+// This used to crash when function_extract_isolation was AssertingIfNonSendable.
+sil [ossa] @function_extract_isolation_test : $@async @convention(thin) (@owned Optional<any Actor>, Int) -> () {
+bb0(%actor : @owned $Optional<any Actor>, %int : $Int):
+  %f = function_ref @function_extract_isolation_test_closure : $@convention(thin) (@guaranteed Optional<any Actor>, Int) -> ()
+  %closure = partial_apply [isolated_any] [callee_guaranteed] %f(%actor, %int) : $@convention(thin) (@guaranteed Optional<any Actor>, Int) -> ()
+  %closure_b = begin_borrow %closure : $@callee_guaranteed @isolated(any) () -> ()
+  %outputActor = function_extract_isolation %closure_b : $@callee_guaranteed @isolated(any) () -> ()
+  end_borrow %closure_b : $@callee_guaranteed @isolated(any) () -> ()
+  destroy_value %closure : $@callee_guaranteed @isolated(any) () -> ()
+
   %9999 = tuple ()
   return %9999 : $()
 }
