@@ -379,7 +379,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     // TODO: rdar://123555720: Remove this check after another round of
     // surveying builtins
     if (auto *fd = dyn_cast<FuncDecl>(afd)) {
-      if (fd->isImplicit()) {
+      if (fd->isImplicit() && fd->getModuleContext()->isBuiltinModule()) {
         return std::nullopt;
       }
     }
