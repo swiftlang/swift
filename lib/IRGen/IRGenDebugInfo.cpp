@@ -758,7 +758,7 @@ private:
     // The function return type is the first element in the list.
     createParameterType(Parameters, getResultTypeForDebugInfo(IGM, FnTy));
 
-    for (auto Param : FnTy->getParameters())
+    for (auto &Param : FnTy->getParameters())
       createParameterType(
           Parameters, IGM.silConv.getSILType(
                           Param, FnTy, IGM.getMaximalTypeExpansionContext()));
