@@ -166,65 +166,46 @@ Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   return getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
 }
 
+static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
+                                 Identifier member) {
+  if (!protocol)
+    return ErrorType::get(type->getASTContext());
+
+  auto module = type->getParentModule();
+  Type selfType = type->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, protocol);
+  if (!conformance || conformance.isInvalid())
+    return Type();
+  return conformance.getTypeWitnessByName(selfType, member);
+}
+
 Type swift::getDistributedActorSystemActorIDType(NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorID);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_ActorID);
 }
 
 Type swift::getDistributedActorSystemResultHandlerType(
     NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_ResultHandler);
 }
 
 Type swift::getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_InvocationEncoder);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_InvocationEncoder);
 }
 
 Type swift::getDistributedActorSystemInvocationDecoderType(NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_InvocationDecoder);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_InvocationDecoder);
 }
 
 Type swift::getDistributedSerializationRequirementType(
