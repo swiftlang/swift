@@ -64,6 +64,16 @@ public func unprotectedUnsafeBytes() {
   }
 }
 
+// CHECK-LABEL: sil @$s4test29unprotectedUnsafeMutableBytesyyF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test29unprotectedUnsafeMutableBytesyyF'
+public func unprotectedUnsafeMutableBytes() {
+  var x = 0
+  _withUnprotectedUnsafeMutableBytes(of: &x) {
+    potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
+  }
+}
+
 // CHECK-LABEL: sil [stack_protection] @$s4test20overflowInCFunction2yyF
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function '$s4test20overflowInCFunction2yyF'

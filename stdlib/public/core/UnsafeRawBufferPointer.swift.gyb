@@ -1233,6 +1233,24 @@ func __abi_se0413_withUnsafeMutableBytes<T, Result>(
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
 /// the given argument.
 ///
+/// This function is similar to `withUnsafeMutableBytes`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeMutableBytes<T, E: Error, Result>(
+  of value: inout T,
+  _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+#if $BuiltinUnprotectedAddressOf
+  let pointer = UnsafeMutableRawPointer(Builtin.unprotectedAddressOf(&value))
+#else
+  let pointer = UnsafeMutableRawPointer(Builtin.addressof(&value))
+#endif
+  return try body(.init(start: pointer, count: MemoryLayout<T>.size))
+}
+
+/// Invokes the given closure with a buffer pointer covering the raw bytes of
+/// the given argument.
+///
 /// The buffer pointer argument to the `body` closure provides a collection
 /// interface to the raw bytes of `value`. The buffer is the size of the
 /// instance passed as `value` and does not include any remote storage.
