@@ -120,9 +120,6 @@ func test3(_ a: Array<Int>) {
   }
 }
 
-/*
-// Currently fails because the lifetime dependence util isn't analyzing a
-// def-use chain involving a stack temporary
 func test4(_ a: Array<Int>) {
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
@@ -132,7 +129,6 @@ func test4(_ a: Array<Int>) {
     consume(view)
   }
 }
-*/
 
 func test5(_ a: Array<Int>) {
   a.withUnsafeBytes {
@@ -175,7 +171,6 @@ func test7(_ a: UnsafeRawBufferPointer) {
   mutate(&x)
 }
 
-/*
 // Currently fails because the lifetime dependence util isn't analyzing a
 // def-use chain involving a stack temporary
 func test8(_ a: Array<Int>) {
@@ -187,7 +182,6 @@ func test8(_ a: Array<Int>) {
     consume(view)
   }
 }
-*/
 
 struct Wrapper : ~Escapable {
   var _view: View

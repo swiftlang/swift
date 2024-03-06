@@ -151,10 +151,12 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   
   %inout_arg_mark = mark_dependence [nonescaping] %inguaranteed_arg_mark : $C on %4 : $*D
   specify_test "lifetime_dependence_scope %inout_arg_mark"
+// @inout arguments are expected to have an access scope.
+// A direct dependence on an @inout argument is considered "Unknown".
+//
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
-// CHECK-NEXT: Caller:     %4 = argument of bb0 : $*D
+// CHECK-NEXT: Unknown:     %4 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:  %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %4 : $*D
-// CHECK-NEXT: Caller range
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
 
   destroy_value %inout_arg_mark : $C

@@ -287,8 +287,6 @@ final public class StoreInst : Instruction, StoringInstruction {
 final public class StoreWeakInst : Instruction, StoringInstruction { }
 final public class StoreUnownedInst : Instruction, StoringInstruction { }
 
-final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction { }
-
 final public class AssignInst : Instruction, StoringInstruction {
   // must match with enum class swift::AssignOwnershipQualifier
   public enum AssignOwnership: Int {
@@ -340,17 +338,6 @@ final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction
     bridged.ExplicitCopyAddrInst_isInitializationOfDest()
   }
 }
-
-final public class EndAccessInst : Instruction, UnaryInstruction {
-  public var beginAccess: BeginAccessInst {
-    return operand.value as! BeginAccessInst
-  }
-}
-
-final public class BeginUnpairedAccessInst : Instruction {}
-final public class EndUnpairedAccessInst : Instruction {}
-
-final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
 
@@ -448,9 +435,6 @@ final public class SpecifyTestInst : Instruction {}
 final public class UnconditionalCheckedCastAddrInst : Instruction {
   public override var mayTrap: Bool { true }
 }
-
-final public class EndApplyInst : Instruction, UnaryInstruction {}
-final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
 final public class BeginDeallocRefInst : SingleValueInstruction, UnaryInstruction {
   public var reference: Value { operands[0].value }
@@ -568,9 +552,6 @@ extension LoadInstruction {
   public var address: Value { operand.value }
 }
 
-/// Instructions, beginning a borrow-scope which must be ended by `end_borrow`.
-public protocol BorrowIntroducingInstruction : SingleValueInstruction {}
-
 final public class LoadInst : SingleValueInstruction, LoadInstruction {
   // must match with enum class LoadOwnershipQualifier
   public enum LoadOwnership: Int {
@@ -583,7 +564,6 @@ final public class LoadInst : SingleValueInstruction, LoadInstruction {
 
 final public class LoadWeakInst : SingleValueInstruction, LoadInstruction {}
 final public class LoadUnownedInst : SingleValueInstruction, LoadInstruction {}
-final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
   public typealias ID = BridgedInstruction.BuiltinValueKind
@@ -983,57 +963,6 @@ final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruct
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
 
-// TODO: add support for begin_unpaired_access
-final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  // The raw values must match SILAccessKind.
-  public enum AccessKind: Int {
-    case `init` = 0
-    case read = 1
-    case modify = 2
-    case `deinit` = 3
-  }
-  public var accessKind: AccessKind {
-    AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
-  }
-
-  public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
-
-  public var address: Value { operand.value }
-}
-
-// An instruction that is always paired with a scope ending instruction
-// such as `begin_access` (ending with `end_access`) and `alloc_stack`
-// (ending with `dealloc_stack`).
-public protocol ScopedInstruction {
-  // The type of the ending instructions (while `IteratorProtocol` would be
-  // ideal, for performance reasons we allow the user to specify any type as return)
-  associatedtype EndInstructions
-
-  // The instructions that end the scope of the instruction denoted
-  // by `self`.
-  var endInstructions: EndInstructions { get }
-}
-
-extension BeginAccessInst : ScopedInstruction {
-  public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<UseList>, EndAccessInst>
-
-  public var endInstructions: EndInstructions {
-    endOperands.map { $0.instruction as! EndAccessInst }
-  }
-
-  public var endOperands: LazyFilterSequence<UseList> {
-    return uses.lazy.filter { $0.instruction is EndAccessInst }
-  }
-}
-
-final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
-  public var borrowedValue: Value { operand.value }
-
-  public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
-
-  public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
-}
-
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
   public var box: Value { operand.value }
   public var fieldIndex: Int { bridged.ProjectBoxInst_fieldIndex() }
@@ -1242,6 +1171,157 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 }
 
 //===----------------------------------------------------------------------===//
+//                           scoped instructions
+//===----------------------------------------------------------------------===//
+
+/// An instruction whose side effects extend across a scope including other instructions. These are always paired with a
+/// scope ending instruction such as `begin_access` (ending with `end_access`) and `begin_borrow` (ending with
+/// `end_borrow`).
+public protocol ScopedInstruction {
+  var endOperands: LazyFilterSequence<UseList> { get }
+}
+
+extension Instruction {
+  /// Return the sequence of use points of any instruction.
+  public var endInstructions: EndInstructions {
+    if let scopedInst = self as? ScopedInstruction {
+      return .scoped(scopedInst.endOperands.map({ $0.instruction }))
+    }
+    return .single(self)
+  }
+}
+
+/// Instructions beginning a borrow-scope which must be ended by `end_borrow`.
+public protocol BorrowIntroducingInstruction : SingleValueInstruction, ScopedInstruction {}
+
+final public class EndBorrowInst : Instruction, UnaryInstruction {}
+
+extension BorrowIntroducingInstruction {
+  public var endOperands: LazyFilterSequence<UseList> {
+    return uses.lazy.filter { $0.instruction is EndBorrowInst }
+  }
+}
+
+final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
+  public var borrowedValue: Value { operand.value }
+
+  public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
+
+  public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
+
+  public var endOperands: LazyFilterSequence<UseList> {
+    return uses.endingLifetime
+  }
+}
+
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
+
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction { }
+
+final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
+  // The raw values must match SILAccessKind.
+  public enum AccessKind: Int {
+    case `init` = 0
+    case read = 1
+    case modify = 2
+    case `deinit` = 3
+  }
+  public var accessKind: AccessKind {
+    AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
+  }
+
+  public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
+
+  public var address: Value { operand.value }
+
+  public typealias EndAccessInstructions = LazyMapSequence<LazyFilterSequence<UseList>, EndAccessInst>
+
+  public var endAccessInstructions: EndAccessInstructions {
+    endOperands.map { $0.instruction as! EndAccessInst }
+  }
+}
+
+final public class EndAccessInst : Instruction, UnaryInstruction {
+  public var beginAccess: BeginAccessInst {
+    return operand.value as! BeginAccessInst
+  }
+}
+
+extension BeginAccessInst : ScopedInstruction {
+  public var endOperands: LazyFilterSequence<UseList> {
+    return uses.lazy.filter { $0.instruction is EndAccessInst }
+  }
+}
+
+// Unpaired accesses do not have a static scope, are generally unsupported by the optimizer, and should be avoided.
+final public class BeginUnpairedAccessInst : Instruction {}
+
+final public class EndUnpairedAccessInst : Instruction {}
+
+
+final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
+  public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
+
+  public var singleDirectResult: Value? { nil }
+
+  public var token: Value { getResult(index: resultCount - 1) }
+
+  public var yieldedValues: Results {
+    Results(inst: self, numResults: resultCount - 1)
+  }
+}
+
+final public class EndApplyInst : Instruction, UnaryInstruction {}
+final public class AbortApplyInst : Instruction, UnaryInstruction {}
+
+extension BeginApplyInst : ScopedInstruction {
+  public var endOperands: LazyFilterSequence<UseList> {
+    return token.uses.lazy.filter { _ in true }
+  }
+}
+
+/// A sequence representing the use points of an instruction for the purpose of liveness and the general
+/// nesting of scopes.
+///
+/// Abstracts over simple single-use instructions vs. an instruction that is always paired with scope ending
+/// instructions that denote the end of the scoped operation.
+public enum EndInstructions: CollectionLikeSequence {
+  public typealias EndScopedInstructions = LazyMapSequence<LazyFilterSequence<UseList>, Instruction>
+
+  case single(Instruction)
+  case scoped(EndScopedInstructions)
+
+  public enum Iterator : IteratorProtocol {
+    case single(Instruction?)
+    case scoped(EndScopedInstructions.Iterator)
+
+    public mutating func next() -> Instruction? {
+      switch self {
+      case let .single(inst):
+        if let result = inst {
+          self = .single(nil)
+          return result
+        }
+        return nil
+      case var .scoped(iter):
+        let result = iter.next()
+        self = .scoped(iter)
+        return result
+      }
+    }
+  }
+
+  public func makeIterator() -> Iterator {
+    switch self {
+    case let .single(inst):
+      return .single(inst)
+    case let .scoped(endScoped):
+      return .scoped(endScoped.makeIterator())
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                            multi-value instructions
 //===----------------------------------------------------------------------===//
 
@@ -1257,18 +1337,6 @@ final public class DestructureStructInst : MultipleValueInstruction, UnaryInstru
 
 final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruction {
   public var `tuple`: Value { operand.value }
-}
-
-final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
-  public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
-
-  public var singleDirectResult: Value? { nil }
-
-  public var token: Value { getResult(index: resultCount - 1) }
-
-  public var yieldedValues: Results {
-    Results(inst: self, numResults: resultCount - 1)
-  }
 }
 
 //===----------------------------------------------------------------------===//

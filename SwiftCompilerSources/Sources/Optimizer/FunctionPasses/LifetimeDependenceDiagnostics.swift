@@ -32,7 +32,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   if !context.options.hasFeature(.NonescapableTypes) {
     return
   }
-  log("Diagnosing lifetime dependence in \(function.name)")
+  log(" --- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
 
   for argument in function.arguments where !argument.type.isEscapable {
@@ -236,7 +236,7 @@ private struct LifetimeVariable {
       self = Self(accessBase: value.accessBase, context)
       return
     }
-    if let firstIntroducer = getFirstBorrowIntroducer(of: value, context) {
+    if let firstIntroducer = getFirstVariableIntroducer(of: value, context) {
       self = Self(introducer: firstIntroducer)
       return
     }
@@ -244,24 +244,14 @@ private struct LifetimeVariable {
     self.sourceLoc = nil
   }
 
-  // FUTURE: consider diagnosing multiple variable introducers. It's
-  // unclear how more than one can happen.
-  private func getFirstBorrowIntroducer(of value: Value,
-                                        _ context: some Context)
-    -> Value? {
-    var introducers = Stack<Value>(context)
-    gatherBorrowIntroducers(for: value, in: &introducers, context)
-    return introducers.pop()
-  }
-
-  private func getFirstLifetimeIntroducer(of value: Value,
-                                          _ context: some Context)
-    -> Value? {
+  private func getFirstVariableIntroducer(of value: Value, _ context: some Context) -> Value? {
     var introducer: Value?
-    _ = visitLifetimeIntroducers(for: value, context) {
+    var useDefVisitor = VariableIntroducerUseDefWalker(context) {
       introducer = $0
       return .abortWalk
     }
+    defer { useDefVisitor.deinitialize() }
+    _ = useDefVisitor.walkUp(valueOrAddress: value)
     return introducer
   }
 
@@ -283,12 +273,11 @@ private struct LifetimeVariable {
   private init(accessBase: AccessBase, _ context: some Context) {
     switch accessBase {
     case .box(let projectBox):
-      if let box = getFirstLifetimeIntroducer(of: projectBox.box, context) {
-        self = Self(introducer: box)
-      }
-      // We should always find an introducer since boxes are nontrivial.
-      self.varDecl = nil
-      self.sourceLoc = nil
+      // Note: referenceRoot looks through `begin_borrow [var_decl]` and `move_value [var_decl]`. But the box should
+      // never be produced by one of these, except when it is redundant with the `alloc_box` VarDecl. It does not seem
+      // possible for a box to be moved/borrowed directly into another variable's box. Reassignment always loads/stores
+      // the value.
+      self = Self(introducer: projectBox.box.referenceRoot)
     case .stack(let allocStack):
       self = Self(introducer: allocStack)
     case .global(let globalVar):
@@ -328,13 +317,14 @@ private struct LifetimeVariable {
 private struct DiagnoseDependenceWalker {
   let context: Context
   var diagnostics: DiagnoseDependence
+  let localReachabilityCache = LocalVariableReachabilityCache()
   var visitedValues: ValueSet
 
   var function: Function { diagnostics.function }
   
   init(_ diagnostics: DiagnoseDependence, _ context: Context) {
-    self.diagnostics = diagnostics
     self.context = context
+    self.diagnostics = diagnostics
     self.visitedValues = ValueSet(context)
   }
   

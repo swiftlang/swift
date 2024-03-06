@@ -357,6 +357,10 @@ extension OwnershipUseVisitor {
       return .continueWalk
 
     case .pointerEscape:
+      // TODO: Change ProjectBox ownership to InteriorPointer and allow them to take owned values.
+      if operand.instruction is ProjectBoxInst {
+        return visitInteriorPointerUse(of: operand)
+      }
       return pointerEscapingUse(of: operand)
 
     case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse,
@@ -395,8 +399,6 @@ extension OwnershipUseVisitor {
     }
   }
 
-  // TODO: Change ProjectBox ownership to InteriorPointer and allow
-  // owned interior pointers.
   private mutating func visitInteriorPointerUse(of operand: Operand)
     -> WalkResult {
     switch operand.instruction {

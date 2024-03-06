@@ -393,8 +393,9 @@ enum BeginBorrowValue {
 ///     %field = ref_element_addr %first           // (none)
 ///     %load = load_borrow %field : $*C           // %load
 func gatherBorrowIntroducers(for value: Value,
-                             in borrowIntroducers: inout Stack<Value>,
+                             in borrowIntroducers: inout Stack<BeginBorrowValue>,
                              _ context: Context) {
+  assert(value.ownership == .guaranteed)
 
   // Cache introducers across multiple instances of BorrowIntroducers.
   var cache = BorrowIntroducers.Cache(context)
@@ -403,8 +404,30 @@ func gatherBorrowIntroducers(for value: Value,
                            &cache, context)
 }
 
+/// Compute the live range for the borrow scopes of a guaranteed value. This returns a separate instruction range for
+/// each of the value's borrow introducers. Unioning those ranges would be incorrect. We typically want their
+/// intersection.
+func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
+  -> SingleInlineArray<(BeginBorrowValue, InstructionRange)> {
+  assert(value.ownership == .guaranteed)
+
+  var ranges = SingleInlineArray<(BeginBorrowValue, InstructionRange)>()
+  var introducers = Stack<BeginBorrowValue>(context)
+  defer { introducers.deinitialize() }
+  gatherBorrowIntroducers(for: value, in: &introducers, context)
+  // If introducers is empty, then the dependence is on a trivial value, so
+  // there is no ownership range.
+  while let beginBorrow = introducers.pop() {
+    /// FIXME: Remove calls to computeInteriorLiveness as soon as lifetime completion runs immediately after
+    /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
+    /// like LifetimeDependenc.Scope.computeRange().
+    ranges.push((beginBorrow, computeInteriorLiveness(for: beginBorrow.value, context)))
+  }
+  return ranges
+}
+
 private struct BorrowIntroducers {
-  typealias CachedIntroducers = SingleInlineArray<Value>
+  typealias CachedIntroducers = SingleInlineArray<BeginBorrowValue>
   struct Cache {
     // Cache the introducers already found for each SILValue.
     var valueIntroducers: Dictionary<HashableValue, CachedIntroducers>
@@ -430,21 +453,21 @@ private struct BorrowIntroducers {
   // introducer set to avoid adding duplicates.
   var visitedIntroducers: Set<HashableValue> = Set()
 
-  static func gather(for value: Value, in introducers: inout Stack<Value>,
+  static func gather(for value: Value, in introducers: inout Stack<BeginBorrowValue>,
                      _ cache: inout Cache, _ context: Context) {
     var borrowIntroducers = BorrowIntroducers(context: context)
     borrowIntroducers.gather(for: value, in: &introducers, &cache)
   }
 
-  private mutating func push(_ introducer: Value,
-    in introducers: inout Stack<Value>) {
-    if visitedIntroducers.insert(introducer.hashable).inserted {
-      introducers.push(introducer)
+  private mutating func push(_ beginBorrow: BeginBorrowValue,
+    in introducers: inout Stack<BeginBorrowValue>) {
+    if visitedIntroducers.insert(beginBorrow.value.hashable).inserted {
+      introducers.push(beginBorrow)
     }
   }
 
   private mutating func push<S: Sequence>(contentsOf other: S,
-    in introducers: inout Stack<Value>) where S.Element == Value {
+    in introducers: inout Stack<BeginBorrowValue>) where S.Element == BeginBorrowValue {
     for elem in other {
       push(elem, in: &introducers)
     }
@@ -457,8 +480,9 @@ private struct BorrowIntroducers {
   //
   // Otherwise recurse up the use-def chain to find all introducers.
   private mutating func gather(for value: Value,
-                               in introducers: inout Stack<Value>,
+                               in introducers: inout Stack<BeginBorrowValue>,
                                _ cache: inout Cache) {
+    assert(value.ownership == .guaranteed)
     // Check if this value's introducers have already been added to
     // 'introducers' to avoid duplicates and avoid exponential
     // recursion on aggregates.
@@ -478,23 +502,12 @@ private struct BorrowIntroducers {
   }
 
   private mutating func gatherUncached(for value: Value,
-                                       in introducers: inout Stack<Value>,
+                                       in introducers: inout Stack<BeginBorrowValue>,
                                        _ cache: inout Cache) {
-    switch value.ownership {
-    case .none, .unowned:
-      return
-
-    case .owned:
-      push(value, in: &introducers);
-      return
-
-    case .guaranteed:
-      break
-    }
     // BeginBorrowedValue handles the initial scope introducers: begin_borrow,
     // load_borrow, & reborrow.
-    if BeginBorrowValue(value) != nil {
-      push(value, in: &introducers)
+    if let beginBorrow = BeginBorrowValue(value) {
+      push(beginBorrow, in: &introducers)
       return
     }
     // Handle guaranteed forwarding phis
@@ -543,27 +556,35 @@ private struct BorrowIntroducers {
   //    %reborrow_2 is returned.
   //
   private mutating func gather(forPhi phi: Phi,
-                               in introducers: inout Stack<Value>,
+                               in introducers: inout Stack<BeginBorrowValue>,
                                _ cache: inout Cache) {
     // Phi cycles are skipped. They cannot contribute any new introducer.
     if !cache.pendingPhis.insert(phi.value) {
       return
     }
     for (pred, value) in zip(phi.predecessors, phi.incomingValues) {
+      switch value.ownership {
+      case .none:
+        continue
+      case .owned, .unowned:
+        fatalError("unexpected ownership for a guaranteed phi operand")
+      case .guaranteed:
+        break
+      }
       // Each phi operand requires a new introducer list and visited
       // values set. These values will be remapped to successor phis
       // before adding them to the caller's introducer list. It may be
       // necessary to revisit a value that was already visited by the
       // caller before remapping to phis.
-      var incomingIntroducers = Stack<Value>(context)
+      var incomingIntroducers = Stack<BeginBorrowValue>(context)
       defer {
         incomingIntroducers.deinitialize()
       }
       BorrowIntroducers.gather(for: value, in: &incomingIntroducers,
                                &cache, context)
       // Map the incoming introducers to an outer-adjacent phi if one exists.
-      push(contentsOf: mapToPhi(predecessor: pred,
-                                incomingValues: incomingIntroducers),
+      push(contentsOf: mapToGuaranteedPhi(predecessor: pred,
+                                          incomingBorrows: incomingIntroducers),
            in: &introducers)
     }
     // Remove this phi from the pending set. This phi may be visited
@@ -574,13 +595,35 @@ private struct BorrowIntroducers {
   }
 }
 
-// Given incoming values on a predecessor path, return the
-// corresponding values on the successor block. Each incoming value is
+// Given incoming borrows on a predecessor path, return the
+// corresponding borrows on the successor block. Each incoming borrow is
 // either used by a phi in the successor block, or it must dominate
 // the successor block.
+private func mapToGuaranteedPhi<PredecessorSequence: Sequence<BeginBorrowValue>> (
+  predecessor: BasicBlock, incomingBorrows: PredecessorSequence)
+-> LazyMapSequence<PredecessorSequence, BeginBorrowValue> {
+
+  let branch = predecessor.terminator as! BranchInst
+  // Gather the new introducers for the successor block.
+  return incomingBorrows.lazy.map { incomingBorrow in
+    // Find an outer adjacent phi in the successor block.
+    let incomingValue = incomingBorrow.value
+    if let incomingOp = branch.operands.first(where: { $0.value == incomingValue }) {
+      return BeginBorrowValue(branch.getArgument(for: incomingOp))!
+    }
+    // No candidates phi are outer-adjacent phis. The incoming
+    // `predDef` must dominate the current guaranteed phi.
+    return incomingBorrow
+  }
+}
+
+// Given incoming values on a predecessor path, return the corresponding values on the successor block. Each incoming
+// value is either used by a phi in the successor block, or it must dominate the successor block.
+//
+// This is Logically the same as mapToGuaranteedPhi but more efficient to simply duplicate the code.
 private func mapToPhi<PredecessorSequence: Sequence<Value>> (
   predecessor: BasicBlock, incomingValues: PredecessorSequence)
--> LazyMapSequence<PredecessorSequence, Value> {
+  -> LazyMapSequence<PredecessorSequence, Value> {
 
   let branch = predecessor.terminator as! BranchInst
   // Gather the new introducers for the successor block.
@@ -612,7 +655,7 @@ private func mapToPhi<PredecessorSequence: Sequence<Value>> (
 /// introducers of the outer enclosing borrow scope that contains this
 /// inner scope.
 ///
-/// If `value` is a `begin_borrow`, then this returns its operand.
+/// If `value` is a `begin_borrow`, then this returns its owned operand, or the introducers of its guaranteed operand.
 ///
 /// If `value` is an owned value, a function argument, or a
 /// load_borrow, then this is an empty set.
@@ -725,9 +768,18 @@ private struct EnclosingValues {
     if let beginBorrow = BeginBorrowValue(value) {
       switch beginBorrow {
       case let .beginBorrow(bbi):
+        let outerValue = bbi.operand.value
+        switch outerValue.ownership {
+        case .none, .unowned:
+          return
+        case .owned:
+          push(outerValue, in: &enclosingValues);
+          return
+        case .guaranteed:
+          break
+        }
         // Gather the outer enclosing borrow scope.
-        BorrowIntroducers.gather(for: bbi.operand.value, in: &enclosingValues,
-                                 &cache.borrowIntroducerCache, context)
+        gatherBorrows(for: outerValue, in: &enclosingValues, &cache)
       case .loadBorrow, .beginApply, .functionArgument:
         // There is no enclosing value on this path.
         break
@@ -736,11 +788,19 @@ private struct EnclosingValues {
       }
     } else {
       // Handle forwarded guaranteed values.
-      BorrowIntroducers.gather(for: value, in: &enclosingValues,
-                               &cache.borrowIntroducerCache, context)
+      gatherBorrows(for: value, in: &enclosingValues, &cache)
     }
   }
-  
+
+  mutating func gatherBorrows(for value: Value, in enclosingValues: inout Stack<Value>, _ cache: inout Cache) {
+    var introducers = Stack<BeginBorrowValue>(context)
+    defer { introducers.deinitialize() }
+    BorrowIntroducers.gather(for: value, in: &introducers, &cache.borrowIntroducerCache, context)
+    for beginBorrow in introducers {
+      enclosingValues.push(beginBorrow.value)
+    }
+  }
+
   // Given a reborrow, find the enclosing values. Each enclosing value
   // is represented by one of the following cases, which refer to the
   // example below:
@@ -841,12 +901,12 @@ let borrowIntroducersTest = FunctionTest("borrow_introducers") {
   let value = arguments.takeValue()
   print(function)
   print("Borrow introducers for: \(value)")
-  var introducers = Stack<Value>(context)
+  var introducers = Stack<BeginBorrowValue>(context)
   defer {
     introducers.deinitialize()
   }
   gatherBorrowIntroducers(for: value, in: &introducers, context)
-  introducers.forEach { print($0) }
+  introducers.forEach { print($0.value) }
 }
 
 let enclosingValuesTest = FunctionTest("enclosing_values") {
