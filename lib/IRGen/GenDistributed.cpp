@@ -858,6 +858,9 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
   }
 
   auto *requirementDecl = Target.get<AbstractFunctionDecl *>();
+  if (requirementDecl->isDistributed()) {
+    requirementDecl = requirementDecl->getDistributedThunk();
+  }
   auto *protocol = requirementDecl->getDeclContext()->getSelfProtocolDecl();
   SILDeclRef requirementRef = SILDeclRef(requirementDecl).asDistributed();
 

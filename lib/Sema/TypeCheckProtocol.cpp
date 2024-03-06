@@ -1455,9 +1455,20 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     DC->lookupQualified(nominal, reqName, nominal->getLoc(),
                         options, lookupResults);
     for (auto *decl : lookupResults) {
+      // a distributed thunk is the witness
       if (!isa<ProtocolDecl>(decl->getDeclContext())) {
-        witnesses.push_back(decl);
-        addedAny = true;
+        auto func = dyn_cast<AbstractFunctionDecl>(req);
+        if (func && func->isDistributedThunk()) {
+          if (auto candidate = dyn_cast<AbstractFunctionDecl>(decl)) {
+            if (candidate->isDistributed()) {
+              witnesses.push_back(candidate->getDistributedThunk());
+              addedAny = true;
+            }
+          }
+        } else {
+          witnesses.push_back(decl);
+          addedAny = true;
+        }
       }
     };
 

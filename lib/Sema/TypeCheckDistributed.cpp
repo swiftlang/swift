@@ -499,10 +499,20 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
 /// \returns \c true if there was a problem with adding the attribute, \c false
 /// otherwise.
 bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
+  if (!func->isDistributed())
+    return false;
+
   auto &C = func->getASTContext();
-  return evaluateOrDefault(C.evaluator,
+
+  fprintf(stderr, "[%s:%d](%s) CHECK FUNC\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  func->dump();
+
+  auto result = evaluateOrDefault(C.evaluator,
                            CheckDistributedFunctionRequest{func},
                            false); // no error if cycle
+  fprintf(stderr, "[%s:%d](%s) RESULT: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          result ? "no errors" : "errors");
+  return result;
 }
 
 bool CheckDistributedFunctionRequest::evaluate(
@@ -521,10 +531,10 @@ bool CheckDistributedFunctionRequest::evaluate(
   if (!C.getLoadedModule(C.Id_Distributed))
     return true;
 
-  // No checking for protocol requirements because they are not required
-  // to have `SerializationRequirement`.
-  if (isa<ProtocolDecl>(func->getDeclContext()))
-    return false;
+//  // No checking for protocol requirements because they are not required
+//  // to have `SerializationRequirement`.
+//  if (isa<ProtocolDecl>(func->getDeclContext()))
+//    return false;
 
   Type serializationReqType =
       getDistributedActorSerializationType(func->getDeclContext());
@@ -741,9 +751,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 }
 
 bool TypeChecker::checkDistributedFunc(FuncDecl *func) {
-  if (!func->isDistributed())
-    return false;
-
   return swift::checkDistributedFunction(func);
 }
 

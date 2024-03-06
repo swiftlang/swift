@@ -144,13 +144,28 @@ public:
     // Accessors are emitted by visitAbstractStorageDecl, above.
   }
 
-  void visitFuncDecl(FuncDecl *func) {
+  void visitFuncDecl(FuncDecl *func) { // FIXME(XXX)
     assert(!isa<AccessorDecl>(func));
-    if (func->requiresNewWitnessTableEntry()) {
+    if (!func->requiresNewWitnessTableEntry())
+      return;
+
+    if (isa<ProtocolDecl>(func->getDeclContext()) &&
+        (func->isDistributedThunk() || func->isDistributed())) {
+      addDistributedWitnessMethodsIfRequired(func->getDistributedThunk(), SILDeclRef::Kind::Func);
+      // DO NOT ADD IT
+      fprintf(stderr, "[%s:%d](%s) SKIP DECL ADDING FOR FUNC\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    } else {
       asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
-      addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
-      addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
     }
+    addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+
+    // TODO: for protocols, do want the original requirement without distributed in sildecl ref?
+    // - for protocols
+    //    - the original requirement and distributed+distributed thunk
+    //      - since we now have a
+    // TODO: maybe not add the thunk as ONLY distributed thunk -> new with the newly added declaration
+    // for protocol: don't add the original here -- 150, dont do that
+    addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -160,7 +175,7 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // We already visited these in the first pass.
   }
-    
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {
     // We don't care about these by themselves for witnesses.
   }
@@ -198,17 +213,52 @@ private:
     }
   }
 
+  // FIXME(XXX): the problem may be here?
   void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
-    if (!AFD->isDistributed())
-      return;
+//    if (AFD->isDistributedThunk()) {
+//      fprintf(stderr, "[%s:%d](%s) addDistributedWitnessMethodsIfRequired THUNK \n",
+//              __FILE_NAME__, __LINE__, __FUNCTION__);
+//      AFD->dump();
+//
+//      // FIXME(XXX): this is wrong I guess
+//      SILDeclRef declRef(AFD, kind);
+//      asDerived().addMethod(declRef.asDistributed());
+//
+//      return;
+//    }
 
-    if (isa<ProtocolDecl>(AFD->getDeclContext()))
-      return;
+    if (AFD->isDistributed()) {
+      fprintf(stderr, "[%s:%d](%s) addDistributedWitnessMethodsIfRequired DIST FUNC \n",
+              __FILE_NAME__, __LINE__, __FUNCTION__);
+      AFD->dump();
 
-    // Add another which will be witnessed by the 'distributed thunk'
-    SILDeclRef declRef(AFD, kind);
-    asDerived().addMethod(declRef.asDistributed());
+      // TODO: what about this; don't do it
+      // TODO: mark the other declaration as distributed thunk and in GenDistributed where we emit witness call, not just as distributed but also as thunk
+      if (isa<ProtocolDecl>(AFD->getDeclContext())) {
+//        fprintf(stderr, "[%s:%d](%s) SKIP OUT ON\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//        AFD->dump();
+
+        auto thunk = AFD->getDistributedThunk();
+        SILDeclRef declRef(thunk, kind);
+        asDerived().addMethod(declRef.asDistributed());
+        return;
+      }
+
+      // Add another which will be witnessed by the 'distributed thunk'
+      SILDeclRef declRef(AFD, kind);
+      asDerived().addMethod(declRef.asDistributed());
+
+      // original requirement; added as witness, adeded it with the asDistributed the distributed written by user would match against the declaration in protocol. the THUNK would match against against this asDistributed()
+      // TODO: check this
+      // WHAT IS MATCHED AGAINST THIS AS-DISTRIBUTED??? IF the thunk was matching against that that's wrong.
+
+      // TODO: this does not have async throws (CONFIRM?)
+
+      // NOTE: the extension one was witnessing the
+
+      // TODO: can't add the thunk just here since we'll be in VISIT and add from there
+    }
   }
 };
 

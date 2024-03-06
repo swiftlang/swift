@@ -726,6 +726,14 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 
   DeclName thunkName;
 
+//  if (auto actor = dyn_cast<ClassDecl>(DC)) {
+//    if (!actor->isDistributed())
+//      return nullptr;
+//  } else if (auto actor = dyn_cast<ProtocolDecl>(DC)) {
+//    if (!actor->isDistributed())
+//      return nullptr;
+//  }
+
   // Since accessors don't have names, let's generate one based on
   // the computed property.
   if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
