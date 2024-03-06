@@ -26,7 +26,7 @@ public extension Eq where Self: ~Copyable {
 }
 
 /// MARK: Result
-public enum Either<Success, Failure: Error> {
+public enum Either<Success: ~Copyable, Failure: Error> {
   case success(Success)
   case failure(Failure)
 }
@@ -45,10 +45,10 @@ extension Either where Failure == Swift.Error {
 
 public protocol Generator: ~Copyable {
   associatedtype Element: ~Copyable
-  func next() -> Element
+  func next() -> Maybe<Element>
 }
 
-
+/// MARK: Lists
 public struct Vector<T: ~Copyable> {
 
   subscript(_ i: UInt) -> T {
@@ -56,47 +56,73 @@ public struct Vector<T: ~Copyable> {
   }
 }
 
+// MARK: Tuples
+public enum Pair<L: ~Copyable, R: ~Copyable>: ~Copyable {
+  case elms(L, R)
+}
+
 
 /// MARK: Data.Maybe
 
-public enum Maybe<Value: ~Copyable> {
+public enum Maybe<Value: ~Copyable>: ~Copyable {
   case just(Value)
   case nothing
 }
 
-extension Maybe: Show where Value: ~Copyable {
+extension Maybe: Copyable {}
+
+extension Maybe: Show where Value: Show & ~Copyable {
   public borrowing func show() -> String {
-    fatalError("need borrowing switches")
+    switch self {
+      case let .just(_borrowing elm):
+        return elm.show()
+      case .nothing:
+        return "<nothing>"
+    }
   }
 }
 
 extension Maybe: Eq where Value: Eq, Value: ~Copyable {
   public static func ==(_ a: borrowing Self, _ b: borrowing Self) -> Bool {
-    fatalError("need borrowing switches")
-  }
-}
-
-public func maybe<A: ~Copyable, B>(_ defaultVal: B,
-                                   _ fn: (consuming A) -> B)
-                                   -> (consuming Maybe<A>) -> B {
-  return { (_ mayb: consuming Maybe<A>) -> B in
-    switch consume mayb {
-      case .just(_):
-        fatalError("waiting for bugfix here")
-        // return fn(val)
+    switch a {
+      case let .just(_borrowing a1):
+        switch b {
+          case let .just(_borrowing b1):
+            return a1 == b1
+          case .nothing:
+            return false
+        }
       case .nothing:
-        return defaultVal
+        switch b {
+          case .just:
+            return false
+          case .nothing:
+            return true
+        }
     }
   }
 }
 
-@inlinable
-public func fromMaybe<A>(_ defaultVal: A) -> (Maybe<A>) -> A {
-  return maybe(defaultVal, {$0})
-}
+
+// FIXME: triggers crash!
+// @inlinable
+// public func fromMaybe<A: ~Copyable>(_ defaultVal: consuming A, 
+//                                     _ mayb: consuming Maybe<A>) -> A {
+//   switch mayb {
+//     case let .just(payload):
+//       return payload
+//     case .nothing:
+//       return defaultVal
+//   }
+// }
 
 public func isJust<A: ~Copyable>(_ m: borrowing Maybe<A>) -> Bool {
-  fatalError("need borrowing switches")
+  switch m {
+    case .just:
+      return true
+    case .nothing:
+      return false
+  }
 }
 
 @inlinable
