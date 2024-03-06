@@ -12,12 +12,12 @@ import Distributed
 // CHECK-NEXT: distributed public actor DA {
 @available(SwiftStdlib 5.7, *)
 public distributed actor DA {
-  // CHECK: @_compilerInitialized nonisolated final public let id: Distributed.LocalTestingDistributedActorSystem.ActorID
+  // CHECK: @_compilerInitialized nonisolated final public let id: Distributed.LocalTestingActorID
   // CHECK: nonisolated final public let actorSystem: Library.DA.ActorSystem
   // CHECK: public typealias ActorSystem = Distributed.LocalTestingDistributedActorSystem
   public typealias ActorSystem = LocalTestingDistributedActorSystem
 
-  // CHECK:       public static func resolve(id: Distributed.LocalTestingDistributedActorSystem.ActorID, using system: Library.DA.ActorSystem) throws -> Library.DA
+  // CHECK:       public static func resolve(id: Distributed.LocalTestingActorID, using system: Library.DA.ActorSystem) throws -> Library.DA
   // CHECK:       public typealias ID = Distributed.LocalTestingDistributedActorSystem.ActorID
   // CHECK:       public typealias SerializationRequirement = any Swift.Decodable & Swift.Encodable
   // CHECK:       {{@objc deinit|deinit}}
