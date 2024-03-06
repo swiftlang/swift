@@ -7741,6 +7741,16 @@ ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
+ERROR(consume_expression_partial_copyable,none,
+      "'consume' can only be used to partially consume storage of a noncopyable type", ())
+ERROR(consume_expression_non_storage,none,
+      "'consume' can only be used to partially consume storage", ())
+NOTE(note_consume_expression_non_storage_call,none,
+      "non-storage produced by this call", ())
+NOTE(note_consume_expression_non_storage_subscript,none,
+      "non-storage produced by this subscript", ())
+NOTE(note_consume_expression_non_storage_property,none,
+      "non-storage produced by this computed property", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(copy_expression_not_passed_lvalue,none,
