@@ -166,11 +166,22 @@ func __abi_withUnsafePointer<T, Result>(
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @inlinable
-public func withUnsafePointer<T, Result>(
+@_alwaysEmitIntoClient
+public func withUnsafePointer<T, E: Error, Result>(
+  to value: inout T,
+  _ body: (UnsafePointer<T>) throws(E) -> Result
+) throws(E) -> Result {
+  try body(UnsafePointer<T>(Builtin.addressof(&value)))
+}
+
+/// ABI: Historical withUnsafePointer(to:_:) rethrows,
+/// expressed as "throws", which is ABI-compatible with "rethrows".
+@_silgen_name("$ss17withUnsafePointer2to_q_xz_q_SPyxGKXEtKr0_lF")
+@usableFromInline
+func __abi_se0413_withUnsafePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result
-{
+) throws -> Result {
   return try body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 
@@ -179,11 +190,10 @@ public func withUnsafePointer<T, Result>(
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafePointer<T, Result>(
+public func _withUnprotectedUnsafePointer<T, E: Error, Result>(
   to value: inout T,
-  _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result
-{
+  _ body: (UnsafePointer<T>) throws(E) -> Result
+) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
   return try body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
 #else
