@@ -517,8 +517,6 @@ extension MutableCollection {
   }
 }
 
-// the legacy swap free function
-//
 /// Exchanges the values of the two arguments.
 ///
 /// The two arguments must not alias each other. To swap two elements of a
