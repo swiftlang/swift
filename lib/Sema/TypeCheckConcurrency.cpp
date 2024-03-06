@@ -4234,7 +4234,7 @@ swift::getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose,
   if (numIsolationAttrs == 0)
     return std::nullopt;
 
-  // Only one such attribute is valid, but we only actually care of one of
+  // Only one such attribute is valid, but we only actually care if one of
   // them is a global actor.
   if (numIsolationAttrs > 1 && globalActorAttr && shouldDiagnose) {
     decl->diagnose(diag::actor_isolation_multiple_attr, decl,
@@ -4266,7 +4266,7 @@ swift::getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose,
     // Handle @<global attribute type>(unsafe).
     auto *attr = globalActorAttr->first;
     bool isUnsafe = attr->isArgUnsafe();
-    if (attr->hasArgs()) {
+    if (attr->hasArgs() && shouldDiagnose) {
       if (isUnsafe) {
         SourceFile *file = decl->getDeclContext()->getParentSourceFile();
         bool inSwiftinterface =

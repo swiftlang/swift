@@ -2561,7 +2561,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto &ctx = AFD->getASTContext();
 
       // Check for explicit global actor attribute
-      auto isolationFromAttr = getIsolationFromAttributes(AFD);
+      auto isolationFromAttr = getIsolationFromAttributes(AFD, false);
 
       // Main.main() and Main.$main are implicitly MainActor-protected.
       // Any other isolation is an error.
