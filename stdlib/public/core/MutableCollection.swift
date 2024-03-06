@@ -529,7 +529,8 @@ extension MutableCollection {
 ///   - a: The first value to swap.
 ///   - b: The second value to swap.
 @inlinable
-public func swap<T>(_ a: inout T, _ b: inout T) {
+@_preInverseGenerics
+public func swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
 #if $BuiltinUnprotectedAddressOf
