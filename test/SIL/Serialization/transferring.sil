@@ -1,8 +1,8 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -emit-sib -o %t/tmp.sib -module-name basic2
-// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
-// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -emit-sib -o %t/tmp.sib -module-name basic2
+// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
+// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
 
 sil_stage raw
 

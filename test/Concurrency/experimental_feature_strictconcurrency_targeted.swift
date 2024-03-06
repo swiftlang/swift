@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-feature StrictConcurrency=targeted %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -strict-concurrency=complete
-// RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
