@@ -132,6 +132,10 @@ public enum Optional<Wrapped: ~Copyable>: ~Copyable {
   case some(Wrapped)
 }
 
+extension Optional: Sendable where Wrapped: ~Copyable & Sendable { }
+
+extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }
+
 extension Optional: Copyable /* where Wrapped: Copyable */ {}
 
 extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
@@ -145,6 +149,7 @@ extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
   /// In this example, the assignment to the `i` variable calls this
   /// initializer behind the scenes.
   @_transparent
+  @_preInverseGenerics
   public init(nilLiteral: ()) {
     self = .none
   }
@@ -152,16 +157,9 @@ extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
 
 extension Optional where Wrapped: ~Copyable {
   /// Creates an instance that stores the given value.
-  @_alwaysEmitIntoClient
   @_transparent
+  @_preInverseGenerics
   public init(_ some: consuming Wrapped) { self = .some(some) }
-}
-
-extension Optional {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal init(_ some: Wrapped) { self = .some(some) }
 }
 
 extension Optional {
@@ -346,7 +344,6 @@ extension Optional {
   /// overhead for users, even in Debug builds.
   @inlinable
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
-    // FIXME(NCG): Migrate to the function below and obsolete this.
     @inline(__always)
     get {
       if let x = self {
@@ -358,12 +355,16 @@ extension Optional {
 }
 
 extension Optional where Wrapped: ~Copyable {
+  /// - Returns: `unsafelyUnwrapped`.
+  ///
+  /// This version is for internal stdlib use; it avoids any checking
+  /// overhead for users, even in Debug builds.
   @_alwaysEmitIntoClient
-  internal consuming func _unsafelyUnwrappedUnchecked2() -> Wrapped {
+  internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
     if let x = self {
       return x
     }
-    _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
+    _internalInvariantFailure("_uncheckedUnwrapped of nil optional")
   }
 }
 
@@ -573,6 +574,7 @@ extension Optional where Wrapped: ~Copyable {
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to match against `nil`.
   @_transparent
+  @_preInverseGenerics
   public static func ~=(
     lhs: _OptionalNilComparisonType,
     rhs: borrowing Wrapped?
@@ -610,6 +612,7 @@ extension Optional where Wrapped: ~Copyable {
   ///   - lhs: A value to compare to `nil`.
   ///   - rhs: A `nil` literal.
   @_transparent
+  @_preInverseGenerics
   public static func ==(
     lhs: borrowing Wrapped?,
     rhs: _OptionalNilComparisonType
@@ -644,6 +647,7 @@ extension Optional where Wrapped: ~Copyable {
   ///   - lhs: A value to compare to `nil`.
   ///   - rhs: A `nil` literal.
   @_transparent
+  @_preInverseGenerics
   public static func !=(
     lhs: borrowing Wrapped?,
     rhs: _OptionalNilComparisonType
@@ -678,6 +682,7 @@ extension Optional where Wrapped: ~Copyable {
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to compare to `nil`.
   @_transparent
+  @_preInverseGenerics
   public static func ==(
     lhs: _OptionalNilComparisonType,
     rhs: borrowing Wrapped?
@@ -712,86 +717,10 @@ extension Optional where Wrapped: ~Copyable {
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to compare to `nil`.
   @_transparent
+  @_preInverseGenerics
   public static func !=(
     lhs: _OptionalNilComparisonType,
     rhs: borrowing Wrapped?
-  ) -> Bool {
-    switch rhs {
-    case .some:
-      return true
-    case .none:
-      return false
-    }
-  }
-}
-
-extension Optional {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func ~=(
-    lhs: _OptionalNilComparisonType,
-    rhs: Wrapped?
-  ) -> Bool {
-    switch rhs {
-    case .some:
-      return false
-    case .none:
-      return true
-    }
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func ==(
-    lhs: Wrapped?,
-    rhs: _OptionalNilComparisonType
-  ) -> Bool {
-    switch lhs {
-    case .some:
-      return false
-    case .none:
-      return true
-    }
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func !=(
-    lhs: Wrapped?,
-    rhs: _OptionalNilComparisonType
-  ) -> Bool {
-    switch lhs {
-    case .some:
-      return true
-    case .none:
-      return false
-    }
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func ==(
-    lhs: _OptionalNilComparisonType,
-    rhs: Wrapped?
-  ) -> Bool {
-    switch rhs {
-    case .some:
-      return false
-    case .none:
-      return true
-    }
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func !=(
-    lhs: _OptionalNilComparisonType,
-    rhs: Wrapped?
   ) -> Bool {
     switch rhs {
     case .some:
@@ -1013,7 +942,3 @@ extension Optional: _ObjectiveCBridgeable {
   }
 }
 #endif
-
-extension Optional: Sendable where Wrapped: ~Copyable & Sendable { }
-
-extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }
