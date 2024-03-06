@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 public struct Wrapped<Values>: Sequence where Values: Sequence {
     public var values: Values
 

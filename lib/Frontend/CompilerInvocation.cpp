@@ -626,6 +626,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       !Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics) &&
       Args.hasArg(OPT_enable_experimental_eager_clang_module_diagnostics);
 
+  Opts.DisableNamedLazyImportAsMemberLoading |=
+      Args.hasArg(OPT_disable_named_lazy_import_as_member_loading);
+
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 

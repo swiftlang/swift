@@ -711,6 +711,16 @@ public:
     Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
+  /// Returns true if -experimental-allow-non-resilient-access was passed
+  /// and the module is built from source.
+  bool allowNonResilientAccess() const {
+    return Bits.ModuleDecl.AllowNonResilientAccess &&
+          !Bits.ModuleDecl.IsBuiltFromInterface;
+  }
+  void setAllowNonResilientAccess(bool flag = true) {
+    Bits.ModuleDecl.AllowNonResilientAccess = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///

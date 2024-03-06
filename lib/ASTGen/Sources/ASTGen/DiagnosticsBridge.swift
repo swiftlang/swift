@@ -141,7 +141,9 @@ extension DiagnosticSeverity {
     case .note: return .note
     case .warning: return .warning
     case .remark: return .remark
+#if RESILIENT_SWIFT_SYNTAX
     @unknown default: return .error
+#endif
     }
   }
 }

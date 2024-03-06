@@ -48,6 +48,9 @@ enum class Status {
   /// The precise revision version doesn't match.
   RevisionIncompatible,
 
+  /// The distribution channel doesn't match.
+  ChannelIncompatible,
+
   /// The module is required to be in OSSA, but is not.
   NotInOSSA,
 
@@ -105,6 +108,7 @@ struct ValidationInfo {
   llvm::VersionTuple userModuleVersion;
   StringRef sdkName = {};
   StringRef problematicRevision = {};
+  StringRef problematicChannel = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
   std::vector<StringRef> allowableClients;
@@ -140,6 +144,7 @@ class ExtendedValidationInfo {
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
+    unsigned AllowNonResilientAccess: 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -203,6 +208,10 @@ public:
   bool isBuiltFromInterface() const { return Bits.IsBuiltFromInterface; }
   void setIsBuiltFromInterface(bool val) {
     Bits.IsBuiltFromInterface = val;
+  }
+  bool allowNonResilientAccess() const { return Bits.AllowNonResilientAccess; }
+  void setAllowNonResilientAccess(bool val) {
+    Bits.AllowNonResilientAccess = val;
   }
   bool isAllowModuleWithCompilerErrorsEnabled() {
     return Bits.IsAllowModuleWithCompilerErrorsEnabled;

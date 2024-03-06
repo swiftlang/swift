@@ -185,6 +185,8 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .unavailableFromAsync:
         fatalError("unimplemented")
+      case .allowFeatureSuppression:
+        return self.generateAllowFeatureSuppressionAttr(attribute: node)?.asDeclAttribute
 
       // Simple attributes.
       case .alwaysEmitConformanceMetadata,
@@ -237,6 +239,7 @@ extension ASTGenVisitor {
         .objCMembers,
         .objCNonLazyRealization,
         .preconcurrency,
+        .preInverseGenerics,
         .propertyWrapper,
         .requiresStoredPropertyInits,
         .resultBuilder,
@@ -336,6 +339,32 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateAllowFeatureSuppressionAttr(attribute node: AttributeSyntax) -> BridgedAllowFeatureSuppressionAttr? {
+    guard case .argumentList(let args) = node.arguments
+    else {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    let features = args.compactMap(in: self) { arg -> BridgedIdentifier? in
+      guard arg.label == nil,
+            let declNameExpr = arg.expression.as(DeclReferenceExprSyntax.self),
+            declNameExpr.argumentNames == nil
+      else {
+        // TODO: Diagnose.
+        return nil
+      }
+
+      return generateIdentifier(declNameExpr.baseName)
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateSourceRange(node),
+      features: features)
+  }
+
   func generateCDeclAttr(attribute node: AttributeSyntax) -> BridgedCDeclAttr? {
     guard
       // `@_cdecl` attribute has `.string(StringLiteralExprSyntax)` arguments.
@@ -367,6 +396,7 @@ extension ASTGenVisitor {
       return []
     }
 
+    _ = args
     fatalError("unimplemented")
   }
 
@@ -757,6 +787,7 @@ extension ASTGenVisitor {
       return []
     }
 
+    _ = args
     fatalError("unimplemented")
   }
 
@@ -934,11 +965,13 @@ extension ASTGenVisitor {
 
   func generateCustomAttr(attribute node: AttributeSyntax) -> BridgedCustomAttr? {
     guard
-      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
+      let args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
     else {
       // TODO: Diagnose.
       return nil
     }
+
+    _ = args
     fatalError("unimplemented")
   }
 

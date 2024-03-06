@@ -2258,6 +2258,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         baseName = newName;
       }
     }
+    if (method->isImplicit() &&
+        baseName.starts_with("__synthesizedVirtualCall_")) {
+      // If this is a thunk for a virtual method of a C++ reference type, we
+      // strip away the underscored prefix. This method should be visible and
+      // callable from Swift.
+      newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
+      baseName = newName;
+    }
   }
 
   // swift_newtype-ed declarations may have common words with the type name

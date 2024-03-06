@@ -651,7 +651,7 @@ private:
     // records it as a separate conjunction element to allow for a more
     // granular control over what contextual information is brought into
     // the scope during pattern + sequence and `where` clause solving.
-    auto target = SyntacticElementTarget::forForEachStmt(
+    auto target = SyntacticElementTarget::forForEachPreamble(
         forEachStmt, context.getAsDeclContext(),
         /*ignoreWhereClause=*/true);
 

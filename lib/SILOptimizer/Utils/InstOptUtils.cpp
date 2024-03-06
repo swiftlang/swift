@@ -127,12 +127,17 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
 
 /// Returns true if OSSA scope ending instructions end_borrow/destroy_value can
 /// be deleted trivially
-static bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
+bool swift::canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
   if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
     return false;
   if (isa<StoreBorrowInst>(i->getOperand(0)))
     return false;
-  return i->getOperand(0)->getOwnershipKind() == OwnershipKind::None;
+
+  auto opValue = i->getOperand(0);
+  // We can delete destroy_value with operands of none ownership unless
+  // they are move-only values, which can have custom deinit
+  return opValue->getOwnershipKind() == OwnershipKind::None &&
+         !opValue->getType().isMoveOnly();
 }
 
 /// Perform a fast local check to see if the instruction is dead.

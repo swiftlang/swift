@@ -694,7 +694,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -750,7 +750,10 @@ protected:
     ObjCNameLookupCachePopulated : 1,
 
     /// Whether this module has been built with C++ interoperability enabled.
-    HasCxxInteroperability : 1
+    HasCxxInteroperability : 1,
+
+    /// Whether this module has been built with -experimental-allow-non-resilient-access.
+    AllowNonResilientAccess : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1856,6 +1859,10 @@ public:
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
 
+  /// Determine whether this extension context is in the same defining module as
+  /// the original nominal type context.
+  bool isInSameDefiningModule() const;
+
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid or
   /// \c isObjCImplementation() is false.
@@ -2931,9 +2938,9 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
-  /// True if opted in for bypassing resilience within a package. Allowed only on
-  /// access from the \p accessingModule to a package decl in the defining
-  /// binary (not interface) module within the same package.
+  /// True if opted in to bypass a resilience check at the use site in the
+  /// \p accessingModule that references decls defined in a module
+  /// that allows non-resilient access within the same package.
   bool bypassResilienceInPackage(ModuleDecl *accessingModule) const;
 
   /// FIXME: This is deprecated.

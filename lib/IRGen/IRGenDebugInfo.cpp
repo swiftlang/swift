@@ -1207,11 +1207,10 @@ private:
       return OpaqueType;
     }
 
-    auto *opaqueType = createOpaqueStructWithSizedContainer(
-        Scope, Decl ? Decl->getNameStr() : "", File, Line, SizeInBits,
-        AlignInBits, Flags, MangledName, collectGenericParams(Type),
-        UnsubstitutedType);
-    return opaqueType;
+    auto *OpaqueType = createOpaqueStruct(
+        Scope, "", File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        collectGenericParams(Type), UnsubstitutedType);
+    return OpaqueType;
   }
 
   /// Create debug information for an enum with a raw type (enum E : Int {}).
@@ -1647,12 +1646,19 @@ private:
   llvm::DICompositeType *
   createOpaqueStruct(llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File,
                      unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
-                     llvm::DINode::DIFlags Flags, StringRef MangledName) {
-    return DBuilder.createStructType(
+                     llvm::DINode::DIFlags Flags, StringRef MangledName,
+                     llvm::DINodeArray BoundParams = {},
+                     llvm::DIType *SpecificationOf = nullptr) {
+
+    auto StructType = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr,
         DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
-        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, SpecificationOf);
+
+    if (BoundParams)
+      DBuilder.replaceArrays(StructType, nullptr, BoundParams);
+    return StructType;
   }
 
   bool shouldCacheDIType(llvm::DIType *DITy, DebugTypeInfo &DbgTy) {
@@ -2035,11 +2041,9 @@ private:
         // Force the creation of the unsubstituted type, don't create it
         // directly so it goes through all the caching/verification logic.
         auto unsubstitutedDbgTy = getOrCreateType(DbgTy);
-        DBuilder.retainType(unsubstitutedDbgTy);
-        return createOpaqueStructWithSizedContainer(
-            Scope, Decl->getName().str(), L.File, FwdDeclLine, SizeInBits,
-            AlignInBits, Flags, MangledName, collectGenericParams(EnumTy),
-            unsubstitutedDbgTy);
+        return createOpaqueStruct(
+            Scope, "", L.File, FwdDeclLine, SizeInBits, AlignInBits, Flags,
+            MangledName, collectGenericParams(EnumTy), unsubstitutedDbgTy);
       }
       return createOpaqueStructWithSizedContainer(
           Scope, Decl->getName().str(), L.File, FwdDeclLine, SizeInBits,
@@ -2380,9 +2384,12 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   bool EnableCXXInterop =
       IGM.getSILModule().getASTContext().LangOpts.EnableCXXInterop;
+  bool EnableEmbeddedSwift =
+      IGM.getSILModule().getASTContext().LangOpts.hasFeature(Feature::Embedded);
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile, Producer, Opts.shouldOptimize(),
-      Opts.getDebugFlags(PD, EnableCXXInterop), MajorRuntimeVersion, SplitName,
+      Opts.getDebugFlags(PD, EnableCXXInterop, EnableEmbeddedSwift),
+      MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly,
@@ -2857,7 +2864,9 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   // Because there's no good way to cross the CU boundary to insert a nested
   // DISubprogram definition in one CU into a type defined in another CU when
   // doing LTO builds.
-  if (Rep == SILFunctionTypeRepresentation::Method) {
+  if (Rep == SILFunctionTypeRepresentation::Method ||
+      Rep == SILFunctionTypeRepresentation::ObjCMethod ||
+      Rep == SILFunctionTypeRepresentation::WitnessMethod) {
     llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
         /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
         /*IsDefinition=*/false, /*IsOptimized=*/Opts.shouldOptimize());

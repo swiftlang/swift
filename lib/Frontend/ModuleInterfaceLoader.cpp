@@ -316,6 +316,8 @@ struct ModuleRebuildInfo {
       return "compiled with a newer version of the compiler";
     case Status::RevisionIncompatible:
       return "compiled with a different version of the compiler";
+    case Status::ChannelIncompatible:
+      return "compiled for a different distribution channel";
     case Status::NotInOSSA:
       return "module was not built with OSSA";
     case Status::NoncopyableGenericsMismatch:
@@ -1941,6 +1943,10 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       // The SDK build version may identify differences in headers
       // that affects references serialized in the cached file.
       sdkBuildVersion,
+
+      // Applying the distribution channel of the current compiler enables
+      // different compilers to share a module cache location.
+      version::getCurrentCompilerChannel(),
 
       // Whether or not we're tracking system dependencies affects the
       // invalidation behavior of this cache item.

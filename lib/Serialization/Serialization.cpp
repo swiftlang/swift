@@ -834,6 +834,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
   BLOCK_RECORD(control_block, REVISION);
+  BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
   BLOCK_RECORD(control_block, HAS_NONCOPYABLE_GENERICS);
@@ -853,6 +854,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, MODULE_PACKAGE_NAME);
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
+  BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -982,6 +984,7 @@ void Serializer::writeHeader() {
     control_block::TargetLayout Target(Out);
     control_block::SDKNameLayout SDKName(Out);
     control_block::RevisionLayout Revision(Out);
+    control_block::ChannelLayout Channel(Out);
     control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
     control_block::HasNoncopyableGenerics HasNoncopyableGenerics(Out);
@@ -1035,6 +1038,8 @@ void Serializer::writeHeader() {
       forcedDebugRevision : version::getCurrentCompilerSerializationTag();
     Revision.emit(ScratchRecord, revision);
 
+    Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
+
     IsOSSA.emit(ScratchRecord, Options.IsOSSA);
 
     HasNoncopyableGenerics.emit(ScratchRecord,
@@ -1084,6 +1089,11 @@ void Serializer::writeHeader() {
       if (M->isBuiltFromInterface()) {
         options_block::IsBuiltFromInterfaceLayout BuiltFromInterface(Out);
         BuiltFromInterface.emit(ScratchRecord);
+      }
+
+      if (M->allowNonResilientAccess()) {
+        options_block::AllowNonResilientAccess AllowNonResAcess(Out);
+        AllowNonResAcess.emit(ScratchRecord);
       }
 
       if (allowCompilerErrors()) {
@@ -2748,6 +2758,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::AllowFeatureSuppression: {
+      auto *theAttr = cast<AllowFeatureSuppressionAttr>(DA);
+      auto abbrCode =
+        S.DeclTypeAbbrCodes[AllowFeatureSuppressionDeclAttrLayout::Code];
+
+      SmallVector<IdentifierID> ids;
+      for (auto id : theAttr->getSuppressedFeatures())
+        ids.push_back(S.addUniquedStringRef(id.str()));
+
+      AllowFeatureSuppressionDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), ids);
+      return;
+    }
+
     case DeclAttrKind::SPIAccessControl: {
       auto theAttr = cast<SPIAccessControlAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];
@@ -3712,6 +3736,18 @@ private:
     }
   }
 
+  void writeInheritedProtocols(ArrayRef<ProtocolDecl *> inherited) {
+    using namespace decls_block;
+
+    SmallVector<DeclID, 4> inheritedIDs;
+    llvm::transform(inherited, std::back_inserter(inheritedIDs),
+                    [&](const ProtocolDecl *P) { return S.addDeclRef(P); });
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[InheritedProtocolsLayout::Code];
+    InheritedProtocolsLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                         inheritedIDs);
+  }
+
   void writeDefaultWitnessTable(const ProtocolDecl *proto) {
     using namespace decls_block;
 
@@ -4280,11 +4316,7 @@ public:
 
     auto contextID = S.addDeclContextRef(proto->getDeclContext());
 
-    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     swift::SmallSetVector<Type, 4> dependencyTypes;
-
-    unsigned numInherited = addInherited(
-        proto->getInherited(), inheritedAndDependencyTypes);
 
     // Separately collect inherited protocol types as dependencies.
     for (auto element : proto->getInherited().getEntries()) {
@@ -4311,8 +4343,9 @@ public:
                                   /*excluding*/S.M);
     }
 
+    SmallVector<TypeID, 4> dependencyTypeIDs;
     for (Type ty : dependencyTypes)
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(ty));
+      dependencyTypeIDs.push_back(S.addTypeRef(ty));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(proto->getFormalAccess());
 
@@ -4325,9 +4358,11 @@ public:
                                  ->requiresClass(),
                                proto->isObjC(),
                                proto->hasSelfOrAssociatedTypeRequirements(),
-                               rawAccessLevel, numInherited,
-                               inheritedAndDependencyTypes);
+                               S.addTypeRef(proto->getSuperclass()),
+                               rawAccessLevel,
+                               dependencyTypeIDs);
 
+    writeInheritedProtocols(proto->getInheritedProtocols());
     writeGenericParams(proto->getGenericParams());
     S.writeRequirementSignature(proto->getRequirementSignature());
     S.writeAssociatedTypes(proto->getAssociatedTypeMembers());
@@ -5904,7 +5939,7 @@ bool Serializer::writeASTBlockEntitiesIfNeeded(
 }
 
 void Serializer::writeAllDeclsAndTypes() {
-  BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
+  BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 9);
   using namespace decls_block;
   registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
   registerDeclTypeAbbr<TypeAliasTypeLayout>();
@@ -6030,6 +6065,8 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<ConditionalSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionConditionLayout>();
+
+  registerDeclTypeAbbr<InheritedProtocolsLayout>();
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();

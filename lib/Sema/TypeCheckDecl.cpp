@@ -2323,17 +2323,20 @@ static Type validateParameterType(ParamDecl *decl) {
     break;
   }
 
-  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
-    // If the element is a variadic parameter, resolve the parameter type as if
-    // it were in non-parameter position, since we want functions to be
-    // @escaping in this case.
-    options.setContext(TypeResolverContext::VariadicFunctionInput);
-    options |= TypeResolutionFlags::Direct;
+  // If the element is a variadic parameter, resolve the parameter type as if
+  // it were in non-parameter position, since we want functions to be
+  // @escaping in this case.
+  options.setContext(isa<VarargTypeRepr>(nestedRepr)
+                     ? TypeResolverContext::VariadicFunctionInput
+                     : TypeResolverContext::FunctionInput);
+  options |= TypeResolutionFlags::Direct;
 
-    const auto resolution =
-        TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                     PlaceholderType::get,
-                                     /*packElementOpener*/ nullptr);
+  const auto resolution =
+      TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                   PlaceholderType::get,
+                                   /*packElementOpener*/ nullptr);
+
+  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
     Ty = resolution.resolveType(nestedRepr);
 
     // Monovariadic types (T...) for <T> resolve to [T].
@@ -2347,13 +2350,6 @@ static Type validateParameterType(ParamDecl *decl) {
       return ErrorType::get(ctx);
     }
   } else {
-    options.setContext(TypeResolverContext::FunctionInput);
-    options |= TypeResolutionFlags::Direct;
-
-    const auto resolution =
-        TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                     PlaceholderType::get,
-                                     /*packElementOpener*/ nullptr);
     Ty = resolution.resolveType(decl->getTypeRepr());
   }
 
@@ -2364,8 +2360,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   // Validate the presence of ownership for a parameter with an inverse applied.
   if (!Ty->hasUnboundGenericType() &&
-      diagnoseMissingOwnership(ctx, dc, ownership,
-                               decl->getTypeRepr(), Ty, options)) {
+      diagnoseMissingOwnership(ownership, decl->getTypeRepr(), Ty, resolution)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }

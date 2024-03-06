@@ -1,7 +1,5 @@
 // RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
-// XFAIL: noncopyable_generics
-
 // Test SILGen -enable-sil-opaque-values with tests that depend on the stdlib.
 
 // FIXME: "HECK" lines all need to be updated for OSSA.

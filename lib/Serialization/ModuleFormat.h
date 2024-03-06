@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 855; // ref_adhoc_requirement_witness attributes are back
+const uint16_t SWIFTMODULE_VERSION_MINOR = 861; // AllowNonResilientAccess
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -860,6 +860,7 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
+    CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
     HAS_NONCOPYABLE_GENERICS,
@@ -895,6 +896,11 @@ namespace control_block {
 
   using RevisionLayout = BCRecordLayout<
     REVISION,
+    BCBlob
+  >;
+
+  using ChannelLayout = BCRecordLayout<
+    CHANNEL,
     BCBlob
   >;
 
@@ -938,6 +944,7 @@ namespace options_block {
     MODULE_EXPORT_AS_NAME,
     PLUGIN_SEARCH_OPTION,
     HAS_CXX_INTEROPERABILITY_ENABLED,
+    ALLOW_NON_RESILIENT_ACCESS,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1019,6 +1026,10 @@ namespace options_block {
 
   using HasCxxInteroperabilityEnabledLayout = BCRecordLayout<
     HAS_CXX_INTEROPERABILITY_ENABLED
+  >;
+
+  using AllowNonResilientAccess = BCRecordLayout<
+    ALLOW_NON_RESILIENT_ACCESS
   >;
 }
 
@@ -1527,11 +1538,18 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
+    TypeIDField,            // superclass
     AccessLevelField,       // access level
-    BCVBR<4>,               // number of inherited types
-    BCArray<TypeIDField>    // inherited types, followed by dependency types
-    // Trailed by the generic parameters (if any), the members record, and
-    // the default witness table record
+    BCArray<TypeIDField>    // dependency types
+    // Trailed by the inherited protocols, the generic parameters (if any),
+    // the generic signature, the members record, and the default witness table record
+  >;
+
+  /// A default witness table for a protocol.
+  using InheritedProtocolsLayout = BCRecordLayout<
+    INHERITED_PROTOCOLS,
+    BCArray<DeclIDField>
+    // An array of inherited protocol declarations
   >;
 
   /// A default witness table for a protocol.
@@ -2120,6 +2138,12 @@ namespace decls_block {
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
     BCArray<IdentifierIDField> // name components
+  >;
+
+  using AllowFeatureSuppressionDeclAttrLayout = BCRecordLayout<
+    AllowFeatureSuppression_DECL_ATTR,
+    BCFixed<1>,   // implicit flag
+    BCArray<IdentifierIDField>  // feature names
   >;
 
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<

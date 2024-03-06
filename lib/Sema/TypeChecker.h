@@ -136,6 +136,10 @@ enum class TypeCheckExprFlags {
 
   /// Don't expand macros.
   DisableMacroExpansions = 0x08,
+
+  /// If set, typeCheckExpression will avoid invalidating the AST if
+  /// type-checking fails. Do not add new uses of this.
+  AvoidInvalidatingAST = 0x10,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -746,11 +750,12 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
                              Type patternType = Type(),
                              TypeCheckExprOptions options = {});
 
-/// Type-check a for-each loop's pattern binding and sequence together.
+/// Type-check a for-each loop's pattern binding, sequence, and where clause
+/// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt,
-                             GenericEnvironment *packElementEnv);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                              GenericEnvironment *packElementEnv);
 
 /// Compute the set of captures for the given function or closure.
 void computeCaptures(AnyFunctionRef AFR);
@@ -1402,10 +1407,6 @@ bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 /// protocol. If \p type is not null, check specifically whether \p decl
 /// could fulfill a protocol requirement for it.
 bool isMemberOperator(FuncDecl *decl, Type type);
-
-/// Given an interface type and possibly a generic environment,
-/// is the type ever noncopyable?
-bool isInterfaceTypeNoncopyable(Type interfaceTy, GenericEnvironment *env);
 
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
 bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);

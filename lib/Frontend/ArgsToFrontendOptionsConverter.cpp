@@ -66,6 +66,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
     Opts.ExplicitModulesOutputPath = A->getValue();
+  } else {
+    SmallString<128> defaultPath;
+    llvm::sys::path::cache_directory(defaultPath);
+    Opts.ExplicitModulesOutputPath = defaultPath.str().str();
   }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();
@@ -165,6 +169,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();
+
+  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -308,6 +314,26 @@ bool ArgsToFrontendOptionsConverter::convert(
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-skip-non-exportable-decls",
                      "-enable-library-evolution");
+  }
+
+  Opts.AllowNonResilientAccess = Args.hasArg(OPT_experimental_allow_non_resilient_access);
+  if (Opts.AllowNonResilientAccess) {
+    // Override the option to skip non-exportable decls.
+    if (Opts.SkipNonExportableDecls) {
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-exportable-decls",
+                     "-experimental-allow-non-resilient-access");
+      Opts.SkipNonExportableDecls = false;
+    }
+    // If built from interface, non-resilient access should not be allowed.
+    if (Opts.AllowNonResilientAccess &&
+        (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
+         Opts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-allow-non-resilient-access",
+                     "-compile-module-from-interface or -typecheck-module-from-interface");
+      Opts.AllowNonResilientAccess = false;
+    }
   }
 
   // HACK: The driver currently erroneously passes all flags to module interface

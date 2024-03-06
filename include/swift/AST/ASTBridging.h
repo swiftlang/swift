@@ -481,6 +481,14 @@ BridgedAlignmentAttr_createParsed(BridgedASTContext cContext,
                                   BridgedSourceLoc cAtLoc,
                                   BridgedSourceRange cRange, size_t cValue);
 
+SWIFT_NAME("BridgedAllowFeatureSuppressionAttr.createParsed(_:atLoc:range:features:)")
+BridgedAllowFeatureSuppressionAttr
+BridgedAllowFeatureSuppressionAttr_createParsed(
+                                  BridgedASTContext cContext,
+                                  BridgedSourceLoc cAtLoc,
+                                  BridgedSourceRange cRange,
+                                  BridgedArrayRef cFeatures);
+
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:)")
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,

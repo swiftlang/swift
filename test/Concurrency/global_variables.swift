@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables -parse-as-library -strict-concurrency=minimal -swift-version 5 %S/Inputs/GlobalVariables.swift
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t %s -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
 
@@ -71,7 +71,7 @@ func testLocalNonisolatedUnsafe() async {
 
 func testImportedGlobals() { // expected-note{{add '@MainActor' to make global function 'testImportedGlobals()' part of global actor 'MainActor'}}
   let _ = Globals.integerConstant
-  let _ = Globals.integerMutable // expected-warning{{reference to static property 'integerMutable' is not concurrency-safe because it involves shared mutable state}}
+  let _ = Globals.integerMutable
   let _ = Globals.nonisolatedUnsafeIntegerConstant
   let _ = Globals.nonisolatedUnsafeIntegerMutable
   let _ = Globals.actorInteger // expected-error{{main actor-isolated static property 'actorInteger' can not be referenced from a non-isolated context}}

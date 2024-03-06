@@ -878,9 +878,6 @@ static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarge
     return true;
   }
 
-  auto &C = distributedTarget->getASTContext();
-  ProtocolDecl *DistributedActor = C.getDistributedActorDecl();
-
   SmallPtrSet<ProtocolDecl *, 2> requirementProtos;
   if (getSerializationRequirementTypesForMember(distributedTarget,
                                                 requirementProtos)) {

@@ -30,10 +30,17 @@ extension ObjCClass {
   // Implicit `override init()` to override superclass
 
   // NEGATIVE-NOT: )swiftMethod{{ }}
-  @objc func swiftMethod() -> Any? { nil }
+  @objc public func swiftMethod() -> Any? { nil }
 
   // NEGATIVE-NOT: )privateMethod{{ }}
   @objc private func privateMethod() -> Any? { nil }
+}
+
+// Has no contents that need to be printed
+// NEGATIVE-NOT: ObjCClass2
+@_objcImplementation extension ObjCClass2 {
+  // NEGATIVE-NOT: )init{{ }}
+  public override init() { }
 }
 
 @_cdecl("CImplFunc") @_objcImplementation func CImplFunc() {}

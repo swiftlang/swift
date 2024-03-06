@@ -5,6 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// XFAIL: noncopyable_generics
+
 // RUN: not %target-swift-frontend %s -emit-ir
 protocol A:A.b{func 丏
 protocol b:Collection

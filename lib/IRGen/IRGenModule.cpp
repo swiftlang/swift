@@ -122,14 +122,16 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
     CGO.DwarfDebugFlags =
-        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
+                           Context.LangOpts.hasFeature(Feature::Embedded));
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
     CGO.DwarfDebugFlags =
-        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
+                           Context.LangOpts.hasFeature(Feature::Embedded));
     break;
   }
   if (!Opts.TrapFuncName.empty()) {
@@ -954,7 +956,7 @@ namespace RuntimeConstants {
   }
 
   RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
-    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    auto featureAvailability = Context.getParameterizedExistentialAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

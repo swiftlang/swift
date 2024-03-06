@@ -230,8 +230,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
   if (LangOpts.ClangTarget) {
-    serializationOpts.ExtraClangOptions.push_back("-triple");
-    serializationOpts.ExtraClangOptions.push_back(LangOpts.ClangTarget->str());
+    serializationOpts.ExtraClangOptions.push_back("--target=" +
+                                                  LangOpts.ClangTarget->str());
   }
 
   serializationOpts.PluginSearchOptions =
@@ -1402,6 +1402,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
+    if (Invocation.getFrontendOptions().AllowNonResilientAccess)
+      MainModule->setAllowNonResilientAccess();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);

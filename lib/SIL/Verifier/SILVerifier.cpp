@@ -1263,6 +1263,10 @@ public:
                 "instruction isn't dominated by its bb argument operand");
       }
 
+      if (auto *undef = dyn_cast<SILUndef>(operand.get())) {
+        require(undef->getParent() == BB->getParent(), "SILUndef in wrong function");
+      }
+
       require(operand.getUser() == I,
               "instruction's operand's owner isn't the instruction");
       require(isOperandInValueUses(&operand), "operand value isn't used by operand");

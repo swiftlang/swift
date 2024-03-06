@@ -492,7 +492,7 @@ public:
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
-    collector.collectTypeMetadataForLayout(T);
+    collector.collectTypeMetadata(T);
   }
 };
 

@@ -1559,6 +1559,7 @@ namespace  {
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
     UNINTERESTING_ATTR(Preconcurrency)
+    UNINTERESTING_ATTR(AllowFeatureSuppression)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1636,6 +1637,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
     UNINTERESTING_ATTR(StaticExclusiveOnly)
     UNINTERESTING_ATTR(DistributedThunkTarget)
+    UNINTERESTING_ATTR(PreInverseGenerics)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

@@ -184,7 +184,7 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
     loadAsCopy(IGF, srcAddr, copy);
     initialize(IGF, copy, destAddr, true);
   } else {
-    OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+    OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                          DeinitIsNotNeeded);
     // No need to collect anything because we assume loadable types can be
     // loaded without enums.
@@ -2861,6 +2861,8 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
           TypeExpansionContext(expansion, IGM.getSwiftModule(),
                                IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(fieldTy))
+        return SILType();
+      if (fieldTy.isMoveOnly() != t.isMoveOnly())
         return SILType();
       return fieldTy;
     }

@@ -175,3 +175,27 @@ bb0:
   %19 = tuple ()
   return %19 : $()
 }
+
+// Dead block crasher
+//
+// We used to crash here since we attempted to process /all/ blocks for
+// diagnostic even for non-dead blocks. This is a problem since the dataflow
+// uses a reverse post order traversal to get quick convergence and that skips
+// dead blocks.
+sil [ossa] @dead_block_crasher : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+  br bb1
+
+bbDeadBlock:
+  %transfer = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  br bb1
+
+bb1:
+  destroy_value %1 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+

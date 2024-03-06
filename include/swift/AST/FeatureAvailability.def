@@ -18,6 +18,13 @@
 /// FEATURE(N, V)
 ///   N - The name of the feature (in UpperCamelCase).
 ///   V - The Swift version number, as a tuple, or FUTURE.
+///
+/// The feature Foo turns into two methods on ASTContext:
+/// getFooRuntimeAvailability(), which returns the exact version provided
+/// here, and getFooAvailability(), which maps that version into a version
+/// of the target OS.  Because both of these methods exist, it is a bad idea
+/// to use a feature name that ends in "Runtime", or people might get very
+/// confused.
 #ifndef FEATURE
 #define FEATURE(N, V)
 #endif
@@ -48,7 +55,8 @@ FEATURE(Concurrency,                                    (5, 5))
 FEATURE(MultiPayloadEnumTagSinglePayload,               (5, 6))
 FEATURE(ObjCIsUniquelyReferenced,                       (5, 6))
 
-FEATURE(ParameterizedExistentialRuntime,                (5, 7))
+// Metadata and casting support for parameterized existential types
+FEATURE(ParameterizedExistential,                       (5, 7))
 
 FEATURE(VariadicGenericType,                            (5, 9))
 FEATURE(SignedConformsToProtocol,                       (5, 9))
@@ -60,6 +68,8 @@ FEATURE(ObjCSymbolicReferences,                         (5, 11))
 FEATURE(TypedThrows,                                    (5, 11))
 FEATURE(StaticReadOnlyArrays,                           (5, 11))
 FEATURE(SwiftExceptionPersonality,                      (5, 11))
+// Metadata support for @isolated(any) function types
+FEATURE(IsolatedAny,                                    (5, 11))
 
 FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)

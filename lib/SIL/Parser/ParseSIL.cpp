@@ -138,7 +138,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
 //===----------------------------------------------------------------------===//
 
 bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
-                                   const Diagnostic &D) {
+                                   DiagRef D) {
   switch (P.Tok.getKind()) {
   case tok::identifier:
   case tok::dollarident:
@@ -602,7 +602,7 @@ bool SILParser::parseSILQualifier(
   }
   result = parseName(Str);
   if (!result) {
-    P.diagnose(loc, Diagnostic(diag::unrecognized_sil_qualifier));
+    P.diagnose(loc, diag::unrecognized_sil_qualifier);
     return true;
   }
   return false;
@@ -2051,7 +2051,7 @@ parseAssignOrInitAssignments(llvm::SmallVectorImpl<unsigned> &assignments,
 // Returns true on error.
 static bool parseIndexList(Parser &P, StringRef label,
                            SmallVectorImpl<unsigned> &indices,
-                           const Diagnostic &parseIndexDiag) {
+                           DiagRef parseIndexDiag) {
   SourceLoc loc;
   // Parse `[<label> <integer_literal>...]`.
   if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
@@ -7761,7 +7761,7 @@ parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
 
   if (P.parseSpecificIdentifier(
           ModuleKeyword, KeywordLoc,
-          Diagnostic(diag::expected_tok_in_sil_instr, ModuleKeyword)) ||
+          {diag::expected_tok_in_sil_instr, {ModuleKeyword}}) ||
       SP.parseSILIdentifier(ModuleName, Loc, diag::expected_sil_value_name))
     return ProtocolConformanceRef();
 

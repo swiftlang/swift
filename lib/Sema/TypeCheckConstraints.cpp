@@ -394,7 +394,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
     return;
   }
 
-  case SyntacticElementTarget::Kind::forEachStmt: {
+  case SyntacticElementTarget::Kind::forEachPreamble: {
     auto *stmt = target.getAsForEachStmt();
 
     // First emit diagnostics for the main expression.
@@ -466,6 +466,13 @@ TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
 std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                              TypeCheckExprOptions options) {
+  auto errorResult = [&]() -> std::optional<SyntacticElementTarget> {
+    // Fill in ErrorTypes for the target if we can.
+    if (!options.contains(TypeCheckExprFlags::AvoidInvalidatingAST))
+      target.markInvalid();
+
+    return std::nullopt;
+  };
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
   PrettyStackTraceLocation stackTrace(Context, "type-checking-target",
@@ -475,11 +482,12 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckTarget(
           target, /*replaceInvalidRefsWithErrors=*/true)) {
-    return std::nullopt;
+    return errorResult();
   }
 
   // Check whether given target has a code completion token which requires
-  // special handling.
+  // special handling. Returns true if handled, in which case we've already
+  // type-checked it for completion, and don't need the solution applied.
   if (Context.CompletionCallback &&
       typeCheckForCodeCompletion(target, /*needsPrecheck*/ false,
                                  [&](const constraints::Solution &S) {
@@ -517,7 +525,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable)
-    return std::nullopt;
+    return errorResult();
 
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
@@ -528,7 +536,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   auto resultTarget = cs.applySolution(solution, target);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
-    return std::nullopt;
+    return errorResult();
   }
 
   // Unless the client has disabled them, perform syntactic checks on the
@@ -571,6 +579,13 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     DiagnosticTransaction diagnostics(ctx.Diags);
 
     TypeCheckExprOptions options;
+
+    // Avoid invalidating the AST since we'll fall through and try to type-check
+    // with an archetype contextual type opened. Note we also don't need to call
+    // `markInvalid` for the target below since we'll replace the expression
+    // with an ErrorExpr on failure anyway.
+    options |= TypeCheckExprFlags::AvoidInvalidatingAST;
+
     // Expand macro expansion expression at caller side only
     if (!atCallerSide && isa<MacroExpansionExpr>(defaultValue)) {
       options |= TypeCheckExprFlags::DisableMacroExpansions;
@@ -913,8 +928,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   return hadError;
 }
 
-bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt,
-                                          GenericEnvironment *packElementEnv) {
+bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                                           GenericEnvironment *packElementEnv) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer statsTracer(Context.Stats, "typecheck-for-each", stmt);
   PrettyStackTraceStmt stackTrace(Context, "type-checking-for-each", stmt);
@@ -930,7 +945,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt,
     return true;
   };
 
-  auto target = SyntacticElementTarget::forForEachStmt(
+  auto target = SyntacticElementTarget::forForEachPreamble(
       stmt, dc, /*ignoreWhereClause=*/false, packElementEnv);
   if (!typeCheckTarget(target))
     return failed();

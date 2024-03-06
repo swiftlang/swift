@@ -538,6 +538,9 @@ private:
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
       llvm::BitstreamCursor &Cursor);
 
+  /// Read a list of the protocol declarations inherited by another protocol.
+  bool readInheritedProtocols(SmallVectorImpl<ProtocolDecl *> &inherited);
+
   /// Populates the protocol's default witness table.
   ///
   /// Returns true if there is an error.
@@ -650,6 +653,10 @@ public:
 
   bool isBuiltFromInterface() const {
     return Core->Bits.IsBuiltFromInterface;
+  }
+
+  bool allowNonResilientAccess() const {
+    return Core->Bits.AllowNonResilientAccess;
   }
 
   /// Whether this module is compiled with implicit dynamic.

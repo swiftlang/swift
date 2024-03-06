@@ -75,6 +75,8 @@ RequirementMachine::getLocalRequirements(
   for (const auto *proto : props->getConformsTo())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));
 
+  ProtocolType::canonicalizeProtocols(result.protos);
+
   result.layout = props->getLayoutConstraint();
 
   return result;

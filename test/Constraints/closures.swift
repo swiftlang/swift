@@ -1026,7 +1026,7 @@ func rdar_59741308() {
 func r60074136() {
   func takesClosure(_ closure: ((Int) -> Void) -> Void) {}
 
-  takesClosure { ((Int) -> Void) -> Void in // expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in Swift 6}}
+  takesClosure { ((Int) -> Void) -> Void in // expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}}
   }
 }
 

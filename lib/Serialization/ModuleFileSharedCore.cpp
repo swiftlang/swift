@@ -197,6 +197,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::HAS_CXX_INTEROPERABILITY_ENABLED:
       extendedInfo.setHasCxxInteroperability(true);
       break;
+    case options_block::ALLOW_NON_RESILIENT_ACCESS:
+      extendedInfo.setAllowNonResilientAccess(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -418,6 +421,21 @@ static ValidationInfo validateControlBlock(
       }
       break;
     }
+    case control_block::CHANNEL: {
+      static const char* ignoreRevision =
+        ::getenv("SWIFT_IGNORE_SWIFTMODULE_REVISION");
+      if (ignoreRevision)
+        break;
+
+      StringRef moduleChannel = blobData,
+                compilerChannel = version::getCurrentCompilerChannel();
+      if (requiresRevisionMatch && !compilerChannel.empty() &&
+          moduleChannel != compilerChannel) {
+        result.problematicChannel = moduleChannel;
+        result.status = Status::ChannelIncompatible;
+      }
+      break;
+    }
     case control_block::IS_OSSA: {
       auto isModuleInOSSA = scratch[0];
       if (requiresOSSAModules && !isModuleInOSSA)
@@ -532,6 +550,7 @@ std::string serialization::StatusToString(Status S) {
   case Status::FormatTooOld: return "FormatTooOld";
   case Status::FormatTooNew: return "FormatTooNew";
   case Status::RevisionIncompatible: return "RevisionIncompatible";
+  case Status::ChannelIncompatible: return "ChannelIncompatible";
   case Status::NotInOSSA: return "NotInOSSA";
   case Status::NoncopyableGenericsMismatch:
     return "NoncopyableGenericsMismatch";
@@ -679,6 +698,8 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
      << "', built from "
      << (Bits.IsBuiltFromInterface? "swiftinterface": "source")
      << ", " << (resilient? "resilient": "non-resilient");
+  if (Bits.AllowNonResilientAccess)
+    os << ", built with -experimental-allow-non-resilient-access";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)
@@ -1441,6 +1462,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       Bits.HasCxxInteroperability = extInfo.hasCxxInteroperability();
+      Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       MiscVersion = info.miscVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();

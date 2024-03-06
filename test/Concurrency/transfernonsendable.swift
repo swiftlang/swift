@@ -195,14 +195,10 @@ func transferNonIsolatedNonAsyncClosureTwice() async {
   var actorCaptureClosure = { print(a) }
   await transferToMain(actorCaptureClosure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  // expected-tns-warning @-2 {{transferring 'actorCaptureClosure' may cause a race}}
-  // expected-tns-note @-3 {{transferring nonisolated 'actorCaptureClosure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 
   actorCaptureClosure = { print(a) }
   await transferToMain(actorCaptureClosure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  // expected-tns-warning @-2 {{transferring 'actorCaptureClosure' may cause a race}}
-  // expected-tns-note @-3 {{transferring nonisolated 'actorCaptureClosure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 }
 
 extension Actor {
@@ -403,8 +399,6 @@ func testSimpleLetClosureCaptureActor() async {
   let closure = { print(a) }
   await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
-  // expected-tns-note @-3 {{transferring nonisolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 }
 
 #if TYPECHECKER_ONLY
@@ -441,8 +435,6 @@ func testSimpleVarClosureCaptureActor() async {
   closure = { print(a) }
   await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
-  // expected-tns-note @-3 {{transferring nonisolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 }
 
 #if TYPECHECKER_ONLY

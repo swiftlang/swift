@@ -652,12 +652,21 @@ SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs,
   if (!fs.exists(interfacePath))
     return std::nullopt;
 
-  // If in the same package, try return the package interface path if not
-  // preferring the interface file.
-  if (!ctx.LangOpts.AllowNonPackageInterfaceImportFromSamePackage) {
-    if (auto packageName = getPackageNameFromInterface(interfacePath, fs)) {
-      if (*packageName == ctx.LangOpts.PackageName)
-        return getPackageInterfacePathIfInSamePackage(fs, ctx);
+  // If there is a package name, try look for the package interface.
+  if (!ctx.LangOpts.PackageName.empty()) {
+    if (auto maybePackageInterface =
+            getPackageInterfacePathIfInSamePackage(fs, ctx))
+      return *maybePackageInterface;
+
+    // If package interface is not found, check if we can load the
+    // public/private interface file by checking:
+    // * if AllowNonPackageInterfaceImportFromSamePackage is true
+    // * if the package name is not equal so not in the same package.
+    if (!ctx.LangOpts.AllowNonPackageInterfaceImportFromSamePackage) {
+      if (auto packageName = getPackageNameFromInterface(interfacePath, fs)) {
+        if (*packageName == ctx.LangOpts.PackageName)
+          return std::nullopt;
+      }
     }
   }
 
@@ -918,6 +927,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setHasIncrementalInfo();
     if (loadedModuleFile->isBuiltFromInterface())
       M.setIsBuiltFromInterface();
+    if (loadedModuleFile->allowNonResilientAccess())
+      M.setAllowNonResilientAccess();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
@@ -1081,6 +1092,12 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
                        loadInfo.problematicRevision, ModuleName, moduleBufferID);
     break;
+  case serialization::Status::ChannelIncompatible:
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_channel,
+                       loadInfo.problematicChannel,
+                       version::getCurrentCompilerChannel(),
+                       ModuleName, moduleBufferID);
+    break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
                        moduleBufferID);
@@ -1168,6 +1185,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::NotInOSSA:
   case serialization::Status::NoncopyableGenericsMismatch:
   case serialization::Status::RevisionIncompatible:
+  case serialization::Status::ChannelIncompatible:
   case serialization::Status::Malformed:
   case serialization::Status::MalformedDocumentation:
   case serialization::Status::FailedToLoadBridgingHeader:

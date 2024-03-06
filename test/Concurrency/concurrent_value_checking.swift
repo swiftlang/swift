@@ -232,7 +232,7 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
 // Sendable restriction on nonisolated declarations.
 // ----------------------------------------------------------------------
 actor ANI {
-  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in Swift 6}}
+  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in the Swift 6 language mode}}
   nonisolated func f() -> NC? { nil }
 }
 
@@ -273,7 +273,7 @@ typealias CF = @Sendable () -> NotConcurrent?
 typealias BadGenericCF<T> = @Sendable () -> T?
 typealias GoodGenericCF<T: Sendable> = @Sendable () -> T? // okay
 
-var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
 // expected-note@-1 {{isolate 'concurrentFuncVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 
 // ----------------------------------------------------------------------

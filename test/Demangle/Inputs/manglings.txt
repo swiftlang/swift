@@ -467,3 +467,4 @@ $sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swif
 $s4testA2A5KlassCyYTF ---> test.test() -> transferring test.Klass
 $s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> transferring main.Klass
 $s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() -> transferring null.NonSendableKlass
+$s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> transferring (@out null.NonSendableKlass, @error @owned Swift.Error)

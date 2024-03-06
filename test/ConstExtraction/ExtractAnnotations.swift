@@ -172,4 +172,3 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
 
-// XFAIL: noncopyable_generics

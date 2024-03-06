@@ -131,6 +131,7 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
+  friend class SwiftDeclSynthesizer;
 
   // Make requests in the ClangImporter zone friends so they can access `Impl`.
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
@@ -537,7 +538,7 @@ public:
   void printStatistics() const override;
 
   /// Dump Swift lookup tables.
-  void dumpSwiftLookupTables();
+  void dumpSwiftLookupTables() const override;
 
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.

@@ -139,6 +139,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addAddressLowering();
 
+  // Before we run later semantic optimizations, eliminate simple functions that
+  // we specialized to ensure that we do not emit diagnostics twice.
+  P.addDiagnosticDeadFunctionElimination();
+
   P.addFlowIsolation();
 
   //===---

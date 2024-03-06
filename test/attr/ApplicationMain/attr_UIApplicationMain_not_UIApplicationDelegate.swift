@@ -6,7 +6,7 @@
 import UIKit
 
 @UIApplicationMain // expected-error{{'UIApplicationMain' class must conform to the 'UIApplicationDelegate' protocol}}
-// expected-deprecated-warning@-1 {{'UIApplicationMain' is deprecated; this is an error in Swift 6}}
+// expected-deprecated-warning@-1 {{'UIApplicationMain' is deprecated; this is an error in the Swift 6 language mode}}
 // expected-deprecated-note@-2 {{use @main instead}} {{1-19=@main}}
 class MyNonDelegate {
 }

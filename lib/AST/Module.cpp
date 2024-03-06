@@ -722,6 +722,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
   Bits.ModuleDecl.HasCxxInteroperability = 0;
+  Bits.ModuleDecl.AllowNonResilientAccess = 0;
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {
@@ -2296,7 +2297,7 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
         for (Identifier overlay: overlays) {
           // We don't present non-underscored overlays as part of the underlying
           // module, so ignore them.
-          if (!overlay.str().startswith("_"))
+          if (!overlay.hasUnderscoredNaming())
             continue;
           ModuleDecl *overlayMod =
               getASTContext().getModuleByName(overlay.str());

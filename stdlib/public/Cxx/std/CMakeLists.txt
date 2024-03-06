@@ -35,6 +35,7 @@ endif()
 # as it's not ABI stable.
 add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS_FRAGILE
     std.swift
+    Chrono.swift
     String.swift
 
     SWIFT_MODULE_DEPENDS Cxx

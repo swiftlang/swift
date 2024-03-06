@@ -280,6 +280,10 @@ public:
   /// termination.
   bool PrintClangStats = false;
 
+  /// Indicates whether or not the Clang importer should dump lookup tables
+  /// upon termination.
+  bool DumpClangLookupTables = false;
+
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 
@@ -310,6 +314,10 @@ public:
 
   /// Should we skip decls that cannot be referenced externally?
   bool SkipNonExportableDecls = false;
+
+  /// True if -experimental-allow-non-resilient-access is passed and built
+  /// from source.
+  bool AllowNonResilientAccess = false;
 
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?

@@ -2,10 +2,6 @@ set(library_name "swiftCompatibility56")
 
 include_directories("include/" "${SWIFT_STDLIB_SOURCE_DIR}")
 
-set(CMAKE_C_VISIBILITY_PRESET hidden)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
-
 add_compile_definitions(SWIFT_COMPATIBILITY56)
 add_swift_target_library("${library_name}" STATIC
   Overrides.cpp

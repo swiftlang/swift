@@ -629,7 +629,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
       bool VerArgWasEmpty = VerArg.empty();
       if (parseVersionTuple(
               VerArg.Version, VerArg.Range,
-              Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+              {diag::attr_availability_expected_version, {AttrName}})) {
         AnyArgumentInvalid = true;
         if (peekToken().isAny(tok::r_paren, tok::comma))
           consumeToken();
@@ -2251,7 +2251,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   llvm::VersionTuple VerTuple;
   SourceRange VersionRange;
   if (parseVersionTuple(VerTuple, VersionRange,
-      Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+        {diag::attr_availability_expected_version, {AttrName}})) {
     return makeParserError();
   }
 
@@ -2419,43 +2419,69 @@ bool Parser::parseDocumentationAttributeArgument(
   return true;
 }
 
-ParserResult<DocumentationAttr>
-Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
-  StringRef AttrName = "_documentation";
-  bool declModifier =
-      DeclAttribute::isDeclModifier(DeclAttrKind::Documentation);
-  std::optional<AccessLevel> Visibility = std::nullopt;
-  std::optional<StringRef> Metadata = std::nullopt;
-
+ParserStatus
+Parser::parseAttributeArguments(SourceLoc attrLoc, StringRef attrName,
+                                bool isModifier, SourceRange &parensRange,
+                                llvm::function_ref<ParserStatus()> parseArg) {
+  parensRange.Start = Tok.getLoc();
   if (!consumeIfAttributeLParen()) {
-    diagnose(Loc, diag::attr_expected_lparen, AttrName,
-             declModifier);
+    diagnose(attrLoc, diag::attr_expected_lparen, attrName, isModifier);
     return makeParserError();
   }
 
-  while (Tok.isNot(tok::r_paren)) {
-    if (!parseDocumentationAttributeArgument(Metadata, Visibility))
+  return parseList(tok::r_paren, parensRange.Start, parensRange.End,
+                   /*allow sep after last*/ true,
+                   {diag::attr_expected_rparen, {attrName, isModifier}},
+                   parseArg);
+}
+
+ParserResult<DocumentationAttr>
+Parser::parseDocumentationAttribute(SourceLoc atLoc, SourceLoc loc) {
+  StringRef attrName = "_documentation";
+
+  std::optional<AccessLevel> visibility = std::nullopt;
+  std::optional<StringRef> metadata = std::nullopt;
+
+  SourceRange parensRange;
+  auto status = parseAttributeArguments(loc, attrName, false, parensRange,
+                                        [&] {
+    if (!parseDocumentationAttributeArgument(metadata, visibility))
       return makeParserError();
+    return makeParserSuccess();
+  });
+  if (!status.isSuccess())
+    return status;
 
-    if (Tok.is(tok::comma)) {
-      consumeToken();
-    } else if (Tok.isNot(tok::r_paren)) {
-      diagnose(Tok, diag::expected_separator, ",");
+  auto range = SourceRange(loc, parensRange.End);
+  StringRef finalMetadata = metadata.value_or("");
+
+  return makeParserResult(
+    new (Context) DocumentationAttr(loc, range, finalMetadata,
+                                    visibility, false));
+}
+
+ParserResult<AllowFeatureSuppressionAttr>
+Parser::parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc) {
+  StringRef attrName = "_allowFeatureSuppression";
+
+  SmallVector<Identifier, 4> features;
+  SourceRange parensRange;
+  auto status = parseAttributeArguments(loc, attrName, /*modifier*/ false,
+                                        parensRange, [&] {
+    Identifier feature;
+    if (parseAnyIdentifier(feature, /*diagnose dollars*/ true,
+                           diag::attr_expected_feature_name, attrName))
       return makeParserError();
-    }
-  }
+    features.push_back(feature);
+    return makeParserSuccess();
+  });
+  if (!status.isSuccess())
+    return status;
 
-  auto range = SourceRange(Loc, Tok.getRange().getStart());
-
-  if (!consumeIf(tok::r_paren)) {
-    diagnose(Loc, diag::attr_expected_rparen, AttrName,
-             declModifier);
-    return makeParserError();
-  }
-
-  StringRef FinalMetadata = Metadata.value_or("");
-
-  return makeParserResult(new (Context) DocumentationAttr(Loc, range, FinalMetadata, Visibility, false));
+  auto range = SourceRange(loc, parensRange.End);
+  return makeParserResult(
+    AllowFeatureSuppressionAttr::create(Context, loc, range, /*implicit*/ false,
+                                        features));
 }
 
 static std::optional<MacroIntroducedDeclNameKind>
@@ -2745,7 +2771,7 @@ Parser::parseMacroRoleAttribute(
 ///          omitted; the identifier written by the user otherwise.
 static std::optional<Identifier> parseSingleAttrOptionImpl(
     Parser &P, SourceLoc Loc, SourceRange &AttrRange, StringRef AttrName,
-    DeclAttrKind DK, bool allowOmitted, Diagnostic nonIdentifierDiagnostic) {
+    DeclAttrKind DK, bool allowOmitted, DiagRef nonIdentifierDiagnostic) {
   SWIFT_DEFER {
     AttrRange = SourceRange(Loc, P.PreviousLoc);
   };
@@ -2793,7 +2819,7 @@ parseSingleAttrOptionIdentifier(Parser &P, SourceLoc Loc,
                                 DeclAttrKind DK, bool allowOmitted = false) {
   return parseSingleAttrOptionImpl(
              P, Loc, AttrRange, AttrName, DK, allowOmitted,
-             { diag::attr_expected_option_identifier, AttrName });
+             {diag::attr_expected_option_identifier, {AttrName}});
 }
 
 /// Parses a (possibly optional) argument for an attribute containing a single identifier from a known set of
@@ -2819,8 +2845,8 @@ parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
   auto parsedIdentifier = parseSingleAttrOptionImpl(
              P, Loc, AttrRange,AttrName, DK,
              /*allowOmitted=*/valueIfOmitted.has_value(),
-             Diagnostic(diag::attr_expected_option_such_as, AttrName,
-                        options.front().first.str()));
+             {diag::attr_expected_option_such_as,
+              {AttrName, options.front().first.str()}});
   if (!parsedIdentifier)
     return std::nullopt;
 
@@ -2871,14 +2897,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     DiscardAttribute = true;
-  }
-
-  if (Context.LangOpts.Target.isOSBinFormatCOFF()) {
-    if (DK == DeclAttrKind::WeakLinked) {
-      diagnose(Loc, diag::attr_unsupported_on_target, AttrName,
-               Context.LangOpts.Target.str());
-      DiscardAttribute = true;
-    }
   }
 
   if (DK == DeclAttrKind::ResultDependsOnSelf &&
@@ -3498,7 +3516,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     assert(!OriginalModuleName.empty());
     assert(!PlatformAndVersions.empty());
     assert(NK == NextSegmentKind::PlatformVersion);
-    AttrRange = SourceRange(Loc, Tok.getLoc());
+    AttrRange = SourceRange(Loc, RightLoc);
     for (auto &Item: PlatformAndVersions) {
       Attributes.add(new (Context) OriginallyDefinedInAttr(AtLoc, AttrRange,
                                                            OriginalModuleName,
@@ -3883,6 +3901,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return Attr;
     break;
   }
+  case DeclAttrKind::AllowFeatureSuppression: {
+    auto Attr = parseAllowFeatureSuppressionAttribute(AtLoc, Loc);
+    Status |= Attr;
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    else
+      return makeParserSuccess();
+    break;
+  }
   case DeclAttrKind::RawLayout: {
     if (Tok.isNot(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -3944,28 +3971,30 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      if (!consumeIf(tok::r_paren)) {
+      SourceLoc rParenLoc;
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
                  AttrName, /*isModifier*/false);
         return makeParserSuccess();
       }
       
       attr = new (Context) RawLayoutAttr(size, align,
-                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+                                         AtLoc, SourceRange(Loc, rParenLoc));
     } else if (firstLabel.is("like")) {
       // @_rawLayout(like: T)
       auto likeType = parseType(diag::expected_type);
       if (likeType.isNull()) {
         return makeParserSuccess();
       }
-      if (!consumeIf(tok::r_paren)) {
+      SourceLoc rParenLoc;
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
                  AttrName, /*isModifier*/false);
         return makeParserSuccess();
       }
 
       attr = new (Context) RawLayoutAttr(likeType.get(),
-                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+                                         AtLoc, SourceRange(Loc, rParenLoc));
     } else if (firstLabel.is("likeArrayOf")) {
       // @_rawLayout(likeArrayOf: T, count: N)
       auto likeType = parseType(diag::expected_type);
@@ -4003,14 +4032,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      if (!consumeIf(tok::r_paren)) {
+      SourceLoc rParenLoc;
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
                  AttrName, /*isModifier*/false);
         return makeParserSuccess();
       }
       
       attr = new (Context) RawLayoutAttr(likeType.get(), count,
-                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+                                         AtLoc, SourceRange(Loc, rParenLoc));
     } else {
       diagnose(Loc, diag::attr_rawlayout_expected_label,
                "'size', 'like', or 'likeArrayOf'");
@@ -4040,7 +4070,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
 bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
                                SourceRange &Range,
-                               const Diagnostic &D) {
+                               DiagRef D) {
   // A version number is either an integer (8), a float (8.1), or a
   // float followed by a dot and an integer (8.1.0).
   if (!Tok.isAny(tok::integer_literal, tok::floating_literal)) {

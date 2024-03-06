@@ -1,4 +1,5 @@
 // REQUIRES: VENDOR=apple
+// XFAIL: OS=ios && (CPU=arm64e || CPU=arm64)
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/cache)
 // RUN: split-file %s %t

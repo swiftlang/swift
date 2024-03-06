@@ -1693,18 +1693,19 @@ public:
     }
 
     SILMultiAssignOptions options;
-    for (auto arg : pai->getOperandValues()) {
-      if (auto value = tryToTrackValue(arg)) {
+    for (auto &op : pai->getAllOperands()) {
+      if (auto value = tryToTrackValue(op.get())) {
         if (value->isActorDerived()) {
           options |= SILMultiAssignFlags::PropagatesActorSelf;
         }
       } else {
-        // NOTE: One may think that only sendable things can enter
-        // here... but we treat things like function_ref/class_method which
-        // are non-Sendable as sendable for our purposes.
-        if (arg->getType().isActor()) {
+        // We only treat Sendable values as propagating actor self if the
+        // partial apply has operand as an sil_isolated parameter.
+        ApplySite applySite(pai);
+        if (applySite.isArgumentOperand(op) &&
+            ApplySite(pai).getArgumentParameterInfo(op).hasOption(
+                SILParameterInfo::Isolated))
           options |= SILMultiAssignFlags::PropagatesActorSelf;
-        }
       }
     }
 
@@ -1986,16 +1987,6 @@ public:
     SILValue srcValue = src->get();
 
     if (auto nonSendableDest = tryToTrackValue(destValue)) {
-      // Before we do anything check if we have an assignment into an
-      // alloc_stack for a consuming transferring parameter... in such a case,
-      // we need to handle this specially.
-      if (nonSendableDest->isTransferringParameter()) {
-        if (auto nonSendableSrc = tryToTrackValue(srcValue)) {
-          return translateSILAssignmentToTransferringParameter(
-              *nonSendableDest, dest, *nonSendableSrc, src);
-        }
-      }
-
       // In the following situations, we can perform an assign:
       //
       // 1. A store to unaliased storage.
@@ -3066,6 +3057,7 @@ void RegionAnalysisFunctionInfo::runDataflow() {
 
     for (auto *block : pofi->getReversePostOrder()) {
       auto &blockState = (*blockStates)[block];
+      blockState.isLive = true;
 
       LLVM_DEBUG(llvm::dbgs() << "Block: bb" << block->getDebugID() << "\n");
       if (!blockState.needsUpdate) {

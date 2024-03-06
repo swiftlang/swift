@@ -2275,7 +2275,7 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
 }
 
 DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
-                                     const Diagnostic &diag,
+                                     DiagRef diag,
                                      DeclNameOptions flags) {
   // Consume the base name.
   DeclBaseName baseName;
@@ -2338,7 +2338,7 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
     SourceLoc &poundLoc, DeclNameLoc &macroNameLoc, DeclNameRef &macroNameRef,
     SourceLoc &leftAngleLoc, SmallVectorImpl<TypeRepr *> &genericArgs,
     SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
-    const Diagnostic &diag) {
+    DiagRef diag) {
   SourceLoc poundEndLoc = Tok.getRange().getEnd();
   poundLoc = consumeToken(tok::pound);
 

@@ -1,8 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 func testInvalidConformance() {
   // expected-error@+1 {{type 'T' constrained to non-protocol, non-class type 'Int'}}
   func invalidIntConformance<T>(_: T) where T: Int {}
@@ -324,10 +322,11 @@ func sameTypeConflicts() {
   // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == G<U.Foo>' and 'T.X == Int'}}
   func fail7<U: Fooable, T: Concrete>(_: U, _: T) where T.X == G<U.Foo> {}
 
+  // expected-warning@+2{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
   // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail8<T, U: Fooable>(_: U, _: T) where T == G<U.Foo>, T == Int {}
 
   // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail9<T, U: Fooable>(_: U, _: T) where T == Int, T == G<U.Foo> {}
-  // expected-warning@-1{{same-type requirement makes generic parameter 'T' non-generic; this is an error in Swift 6}}
+  // expected-warning@-1{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
 }

@@ -1719,6 +1719,35 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   return substitutions;
 }
 
+bool ModuleFile::readInheritedProtocols(
+    SmallVectorImpl<ProtocolDecl *> &inherited) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return false;
+
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
+  if (recordID != INHERITED_PROTOCOLS)
+    return false;
+
+  lastRecordOffset.reset();
+
+  ArrayRef<uint64_t> inheritedIDs;
+  InheritedProtocolsLayout::readRecord(scratch, inheritedIDs);
+
+  llvm::transform(inheritedIDs, std::back_inserter(inherited),
+                  [&](uint64_t protocolID) {
+                    return cast<ProtocolDecl>(getDecl(protocolID));
+                  });
+  return true;
+}
+
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
   using namespace decls_block;
 
@@ -4425,21 +4454,21 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, hasSelfOrAssocTypeRequirements;
+    TypeID superclassID;
     uint8_t rawAccessLevel;
-    unsigned numInheritedTypes;
-    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
+    ArrayRef<uint64_t> dependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             hasSelfOrAssocTypeRequirements,
-                                            rawAccessLevel, numInheritedTypes,
-                                            rawInheritedAndDependencyIDs);
+                                            superclassID,
+                                            rawAccessLevel,
+                                            dependencyIDs);
 
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
-    for (TypeID dependencyID :
-           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+    for (TypeID dependencyID : dependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -4457,6 +4486,8 @@ public:
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
+    proto->setSuperclass(MF.getType(superclassID));
+
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
     ctx.evaluator.cacheOutput(HasSelfOrAssociatedTypeRequirementsRequest{proto},
@@ -4467,13 +4498,17 @@ public:
     else
       return MF.diagnoseFatal();
 
+    SmallVector<ProtocolDecl *, 2> inherited;
+    if (!MF.readInheritedProtocols(inherited))
+      return MF.diagnoseFatal();
+
+    ctx.evaluator.cacheOutput(InheritedProtocolsRequest{proto},
+                              ctx.AllocateCopy(inherited));
+
     auto genericParams = MF.maybeReadGenericParams(DC);
     assert(genericParams && "protocol with no generic parameters?");
     ctx.evaluator.cacheOutput(GenericParamListRequest{proto},
                               std::move(genericParams));
-
-    handleInherited(proto,
-                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     if (isImplicit)
       proto->setImplicit();
@@ -5968,6 +6003,22 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
                                             SourceRange(), spis);
+        break;
+      }
+
+      case decls_block::AllowFeatureSuppression_DECL_ATTR: {
+        bool isImplicit;
+        ArrayRef<uint64_t> featureIds;
+        serialization::decls_block::AllowFeatureSuppressionDeclAttrLayout
+                     ::readRecord(scratch, isImplicit, featureIds);
+
+        SmallVector<Identifier, 4> features;
+        for (auto id : featureIds)
+          features.push_back(MF.getIdentifier(id));
+
+        Attr = AllowFeatureSuppressionAttr::create(ctx, SourceLoc(),
+                                                   SourceRange(), isImplicit,
+                                                   features);
         break;
       }
 
@@ -8207,7 +8258,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto maybeConformance = getConformanceChecked(conformanceID);
     if (maybeConformance) {
       reqConformances.push_back(maybeConformance.get());
-    } else if (allowCompilerErrors()) {
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
       diagnoseAndConsumeError(maybeConformance.takeError());
       reqConformances.push_back(ProtocolConformanceRef::forInvalid());
     } else {

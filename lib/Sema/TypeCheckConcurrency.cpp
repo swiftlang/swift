@@ -2427,6 +2427,8 @@ namespace {
     }
 
     void checkDefaultArgument(DefaultArgumentExpr *expr) {
+      getCurrentContextIsolation(expr);
+
       // Check the context isolation against the required isolation for
       // evaluating the default argument synchronously. If the default
       // argument must be evaluated asynchronously, record that in the
@@ -2468,6 +2470,15 @@ namespace {
         // If the closure won't execute concurrently with the context in
         // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
+        auto isolation = getActorIsolation(decl);
+
+        // 'nonisolated' local variables are always okay to capture in
+        // 'Sendable' closures because they can be accessed from anywhere.
+        // Note that only 'nonisolated(unsafe)' can be applied to local
+        // variables.
+        if (isolation.isNonisolated())
+          continue;
+
         auto *context = localFunc.getAsDeclContext();
         auto fnType = localFunc.getType()->getAs<AnyFunctionType>();
         if (!mayExecuteConcurrentlyWith(context, decl->getDeclContext()))
@@ -3046,7 +3057,7 @@ namespace {
       ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value)
           .limitBehaviorUntilSwiftVersion(limit, 6)
           // Preconcurrency global variables are warnings even in Swift 6
-          .limitBehaviorIf(isPreconcurrencyImport, DiagnosticBehavior::Warning);
+          .limitBehaviorIf(isPreconcurrencyImport, limit);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       if (const auto sourceFile = getDeclContext()->getParentSourceFile();
           sourceFile && isPreconcurrencyImport) {
@@ -3369,13 +3380,8 @@ namespace {
 
         // FIXME: CurrentContextIsolationExpr does not have its actor set
         // at this point.
-        if (auto *macro = dyn_cast<MacroExpansionExpr>(arg)) {
-          auto *expansion = macro->getRewritten();
-          if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expansion)) {
-            recordCurrentContextIsolation(isolation);
-            arg = isolation->getActor();
-          }
-        }
+        if (auto isolation = getCurrentContextIsolation(arg))
+          arg = isolation;
 
         argForIsolatedParam = arg;
         unsatisfiedIsolation = std::nullopt;
@@ -3536,6 +3542,25 @@ namespace {
         return true;
 
       return false;
+    }
+
+    Expr *getCurrentContextIsolation(Expr *expr) {
+      // Look through caller-side default arguments for #isolation.
+      auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr);
+      if (defaultArg && defaultArg->isCallerSide()) {
+        expr = defaultArg->getCallerSideDefaultExpr();
+      }
+
+      if (auto *macro = dyn_cast<MacroExpansionExpr>(expr)) {
+        expr = macro->getRewritten();
+      }
+
+      if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expr)) {
+        recordCurrentContextIsolation(isolation);
+        return isolation->getActor();
+      }
+
+      return nullptr;
     }
 
     void recordCurrentContextIsolation(
@@ -5490,13 +5515,18 @@ static bool checkSendableInstanceStorage(
 
     /// Handle a stored property.
     bool operator()(VarDecl *property, Type propertyType) override {
+      ActorIsolation isolation = getActorIsolation(property);
+
+      // 'nonisolated' properties are always okay in 'Sendable' types because
+      // they can be accessed from anywhere. Note that 'nonisolated' without
+      // '(unsafe)' can only be applied to immutable, 'Sendable' properties.
+      if (isolation.isNonisolated())
+        return false;
+
       // Classes with mutable properties are Sendable if property is
       // actor-isolated
       if (isa<ClassDecl>(nominal)) {
-        ActorIsolation isolation = getActorIsolation(property);
-
-        if (property->supportsMutation() &&
-            (isolation.isNonisolated() || isolation.isUnspecified())) {
+        if (property->supportsMutation() && isolation.isUnspecified()) {
           auto behavior =
               SendableCheckContext(dc, check).defaultDiagnosticBehavior();
           if (behavior != DiagnosticBehavior::Ignore) {

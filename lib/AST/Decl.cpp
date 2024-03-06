@@ -1083,7 +1083,7 @@ bool Decl::hasUnderscoredNaming() const {
   }
 
   if (!VD->getBaseName().isSpecial() &&
-      VD->getBaseIdentifier().str().startswith("_")) {
+      VD->getBaseIdentifier().hasUnderscoredNaming()) {
     return true;
   }
 
@@ -1563,6 +1563,15 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
   }
 }
 
+InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
+  Entries = typeDecl->Inherited;
+}
+
+InheritedTypes::InheritedTypes(const ExtensionDecl *extensionDecl)
+    : Decl(extensionDecl) {
+  Entries = extensionDecl->Inherited;
+}
+
 InheritedTypes::InheritedTypes(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl)
     : Decl(decl) {
@@ -1639,15 +1648,6 @@ SourceRange InheritedTypes::getRemovalRange(unsigned i) const {
                                  inheritedClause[i].getSourceRange().End);
 
   return SourceRange(afterPriorLoc, afterMyEndLoc);
-}
-
-InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
-  Entries = typeDecl->Inherited;
-}
-
-InheritedTypes::InheritedTypes(const ExtensionDecl *extensionDecl)
-    : Decl(extensionDecl) {
-  Entries = extensionDecl->Inherited;
 }
 
 Type InheritedTypes::getResolvedType(unsigned i,
@@ -1763,32 +1763,32 @@ bool ExtensionDecl::isConstrainedExtension() const {
   return !typeSig->isEqual(extSig);
 }
 
-bool ExtensionDecl::isEquivalentToExtendedContext() const {
+bool ExtensionDecl::isInSameDefiningModule() const {
   auto decl = getExtendedNominal();
-  bool extendDeclFromSameModule = false;
   auto extensionAlterName = getAlternateModuleName();
   auto typeAlterName = decl->getAlternateModuleName();
 
   if (!extensionAlterName.empty()) {
     if (!typeAlterName.empty()) {
       // Case I: type and extension are both moved from somewhere else
-      extendDeclFromSameModule = typeAlterName == extensionAlterName;
+      return typeAlterName == extensionAlterName;
     } else {
       // Case II: extension alone was moved from somewhere else
-      extendDeclFromSameModule = extensionAlterName ==
-        decl->getParentModule()->getNameStr();
+      return extensionAlterName == decl->getParentModule()->getNameStr();
     }
   } else {
     if (!typeAlterName.empty()) {
       // Case III: extended type alone was moved from somewhere else
-      extendDeclFromSameModule = typeAlterName == getParentModule()->getNameStr();
+      return typeAlterName == getParentModule()->getNameStr();
     } else {
       // Case IV: neither of type and extension was moved from somewhere else
-      extendDeclFromSameModule = getParentModule() == decl->getParentModule();
+      return getParentModule() == decl->getParentModule();
     }
   }
+}
 
-  return extendDeclFromSameModule
+bool ExtensionDecl::isEquivalentToExtendedContext() const {
+  return isInSameDefiningModule()
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
 }
@@ -4214,9 +4214,13 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 }
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
+  // Client needs to opt in to bypass resilience checks at the use site.
+  // Client and the loaded module both need to be in the same package.
+  // The loaded module needs to be built from source and opt in to allow
+  // non-resilient access.
   return getASTContext().LangOpts.EnableBypassResilienceInPackage &&
          getModuleContext()->inSamePackage(accessingModule) &&
-         !getModuleContext()->isBuiltFromInterface();
+         getModuleContext()->allowNonResilientAccess();
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -6858,63 +6862,12 @@ ProtocolDecl::getProtocolDependencies() const {
       std::nullopt);
 }
 
-/// If we hit a request cycle, give the protocol a requirement signature that
-/// still has inherited protocol requirements on Self, and also conformances
-/// to Copyable and Escapable for all associated types. Otherwise, we'll see
-/// invariant violations from the inheritance clause mismatch, as well as
-/// spurious downstream diagnostics concerning move-only types.
-static RequirementSignature getPlaceholderRequirementSignature(
-    const ProtocolDecl *proto) {
-  auto &ctx = proto->getASTContext();
-
-  SmallVector<ProtocolDecl *, 2> inheritedProtos;
-  for (auto *inheritedProto : proto->getInheritedProtocols()) {
-    inheritedProtos.push_back(inheritedProto);
-  }
-
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto ip : InvertibleProtocolSet::full()) {
-      auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-      inheritedProtos.push_back(otherProto);
-    }
-  }
-
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  SmallVector<Requirement, 2> requirements;
-
-  for (auto *inheritedProto : inheritedProtos) {
-    requirements.emplace_back(RequirementKind::Conformance,
-                              proto->getSelfInterfaceType(),
-                              inheritedProto->getDeclaredInterfaceType());
-  }
-
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
-      for (auto ip : InvertibleProtocolSet::full()) {
-        auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-        requirements.emplace_back(RequirementKind::Conformance,
-                                  assocTypeDecl->getDeclaredInterfaceType(),
-                                  otherProto->getDeclaredInterfaceType());
-      }
-    }
-  }
-
-  // Maintain invariants.
-  llvm::array_pod_sort(requirements.begin(), requirements.end(),
-                       [](const Requirement *lhs, const Requirement *rhs) -> int {
-                         return lhs->compare(*rhs);
-                       });
-
-  return RequirementSignature(ctx.AllocateCopy(requirements),
-                              ArrayRef<ProtocolTypeAlias>());
-}
-
 RequirementSignature ProtocolDecl::getRequirementSignature() const {
   return getASTContext().evaluator(
-               RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
+               RequirementSignatureRequest{const_cast<ProtocolDecl *>(this)},
                [this]() {
-                 return getPlaceholderRequirementSignature(this);
+                 return RequirementSignature::getPlaceholderRequirementSignature(
+                     this, GenericSignatureErrors());
                });
 }
 

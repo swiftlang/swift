@@ -497,6 +497,8 @@ PASS(MoveOnlyBorrowToDestructureTransform,
      "any move only errors with respect to non-borrow+projection uses")
 PASS(ReferenceBindingTransform, "sil-reference-binding-transform",
      "Check/transform reference bindings")
+PASS(DiagnosticDeadFunctionElimination, "sil-diagnostic-dead-function-elim",
+     "Eliminate dead functions from early specialization optimizations before we run later diagnostics")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)

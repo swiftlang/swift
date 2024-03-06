@@ -1,0 +1,24 @@
+// RUN: %swift -emit-ir %s -enable-experimental-feature IsolatedAny -target x86_64-apple-macosx10.10 -disable-legacy-type-info -parse-stdlib | %FileCheck -DINT=i64 %s -check-prefixes=CHECK,CHECK-ACCESSOR
+// RUN: %swift -emit-ir %s -enable-experimental-feature IsolatedAny -target x86_64-unknown-linux-gnu -disable-legacy-type-info -parse-stdlib | %FileCheck -DINT=i64 %s -check-prefixes=CHECK,CHECK-DEMANGLE
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+// CHECK-LABEL:        define{{.*}} swiftcc ptr @get_metadata
+// CHECK:              entry:
+// CHECK-ACCESSOR-NEXT:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$syyYAcMa"([[INT]] 0)
+// CHECK-ACCESSOR-NEXT:  [[METADATA:%.]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-DEMANGLE:       [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYAcMD")
+// CHECK-NEXT:           ret ptr [[METADATA]]
+sil @get_metadata : $() -> @thick Any.Type {
+entry:
+  %type = metatype $@thick (@isolated(any) () -> ()).Type
+  %result = init_existential_metatype %type : $@thick (@isolated(any) () -> ()).Type, $@thick Any.Type
+  return %result : $@thick Any.Type
+}
+
+// CHECK-ACCESSOR-LABEL: define{{.*}} swiftcc %swift.metadata_response @"$syyYAcMa"
+//   2214592512 == 0x84000000 == (ExtendedFlags | Escaping)
+//   2 == IsolatedAny
+// CHECK-ACCESSOR:         call ptr @swift_getExtendedFunctionTypeMetadata([[INT]] 2214592512, [[INT]] 0, ptr null, ptr null, ptr getelementptr inbounds {{.*}} @"$sytN"{{.*}}), ptr null, i32 2, ptr null)

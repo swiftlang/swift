@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -431,6 +431,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
 #if $BitwiseCopyable
+  @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T : _BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
@@ -442,6 +443,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 #endif
+  @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
@@ -1074,10 +1076,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Result, E: Error>(
     to type: T.Type,
-    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     guard let s = _position else {
       return try body(.init(start: nil, count: 0))
     }

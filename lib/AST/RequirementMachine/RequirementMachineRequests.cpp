@@ -342,8 +342,8 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
   unsigned attempt = 0;
   for (;;) {
-    for (const auto *proto : component) {
-      auto &requirements = protos[proto];
+    for (const auto *otherProto : component) {
+      auto &requirements = protos[otherProto];
 
       // Preprocess requirements to eliminate conformances on type parameters
       // which are made concrete.
@@ -384,11 +384,13 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
         if (otherProto != proto) {
           ctx.evaluator.cacheOutput(
             RequirementSignatureRequest{const_cast<ProtocolDecl *>(otherProto)},
-            RequirementSignature(GenericSignatureErrorFlags::CompletionFailed));
+            RequirementSignature::getPlaceholderRequirementSignature(
+                otherProto, GenericSignatureErrorFlags::CompletionFailed));
         }
       }
 
-      return RequirementSignature(GenericSignatureErrorFlags::CompletionFailed);
+      return RequirementSignature::getPlaceholderRequirementSignature(
+          proto, GenericSignatureErrorFlags::CompletionFailed);
     }
 
     auto minimalRequirements = machine->computeMinimalProtocolRequirements();

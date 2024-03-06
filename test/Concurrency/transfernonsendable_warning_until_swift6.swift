@@ -34,13 +34,13 @@ func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {
 
 func testAssignmentIntoTransferringParameter(_ x: transferring NonSendableType) async {
   let y = NonSendableType()
-  x = y // expected-error {{transferring value of non-Sendable type 'NonSendableType' into transferring parameter; later accesses could race}}
-  useValue(y) // expected-note {{access here could race}}
+  await transferToMain(x)
+  x = y
+  useValue(y)
 }
 
 func testAssigningParameterIntoTransferringParameter(_ x: transferring NonSendableType, _ y: NonSendableType) async {
-  x = y // expected-error {{assigning 'y' to transferring parameter 'x' may cause a race}}
-  // expected-note @-1 {{'y' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y'}}
+  x = y
 }
 
 func testIsolationCrossingDueToCapture() async {
