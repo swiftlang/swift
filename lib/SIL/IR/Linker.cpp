@@ -448,11 +448,6 @@ void SILLinkerVisitor::process() {
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
     }
 
-    // TODO: This should probably be done as a separate SIL pass ("internalize")
-    if (Fn->getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-      Fn->setLinkage(stripExternalFromLinkage(Fn->getLinkage()));
-    }
-
     LLVM_DEBUG(llvm::dbgs() << "Process imports in function: "
                             << Fn->getName() << "\n");
 
