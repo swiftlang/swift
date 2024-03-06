@@ -491,7 +491,10 @@ DECL_ATTR(_distributedThunkTarget, DistributedThunkTarget,
 DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
   157)
-LAST_DECL_ATTR(AllowFeatureSuppression)
+SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
+  OnAbstractFunction | OnSubscript | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  158)
+LAST_DECL_ATTR(PreInverseGenerics)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

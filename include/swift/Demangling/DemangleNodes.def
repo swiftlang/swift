@@ -394,5 +394,7 @@ NODE(OutlinedAssignWithTakeNoValueWitness)
 NODE(OutlinedAssignWithCopyNoValueWitness)
 NODE(OutlinedDestroyNoValueWitness)
 
+NODE(DependentGenericInverseConformanceRequirement)
+
 #undef CONTEXT_NODE
 #undef NODE

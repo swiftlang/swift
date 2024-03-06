@@ -145,6 +145,11 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch");
   }
 
+  friend bool operator!=(const Requirement &lhs,
+                         const Requirement &rhs) {
+    return !(lhs == rhs);
+  }
+
   /// Whether this requirement's types contain ErrorTypes.
   bool hasError() const;
 
@@ -256,6 +261,9 @@ struct InverseRequirement {
   InverseRequirement(Type subject, ProtocolDecl *protocol, SourceLoc loc);
 
   InvertibleProtocolKind getKind() const;
+
+  /// Linear order on inverse requirements in a generic signature.
+  int compare(const InverseRequirement &other) const;
 
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.

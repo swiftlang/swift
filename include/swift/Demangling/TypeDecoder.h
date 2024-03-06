@@ -448,7 +448,13 @@ void decodeRequirement(NodePointer node,
           child->getChild(1), /*forRequirement=*/false);
       if (!constraintType)
         return;
+    } else if (child->getKind() ==
+          Demangle::Node::Kind::DependentGenericInverseConformanceRequirement) {
+      // FIXME(kavon): this is unimplemented! We should build a PCT here with
+      //               the inverse in it.
+      return;
     }
+
 
     switch (child->getKind()) {
     case Demangle::Node::Kind::DependentGenericConformanceRequirement: {
