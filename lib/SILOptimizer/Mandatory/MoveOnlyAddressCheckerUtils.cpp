@@ -101,7 +101,7 @@
 /// ```
 ///
 /// The variants of SMOA form can be classified by the specific
-/// mark_unresolved_non_copyable_value kind put on the the checker mark
+/// mark_unresolved_non_copyable_value kind put on the checker mark
 /// instruction and are as follows:
 ///
 /// 1. no_consume_or_assign. This means that the address can only be consumed by

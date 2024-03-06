@@ -617,7 +617,7 @@ public:
     /// argument that was not rethrows/reasync-only in this context.
     ByDefaultClosure,
 
-    /// The the function is rethrows/reasync, and it was called with
+    /// The function is rethrows/reasync, and it was called with
     /// a throwing conformance as one of its generic arguments.
     ByConformance,
 

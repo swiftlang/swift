@@ -75,7 +75,7 @@ func globalWithAppend() {
   printit(S.a)
 }
 
-// First method to pass a FixedArray to a function: as `borrowing` paramter
+// First method to pass a FixedArray to a function: as `borrowing` parameter
 func printit<T: Printable>(_ a: borrowing FixedArray<T>) {
   // Currently FixedArray cannot conform to Collection, yet.
   // For iteration, we need to take the detour through BufferView.

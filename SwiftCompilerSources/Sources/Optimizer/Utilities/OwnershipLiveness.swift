@@ -476,7 +476,7 @@ struct InteriorUseWalker {
   ///
   /// .escaping may either be a non-address operand with
   /// .pointerEscape ownership, or and address operand that escapes
-  /// the adderss (address_to_pointer).
+  /// the address (address_to_pointer).
   ///
   /// .unknown is an address operand whose user is unrecognized.
   enum InteriorPointerStatus {

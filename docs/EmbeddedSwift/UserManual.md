@@ -26,7 +26,7 @@ A typical setup and build + run cycle for an embedded development board involves
 - (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool or by copying it to a fake USB Mass Storage volume presented by the board.
 - (6) Restarting the board, observing physical effects of the firmware (LEDs light up) or UART output over USB, or presence on network, etc.
 
-Most of these steps are out of scope for this document, instead refer to the vendor provided documentation and get familiar with the details of firmware development for your board without Swift in the mix first. Even if you want to build a completely pure Swift firmware, you are still very likely going to need the the vendor provided tooling for linking, post-processing, uploading, etc.
+Most of these steps are out of scope for this document, instead refer to the vendor provided documentation and get familiar with the details of firmware development for your board without Swift in the mix first. Even if you want to build a completely pure Swift firmware, you are still very likely going to need the vendor provided tooling for linking, post-processing, uploading, etc.
 
 ## Building code using Embedded Swift
 

@@ -244,7 +244,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   /// The SIL argument index of the function type's first parameter.
   public var firstParameterIndex: Int { indirectSILResultCount }
 
-  /// The SIL argument index of the 'self' paramter.
+  /// The SIL argument index of the 'self' parameter.
   var selfIndex: Int? {
     guard convention.hasSelfParameter else { return nil }
     // self is the last parameter

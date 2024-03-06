@@ -569,7 +569,7 @@ public:
       // pointer to a box can be formed; and the box doesn't synchronize on
       // deinit.
       //
-      // Only add a lexical lifetime to the box if the the variable it stores
+      // Only add a lexical lifetime to the box if the variable it stores
       // requires one.
       Box = SGF.B.createBeginBorrow(
           decl, Box, /*isLexical=*/lifetime.isLexical(),

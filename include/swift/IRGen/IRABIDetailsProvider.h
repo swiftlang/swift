@@ -235,7 +235,7 @@ public:
     SmallVector<TypeRecordABIRepresentation, 4> parameterTypes;
   };
 
-  /// Returns the function signature that is used for the the type metadata
+  /// Returns the function signature that is used for the type metadata
   /// access function.
   FunctionABISignature getTypeMetadataAccessFunctionSignature();
 
