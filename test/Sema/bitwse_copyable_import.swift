@@ -60,6 +60,11 @@ struct IntsTrailing3 {
   int is[];
 } __attribute__((__swift_attr__("_BitwiseCopyable")));
 
+enum E {
+  foo,
+  bar
+};
+
 //--- Downstream.swift
 
 func take<T : _BitwiseCopyable>(_ t: T) {}
@@ -84,4 +89,8 @@ func passIntsTrailing2(_ t: IntsTrailing2) {
 }
 func passIntsTrailing3(_ t: IntsTrailing3) {
   take(t)
+}
+
+func passE(_ e: E) {
+  take(e)
 }
