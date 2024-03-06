@@ -2215,7 +2215,6 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   Result.Version = MovedVersion;
   Result.ModuleName = OriginalModuleName;
   if (isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/false)) {
-    Result.IsSimulator = ctx.LangOpts.Target.isSimulatorEnvironment();
     return Result;
   }
 
@@ -2224,7 +2223,7 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   // libraries.
   if (ctx.LangOpts.TargetVariant.has_value() &&
       isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/true)) {
-    Result.IsSimulator = ctx.LangOpts.TargetVariant->isSimulatorEnvironment();
+    Result.ForTargetVariant = true;
     return Result;
   }
   return std::nullopt;
