@@ -164,19 +164,7 @@ Type swift::getDistributedActorSerializationType(
         actorProtocol->getAssociatedType(ctx.Id_SerializationRequirement)
             ->getDeclaredInterfaceType();
 
-    auto protocols = sig->getRequiredProtocols(serializationTy);
-    if (protocols.empty())
-      return Type();
-
-    SmallVector<Type, 2> members;
-    llvm::transform(protocols, std::back_inserter(members), [](const auto *P) {
-      return P->getDeclaredInterfaceType();
-    });
-
-    return ExistentialType::get(
-        ProtocolCompositionType::get(ctx, members,
-                                     /*inverses=*/{},
-                                     /*HasExplicitAnyObject=*/false));
+    return sig->getExistentialType(serializationTy);
   }
 
   return resultTy;
