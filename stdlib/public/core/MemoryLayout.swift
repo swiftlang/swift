@@ -42,6 +42,9 @@
 @frozen // namespace
 public enum MemoryLayout<T: ~Copyable> {}
 
+@available(*, unavailable)
+extension MemoryLayout : _BitwiseCopyable {}
+
 extension MemoryLayout where T: ~Copyable {
   /// The contiguous memory footprint of `T`, in bytes.
   ///
@@ -52,7 +55,7 @@ extension MemoryLayout where T: ~Copyable {
   /// When allocating memory for multiple instances of `T` using an unsafe
   /// pointer, use a multiple of the type's stride instead of its size.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public static var size: Int {
     return Int(Builtin.sizeof(T.self))
   }
@@ -65,7 +68,7 @@ extension MemoryLayout where T: ~Copyable {
   /// trades runtime performance for space efficiency. This value is always
   /// positive.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public static var stride: Int {
     return Int(Builtin.strideof(T.self))
   }
@@ -75,34 +78,8 @@ extension MemoryLayout where T: ~Copyable {
   /// Use the `alignment` property for a type when allocating memory using an
   /// unsafe pointer. This value is always positive.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public static var alignment: Int {
-    return Int(Builtin.alignof(T.self))
-  }
-}
-
-@available(*, unavailable)
-extension MemoryLayout : _BitwiseCopyable {}
-
-extension MemoryLayout {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static var size: Int {
-    return Int(Builtin.sizeof(T.self))
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static var stride: Int {
-    return Int(Builtin.strideof(T.self))
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static var alignment: Int {
     return Int(Builtin.alignof(T.self))
   }
 }
@@ -131,7 +108,7 @@ extension MemoryLayout where T: ~Copyable {
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The size, in bytes, of the given value's type.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public static func size(ofValue value: borrowing T) -> Int {
     return MemoryLayout.size
   }
@@ -160,7 +137,7 @@ extension MemoryLayout where T: ~Copyable {
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The stride, in bytes, of the given value's type.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public static func stride(ofValue value: borrowing T) -> Int {
     return MemoryLayout.stride
   }
@@ -186,31 +163,8 @@ extension MemoryLayout where T: ~Copyable {
   /// - Returns: The default memory alignment, in bytes, of the given value's
   ///   type. This value is always positive.
   @_transparent
-  @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public static func alignment(ofValue value: borrowing T) -> Int {
-    return MemoryLayout.alignment
-  }
-}
-
-extension MemoryLayout {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func size(ofValue value: borrowing T) -> Int {
-    return MemoryLayout.size
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func stride(ofValue value: borrowing T) -> Int {
-    return MemoryLayout.stride
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func alignment(ofValue value: borrowing T) -> Int {
     return MemoryLayout.alignment
   }
 }
