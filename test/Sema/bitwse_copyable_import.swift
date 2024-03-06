@@ -42,6 +42,18 @@ struct VoidPointers {
   void *p10;
 };
 
+struct IntsTrailing {
+  double d;
+  float f;
+  int is[];
+};
+
+struct IntsTrailing2 {
+  double d;
+  float f;
+  int is[];
+};
+
 //--- Downstream.swift
 
 func take<T : _BitwiseCopyable>(_ t: T) {}
@@ -55,4 +67,12 @@ func passInts128(_ t: Ints128) {
 func passVoidPointers(_ t: VoidPointers) { 
   take(t) 
   take(t.p10)
+}
+func passIntsTrailing(_ t: IntsTrailing) {
+  take(t) // expected-error{{type_does_not_conform_decl_owner}}
+          // expected-note@-14{{where_requirement_failure_one_subst}}
+}
+extension IntsTrailing2 : _BitwiseCopyable {} //expected-error{{bitwise_copyable_outside_module}}
+func passIntsTrailing2(_ t: IntsTrailing2) {
+  take(t)
 }

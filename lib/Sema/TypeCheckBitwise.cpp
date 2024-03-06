@@ -269,6 +269,13 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
+  if (sd && sd->hasUnreferenceableStorage()) {
+    if (!isImplicit(check)) {
+      sd->diagnose(diag::non_bitwise_copyable_c_type_nontrivial);
+    }
+    return true;
+  }
+
   BitwiseCopyableStorageVisitor visitor(nominal, dc, check);
 
   return visitor.visit(nominal, dc) || visitor.invalid;
