@@ -23,9 +23,9 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -1091,21 +1091,33 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Synthesize the unconditional conformances to invertible protocols.
   if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // Classes get their conformances during ModuleDecl::lookupConformance.
-    if (!isa<ClassDecl>(this)) {
-      bool missingOne = false;
-      for (auto ip : InvertibleProtocolSet::full()) {
-        if (!hasInverseMarking(ip))
-          addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
-        else
-          missingOne = true;
-      }
+    // FIXME: We should be able to only resolve the inheritance clause once,
+    // but we also do it in ConformanceLookupTable::updateLookupTable().
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void) getDirectlyInheritedNominalTypeDecls(this, inverses, anyObject);
 
-      // Non-copyable and non-escaping types do not implicitly conform to
-      // any other protocols.
-      if (missingOne)
-        return;
+    // Handle deprecated attributes.
+    if (getAttrs().hasAttribute<MoveOnlyAttr>())
+      inverses.insert(InvertibleProtocolKind::Copyable);
+    if (getAttrs().hasAttribute<NonEscapableAttr>())
+      inverses.insert(InvertibleProtocolKind::Escapable);
+
+    bool hasSuppressedConformances = false;
+    for (auto ip : InvertibleProtocolSet::full()) {
+      if (!inverses.contains(ip) ||
+          (isa<ClassDecl>(this) &&
+           !ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
+        addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+      } else {
+        hasSuppressedConformances = true;
+      }
     }
+
+    // Non-copyable and non-escaping types do not implicitly conform to
+    // any other protocols.
+    if (hasSuppressedConformances)
+      return;
   } else if (!canBeCopyable()) {
     return; // No synthesized conformances for move-only nominals.
   }

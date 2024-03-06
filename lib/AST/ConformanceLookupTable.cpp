@@ -921,7 +921,22 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredInterfaceType();
   ASTContext &ctx = nominal->getASTContext();
-  if (entry->getKind() == ConformanceEntryKind::Inherited) {
+
+  if (protocol->getInvertibleProtocolKind() &&
+      entry->getDeclContext() == nominal &&
+      (entry->getKind() == ConformanceEntryKind::Synthesized ||
+       entry->getKind() == ConformanceEntryKind::Inherited)) {
+    // Unconditional conformances to Copyable and Escapable are represented as
+    // builtin conformances, which do not need to store a substitution map.
+    //
+    // This avoids an exponential blowup when constructing the context
+    // substitution map for a type like G<G<G<G<...>>>>.
+    Type conformingType = nominal->getSelfInterfaceType();
+
+    entry->Conformance = ctx.getBuiltinConformance(
+        conformingType, protocol, BuiltinConformanceKind::Synthesized);
+
+  } else if (entry->getKind() == ConformanceEntryKind::Inherited) {
     // For an inherited conformance, the conforming nominal type will
     // be different from the nominal type.
     assert(conformingNominal != nominal && "Broken inherited conformance");
