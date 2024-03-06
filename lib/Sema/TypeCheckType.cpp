@@ -176,9 +176,9 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   llvm_unreachable("Invalid type resolution context");
 }
 
-Type TypeResolution::resolveDependentMemberType(Type baseTy, DeclContext *DC,
-                                                SourceRange baseRange,
-                                                MemberTypeRepr *repr) const {
+Type TypeResolution::resolveDependentMemberType(
+    Type baseTy, DeclContext *DC, SourceRange baseRange,
+    QualifiedIdentTypeRepr *repr) const {
   // FIXME(ModQual): Reject qualified names immediately; they cannot be
   // dependent member types.
   Identifier refIdentifier = repr->getNameRef().getBaseIdentifier();
@@ -1278,7 +1278,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                             TypeResolution resolution,
                             SILTypeResolutionContext *silContext,
-                            IdentTypeRepr *repr) {
+                            UnqualifiedIdentTypeRepr *repr) {
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type = resolution.resolveTypeInContext(typeDecl, foundDC,
@@ -1338,7 +1338,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
                                 SourceRange parentRange,
                                 DeclRefTypeRepr *repr,
                                 NameLookupOptions lookupOptions) {
-  assert(parentType || isa<IdentTypeRepr>(repr));
+  assert(parentType || isa<UnqualifiedIdentTypeRepr>(repr));
 
   auto dc = resolution.getDeclContext();
   ASTContext &ctx = dc->getASTContext();
@@ -1587,7 +1587,7 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
 }
 
 static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
-                                           IdentTypeRepr *repr,
+                                           UnqualifiedIdentTypeRepr *repr,
                                            DeclContext *typeDC) {
   ASTContext &ctx = resolution.getASTContext();
   auto &diags = ctx.Diags;
@@ -1612,9 +1612,10 @@ static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
 ///
 /// \returns Either the resolved type or a null type, the latter of
 /// which indicates that some dependencies were unsatisfied.
-static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
-                                            SILTypeResolutionContext *silContext,
-                                            IdentTypeRepr *repr) {
+static Type
+resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
+                                SILTypeResolutionContext *silContext,
+                                UnqualifiedIdentTypeRepr *repr) {
   const auto options = resolution.getOptions();
   ASTContext &ctx = resolution.getASTContext();
   auto &diags = ctx.Diags;
@@ -1733,7 +1734,7 @@ static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
   if (id.isSimpleName(ctx.Id_Self)) {
     if (auto *typeDC = DC->getInnermostTypeContext()) {
       // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-      // The issue is though that IdentTypeRepr only accepts a ValueDecl
+      // The issue is though that DeclRefTypeRepr only accepts a ValueDecl
       // while the 'Self' type is more than just a reference to a TypeDecl.
       auto selfType = typeDC->getSelfInterfaceType();
 
@@ -1790,7 +1791,8 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
 /// \param silContext Used to look up generic parameters in SIL mode.
 static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
                                           SILTypeResolutionContext *silContext,
-                                          Type parentTy, MemberTypeRepr *repr) {
+                                          Type parentTy,
+                                          QualifiedIdentTypeRepr *repr) {
   const auto options = resolution.getOptions();
   auto DC = resolution.getDeclContext();
   auto &ctx = DC->getASTContext();
@@ -2619,9 +2621,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::CompileTimeConst:
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
-  case TypeReprKind::SimpleIdent:
-  case TypeReprKind::GenericIdent:
-  case TypeReprKind::Member: {
+  case TypeReprKind::UnqualifiedIdent:
+  case TypeReprKind::QualifiedIdent: {
       return resolveDeclRefTypeRepr(cast<DeclRefTypeRepr>(repr), options);
   }
 
@@ -2753,9 +2754,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       // FIXME: Temporary hack to resolve an identifier type to one of the
       // generic parameters of the opaque return type. This should be subsumed
       // be proper name lookup, OF COURSE.
-      if (auto simpleIdent = dyn_cast<SimpleIdentTypeRepr>(
-              opaqueRepr->getBase())) {
-        Identifier name = simpleIdent->getNameRef().getBaseIdentifier();
+      auto *unqualIdentRepr =
+          dyn_cast<UnqualifiedIdentTypeRepr>(opaqueRepr->getBase());
+      if (unqualIdentRepr && !unqualIdentRepr->hasGenericArgList()) {
+        Identifier name = unqualIdentRepr->getNameRef().getBaseIdentifier();
         if (auto gpDecl = opaqueRepr->getGenericParams()
                 ->lookUpGenericParam(name)) {
           auto outerGenericSignature = opaqueDecl->getNamingDecl()
@@ -3832,12 +3834,12 @@ NeverNullType
 TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                       unsigned ordinal,
                                       TypeResolutionOptions options) {
-  // The type repr should be a generic identifier type. We don't really use
-  // the identifier for anything, but we do resolve the generic arguments
-  // to instantiate the possibly-generic opaque type.
+  // The type representation should be an unqualified identifier. We don't
+  // really use the identifier for anything, but we do resolve any generic
+  // arguments to instantiate the possibly-generic opaque type.
   SmallVector<Type, 4> TypeArgsBuf;
-  if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
-    for (auto argRepr : generic->getGenericArgs()) {
+  if (auto *unqualIdentRepr = dyn_cast<UnqualifiedIdentTypeRepr>(repr)) {
+    for (auto argRepr : unqualIdentRepr->getGenericArgs()) {
       auto argTy = resolveType(argRepr, options);
       // If we cannot resolve the generic parameter, propagate the error out.
       if (argTy->hasError()) {
@@ -3846,7 +3848,7 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
       TypeArgsBuf.push_back(argTy);
     }
   }
-  
+
   // Use type reconstruction to summon the opaque type decl.
   Demangler demangle;
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
@@ -4248,8 +4250,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       if (*parsedRep == SILFunctionType::Representation::WitnessMethod) {
         auto protocolName = conventionAttr->getWitnessMethodProtocol();
         // FIXME: parse the DeclNameLoc to here
-        witnessMethodProtocol =
-          new (getASTContext()) SimpleIdentTypeRepr(DeclNameLoc(), protocolName);
+        witnessMethodProtocol = UnqualifiedIdentTypeRepr::create(
+            getASTContext(), DeclNameLoc(), protocolName);
       }
     }
   }
@@ -4708,10 +4710,10 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
 
   Type result;
 
-  if (auto *identTR = dyn_cast<IdentTypeRepr>(repr)) {
+  if (auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(repr)) {
     // The base component uses unqualified lookup.
     result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
-                                             silContext, identTR);
+                                             silContext, unqualIdentTR);
 
     if (result && result->isParameterPack() &&
         // Workaround to allow 'shape' type checking of SIL.
@@ -4734,7 +4736,7 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
       }
     }
   } else {
-    auto *qualIdentTR = cast<MemberTypeRepr>(repr);
+    auto *qualIdentTR = cast<QualifiedIdentTypeRepr>(repr);
     auto *baseTR = qualIdentTR->getBase();
 
     Type baseTy;
@@ -5362,7 +5364,8 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
     auto diag =
         ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack, packReference);
     bool addEachFixitApplied = false;
-    if (auto *packIdent = dyn_cast<IdentTypeRepr>(repr->getPackType())) {
+    if (auto *packIdent =
+            dyn_cast<UnqualifiedIdentTypeRepr>(repr->getPackType())) {
       if (auto *packIdentBinding = packIdent->getBoundDecl()) {
         if (packIdentBinding->getLoc().isValid()) {
           diag.fixItInsert(packIdentBinding->getLoc(), "each ");
@@ -5940,9 +5943,9 @@ public:
     // We only care about the type of an outermost member type representation.
     // For example, in `A<T>.B.C<U>`, check `C` and generic arguments `U` and
     // `T`, but not `A` or `B`.
-    if (auto *parentMemberTR =
-            dyn_cast_or_null<MemberTypeRepr>(Parent.getAsTypeRepr())) {
-      if (T == parentMemberTR->getBase()) {
+    if (auto *parentQualIdentTR =
+            dyn_cast_or_null<QualifiedIdentTypeRepr>(Parent.getAsTypeRepr())) {
+      if (T == parentQualIdentTR->getBase()) {
         return Action::Continue();
       }
     }
@@ -5996,9 +5999,8 @@ private:
     case TypeReprKind::OpaqueReturn:
     case TypeReprKind::NamedOpaqueReturn:
     case TypeReprKind::Existential:
-    case TypeReprKind::SimpleIdent:
-    case TypeReprKind::GenericIdent:
-    case TypeReprKind::Member:
+    case TypeReprKind::UnqualifiedIdent:
+    case TypeReprKind::QualifiedIdent:
     case TypeReprKind::Dictionary:
     case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Inverse:

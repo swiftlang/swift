@@ -1594,14 +1594,15 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
 /// Determines if a given TypeLoc is module qualified by checking if it's
 /// of the form `<Module>.<Type>`.
 static bool isModuleQualified(TypeRepr *repr, ModuleDecl *module) {
-  auto memberTy = dyn_cast<MemberTypeRepr>(repr);
-  if (!memberTy) {
+  auto qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(repr);
+  if (!qualIdentTR) {
     return false;
   }
 
   // FIXME(ModQual): This needs to be updated once we have an explicit
   //                 module qualification syntax.
-  return memberTy->getRoot()->isSimpleUnqualifiedIdentifier(module->getName());
+  return qualIdentTR->getRoot()->isSimpleUnqualifiedIdentifier(
+      module->getName());
 }
 
 /// If the provided type is an AttributedTypeRepr, unwraps it and provides both

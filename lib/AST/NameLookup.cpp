@@ -2789,11 +2789,12 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
               anyObject = true;
         }
         // TypeRepr version: Builtin.AnyObject
-        else if (auto *memberTR = dyn_cast_or_null<MemberTypeRepr>(
+        else if (auto *qualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
                      typealias->getUnderlyingTypeRepr())) {
-          if (!memberTR->hasGenericArgList() &&
-              memberTR->getNameRef().isSimpleName("AnyObject") &&
-              memberTR->getBase()->isSimpleUnqualifiedIdentifier("Builtin")) {
+          if (!qualIdentTR->hasGenericArgList() &&
+              qualIdentTR->getNameRef().isSimpleName("AnyObject") &&
+              qualIdentTR->getBase()->isSimpleUnqualifiedIdentifier(
+                  "Builtin")) {
             anyObject = true;
           }
         }
@@ -2956,9 +2957,9 @@ static DirectlyReferencedTypeDecls
 directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                    DeclRefTypeRepr *repr, DeclContext *dc,
                                    bool allowUsableFromInline) {
-  if (auto *memberTR = dyn_cast<MemberTypeRepr>(repr)) {
+  if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(repr)) {
     auto result = directReferencesForTypeRepr(
-        evaluator, ctx, memberTR->getBase(), dc, allowUsableFromInline);
+        evaluator, ctx, qualIdentTR->getBase(), dc, allowUsableFromInline);
 
     // For a qualified identifier, perform qualified name lookup.
     result.first = directReferencesForQualifiedTypeLookup(
@@ -3008,9 +3009,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return result;
   }
 
-  case TypeReprKind::Member:
-  case TypeReprKind::GenericIdent:
-  case TypeReprKind::SimpleIdent:
+  case TypeReprKind::QualifiedIdent:
+  case TypeReprKind::UnqualifiedIdent:
     return directReferencesForDeclRefTypeRepr(evaluator, ctx,
                                               cast<DeclRefTypeRepr>(typeRepr),
                                               dc, allowUsableFromInline);
@@ -3511,9 +3511,9 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
         // We only care about the type of an outermost member type
         // representation. For example, in `A<T>.B.C<U>`, check `C` and generic
         // arguments `U` and `T`, but not `A` or `B`.
-        if (auto *parentMemberTR =
-                dyn_cast_or_null<MemberTypeRepr>(Parent.getAsTypeRepr())) {
-          if (repr == parentMemberTR->getBase()) {
+        if (auto *parentQualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
+                Parent.getAsTypeRepr())) {
+          if (repr == parentQualIdentTR->getBase()) {
             return Action::Continue();
           }
         }
@@ -3749,15 +3749,19 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // If we found declarations that are associated types, look outside of
   // the current context to see if we can recover.
   if (declsAreAssociatedTypes(decls.first)) {
-    if (auto typeRepr = attr->getTypeRepr()) {
-      if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
+    if (auto *unqualIdentRepr =
+            dyn_cast_or_null<UnqualifiedIdentTypeRepr>(attr->getTypeRepr())) {
+      if (!unqualIdentRepr->hasGenericArgList()) {
         auto assocType = cast<AssociatedTypeDecl>(decls.first.front());
+
+        const auto name = unqualIdentRepr->getNameRef();
+        const auto nameLoc = unqualIdentRepr->getNameLoc();
+        const auto loc = unqualIdentRepr->getLoc();
 
         modulesFound.clear();
         anyObject = false;
         decls = directReferencesForUnqualifiedTypeLookup(
-            identTypeRepr->getNameRef(), identTypeRepr->getLoc(), dc,
-            LookupOuterResults::Included);
+            name, loc, dc, LookupOuterResults::Included);
         nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                              ResolveToNominalOptions(),
                                              modulesFound, anyObject);
@@ -3766,22 +3770,19 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
           if (nominal->getDeclContext()->isModuleScopeContext()) {
             // Complain, producing module qualification in a Fix-It.
             auto moduleName = nominal->getParentModule()->getName();
-            ctx.Diags.diagnose(typeRepr->getLoc(),
-                               diag::warn_property_wrapper_module_scope,
-                               identTypeRepr->getNameRef(),
-                               moduleName)
-              .fixItInsert(typeRepr->getLoc(),
-                           moduleName.str().str() + ".");
+            ctx.Diags
+                .diagnose(loc, diag::warn_property_wrapper_module_scope, name,
+                          moduleName)
+                .fixItInsert(loc, moduleName.str().str() + ".");
             ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
                                assocType->getDescriptiveKind(),
                                assocType->getName());
 
-            auto *baseTR = new (ctx) SimpleIdentTypeRepr(
-                identTypeRepr->getNameLoc(), DeclNameRef(moduleName));
+            auto *baseTR = UnqualifiedIdentTypeRepr::create(
+                ctx, nameLoc, DeclNameRef(moduleName));
 
             auto *newTE = new (ctx) TypeExpr(
-                MemberTypeRepr::create(ctx, baseTR, identTypeRepr->getNameLoc(),
-                                       identTypeRepr->getNameRef()));
+                QualifiedIdentTypeRepr::create(ctx, baseTR, nameLoc, name));
             attr->resetTypeInformation(newTE);
             return nominal;
           }

@@ -120,14 +120,14 @@ extension ASTGenVisitor {
     let id = self.generateIdentifier(node.name)
 
     guard let generics = node.genericArgumentClause else {
-      return BridgedSimpleIdentTypeRepr.createParsed(ctx, loc: loc, name: id).asTypeRepr
+      return BridgedUnqualifiedIdentTypeRepr.createParsed(ctx, loc: loc, name: id).asTypeRepr
     }
 
     let genericArguments = generics.arguments.lazy.map {
       self.generate(type: $0.argument)
     }
 
-    return BridgedGenericIdentTypeRepr.createParsed(
+    return BridgedUnqualifiedIdentTypeRepr.createParsed(
       self.ctx,
       name: id,
       nameLoc: loc,
@@ -325,7 +325,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(classRestrictionType node: ClassRestrictionTypeSyntax) -> BridgedSimpleIdentTypeRepr {
+  func generate(classRestrictionType node: ClassRestrictionTypeSyntax) -> BridgedUnqualifiedIdentTypeRepr {
     // TODO: diagnostics.
     // warning: using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead
     return .createParsed(

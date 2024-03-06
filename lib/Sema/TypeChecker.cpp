@@ -490,10 +490,11 @@ namespace {
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       // Only unqualified identifiers can reference generic parameters.
-      if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
-        auto name = simpleIdentTR->getNameRef().getBaseIdentifier();
+      auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(T);
+      if (unqualIdentTR && !unqualIdentTR->hasGenericArgList()) {
+        auto name = unqualIdentTR->getNameRef().getBaseIdentifier();
         if (auto *paramDecl = params->lookUpGenericParam(name)) {
-          simpleIdentTR->setValue(paramDecl, dc);
+          unqualIdentTR->setValue(paramDecl, dc);
         }
       }
 

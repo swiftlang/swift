@@ -62,8 +62,9 @@ private:
     return SEWalker.getMacroWalkingBehavior();
   }
 
-  MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const override {
-    return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+  QualifiedIdentTypeReprWalkingScheme
+  getQualifiedIdentTypeReprWalkingScheme() const override {
+    return QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override;

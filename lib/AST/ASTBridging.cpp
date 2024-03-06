@@ -2052,14 +2052,14 @@ BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//
 
-BridgedSimpleIdentTypeRepr BridgedSimpleIdentTypeRepr_createParsed(
+BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLoc, BridgedIdentifier id) {
-  ASTContext &context = cContext.unbridged();
-  return new (context) SimpleIdentTypeRepr(DeclNameLoc(cLoc.unbridged()),
-                                           DeclNameRef(id.unbridged()));
+  return UnqualifiedIdentTypeRepr::create(cContext.unbridged(),
+                                          DeclNameLoc(cLoc.unbridged()),
+                                          DeclNameRef(id.unbridged()));
 }
 
-BridgedGenericIdentTypeRepr BridgedGenericIdentTypeRepr_createParsed(
+BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedIdentifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef genericArgs,
     BridgedSourceLoc cLAngleLoc, BridgedSourceLoc cRAngleLoc) {
@@ -2068,9 +2068,9 @@ BridgedGenericIdentTypeRepr BridgedGenericIdentTypeRepr_createParsed(
   auto Name = DeclNameRef(name.unbridged());
   SourceLoc lAngleLoc = cLAngleLoc.unbridged();
   SourceLoc rAngleLoc = cRAngleLoc.unbridged();
-  return GenericIdentTypeRepr::create(context, Loc, Name,
-                                      genericArgs.unbridged<TypeRepr *>(),
-                                      SourceRange{lAngleLoc, rAngleLoc});
+  return UnqualifiedIdentTypeRepr::create(context, Loc, Name,
+                                          genericArgs.unbridged<TypeRepr *>(),
+                                          SourceRange{lAngleLoc, rAngleLoc});
 }
 
 BridgedOptionalTypeRepr

@@ -1627,19 +1627,19 @@ public:
   }
 
 private:
-  /// Walk a `MemberTypeRepr` in source order such that each subsequent
+  /// Walk a `QualifiedIdentTypeRepr` in source order such that each subsequent
   /// dot-separated component is a child of the previous one
-  [[nodiscard]] bool doItInSourceOrderRecursive(MemberTypeRepr *T);
+  [[nodiscard]] bool doItInSourceOrderRecursive(QualifiedIdentTypeRepr *T);
 
 public:
   /// Returns true on failure.
   [[nodiscard]]
   bool doIt(TypeRepr *T) {
-    if (auto *MTR = dyn_cast<MemberTypeRepr>(T)) {
-      switch (Walker.getMemberTypeReprWalkingScheme()) {
-      case MemberTypeReprWalkingScheme::SourceOrderRecursive:
-        return doItInSourceOrderRecursive(MTR);
-      case MemberTypeReprWalkingScheme::ASTOrderRecursive:
+    if (auto *QualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T)) {
+      switch (Walker.getQualifiedIdentTypeReprWalkingScheme()) {
+      case QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive:
+        return doItInSourceOrderRecursive(QualIdentTR);
+      case QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive:
         break;
       }
     }
@@ -1723,11 +1723,11 @@ public:
 
 } // end anonymous namespace
 
-bool Traversal::doItInSourceOrderRecursive(MemberTypeRepr *T) {
+bool Traversal::doItInSourceOrderRecursive(QualifiedIdentTypeRepr *T) {
   // Qualified types are modeled resursively such that each previous
   // dot-separated component is a child of the next one. To walk a member type
   // representation according to
-  // `MemberTypeReprWalkingScheme::SourceOrderRecursive`:
+  // `QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive`:
 
   // 1. Pre-walk the dot-separated components in source order. If asked to skip
   //    the children of a given component:
@@ -1737,8 +1737,8 @@ bool Traversal::doItInSourceOrderRecursive(MemberTypeRepr *T) {
       doItInSourceOrderPre = [&](TypeRepr *T,
                                  std::optional<unsigned> &StartPostWalkDepth,
                                  unsigned Depth) {
-        if (auto *MemberTR = dyn_cast<MemberTypeRepr>(T)) {
-          if (doItInSourceOrderPre(MemberTR->getBase(), StartPostWalkDepth,
+        if (auto *QualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T)) {
+          if (doItInSourceOrderPre(QualIdentTR->getBase(), StartPostWalkDepth,
                                    Depth + 1)) {
             return true;
           }
@@ -1789,9 +1789,9 @@ bool Traversal::doItInSourceOrderRecursive(MemberTypeRepr *T) {
           }
         }
 
-        if (auto *MemberTR = dyn_cast<MemberTypeRepr>(T)) {
-          return doItInSourceOrderPost(MemberTR->getBase(), StartPostWalkDepth,
-                                       Depth + 1);
+        if (auto *QualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T)) {
+          return doItInSourceOrderPost(QualIdentTR->getBase(),
+                                       StartPostWalkDepth, Depth + 1);
         }
 
         return false;
@@ -2231,8 +2231,8 @@ bool Traversal::visitAttributedTypeRepr(AttributedTypeRepr *T) {
 }
 
 bool Traversal::visitDeclRefTypeRepr(DeclRefTypeRepr *T) {
-  if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
-    if (doIt(memberTR->getBase())) {
+  if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T)) {
+    if (doIt(qualIdentTR->getBase())) {
       return true;
     }
   }
@@ -2246,15 +2246,11 @@ bool Traversal::visitDeclRefTypeRepr(DeclRefTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
+bool Traversal::visitUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *T) {
   return visitDeclRefTypeRepr(T);
 }
 
-bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
-  return visitDeclRefTypeRepr(T);
-}
-
-bool Traversal::visitMemberTypeRepr(MemberTypeRepr *T) {
+bool Traversal::visitQualifiedIdentTypeRepr(QualifiedIdentTypeRepr *T) {
   return visitDeclRefTypeRepr(T);
 }
 
