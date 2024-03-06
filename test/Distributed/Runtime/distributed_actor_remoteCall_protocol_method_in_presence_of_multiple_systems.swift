@@ -12,12 +12,15 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
+// UNSUPPORTED: OS=windows-msvc
+
 import Distributed
 import FakeDistributedActorSystems
 
 @_DistributedProtocol
 protocol GreeterProtocol: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
-  distributed func greet() -> String
+  distributed func greet() async throws -> String
 }
 
 // ==== ------------------------------------------------------------------------
@@ -26,6 +29,7 @@ distributed actor DAFR: GreeterProtocol {
   typealias ActorSystem = FakeRoundtripActorSystem
   distributed func greet() -> String { "\(Self.self)" }
 }
+
 distributed actor DAFL: GreeterProtocol {
   typealias ActorSystem = LocalTestingDistributedActorSystem
   distributed func greet() -> String { "\(Self.self)" }
@@ -46,9 +50,6 @@ distributed actor DAFL: GreeterProtocol {
     // Notes:
     // - The call is made on the stub: $GreeterProtocol
     // - the record is name is 'HF' for the accessible function
-
-    // FIXME: remove this when we can properly roundtrip through new accessor
-    fakeRoundtripSystem.forceNextRemoteCallReply("FAKE")
 
     let got = try await gfr.greet()
     print("got: \(got)")

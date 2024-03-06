@@ -609,6 +609,40 @@ enum class MangledTypeRefRole {
   FlatUnique,
 };
 
+
+struct AccessibleFunction {
+private:
+  std::string RecordName;
+  std::string FunctionName;
+
+  bool IsDistributed: 1;
+
+  CanSILFunctionType Type;
+  llvm::Constant *Address;
+
+  explicit AccessibleFunction(std::string recordName, std::string funcName,
+                              bool isDistributed, CanSILFunctionType type,
+                              llvm::Constant *addr)
+      : RecordName(recordName), FunctionName(funcName),
+        IsDistributed(isDistributed), Type(type), Address(addr) {}
+
+public:
+  StringRef getRecordName() const { return RecordName; }
+  StringRef getFunctionName() const { return FunctionName; }
+
+  bool isDistributed() const { return IsDistributed; }
+
+  CanSILFunctionType getType() const { return Type; }
+
+  llvm::Constant *getAddress() const { return Address; }
+
+  static AccessibleFunction forSILFunction(IRGenModule &IGM, SILFunction *func);
+  static AccessibleFunction forDistributed(std::string recordName,
+                                           std::string accessorName,
+                                           CanSILFunctionType type,
+                                           llvm::Constant *address);
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -1148,7 +1182,7 @@ public:
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
-  void addAccessibleFunction(SILFunction *func);
+  void addAccessibleFunction(AccessibleFunction func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
@@ -1156,7 +1190,7 @@ public:
 
   void emitAccessibleFunctions();
   void emitAccessibleFunction(StringRef sectionName,
-                              SILFunction *func);
+                              const AccessibleFunction &func);
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1304,7 +1338,7 @@ private:
 
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
-  SmallVector<SILFunction *, 4> AccessibleFunctions;
+  SmallVector<AccessibleFunction, 4> AccessibleFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
@@ -1813,10 +1847,14 @@ public:
   Address getAddrOfObjCISAMask();
 
   llvm::Function *
-  getAddrOfDistributedTargetAccessor(SILFunction *F,
+  getAddrOfDistributedTargetAccessor(LinkEntity accessor,
                                      ForDefinition_t forDefinition);
 
-  void emitDistributedTargetAccessor(SILFunction *method);
+  /// Emit a distributed accessor function for the given distributed thunk or
+  /// protocol requirement.
+  void emitDistributedTargetAccessor(
+      llvm::PointerUnion<SILFunction *, AbstractFunctionDecl *>
+          thunkOrRequirement);
 
   llvm::Constant *getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn);
 
