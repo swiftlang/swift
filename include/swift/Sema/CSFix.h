@@ -262,6 +262,10 @@ enum class FixKind : uint8_t {
   /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
 
+  /// Type of the element in generic pack couldn't be inferred and has to be
+  /// specified explicitly.
+  SpecifyPackElementType,
+
   /// Allow any type (and not just class or class-constrained type) to
   /// be convertible to AnyObject.
   AllowNonClassTypeToConvertToAnyObject,
@@ -2735,6 +2739,25 @@ public:
     return fix->getKind() == FixKind::SpecifyObjectLiteralTypeImport;
   }
 };
+
+class SpecifyPackElementType final : public ConstraintFix {
+  SpecifyPackElementType(ConstraintSystem &cs, ConstraintLocator *locator)
+        : ConstraintFix(cs, FixKind::SpecifyPackElementType, locator) {}
+public:
+  std::string getName() const override {
+    return "specify pack element type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote) const override;
+
+  static SpecifyPackElementType *create(ConstraintSystem &cs,
+                                        ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::SpecifyPackElementType;
+  }
+};
+
 
 class AddQualifierToAccessTopLevelName final : public ConstraintFix {
   AddQualifierToAccessTopLevelName(ConstraintSystem &cs,

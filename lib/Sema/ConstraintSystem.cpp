@@ -5883,9 +5883,24 @@ void constraints::simplifyLocator(ASTNode &anchor,
       if (!elt)
         break;
 
+      // If the 3rd element is an PackElement, add the index of pack element
+      // within packs to locate the correct element.
+      std::optional<unsigned> eltPackIdx;
+      if (path.size() > 2) {
+        if (auto eltPack = path[2].getAs<LocatorPathElt::PackElement>()) {
+          eltPackIdx = eltPack->getIndex();
+        }
+      }
+
       // Extract application argument.
       if (auto *args = anchorExpr->getArgs()) {
-        if (elt->getArgIdx() < args->size()) {
+        if (eltPackIdx.has_value()) {
+          if (elt->getArgIdx() + eltPackIdx.value() < args->size()) {
+            anchor = args->getExpr(elt->getArgIdx() + eltPackIdx.value());
+            path = path.slice(3);
+            continue;
+          }
+        } else if (elt->getArgIdx() < args->size()) {
           anchor = args->getExpr(elt->getArgIdx());
           path = path.slice(2);
           continue;

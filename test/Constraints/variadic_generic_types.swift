@@ -106,3 +106,15 @@ do {
     }
   }
 }
+
+// apple/swift#69432 - Passing nil to a parameter pack fails to produce diagnostic for expression
+do {
+  struct Foo<each T> {
+    init(_ value: repeat each T) {}
+    // expected-note@-1 {{in inferring pack element #0 of 'value'}}
+    // expected-note@-2 {{in inferring pack element #0 of 'value'}}
+  }
+
+  _ = Foo(nil) // expected-error {{'nil' requires a contextual type}}
+  _ = Foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
+}
