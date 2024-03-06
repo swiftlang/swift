@@ -8200,6 +8200,45 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
   return true;
 }
 
+bool UnableToInferGenericPackElementType::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto path = locator->getPath();
+
+  auto packElementElt = locator->getLastElementAs<LocatorPathElt::PackElement>();
+  assert(packElementElt && "Expected path to end with a pack element locator");
+
+  if (isExpr<NilLiteralExpr>(getAnchor())) {
+    // `nil` appears as an element of generic pack params, let's record a
+    // specify contextual type for nil fix.
+    emitDiagnostic(diag::unresolved_nil_literal);
+  } else {
+    // unable to infer the type of an element of generic pack params
+    emitDiagnostic(diag::could_not_infer_pack_element,
+                   packElementElt->getIndex());
+  }
+
+  if (isExpr<ApplyExpr>(locator->getAnchor())) {
+    // emit callee side diagnostics
+    if (auto *calleeLocator = getSolution().getCalleeLocator(locator)) {
+      if (const auto choice = getOverloadChoiceIfAvailable(calleeLocator)) {
+        if (auto *decl = choice->choice.getDeclOrNull()) {
+          if (auto applyArgToParamElt =
+                  locator->findFirst<LocatorPathElt::ApplyArgToParam>()) {
+            if (auto paramDecl =
+                    getParameterAt(decl, applyArgToParamElt->getParamIdx())) {
+              emitDiagnosticAt(
+                  paramDecl->getLoc(), diag::note_in_opening_pack_element,
+                  packElementElt->getIndex(), paramDecl->getNameStr());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
 static std::pair<StringRef, StringRef>
 getImportModuleAndDefaultType(const ASTContext &ctx,
                               const ObjectLiteralExpr *expr) {
