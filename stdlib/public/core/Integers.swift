@@ -1902,8 +1902,7 @@ public protocol _LosslessStringConvertibleOrNone {}
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger
-: BinaryInteger, _LosslessStringConvertibleOrNone, _BitwiseCopyable
+public protocol FixedWidthInteger: BinaryInteger, _LosslessStringConvertibleOrNone
 where Magnitude: FixedWidthInteger & UnsignedInteger,
       Stride: FixedWidthInteger & SignedInteger {
   /// The number of bits used for the underlying binary representation of
