@@ -23,9 +23,9 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
@@ -528,6 +528,11 @@ public:
 
     PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
+
+    // Check whether the conformance is valid first.
+    Conformance->resolveValueWitnesses();
+    if (Conformance->isInvalid())
+      return nullptr;
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
@@ -1150,7 +1155,7 @@ public:
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::NonInherited)) {
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-        SGM.getWitnessTable(normal);
+        (void)SGM.getWitnessTable(normal);
     }
   }
 
@@ -1309,7 +1314,7 @@ public:
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All)) {
         if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
-          SGM.getWitnessTable(normal);
+          (void)SGM.getWitnessTable(normal);
       }
     }
   }

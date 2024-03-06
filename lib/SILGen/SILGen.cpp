@@ -2106,7 +2106,7 @@ public:
         SGM.pendingForcedFunctions.pop_front();
       }
       while (!SGM.pendingConformances.empty()) {
-        SGM.getWitnessTable(SGM.pendingConformances.front());
+        (void)SGM.getWitnessTable(SGM.pendingConformances.front());
         SGM.pendingConformances.pop_front();
       }
     }

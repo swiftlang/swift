@@ -169,9 +169,7 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
             evaluateOrDefault(ctx.evaluator,
                               ResolveTypeWitnessesRequest{normal},
                               evaluator::SideEffect());
-            evaluateOrDefault(ctx.evaluator,
-                              ResolveValueWitnessesRequest{normal},
-                              evaluator::SideEffect());
+            normal->resolveValueWitnesses();
           }
         }
       };
