@@ -169,9 +169,9 @@
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
 public struct UnsafeRawPointer: _Pointer {
-  
+
   public typealias Pointee = UInt8
-  
+
   /// The underlying raw pointer.
   /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
@@ -189,27 +189,27 @@ extension UnsafeRawPointer: Sendable {}
 extension UnsafeRawPointer {
   /// Creates a new raw pointer from the given typed pointer.
   ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
+  /// Use this initializer to explicitly convert `other` to an
+  /// `UnsafeRawPointer` instance. This initializer creates a new pointer to the
+  /// same address as `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>) {
     _rawValue = other._rawValue
   }
 
   /// Creates a new raw pointer from the given typed pointer.
   ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
+  /// Use this initializer to explicitly convert `other` to an
+  /// `UnsafeRawPointer` instance. This initializer creates a new pointer to the
+  /// same address as `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
@@ -219,9 +219,9 @@ extension UnsafeRawPointer {
 extension UnsafeRawPointer {
   /// Creates a new raw pointer from the given mutable raw pointer.
   ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
+  /// Use this initializer to explicitly convert `other` to an
+  /// `UnsafeRawPointer` instance. This initializer creates a new pointer to the
+  /// same address as `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The mutable raw pointer to convert.
   @_transparent
@@ -231,9 +231,9 @@ extension UnsafeRawPointer {
 
   /// Creates a new raw pointer from the given mutable raw pointer.
   ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
+  /// Use this initializer to explicitly convert `other` to an
+  /// `UnsafeRawPointer` instance. This initializer creates a new pointer to the
+  /// same address as `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The mutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
@@ -247,33 +247,34 @@ extension UnsafeRawPointer {
 extension UnsafeRawPointer {
   /// Creates a new raw pointer from the given typed pointer.
   ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
+  /// Use this initializer to explicitly convert `other` to an
+  /// `UnsafeRawPointer` instance. This initializer creates a new pointer to the
+  /// same address as `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
   /// Creates a new raw pointer from the given typed pointer.
   ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
+  /// Use this initializer to explicitly convert `other` to an
+  /// `UnsafeRawPointer` instance. This initializer creates a new pointer to the
+  /// same address as `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
-  /// Deallocates the previously allocated memory block referenced by this pointer.
+  /// Deallocates the previously allocated memory block referenced by this
+  /// pointer.
   ///
   /// The memory to be deallocated must be uninitialized or initialized to a
   /// trivial type.
@@ -323,7 +324,7 @@ extension UnsafeRawPointer {
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   @discardableResult
   public func bindMemory<T: ~Copyable>(
     to type: T.Type, capacity count: Int
@@ -410,7 +411,7 @@ extension UnsafeRawPointer {
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
   ) -> UnsafePointer<T> {
@@ -620,8 +621,7 @@ extension UnsafeRawPointer {
   }
 }
 
-/// A raw pointer for accessing and manipulating
-/// untyped data.
+/// A raw pointer for accessing and manipulating untyped data.
 ///
 /// The `UnsafeMutableRawPointer` type provides no automated memory management,
 /// no type safety, and no alignment guarantees. You are responsible for
@@ -800,7 +800,7 @@ extension UnsafeMutableRawPointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
@@ -814,7 +814,7 @@ extension UnsafeMutableRawPointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
@@ -937,7 +937,7 @@ extension UnsafeMutableRawPointer {
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   @discardableResult
   public func bindMemory<T: ~Copyable>(
     to type: T.Type, capacity count: Int
@@ -1022,7 +1022,7 @@ extension UnsafeMutableRawPointer {
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
   ) -> UnsafeMutablePointer<T> {
@@ -1216,7 +1216,7 @@ extension UnsafeMutableRawPointer {
   ///     must not be negative.
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   @inlinable
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   @discardableResult
   public func moveInitializeMemory<T: ~Copyable>(
     as type: T.Type, from source: UnsafeMutablePointer<T>, count: Int
