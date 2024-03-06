@@ -1507,7 +1507,8 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
     SILDIExprOperator::Plus,
     SILDIExprOperator::Minus,
     SILDIExprOperator::ConstUInt,
-    SILDIExprOperator::ConstSInt
+    SILDIExprOperator::ConstSInt,
+    SILDIExprOperator::TupleFragment
   };
 
   do {
@@ -1554,6 +1555,18 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             Val = -Val;
           auto NewOperand =
             SILDIExprElement::createConstInt(static_cast<uint64_t>(Val));
+          DIExpr.push_back(NewOperand);
+          break;
+        }
+        case SILDIExprElement::TypeKind: {
+          SILType Result;
+          if (parseSILType(Result)) {
+            P.diagnose(P.Tok.getLoc(), diag::sil_dbg_expr_expect_operand_kind,
+                       OpText, "type");
+            return true;
+          }
+          auto NewOperand = SILDIExprElement::createType(
+            Result.getASTType().getPointer());
           DIExpr.push_back(NewOperand);
           break;
         }

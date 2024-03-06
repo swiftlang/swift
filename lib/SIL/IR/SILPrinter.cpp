@@ -1388,6 +1388,11 @@ public:
             *this << V;
           break;
         }
+        case SILDIExprElement::TypeKind: {
+          const Type TypePtr = Arg.getAsType();
+          *this << "$";
+          TypePtr->print(PrintState.OS, PrintState.ASTOptions);
+        }
         }
       }
     }
