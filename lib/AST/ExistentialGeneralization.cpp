@@ -15,9 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
@@ -57,7 +59,7 @@ public:
     auto sig = buildGenericSignature(ctx, GenericSignature(),
                                      addedParameters,
                                      addedRequirements,
-                                     /*allowInverses=*/false);
+                                     /*allowInverses=*/true);
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.
@@ -93,8 +95,10 @@ private:
     for (auto origArg: origArgs) {
       newArgs.push_back(generalizeComponentType(origArg));
     }
-    return ParameterizedProtocolType::get(ctx, origType->getBaseType(),
-                                          newArgs);
+
+    ProtocolType *baseType =
+        visitProtocolType(origType.getBaseType())->castTo<ProtocolType>();
+    return ParameterizedProtocolType::get(ctx, baseType, newArgs);
   }
 
   Type visitProtocolCompositionType(CanProtocolCompositionType origType) {
@@ -182,7 +186,7 @@ private:
   INVALID_TO_GENERALIZE(SILMoveOnlyWrapped)
 #undef INVALID_TO_GENERALIZE
 
-  /// Generalize the generic arguments of the given generic type.s
+  /// Generalize the generic arguments of the given generic type.
   Type generalizeGenericArguments(NominalTypeDecl *decl, CanType type) {
     assert(decl->isGenericContext());
     auto origSubs = type->getContextSubstitutionMap(decl->getModuleContext(),
@@ -259,6 +263,26 @@ private:
                                               /*index*/ substTypes.size(),
                                               ctx);
     addedParameters.push_back(newParam);
+
+    // When noncopyable generics are enabled, add requirements for the
+    // various invertible protocols.
+    if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        auto module = proto->getParentModule();
+        if (auto conformance = module->checkConformance(origArg, proto)) {
+          // The argument satisfies this protocol, so record the conformance
+          // that makes it so.
+          substConformances.insert({{CanType(newParam), proto}, conformance});
+        } else {
+          // The argument does not satisfy this protocol, so add the inverse
+          // requirement to capture this fact in the generalization.
+          Type inverseReq = ProtocolCompositionType::get(ctx, { }, {ip}, false);
+          addedRequirements.push_back(
+              Requirement(RequirementKind::Conformance, newParam, inverseReq));
+        }
+      }
+    }
 
     substTypes.insert({CanType(newParam), origArg});
     return newParam;
