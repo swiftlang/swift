@@ -5,7 +5,7 @@
 
 ## Swift 5.10
 
-* Swift 5.10 closes all known static data-race safey holes in complete strict
+* Swift 5.10 closes all known static data-race safety holes in complete strict
 concurrency checking.
 
   When writing code against `-strict-concurrency=complete`, Swift 5.10 will
