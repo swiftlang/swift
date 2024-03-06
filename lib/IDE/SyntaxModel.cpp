@@ -403,8 +403,9 @@ public:
   PreWalkAction walkToDeclPre(Decl *D) override;
   PostWalkAction walkToDeclPost(Decl *D) override;
 
-  MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const override {
-    return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+  QualifiedIdentTypeReprWalkingScheme
+  getQualifiedIdentTypeReprWalkingScheme() const override {
+    return QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive;
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override;

@@ -4696,7 +4696,8 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   while (auto *metatype = dyn_cast<MetatypeTypeRepr>(constraintRepr)) {
     // The generic equivalent of 'any P.Type' is '(some P).Type'
     constraintRepr = metatype->getBase()->getWithoutParens();
-    if (isa<SimpleIdentTypeRepr>(constraintRepr))
+    if (isa<UnqualifiedIdentTypeRepr>(constraintRepr) &&
+        !cast<UnqualifiedIdentTypeRepr>(constraintRepr)->hasGenericArgList())
       needsParens = !isa<TupleTypeRepr>(metatype->getBase());
   }
 

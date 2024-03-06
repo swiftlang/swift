@@ -42,11 +42,8 @@ namespace llvm {
 }
 
 namespace swift {
-  class IdentTypeRepr;
-  class ErrorTypeRepr;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
-  class IDEInspectionCallbacksFactory;
   class DefaultArgumentInitializer;
   class DiagnosticEngine;
   class Expr;
@@ -54,11 +51,7 @@ namespace swift {
   class PersistentParserState;
   class RequirementRepr;
   class SILParserStateBase;
-  class ScopeInfo;
-  class SingleValueStmtExpr;
   class SourceManager;
-  class TupleType;
-  class TypeLoc;
   class UUID;
   
   struct EnumElementInfo;

@@ -709,9 +709,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             if (argList->isUnlabeledUnary())
               behavior = DiagnosticBehavior::Warning;
           } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
-            if (auto *TR =
-                    dyn_cast_or_null<MemberTypeRepr>(TE->getTypeRepr())) {
-              if (!isa<IdentTypeRepr>(TR->getRoot())) {
+            if (auto *QualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
+                    TE->getTypeRepr())) {
+              if (!isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot())) {
                 behavior = DiagnosticBehavior::Warning;
               }
             }

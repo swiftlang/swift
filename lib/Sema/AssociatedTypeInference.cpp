@@ -1234,15 +1234,23 @@ public:
 
 private:
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    auto *declRefTyR = dyn_cast<DeclRefTypeRepr>(T);
+    if (!declRefTyR || declRefTyR->hasGenericArgList()) {
+      return Action::Continue();
+    }
+
+    auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T);
+
     // If we're inferring `Foo`, don't look at a witness mentioning `Foo`.
-    if (auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(T)) {
-      if (circularNames.count(identTyR->getNameRef().getBaseIdentifier()) > 0) {
+    if (!qualIdentTR) {
+      if (circularNames.count(declRefTyR->getNameRef().getBaseIdentifier()) >
+          0) {
         // If unqualified lookup can find a type with this name without looking
         // into protocol members, don't skip the witness, since this type might
         // be a candidate witness.
         auto desc = UnqualifiedLookupDescriptor(
-            identTyR->getNameRef(), witness->getDeclContext(),
-            identTyR->getLoc(), UnqualifiedLookupOptions());
+            declRefTyR->getNameRef(), witness->getDeclContext(),
+            declRefTyR->getLoc(), UnqualifiedLookupOptions());
 
         auto results =
             evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
@@ -1259,23 +1267,18 @@ private:
     }
 
     // If we're inferring `Foo`, don't look at a witness mentioning `Self.Foo`.
-    auto *memberTyR = dyn_cast<MemberTypeRepr>(T);
-    if (!memberTyR || memberTyR->hasGenericArgList()) {
+    if (!qualIdentTR->getBase()->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
       return Action::Continue();
     }
 
-    if (!memberTyR->getBase()->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
-      return Action::Continue();
-    }
-
-    if (circularNames.count(memberTyR->getNameRef().getBaseIdentifier()) > 0) {
+    if (circularNames.count(declRefTyR->getNameRef().getBaseIdentifier()) > 0) {
       // But if qualified lookup can find a type with this name without looking
       // into protocol members, don't skip the witness, since this type might
       // be a candidate witness.
       SmallVector<ValueDecl *, 2> results;
       witness->getInnermostDeclContext()->lookupQualified(
           witness->getDeclContext()->getSelfTypeInContext(),
-          memberTyR->getNameRef(), SourceLoc(), NLOptions(), results);
+          declRefTyR->getNameRef(), SourceLoc(), NLOptions(), results);
 
       // Ok, resolving this member type would trigger associated type
       // inference recursively. We're going to skip this witness.

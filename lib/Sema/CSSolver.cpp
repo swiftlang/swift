@@ -1277,14 +1277,19 @@ void ConstraintSystem::shrink(Expr *expr) {
     bool isSuitableCollection(TypeRepr *collectionTypeRepr) {
       // Only generic identifier, array or dictionary.
       switch (collectionTypeRepr->getKind()) {
-      case TypeReprKind::GenericIdent:
+      case TypeReprKind::UnqualifiedIdent:
+        return cast<UnqualifiedIdentTypeRepr>(collectionTypeRepr)
+            ->hasGenericArgList();
+
       case TypeReprKind::Array:
       case TypeReprKind::Dictionary:
         return true;
 
       default:
-        return false;
+        break;
       }
+
+      return false;
     }
 
     void visitCoerceExpr(CoerceExpr *coerceExpr) {

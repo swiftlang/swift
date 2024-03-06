@@ -114,7 +114,7 @@ struct SelfParam {
   // CHECK-NEXT:    (parameter "self")
   // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   // CHECK-NEXT:    (result=type_optional
-  // CHECK-NEXT:      (type_ident id="SelfParam" unbound))
+  // CHECK-NEXT:      (type_unqualified_ident id="SelfParam" unbound))
   static func createOptional() -> SelfParam? {
 
     // CHECK-LABEL: (call_expr type="<null>"
@@ -126,7 +126,7 @@ struct SelfParam {
 
 // CHECK-LABEL: (func_decl range=[{{.+}}] "dumpMemberTypeRepr()"
 // CHECK-NEXT:    (parameter_list range=[{{.+}}])
-// CHECK-NEXT:    (result=type_member id="Element" unbound
-// CHECK-NEXT:      (type_ident id="Array" unbound
-// CHECK-NEXT:        (type_ident id="Bool" unbound))
+// CHECK-NEXT:    (result=type_qualified_ident id="Element" unbound
+// CHECK-NEXT:      (type_unqualified_ident id="Array" unbound
+// CHECK-NEXT:        (type_unqualified_ident id="Bool" unbound))
 func dumpMemberTypeRepr() -> Array<Bool>.Element { true }
