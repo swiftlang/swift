@@ -15,6 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/InverseMarking.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "clang/AST/DeclObjC.h"
@@ -525,22 +526,49 @@ static bool usesFeatureRawLayout(Decl *decl) {
 UNINTERESTING_FEATURE(Embedded)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
-  auto checkInverseMarking = [](auto &marking) -> bool {
-    switch (marking.getKind()) {
-    case InverseMarking::Kind::None:
-    case InverseMarking::Kind::LegacyExplicit: // covered by other checks.
-      return false;
+  if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
+    if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
+      auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
 
-    case InverseMarking::Kind::Explicit:
-    case InverseMarking::Kind::Inferred:
-      return true;
+      InvertibleProtocolSet inverses;
+      bool anyObject = false;
+      getDirectlyInheritedNominalTypeDecls(nominalDecl, inverses, anyObject);
+      if (!inverses.empty())
+        return true;
     }
-  };
 
-  return hasInverse(decl, InvertibleProtocolKind::Copyable,
-                    checkInverseMarking) ||
-         hasInverse(decl, InvertibleProtocolKind::Escapable,
-                    checkInverseMarking);
+    if (isa<AbstractFunctionDecl>(valueDecl) ||
+        isa<AbstractStorageDecl>(valueDecl)) {
+      if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
+            if (auto *nominalDecl = type->getAnyNominal()) {
+              if (isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
+                return usesFeatureNoncopyableGenerics(nominalDecl);
+            }
+            return false;
+          })) {
+        return true;
+      }
+    }
+  }
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto *nominal = ext->getExtendedNominal())
+      if (usesFeatureNoncopyableGenerics(nominal))
+        return true;
+  }
+
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    proto->getRequirementSignature().getRequirementsWithInverses(
+        proto, reqs, inverseReqs);
+  } else if (auto *genCtx = decl->getAsGenericContext()) {
+    if (auto genericSig = genCtx->getGenericSignature())
+      genericSig->getRequirementsWithInverses(reqs, inverseReqs);
+  }
+
+  return !inverseReqs.empty();
 }
 
 static bool usesFeatureStructLetDestructuring(Decl *decl) {

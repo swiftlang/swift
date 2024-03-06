@@ -26,10 +26,12 @@ public extension Eq where Self: ~Copyable {
 }
 
 /// MARK: Result
-public enum Either<Success: ~Copyable, Failure: Error> {
+public enum Either<Success: ~Copyable, Failure: Error>: ~Copyable {
   case success(Success)
   case failure(Failure)
 }
+
+extension Either: Copyable {}
 
 extension Either where Failure == Swift.Error {
   public init(catching body: () throws -> Success) {
@@ -48,19 +50,10 @@ public protocol Generator: ~Copyable {
   func next() -> Maybe<Element>
 }
 
-/// MARK: Lists
-public struct Vector<T: ~Copyable> {
-
-  subscript(_ i: UInt) -> T {
-    fatalError("todo")
-  }
-}
-
 // MARK: Tuples
 public enum Pair<L: ~Copyable, R: ~Copyable>: ~Copyable {
   case elms(L, R)
 }
-
 
 /// MARK: Data.Maybe
 

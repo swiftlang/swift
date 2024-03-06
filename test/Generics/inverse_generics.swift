@@ -4,7 +4,7 @@
 
 // Check support for explicit conditional conformance
 public struct ExplicitCond<T: ~Copyable>: ~Copyable {}
-extension ExplicitCond: Copyable where T: Copyable {}
+extension ExplicitCond: Copyable {}
 // expected-note@-1 {{requirement from conditional conformance}}
 // expected-note@-2 {{requirement from conditional conformance of 'ExplicitCondAlias<NC>' (aka 'ExplicitCond<NC>') to 'Copyable'}}
 
@@ -73,14 +73,20 @@ class ClassContainment<T: ~Copyable> {
     deinit {}
 }
 
-// expected-note@+2 {{generic struct 'ConditionalContainment' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
-// expected-note@+1 {{consider adding '~Copyable' to generic struct 'ConditionalContainment'}}{{45-45=: ~Copyable}}
-struct ConditionalContainment<T: ~Copyable> {
+struct ConditionalContainment<T: ~Copyable>: ~Copyable {
   var x: T
   var y: NC // expected-error {{stored property 'y' of 'Copyable'-conforming generic struct 'ConditionalContainment' has non-Copyable type 'NC'}}
 }
 
+extension ConditionalContainment: Copyable {}
+
 func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
+
+func chk(_ t: ConditionalContainment<NC>) {}
+// expected-error@-1 {{parameter of noncopyable type 'ConditionalContainment<NC>' must specify ownership}}
+// expected-note@-2 3{{add}}
+
+/// ----------------
 
 // expected-note@+2 3{{add}}
 // expected-error@+1 {{parameter of noncopyable type 'some Escapable & ~Copyable' must specify ownership}}
@@ -110,14 +116,15 @@ struct NoncopyableAndSendable: ~Copyable, Sendable {}
 
 /// ---------------
 
-// expected-note@+2 {{consider adding '~Copyable' to generic enum 'Maybe'}}
-// expected-note@+1 2{{generic enum 'Maybe' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
-enum Maybe<Wrapped: ~Copyable> {
+// expected-note@+1 {{generic enum 'Maybe' has '~Copyable' constraint preventing 'Copyable' conformance}}
+enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   case just(Wrapped)
   case none
 
   deinit {} // expected-error {{deinitializer cannot be declared in generic enum 'Maybe' that conforms to 'Copyable'}}
 }
+
+extension Maybe: Copyable {}
 
 // expected-note@+4{{requirement specified as 'NC' : 'Copyable'}}
 // expected-note@+3{{requirement from conditional conformance of 'Maybe<NC>' to 'Copyable'}}
@@ -129,7 +136,7 @@ struct RequireCopyable<T> {
 }
 
 struct NC: ~Copyable {
-// expected-note@-1 4{{struct 'NC' has '~Copyable' constraint preventing 'Copyable' conformance}}
+// expected-note@-1 3{{struct 'NC' has '~Copyable' constraint preventing 'Copyable' conformance}}
   deinit {}
 }
 
@@ -152,18 +159,6 @@ extension Maybe where Wrapped: ~Copyable {
 extension Maybe {
   func check2(_ t: RequireCopyable<Self>) {}
 }
-
-// expected-note@+2 {{generic struct 'CornerCase' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
-// expected-note@+1 {{consider adding '~Copyable' to generic struct 'CornerCase'}}{{33-33=: ~Copyable}}
-struct CornerCase<T: ~Copyable> {
-  let t: T
-  let nc: NC // expected-error {{stored property 'nc' of 'Copyable'-conforming generic struct 'CornerCase' has non-Copyable type 'NC'}}
-}
-
-func chk(_ t: CornerCase<NC>) {}
-// expected-error@-1 {{parameter of noncopyable type 'CornerCase<NC>' must specify ownership}}
-// expected-note@-2 3{{add}}
-
 
 /// MARK: tests that we diagnose ~Copyable that became invalid because it's required to be copyable
 
@@ -260,13 +255,6 @@ func checkNominals(_ mutRef: inout MutableBuggerView<NC>,
 
 struct NonescapingType: ~Escapable {}
 
-struct Wraps: ~Escapable {
-  let x: MaybeEscapes<NonescapingType>
-  init(_ x: consuming MaybeEscapes<NonescapingType>) {
-    self.x = x
-  }
-}
-
 struct NonescapeDoesNotAllowNoncopyable: ~Escapable { // expected-note {{consider adding '~Copyable' to struct 'NonescapeDoesNotAllowNoncopyable'}}
   let x: NC // expected-error {{stored property 'x' of 'Copyable'-conforming struct 'NonescapeDoesNotAllowNoncopyable' has non-Copyable type 'NC'}}
   init(_ x: borrowing NC) {
@@ -274,10 +262,12 @@ struct NonescapeDoesNotAllowNoncopyable: ~Escapable { // expected-note {{conside
   }
 }
 
-enum MaybeEscapes<T: ~Escapable> { // expected-note {{generic enum 'MaybeEscapes' has '~Escapable' constraint on a generic parameter, making its 'Escapable' conformance conditional}}
+enum MaybeEscapes<T: ~Escapable>: ~Escapable { // expected-note {{generic enum 'MaybeEscapes' has '~Escapable' constraint preventing 'Escapable' conformance}}
   case just(T)
   case none
 }
+
+extension MaybeEscapes: Escapable {}
 
 struct Escapes { // expected-note {{consider adding '~Escapable' to struct 'Escapes'}}
   let t: MaybeEscapes<NonescapingType> // expected-error {{stored property 't' of 'Escapable'-conforming struct 'Escapes' has non-Escapable type 'MaybeEscapes<NonescapingType>'}}

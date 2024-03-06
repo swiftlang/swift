@@ -421,7 +421,6 @@ getBuiltinInvertibleProtocolConformance(NominalTypeDecl *nominal,
         // An inverse ~Copyable prevents conformance.
         return ProtocolConformanceRef::forInvalid();
 
-      case InverseMarking::Kind::Inferred: // ignore "inferred" inverse marking
       case InverseMarking::Kind::None:
         break;
       }
