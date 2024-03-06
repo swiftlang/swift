@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -verify -enable-experimental-feature RegionBasedIsolation %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -verify -enable-upcoming-feature RegionBasedIsolation %s -o /dev/null
 
 // REQUIRES: asserts
 

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -emit-sil -verify -o /dev/null %s
 // RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -emit-sil -verify -o /dev/null %s
-// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -emit-sil -verify -o /dev/null %s -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -emit-sil -verify -o /dev/null %s -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

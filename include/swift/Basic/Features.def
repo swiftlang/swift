@@ -182,6 +182,7 @@ UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
+UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -274,9 +275,6 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
-
-/// Region Based Isolation testing using the TransferNonSendable pass
-EXPERIMENTAL_FEATURE(RegionBasedIsolation, true)
 
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
