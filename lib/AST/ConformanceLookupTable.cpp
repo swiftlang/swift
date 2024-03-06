@@ -295,8 +295,19 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     forEachInStage(
         stage, nominal,
         [&](NominalTypeDecl *nominal) {
-          addInheritedProtocols(nominal,
-                                ConformanceSource::forExplicit(nominal));
+          auto source = ConformanceSource::forExplicit(nominal);
+
+          // Get all of the protocols in the inheritance clause.
+          InvertibleProtocolSet inverses;
+          bool anyObject = false;
+          for (const auto &found :
+                  getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject)) {
+            if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+              addProtocol(proto, found.Loc,
+                          source.withUncheckedLoc(found.uncheckedLoc)
+                                .withPreconcurrencyLoc(found.preconcurrencyLoc));
+            }
+          }
 
           addMacroGeneratedProtocols(
               nominal, ConformanceSource::forUnexpandedMacro(nominal));
@@ -492,22 +503,6 @@ bool ConformanceLookupTable::addProtocol(ProtocolDecl *protocol, SourceLoc loc,
   AllConformances[dc].push_back(entry);
 
   return true;
-}
-
-void ConformanceLookupTable::addInheritedProtocols(
-    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    ConformanceSource source) {
-  // Find all of the protocols in the inheritance list.
-  InvertibleProtocolSet inverses;
-  bool anyObject = false;
-  for (const auto &found :
-          getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      addProtocol(proto, found.Loc,
-                  source.withUncheckedLoc(found.uncheckedLoc)
-                        .withPreconcurrencyLoc(found.preconcurrencyLoc));
-    }
-  }
 }
 
 void ConformanceLookupTable::addMacroGeneratedProtocols(

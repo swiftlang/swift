@@ -381,11 +381,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   bool addProtocol(ProtocolDecl *protocol, SourceLoc loc,
                    ConformanceSource source);
 
-  /// Add the protocols from the given list.
-  void addInheritedProtocols(
-      llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-      ConformanceSource source);
-
   /// Add the protocols added by attached extension macros that are not
   /// yet expanded.
   void addMacroGeneratedProtocols(
