@@ -10,6 +10,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature BorrowingSwitch \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
 // RUN:     %S/../Inputs/Swiftskell.swift
@@ -150,42 +151,29 @@ import NoncopyableGenerics_Misc
 
 import Swiftskell
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public protocol Show : ~Copyable {
+// CHECK-DAG: public protocol Show : ~Copyable {
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public func print(_ s: borrowing some Show & ~Copyable)
+// CHECK-DAG: public func print(_ s: borrowing some Show & ~Copyable)
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public protocol Eq : ~Copyable {
+// CHECK-DAG: public protocol Eq : ~Copyable {
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Eq where Self : ~Copyable {
+// CHECK-DAG: extension Swiftskell.Eq where Self : ~Copyable {
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public protocol Generator : ~Copyable {
+// CHECK-DAG: public enum Either<Success, Failure> where Failure : Swift.Error, Success : ~Copyable {
+
+    /// This one is position dependent so we can ensure the associated type was printed correctly.
+// CHECK: public protocol Generator : ~Copyable {
 // CHECK-NEXT:   associatedtype Element : ~Copyable
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public struct Vector<T> where T : ~Copyable {
+// CHECK-DAG: public struct Vector<T> where T : ~Copyable {
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public enum Maybe<Value> where Value : ~Copyable {
+// CHECK-DAG: public enum Maybe<Value> : ~Copyable where Value : ~Copyable {
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Show where Value : ~Copyable {
+// CHECK-DAG: extension Swiftskell.Maybe : Swiftskell.Show where Value : Swiftskell.Show, Value : ~Copyable {
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Eq where Value : Swiftskell.Eq, Value : ~Copyable {
+// CHECK-DAG: extension Swiftskell.Maybe : Swiftskell.Eq where Value : Swiftskell.Eq, Value : ~Copyable {
 
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public func maybe<A, B>(_ defaultVal: B, _ fn: (consuming A) -> B) -> (consuming Swiftskell.Maybe<A>) -> B where A : ~Copyable
-
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: @inlinable public func fromMaybe<A>(_ defaultVal: A) -> (Swiftskell.Maybe<A>) -> A {
-
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public func isJust<A>(_ m: borrowing Swiftskell.Maybe<A>) -> Swift.Bool where A : ~Copyable
+// CHECK-DAG: public func isJust<A>(_ m: borrowing Swiftskell.Maybe<A>) -> Swift.Bool where A : ~Copyable
 
 
 struct FileDescriptor: ~Copyable, Eq, Show {
