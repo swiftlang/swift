@@ -4259,7 +4259,8 @@ void ASTMangler::appendDistributedThunk(
   };
 
   if (auto *P = referenceInProtocolContextOrRequirement()) {
-    appendContext(P->getDeclContext(), thunk->getAlternateModuleName());
+    appendContext(P->getDeclContext(), base,
+                  thunk->getAlternateModuleName());
     appendIdentifier(Twine("$", P->getNameStr()).str());
     appendOperator("C"); // necessary for roundtrip, though we don't use it
   } else {
