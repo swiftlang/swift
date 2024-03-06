@@ -1136,8 +1136,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     if (!AI->getFunction()->hasOwnership()) {
       // In non-OSSA we don't balance CSE'd apply results which return an
       // owned value.
-      if (auto ri = AI->getSingleResult()) {
-        if (ri.value().getConvention() != ResultConvention::Unowned)
+      for (const SILResultInfo &ri : AI->getSubstCalleeType()->getResults()) {
+        if (ri.getConvention() != ResultConvention::Unowned)
           return false;
       }
     }
