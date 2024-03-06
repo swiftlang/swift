@@ -36,11 +36,6 @@ bool checkCopyableConformance(ProtocolConformance *conformance);
 
 /// \returns true if the conformance to Escapable was successfully validated.
 bool checkEscapableConformance(ProtocolConformance *conformance);
-
-/// You should be using `ImplicitKnownProtocolConformanceRequest` instead
-ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
-                                                    NominalTypeDecl *nominal,
-                                                    KnownProtocolKind kp);
 }
 
 

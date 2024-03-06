@@ -1072,7 +1072,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
   auto *file = cast<FileUnit>(getModuleScopeContext());
   if (file->getKind() != FileUnitKind::Source &&
       file->getKind() != FileUnitKind::ClangModule &&
-      file->getKind() != FileUnitKind::DWARFModule) {
+      file->getKind() != FileUnitKind::DWARFModule &&
+      file->getKind() != FileUnitKind::Synthesized) {
     return;
   }
 
@@ -1089,7 +1090,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
   };
 
   // Synthesize the unconditional conformances to invertible protocols.
-  // For conditional ones, see findSynthesizedConformances .
   if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     // Classes get their conformances during ModuleDecl::lookupConformance.
     if (!isa<ClassDecl>(this)) {
@@ -1101,13 +1101,18 @@ void NominalTypeDecl::prepareConformanceTable() const {
           missingOne = true;
       }
 
-      // FIXME: rdar://122289155 (NCGenerics: convert Equatable, Hashable, and RawRepresentable to ~Copyable.)
+      // Non-copyable and non-escaping types do not implicitly conform to
+      // any other protocols.
       if (missingOne)
         return;
     }
   } else if (!canBeCopyable()) {
     return; // No synthesized conformances for move-only nominals.
   }
+
+  // Don't do any more for synthesized FileUnits.
+  if (file->getKind() == FileUnitKind::Synthesized)
+    return;
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {

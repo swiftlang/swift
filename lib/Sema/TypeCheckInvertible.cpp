@@ -22,7 +22,7 @@
 #include "swift/AST/InverseMarking.h"
 #include "TypeChecker.h"
 
-namespace swift {
+using namespace swift;
 
 /// MARK: diagnostic utilities
 
@@ -267,12 +267,12 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
   return conforms;
 }
 
-bool checkEscapableConformance(ProtocolConformance *conformance) {
+bool swift::checkEscapableConformance(ProtocolConformance *conformance) {
   return checkInvertibleConformanceCommon(conformance,
                                           InvertibleProtocolKind::Escapable);
 }
 
-bool checkCopyableConformance(ProtocolConformance *conformance) {
+bool swift::checkCopyableConformance(ProtocolConformance *conformance) {
   return checkInvertibleConformanceCommon(conformance,
                                           InvertibleProtocolKind::Copyable);
 }
@@ -312,58 +312,4 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
 
   assert(!isa<ProtocolDecl>(nominal) || !isa<BuiltinTupleDecl>(nominal));
   return false;
-}
-
-/// Produces implicit ProtocolConformances for known protocols. Does _not_ check
-/// whether the conformance is valid. Nor does it recursively check whether
-/// stored properties implicitly conform, so there is no risk of a
-/// request-evaluator cycle.
-///
-/// (the conformance is checked in `TypeChecker::checkConformancesInContext`).
-ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
-                                                    NominalTypeDecl *nominal,
-                                                    KnownProtocolKind kp) {
-  auto &ctx = nominal->getASTContext();
-  auto *proto = ctx.getProtocol(kp);
-  auto ip = getInvertibleProtocolKind(kp);
-  if (!ip)
-    llvm_unreachable("not an invertible protocol");
-
-  assert(!isa<ClassDecl>(nominal) && "classes aren't handled here");
-
-  // Generates a conformance for the nominal to the protocol.
-  // The conformanceDC specifies THE decl context to use for the conformance.
-  auto generateConformance =
-      [&](DeclContext *conformanceDC) -> ProtocolConformance * {
-    // Form a conformance.
-    auto conformance = ctx.getNormalConformance(
-        nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        conformanceDC, ProtocolConformanceState::Complete,
-        /*isUnchecked=*/false, /*isPreconcurrency=*/false);
-    conformance->setSourceKindAndImplyingConformance(
-        ConformanceEntryKind::Synthesized, nullptr);
-
-    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
-    return conformance;
-  };
-
-  // Check what kind of inverse-marking we have to determine whether to generate
-  // a conformance for IP.
-  switch (nominal->hasInverseMarking(*ip).getKind()) {
-  case InverseMarking::Kind::LegacyExplicit:
-  case InverseMarking::Kind::Explicit:
-    return nullptr; // No positive IP conformance will be inferred.
-
-  case InverseMarking::Kind::None:
-    // All types already start with conformances to the invertible protocols in
-    // this case, within `NominalTypeDecl::prepareConformanceTable`.
-    //
-    // There are various other kinds of SourceFiles, like SIL, which instead
-    // get their conformances here instead.
-    //
-    // If there's no inverse, we infer a positive IP conformance.
-    return generateConformance(nominal);
-  }
-}
-
 }

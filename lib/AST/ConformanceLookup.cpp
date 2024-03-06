@@ -677,31 +677,17 @@ LookupConformanceInModuleRequest::evaluate(
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
-    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
-               || protocol->isSpecificProtocol(KnownProtocolKind::Escapable)) {
-      const auto kp = protocol->getKnownProtocolKind().value();
-
-      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
-          && kp == KnownProtocolKind::Copyable) {
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
         // Return an abstract conformance to maintain legacy compatability.
         // We only need to do this until we are properly dealing with or
         // omitting Copyable conformances in modules/interfaces.
 
         if (nominal->canBeCopyable())
           return ProtocolConformanceRef(protocol);
-        else
-          return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
 
-      // Try to infer the conformance.
-      ImplicitKnownProtocolConformanceRequest cvRequest{nominal, kp};
-      if (auto conformance = evaluateOrDefault(
-          ctx.evaluator, cvRequest, nullptr)) {
-        conformances.clear();
-        conformances.push_back(conformance);
-      } else {
-        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
-      }
+      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     } else if (protocol->isSpecificProtocol(
                    KnownProtocolKind::BitwiseCopyable)) {
       // Try to infer BitwiseCopyable conformance.
