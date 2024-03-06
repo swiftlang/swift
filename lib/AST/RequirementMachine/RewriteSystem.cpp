@@ -33,6 +33,7 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   Frozen = 0;
   RecordLoops = 0;
   LongestInitialRule = 0;
+  DeepestInitialRule = 0;
 }
 
 RewriteSystem::~RewriteSystem() {
@@ -88,6 +89,7 @@ void RewriteSystem::initialize(
 
   for (const auto &rule : getLocalRules()) {
     LongestInitialRule = std::max(LongestInitialRule, rule.getDepth());
+    DeepestInitialRule = std::max(DeepestInitialRule, rule.getNesting());
   }
 }
 
