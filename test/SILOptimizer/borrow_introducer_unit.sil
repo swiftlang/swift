@@ -340,11 +340,6 @@ bb2:
   unreachable
 }
 
-// CHECK-LABEL: introducer_example: borrow_introducers with: %0
-// CHECK: Borrow introducers for: %0 = argument of bb0 : $C
-// CHECK-NEXT: %0 = argument of bb0 : $C
-// CHECK-NEXT: introducer_example: borrow_introducers with: %0
-
 // CHECK-LABEL: introducer_example: borrow_introducers with: %borrow0
 // CHECK: Borrow introducers for:   %{{.*}} = begin_borrow %0 : $C
 // CHECK-NEXT:  %{{.*}} = begin_borrow %0 : $C
@@ -356,10 +351,6 @@ bb2:
 // CHECK-NEXT:  %{{.*}} = argument of bb0 : $C
 // CHECK-NEXT: introducer_example: borrow_introducers with: %first
 
-// CHECK-LABEL: introducer_example: borrow_introducers with: %field
-// CHECK: Borrow introducers for:   %{{.*}} = ref_element_addr %{{.*}} : $C, #C.field
-// CHECK-NEXT: introducer_example: borrow_introducers with: %field
-
 // CHECK-LABEL: introducer_example: borrow_introducers with: %load
 // CHECK-LABEL: Borrow introducers for:   %{{.*}} = load_borrow %{{.*}} : $*C
 // CHECK-NEXT: %{{.*}} = load_borrow %{{.*}} : $*C
@@ -367,14 +358,12 @@ bb2:
 sil [ossa] @introducer_example : $@convention(thin) (@owned C, @guaranteed C) -> () {
 bb0(%0 : @owned $C,
     %1 : @guaranteed $C):
-  specify_test "borrow_introducers %0"
   %borrow0 = begin_borrow %0 : $C
   specify_test "borrow_introducers %borrow0"
   %pair = struct $PairC(%borrow0 : $C, %1 : $C)
   %first = struct_extract %pair : $PairC, #PairC.first
   specify_test "borrow_introducers %first"
   %field = ref_element_addr %first : $C, #C.field
-  specify_test "borrow_introducers %field"
   %load = load_borrow %field : $*C
   specify_test "borrow_introducers %load"
   end_borrow %load : $C
@@ -417,7 +406,7 @@ bb3:
 // visited once on each path, and each time the recursive algorithm
 // must find the enclosing def %0, which maps to a %outer0 on one path
 // and %outer1 on another path. If the cache fails, then we only find
-// one of the outer adjacent phis as and enclosing value for %inner.
+// one of the outer adjacent phis as an enclosing value for %inner.
 //
 // CHECK-LABEL: testEnclosingRevisitReborrow: enclosing_values with: %inner
 // CHECK: Enclosing values for: %10 = argument of bb4 : $C                        // user: %11

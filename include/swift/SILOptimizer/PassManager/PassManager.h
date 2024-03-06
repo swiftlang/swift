@@ -73,7 +73,7 @@ class SwiftPassInvocation {
 
   SILSSAUpdater *ssaUpdater = nullptr;
 
-  static constexpr int BlockSetCapacity = 8;
+  static constexpr int BlockSetCapacity = 16;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
   int numBlockSetsAllocated = 0;

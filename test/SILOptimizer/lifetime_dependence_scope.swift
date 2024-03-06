@@ -35,7 +35,7 @@ struct NC : ~Copyable {
   }
 }
 
-// Rewrite the mark_dependence to depende on the incoming argument rather than the nested access.
+// Rewrite the mark_dependence to depend on the incoming argument rather than the nested access.
 //
 // CHECK-LABEL: sil hidden @$s4test13bv_get_mutate9containerAA2BVVAA2NCVzYls_tF : $@convention(thin) (@inout NC) -> _scope(1) @owned BV {
 // CHECK: bb0(%0 : $*NC):

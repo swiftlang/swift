@@ -34,7 +34,7 @@ let lifetimeDependenceInsertionPass = FunctionPass(
   if !context.options.hasFeature(.NonescapableTypes) {
     return
   }
-  log("Inserting lifetime dependence markers in \(function.name)")
+  log(" --- Inserting lifetime dependence markers in \(function.name)")
 
   for instruction in function.instructions {
     if let dependentApply = LifetimeDependentApply(instruction) {
