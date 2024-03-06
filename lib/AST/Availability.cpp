@@ -111,7 +111,8 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
                                           ASTContext &Context) {
   // If there is no information that would go into the availability attribute,
   // don't create one.
-  if (!Inferred.Introduced && !Inferred.Deprecated && !Inferred.Obsoleted &&
+  if (Inferred.PlatformAgnostic == PlatformAgnosticAvailabilityKind::None &&
+      !Inferred.Introduced && !Inferred.Deprecated && !Inferred.Obsoleted &&
       Message.empty() && Rename.empty() && !RenameDecl)
     return nullptr;
 
