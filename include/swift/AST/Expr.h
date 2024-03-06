@@ -4716,7 +4716,7 @@ public:
   /// complete type-checking.
   ///
   /// Returns the thrown error destination, which includes both the type
-  /// thrown from this application as well as the the context's error type,
+  /// thrown from this application as well as the context's error type,
   /// which may be different.
   ThrownErrorDestination throws() const {
     assert(Bits.ApplyExpr.ThrowsIsSet);
