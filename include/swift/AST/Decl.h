@@ -1859,6 +1859,10 @@ public:
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
 
+  /// Determine whether this extension context is in the same defining module as
+  /// the original nominal type context.
+  bool isInSameDefiningModule() const;
+
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid or
   /// \c isObjCImplementation() is false.

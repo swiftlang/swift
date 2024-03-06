@@ -490,3 +490,8 @@ extension StillIllegal1: AnotherOne where Pointee: Escapable {}
 struct SillIllegal2<Pointee> {}
 extension SillIllegal2: Arbitrary where Pointee: Sendable {}
 // expected-error@-1 {{conditional conformance to non-marker protocol 'Arbitrary' cannot depend on conformance of 'Pointee' to marker protocol 'Sendable'}}
+
+struct SSS: ~Copyable, PPP {}
+protocol PPP: ~Copyable {}
+let global__old__: any PPP = SSS() // expected-error {{value of type 'SSS' does not conform to specified type 'Copyable'}}
+let global__new__: any PPP & ~Copyable = SSS()

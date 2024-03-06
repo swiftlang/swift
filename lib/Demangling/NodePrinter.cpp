@@ -645,6 +645,7 @@ private:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
     case Node::Kind::ParamLifetimeDependence:
     case Node::Kind::SelfLifetimeDependence:
+    case Node::Kind::DependentGenericInverseConformanceRequirement:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2859,6 +2860,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     NodePointer reqt = Node->getChild(1);
     print(type, depth + 1);
     Printer << ": ";
+    print(reqt, depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::DependentGenericInverseConformanceRequirement: {
+    NodePointer type = Node->getChild(0);
+    NodePointer reqt = Node->getChild(1);
+    print(type, depth + 1);
+    Printer << ": ~";
     print(reqt, depth + 1);
     return nullptr;
   }

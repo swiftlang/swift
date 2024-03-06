@@ -72,10 +72,8 @@ protected:
   /// If enabled, marker protocols can be encoded in the mangled name.
   bool AllowMarkerProtocols = true;
 
-  /// Whether the mangling predates concurrency, and therefore shouldn't
-  /// include concurrency features such as global actors or @Sendable
-  /// function types.
-  bool Preconcurrency = false;
+  /// If enabled, inverses will not be mangled into generic signatures.
+  bool AllowInverses = true;
 
   /// If enabled, declarations annotated with @_originallyDefinedIn are mangled
   /// as if they're part of their original module. Disabled for debug mangling,
@@ -455,16 +453,54 @@ protected:
                                  GenericSignature sig,
                                  const ValueDecl *forDecl);
 
-  void appendContextOf(const ValueDecl *decl);
+  // A "base entity" is a function, property, subscript, or any other
+  // declaration that can appear in an extension.
+  struct BaseEntitySignature {
+  private:
+    GenericSignature sig;
+    bool innermostTypeDecl;
+    bool extension;
+    std::optional<unsigned> mangledDepth; // for inverses
+  public:
+    bool reachedInnermostTypeDecl() {
+      bool answer = innermostTypeDecl;
+      innermostTypeDecl = false;
+      return answer;
+    }
+    bool reachedExtension() const { return extension; }
+    void setReachedExtension() { assert(!extension); extension = true; }
+    GenericSignature getSignature() const { return sig; }
+    // The depth of the inverses mangled so far.
+    std::optional<unsigned> getDepth() const { return mangledDepth; }
+    void setDepth(unsigned depth) {
+      assert(!mangledDepth || *mangledDepth <= depth);
+      mangledDepth = depth;
+    }
+    BaseEntitySignature(const Decl *decl);
+  };
 
-  void appendContext(const DeclContext *ctx, StringRef useModuleName);
+  void appendContextOf(const ValueDecl *decl, BaseEntitySignature &base);
+  void appendContextualInverses(const GenericTypeDecl *contextDecl,
+                                BaseEntitySignature &base,
+                                const ModuleDecl *module,
+                                StringRef useModuleName);
+
+  void appendContext(const DeclContext *ctx,
+                     BaseEntitySignature &base,
+                     StringRef useModuleName);
 
   void appendModule(const ModuleDecl *module, StringRef useModuleName);
+
+  void appendExtension(const ExtensionDecl *ext,
+                       BaseEntitySignature &base,
+                       StringRef useModuleName);
 
   void appendProtocolName(const ProtocolDecl *protocol,
                           bool allowStandardSubstitution = true);
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
+  void appendAnyGenericType(const GenericTypeDecl *decl,
+                            BaseEntitySignature &base);
 
   enum FunctionManglingKind {
     NoFunctionMangling,
@@ -508,6 +544,24 @@ protected:
                                   GenericSignature sig,
                                   const ValueDecl *forDecl = nullptr);
 
+  struct GenericSignatureParts {
+    ArrayRef<CanGenericTypeParamType> params;
+    unsigned initialParamDepth = 0;
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<InverseRequirement, 2> inverses;
+    bool isNull() const; // Is there anything to mangle?
+    bool hasRequirements() const; // Are there any requirements to mangle?
+    void clear();
+  };
+
+  /// Append a generic signature to the mangling.
+  ///
+  /// \param sig The generic signature.
+  ///
+  /// \returns \c true if a generic signature was appended, \c false
+  /// if it was empty.
+  bool appendGenericSignature(GenericSignature sig);
+
   /// Append a generic signature to the mangling.
   ///
   /// \param sig The generic signature.
@@ -515,10 +569,17 @@ protected:
   /// \param contextSig The signature of the known context. This function
   /// will only mangle the difference between \c sig and \c contextSig.
   ///
+  /// \param base The signature of the base entity whose generic signature we're
+  /// mangling. This function will only mangle the inverses on generic
+  /// parameter in \c sig that are not eliminated by conformance requirements in
+  /// \c base.
+  ///
+  ///
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
   bool appendGenericSignature(GenericSignature sig,
-                              GenericSignature contextSig = nullptr);
+                              GenericSignature contextSig,
+                              BaseEntitySignature &base);
 
   /// Append a requirement to the mangling.
   ///
@@ -532,10 +593,23 @@ protected:
   void appendRequirement(const Requirement &reqt, GenericSignature sig,
                          bool lhsBaseIsProtocolSelf = false);
 
+  /// Append an inverse requirement into the mangling.
+  ///
+  /// Instead of mangling the presence of an invertible protocol, we mangle
+  /// their absence, which is what an inverse represents.
+  ///
+  /// \param req The inverse requirement to mangle.
+  void appendInverseRequirement(const InverseRequirement &req,
+                                GenericSignature sig,
+                                bool lhsBaseIsProtocolSelf = false);
+
+  void gatherGenericSignatureParts(GenericSignature sig,
+                                   GenericSignature contextSig,
+                                   BaseEntitySignature &base,
+                                   GenericSignatureParts &parts);
+
   void appendGenericSignatureParts(GenericSignature sig,
-                                   ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
-                                   unsigned initialParamDepth,
-                                   ArrayRef<Requirement> requirements);
+                                   GenericSignatureParts const& parts);
 
   DependentMemberType *dropProtocolFromAssociatedType(DependentMemberType *dmt,
                                                       GenericSignature sig);
@@ -565,6 +639,7 @@ protected:
   
 
   void appendDeclType(const ValueDecl *decl,
+                    BaseEntitySignature &base,
                     FunctionManglingKind functionMangling = NoFunctionMangling);
 
   bool tryAppendStandardSubstitution(const GenericTypeDecl *type);
@@ -580,7 +655,10 @@ protected:
   void appendAccessorEntity(StringRef accessorKindCode,
                             const AbstractStorageDecl *decl, bool isStatic);
 
-  void appendEntity(const ValueDecl *decl, StringRef EntityOp, bool isStatic);
+  void appendEntity(const ValueDecl *decl,
+                    BaseEntitySignature &base,
+                    StringRef EntityOp,
+                    bool isStatic);
 
   void appendEntity(const ValueDecl *decl);
 
