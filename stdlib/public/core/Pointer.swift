@@ -25,9 +25,13 @@ public typealias _CustomDebugStringConvertibleOrNone = Any
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafeMutablePointer, UnsafePointer, UnsafeRawPointer,
 /// UnsafeMutableRawPointer, and AutoreleasingUnsafeMutablePointer.
-public protocol _Pointer
-: Hashable, Strideable, _CustomDebugStringConvertibleOrNone, _CustomReflectableOrNone
-, _BitwiseCopyable {
+public protocol _Pointer:
+  Hashable,
+  Strideable,
+  _CustomDebugStringConvertibleOrNone,
+  _CustomReflectableOrNone,
+  _BitwiseCopyable
+{
   /// A type that represents the distance between two pointers.
   typealias Distance = Int
 

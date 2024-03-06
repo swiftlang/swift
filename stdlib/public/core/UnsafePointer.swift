@@ -213,21 +213,15 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   public let _rawValue: Builtin.RawPointer
 
   /// Creates an `UnsafePointer` from a builtin raw pointer.
-  @_alwaysEmitIntoClient
   @_transparent
+  @_preInverseGenerics
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 }
 
-extension UnsafePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal init(_ _rawValue: Builtin.RawPointer) {
-    self._rawValue = _rawValue
-  }
-}
+@available(*, unavailable)
+extension UnsafePointer: Sendable where Pointee: ~Copyable {}
 
 extension UnsafePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
@@ -235,21 +229,9 @@ extension UnsafePointer where Pointee: ~Copyable {
   /// This pointer must be a pointer to the start of a previously allocated
   /// memory block. The memory must not be initialized or `Pointee` must be a
   /// trivial type.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public func deallocate() {
-    // Passing zero alignment to the runtime forces "aligned
-    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
-    // always uses the "aligned allocation" path, this ensures that the
-    // runtime's allocation and deallocation paths are compatible.
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
-  }
-}
-
-extension UnsafePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal func deallocate() {
     // Passing zero alignment to the runtime forces "aligned
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
@@ -263,20 +245,10 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///
   /// When reading from the `pointee` property, the instance referenced by
   /// this pointer must already be initialized.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public var pointee: Pointee {
     @_transparent unsafeAddress {
-      return self
-    }
-  }
-}
-
-extension UnsafePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal var pointee: Pointee {
-    unsafeAddress {
       return self
     }
   }
@@ -290,20 +262,9 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public subscript(i: Int) -> Pointee {
-    @_transparent
-    unsafeAddress {
-      return self + i
-    }
-  }
-}
-
-extension UnsafePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
       return self + i
@@ -374,9 +335,6 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  // This custom silgen name is chosen to not interfere with the old ABI
-  @_silgen_name("_swift_se0333_UnsafePointer_withMemoryRebound")
-  // TODO: Remove @_silgen_name once ~Copyable can be a thing above
   public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
@@ -441,8 +399,9 @@ extension UnsafePointer {
   }
 }
 
-extension UnsafePointer {
+extension UnsafePointer where Pointee: ~Copyable {
   @inlinable // unsafe-performance
+  @_preInverseGenerics
   internal static var _max: UnsafePointer {
     return UnsafePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
@@ -646,18 +605,23 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   public let _rawValue: Builtin.RawPointer
 
   /// Creates an `UnsafeMutablePointer` from a builtin raw pointer.
-  @_alwaysEmitIntoClient
   @_transparent
+  @_preInverseGenerics
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
+}
 
+@available(*, unavailable)
+extension UnsafeMutablePointer: Sendable where Pointee: ~Copyable {}
+
+extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Creates a mutable typed pointer referencing the same memory as the given
   /// immutable pointer.
   ///
   /// - Parameter other: The immutable pointer to convert.
-  @_alwaysEmitIntoClient
   @_transparent
+  @_preInverseGenerics
   public init(@_nonEphemeral mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
@@ -667,19 +631,19 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   ///
   /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
-  @_alwaysEmitIntoClient
   @_transparent
+  @_preInverseGenerics
   public init?(@_nonEphemeral mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
   }
-  
+
   /// Creates a mutable typed pointer referencing the same memory as the
   /// given mutable pointer.
   ///
   /// - Parameter other: The pointer to convert.
-  @_alwaysEmitIntoClient
   @_transparent
+  @_preInverseGenerics
   public init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
    self._rawValue = other._rawValue
   }
@@ -689,48 +653,9 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @_alwaysEmitIntoClient
   @_transparent
+  @_preInverseGenerics
   public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
-   guard let unwrapped = other else { return nil }
-   self.init(unwrapped)
-  }
-}
-
-extension UnsafeMutablePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal init(_ _rawValue: Builtin.RawPointer) {
-    self._rawValue = _rawValue
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal init(@_nonEphemeral mutating other: UnsafePointer<Pointee>) {
-    self._rawValue = other._rawValue
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal init?(@_nonEphemeral mutating other: UnsafePointer<Pointee>?) {
-    guard let unwrapped = other else { return nil }
-    self.init(mutating: unwrapped)
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
-   self._rawValue = other._rawValue
-  }
-
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
    guard let unwrapped = other else { return nil }
    self.init(unwrapped)
   }
@@ -760,36 +685,9 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   /// - Parameter count: The amount of memory to allocate, counted in instances
   ///   of `Pointee`.
-  @_alwaysEmitIntoClient
-  public static func allocate(capacity count: Int)
-    -> UnsafeMutablePointer<Pointee> {
-    let size = MemoryLayout<Pointee>.stride * count
-    // For any alignment <= _minAllocationAlignment, force alignment = 0.
-    // This forces the runtime's "aligned" allocation path so that
-    // deallocation does not require the original alignment.
-    //
-    // The runtime guarantees:
-    //
-    // align == 0 || align > _minAllocationAlignment:
-    //   Runtime uses "aligned allocation".
-    //
-    // 0 < align <= _minAllocationAlignment:
-    //   Runtime may use either malloc or "aligned allocation".
-    var align = Builtin.alignof(Pointee.self)
-    if Int(align) <= _minAllocationAlignment() {
-      align = (0)._builtinWordValue
-    }
-    let rawPtr = Builtin.allocRaw(size._builtinWordValue, align)
-    Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
-    return UnsafeMutablePointer(rawPtr)
-  }
-}
-
-extension UnsafeMutablePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func allocate(
+  @inlinable
+  @_preInverseGenerics
+  public static func allocate(
     capacity count: Int
   ) -> UnsafeMutablePointer<Pointee> {
     let size = MemoryLayout<Pointee>.stride * count
@@ -817,9 +715,11 @@ extension UnsafeMutablePointer {
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
   ///
-  /// This pointer must be a pointer to the start of a previously allocated memory 
-  /// block. The memory must not be initialized or `Pointee` must be a trivial type.
-  @_alwaysEmitIntoClient
+  /// This pointer must be a pointer to the start of a previously allocated
+  /// memory block. The memory must not be initialized or `Pointee` must be a
+  /// trivial type.
+  @inlinable
+  @_preInverseGenerics
   public func deallocate() {
     // Passing zero alignment to the runtime forces "aligned
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
@@ -828,20 +728,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 }
-
-extension UnsafeMutablePointer  {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal func deallocate() {
-    // Passing zero alignment to the runtime forces "aligned
-    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
-    // always uses the "aligned allocation" path, this ensures that the
-    // runtime's allocation and deallocation paths are compatible.
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
-  }
-}
-
 
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Reads or updates the instance referenced by this pointer.
@@ -855,20 +741,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// using `pointee`. Instead, use an initializing method, such as
   /// `initialize(to:)`.
   @inlinable // unsafe-performance
+  @_preInverseGenerics
   public var pointee: Pointee {
-    @_transparent unsafeAddress {
-      return UnsafePointer(self)
-    }
-    @_transparent nonmutating unsafeMutableAddress {
-      return self
-    }
-  }
-}
-
-extension UnsafeMutablePointer {
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal var pointee: Pointee {
     @_transparent unsafeAddress {
       return UnsafePointer(self)
     }
@@ -883,13 +757,13 @@ extension UnsafeMutablePointer {
   /// consecutive copies of the given value.
   ///
   /// The destination memory must be uninitialized or the pointer's `Pointee`
-  /// must be a trivial type. After a call to `initialize(repeating:count:)`, the
-  /// memory referenced by this pointer is initialized.
+  /// must be a trivial type. After a call to `initialize(repeating:count:)`,
+  /// the memory referenced by this pointer is initialized.
   ///
   /// - Parameters:
   ///   - repeatedValue: The instance to initialize this pointer's memory with.
   ///   - count: The number of consecutive copies of `newValue` to initialize.
-  ///     `count` must not be negative. 
+  ///     `count` must not be negative.
   @inlinable
   public func initialize(repeating repeatedValue: Pointee, count: Int) {
     // FIXME: add tests (since the `count` has been added)
@@ -923,7 +797,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 extension UnsafeMutablePointer {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
-  internal func initialize(to value: Pointee) { // Note: `value` was __shared!
+  internal func initialize(to value: Pointee) { // Note: `value` is __shared!
     Builtin.initialize(value, self._rawValue)
   }
 }
@@ -945,17 +819,9 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// `move()`, the memory is uninitialized.
   ///
   /// - Returns: The instance referenced by this pointer.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public func move() -> Pointee {
-    return Builtin.take(_rawValue)
-  }
-}
-
-extension UnsafeMutablePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
 }
@@ -982,7 +848,6 @@ extension UnsafeMutablePointer {
     }
   }
 
-  
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(repeating:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_repeating_count")
@@ -1035,7 +900,6 @@ extension UnsafeMutablePointer {
     }
   }
 
-  @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(from:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_from_count")
@@ -1064,39 +928,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public func moveInitialize(
-    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
-  ) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
-    if self < source || self >= source + count {
-      // initialize forward from a disjoint or following overlapping range.
-      Builtin.takeArrayFrontToBack(
-        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-      // This builtin is equivalent to:
-      // for i in 0..<count {
-      //   (self + i).initialize(to: (source + i).move())
-      // }
-    }
-    else if self != source {
-      // initialize backward from a non-following overlapping range.
-      Builtin.takeArrayBackToFront(
-        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-      // This builtin is equivalent to:
-      // var src = source + count
-      // var dst = self + count
-      // while dst != self {
-      //   (--dst).initialize(to: (--src).move())
-      // }
-    }
-  }
-}
-
-extension UnsafeMutablePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal func moveInitialize(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
     _debugPrecondition(
@@ -1177,7 +1010,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///     referenced by `source` and this pointer must not overlap.
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public func moveUpdate(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
@@ -1196,26 +1030,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  @_silgen_name("$sSp10moveAssign4from5countySpyxG_SitF") // To maintain ABI with moveAssign below
-  internal func moveUpdate(
-    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
-  ) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveUpdate(from:) with negative count")
-    _debugPrecondition(
-      self + count <= source || source + count <= self,
-      "moveUpdate overlapping range")
-    Builtin.assignTakeArray(
-      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    // These builtins are equivalent to:
-    // for i in 0..<count {
-    //   self[i] = (source + i).move()
-    // }
-  }
-
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "moveUpdate(from:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_moveAssign_from_count")
@@ -1238,7 +1052,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///   not be negative.
   /// - Returns: A raw pointer to the same address as this pointer. The memory
   ///   referenced by the returned raw pointer is still bound to `Pointee`.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   @discardableResult
   public func deinitialize(count: Int) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
@@ -1249,21 +1064,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal func deinitialize(count: Int) -> UnsafeMutableRawPointer {
-    _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
-    // TODO: IRGen optimization when `count` value is statically known to be 1,
-    //       then call `Builtin.destroy(Pointee.self, _rawValue)` instead.
-    Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
-    return UnsafeMutableRawPointer(self)
-  }
-}
-
-extension UnsafeMutablePointer /* where Pointee: ~Copyable */ {
-  // FIXME: We want this to have the constraint above, but that triggers a .swiftinterface issue.
+extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Executes the given closure while temporarily binding memory to
   /// the specified number of instances of the given type.
   ///
@@ -1324,8 +1125,6 @@ extension UnsafeMutablePointer /* where Pointee: ~Copyable */ {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  // This custom silgen name is chosen to not interfere with the old ABI
-  @_silgen_name("_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
   public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
@@ -1348,10 +1147,9 @@ extension UnsafeMutablePointer /* where Pointee: ~Copyable */ {
 }
 
 extension UnsafeMutablePointer {
-  // This obsolete implementation uses the expected mangled name
-  // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
-  // an entry point for any binary linked against the stdlib binary
-  // for Swift 5.6 and older.
+  // This obsolete implementation uses the expected mangled name of
+  // `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides an entry point
+  // for any binary linked against the stdlib binary for Swift 5.6 and older.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")
   @usableFromInline
@@ -1380,24 +1178,9 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public subscript(i: Int) -> Pointee {
-    @_transparent
-    unsafeAddress {
-      return UnsafePointer(self + i)
-    }
-    @_transparent
-    nonmutating unsafeMutableAddress {
-      return self + i
-    }
-  }
-}
-
-extension UnsafeMutablePointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
       return UnsafePointer(self + i)
@@ -1418,7 +1201,6 @@ extension UnsafeMutablePointer {
   /// - Parameter property: A `KeyPath` whose `Root` is `Pointee`.
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
-  @inlinable
   @_alwaysEmitIntoClient
   @_unavailableInEmbedded
   public func pointer<Property>(
@@ -1441,7 +1223,6 @@ extension UnsafeMutablePointer {
   /// - Parameter property: A `WritableKeyPath` whose `Root` is `Pointee`.
   /// - Returns: A mutable pointer to the stored property represented
   ///            by the key path, or `nil`.
-  @inlinable
   @_alwaysEmitIntoClient
   @_unavailableInEmbedded
   public func pointer<Property>(
@@ -1455,16 +1236,14 @@ extension UnsafeMutablePointer {
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
+}
 
+extension UnsafeMutablePointer where Pointee: ~Copyable {
   @inlinable // unsafe-performance
+  @_preInverseGenerics
   internal static var _max: UnsafeMutablePointer {
     return UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
   }
 }
-
-@available(*, unavailable)
-extension UnsafePointer: Sendable { }
-@available(*, unavailable)
-extension UnsafeMutablePointer: Sendable { }
