@@ -198,6 +198,8 @@
 
 ## Swift 5.10
 
+### 2024-03-05 (Xcode 15.3)
+
 * Swift 5.10 closes all known static data-race safety holes in complete strict
 concurrency checking.
 
