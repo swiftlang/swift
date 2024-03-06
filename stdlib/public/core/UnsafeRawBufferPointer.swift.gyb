@@ -1228,7 +1228,7 @@ extension ${Self} {
 ///     of the closure's execution.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
-public func withUnsafeMutableBytes<T, E: Error, Result>(
+public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
@@ -1238,6 +1238,7 @@ public func withUnsafeMutableBytes<T, E: Error, Result>(
 
 /// ABI: Historical withUnsafeMutableBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
 @_silgen_name("$ss22withUnsafeMutableBytes2of_q_xz_q_SwKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeMutableBytes<T, Result>(
@@ -1256,7 +1257,9 @@ func __abi_se0413_withUnsafeMutableBytes<T, Result>(
 /// This function is similar to `withUnsafeMutableBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeMutableBytes<T, E: Error, Result>(
+public func _withUnprotectedUnsafeMutableBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
@@ -1292,7 +1295,7 @@ public func _withUnprotectedUnsafeMutableBytes<T, E: Error, Result>(
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
-public func withUnsafeBytes<T, E: Error, Result>(
+public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
@@ -1302,6 +1305,7 @@ public func withUnsafeBytes<T, E: Error, Result>(
 
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
 @_silgen_name("$ss15withUnsafeBytes2of_q_xz_q_SWKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
@@ -1319,7 +1323,9 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeBytes<T, E: Error, Result>(
+public func _withUnprotectedUnsafeBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
@@ -1351,8 +1357,10 @@ public func _withUnprotectedUnsafeBytes<T, E: Error, Result>(
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
-public func withUnsafeBytes<T, E: Error, Result>(
-  of value: T,
+public func withUnsafeBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  of value: borrowing T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
@@ -1361,6 +1369,7 @@ public func withUnsafeBytes<T, E: Error, Result>(
 
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
 @_silgen_name("$ss15withUnsafeBytes2of_q_x_q_SWKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
@@ -1378,8 +1387,10 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeBytes<T, E: Error, Result>(
-  of value: T,
+public func _withUnprotectedUnsafeBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  of value: borrowing T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
