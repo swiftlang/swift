@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -425,9 +425,7 @@ extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafePointer: _CustomPlaygroundQuickLookable
-where Pointee: ~Copyable // FIXME: Remove this (rdar://123262870)
-{
+extension UnsafePointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 
@@ -441,9 +439,7 @@ where Pointee: ~Copyable // FIXME: Remove this (rdar://123262870)
   }
 }
 
-extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable
-where Pointee: ~Copyable // FIXME: Remove this (rdar://123262870)
-{
+extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 

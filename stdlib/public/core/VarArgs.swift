@@ -354,6 +354,7 @@ extension UnsafePointer: CVarArg where Pointee: ~Copyable {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
+  @_preInverseGenerics
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
@@ -363,6 +364,7 @@ extension UnsafeMutablePointer: CVarArg where Pointee: ~Copyable {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
+  @_preInverseGenerics
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
