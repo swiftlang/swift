@@ -5,6 +5,7 @@
 @available(SwiftStdlib 5.1, *)
 @globalActor
 private struct PrivateGA { // expected-note 2 {{type declared here}}
+  // expected-note@-1 {{struct 'PrivateGA' is not '@usableFromInline' or public}}
   actor Actor {}
   static let shared = Actor()
 }
@@ -12,6 +13,7 @@ private struct PrivateGA { // expected-note 2 {{type declared here}}
 @available(SwiftStdlib 5.1, *)
 @globalActor
 internal struct InternalGA { // expected-note {{type declared here}}
+  // expected-note@-1 {{struct 'InternalGA' is not '@usableFromInline' or public}}
   actor Actor {}
   static let shared = Actor()
 }
@@ -43,10 +45,10 @@ public struct PublicGA {
 
 @available(SwiftStdlib 5.1, *)
 @inlinable public func testNestedFuncs() {
-  // FIXME: Functions isolated to non-resilient global actors nested in
+  // Functions isolated to non-resilient global actors nested in
   //        inlinable functions should be diagnosed.
-  @PrivateGA func inlineFuncPrivateGA() {}
-  @InternalGA func inlineFuncInternalGA() {}
+  @PrivateGA func inlineFuncPrivateGA() {} // expected-error {{struct 'PrivateGA' is private and cannot be referenced from an '@inlinable' function}}
+  @InternalGA func inlineFuncInternalGA() {} // expected-error {{struct 'InternalGA' is internal and cannot be referenced from an '@inlinable' function}}
   @UFIGA func inlineFuncUFIGA() {}
   @PublicGA func inlineFuncPublicGA() {}
 }
