@@ -846,7 +846,7 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
   PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
   ++NumNormalProtocolConformancesLoaded;
 
-  auto *rootConformance = cast<RootProtocolConformance>(
+  auto *rootConformance = cast<NormalProtocolConformance>(
       genericConformance.getConcrete());
 
   auto conformance =

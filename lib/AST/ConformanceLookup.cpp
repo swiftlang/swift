@@ -643,8 +643,12 @@ LookupConformanceInModuleRequest::evaluate(
       ExpandExtensionMacros{nominal},
       { });
 
-  // Find the (unspecialized) conformance.
+  // Find the root conformance in the nominal type declaration's
+  // conformance lookup table.
   SmallVector<ProtocolConformance *, 2> conformances;
+
+  // If the conformance lookup table produced nothing, we try to derive the
+  // conformance for a few special protocol kinds.
   if (!nominal->lookupConformance(protocol, conformances)) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       // Try to infer Sendable conformance.
@@ -706,6 +710,8 @@ LookupConformanceInModuleRequest::evaluate(
     }
   }
 
+  // We should have at least one conformance by now, or we would have returned
+  // above.
   assert(!conformances.empty());
 
   // If we have multiple conformances, first try to filter out any that are
@@ -754,27 +760,32 @@ LookupConformanceInModuleRequest::evaluate(
     return ProtocolConformanceRef(conformance);
   }
 
-  // If the type is specialized, find the conformance for the generic type.
+  // We now have a root conformance for the nominal's declared interface type.
+  // If our type is specialized, apply a substitution map to the root
+  // conformance.
   if (type->isSpecialized()) {
-    // Figure out the type that's explicitly conforming to this protocol.
-    Type explicitConformanceType = conformance->getType();
-    DeclContext *explicitConformanceDC = conformance->getDeclContext();
+    if (!conformance->getType()->isEqual(type)) {
+      // We use a builtin conformance for unconditional Copyable and Escapable
+      // conformances. Avoid building a substitution map and just return the
+      // correct builtin conformance for the specialized type.
+      if (auto *builtinConf = dyn_cast<BuiltinProtocolConformance>(conformance)) {
+        return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      builtinConf->getBuiltinConformanceKind()));
+      }
 
-    // If the explicit conformance is associated with a type that is different
-    // from the type we're checking, retrieve generic conformance.
-    if (!explicitConformanceType->isEqual(type)) {
-      // Gather the substitutions we need to map the generic conformance to
-      // the specialized conformance.
-      auto subMap = type->getContextSubstitutionMap(mod, explicitConformanceDC);
-
-      // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type,
-        cast<RootProtocolConformance>(conformance), subMap);
-      return ProtocolConformanceRef(result);
+      // Otherwise, we have a normal conformance, so we're going to build a
+      // specialized conformance from the context substitution map of the
+      // specialized type.
+      auto *normalConf = cast<NormalProtocolConformance>(conformance);
+      auto *conformanceDC = normalConf->getDeclContext();
+      auto subMap = type->getContextSubstitutionMap(mod, conformanceDC);
+      return ProtocolConformanceRef(
+          ctx.getSpecializedConformance(type, normalConf, subMap));
     }
   }
 
-  // Record and return the simple conformance.
+  // Return the root conformance.
   return ProtocolConformanceRef(conformance);
 }
 

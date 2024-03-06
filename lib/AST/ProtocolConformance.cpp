@@ -731,7 +731,7 @@ void NormalProtocolConformance::overrideWitness(ValueDecl *requirement,
 
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
-    RootProtocolConformance *genericConformance,
+    NormalProtocolConformance *genericConformance,
     SubstitutionMap substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
     GenericConformance(genericConformance),
@@ -917,7 +917,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
 /// Check if the replacement is a one-element pack with a scalar type.
 static bool isVanishingTupleConformance(
-    RootProtocolConformance *generic,
+    NormalProtocolConformance *generic,
     SubstitutionMap substitutions) {
   if (!isa<BuiltinTupleDecl>(generic->getDeclContext()->getSelfNominalTypeDecl()))
     return false;
@@ -1515,7 +1515,7 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     auto genericConformance = spec->getGenericConformance();
     return Ctx.getSpecializedConformance(
                                 getType()->getCanonicalType(),
-                                cast<RootProtocolConformance>(
+                                cast<NormalProtocolConformance>(
                                     genericConformance->getCanonicalConformance()),
                                 spec->getSubstitutionMap().getCanonical());
   }

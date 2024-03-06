@@ -2592,7 +2592,7 @@ ASTContext::getBuiltinConformance(Type type, ProtocolDecl *protocol,
 }
 
 static bool collapseSpecializedConformance(Type type,
-                                           RootProtocolConformance *conformance,
+                                           NormalProtocolConformance *conformance,
                                            SubstitutionMap substitutions) {
   if (!conformance->getType()->isEqual(type))
     return false;
@@ -2607,7 +2607,7 @@ static bool collapseSpecializedConformance(Type type,
 
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
-                                      RootProtocolConformance *generic,
+                                      NormalProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
   // If the specialization is a no-op, use the root conformance instead.
   if (collapseSpecializedConformance(type, generic, substitutions)) {

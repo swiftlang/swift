@@ -7868,7 +7868,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
     if (!subMap)
       return ProtocolConformanceRef();
 
-    auto *rootConform = cast<RootProtocolConformance>(
+    auto *rootConform = cast<NormalProtocolConformance>(
         genericConform.getConcrete());
     auto result = P.Context.getSpecializedConformance(
         ConformingTy, rootConform, subMap);
