@@ -182,7 +182,7 @@ extension OpaquePointer {
 extension OpaquePointer {
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init<T: ~Copyable>(@_nonEphemeral _ from: UnsafePointer<T>) {
     self._rawValue = from._rawValue
   }
@@ -191,7 +191,7 @@ extension OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init?<T: ~Copyable>(@_nonEphemeral _ from: UnsafePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
@@ -201,7 +201,7 @@ extension OpaquePointer {
 extension OpaquePointer {
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
     self._rawValue = from._rawValue
   }
@@ -210,7 +210,7 @@ extension OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  // FIXME(NCG): @_preInverseGenerics
+  @_preInverseGenerics
   public init?<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
