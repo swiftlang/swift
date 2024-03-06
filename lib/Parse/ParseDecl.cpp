@@ -3055,6 +3055,14 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       AttrRange = SourceRange(Loc);
     }
 
+    // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
+    if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (Kind == ReferenceOwnership::Weak ||
+          Kind == ReferenceOwnership::Unowned) {
+        diagnose(Loc, diag::weak_unowned_in_embedded_swift, Kind);
+      }
+    }
+
     if (!DiscardAttribute)
       Attributes.add(
           new (Context) ReferenceOwnershipAttr(AttrRange, Kind));
