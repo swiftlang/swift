@@ -280,6 +280,10 @@ public:
   /// termination.
   bool PrintClangStats = false;
 
+  /// Indicates whether or not the Clang importer should dump lookup tables
+  /// upon termination.
+  bool DumpClangLookupTables = false;
+
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 
