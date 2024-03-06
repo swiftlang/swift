@@ -916,6 +916,12 @@ namespace {
       if (Resilient || IGM.getOptions().WitnessMethodElimination)
         IGM.emitDispatchThunk(func);
 
+      {
+        auto *requirement = cast<AbstractFunctionDecl>(func.getDecl());
+        if (requirement->isDistributed())
+          IGM.emitDistributedTargetAccessor(requirement);
+      }
+
       // Classify the function.
       auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
 

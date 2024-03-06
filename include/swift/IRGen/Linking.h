@@ -359,6 +359,9 @@ class LinkEntity {
     /// the metadata cache once.
     CanonicalPrespecializedGenericTypeCachingOnceToken,
 
+    /// The function used to access distributed methods and accessors.
+    DistributedAccessor,
+
     /// The same as AsyncFunctionPointer but with a different stored value, for
     /// use by TBDGen.
     /// The pointer is an AbstractFunctionDecl*.
@@ -512,8 +515,6 @@ class LinkEntity {
     /// The pointer is a const char* of the name.
     KnownAsyncFunctionPointer,
 
-    /// The pointer is SILFunction*
-    DistributedAccessor,
     /// An async function pointer for a distributed accessor (method or
     /// property).
     /// The pointer is a SILFunction*.
@@ -1341,6 +1342,10 @@ public:
   }
 
   static LinkEntity forDistributedTargetAccessor(SILFunction *target) {
+    return forDistributedTargetAccessor(target->getDeclContext()->getAsDecl());
+  }
+
+  static LinkEntity forDistributedTargetAccessor(Decl *target) {
     LinkEntity entity;
     entity.Pointer = target;
     entity.SecondaryPointer = nullptr;

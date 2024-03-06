@@ -4423,8 +4423,34 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   }
 }
 
-void IRGenModule::addAccessibleFunction(SILFunction *func) {
-  AccessibleFunctions.push_back(func);
+AccessibleFunction AccessibleFunction::forSILFunction(IRGenModule &IGM,
+                                                      SILFunction *func) {
+  assert(!func->isDistributed() && "use forDistributed(...) instead");
+
+  llvm::Constant *funcAddr = nullptr;
+  if (func->isAsync()) {
+    funcAddr = IGM.getAddrOfAsyncFunctionPointer(func);
+  } else {
+    funcAddr = IGM.getAddrOfSILFunction(func, NotForDefinition);
+  }
+
+  return AccessibleFunction(
+      /*recordName=*/LinkEntity::forAccessibleFunctionRecord(func)
+          .mangleAsString(),
+      /*funcName=*/LinkEntity::forSILFunction(func).mangleAsString(),
+      /*isDistributed=*/false, func->getLoweredFunctionType(), funcAddr);
+}
+
+AccessibleFunction AccessibleFunction::forDistributed(std::string recordName,
+                                                      std::string accessorName,
+                                                      CanSILFunctionType type,
+                                                      llvm::Constant *address) {
+  return AccessibleFunction(recordName, accessorName,
+                            /*isDistributed=*/true, type, address);
+}
+
+void IRGenModule::addAccessibleFunction(AccessibleFunction func) {
+  AccessibleFunctions.push_back(std::move(func));
 }
 
 /// Emit the protocol conformance list and return it (if asContiguousArray is
@@ -4648,17 +4674,12 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   return nullptr;
 }
 
-void IRGenModule::emitAccessibleFunction(
-    StringRef sectionName, SILFunction* func) {
-  std::string mangledRecordName =
-      LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
-  std::string mangledFunctionName =
-      LinkEntity::forSILFunction(func).mangleAsString();
-
+void IRGenModule::emitAccessibleFunction(StringRef sectionName,
+                                         const AccessibleFunction &func) {
   auto var = new llvm::GlobalVariable(
       Module, AccessibleFunctionRecordTy, /*isConstant=*/true,
       llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
-      mangledRecordName);
+      func.getRecordName());
 
   ConstantInitBuilder builder(*this);
 
@@ -4669,7 +4690,7 @@ void IRGenModule::emitAccessibleFunction(
   // -- Field: Name (record name)
   {
     llvm::Constant *name =
-        getAddrOfGlobalString(mangledFunctionName,
+        getAddrOfGlobalString(func.getFunctionName(),
                               /*willBeRelativelyAddressed=*/true);
     fields.addRelativeAddress(name);
   }
@@ -4677,11 +4698,11 @@ void IRGenModule::emitAccessibleFunction(
   // -- Field: GenericEnvironment
   llvm::Constant *genericEnvironment = nullptr;
 
-  GenericSignature signature;
-  if (auto *env = func->getGenericEnvironment()) {
+  GenericSignature signature = func.getType()->getInvocationGenericSignature();
+  if (signature) {
     // Drop all the marker protocols because they are effect-less
     // at runtime.
-    signature = env->getGenericSignature().withoutMarkerProtocols();
+    signature = signature.withoutMarkerProtocols();
 
     genericEnvironment =
         getAddrOfGenericEnvironment(signature.getCanonicalSignature());
@@ -4689,27 +4710,16 @@ void IRGenModule::emitAccessibleFunction(
   fields.addRelativeAddressOrNull(genericEnvironment);
 
   // -- Field: FunctionType
-  llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
-                                    MangledTypeRefRole::Metadata)
-                             .first;
+  llvm::Constant *type =
+      getTypeRef(func.getType(), signature, MangledTypeRefRole::Metadata).first;
   fields.addRelativeAddress(type);
 
   // -- Field: Function
-  llvm::Constant *funcAddr = nullptr;
-  if (func->isDistributed()) {
-    funcAddr = getAddrOfAsyncFunctionPointer(
-        LinkEntity::forDistributedTargetAccessor(func));
-  } else if (func->isAsync()) {
-    funcAddr = getAddrOfAsyncFunctionPointer(func);
-  } else {
-    funcAddr = getAddrOfSILFunction(func, NotForDefinition);
-  }
-
-  fields.addRelativeAddress(funcAddr);
+  fields.addRelativeAddress(func.getAddress());
 
   // -- Field: Flags
   AccessibleFunctionFlags flags;
-  flags.setDistributed(func->isDistributed());
+  flags.setDistributed(func.isDistributed());
   fields.addInt32(flags.getOpaqueValue());
 
   // ---- End of 'TargetAccessibleFunctionRecord' fields
@@ -4746,7 +4756,7 @@ void IRGenModule::emitAccessibleFunctions() {
     break;
   }
 
-  for (auto *func : AccessibleFunctions) {
+  for (const auto &func : AccessibleFunctions) {
     emitAccessibleFunction(fnsSectionName, func);
   }
 }

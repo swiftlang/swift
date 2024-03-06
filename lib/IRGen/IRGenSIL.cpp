@@ -2468,15 +2468,13 @@ void IRGenSILFunction::emitSILFunction() {
   }
 
   if (CurSILFn->isRuntimeAccessible())
-    IGM.addAccessibleFunction(CurSILFn);
+    IGM.addAccessibleFunction(
+        AccessibleFunction::forSILFunction(IGM, CurSILFn));
 
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
   if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
-    IGM.addAccessibleFunction(CurSILFn);
-
-    // TODO(distributed): for protocols emit a special accessor
   }
 
   // Configure the dominance resolver.
