@@ -2522,6 +2522,22 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
   }
 }
 
+void Serializer::writeLifetimeDependenceInfo(
+    LifetimeDependenceInfo lifetimeDependenceInfo, bool skipImplicit) {
+  if (skipImplicit && !lifetimeDependenceInfo.isExplicitlySpecified()) {
+    return;
+  }
+  using namespace decls_block;
+  SmallVector<bool> paramIndices;
+  lifetimeDependenceInfo.getConcatenatedData(paramIndices);
+
+  auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
+  LifetimeDependenceLayout::emitRecord(
+      Out, ScratchRecord, abbrCode,
+      lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
+      lifetimeDependenceInfo.hasScopeLifetimeParamIndices(), paramIndices);
+}
+
 #define SIMPLE_CASE(TYPENAME, VALUE) \
   case swift::TYPENAME::VALUE: return uint8_t(serialization::TYPENAME::VALUE);
 
@@ -3539,19 +3555,6 @@ private:
                                              fac.completionHandlerFlagIsErrorOnZero());
   }
 
-  void
-  writeLifetimeDependenceInfo(LifetimeDependenceInfo lifetimeDependenceInfo) {
-    using namespace decls_block;
-    SmallVector<bool> paramIndices;
-    lifetimeDependenceInfo.getConcatenatedData(paramIndices);
-
-    auto abbrCode = S.DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
-    LifetimeDependenceLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
-        lifetimeDependenceInfo.hasScopeLifetimeParamIndices(), paramIndices);
-  }
-
   void writeGenericParams(const GenericParamList *genericParams) {
     using namespace decls_block;
 
@@ -4549,10 +4552,13 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
-    auto fnType = ty->getAs<FunctionType>();
-    if (fnType && fnType->hasLifetimeDependenceInfo()) {
-      assert(!fnType->getLifetimeDependenceInfo().empty());
-      writeLifetimeDependenceInfo(fnType->getLifetimeDependenceInfo());
+    auto fnType = ty->getAs<AnyFunctionType>();
+    if (fnType) {
+      if (auto *lifetimeDependenceInfo =
+              fnType->getLifetimeDependenceInfoOrNull()) {
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
+                                      /*skipImplicit*/ true);
+      }
     }
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -4673,6 +4679,15 @@ public:
 
     // Write the body parameters.
     writeParameterList(fn->getParameters());
+
+    auto fnType = ty->getAs<AnyFunctionType>();
+    if (fnType) {
+      if (auto *lifetimeDependenceInfo =
+              fnType->getLifetimeDependenceInfoOrNull()) {
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
+                                      /*skipImplicit*/ true);
+      }
+    }
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -4836,10 +4851,13 @@ public:
     writeGenericParams(ctor->getGenericParams());
     writeParameterList(ctor->getParameters());
 
-    auto fnType = ty->getAs<FunctionType>();
-    if (fnType && fnType->hasLifetimeDependenceInfo()) {
-      assert(!fnType->getLifetimeDependenceInfo().empty());
-      writeLifetimeDependenceInfo(fnType->getLifetimeDependenceInfo());
+    auto fnType = ty->getAs<AnyFunctionType>();
+    if (fnType) {
+      if (auto *lifetimeDependenceInfo =
+              fnType->getLifetimeDependenceInfoOrNull()) {
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
+                                      /*skipImplicit*/ true);
+      }
     }
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
@@ -5577,6 +5595,11 @@ public:
         fnTy->hasTransferringResult());
 
     serializeFunctionTypeParams(fnTy);
+
+    if (auto *lifetimeDependenceInfo =
+            fnTy->getLifetimeDependenceInfoOrNull()) {
+      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
   }
 
   void visitGenericFunctionType(const GenericFunctionType *fnTy) {
@@ -5595,6 +5618,11 @@ public:
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
+
+    if (auto *lifetimeDependenceInfo =
+            fnTy->getLifetimeDependenceInfoOrNull()) {
+      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
   }
 
   void visitSILBlockStorageType(const SILBlockStorageType *storageTy) {
@@ -5683,6 +5711,11 @@ public:
         fnTy->getNumYields(), fnTy->getNumResults(),
         invocationSigID, invocationSubstMapID, patternSubstMapID,
         clangTypeID, variableData);
+
+    if (auto *lifetimeDependenceInfo =
+            fnTy->getLifetimeDependenceInfoOrNull()) {
+      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
   }
 
   void visitArraySliceType(const ArraySliceType *sliceTy) {

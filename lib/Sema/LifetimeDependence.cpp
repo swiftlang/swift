@@ -103,6 +103,24 @@ void LifetimeDependenceInfo::getConcatenatedData(
   }
 }
 
+static bool hasEscapableResultOrYield(AbstractFunctionDecl *afd,
+                                      Type resultType) {
+  Type resultTypeInContext = afd->mapTypeIntoContext(resultType);
+  std::optional<Type> yieldTyInContext;
+
+  if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
+    if (accessor->isCoroutine()) {
+      yieldTyInContext = accessor->getStorage()->getValueInterfaceType();
+      yieldTyInContext = accessor->mapTypeIntoContext(*yieldTyInContext);
+    }
+  }
+  if (resultTypeInContext->isEscapable() &&
+      (!yieldTyInContext.has_value() || (*yieldTyInContext)->isEscapable())) {
+    return true;
+  }
+  return false;
+}
+
 std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                                      bool allowIndex) {
@@ -114,6 +132,12 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
   auto lifetimeDependentRepr =
       cast<LifetimeDependentReturnTypeRepr>(afd->getResultTypeRepr());
 
+  if (hasEscapableResultOrYield(afd, resultType)) {
+    diags.diagnose(lifetimeDependentRepr->getLoc(),
+                   diag::lifetime_dependence_invalid_return_type);
+    return std::nullopt;
+  }
+
   SmallBitVector inheritLifetimeParamIndices(capacity);
   SmallBitVector scopeLifetimeParamIndices(capacity);
 
@@ -122,11 +146,6 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                                           ValueOwnership ownership) {
     auto loc = specifier.getLoc();
     auto kind = specifier.getLifetimeDependenceKind();
-    Type resultTypeInContext = afd->mapTypeIntoContext(resultType);
-    if (resultTypeInContext->isEscapable()) {
-      diags.diagnose(loc, diag::lifetime_dependence_invalid_return_type);
-      return true;
-    }
 
     if (ownership == ValueOwnership::Default) {
       diags.diagnose(loc, diag::lifetime_dependence_missing_ownership_modifier);
@@ -253,7 +272,8 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
           : nullptr,
       scopeLifetimeParamIndices.any()
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
-          : nullptr);
+          : nullptr,
+      /*isExplicit*/ true);
 }
 
 std::optional<LifetimeDependenceInfo>
@@ -274,19 +294,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   auto &diags = ctx.Diags;
   auto returnTypeRepr = afd->getResultTypeRepr();
   auto returnLoc = returnTypeRepr ? returnTypeRepr->getLoc() : afd->getLoc();
-  Type returnTyInContext = afd->mapTypeIntoContext(resultType);
-  std::optional<Type> yieldTyInContext;
 
-  if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
-    if (accessor->isCoroutine()) {
-      yieldTyInContext = accessor->getStorage()->getValueInterfaceType();
-      yieldTyInContext = accessor->mapTypeIntoContext(*yieldTyInContext);
-    }
-  }
-  if (returnTyInContext->isEscapable() &&
-      (!yieldTyInContext.has_value() || (*yieldTyInContext)->isEscapable())) {
+  if (hasEscapableResultOrYield(afd, resultType)) {
     return std::nullopt;
   }
+
   if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return std::nullopt;
   }

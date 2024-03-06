@@ -58,7 +58,8 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 861; // AllowNonResilientAccess
+const uint16_t SWIFTMODULE_VERSION_MINOR =
+    862; // add lifetime dependence info in type serialization as well.
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1245,6 +1246,7 @@ namespace decls_block {
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>                       // has transferring result
     // trailed by parameters
+    // Optionally lifetime dependence info
   );
 
   using FunctionParamLayout =
@@ -1346,6 +1348,7 @@ namespace decls_block {
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
+    // Optionally lifetime dependence info
   );
 
   TYPE_LAYOUT(SILFunctionTypeLayout,
@@ -1374,6 +1377,7 @@ namespace decls_block {
                           // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
     // Optionally a substitution map (for substituted function types)
+    // Optionally lifetime dependence info
   );
 
   TYPE_LAYOUT(SILBlockStorageTypeLayout,

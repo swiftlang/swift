@@ -1335,6 +1335,10 @@ public:
     return builder.withTransferringResult(hasTransferringResult).build();
   }
 
+  SILExtInfo withLifetimeDependenceInfo(LifetimeDependenceInfo info) const {
+    return builder.withLifetimeDependenceInfo(info);
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
 
   bool isEqualTo(SILExtInfo other, bool useClangTypes) const {
