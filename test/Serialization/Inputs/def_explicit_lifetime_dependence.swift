@@ -7,8 +7,9 @@ public struct AnotherView : ~Escapable {
 }
 
 public struct BufferView : ~Escapable {
-  let ptr: UnsafeRawBufferPointer
+  public let ptr: UnsafeRawBufferPointer
   @_unsafeNonescapableResult
+  @inlinable
   public init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
@@ -34,6 +35,7 @@ public struct MutableBufferView : ~Escapable, ~Copyable {
   }
 }
 
+@inlinable
 public func derive(_ x: borrowing BufferView) -> _borrow(x) BufferView {
   return BufferView(x.ptr)
 }
@@ -55,3 +57,17 @@ public func deriveThisOrThat(_ this: borrowing BufferView, _ that: borrowing Buf
   return BufferView(that.ptr)
 }
 
+public struct Wrapper : ~Escapable {
+  var _view: BufferView
+  public init(_ view: consuming BufferView) {
+    self._view = view
+  }
+  public var view: BufferView {
+    _read {
+      yield _view
+    }
+    _modify {
+      yield &_view
+    }
+  }
+}

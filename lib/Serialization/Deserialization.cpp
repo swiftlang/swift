@@ -3590,7 +3590,8 @@ public:
     ctor->setParameters(bodyParams);
 
     SmallVector<LifetimeDependenceSpecifier> specifierList;
-    if (MF.maybeReadLifetimeDependence(specifierList, bodyParams->size())) {
+    if (MF.maybeReadLifetimeDependenceSpecifier(specifierList,
+                                                bodyParams->size())) {
       auto SelfType = ctor->getDeclaredInterfaceType();
       auto typeRepr = new (ctx) FixedTypeRepr(SelfType, SourceLoc());
       auto lifetimeTypeRepr =
@@ -4159,7 +4160,8 @@ public:
     ParameterList *paramList = MF.readParameterList();
     fn->setParameters(paramList);
     SmallVector<LifetimeDependenceSpecifier> specifierList;
-    if (MF.maybeReadLifetimeDependence(specifierList, paramList->size())) {
+    if (MF.maybeReadLifetimeDependenceSpecifier(specifierList,
+                                                paramList->size())) {
       auto typeRepr = new (ctx) FixedTypeRepr(resultType, SourceLoc());
       auto lifetimeTypeRepr =
           LifetimeDependentReturnTypeRepr::create(ctx, typeRepr, specifierList);
@@ -6851,7 +6853,6 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     isolation = swift::FunctionTypeIsolation::forGlobalActor(globalActorTy.get());
   }
 
-  // TODO: Handle LifetimeDependenceInfo here.
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation, LifetimeDependenceInfo(),
@@ -6866,6 +6867,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
 
   SmallVector<AnyFunctionType::Param, 8> params;
   while (true) {
+    BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
     llvm::BitstreamEntry entry =
         MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record)
@@ -6876,6 +6878,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
         MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
     if (recordID != decls_block::FUNCTION_PARAM)
       break;
+
+    restoreOffset.reset();
 
     IdentifierID labelID;
     IdentifierID internalLabelID;
@@ -6905,6 +6909,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            isCompileTimeConst,
                                            hasResultDependsOn, isTransferring),
                         MF.getIdentifier(internalLabelID));
+  }
+
+  auto lifetimeDependenceInfo =
+      MF.maybeReadLifetimeDependenceInfo(params.size());
+
+  if (lifetimeDependenceInfo.has_value()) {
+    info = info.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
   }
 
   if (!isGeneric) {
@@ -7384,7 +7395,6 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (erasedIsolation)
     isolation = SILFunctionTypeIsolation::Erased;
 
-  // Handle LifetimeDependenceInfo here.
   auto extInfo =
       SILFunctionType::ExtInfoBuilder(
           *representation, pseudogeneric, noescape, concurrent, async,
@@ -7526,6 +7536,13 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   auto patternSubsOrErr = MF.getSubstitutionMapChecked(rawPatternSubs);
   if (!patternSubsOrErr)
     return patternSubsOrErr.takeError();
+
+  auto lifetimeDependenceInfo = MF.maybeReadLifetimeDependenceInfo(
+      extInfo.hasSelfParam() ? numParams : numParams + 1);
+
+  if (lifetimeDependenceInfo.has_value()) {
+    extInfo = extInfo.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
+  }
 
   return SILFunctionType::get(invocationSig, extInfo, coroutineKind.value(),
                               calleeConvention.value(), allParams, allYields,
@@ -8687,11 +8704,9 @@ ModuleFile::maybeReadForeignAsyncConvention() {
       errorFlagPolarity);
 }
 
-bool ModuleFile::maybeReadLifetimeDependence(
-    SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
-    unsigned numParams) {
+bool ModuleFile::maybeReadLifetimeDependenceRecord(
+    SmallVectorImpl<uint64_t> &scratch) {
   using namespace decls_block;
-  SmallVector<uint64_t, 8> scratch;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
 
@@ -8711,7 +8726,67 @@ bool ModuleFile::maybeReadLifetimeDependence(
     return false;
   }
 
-  bool hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices;
+  return true;
+}
+
+std::optional<LifetimeDependenceInfo>
+ModuleFile::maybeReadLifetimeDependenceInfo(unsigned numParams) {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+  if (!maybeReadLifetimeDependenceRecord(scratch)) {
+    return std::nullopt;
+  }
+
+  bool hasInheritLifetimeParamIndices;
+  bool hasScopeLifetimeParamIndices;
+  ArrayRef<uint64_t> lifetimeDependenceData;
+  LifetimeDependenceLayout::readRecord(scratch, hasInheritLifetimeParamIndices,
+                                       hasScopeLifetimeParamIndices,
+                                       lifetimeDependenceData);
+
+  SmallBitVector inheritLifetimeParamIndices(numParams, false);
+  SmallBitVector scopeLifetimeParamIndices(numParams, false);
+
+  unsigned startIndex = 0;
+  auto pushData = [&](SmallBitVector &bits) {
+    for (unsigned i = 0; i < numParams; i++) {
+      if (lifetimeDependenceData[startIndex + i]) {
+        bits.set(i);
+      }
+    }
+    startIndex += numParams;
+  };
+
+  if (hasInheritLifetimeParamIndices) {
+    pushData(inheritLifetimeParamIndices);
+  }
+  if (hasScopeLifetimeParamIndices) {
+    pushData(scopeLifetimeParamIndices);
+  }
+
+  ASTContext &ctx = getContext();
+  return LifetimeDependenceInfo(
+      hasInheritLifetimeParamIndices
+          ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
+          : nullptr,
+      hasScopeLifetimeParamIndices
+          ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
+          : nullptr);
+}
+
+bool ModuleFile::maybeReadLifetimeDependenceSpecifier(
+    SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
+    unsigned numDeclParams) {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+  if (!maybeReadLifetimeDependenceRecord(scratch)) {
+    return false;
+  }
+
+  bool hasInheritLifetimeParamIndices;
+  bool hasScopeLifetimeParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(scratch, hasInheritLifetimeParamIndices,
                                        hasScopeLifetimeParamIndices,
@@ -8719,14 +8794,14 @@ bool ModuleFile::maybeReadLifetimeDependence(
 
   unsigned startIndex = 0;
   auto pushData = [&](LifetimeDependenceKind kind) {
-    for (unsigned i = 0; i < numParams + 1; i++) {
+    for (unsigned i = 0; i < numDeclParams + 1; i++) {
       if (lifetimeDependenceData[startIndex + i]) {
         specifierList.push_back(
             LifetimeDependenceSpecifier::getOrderedLifetimeDependenceSpecifier(
                 SourceLoc(), kind, i));
       }
     }
-    startIndex += numParams + 1;
+    startIndex += numDeclParams + 1;
   };
 
   if (hasInheritLifetimeParamIndices) {

@@ -1,11 +1,12 @@
 public struct BufferView : ~Escapable {
-  let ptr: UnsafeRawBufferPointer
-  let c: Int
+  public let ptr: UnsafeRawBufferPointer
+  public let c: Int
   @_unsafeNonescapableResult
   public init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
+  @inlinable
   public init(_ otherBV: borrowing BufferView) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
@@ -22,6 +23,7 @@ public struct MutableBufferView : ~Escapable, ~Copyable {
   }
 }
 
+@inlinable
 public func derive(_ x: borrowing BufferView) -> BufferView {
   return BufferView(x.ptr, x.c)
 }

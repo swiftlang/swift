@@ -100,24 +100,23 @@ getAllMovedPlatformVersions(Decl *D) {
   return Results;
 }
 
-static StringRef getLinkerPlatformName(uint8_t Id) {
+static StringRef getLinkerPlatformName(LinkerPlatformId Id) {
   switch (Id) {
-#define LD_PLATFORM(Name, Id) case Id: return #Name;
+#define LD_PLATFORM(Name, Id) case LinkerPlatformId::Name: return #Name;
 #include "ldPlatformKinds.def"
-  default:
-    llvm_unreachable("unrecognized platform id");
   }
+  llvm_unreachable("unrecognized platform id");
 }
 
-static std::optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
-  return llvm::StringSwitch<std::optional<uint8_t>>(Platform)
-#define LD_PLATFORM(Name, Id) .Case(#Name, Id)
+static std::optional<LinkerPlatformId> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<std::optional<LinkerPlatformId>>(Platform)
+#define LD_PLATFORM(Name, Id) .Case(#Name, LinkerPlatformId::Name)
 #include "ldPlatformKinds.def"
       .Default(std::nullopt);
 }
 
 StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
-  auto It = PlatformInstallName.find((uint8_t)Id);
+  auto It = PlatformInstallName.find(Id);
   if (It == PlatformInstallName.end())
     return InstallName;
   else
@@ -129,8 +128,9 @@ static std::string getScalaNodeText(Node *N) {
   return cast<ScalarNode>(N)->getValue(Buffer).str();
 }
 
-static std::set<int8_t> getSequenceNodePlatformList(ASTContext &Ctx, Node *N) {
-  std::set<int8_t> Results;
+static std::set<LinkerPlatformId> getSequenceNodePlatformList(ASTContext &Ctx,
+                                                              Node *N) {
+  std::set<LinkerPlatformId> Results;
   for (auto &E: *cast<SequenceNode>(N)) {
     auto Platform = getScalaNodeText(&E);
     auto Id = getLinkerPlatformId(Platform);
@@ -158,7 +158,7 @@ parseEntry(ASTContext &Ctx,
       auto *MN = cast<MappingNode>(&*It);
       std::string ModuleName;
       std::string InstallName;
-      std::optional<std::set<int8_t>> Platforms;
+      std::optional<std::set<LinkerPlatformId>> Platforms;
       for (auto &Pair: *MN) {
         auto Key = getScalaNodeText(Pair.getKey());
         auto* Value = Pair.getValue();
@@ -233,7 +233,12 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
 }
 
 static LinkerPlatformId
-getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
+getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
+                    ASTContext &Ctx) {
+  auto target =
+      Ver.ForTargetVariant ? Ctx.LangOpts.TargetVariant : Ctx.LangOpts.Target;
+  bool isSimulator = target ? target->isSimulatorEnvironment() : false;
+
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
@@ -243,16 +248,16 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::iOS:
   case swift::PlatformKind::iOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::iOS_sim:
-                             LinkerPlatformId::iOS;
+    if (target && target->isMacCatalystEnvironment())
+      return LinkerPlatformId::macCatalyst;
+    return isSimulator ? LinkerPlatformId::iOS_sim : LinkerPlatformId::iOS;
   case swift::PlatformKind::tvOS:
   case swift::PlatformKind::tvOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::tvOS_sim:
-                             LinkerPlatformId::tvOS;
+    return isSimulator ? LinkerPlatformId::tvOS_sim : LinkerPlatformId::tvOS;
   case swift::PlatformKind::watchOS:
   case swift::PlatformKind::watchOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
-                             LinkerPlatformId::watchOS;
+    return isSimulator ? LinkerPlatformId::watchOS_sim
+                       : LinkerPlatformId::watchOS;
   case swift::PlatformKind::macOS:
   case swift::PlatformKind::macOSApplicationExtension:
     return LinkerPlatformId::macOS;
@@ -264,8 +269,9 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
 }
 
 static StringRef
-getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
-  return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
+getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver,
+                      ASTContext &Ctx) {
+  return getLinkerPlatformName(getLinkerPlatformId(Ver, Ctx));
 }
 
 /// Find the most relevant introducing version of the decl stack we have visited
@@ -313,17 +319,17 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     // so we don't need the linker directives.
     if (*IntroVer >= Ver.Version)
       continue;
-    auto PlatformNumber = getLinkerPlatformId(Ver);
+    auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
     auto It = previousInstallNameMap->find(Ver.ModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver));
+                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver));
+                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;
@@ -333,7 +339,7 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     OS << "$ld$previous$";
     OS << InstallName << "$";
     OS << ComptibleVersion << "$";
-    OS << std::to_string((uint8_t)PlatformNumber) << "$";
+    OS << std::to_string(static_cast<uint8_t>(PlatformNumber)) << "$";
     static auto getMinor = [](std::optional<unsigned> Minor) {
       return Minor.has_value() ? *Minor : 0;
     };

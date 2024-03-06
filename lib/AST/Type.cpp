@@ -3896,12 +3896,13 @@ Type AnyFunctionType::getGlobalActor() const {
   }
 }
 
-LifetimeDependenceInfo AnyFunctionType::getLifetimeDependenceInfo() const {
+const LifetimeDependenceInfo *
+AnyFunctionType::getLifetimeDependenceInfoOrNull() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getLifetimeDependenceInfo();
+    return cast<FunctionType>(this)->getLifetimeDependenceInfoOrNull();
   case TypeKind::GenericFunction:
-    return cast<GenericFunctionType>(this)->getLifetimeDependenceInfo();
+    return cast<GenericFunctionType>(this)->getLifetimeDependenceInfoOrNull();
 
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");

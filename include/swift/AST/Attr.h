@@ -1863,8 +1863,8 @@ public:
   struct ActiveVersion {
     StringRef ModuleName;
     PlatformKind Platform;
-    bool IsSimulator;
     llvm::VersionTuple Version;
+    bool ForTargetVariant = false;
   };
 
   /// Returns non-optional if this attribute is active given the current platform.
