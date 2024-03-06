@@ -372,7 +372,13 @@ def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
   Alias<debug_constraints_on_line>;
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
-  HelpText<"Disable per-name lazy member loading">;
+  HelpText<"Disable per-name lazy member loading (obsolete)">;
+
+def disable_named_lazy_import_as_member_loading :
+  Flag<["-"], "disable-named-lazy-import-as-member-loading">,
+  HelpText<"Import all of a type's import-as-member globals together, as Swift "
+           "5.10 and earlier did; temporary workaround for modules that are "
+           "sensitive to this change">;
 
 def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
   HelpText<"Enables dumping rewrite systems from the generics implementation">;
@@ -579,6 +585,10 @@ def stack_promotion_limit : Separate<["-"], "stack-promotion-limit">,
 
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
+
+def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
+  HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
+           "stderr">;
 
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
