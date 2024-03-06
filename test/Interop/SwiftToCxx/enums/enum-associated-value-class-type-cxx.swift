@@ -14,6 +14,18 @@ public enum E {
     case i(Int)
 }
 
+extension E {
+  public func matchesIntValue(_ value: Int) -> Bool {
+    switch self {
+    case .c:
+      return false
+
+    case .i(let mine):
+      return mine == value
+    }
+  }
+}
+
 // CHECK:      SWIFT_INLINE_THUNK E E::_impl_c::operator()(const C& val) const {
 // CHECK-NEXT:   auto result = E::_make();
 // CHECK-NEXT:   auto op = swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
@@ -29,3 +41,6 @@ public enum E {
 // CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:   return swift::_impl::implClassFor<C>::type::makeRetained(*reinterpret_cast<void **>(payloadFromDestruction));
 // CHECK-NEXT: }
+
+// CHECK: SWIFT_INLINE_THUNK bool E::matchesIntValue(swift::Int value) const {
+// CHECK-NEXT: return _impl::$s5Enums1EO15matchesIntValueySbSiF(value, _impl::swift_interop_passDirect_Enums_uint64_t_0_8_uint8_t_8_9(_getOpaquePointer()));

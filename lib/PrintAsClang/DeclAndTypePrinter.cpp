@@ -869,6 +869,14 @@ private:
           os << "\n";
 
           printMembers(ED->getMembers());
+
+          for (const auto *ext :
+               owningPrinter.interopContext.getExtensionsForNominalType(ED)) {
+            if (!cxx_translation::isExposableToCxx(ext->getGenericSignature()))
+              continue;
+
+            printMembers(ext->getMembers());
+          }
         },
         owningPrinter);
     recordEmittedDeclInCurrentCxxLexicalScope(ED);
@@ -2769,13 +2777,13 @@ static bool isStringNestedType(const ValueDecl *VD, StringRef Typename) {
              VD->getASTContext().getStringDecl();
 }
 
-static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
+static bool hasExposeAttr(const ValueDecl *VD) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
     if (VD == VD->getASTContext().getStringDecl())
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
-    if (VD == VD->getASTContext().getOptionalDecl() && !isExtension)
+    if (VD == VD->getASTContext().getOptionalDecl())
       return true;
     if (isStringNestedType(VD, "UTF8View") || isStringNestedType(VD, "Index"))
       return true;
@@ -2812,7 +2820,7 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
         return false;
     }
 
-    return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
+    return hasExposeAttr(ED->getExtendedNominal());
   }
   return false;
 }
