@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,8 +20,10 @@
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @inlinable
-public func withExtendedLifetime<T, Result>(
-  _ x: T, _ body: () throws -> Result
+@_preInverseGenerics
+public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
+  _ x: borrowing T,
+  _ body: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -38,6 +40,7 @@ public func withExtendedLifetime<T, Result>(
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @inlinable
 public func withExtendedLifetime<T, Result>(
+  // FIXME(NCG): This should have T, Result as ~Copyable, but then the closure would need to take a borrow
   _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
@@ -47,7 +50,8 @@ public func withExtendedLifetime<T, Result>(
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
 @_transparent
-public func _fixLifetime<T>(_ x: T) {
+@_preInverseGenerics
+public func _fixLifetime<T: ~Copyable>(_ x: borrowing T) {
   Builtin.fixLifetime(x)
 }
 
