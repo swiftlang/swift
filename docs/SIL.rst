@@ -4325,6 +4325,7 @@ from that of source variable.
   debug-info-expr   ::= di-expr-operand (':' di-expr-operand)*
   di-expr-operand   ::= di-expr-operator (':' sil-operand)*
   di-expr-operator  ::= 'op_fragment'
+  di-expr-operator  ::= 'op_tuple_fragment'
   di-expr-operator  ::= 'op_deref'
 
 SIL debug info expression (SIL DIExpression) is a powerful method to connect SSA
@@ -4371,6 +4372,10 @@ a field declaration -- which references the desired sub-field in source variable
 
 In the snippet above, source variable "the_struct" has an aggregate type ``$MyStruct`` and we use a SIL DIExpression with ``op_fragment`` operator to associate ``%1`` to the ``y`` member variable (via the ``#MyStruct.y`` directive) inside "the_struct".
 Note that the extra source location directive follows right after ``name "the_struct"`` indicate that "the_struct" was originally declared in line 8, but not until line 9 -- the current ``debug_value`` instruction's source location -- does member ``y`` got updated with SSA value ``%1``.
+
+For tuples, it works similarly, except we use ``op_tuple_fragment``, which takes two arguments: the tuple type and the index. If our struct was instead a tuple, we would have:
+
+  debug_value %1 : $Int, var, (name "the_tuple", loc "file.swift":8:7), type $(x: Int, y: Int), expr op_tuple_fragment:$(x: Int, y: Int):1, loc "file.swift":9:4
 
 It is worth noting that a SIL DIExpression is similar to
 `!DIExpression <https://www.llvm.org/docs/LangRef.html#diexpression>`_ in LLVM debug

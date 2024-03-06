@@ -18,6 +18,7 @@
 #include "GenEnum.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
+#include "GenTuple.h"
 #include "GenType.h"
 #include "IRBuilder.h"
 #include "swift/AST/ASTDemangler.h"
@@ -232,6 +233,9 @@ public:
   /// Return false if we fail to create the right DW_OP_LLVM_fragment operand.
   bool handleFragmentDIExpr(const SILDIExprOperand &CurDIExprOp,
                             llvm::DIExpression::FragmentInfo &Fragment);
+  /// Return false if we fail to create the right DW_OP_LLVM_fragment operand.
+  bool handleTupleFragmentDIExpr(const SILDIExprOperand &CurDIExprOp,
+                                 llvm::DIExpression::FragmentInfo &Fragment);
   /// Return false if we fail to create the desired !DIExpression.
   bool buildDebugInfoExpression(const SILDebugVariable &VarInfo,
                                 SmallVectorImpl<uint64_t> &Operands,
@@ -2928,10 +2932,12 @@ void IRGenDebugInfoImpl::emitOutlinedFunction(IRBuilder &Builder,
 bool IRGenDebugInfoImpl::handleFragmentDIExpr(
     const SILDIExprOperand &CurDIExprOp,
     llvm::DIExpression::FragmentInfo &Fragment) {
+  if (CurDIExprOp.getOperator() == SILDIExprOperator::TupleFragment)
+    return handleTupleFragmentDIExpr(CurDIExprOp, Fragment);
   assert(CurDIExprOp.getOperator() == SILDIExprOperator::Fragment);
   // Expecting a VarDecl that points to a field in an struct
   auto DIExprArgs = CurDIExprOp.args();
-  auto *VD = dyn_cast_or_null<VarDecl>(DIExprArgs.size()?
+  auto *VD = dyn_cast_or_null<VarDecl>(DIExprArgs.size() ?
                                        DIExprArgs[0].getAsDecl() : nullptr);
   assert(VD && "Expecting a VarDecl as the operand for "
                "DIExprOperator::Fragment");
@@ -2965,6 +2971,39 @@ bool IRGenDebugInfoImpl::handleFragmentDIExpr(
   return true;
 }
 
+bool IRGenDebugInfoImpl::handleTupleFragmentDIExpr(
+    const SILDIExprOperand &CurDIExprOp,
+    llvm::DIExpression::FragmentInfo &Fragment) {
+  assert(CurDIExprOp.getOperator() == SILDIExprOperator::TupleFragment);
+  // Expecting a TupleType followed by an index
+  auto DIExprArgs = CurDIExprOp.args();
+  assert(DIExprArgs.size() >= 2 && "Expecting two arguments for "
+         "DIExprOperator::TupleFragment");
+  auto *TT = dyn_cast<TupleType>(DIExprArgs[0].getAsType().getPointer());
+  assert(TT && "Expecting a TupleType as the first operand for "
+               "DIExprOperator::TupleFragment");
+  auto Idx = DIExprArgs[1].getAsConstInt();
+  assert(Idx && "Expecting an index as the second operand for "
+               "DIExprOperator::TupleFragment");
+  // Translate the based type
+  SILType ParentSILType = IGM.getLoweredType(TT);
+  // Retrieve the offset & size of the field
+  auto Offset = getFixedTupleElementOffset(IGM, ParentSILType, *Idx);
+  auto ElementType = TT->getElement(*Idx).getType()->getCanonicalType();
+  llvm::Type *FieldTy = IGM.getStorageTypeForLowered(ElementType);
+  // Doesn't support non-fixed type right now
+  if (!Offset || !FieldTy)
+    return false;
+
+  uint64_t SizeInBits = IGM.DataLayout.getTypeSizeInBits(FieldTy);
+  uint64_t OffsetInBits = Offset->getValueInBits();
+
+  // Translate to DW_OP_LLVM_fragment operands
+  Fragment = {SizeInBits, OffsetInBits};
+
+  return true;
+}
+
 bool IRGenDebugInfoImpl::buildDebugInfoExpression(
     const SILDebugVariable &VarInfo, SmallVectorImpl<uint64_t> &Operands,
     llvm::DIExpression::FragmentInfo &Fragment) {
@@ -2975,6 +3014,7 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
     llvm::DIExpression::FragmentInfo SubFragment = {0, 0};
     switch (ExprOperand.getOperator()) {
     case SILDIExprOperator::Fragment:
+    case SILDIExprOperator::TupleFragment:
       if (!handleFragmentDIExpr(ExprOperand, SubFragment))
         return false;
       assert(!Fragment.SizeInBits
