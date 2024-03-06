@@ -106,42 +106,6 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
-Type swift::getSerializationRequirementTypesForMember(
-    ValueDecl *member,
-    llvm::SmallPtrSet<ProtocolDecl *, 2> &serializationRequirements) {
-  auto &C = member->getASTContext();
-  auto *DC = member->getDeclContext();
-  auto DA = C.getDistributedActorDecl();
-
-  // === When declared inside an actor, we can get the type directly
-  if (auto classDecl = DC->getSelfClassDecl()) {
-    return getDistributedSerializationRequirementType(classDecl, C.getDistributedActorDecl());
-  }
-
-  auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
-      ->getDeclaredInterfaceType();
-
-  if (DC->getSelfProtocolDecl()) {
-    GenericSignature signature;
-    if (auto *genericContext = member->getAsGenericContext()) {
-      signature = genericContext->getGenericSignature();
-    } else {
-      signature = DC->getGenericSignatureOfContext();
-    }
-
-    // Also store all `SerializationRequirement : SomeProtocol` requirements
-    for (auto proto: signature->getRequiredProtocols(SerReqAssocType)) {
-      serializationRequirements.insert(proto);
-    }
-
-    // Note that this may be null, e.g. if we're a distributed func inside
-    // a protocol that did not declare a specific actor system requirement.
-    return signature->getConcreteType(SerReqAssocType);
-  }
-
-  llvm_unreachable("Unable to fetch SerializationRequirement type!");
-}
-
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(!dyn_cast<ProtocolDecl>(actor) &&
          "Use getConcreteReplacementForProtocolActorSystemType instead to get"
@@ -177,6 +141,53 @@ static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
   if (!conformance || conformance.isInvalid())
     return Type();
   return conformance.getTypeWitnessByName(selfType, member);
+}
+
+Type swift::getDistributedActorSerializationType(
+    DeclContext *actorOrExtension) {
+  auto &ctx = actorOrExtension->getASTContext();
+  auto resultTy = getAssociatedTypeOfDistributedSystemOfActor(
+      actorOrExtension,
+      ctx.Id_SerializationRequirement);
+
+  // Protocols are allowed to either not provide a `SerializationRequirement`
+  // at all or provide it in a conformance requirement.
+  if ((!resultTy || resultTy->hasDependentMember()) &&
+      actorOrExtension->getSelfProtocolDecl()) {
+    auto sig = actorOrExtension->getGenericSignatureOfContext();
+
+    auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+    if (!actorProtocol)
+      return Type();
+
+    auto serializationTy =
+        actorProtocol->getAssociatedType(ctx.Id_SerializationRequirement)
+            ->getDeclaredInterfaceType();
+
+    auto protocols = sig->getRequiredProtocols(serializationTy);
+    if (protocols.empty())
+      return Type();
+
+    SmallVector<Type, 2> members;
+    llvm::transform(protocols, std::back_inserter(members), [](const auto *P) {
+      return P->getDeclaredInterfaceType();
+    });
+
+    return ExistentialType::get(
+        ProtocolCompositionType::get(ctx, members,
+                                     /*inverses=*/{},
+                                     /*HasExplicitAnyObject=*/false));
+  }
+
+  return resultTy;
+}
+
+Type swift::getDistributedActorSystemSerializationType(
+    NominalTypeDecl *system) {
+  assert(!system->isDistributedActor());
+  auto &ctx = system->getASTContext();
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_SerializationRequirement);
 }
 
 Type swift::getDistributedActorSystemActorIDType(NominalTypeDecl *system) {
@@ -248,17 +259,12 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
       decoderTy->getAnyNominal());
 }
 
-Type swift::getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
-                                                        Identifier member) {
-  auto &ctx = actor->getASTContext();
+Type swift::getAssociatedTypeOfDistributedSystemOfActor(
+    DeclContext *actorOrExtension, Identifier member) {
+  auto &ctx = actorOrExtension->getASTContext();
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   if (!actorProtocol)
-    return Type();
-
-  auto actorConformance = actor->getParentModule()->lookupConformance(
-      actor->getDeclaredInterfaceType(), actorProtocol);
-  if (!actorConformance || actorConformance.isInvalid())
     return Type();
 
   AssociatedTypeDecl *actorSystemDecl =
@@ -275,15 +281,27 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
   if (!memberTypeDecl)
     return Type();
 
-  auto depMemTy = DependentMemberType::get(
-      DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
-                               actorSystemDecl),
-      memberTypeDecl);
+  Type memberTy = DependentMemberType::get(
+    DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
+                             actorSystemDecl),
+    memberTypeDecl);
+
+  auto sig = actorOrExtension->getGenericSignatureOfContext();
+
+  auto *actorType = actorOrExtension->getSelfNominalTypeDecl();
+  if (isa<ProtocolDecl>(actorType))
+    return memberTy->getReducedType(sig);
+
+  auto actorConformance =
+      actorOrExtension->getParentModule()->lookupConformance(
+          actorType->getDeclaredInterfaceType(), actorProtocol);
+  if (!actorConformance || actorConformance.isInvalid())
+    return Type();
 
   auto subs = SubstitutionMap::getProtocolSubstitutions(
-      actorProtocol, actor->getDeclaredInterfaceType(), actorConformance);
+      actorProtocol, actorType->getDeclaredInterfaceType(), actorConformance);
 
-  return Type(depMemTy).subst(subs);
+  return memberTy.subst(subs)->getReducedType(sig);
 }
 
 /******************************************************************************/
