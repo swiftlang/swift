@@ -54,6 +54,12 @@ struct IntsTrailing2 {
   int is[];
 };
 
+struct IntsTrailing3 {
+  double d;
+  float f;
+  int is[];
+} __attribute__((__swift_attr__("_BitwiseCopyable")));
+
 //--- Downstream.swift
 
 func take<T : _BitwiseCopyable>(_ t: T) {}
@@ -74,5 +80,8 @@ func passIntsTrailing(_ t: IntsTrailing) {
 }
 extension IntsTrailing2 : _BitwiseCopyable {} //expected-error{{bitwise_copyable_outside_module}}
 func passIntsTrailing2(_ t: IntsTrailing2) {
+  take(t)
+}
+func passIntsTrailing3(_ t: IntsTrailing3) {
   take(t)
 }
