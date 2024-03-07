@@ -1468,6 +1468,13 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::ProtocolComposition: {
       auto *PCT = cast<ProtocolCompositionType>(tybase);
+
+      if (!AllowMarkerProtocols) {
+        auto strippedTy = PCT->withoutMarkerProtocols();
+        if (!strippedTy->isEqual(PCT))
+          return appendType(strippedTy, sig, forDecl);
+      }
+
       if (PCT->hasParameterizedExistential()
           || (PCT->hasInverse() && AllowInverses))
         return appendConstrainedExistential(PCT, sig, forDecl);
