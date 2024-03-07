@@ -31,6 +31,9 @@ private func log(_ message: @autoclosure () -> String) {
 let lifetimeDependenceScopeFixupPass = FunctionPass(
   name: "lifetime-dependence-scope-fixup")
 { (function: Function, context: FunctionPassContext) in
+  if !context.options.hasFeature(.NonescapableTypes) {
+    return
+  }
   log(" --- Scope fixup for lifetime dependence in \(function.name)")
 
   let localReachabilityCache = LocalVariableReachabilityCache()
