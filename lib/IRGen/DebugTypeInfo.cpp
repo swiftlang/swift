@@ -57,7 +57,8 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
   assert(TI.getStorageType() && "StorageType is a nullptr");
   return DebugTypeInfo(Ty.getPointer(), StorageType,
                        TI.getBestKnownAlignment(), ::hasDefaultAlignment(Ty),
-                       false, false, NumExtraInhabitants);
+                       /* IsMetadataType = */ false,
+                       /* IsFixedBuffer = */ false, NumExtraInhabitants);
 }
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
@@ -82,7 +83,9 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
 DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty,
                                                llvm::Type *StorageTy, Size size,
                                                Alignment align) {
-  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, align, true, false);
+  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, align,
+                      /* HasDefaultAlignment = */ true,
+                      /* IsMetadataType = */ false);
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type metadata cannot contain an archetype");
@@ -92,7 +95,9 @@ DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty,
 DebugTypeInfo DebugTypeInfo::getTypeMetadata(swift::Type Ty,
                                              llvm::Type *StorageTy, Size size,
                                              Alignment align) {
-  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, align, true, true);
+  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, align,
+                      /* HasDefaultAlignment = */ true,
+                      /* IsMetadataType = */ true);
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type metadata cannot contain an archetype");
@@ -138,7 +143,8 @@ DebugTypeInfo::getGlobalFixedBuffer(SILGlobalVariable *GV,
       Type = DeclType.getPointer();
   }
   DebugTypeInfo DbgTy(Type, FragmentStorageType,
-                      Align, ::hasDefaultAlignment(Type), false, true);
+                      Align, ::hasDefaultAlignment(Type),
+                      /* IsMetadataType = */ false, /* IsFixedBuffer = */ true);
   assert(FragmentStorageType && "FragmentStorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type of global variable cannot be an archetype");
@@ -149,7 +155,9 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
                                           llvm::Type *FragmentStorageType,
                                           Size SizeInBytes, Alignment align) {
   DebugTypeInfo DbgTy(theClass->getInterfaceType().getPointer(),
-                      FragmentStorageType, align, true, false);
+                      FragmentStorageType, align,
+                      /* HasDefaultAlignment = */ true,
+                      /* IsMetadataType = */ false);
   assert(FragmentStorageType && "FragmentStorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type of objc class cannot be an archetype");

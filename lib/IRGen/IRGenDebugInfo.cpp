@@ -2090,8 +2090,9 @@ private:
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
           AliasedTy, DbgTy.getFragmentStorageType(),
-          DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
-          DbgTy.isFixedBuffer(), DbgTy.getNumExtraInhabitants());
+          DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
+          /* IsMetadataType = */ false, DbgTy.isFixedBuffer(),
+          DbgTy.getNumExtraInhabitants());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     L.File, 0, Scope);
     }

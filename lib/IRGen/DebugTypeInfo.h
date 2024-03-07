@@ -152,7 +152,7 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
         llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
-        swift::irgen::Alignment(), false, false);
+        swift::irgen::Alignment(), /* HasDefaultAlignment = */ false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());
