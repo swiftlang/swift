@@ -138,6 +138,7 @@ extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }
 
 extension Optional: Copyable /* where Wrapped: Copyable */ {}
 
+@_preInverseGenerics
 extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
   /// Creates an instance initialized with `nil`.
   ///
