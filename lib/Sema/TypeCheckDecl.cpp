@@ -2562,7 +2562,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // Any other isolation is an error.
       if (FuncDecl *fd = dyn_cast<FuncDecl>(AFD)) {
         std::optional<ActorIsolation> mainIsolation =
-        getActorIsolationForMainFuncDecl(fd);
+            getActorIsolationForMainFuncDecl(fd);
         if (mainIsolation) {
           if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
             if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
@@ -2570,7 +2570,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
               fd->getASTContext().Diags.diagnose(
                   fd->getLoc(), diag::main_function_must_be_mainActor);
             }
-            auto isolation  = FunctionTypeIsolation::forGlobalActor(mainIsolation->getGlobalActor());
+            auto isolation = FunctionTypeIsolation::forGlobalActor(
+                mainIsolation->getGlobalActor());
             infoBuilder = infoBuilder.withIsolation(isolation);
           }
         }
@@ -2623,7 +2624,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         funcTy = FunctionType::get({selfParam}, funcTy, selfInfo);
       }
     }
-
     return funcTy;
   }
 

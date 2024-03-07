@@ -32,7 +32,6 @@ public struct PublicGA {
   public actor Actor {}
   public static let shared = Actor()
 }
-
 // expected-error@+2 {{internal struct 'UFIStructPrivateGA' cannot have private global actor 'PrivateGA'}}
 @available(SwiftStdlib 5.1, *)
 @PrivateGA @usableFromInline internal struct UFIStructPrivateGA {} // expected-error {{global actor for struct 'UFIStructPrivateGA' must be '@usableFromInline' or public}}
