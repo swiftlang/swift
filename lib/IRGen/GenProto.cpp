@@ -2464,15 +2464,10 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 
     auto mw = entry.getMethodWitness();
     auto member = mw.Requirement;
-//    if (conf->getProtocol()->inheritsFrom(conf->getProtocol()->getASTContext().getProtocol(swift::KnownProtocolKind::DistributedActor))) {
-      fprintf(stderr, "[%s:%d](%s) CHECKING THE PROTOCOL:\n", __FILE_NAME__,
-              __LINE__, __FUNCTION__);
-      conf->getProtocol()->dump();
-//    }
 
     auto &fnProtoInfo =
         IGM.getProtocolInfo(conf->getProtocol(), ProtocolInfoKind::Full);
-    auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable(); // FIXME(XXX): here we need to find thunk witness
+    auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable();
     auto entrySize = IGM.IRGen.Opts.UseRelativeProtocolWitnessTables ?
       4 : IGM.getPointerSize().getValue();
     auto offset = index.getValue() * entrySize;
