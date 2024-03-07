@@ -1044,11 +1044,10 @@ private:
                                         llvm::DINode::DIFlags Flags) {
     unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
     auto *Ty = getOrCreateType(DbgTy);
+    auto SizeInBits = getSizeInBits(Ty);
     auto *DITy = DBuilder.createMemberType(
-        Scope, Name, File, 0,
-        DbgTy.getRawSizeInBits() ? *DbgTy.getRawSizeInBits() : 0, 0,
-        OffsetInBits, Flags, Ty);
-    OffsetInBits += getSizeInBits(Ty);
+        Scope, Name, File, 0, SizeInBits, 0, OffsetInBits, Flags, Ty);
+    OffsetInBits += SizeInBits;
     OffsetInBits = llvm::alignTo(OffsetInBits,
                                  SizeOfByte * DbgTy.getAlignment().getValue());
     return DITy;
@@ -1350,14 +1349,14 @@ private:
   // Create debug information for an enum with no raw type.
   llvm::DICompositeType *
   createUnsubstitutedVariantType(DebugTypeInfo DbgTy, EnumDecl *Decl,
-                                 StringRef MangledName, unsigned AlignInBits,
+                                 StringRef MangledName,
+                                 unsigned SizeInBits, unsigned AlignInBits,
                                  llvm::DIScope *Scope, llvm::DIFile *File,
                                  unsigned Line, llvm::DINode::DIFlags Flags) {
     assert(!Decl->getRawType() &&
            "Attempting to create variant debug info from raw enum!");
 
     StringRef Name = Decl->getName().str();
-    unsigned SizeInBits = DbgTy.getRawSizeInBits().value_or(0);
     auto NumExtraInhabitants = DbgTy.getNumExtraInhabitants();
 
     // A variant part should actually be a child to a DW_TAG_structure_type
@@ -1419,8 +1418,7 @@ private:
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
     DebugTypeInfo BlandDbgTy(Ty, DbgTy.getFragmentStorageType(),
-                             DbgTy.getRawSizeInBits(), DbgTy.getAlignment(),
-                             DbgTy.hasDefaultAlignment(),
+                             DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
                              DbgTy.isMetadataType(), DbgTy.isSizeFragmentSize(),
                              DbgTy.isFixedBuffer());
     return getOrCreateType(BlandDbgTy);
@@ -1687,11 +1685,12 @@ private:
     // emitting the storage size of the struct, but it may be necessary
     // to emit the (target!) size of the underlying basic type.
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-    // FIXME: SizeInBits is redundant with DbgTy, remove it.
-    auto *llvmty = IGM.getStorageTypeForUnlowered(DbgTy.getType());
+    auto CompletedDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
+      DbgTy.getType(), IGM.getTypeInfoForUnlowered(DbgTy.getType()), IGM);
     std::optional<uint64_t> SizeInBitsOrNull;
-    if (llvmty->isSized())
-      SizeInBitsOrNull = IGM.DataLayout.getTypeSizeInBits(llvmty);
+    if (CompletedDbgTy)
+      SizeInBitsOrNull = CompletedDbgTy->getSizeInBits();
+
     uint64_t SizeInBits = SizeInBitsOrNull.value_or(0);
     unsigned AlignInBits = DbgTy.hasDefaultAlignment()
                                ? 0
@@ -1720,14 +1719,14 @@ private:
     case TypeKind::BuiltinPackIndex:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;
-      if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+      if (CompletedDbgTy)
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
       break;
     }
 
     case TypeKind::BuiltinIntegerLiteral: {
       Encoding = llvm::dwarf::DW_ATE_unsigned; // ?
-      if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+      if (CompletedDbgTy)
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
       break;
     }
@@ -2015,7 +2014,7 @@ private:
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+        if (CompletedDbgTy)
           return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
                                 Scope, L.File, L.Line, Flags);
       return createOpaqueStruct(Scope, Decl->getName().str(), L.File,
@@ -2041,8 +2040,8 @@ private:
             UnsubstitutedTy->mapTypeOutOfContext(), {});
         if (DeclTypeMangledName == MangledName) {
           return createUnsubstitutedVariantType(DbgTy, Decl, MangledName,
-                                   AlignInBits, Scope, File, FwdDeclLine,
-                                   Flags);
+                                   SizeInBits, AlignInBits, Scope, File,
+                                   FwdDeclLine, Flags);
         }
         // Force the creation of the unsubstituted type, don't create it
         // directly so it goes through all the caching/verification logic.
@@ -2095,7 +2094,7 @@ private:
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
-          AliasedTy, DbgTy.getFragmentStorageType(), DbgTy.getRawSizeInBits(),
+          AliasedTy, DbgTy.getFragmentStorageType(),
           DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
           DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer(),
           DbgTy.getNumExtraInhabitants());
@@ -2190,10 +2189,11 @@ private:
   bool sanityCheckCachedType(DebugTypeInfo DbgTy, llvm::DIType *CachedType) {
     if (DbgTy.isForwardDecl())
       return true;
-    auto *StorageType = IGM.getStorageTypeForUnlowered(DbgTy.getType());
+    auto CompletedDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
+      DbgTy.getType(), IGM.getTypeInfoForUnlowered(DbgTy.getType()), IGM);
     std::optional<uint64_t> SizeInBits;
-    if (StorageType->isSized())
-      SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
+    if (CompletedDbgTy)
+      SizeInBits = CompletedDbgTy->getSizeInBits();
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
     if ((SizeInBits && CachedSizeInBits != *SizeInBits) ||
         (!SizeInBits && CachedSizeInBits)) {

@@ -44,7 +44,6 @@ protected:
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
   llvm::Type *FragmentStorageType = nullptr;
-  std::optional<Size::int_type> SizeInBits;
   std::optional<uint32_t> NumExtraInhabitants;
   Alignment Align;
   bool DefaultAlignment = true;
@@ -55,7 +54,6 @@ protected:
 public:
   DebugTypeInfo() = default;
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy = nullptr,
-                std::optional<Size::int_type> SizeInBits = {},
                 Alignment AlignInBytes = Alignment(1),
                 bool HasDefaultAlignment = true, bool IsMetadataType = false,
                 bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false,
@@ -105,12 +103,7 @@ public:
     return false;
   }
 
-  llvm::Type *getFragmentStorageType() const {
-    if (SizeInBits && *SizeInBits == 0)
-      assert(FragmentStorageType && "only defined types may have a size");
-    return FragmentStorageType;
-  }
-  std::optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
+  llvm::Type *getFragmentStorageType() const { return FragmentStorageType; }
   Alignment getAlignment() const { return Align; }
   bool isNull() const { return Type == nullptr; }
   bool isForwardDecl() const { return FragmentStorageType == nullptr; }
@@ -131,22 +124,23 @@ public:
 
 /// A DebugTypeInfo with a defined size (that may be 0).
 class CompletedDebugTypeInfo : public DebugTypeInfo {
-  CompletedDebugTypeInfo(DebugTypeInfo DbgTy) : DebugTypeInfo(DbgTy) {}
+  Size::int_type SizeInBits;
+
+  CompletedDebugTypeInfo(DebugTypeInfo DbgTy, Size::int_type SizeInBits)
+    : DebugTypeInfo(DbgTy), SizeInBits(SizeInBits) {}
 
 public:
-  static std::optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
-    if (!DbgTy.getRawSizeInBits() || DbgTy.isSizeFragmentSize())
+  static std::optional<CompletedDebugTypeInfo>
+  get(DebugTypeInfo DbgTy, std::optional<Size::int_type> SizeInBits) {
+    if (!SizeInBits)
       return {};
-    return CompletedDebugTypeInfo(DbgTy);
+    return CompletedDebugTypeInfo(DbgTy, *SizeInBits);
   }
 
   static std::optional<CompletedDebugTypeInfo>
-  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM) {
-    return CompletedDebugTypeInfo::get(
-        DebugTypeInfo::getFromTypeInfo(Ty, Info, IGM, /*IsFragment*/ false));
-  }
+  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM);
 
-  Size::int_type getSizeInBits() const { return *SizeInBits; }
+  Size::int_type getSizeInBits() const { return SizeInBits; }
 };
 
 }
@@ -161,7 +155,7 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr, 0,
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
         swift::irgen::Alignment(), false, false, false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
