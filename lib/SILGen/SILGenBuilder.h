@@ -468,6 +468,16 @@ public:
                                     ManagedValue base,
                                     MarkDependenceKind dependencekind);
 
+  ManagedValue createOpaqueBorrowBeginAccess(SILLocation loc,
+                                             ManagedValue address);
+  ManagedValue createFormalAccessOpaqueBorrowBeginAccess(SILLocation loc,
+                                                         ManagedValue address);
+
+  ManagedValue createOpaqueConsumeBeginAccess(SILLocation loc,
+                                              ManagedValue address);
+  ManagedValue createFormalAccessOpaqueConsumeBeginAccess(SILLocation loc,
+                                                          ManagedValue address);
+
   using SILBuilder::createBeginBorrow;
   ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
                                  bool isLexical = false,

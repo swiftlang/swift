@@ -1397,28 +1397,6 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
   }
 }
 
-namespace {
-class EndAccessCleanup final : public Cleanup {
-  SILValue beginAccess;
-public:
-  EndAccessCleanup(SILValue beginAccess)
-    : beginAccess(beginAccess)
-  {}
-  
-  void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
-  override {
-    SGF.B.createEndAccess(loc, beginAccess, /*aborted*/ false);
-  }
-  
-  void dump(SILGenFunction &SGF) const override {
-    llvm::errs() << "EndAccessCleanup\n";
-    if (beginAccess) {
-      beginAccess->print(llvm::errs());
-    }
-  }
-};
-}
-
 /// Bind a borrow binding into the current scope.
 void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
                                       ConsumableManagedValue value) {
@@ -1441,13 +1419,7 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
     // Create a notional copy for the borrow checker to use.
     bindValue = bindValue.copy(SGF, pattern);
   } else {
-    // Treat use of an address value in-place as a separate nested read access.
-    auto access = SGF.B.createBeginAccess(pattern, bindValue.getValue(),
-                                          SILAccessKind::Read,
-                                          SILAccessEnforcement::Static,
-                                          /*no nested conflict*/ true, false);
-    SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
-    bindValue = ManagedValue::forBorrowedAddressRValue(access);
+    bindValue = SGF.B.createOpaqueBorrowBeginAccess(pattern, bindValue);
   }
   // We mark the borrow check as "strict" because we don't want to allow
   // consumes through the binding, even if the original value manages to be
@@ -2795,23 +2767,22 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
     // Create a scope to break down the subject value.
     Scope caseScope(SGF, pattern);
     
-    // If the subject value is in memory, enter a deinit access for the memory.
-    // This saves the move-only-checker from trying to analyze the payload
-    // decomposition as a potential partial consume. We always fully consume
-    // the subject on this path.
-    auto origSubject = NoncopyableConsumableValue.forward(SGF);
-    if (origSubject->getType().isAddress()) {
-      origSubject = SGF.B.createBeginAccess(pattern, origSubject,
-                                            SILAccessKind::Deinit,
-                                            SILAccessEnforcement::Static,
-                                            /*no nested conflict*/ true, false);
-      SGF.Cleanups.pushCleanup<EndAccessCleanup>(origSubject);
+    ManagedValue subject;
+    if (NoncopyableConsumableValue.getType().isAddress()) {
+      // If the subject value is in memory, enter a deinit access for the memory.
+      // This saves the move-only-checker from trying to analyze the payload
+      // decomposition as a potential partial consume. We always fully consume
+      // the subject on this path.
+      subject = SGF.B.createOpaqueConsumeBeginAccess(pattern,
+                                                     NoncopyableConsumableValue);
+    } else {
+      // Clone the original subject's cleanup state so that it will be reliably
+      // consumed in this scope, while leaving the original for other case
+      // blocks to re-consume.
+      subject = SGF.emitManagedRValueWithCleanup(
+                                      NoncopyableConsumableValue.forward(SGF));
     }
     
-    // Clone the original subject's cleanup state so that it will be reliably
-    // consumed in this scope, while leaving the original for other case
-    // blocks to re-consume.
-    ManagedValue subject = SGF.emitManagedRValueWithCleanup(origSubject);
 
     // TODO: handle fallthroughs and multiple cases bindings
     // In those cases we'd need to forward bindings through the shared case
@@ -3427,12 +3398,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
             // Initiate a read access on the memory, to ensure that even
             // if the underlying memory is mutable or consumable, the pattern
             // match is not allowed to modify it.
-            auto access = B.createBeginAccess(S, subjectMV.getValue(),
-              SILAccessKind::Read,
-              SILAccessEnforcement::Static,
-              /*no nested conflict*/ true, false);
-            Cleanups.pushCleanup<EndAccessCleanup>(access);
-            subjectMV = ManagedValue::forBorrowedAddressRValue(access);
+            subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
             if (subjectMV.getType().isLoadable(F)) {
               // Load a borrow if the type is loadable.
               subjectMV = subjectUndergoesFormalAccess
@@ -3471,12 +3437,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           // Perform the pattern match on an opaque borrow or read access of the
           // subject.
           if (subjectMV.getType().isAddress()) {
-            auto access = B.createBeginAccess(S, subjectMV.getValue(),
-              SILAccessKind::Read,
-              SILAccessEnforcement::Static,
-              /*no nested conflict*/ true, false);
-            Cleanups.pushCleanup<EndAccessCleanup>(access);
-            subjectMV = ManagedValue::forBorrowedAddressRValue(access);
+            subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
           } else {
             subjectMV = B.createBeginBorrow(S, subjectMV,
                                             false, /*fixed*/ true);

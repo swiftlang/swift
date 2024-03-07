@@ -162,6 +162,22 @@ enum class SGFAccessKind : uint8_t {
   OwnedObjectConsume,
 };
 
+static inline bool isBorrowAccess(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+    return true;
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+  case SGFAccessKind::Write:
+  case SGFAccessKind::ReadWrite:
+  case SGFAccessKind::OwnedAddressConsume:
+  case SGFAccessKind::OwnedObjectConsume:
+    return false;
+  }
+}
+
 static inline bool isReadAccess(SGFAccessKind kind) {
   return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
 }
@@ -2234,14 +2250,6 @@ public:
   ManagedValue emitBindOptional(SILLocation loc,
                                 ManagedValue optionalAddrOrValue,
                                 unsigned depth);
-
-  /// Emit the control flow for an optional 'bind' operation, branching to the
-  /// active failure destination if the optional value addressed by optionalAddr
-  /// is nil, and leaving the insertion point on the success branch.
-  ///
-  /// NOTE: This operation does not consume the managed address.
-  void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
-                               unsigned depth);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,

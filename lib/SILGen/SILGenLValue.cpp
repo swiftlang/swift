@@ -526,29 +526,46 @@ static LValueTypeData getValueTypeData(SILGenFunction &SGF,
 
 /// Given the address of an optional value, unsafely project out the
 /// address of the value.
-static ManagedValue getAddressOfOptionalValue(SILGenFunction &SGF,
+static ManagedValue getPayloadOfOptionalValue(SILGenFunction &SGF,
                                               SILLocation loc,
-                                              ManagedValue optAddr,
-                                        const LValueTypeData &valueTypeData) {
+                                              ManagedValue optBase,
+                                        const LValueTypeData &valueTypeData,
+                                        SGFAccessKind accessKind) {
   // Project out the 'Some' payload.
   EnumElementDecl *someDecl = SGF.getASTContext().getOptionalSomeDecl();
 
   // If the base is +1, we want to forward the cleanup.
-  bool hadCleanup = optAddr.hasCleanup();
+  SILValue value;
+  bool isOwned;
+  if (optBase.isPlusOne(SGF)) {
+    value = optBase.forward(SGF);
+    isOwned = true;
+  } else {
+    value = optBase.getValue();
+    isOwned = false;
+  }
 
   // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
   // a single-payload enum. There will (currently) never be spare bits
   // embedded in the payload.
-  SILValue valueAddr =
-    SGF.B.createUncheckedTakeEnumDataAddr(loc, optAddr.forward(SGF), someDecl,
+  SILValue payload;
+  if (optBase.getType().isAddress()) {
+    payload = SGF.B.createUncheckedTakeEnumDataAddr(loc, value, someDecl,
                                           SILType::getPrimitiveAddressType(
-                                            valueTypeData.TypeOfRValue));
+                                              valueTypeData.TypeOfRValue));
+  } else {
+    payload = SGF.B.createUncheckedEnumData(loc, value, someDecl,
+                                          SILType::getPrimitiveObjectType(
+                                              valueTypeData.TypeOfRValue));
+  }
 
   // Return the value as +1 if the optional was +1.
-  if (hadCleanup) {
-    return SGF.emitManagedBufferWithCleanup(valueAddr);
+  if (isOwned) {
+    return SGF.emitManagedBufferWithCleanup(payload);
+  } else if (payload->getType().isAddress()) {
+    return ManagedValue::forLValue(payload);
   } else {
-    return ManagedValue::forLValue(valueAddr);
+    return ManagedValue::forBorrowedRValue(payload);
   }
 }
 
@@ -4348,10 +4365,12 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   // Binding reads the base even if we then only write to the result.
   auto baseAccessKind = getBaseAccessKindForStorage(accessKind);
 
-  // We're going to take the address of the base.
-  // TODO: deal more efficiently with an object-preferring access.
-  baseAccessKind = getAddressAccessKind(baseAccessKind);
-
+  if (!isBorrowAccess(accessKind)) {
+    // We're going to take the address of the base.
+    // TODO: deal more efficiently with an object-preferring access.
+    baseAccessKind = getAddressAccessKind(baseAccessKind);
+  }
+  
   // Do formal evaluation of the base l-value.
   LValue optLV = visitRec(e->getSubExpr(), baseAccessKind,
                           options.forComputedBaseLValue());
@@ -4360,21 +4379,65 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   LValueTypeData valueTypeData =
     getOptionalObjectTypeData(SGF, accessKind, optTypeData);
 
-  // The chaining operator immediately begins a formal access to the
-  // base l-value.  In concrete terms, this means we can immediately
-  // evaluate the base down to an address.
-  ManagedValue optAddr = SGF.emitAddressOfLValue(e, std::move(optLV));
-
+  // The chaining operator immediately evaluates the base.
+  // For move-checking purposes, the binding is also treated as an opaque use
+  // of the entire value, since we can't leave the value partially initialized
+  // across multiple optional binding expressions.
+  ManagedValue optBase;
+  if (isBorrowAccess(baseAccessKind)) {
+    optBase = SGF.emitBorrowedLValue(e, std::move(optLV));
+    
+    if (optBase.getType().isMoveOnly()) {
+      if (optBase.getType().isAddress()) {
+        optBase = SGF.B.createFormalAccessOpaqueBorrowBeginAccess(e, optBase);
+        if (optBase.getType().isLoadable(SGF.F)) {
+          optBase = SGF.B.createFormalAccessLoadBorrow(e, optBase);
+        }
+      } else {
+        optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase,
+                                                      false,
+                                                      /*fixed*/ true);
+      }
+    }
+  } else {
+    optBase = SGF.emitAddressOfLValue(e, std::move(optLV));
+    
+    if (isConsumeAccess(accessKind)) {
+      if (optBase.getType().isMoveOnly()) {
+        optBase = SGF.B.createFormalAccessOpaqueConsumeBeginAccess(e, optBase);
+      } else {
+        // Take ownership of the base.
+        optBase = SGF.emitFormalAccessManagedRValueWithCleanup(e,
+                                                           optBase.getValue());
+      }
+    }
+  }
   // Bind the value, branching to the destination address if there's no
   // value there.
-  SGF.emitBindOptionalAddress(e, optAddr, e->getDepth());
+  assert(e->getDepth() < SGF.BindOptionalFailureDests.size());
+  auto failureDepth = SGF.BindOptionalFailureDests.size() - e->getDepth() - 1;
+  auto failureDest = SGF.BindOptionalFailureDests[failureDepth];
+  assert(failureDest.isValid() && "too big to fail");
+
+  // Since we know that we have an address, we do not need to worry about
+  // ownership invariants. Instead just use a select_enum_addr.
+  SILBasicBlock *someBB = SGF.createBasicBlock();
+  SILValue hasValue = SGF.emitDoesOptionalHaveValue(e, optBase.getValue());
+
+  auto noneBB = SGF.Cleanups.emitBlockForCleanups(failureDest, e);
+  SGF.B.createCondBranch(e, hasValue, someBB, noneBB);
+
+  // Reset the insertion point at the end of hasValueBB so we can
+  // continue to emit code there.
+  SGF.B.setInsertionPoint(someBB);
 
   // Project out the payload on the success branch.  We can just use a
   // naked ValueComponent here; this is effectively a separate l-value.
-  ManagedValue valueAddr =
-    getAddressOfOptionalValue(SGF, e, optAddr, valueTypeData);
+  ManagedValue optPayload =
+    getPayloadOfOptionalValue(SGF, e, optBase, valueTypeData, accessKind);
   LValue valueLV;
-  valueLV.add<ValueComponent>(valueAddr, std::nullopt, valueTypeData);
+  valueLV.add<ValueComponent>(optPayload, std::nullopt, valueTypeData,
+                              /*is rvalue*/optBase.getType().isObject());
   return valueLV;
 }
 
@@ -5324,13 +5387,11 @@ RValue SILGenFunction::emitRValueForStorageLoad(
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                  LValue &&src,
                                                  TSanKind tsanKind) {
-  // Write is only included in this list because of property behaviors.
-  // It's obviously unreasonable, though.
   assert(src.getAccessKind() == SGFAccessKind::IgnoredRead ||
          src.getAccessKind() == SGFAccessKind::BorrowedAddressRead ||
          src.getAccessKind() == SGFAccessKind::OwnedAddressRead ||
-         src.getAccessKind() == SGFAccessKind::ReadWrite ||
-         src.getAccessKind() == SGFAccessKind::Write);
+         src.getAccessKind() == SGFAccessKind::OwnedAddressConsume ||
+         src.getAccessKind() == SGFAccessKind::ReadWrite);
 
   ManagedValue addr;
   PathComponent &&component =

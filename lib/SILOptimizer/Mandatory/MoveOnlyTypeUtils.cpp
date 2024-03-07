@@ -101,6 +101,10 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
   }
 
   if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
+    if (enumDecl == fn->getASTContext().getOptionalDecl()) {
+      // The only possible child of Optional is the wrapped type.
+      return {{ancestorOffsetSize, ancestorType.getOptionalObjectType()}};
+    }
     llvm_unreachable("Cannot find child type of enum!\n");
   }
 
@@ -196,6 +200,14 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
   }
 
   if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
+    if (enumDecl == fn->getASTContext().getOptionalDecl()) {
+      // The only possible child of Optional is the wrapped type.
+      auto newValue
+        = builder.createUncheckedEnumData(loc, ancestorValue,
+                                    fn->getASTContext().getOptionalSomeDecl());
+      return {{ancestorOffsetSize, newValue}};
+    }
+
     llvm_unreachable("Cannot find child type of enum!\n");
   }
 
@@ -305,6 +317,10 @@ void TypeOffsetSizePair::constructPathString(
     }
 
     if (auto *enumDecl = iterType.getEnumOrBoundGenericEnum()) {
+      if (enumDecl == fn->getASTContext().getOptionalDecl()) {
+        os << '!';
+        continue;
+      }
       llvm_unreachable("Cannot find child type of enum!\n");
     }
 

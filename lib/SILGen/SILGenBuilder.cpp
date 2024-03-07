@@ -1036,6 +1036,72 @@ ManagedValue SILGenBuilder::createMarkDependence(
   return cloner.clone(mdi);
 }
 
+namespace {
+class EndAccessCleanup final : public Cleanup {
+  SILValue beginAccess;
+public:
+  EndAccessCleanup(SILValue beginAccess)
+    : beginAccess(beginAccess)
+  {}
+  
+  void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
+  override {
+    SGF.B.createEndAccess(loc, beginAccess, /*aborted*/ false);
+  }
+  
+  void dump(SILGenFunction &SGF) const override {
+    llvm::errs() << "EndAccessCleanup\n";
+    if (beginAccess) {
+      beginAccess->print(llvm::errs());
+    }
+  }
+};
+}
+
+ManagedValue
+SILGenBuilder::createOpaqueBorrowBeginAccess(SILLocation loc,
+                                             ManagedValue address) {
+  auto access = createBeginAccess(loc, address.getValue(),
+                                  SILAccessKind::Read,
+                                  SILAccessEnforcement::Static,
+                                  /*no nested conflict*/ true, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return ManagedValue::forBorrowedAddressRValue(access);
+}
+
+ManagedValue
+SILGenBuilder::createOpaqueConsumeBeginAccess(SILLocation loc,
+                                             ManagedValue address) {
+  auto access = createBeginAccess(loc, address.forward(SGF),
+                                  SILAccessKind::Deinit,
+                                  SILAccessEnforcement::Static,
+                                  /*no nested conflict*/ true, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return SGF.emitManagedRValueWithCleanup(access);
+}
+
+ManagedValue
+SILGenBuilder::createFormalAccessOpaqueBorrowBeginAccess(SILLocation loc,
+                                                         ManagedValue address) {
+  auto access = createBeginAccess(loc, address.getValue(),
+                                  SILAccessKind::Read,
+                                  SILAccessEnforcement::Static,
+                                  /*no nested conflict*/ true, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return ManagedValue::forBorrowedAddressRValue(access);
+}
+
+ManagedValue
+SILGenBuilder::createFormalAccessOpaqueConsumeBeginAccess(SILLocation loc,
+                                                          ManagedValue address) {
+  auto access = createBeginAccess(loc, address.forward(SGF),
+                                  SILAccessKind::Deinit,
+                                  SILAccessEnforcement::Static,
+                                  /*no nested conflict*/ true, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return SGF.emitFormalAccessManagedRValueWithCleanup(loc, access);
+}
+
 ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
                                               ManagedValue value,
                                               bool isLexical,
