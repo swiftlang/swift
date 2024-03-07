@@ -2352,6 +2352,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_enable_import_ptrauth_field_function_pointers,
                   OPT_disable_import_ptrauth_field_function_pointers,
                   Opts.EnableImportPtrauthFieldFunctionPointers);
+  Opts.EnableLifetimeDependenceDiagnostics =
+      Args.hasFlag(OPT_enable_lifetime_dependence_diagnostics,
+                   OPT_disable_lifetime_dependence_diagnostics,
+                   Opts.EnableLifetimeDependenceDiagnostics);
+
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);

@@ -137,6 +137,9 @@ public:
   /// function pointers.
   bool EnableImportPtrauthFieldFunctionPointers = false;
 
+  /// Enables SIL-level diagnostics for NonescapableTypes.
+  bool EnableLifetimeDependenceDiagnostics = true;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
