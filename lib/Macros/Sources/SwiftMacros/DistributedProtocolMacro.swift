@@ -19,6 +19,9 @@ import SwiftSyntaxBuilder
 /// - `distributed actor $MyDistributedActor<ActorSystem>: $MyDistributedActor, _DistributedActorStub where ...`
 /// - `extension MyDistributedActor where Self: _DistributedActorStub {}`
 public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
+
+  /// Introduce the `extension MyDistributedActor` which contains default
+  /// implementations of the protocol's requirements.
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo declaration: some DeclGroupSyntax,
@@ -66,8 +69,34 @@ public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
     }
 
     // FIXME must detect this off the protocol
-    let serializationRequirementType =
-      "Codable"
+    let serializationRequirementType: String = "Codable"
+    let specificActorSystemRequirement: TypeSyntax?
+
+    for req in proto.genericWhereClause?.requirements ?? [] {
+      print("req.requirement: \(req.requirement)")
+      switch req.requirement {
+      case .conformanceRequirement(let conformanceReq):
+        print("conf: \(conformanceReq)")
+
+      case .sameTypeRequirement(let sameTypeReq):
+        print("same type: \(sameTypeReq)")
+        if sameTypeReq.leftType.trimmedDescription == "ActorSystem" {
+          let specificActorSystemRequirement = sameTypeReq.rightType.trimmed
+
+          return [
+            """
+            distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
+              Distributed._DistributedActorStub
+            { 
+              typealias ActorSystem = \(specificActorSystemRequirement) 
+            }
+            """
+          ]
+        }
+      case .layoutRequirement(let layoutReq):
+        print("layout: \(layoutReq)")
+      }
+    }
 
     let stubActorDecl: DeclSyntax =
       """
