@@ -51,7 +51,8 @@ struct MoveOnlyTempAllocationFromLetTester : SILFunctionTransform {
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
     searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-        getFunction(), moveIntroducersToProcess, diagnosticEmitter);
+        getFunction(), getAnalysis<PostOrderAnalysis>(),
+        moveIntroducersToProcess, diagnosticEmitter);
 
     // Return early if we emitted a diagnostic.
     if (diagCount != diagnosticEmitter.getDiagnosticCount())
