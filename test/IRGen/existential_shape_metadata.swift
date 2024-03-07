@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -disable-availability-checking | %IRGenFileCheck %s
 
-// XFAIL: noncopyable_generics
-
 // CHECK-LABEL: @"$sl26existential_shape_metadata2Q0_px1TRts_XPXGMq" = linkonce_odr hidden constant
 // CHECK-SAME:  { i32 {{.*}}sub ([[INT]] ptrtoint (ptr @{{[0-9]+}} to [[INT]])
 // CHECK-SAME:    i32 6400,

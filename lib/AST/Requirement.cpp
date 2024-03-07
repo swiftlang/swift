@@ -349,8 +349,7 @@ void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
-      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return;
 
   for (auto gp : gps) {
