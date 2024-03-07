@@ -2,8 +2,7 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
