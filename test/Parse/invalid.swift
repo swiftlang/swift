@@ -80,7 +80,7 @@ do {
 
 do {
   func f(_ a: Int, b: Int) {}
-  f(1, b: 2,)
+  f(1, b: 2,) // expected-error {{unexpected ',' separator}}
 }
 
 // https://github.com/apple/swift/issues/43591
