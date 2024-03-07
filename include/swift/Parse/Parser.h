@@ -1962,6 +1962,8 @@ public:
   /// this parameter is \c true, the function returns \c false such that an
   /// expression can be parsed.
   bool isStartOfStmt(bool preferExpr);
+  
+  bool isStartOfStmtBody();
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);

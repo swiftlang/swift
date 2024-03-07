@@ -1833,6 +1833,40 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   return Status;
 }
 
+bool Parser::isStartOfStmtBody() {
+  
+  Parser::BacktrackingScope Backtrack(*this);
+  
+  if (!consumeIf(tok::l_brace)) {
+    return false;
+  }
+  
+  int braces = 1;
+  
+  while (!Tok.is(tok::eof)) {
+    if (consumeIf(tok::r_brace)) {
+      braces -= 1;
+    } else {
+      consumeToken();
+    }
+    if (braces == 0) {
+      if (Tok.is(tok::comma)) {
+        return false;
+      }
+      if (!Tok.isAtStartOfLine() && (Tok.is(tok::l_brace) || Tok.is(tok::l_paren))) {
+        return false;
+      }
+      return true;
+    }
+    if (consumeIf(tok::l_brace)) {
+      braces += 1;
+    }
+  }
+  
+  return false;
+  
+}
+
 /// Parse the condition of an 'if' or 'while'.
 ///
 ///   condition:
@@ -1863,7 +1897,13 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition, Diag<> Default
   while (true) {
 
     if (Context.LangOpts.hasFeature(Feature::TrailingComma)) {
-      if (Tok.getText() == "else") {
+      
+      // 'guard' conditions terminator
+      if (ParentKind == StmtKind::Guard && Tok.is(tok::kw_else)) {
+        break;
+      }
+      // 'if' and 'while' conditions terminator
+      if (ParentKind != StmtKind::Guard && isStartOfStmtBody()) {
         break;
       }
     }
@@ -1955,36 +1995,19 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
         return recoverWithCond(Status, Condition);
     }
 
-    if (Context.LangOpts.hasFeature(Feature::TrailingComma) && Tok.isNot(tok::l_brace)) {
-      StmtConditionElement LastCondition = Condition.back();
-      if (LastCondition.getKind() == StmtConditionElement::CK_Boolean) {
-        Expr* expr = LastCondition.getExprOrNull();
-        ClosureExpr* closure = dyn_cast<ClosureExpr>(expr);
-        if (closure) {
-          BraceStmt* body = closure->getBody();
-          if (body) {
-            NormalBody = makeParserResult(body);
-            Condition = Condition.drop_back();
-          }
-        }
-      }
-    } else {
-
-      if (Tok.is(tok::kw_else)) {
-        SourceLoc ElseLoc = Tok.getLoc();
-        diagnose(ElseLoc, diag::unexpected_else_after_if);
-        diagnose(ElseLoc, diag::suggest_removing_else)
-          .fixItRemove(ElseLoc);
-        consumeToken(tok::kw_else);
-      }
-
-      NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
-      Status |= NormalBody;
-      if (NormalBody.isNull())
-        return recoverWithCond(Status, Condition);
+    if (Tok.is(tok::kw_else)) {
+      SourceLoc ElseLoc = Tok.getLoc();
+      diagnose(ElseLoc, diag::unexpected_else_after_if);
+      diagnose(ElseLoc, diag::suggest_removing_else)
+        .fixItRemove(ElseLoc);
+      consumeToken(tok::kw_else);
     }
 
-    }
+    NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
+    Status |= NormalBody;
+    if (NormalBody.isNull())
+      return recoverWithCond(Status, Condition);
+  }
 
   // The else branch, if any, is outside of the scope of the condition.
   SourceLoc ElseLoc;
@@ -2095,7 +2118,6 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 
   ParserStatus Status;
   StmtCondition Condition;
-  ParserResult<BraceStmt> Body;
 
   auto recoverWithCond = [&](ParserStatus Status,
                              StmtCondition Condition) -> ParserResult<Stmt> {
@@ -2124,37 +2146,16 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
     if (Status.isErrorOrHasCompletion())
       return recoverWithCond(Status, Condition);
   }
-  
-  if (Context.LangOpts.hasFeature(Feature::TrailingComma)) {
-    if (Tok.isNot(tok::l_brace)) {
-      StmtConditionElement LastCondition = Condition.back();
-      if (LastCondition.getKind() == StmtConditionElement::CK_Boolean) {
-        Expr* expr = LastCondition.getExprOrNull();
-        ClosureExpr* closure = dyn_cast<ClosureExpr>(expr);
-        if (closure) {
-          BraceStmt* body = closure->getBody();
-          if (body) {
-            Body = makeParserResult(body);
-            Condition = Condition.drop_back();
-          }
-        }
-      }
-    } else {
-      Body = parseBraceItemList(diag::expected_lbrace_after_if);
-      Status |= Body;
-      if (Body.isNull())
-        return recoverWithCond(Status, Condition);
-    }
-  } else {
-    Body = parseBraceItemList(diag::expected_lbrace_after_while);
-    Status |= Body;
-    if (Body.isNull()) {
-      return recoverWithCond(Status, Condition);
-    }
-  }
-    
+
+  ParserResult<BraceStmt> Body =
+      parseBraceItemList(diag::expected_lbrace_after_while);
+  Status |= Body;
+  if (Body.isNull())
+    return recoverWithCond(Status, Condition);
+
   return makeParserResult(
-      Status, new (Context) WhileStmt(LabelInfo, WhileLoc, Condition, Body.get()));
+      Status, new (Context) WhileStmt(LabelInfo, WhileLoc, Condition,
+                                      Body.get()));
 }
 
 ///
