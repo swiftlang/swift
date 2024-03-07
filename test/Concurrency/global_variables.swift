@@ -39,10 +39,12 @@ public struct TestWrapper {
 
 struct TestStatics {
   static let immutableExplicitSendable = TestSendable()
-  static let immutableNonsendable = TestNonsendable() // expected-error{{static property 'immutableNonsendable' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor}}
+  static let immutableNonsendable = TestNonsendable() // expected-error{{static property 'immutableNonsendable' is not concurrency-safe because non-'Sendable' type 'TestNonsendable' may have shared mutable state}}
+  // expected-note@-1 {{isolate 'immutableNonsendable' to a global actor, or conform 'TestNonsendable' to 'Sendable'}}
   static nonisolated(unsafe) let immutableNonisolatedUnsafe = TestNonsendable()
-  static nonisolated let immutableNonisolated = TestNonsendable() // expected-error{{static property 'immutableNonisolated' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor}}
-  // expected-error@-1 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'TestNonsendable'}}
+  static nonisolated let immutableNonisolated = TestNonsendable() // expected-error{{static property 'immutableNonisolated' is not concurrency-safe because non-'Sendable' type 'TestNonsendable' may have shared mutable state}}
+  // expected-note@-1 {{isolate 'immutableNonisolated' to a global actor, or conform 'TestNonsendable' to 'Sendable'}}
+  // expected-error@-2 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'TestNonsendable'}}
   static let immutableInferredSendable = 0
   static var mutable = 0 // expected-error{{static property 'mutable' is not concurrency-safe because it is non-isolated global shared mutable state}}
   // expected-note@-1{{isolate 'mutable' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}

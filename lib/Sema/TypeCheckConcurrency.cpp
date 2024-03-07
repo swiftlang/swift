@@ -4908,9 +4908,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
           diagVar = originalVar;
         }
         if (var->isLet()) {
-          if (!var->getInterfaceType()->isSendableType()) {
-            diagVar->diagnose(diag::shared_immutable_state_decl, diagVar)
+          auto type = var->getInterfaceType();
+          if (!type->isSendableType()) {
+            diagVar->diagnose(diag::shared_immutable_state_decl,
+                              diagVar, type)
                 .warnUntilSwiftVersion(6);
+            diagVar->diagnose(diag::shared_immutable_state_decl_note,
+                              diagVar, type);
           }
         } else {
           diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
