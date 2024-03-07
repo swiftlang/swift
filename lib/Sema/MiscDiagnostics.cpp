@@ -422,14 +422,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
       auto partialConsumptionEnabled =
           Ctx.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
+      auto *subExpr = consumeExpr->getSubExpr();
+      bool noncopyable =
+          subExpr->getType()->getCanonicalType()->isNoncopyable();
 
-      bool noncopyable = false;
       bool partial = false;
-      Expr *current = consumeExpr->getSubExpr();
+      Expr *current = subExpr;
       while (current) {
-        if (current->getType()->getCanonicalType()->isNoncopyable()) {
-          noncopyable = true;
-        }
         if (auto *dre = dyn_cast<DeclRefExpr>(current)) {
           if (partial & !noncopyable) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
