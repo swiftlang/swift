@@ -5407,28 +5407,6 @@ void SILGenFunction::emitAssignToPatternVars(
   TupleLValueAssigner(*this, loc, destLVs).emit(destType, std::move(src));
 }
 
-void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
-                                             ManagedValue optAddress,
-                                             unsigned depth) {
-  assert(optAddress.getType().isAddress() && "Expected an address here");
-  assert(depth < BindOptionalFailureDests.size());
-  auto failureDest =
-      BindOptionalFailureDests[BindOptionalFailureDests.size() - depth - 1];
-  assert(failureDest.isValid() && "too big to fail");
-
-  // Since we know that we have an address, we do not need to worry about
-  // ownership invariants. Instead just use a select_enum_addr.
-  SILBasicBlock *someBB = createBasicBlock();
-  SILValue hasValue = emitDoesOptionalHaveValue(loc, optAddress.getValue());
-
-  auto noneBB = Cleanups.emitBlockForCleanups(failureDest, loc);
-  B.createCondBranch(loc, hasValue, someBB, noneBB);
-
-  // Reset the insertion point at the end of hasValueBB so we can
-  // continue to emit code there.
-  B.setInsertionPoint(someBB);
-}
-
 ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
                                               ManagedValue optValue,
                                               unsigned depth) {
@@ -5439,6 +5417,11 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   SILBasicBlock *hasValueBB = createBasicBlock();
   SILBasicBlock *hasNoValueBB = createBasicBlock();
+
+  // For move checking purposes, binding always consumes the value whole.
+  if (optValue.getType().isMoveOnly() && optValue.getType().isAddress()) {
+    optValue = B.createFormalAccessOpaqueConsumeBeginAccess(loc, optValue);
+  }
 
   SILType optValueTy = optValue.getType();
   SwitchEnumBuilder SEB(B, loc, optValue);
