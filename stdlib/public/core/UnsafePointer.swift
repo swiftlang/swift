@@ -227,14 +227,30 @@ extension UnsafePointer: _Pointer where Pointee: ~Copyable {
   public typealias Distance = Int
 }
 
-extension UnsafePointer {
-  // Note: This explicit `hashValue` applies @_preInverseGenerics to the
+@_preInverseGenerics
+extension UnsafePointer: Equatable where Pointee: ~Copyable {}
+@_preInverseGenerics
+extension UnsafePointer: Hashable where Pointee: ~Copyable {
+  // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
   // original (pre-6.0) compiler-synthesized version.
   @_preInverseGenerics
   public var hashValue: Int {
     _hashValue(for: self)
   }
 }
+@_preInverseGenerics
+extension UnsafePointer: Comparable where Pointee: ~Copyable {}
+@_preInverseGenerics
+extension UnsafePointer: Strideable where Pointee: ~Copyable {}
+#if !$Embedded
+@_preInverseGenerics
+extension UnsafePointer: CustomDebugStringConvertible
+where Pointee: ~Copyable {}
+#endif
+#if SWIFT_ENABLE_REFLECTION
+@_preInverseGenerics
+extension UnsafePointer: CustomReflectable where Pointee: ~Copyable {}
+#endif
 
 extension UnsafePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
@@ -258,9 +274,21 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///
   /// When reading from the `pointee` property, the instance referenced by
   /// this pointer must already be initialized.
-  @inlinable
-  @_preInverseGenerics
+  @_alwaysEmitIntoClient
   public var pointee: Pointee {
+    @_transparent unsafeAddress {
+      return self
+    }
+  }
+}
+
+extension UnsafePointer {
+  // This preserves the ABI of the original (pre-6.0) `pointee` property that
+  // used to export a getter. The current one above would export a read
+  // accessor, if it wasn't @_alwaysEmitIntoClient.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @usableFromInline
+  internal var pointee: Pointee {
     @_transparent unsafeAddress {
       return self
     }
@@ -275,9 +303,22 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
-  @inlinable
-  @_preInverseGenerics
+  @_alwaysEmitIntoClient
   public subscript(i: Int) -> Pointee {
+    @_transparent
+    unsafeAddress {
+      return self + i
+    }
+  }
+}
+
+extension UnsafePointer {
+  // This preserves the ABI of the original (pre-6.0) subscript that used to
+  // export a getter. The current one above would export a read accessor, if it
+  // wasn't @_alwaysEmitIntoClient.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @usableFromInline
+  internal subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
       return self + i
@@ -631,6 +672,31 @@ extension UnsafeMutablePointer: _Pointer where Pointee: ~Copyable {
   public typealias Distance = Int
 }
 
+@_preInverseGenerics
+extension UnsafeMutablePointer: Equatable where Pointee: ~Copyable {}
+@_preInverseGenerics
+extension UnsafeMutablePointer: Hashable where Pointee: ~Copyable {
+  // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
+  // original (pre-6.0) compiler-synthesized version.
+  @_preInverseGenerics
+  public var hashValue: Int {
+    _hashValue(for: self)
+  }
+}
+@_preInverseGenerics
+extension UnsafeMutablePointer: Comparable where Pointee: ~Copyable {}
+@_preInverseGenerics
+extension UnsafeMutablePointer: Strideable where Pointee: ~Copyable {}
+#if !$Embedded
+@_preInverseGenerics
+extension UnsafeMutablePointer: CustomDebugStringConvertible
+where Pointee: ~Copyable {}
+#endif
+#if SWIFT_ENABLE_REFLECTION
+@_preInverseGenerics
+extension UnsafeMutablePointer: CustomReflectable where Pointee: ~Copyable {}
+#endif
+
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Creates a mutable typed pointer referencing the same memory as the given
   /// immutable pointer.
@@ -674,15 +740,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
    guard let unwrapped = other else { return nil }
    self.init(unwrapped)
-  }
-}
-
-extension UnsafeMutablePointer {
-  // Note: This explicit `hashValue` applies @_preInverseGenerics to the
-  // original (pre-6.0) compiler-synthesized version.
-  @_preInverseGenerics
-  public var hashValue: Int {
-    _hashValue(for: self)
   }
 }
 
@@ -765,8 +822,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Uninitialized memory cannot be initialized to a nontrivial type
   /// using `pointee`. Instead, use an initializing method, such as
   /// `initialize(to:)`.
-  @inlinable // unsafe-performance
-  @_preInverseGenerics
+  @_alwaysEmitIntoClient
   public var pointee: Pointee {
     @_transparent unsafeAddress {
       return UnsafePointer(self)
@@ -776,6 +832,23 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     }
   }
 }
+
+extension UnsafeMutablePointer {
+  // This preserves the ABI of the original (pre-6.0) `pointee` property that
+  // used to export a getter. The current one above would export a read
+  // accessor, if it wasn't @_alwaysEmitIntoClient.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @usableFromInline
+  internal var pointee: Pointee {
+    @_transparent unsafeAddress {
+      return UnsafePointer(self)
+    }
+    @_transparent nonmutating unsafeMutableAddress {
+      return self
+    }
+  }
+}
+
 
 extension UnsafeMutablePointer {
   /// Initializes this pointer's memory with the specified number of
@@ -952,7 +1025,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///     referenced by `source` and this pointer may overlap.
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
-  @_alwaysEmitIntoClient
+  @inlinable
   @_preInverseGenerics
   public func moveInitialize(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
@@ -1036,6 +1109,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
+  @_silgen_name("$sSp10moveAssign4from5countySpyxG_SitF")
   @_preInverseGenerics
   public func moveUpdate(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
@@ -1203,9 +1277,26 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
-  @inlinable
-  @_preInverseGenerics
+  @_alwaysEmitIntoClient
   public subscript(i: Int) -> Pointee {
+    @_transparent
+    unsafeAddress {
+      return UnsafePointer(self + i)
+    }
+    @_transparent
+    nonmutating unsafeMutableAddress {
+      return self + i
+    }
+  }
+}
+
+extension UnsafeMutablePointer {
+  // This preserves the ABI of the original (pre-6.0) subscript that used to
+  // export a getter. The current one above would export a read accessor, if it
+  // wasn't @_alwaysEmitIntoClient.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @usableFromInline
+  internal subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
       return UnsafePointer(self + i)
