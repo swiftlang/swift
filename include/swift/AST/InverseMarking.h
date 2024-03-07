@@ -24,7 +24,6 @@ namespace swift {
 struct InverseMarking {
   enum class Kind : uint8_t {
     None,            // No inverse marking is present
-    Inferred,        // Inverse is inferred based on generic parameters.
     Explicit,        // Inverse is explicitly present.
     LegacyExplicit,   // An equivalent, explicit legacy annotation is present.
   };
@@ -84,25 +83,6 @@ struct InverseMarking {
       return Mark(k, loc);
     }
   };
-
-private:
-  Mark inverse;
-  Mark positive;
-
-public:
-
-  // Creates an empty marking.
-  InverseMarking() {}
-
-  Mark const& getInverse() const { return inverse; }
-  Mark const& getPositive() const { return positive; }
-
-  static InverseMarking forInverse(Kind kind, SourceLoc loc = SourceLoc()) {
-    InverseMarking marking;
-    marking.inverse.set(kind, loc);
-    marking.positive.set(Kind::None);
-    return marking;
-  }
 };
 
 }

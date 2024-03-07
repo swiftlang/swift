@@ -55,9 +55,12 @@ public struct _Toys {
 public struct ExplicitHello<T: ~Copyable>: ~Copyable {
   let thing: T
 }
-extension ExplicitHello: Copyable where T: Copyable {}
+extension ExplicitHello: Copyable {}
 
-public struct Hello<T: ~Copyable> where T: ~Escapable {}
+public struct Hello<T: ~Copyable>: ~Copyable, ~Escapable where T: ~Escapable {}
+
+extension Hello: Escapable where T: ~Copyable {}
+extension Hello: Copyable where T: ~Escapable {}
 
 public protocol TestAssocTypes {
   associatedtype A: ~Copyable, _NoCopyP = Int
@@ -82,20 +85,24 @@ public func checkAnyInv2<Result: Any>(_ t: borrowing Result) where Result: ~Copy
 public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {}
 
 // coverage for rdar://123281976
-public struct Outer<A: ~Copyable> {
+public struct Outer<A: ~Copyable>: ~Copyable {
   public func innerFn<B: ~Copyable>(_ b: borrowing B) {}
-  public struct InnerStruct<C: ~Copyable> {
+  public struct InnerStruct<C: ~Copyable>: ~Copyable {
     public func g<D>(_ d: borrowing D) where D: ~Copyable {}
   }
-  public struct InnerVariation1<D: ~Copyable>: ~Escapable {}
-  public struct InnerVariation2<D: ~Escapable>: ~Copyable {}
+  public struct InnerVariation1<D: ~Copyable>: ~Copyable, ~Escapable {}
+  public struct InnerVariation2<D: ~Escapable>: ~Copyable, ~Escapable {}
 }
+
+extension Outer: Copyable {}
+extension Outer.InnerStruct: Copyable {}
+
+extension Outer.InnerVariation1: Copyable {}
+extension Outer.InnerVariation2: Escapable {}
 
 extension Outer.InnerStruct {
     public func hello<T: ~Escapable>(_ t: T) {}
 }
-
-public struct Freestanding<T: ~Copyable> where T: ~Escapable {}
 
 @_preInverseGenerics
 public func old_swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {}

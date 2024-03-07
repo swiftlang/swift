@@ -100,7 +100,7 @@ var global__computed__: any ~Copyable {
 }
 
 // <T: ~Copyable>
-public struct A<T: ~Copyable> {
+public struct A<T: ~Copyable>: ~Copyable {
   // Members in an extension with the same generic signature as the nominal
   // should mangle the same, so make sure we mangle the following as if it were
   // in a constrained extension.
@@ -145,6 +145,8 @@ public struct A<T: ~Copyable> {
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.init() -> test.A<A>
   // CHECK: sil hidden [ossa] @$s4test1AVAARiczrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
 }
+
+extension A: Copyable {}
 
 // <T: ~Copyable>
 extension A where T: ~Copyable {
@@ -198,7 +200,7 @@ extension A where T == Int {
 }
 
 // <T: ~Copyable & NoncopyableProto>
-struct B<T: ~Copyable & NoncopyableProto> {}
+struct B<T: ~Copyable & NoncopyableProto>: ~Copyable {}
 
 // <T: Copyable & NoncopyableProto>
 extension B {
@@ -267,7 +269,7 @@ extension D where T: CopyableProto2 {
 // requirements.
 
 // <T: ~Copyable>
-public struct E<T: ~Copyable> {
+public struct E<T: ~Copyable>: ~Copyable {
   // DEMANGLED: test.E.foo() -> ()
   // CHECK: sil [ossa] @$s4test1EV3fooyyF : $@convention(method) <T where T : ~Copyable> (@guaranteed E<T>) -> () {
   @_preInverseGenerics
