@@ -466,11 +466,12 @@ public:
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  /// Add dependency information for the bridging header.
+  /// Add dependency information for header dependencies
+  /// of a binary Swift module.
   ///
   /// \param moduleID the name of the Swift module whose dependency
   /// information will be augmented with information about the given
-  /// bridging header.
+  /// textual header inputs.
   ///
   /// \param clangScanningTool The clang dependency scanner.
   ///
@@ -478,10 +479,11 @@ public:
   /// about new Clang modules discovered along the way.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
-  bool addBridgingHeaderDependencies(
+  bool addHeaderDependencies(
       ModuleDependencyID moduleID,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       ModuleDependenciesCache &cache);
+
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;

@@ -451,7 +451,7 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
                                        });
 }
 
-bool ClangImporter::addBridgingHeaderDependencies(
+bool ClangImporter::addHeaderDependencies(
     ModuleDependencyID moduleID,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     ModuleDependenciesCache &cache) {
@@ -459,78 +459,88 @@ bool ClangImporter::addBridgingHeaderDependencies(
   auto optionalTargetModule = cache.findDependency(moduleID);
   assert(optionalTargetModule.has_value());
   auto targetModule = *(optionalTargetModule.value());
-
   // If we've already recorded bridging header dependencies, we're done.
-  if (auto swiftInterfaceDeps = targetModule.getAsSwiftInterfaceModule()) {
-    if (!swiftInterfaceDeps->textualModuleDetails.bridgingSourceFiles.empty() ||
-        !swiftInterfaceDeps->textualModuleDetails.bridgingModuleDependencies
-             .empty())
-      return false;
-  } else if (auto swiftSourceDeps = targetModule.getAsSwiftSourceModule()) {
-    if (!swiftSourceDeps->textualModuleDetails.bridgingSourceFiles.empty() ||
-        !swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies
-             .empty())
-      return false;
-  } else {
-    llvm_unreachable("Unexpected module dependency kind");
-  }
+  if (!targetModule.getHeaderDependencies().empty() ||
+      !targetModule.getHeaderInputSourceFiles().empty())
+    return false;
 
-  // Retrieve the bridging header.
-  std::string bridgingHeader = *(targetModule.getBridgingHeader());
+  // Scan the specified textual header file and record its dependencies
+  // into the cache
+  auto scanHeaderDependencies =
+      [&](StringRef headerPath) -> llvm::Expected<TranslationUnitDeps> {
+    auto &ctx = Impl.SwiftContext;
+    std::vector<std::string> commandLineArgs =
+        getClangDepScanningInvocationArguments(ctx, StringRef(headerPath));
+    auto optionalWorkingDir =
+        computeClangWorkingDirectory(commandLineArgs, ctx);
+    if (!optionalWorkingDir) {
+      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                         "Missing '-working-directory' argument");
+      return llvm::errorCodeToError(
+          std::error_code(errno, std::generic_category()));
+    }
+    std::string workingDir = *optionalWorkingDir;
+    auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
+    auto lookupModuleOutput =
+        [moduleCachePath](const ModuleID &MID,
+                          ModuleOutputKind MOK) -> std::string {
+      return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleCachePath);
+    };
+    auto dependencies = clangScanningTool.getTranslationUnitDependencies(
+        commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
+        lookupModuleOutput);
+    if (!dependencies) {
+      // FIXME: Route this to a normal diagnostic.
+      llvm::logAllUnhandledErrors(dependencies.takeError(), llvm::errs());
+      return dependencies.takeError();
+    }
 
-  // Determine the command-line arguments for dependency scanning.
-  std::vector<std::string> commandLineArgs =
-      getClangDepScanningInvocationArguments(ctx, StringRef(bridgingHeader));
-  auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
-  if (!optionalWorkingDir) {
-    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
-                       "Missing '-working-directory' argument");
-    return true;
-  }
-  std::string workingDir = *optionalWorkingDir;
+    // Record module dependencies for each new module we found.
+    auto bridgedDeps = bridgeClangModuleDependencies(
+        clangScanningTool, dependencies->ModuleGraph,
+        cache.getModuleOutputPath(),
+        [&cache](StringRef path) {
+          return cache.getScanService().remapPath(path);
+        });
+    cache.recordDependencies(bridgedDeps);
 
-  auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
-  auto lookupModuleOutput =
-      [moduleCachePath](const ModuleID &MID,
-                        ModuleOutputKind MOK) -> std::string {
-    return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleCachePath);
+    // Record dependencies for the source files the bridging header includes.
+    for (const auto &fileDep : dependencies->FileDeps)
+      targetModule.addHeaderSourceFile(fileDep);
+
+    // ... and all module dependencies.
+    llvm::StringSet<> alreadyAddedModules;
+    for (const auto &moduleDep : dependencies->ClangModuleDeps)
+      targetModule.addHeaderInputModuleDependency(moduleDep.ModuleName,
+                                                  alreadyAddedModules);
+
+    return dependencies;
   };
 
-  auto clangModuleDependencies =
-      clangScanningTool.getTranslationUnitDependencies(
-          commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
-          lookupModuleOutput);
-  if (!clangModuleDependencies) {
-    // FIXME: Route this to a normal diagnostic.
-    llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(), llvm::errs());
-    return true;
+  // - Textual module dependencies require us to process their bridging header.
+  // - Binary module dependnecies may have arbitrary header inputs.
+  if (targetModule.isTextualSwiftModule() &&
+      !targetModule.getBridgingHeader()->empty()) {
+    auto clangModuleDependencies =
+        scanHeaderDependencies(*targetModule.getBridgingHeader());
+    if (!clangModuleDependencies)
+      return true;
+    if (auto TreeID = clangModuleDependencies->IncludeTreeID)
+      targetModule.addBridgingHeaderIncludeTree(*TreeID);
+    recordBridgingHeaderOptions(targetModule, *clangModuleDependencies);
+    // Update the cache with the new information for the module.
+    cache.updateDependency(moduleID, targetModule);
+  } else if (targetModule.isSwiftBinaryModule()) {
+    auto swiftBinaryDeps = targetModule.getAsSwiftBinaryModule();
+    if (!swiftBinaryDeps->headerImport.empty()) {
+      auto clangModuleDependencies = scanHeaderDependencies(swiftBinaryDeps->headerImport);
+      if (!clangModuleDependencies)
+        return true;
+      // TODO: CAS will require a header include tree for this.
+      // Update the cache with the new information for the module.
+      cache.updateDependency(moduleID, targetModule);
+    }
   }
-
-  // Record module dependencies for each new module we found.
-  auto bridgedDeps = bridgeClangModuleDependencies(
-      clangScanningTool, clangModuleDependencies->ModuleGraph,
-      cache.getModuleOutputPath(), [&cache](StringRef path) {
-        return cache.getScanService().remapPath(path);
-      });
-  cache.recordDependencies(bridgedDeps);
-
-  // Record dependencies for the source files the bridging header includes.
-  for (const auto &fileDep : clangModuleDependencies->FileDeps)
-    targetModule.addBridgingSourceFile(fileDep);
-
-  // ... and all module dependencies.
-  llvm::StringSet<> alreadyAddedModules;
-  for (const auto &moduleDep : clangModuleDependencies->ClangModuleDeps)
-    targetModule.addBridgingModuleDependency(moduleDep.ModuleName,
-                                             alreadyAddedModules);
-
-  if (auto TreeID = clangModuleDependencies->IncludeTreeID)
-    targetModule.addBridgingHeaderIncludeTree(*TreeID);
-
-  recordBridgingHeaderOptions(targetModule, *clangModuleDependencies);
-
-  // Update the cache with the new information for the module.
-  cache.updateDependency(moduleID, targetModule);
 
   return false;
 }
