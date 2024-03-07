@@ -492,7 +492,7 @@ DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
   157)
 SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
-  OnAbstractFunction | OnSubscript | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnSubscript | OnVar | OnExtension | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   158)
 LAST_DECL_ATTR(PreInverseGenerics)
 
