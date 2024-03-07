@@ -6560,6 +6560,11 @@ getActualSILResultOptions(uint8_t raw) {
     result |= SILResultInfo::NotDifferentiable;
   }
 
+  if (options.contains(serialization::SILResultInfoFlags::IsTransferring)) {
+    options -= serialization::SILResultInfoFlags::IsTransferring;
+    result |= SILResultInfo::IsTransferring;
+  }
+
   // Check if we have any remaining options and return none if we do. We found
   // some option that we did not understand.
   if (bool(options)) {
@@ -7356,7 +7361,6 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool noescape;
   bool erasedIsolation;
   bool hasErrorResult;
-  bool hasTransferringResult;
   unsigned numParams;
   unsigned numYields;
   unsigned numResults;
@@ -7369,7 +7373,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, concurrent, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
-      erasedIsolation, rawDiffKind, hasErrorResult, hasTransferringResult,
+      erasedIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -7399,7 +7403,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
       SILFunctionType::ExtInfoBuilder(
           *representation, pseudogeneric, noescape, concurrent, async,
           unimplementable, isolation, *diffKind, clangFunctionType,
-          LifetimeDependenceInfo(), hasTransferringResult)
+          LifetimeDependenceInfo())
           .build();
 
   // Process the coroutine kind.

@@ -53,6 +53,11 @@ func transferAsyncResultWithTransferringArg2Throwing(_ x: transferring NonSendab
 
 @MainActor var globalNonSendableKlass = NonSendableKlass()
 
+@MainActor
+struct MainActorIsolatedStruct {
+  let ns = NonSendableKlass()
+}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -115,4 +120,13 @@ func useTransferredResultMainActor() async {
 
 func useTransferredResult() async {
   let _ = await transferAsyncResult()
+}
+
+extension MainActorIsolatedStruct {
+  func testNonSendableErrorReturnWithTransfer() -> transferring NonSendableKlass {
+    return ns
+  }
+  func testNonSendableErrorReturnNoTransfer() -> NonSendableKlass {
+    return ns
+  }
 }

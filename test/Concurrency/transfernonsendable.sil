@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -transfer-non-sendable -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -o /dev/null -verify
+// RUN: %target-sil-opt -transfer-non-sendable -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -strict-concurrency=complete %s -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -199,3 +199,10 @@ bb1:
   return %9999 : $()
 }
 
+sil [ossa] @synchronous_returns_transferring_error : $@convention(method) (@guaranteed NonSendableStruct) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : @guaranteed $NonSendableStruct):
+  debug_value %0 : $NonSendableStruct, var, name "myname"
+  %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
+  %3 = copy_value %2 : $NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+}
