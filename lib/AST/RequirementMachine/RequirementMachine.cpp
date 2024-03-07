@@ -449,7 +449,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
       unsigned ruleCount = System.getRules().size();
 
       // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
-      auto result = System.computeConfluentCompletion(MaxRuleCount, MaxRuleLength);
+      auto result = System.performKnuthBendix(MaxRuleCount, MaxRuleLength);
 
       unsigned rulesAdded = (System.getRules().size() - ruleCount);
 
@@ -492,7 +492,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
-        if (newRule.getNesting() > MaxConcreteNesting) {
+        if (newRule.getNesting() > MaxConcreteNesting + System.getDeepestInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteNesting,
                                 ruleCount + i);
         }

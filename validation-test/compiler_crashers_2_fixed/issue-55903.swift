@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -disable-availability-checking -emit-ir -o /dev/null %s
-// REQUIRES: asserts
 
 // https://github.com/apple/swift/issues/55903
 

@@ -20,7 +20,7 @@
 // CHECK-NOT: UnknownCode
 
 // CHECK-PRINT-DAG: protocol Generator<Value> {
-// CHECK-PRINT-DAG: enum Maybe<Wrapped> where Wrapped : ~Copyable {
+// CHECK-PRINT-DAG: enum Maybe<Wrapped> : ~Copyable where Wrapped : ~Copyable {
 // CHECK-PRINT-DAG: extension Maybe : Copyable {
 // CHECK-PRINT-DAG: func ncIdentity<T>(_ t: consuming T) -> T where T : ~Copyable
 // CHECK-PRINT-DAG: protocol Either<Left, Right> : ~Copyable {

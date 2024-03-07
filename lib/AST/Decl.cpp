@@ -6694,9 +6694,9 @@ NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return InverseMarking::Mark(InverseMarking::Kind::None);
 
-  // Claim that the tuple decl has an inferred ~TARGET marking.
+  // Claim that the tuple decl has an explicit ~TARGET marking.
   if (isa<BuiltinTupleDecl>(this))
-    return InverseMarking::Mark(InverseMarking::Kind::Inferred);
+    return InverseMarking::Mark(InverseMarking::Kind::Explicit);
 
   if (auto P = dyn_cast<ProtocolDecl>(this))
     return P->hasInverseMarking(target);
@@ -6704,57 +6704,6 @@ NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   // Search the inheritance clause first.
   if (auto inverse = findInverseInInheritance(getInherited(), target))
     return inverse;
-
-  // Check the generic parameters for an explicit ~TARGET marking
-  // which would result in an Inferred ~TARGET marking for this context.
-  auto *gpList = getParsedGenericParams();
-  if (!gpList)
-    return InverseMarking::Mark();
-
-  llvm::SmallSet<GenericTypeParamDecl *, 4> params;
-
-  // Scan the inheritance clauses of generic parameters only for an inverse.
-  for (GenericTypeParamDecl *param : gpList->getParams()) {
-    auto inverse = findInverseInInheritance(param->getInherited(), target);
-
-    // Inverse is inferred from one of the generic parameters.
-    if (inverse)
-      return inverse.with(InverseMarking::Kind::Inferred);
-
-    params.insert(param);
-  }
-
-  // Next, scan the where clause and return the result.
-  auto whereClause = getTrailingWhereClause();
-  if (!whereClause)
-    return InverseMarking::Mark();
-
-  auto requirements = whereClause->getRequirements();
-  for (unsigned i : indices(requirements)) {
-    auto requirementRepr = requirements[i];
-    if (requirementRepr.getKind() != RequirementReprKind::TypeConstraint)
-      continue;
-
-    auto *subjectRepr =
-        dyn_cast<UnqualifiedIdentTypeRepr>(requirementRepr.getSubjectRepr());
-
-    if (!(subjectRepr && subjectRepr->isBound()))
-      continue;
-
-    auto *subjectGP =
-        dyn_cast<GenericTypeParamDecl>(subjectRepr->getBoundDecl());
-    if (!subjectGP || !params.contains(subjectGP))
-      continue;
-
-    auto *constraintRepr =
-        dyn_cast<InverseTypeRepr>(requirementRepr.getConstraintRepr());
-    if (!constraintRepr || constraintRepr->isInvalid())
-      continue;
-
-    if (constraintRepr->isInverseOf(target, getDeclContext()))
-      return InverseMarking::Mark(InverseMarking::Kind::Inferred,
-                                  constraintRepr->getLoc());
-  }
 
   return InverseMarking::Mark();
 }

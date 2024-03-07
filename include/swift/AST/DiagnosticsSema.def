@@ -7630,10 +7630,6 @@ NOTE(add_inverse,none,
 NOTE(note_inverse_preventing_conformance,none,
      "%0 has '~%1' constraint preventing implicit '%1' conformance",
      (Type, StringRef))
-NOTE(note_inverse_preventing_conformance_implicit,none,
-     "%kind0 has '~%1' constraint on a generic parameter, "
-     "making its '%1' conformance conditional",
-     (const ValueDecl *, StringRef))
 NOTE(note_inverse_preventing_conformance_explicit,none,
      "%kind0 has '~%1' constraint preventing '%1' conformance",
      (const ValueDecl *, StringRef))

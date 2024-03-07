@@ -13,12 +13,16 @@ enum RudeEnum<T: ~Copyable>: Copyable {
   case whatever
 }
 
-struct CondCopyableStruct<T: ~Copyable> {}
+struct CondCopyableStruct<T: ~Copyable>: ~Copyable {}
 
-enum CondCopyableEnum<T: ~Copyable> {
+extension CondCopyableStruct: Copyable {}
+
+enum CondCopyableEnum<T: ~Copyable>: ~Copyable {
   case some(T)
   case none
 }
+
+extension CondCopyableEnum: Copyable {}
 
 // MARK: ensure certain types are treated as trivial (no ownership in func signature).
 

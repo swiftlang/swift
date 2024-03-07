@@ -71,15 +71,7 @@ static void emitAdviceToApplyInverseAfter(InFlightDiagnostic &&diag,
     }
   }
 
-  auto &ctx = nominal->getASTContext();
-
   switch (inverseMarking.getKind()) {
-  case InverseMarking::Kind::Inferred:
-    // Note that the enclosing type is conditionally conforming to KP first.
-    ctx.Diags.diagnose(inverseMarking.getLoc(),
-                       diag::note_inverse_preventing_conformance_implicit,
-                       nominal, getProtocolName(kp));
-    LLVM_FALLTHROUGH;
   case InverseMarking::Kind::None: {
     // Suggest adding ~KP to make it non-KP.
     auto diag = nominal->diagnose(diag::add_inverse,
@@ -143,12 +135,6 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
       switch (inverse.getKind()) {
       case InverseMarking::Kind::None:
         assert(false && "how did it become noncopyable/nonescapable then?");
-        break;
-      case InverseMarking::Kind::Inferred:
-        assert(loc);
-        ctx.Diags.diagnose(loc,
-                           diag::note_inverse_preventing_conformance_implicit,
-                           nominal, getProtocolName(kp));
         break;
       case InverseMarking::Kind::LegacyExplicit:
       case InverseMarking::Kind::Explicit:
@@ -344,7 +330,6 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     llvm_unreachable("not an invertible protocol");
 
   assert(!isa<ClassDecl>(nominal) && "classes aren't handled here");
-  auto file = cast<FileUnit>(nominal->getModuleScopeContext());
 
   // Generates a conformance for the nominal to the protocol.
   // The conformanceDC specifies THE decl context to use for the conformance.
@@ -362,57 +347,12 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     return conformance;
   };
 
-  auto generateConditionalConformance = [&]() -> ProtocolConformance * {
-    // Generate an extension with a conditional conformance to IP that
-    // requires all generic parameters to be IP.
-    auto protoTy = proto->getDeclaredInterfaceType();
-    auto dc = nominal->getDeclContext();
-
-    // extension Nominal: P { ... }
-    SmallVector<InheritedEntry, 1> inherited;
-    inherited.emplace_back(TypeLoc::withoutLoc(protoTy));
-    auto *ext = ExtensionDecl::create(ctx, SourceLoc(), nullptr,
-                                      ctx.AllocateCopy(inherited),
-                                      dc, nullptr);
-    ext->setImplicit();
-
-    // Build a generic signature for this extension that looks like this:
-    // <T_1..., T_n where T_1: IP, ... T_n: IP>
-    auto genericSig = nominal->getGenericSignature();
-    auto params = genericSig.getGenericParams();
-    SmallVector<Requirement, 2> reqs;
-
-    for (auto param : params)
-      reqs.push_back({RequirementKind::Conformance, param, protoTy});
-
-    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs,
-                                       /*allowInverses=*/false);
-    ext->setGenericSignature(genericSig);
-
-    // Bind the extension.
-    evaluator.cacheOutput(ExtendedTypeRequest{ext},
-                          nominal->getDeclaredInterfaceType());
-    ext->setExtendedNominal(nominal);
-    nominal->addExtension(ext);
-
-    // Make it accessible to getTopLevelDecls() so it gets type-checked.
-    file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
-
-    // Then create the conformance using the extension as the conformance's
-    // DeclContext, which is how we register these conditional requirements
-    // with the conformance.
-    return generateConformance(ext);
-  };
-
   // Check what kind of inverse-marking we have to determine whether to generate
   // a conformance for IP.
   switch (nominal->hasInverseMarking(*ip).getKind()) {
   case InverseMarking::Kind::LegacyExplicit:
   case InverseMarking::Kind::Explicit:
     return nullptr; // No positive IP conformance will be inferred.
-
-  case InverseMarking::Kind::Inferred:
-    return generateConditionalConformance();
 
   case InverseMarking::Kind::None:
     // All types already start with conformances to the invertible protocols in
