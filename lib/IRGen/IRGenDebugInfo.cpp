@@ -1688,9 +1688,8 @@ private:
     // to emit the (target!) size of the underlying basic type.
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
     // FIXME: SizeInBits is redundant with DbgTy, remove it.
-    uint64_t SizeInBits = 0;
-    if (DbgTy.getTypeSizeInBits())
-      SizeInBits = *DbgTy.getTypeSizeInBits();
+    auto *llvmty = IGM.getStorageTypeForUnlowered(DbgTy.getType());
+    uint64_t SizeInBits = llvmty->isSized() ? IGM.DataLayout.getTypeSizeInBits(llvmty) : 0;
     unsigned AlignInBits = DbgTy.hasDefaultAlignment()
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
