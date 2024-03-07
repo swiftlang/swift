@@ -32,9 +32,12 @@
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/Swiftskell.swiftinterface -o %t/Swiftskell.swiftmodule
 
-// RUN: %target-swift-frontend -typecheck -I %t %s \
+// RUN: %target-swift-frontend -emit-silgen -I %t %s \
 // RUN:    -enable-experimental-feature NoncopyableGenerics \
-// RUN:    -enable-experimental-feature NonescapableTypes
+// RUN:    -enable-experimental-feature NonescapableTypes \
+// RUN:    -o %t/final.silgen
+
+// RUN: %FileCheck %s --check-prefix=CHECK-SILGEN < %t/final.silgen
 
 
 
@@ -120,6 +123,8 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public struct Freestanding<T> where T : ~Copyable, T : ~Escapable {
 
+// CHECK-MISC-DAG: @_preInverseGenerics public func old_swap<T>(_ a: inout T, _ b: inout T) where T : ~Copyable
+
 ///////////////////////////////////////////////////////////////////////
 // Synthesized conditional conformances are next
 
@@ -185,5 +190,10 @@ struct FileDescriptor: ~Copyable, Eq, Show {
 
   static func ==(_ a: borrowing Self, _ b: borrowing Self) -> Bool {
     return a.id == b.id
+  }
+
+  mutating func exchangeWith(_ other: inout Self) {
+    // CHECK-SILGEN: function_ref @$s24NoncopyableGenerics_Misc8old_swapyyxz_xztlF
+    old_swap(&self, &other)
   }
 }

@@ -70,7 +70,7 @@ static bool inversesAllowed(const Decl *decl) {
     if (auto *storage = accessor->getStorage())
       decl = storage;
 
-  return !decl->getParsedAttrs().hasAttribute<PreInverseGenericsAttr>();
+  return !decl->getAttrs().hasAttribute<PreInverseGenericsAttr>();
 }
 
 static bool inversesAllowedIn(const DeclContext *ctx) {
