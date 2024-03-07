@@ -35,6 +35,7 @@
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -920,7 +921,7 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
   /// If the context was a function, unwrap it and look for the decode method
   /// based off a concrete class; If we're not in a concrete class, we'll be
   /// using a witness for the decoder so returning null is okey.
-  FuncDecl *decodeFn = C.getDistributedActorArgumentDecodingMethod(
+  FuncDecl *decodeFn = getDistributedActorArgumentDecodingMethod(
       thunk->getDeclContext()->getSelfNominalTypeDecl());
 
   // If distributed actor is generic over actor system, we have to
