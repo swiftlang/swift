@@ -174,7 +174,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(nominal, loader.second, conformances);
-      loadAllConformances(nominal, conformances);
+      registerProtocolConformances(nominal, conformances);
     }
 
     nominalFunc(nominal);
@@ -202,7 +202,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(next, loader.second, conformances);
-      loadAllConformances(next, conformances);
+      registerProtocolConformances(next, conformances);
       for (auto conf : conformances) {
         protocols.push_back(
             {conf->getProtocol(), SourceLoc(), SourceLoc(), SourceLoc()});
@@ -433,19 +433,17 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
   }
 }
 
-void ConformanceLookupTable::loadAllConformances(
+void ConformanceLookupTable::registerProtocolConformances(
        DeclContext *dc,
        ArrayRef<ProtocolConformance*> conformances) {
   // If this declaration context came from source, there's nothing to
   // do here.
-  if (dc->getParentSourceFile() ||
-      dc->getParentModule()->isBuiltinModule()) {
-    return;
-  }
+  assert(!dc->getParentSourceFile() &&
+         !dc->getParentModule()->isBuiltinModule());
 
   // Add entries for each loaded conformance.
   for (auto conformance : conformances) {
-    registerProtocolConformance(conformance);
+    registerProtocolConformance(dc, conformance);
   }
 }
 
@@ -1019,10 +1017,9 @@ void ConformanceLookupTable::addSynthesizedConformance(
 }
 
 void ConformanceLookupTable::registerProtocolConformance(
-       ProtocolConformance *conformance,
+       DeclContext *dc, ProtocolConformance *conformance,
        bool synthesized) {
   auto protocol = conformance->getProtocol();
-  auto dc = conformance->getDeclContext();
   auto nominal = dc->getSelfNominalTypeDecl();
 
   // If there is an entry to update, do so.
