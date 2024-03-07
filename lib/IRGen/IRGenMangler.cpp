@@ -496,8 +496,9 @@ IRGenMangler::appendExtendedExistentialTypeShape(CanGenericSignature genSig,
                                                  CanType shapeType) {
   // Append the generalization signature.
   if (genSig) {
-    // Generalization signature never reference inverses.
+    // Generalization signature never references inverses.
     llvm::SaveAndRestore X(AllowInverses, false);
+
     appendGenericSignature(genSig);
   }
 

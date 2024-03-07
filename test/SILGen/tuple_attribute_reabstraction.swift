@@ -1,7 +1,5 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 public struct G<T> {
   var t: T
 
