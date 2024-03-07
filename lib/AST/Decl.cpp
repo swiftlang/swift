@@ -6657,16 +6657,6 @@ findInverseInInheritance(InheritedTypes inherited,
 }
 
 InverseMarking::Mark
-AssociatedTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  auto &ctx = getASTContext();
-
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::Mark();
-
-  return findInverseInInheritance(getInherited(), target);
-}
-
-InverseMarking::Mark
 NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   switch (target) {
   case InvertibleProtocolKind::Copyable:
