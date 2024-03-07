@@ -227,6 +227,15 @@ extension UnsafePointer: _Pointer where Pointee: ~Copyable {
   public typealias Distance = Int
 }
 
+extension UnsafePointer {
+  // Note: This explicit `hashValue` applies @_preInverseGenerics to the
+  // original (pre-6.0) compiler-synthesized version.
+  @_preInverseGenerics
+  public var hashValue: Int {
+    _hashValue(for: self)
+  }
+}
+
 extension UnsafePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
   ///
@@ -665,6 +674,15 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
    guard let unwrapped = other else { return nil }
    self.init(unwrapped)
+  }
+}
+
+extension UnsafeMutablePointer {
+  // Note: This explicit `hashValue` applies @_preInverseGenerics to the
+  // original (pre-6.0) compiler-synthesized version.
+  @_preInverseGenerics
+  public var hashValue: Int {
+    _hashValue(for: self)
   }
 }
 
