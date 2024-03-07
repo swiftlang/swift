@@ -21,7 +21,6 @@ import FakeDistributedActorSystems
 @_DistributedProtocol
 protocol GreeterProtocol: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func greet() -> String
-  // distributed_thunk func greet() async throws -> String
 }
 
 // ==== ------------------------------------------------------------------------
@@ -41,6 +40,7 @@ distributed actor DAFL: GreeterProtocol {
     let fakeRoundtripSystem = FakeRoundtripActorSystem()
     let fr = DAFR(actorSystem: fakeRoundtripSystem)
     let frid = fr.id
+    _ = DAFL(actorSystem: .init())
 
     let gfr: any GreeterProtocol = try $GreeterProtocol.resolve(id: frid, using: fakeRoundtripSystem)
 

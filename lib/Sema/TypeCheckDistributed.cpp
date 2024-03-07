@@ -503,16 +503,9 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
     return false;
 
   auto &C = func->getASTContext();
-
-  fprintf(stderr, "[%s:%d](%s) CHECK FUNC\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  func->dump();
-
-  auto result = evaluateOrDefault(C.evaluator,
+  return evaluateOrDefault(C.evaluator,
                            CheckDistributedFunctionRequest{func},
                            false); // no error if cycle
-  fprintf(stderr, "[%s:%d](%s) RESULT: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          result ? "no errors" : "errors");
-  return result;
 }
 
 bool CheckDistributedFunctionRequest::evaluate(
