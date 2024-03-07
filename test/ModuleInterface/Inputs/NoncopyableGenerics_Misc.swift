@@ -96,3 +96,6 @@ extension Outer.InnerStruct {
 }
 
 public struct Freestanding<T: ~Copyable> where T: ~Escapable {}
+
+@_preInverseGenerics
+public func old_swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {}
