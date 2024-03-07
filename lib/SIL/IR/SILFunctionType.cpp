@@ -4714,6 +4714,9 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     bridgedParams.push_back(selfParam);
   }
 
+  if (innerExtInfo.hasTransferringResult())
+    extInfo = extInfo.withTransferringResult();
+
   auto uncurried = CanAnyFunctionType::get(
       genericSig, llvm::ArrayRef(bridgedParams), bridgedResultType, extInfo);
 
