@@ -940,9 +940,6 @@ bool SILFunction::shouldBePreservedForDebugger() const {
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
     return false;
 
-  if (isAvailableExternally())
-    return false;
-
   if (hasSemanticsAttr("no.preserve.debugger"))
     return false;
 
