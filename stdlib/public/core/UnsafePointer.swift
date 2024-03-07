@@ -204,10 +204,7 @@
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
-public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
-
-  /// A type that represents the distance between two pointers.
-  public typealias Distance = Int
+public struct UnsafePointer<Pointee: ~Copyable>: Copyable {
 
   /// The underlying raw (untyped) pointer.
   @_preInverseGenerics
@@ -223,6 +220,12 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
 
 @available(*, unavailable)
 extension UnsafePointer: Sendable where Pointee: ~Copyable {}
+
+@_preInverseGenerics
+extension UnsafePointer: _Pointer where Pointee: ~Copyable {
+  /// A type that represents the distance between two pointers.
+  public typealias Distance = Int
+}
 
 extension UnsafePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
@@ -597,11 +600,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
-public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
-
-  /// A type that represents the distance between two pointers.
-  public typealias Distance = Int
-
+public struct UnsafeMutablePointer<Pointee: ~Copyable>: Copyable {
   /// The underlying raw (untyped) pointer.
   @_preInverseGenerics
   public let _rawValue: Builtin.RawPointer
@@ -616,6 +615,12 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
 
 @available(*, unavailable)
 extension UnsafeMutablePointer: Sendable where Pointee: ~Copyable {}
+
+@_preInverseGenerics
+extension UnsafeMutablePointer: _Pointer where Pointee: ~Copyable {
+  /// A type that represents the distance between two pointers.
+  public typealias Distance = Int
+}
 
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Creates a mutable typed pointer referencing the same memory as the given
