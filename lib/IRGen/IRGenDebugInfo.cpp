@@ -1689,7 +1689,10 @@ private:
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
     // FIXME: SizeInBits is redundant with DbgTy, remove it.
     auto *llvmty = IGM.getStorageTypeForUnlowered(DbgTy.getType());
-    uint64_t SizeInBits = llvmty->isSized() ? IGM.DataLayout.getTypeSizeInBits(llvmty) : 0;
+    std::optional<uint64_t> SizeInBitsOrNull;
+    if (llvmty->isSized())
+      SizeInBitsOrNull = IGM.DataLayout.getTypeSizeInBits(llvmty);
+    uint64_t SizeInBits = SizeInBitsOrNull.value_or(0);
     unsigned AlignInBits = DbgTy.hasDefaultAlignment()
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
@@ -1790,7 +1793,7 @@ private:
                                 SizeInBits, AlignInBits, Flags, nullptr,
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       StringRef Name = Decl->getName().str();
-      if (!DbgTy.getTypeSizeInBits())
+      if (!SizeInBitsOrNull)
         return DBuilder.createForwardDecl(
             llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, L.File,
             FwdDeclLine, llvm::dwarf::DW_LANG_Swift, 0, AlignInBits);
@@ -2187,7 +2190,10 @@ private:
   bool sanityCheckCachedType(DebugTypeInfo DbgTy, llvm::DIType *CachedType) {
     if (DbgTy.isForwardDecl())
       return true;
-    auto SizeInBits = DbgTy.getTypeSizeInBits();
+    auto *StorageType = IGM.getStorageTypeForUnlowered(DbgTy.getType());
+    std::optional<uint64_t> SizeInBits;
+    if (StorageType->isSized())
+      SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
     if ((SizeInBits && CachedSizeInBits != *SizeInBits) ||
         (!SizeInBits && CachedSizeInBits)) {

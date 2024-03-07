@@ -110,9 +110,6 @@ public:
       assert(FragmentStorageType && "only defined types may have a size");
     return FragmentStorageType;
   }
-  std::optional<Size::int_type> getTypeSizeInBits() const {
-    return SizeIsFragmentSize ? std::nullopt : SizeInBits;
-  }
   std::optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
   Alignment getAlignment() const { return Align; }
   bool isNull() const { return Type == nullptr; }
