@@ -959,7 +959,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       unsigned ArgumentNumber = Op->getOperandNumber() - 1;
 
       // If this is an out-parameter, it is like a store.
-      unsigned NumIndirectResults = substConv.getNumIndirectSILResults();
+      unsigned NumIndirectResults = substConv.getNumIndirectSILResults() +
+                                    substConv.getNumIndirectSILErrorResults();
       if (ArgumentNumber < NumIndirectResults) {
         assert(!InStructSubElement && "We're initializing sub-members?");
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Initialization);
