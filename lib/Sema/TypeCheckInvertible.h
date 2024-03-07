@@ -31,11 +31,13 @@ public:
   virtual ~StorageVisitor() = default;
 };
 
-/// \returns true if the conformance to Copyable was successfully validated.
-bool checkCopyableConformance(ProtocolConformance *conformance);
+/// Checks that all stored properties or associated values are Copyable.
+bool checkCopyableConformance(DeclContext *dc,
+                              ProtocolConformance *conformance);
 
-/// \returns true if the conformance to Escapable was successfully validated.
-bool checkEscapableConformance(ProtocolConformance *conformance);
+/// Checks that all stored properties or associated values are Escapable.
+bool checkEscapableConformance(DeclContext *dc,
+                               ProtocolConformance *conformance);
 }
 
 

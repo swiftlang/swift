@@ -149,7 +149,8 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
 }
 
 /// MARK: conformance checking
-static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
+static bool checkInvertibleConformanceCommon(DeclContext *dc,
+                                             ProtocolConformance *conformance,
                                              InvertibleProtocolKind ip) {
   const auto kp = getKnownProtocolKind(ip);
   auto *proto = conformance->getProtocol();
@@ -170,7 +171,7 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
   // written in an extension, then we do not raise an error.
   auto inverseMarking = nom->hasInverseMarking(ip);
   if (inverseMarking.isAnyExplicit()) {
-    if (conformance->getDeclContext() == nom) {
+    if (dc == nom) {
       ctx.Diags.diagnose(inverseMarking.getLoc(),
                          diag::inverse_but_also_conforms,
                          nom, getProtocolName(kp));
@@ -260,20 +261,21 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
   // This nominal cannot conform to IP if it contains storage that does not
   // conform to IP.
   bool lacksMatchingStorage =
-      LacksMatchingStorage(nom, conformance->getDeclContext(),
-                           ip, /*diagnose=*/true).visit();
+      LacksMatchingStorage(nom, dc, ip, /*diagnose=*/true).visit();
   conforms &= !lacksMatchingStorage;
 
   return conforms;
 }
 
-bool swift::checkEscapableConformance(ProtocolConformance *conformance) {
-  return checkInvertibleConformanceCommon(conformance,
+bool swift::checkEscapableConformance(DeclContext *dc,
+                                      ProtocolConformance *conformance) {
+  return checkInvertibleConformanceCommon(dc, conformance,
                                           InvertibleProtocolKind::Escapable);
 }
 
-bool swift::checkCopyableConformance(ProtocolConformance *conformance) {
-  return checkInvertibleConformanceCommon(conformance,
+bool swift::checkCopyableConformance(DeclContext *dc,
+                                     ProtocolConformance *conformance) {
+  return checkInvertibleConformanceCommon(dc, conformance,
                                           InvertibleProtocolKind::Copyable);
 }
 
