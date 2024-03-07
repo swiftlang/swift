@@ -479,6 +479,9 @@ protected:
     BaseEntitySignature(const Decl *decl);
   };
 
+  static bool inversesAllowed(const Decl *decl);
+  static bool inversesAllowedIn(const DeclContext *ctx);
+
   void appendContextOf(const ValueDecl *decl, BaseEntitySignature &base);
   void appendContextualInverses(const GenericTypeDecl *contextDecl,
                                 BaseEntitySignature &base,
