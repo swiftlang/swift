@@ -197,6 +197,9 @@ IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
+  llvm::SaveAndRestore X(AllowInverses,
+                         inversesAllowedIn(conformance->getDeclContext()));
+
   beginMangling();
   if (isa<NormalProtocolConformance>(conformance)) {
     appendProtocolConformance(conformance);

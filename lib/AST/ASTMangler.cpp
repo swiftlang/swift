@@ -62,7 +62,7 @@
 using namespace swift;
 using namespace swift::Mangle;
 
-static bool inversesAllowed(const Decl *decl) {
+bool ASTMangler::inversesAllowed(const Decl *decl) {
   if (!decl)
     return true;
 
@@ -73,7 +73,7 @@ static bool inversesAllowed(const Decl *decl) {
   return !decl->getParsedAttrs().hasAttribute<PreInverseGenericsAttr>();
 }
 
-static bool inversesAllowedIn(const DeclContext *ctx) {
+bool ASTMangler::inversesAllowedIn(const DeclContext *ctx) {
   assert(ctx);
   return inversesAllowed(ctx->getInnermostDeclarationDeclContext());
 }
@@ -242,6 +242,9 @@ std::string ASTMangler::mangleConstructorVTableThunk(
 }
 
 std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
+  llvm::SaveAndRestore X(AllowInverses,
+                         inversesAllowedIn(C->getDeclContext()));
+
   beginMangling();
   if (isa<NormalProtocolConformance>(C)) {
     appendProtocolConformance(C);
