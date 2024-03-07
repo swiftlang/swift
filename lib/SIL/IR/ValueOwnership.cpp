@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 
@@ -690,3 +691,17 @@ ValueOwnershipKind ValueBase::getOwnershipKind() const {
   assert(result && "Returned ownership kind invalid on values");
   return result;
 }
+
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - message
+static FunctionTest GetOwnershipKind("get-ownership-kind", [](auto &function,
+                                                              auto &arguments,
+                                                              auto &test) {
+  SILValue value = arguments.takeValue();
+  llvm::outs() << value;
+  llvm::outs() << "OwnershipKind: " << value->getOwnershipKind() << "\n";
+});
+} // end namespace swift::test
