@@ -9,6 +9,8 @@
 // RUN: %target-run-simple-swift(-parse-as-library -enable-builtin-module -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BorrowingSwitch -Xfrontend -sil-verify-all) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -parse-as-library -enable-builtin-module -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BorrowingSwitch -Xfrontend -sil-verify-all) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 // CHECK-IR-NOT: @"$sBpWV"
 
 // CHECK: hi end
