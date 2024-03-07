@@ -7610,10 +7610,6 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   // It would be nice if this weren't discarded.
   llvm::Value *baseMetadataCache = nullptr;
 
-
-  // TODO: for witnessing distributed thunk requirement
-//  fprintf(stderr, "[%s:%d](%s) emitWitnessMethodValue member: %s \n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//          member.mangle().c_str());
   auto fn = emitWitnessMethodValue(*this, baseTy, &baseMetadataCache, member,
                                    conformance);
 

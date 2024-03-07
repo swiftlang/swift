@@ -2824,32 +2824,11 @@ namespace {
 
 /// Evaluate a request for a particular set of members of an iterable
 /// declaration context.
-static ArrayRef<Decl *> evaluateMembersRequest( // FIXME(XXX): adding the requirements here
+static ArrayRef<Decl *> evaluateMembersRequest(
   IterableDeclContext *idc, MembersRequestKind kind) {
   auto dc = cast<DeclContext>(idc->getDecl());
   auto &ctx = dc->getASTContext();
   SmallVector<Decl *, 8> result;
-
-  auto p = dyn_cast<ProtocolDecl>(idc);
-
-//  // FIXME(XXX): adding thunks for everything inside protocol
-//  for (auto *member : idc->getMembers()) {
-//    if (isa<ProtocolDecl>(idc)) { // NOTE: Adding this always rather than just in the protocols results in dupes
-//      //    ╭─── macro expansion @_DistributedProtocol ──────────────────────────
-//      //   │1 │ extension GreeterProtocol where Self: Distributed._DistributedActorStub { │2 │   distributed func greet() async throws -> String { │  │                    ╰─ error: multiple definitions of symbol '$s4main15GreeterProtocolPAA11Distributed01_D9ActorStubRzrlE5greetSSyYaKF'
-//      //   │3 │     if #available (SwiftStdlib 6.0, *) {
-//      //   │4 │       Distributed._distributedStubFatalError()
-//      //   ╰────────────────────────────────────────────────────────────────────
-//      // since we still emit the "usual way" whichever way that was for concrete actors and extensions
-//      if (auto *func = dyn_cast<AbstractFunctionDecl>(member)) {
-//        if (auto thunk = func->getDistributedThunk()) {
-//          fprintf(stderr, "[%s:%d](%s) ADD THUNK TO ABI MEMBERS: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//          thunk->dump();
-//          result.push_back(thunk);
-//        }
-//      }
-//    }
-//  }
 
   // If there's no parent source file, everything is already in order.
   if (!dc->getParentSourceFile()) {
@@ -2858,7 +2837,6 @@ static ArrayRef<Decl *> evaluateMembersRequest( // FIXME(XXX): adding the requir
 
     return ctx.AllocateCopy(result);
   }
-
 
   auto nominal = dyn_cast<NominalTypeDecl>(dc->getImplementedObjCContext());
 
@@ -2924,18 +2902,6 @@ static ArrayRef<Decl *> evaluateMembersRequest( // FIXME(XXX): adding the requir
       nullptr);
 
   for (auto *member : idc->getMembers()) {
-    // FIXME(XXX): we're doing it in the beginning of this func after all
-//    if (isa<ProtocolDecl>(idc)) {
-//      if (auto *func = dyn_cast<AbstractFunctionDecl>(member)) {
-//        if (auto thunk = func->getDistributedThunk()) {
-//          fprintf(stderr, "[%s:%d](%s) ADD THUNK TO ABI MEMBERS: \n",
-//                  __FILE_NAME__, __LINE__, __FUNCTION__);
-//          thunk->dump();
-//          result.push_back(thunk);
-//        }
-//      }
-//    }
-
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have
       // dynamically-dispatched accessors, so force them to be synthesized.

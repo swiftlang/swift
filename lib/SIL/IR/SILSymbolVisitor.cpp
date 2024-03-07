@@ -790,10 +790,6 @@ public:
   }
 #endif
 
-  // TODO(XXX): today when we have the witness in extension
-  // - the witness is matching the the not distributed -- but
-  // TODO: when something refers to a witness method, the REQUIREMENT must be the thunk
-
   void visitProtocolDecl(ProtocolDecl *PD) {
     if (canSkipNominal(PD))
       return;

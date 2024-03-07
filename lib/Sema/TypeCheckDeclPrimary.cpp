@@ -3532,8 +3532,6 @@ public:
     }
 
     checkExplicitAvailability(PD);
-
-    // TypeChecker::checkDistributedActor(SF, PD);
   }
 
   void visitVarDecl(VarDecl *VD) {

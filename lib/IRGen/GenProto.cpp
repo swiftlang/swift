@@ -4145,12 +4145,6 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
-  // FIXME(XXX): the problem is here, we don't have the other decl here
-  // (protocol range=[/Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_remoteCall_protocol_method_in_presence_of_multiple_systems.swift:19:1 - line:21:1] "GreeterProtocol" interface type="GreeterProtocol.Type" access=internal non_resilient requirement_signature="<Self where Self : DistributedActor, Self.SerializationRequirement == any Decodable & Encodable>" inherits="DistributedActor" where_requirements="ActorSystem : DistributedActorSystem<any Codable>"
-  //  (func_decl range=[/Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_remoteCall_protocol_method_in_presence_of_multiple_systems.swift:20:15 - line:20:44] "greet()" interface type="<Self where Self : GreeterProtocol> (isolated Self) -> () async throws -> String" access=internal distributed
-  //    (parameter "self" interface type="Self")
-  //    (parameter_list range=[/Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_remoteCall_protocol_method_in_presence_of_multiple_systems.swift:20:25 - line:20:26]) (result=type_ident id="String" bind="Swift.(file).String")))
-
   auto index = fnProtoInfo.getFunctionIndex(member);
   auto isRelativeTable = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables;
   if (isRelativeTable) {

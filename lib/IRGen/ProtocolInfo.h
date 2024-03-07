@@ -284,34 +284,9 @@ public:
   WitnessIndex getFunctionIndex(SILDeclRef declRef) const {
     assert(getKind() >= ProtocolInfoKind::Full);
     for (auto &witness : getWitnessEntries()) {
-//      fprintf(stderr, "[%s:%d](%s) witness entry ....\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      if (witness.isFunction()) {
-//        witness.getFunction().getDecl()->dump();
-//      }
       if (witness.matchesFunction(declRef))
         return getNonBaseWitnessIndex(&witness);
-
-      if (witness.isFunction()) {
-        if (auto witnessAFD =
-                dyn_cast<AbstractFunctionDecl>(witness.getFunction().getDecl())) {
-//          fprintf(stderr, "[%s:%d](%s) get THUNK....\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-          if (auto thunk = witnessAFD->getDistributedThunk()) {
-//            fprintf(stderr, "[%s:%d](%s) GOT THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//            thunk->dump();
-
-            if (witness.matchesFunction(declRef)) {
-              return getNonBaseWitnessIndex(&witness);
-            }
-          }
-        }
-      }
     }
-
-//    fprintf(stderr, "[%s:%d](%s) FAIL FAIL FAIL FAIL FAIL FAIL \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    fprintf(stderr, "[%s:%d](%s) DECL REF: isDistributedThunk = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//            declRef.isDistributedThunk());
-//    declRef.dump();
-//    declRef.getDecl()->dump();
     llvm_unreachable("didn't find entry for function");
   }
 

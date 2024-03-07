@@ -804,13 +804,6 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   if (!f->empty()) {
-    fprintf(stderr, "[%s:%d](%s) FAIL::::::::\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    fprintf(stderr, "[%s:%d](%s) constant: is distributed thunk? %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            constant.isDistributedThunk());
-    constant.dump();
-    fprintf(stderr, "[%s:%d](%s) f: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    f->dump();
-
     diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
              f->getName());
     return;
@@ -1424,7 +1417,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   if (shouldEmitFunctionBody(fd)) {
     Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
-    emitOrDelayFunction(SILDeclRef(decl)); // FIXME(XXX): here the extension func
+    emitOrDelayFunction(SILDeclRef(decl));
   }
 }
 
