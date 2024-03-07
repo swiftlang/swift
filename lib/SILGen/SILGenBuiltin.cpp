@@ -1699,6 +1699,23 @@ static ManagedValue emitBuiltinCreateAsyncTask(
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args), {});
 }
 
+// Emit SIL for the named builtin: createTask.
+static ManagedValue emitBuiltinCreateTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&args, SGFContext C) {
+  return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
+      { CreateTaskOptions::OptionalEverything });
+}
+
+// Emit SIL for the named builtin: createDiscardingTask.
+static ManagedValue emitBuiltinCreateDiscardingTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&args, SGFContext C) {
+  return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
+      { CreateTaskOptions::OptionalEverything,
+        CreateTaskOptions::Discarding });
+}
+
 ManagedValue
 SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
                                         ManagedValue flags,

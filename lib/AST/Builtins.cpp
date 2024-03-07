@@ -1510,6 +1510,32 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
+static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
+      _parameters(
+        _label("flags", _swiftInt),
+        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+        //_label("initialExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("operation", _function(_async(_throws(_sendable(_thick))),
+                                      _typeparam(0), _parameters()))),
+      _tuple(_nativeObject, _rawPointer));
+}
+
+static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _parameters(
+        _label("flags", _swiftInt),
+        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+        //_label("initialExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("operation", _function(_async(_throws(_sendable(_thick))),
+                                      _void, _parameters()))),
+      _tuple(_nativeObject, _rawPointer));
+}
+
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
                                      bool inGroup, bool withTaskExecutor,
                                      bool isDiscarding) {
@@ -3014,6 +3040,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
+
+  case BuiltinValueKind::CreateTask:
+    return getCreateTask(Context, Id);
+
+  case BuiltinValueKind::CreateDiscardingTask:
+    return getCreateDiscardingTask(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTask:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,

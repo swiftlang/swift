@@ -952,13 +952,33 @@ BUILTIN_MISC_OPERATION(AddressOfBorrowOpaque, "addressOfBorrowOpaque", "", Speci
 /// AddressLowering.
 BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBorrowOpaque", "", Special)
 
+/// createTask<T>(flags: Int,
+///               taskGroup: Builtin.RawPointer? = nil,
+///               initialTaskExecutor: (Builtin.Executor)? = nil,
+///               initialExecutor: (Builtin.Executor)? = nil,
+///               operation: @escaping () async throws -> T)
+///  -> Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Create a new task.
+BUILTIN_SIL_OPERATION(CreateTask, "createTask", Special)
+
+/// createDiscardingTask(flags: Int,
+///                      taskGroup: Builtin.RawPointer? = nil,
+///                      initialTaskExecutor: (Builtin.Executor)? = nil,
+///                      initialExecutor: (Builtin.Executor)? = nil,
+///                      operation: @escaping () async throws -> ())
+///  -> (Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Create a new discarding task.
+BUILTIN_SIL_OPERATION(CreateDiscardingTask, "createDiscardingTask", Special)
+
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task, given flags, options, and a function to
-/// execute.
+/// Legacy spelling of:
+///   createTask(flags: $0, operation: $1)
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
                                    "createAsyncTask", "", Special)
 
@@ -968,8 +988,8 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
+/// Legacy spelling of:
+///   createTask(flags: $0, taskGroup: $1, operation: $2)
 BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroup,
                       "createAsyncTaskInGroup", Special)
 
@@ -979,8 +999,8 @@ BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroup,
 ///     @escaping () async throws -> Void  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous discarding task, given flags, a parent task,
-/// task group and a function to execute.
+/// Legacy spelling of:
+///   createDiscardingTask(flags: $0, taskGroup: $1, operation: $2)
 BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroup,
                       "createAsyncDiscardingTaskInGroup", Special)
 
@@ -990,8 +1010,8 @@ BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroup,
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
+/// Legacy spelling of:
+///   createTask(flags: $0, initialTaskExecutor: $1, operation: $2)
 BUILTIN_SIL_OPERATION(CreateAsyncTaskWithExecutor,
                       "createAsyncTaskWithExecutor", Special)
 
@@ -1002,8 +1022,8 @@ BUILTIN_SIL_OPERATION(CreateAsyncTaskWithExecutor,
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
+/// Legacy spelling of:
+///   createTask(flags: $0, taskGroup: $1, initialTaskExecutor: $2, operation: $3)
 BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroupWithExecutor,
                       "createAsyncTaskInGroupWithExecutor", Special)
 
@@ -1014,8 +1034,9 @@ BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroupWithExecutor,
 ///     @escaping () async throws -> Void  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous discarding task, given flags, a parent task,
-/// task group and a function to execute.
+/// Legacy spelling of:
+///   createDiscardingTask(flags: $0, taskGroup: $1, initialTaskExecutor: $2,
+///                        operation: $3)
 BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroupWithExecutor,
                       "createAsyncDiscardingTaskInGroupWithExecutor", Special)
 
