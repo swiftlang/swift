@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdio>
+
 #include "swift/Runtime/HeapObject.h"
 
 namespace swift {
