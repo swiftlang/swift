@@ -48,7 +48,6 @@ protected:
   Alignment Align;
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
-  bool SizeIsFragmentSize = false;
   bool IsFixedBuffer = false;
 
 public:
@@ -56,13 +55,12 @@ public:
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy = nullptr,
                 Alignment AlignInBytes = Alignment(1),
                 bool HasDefaultAlignment = true, bool IsMetadataType = false,
-                bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false,
+                bool IsFixedBuffer = false,
                 std::optional<uint32_t> NumExtraInhabitants = {});
 
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(VarDecl *Decl, swift::Type Ty,
-                                        const TypeInfo &Info, IRGenModule &IGM,
-                                        bool IsFragmentTypeInfo);
+                                        const TypeInfo &Info, IRGenModule &IGM);
   /// Create type for global type metadata.
   static DebugTypeInfo getGlobalMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                          Size size, Alignment align);
@@ -75,8 +73,7 @@ public:
 
   /// Create a standalone type from a TypeInfo object.
   static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
-                                       IRGenModule &IGM,
-                                       bool IsFragmentTypeInfo);
+                                       IRGenModule &IGM);
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV,
                                  llvm::Type *StorageType, IRGenModule &IGM);
@@ -109,7 +106,6 @@ public:
   bool isForwardDecl() const { return FragmentStorageType == nullptr; }
   bool isMetadataType() const { return IsMetadataType; }
   bool hasDefaultAlignment() const { return DefaultAlignment; }
-  bool isSizeFragmentSize() const { return SizeIsFragmentSize; }
   bool isFixedBuffer() const { return IsFixedBuffer; }
   std::optional<uint32_t> getNumExtraInhabitants() const {
     return NumExtraInhabitants;
@@ -156,7 +152,7 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
         llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
-        swift::irgen::Alignment(), false, false, false);
+        swift::irgen::Alignment(), false, false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

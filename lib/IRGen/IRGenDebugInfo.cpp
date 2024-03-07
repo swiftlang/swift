@@ -1141,7 +1141,7 @@ private:
           memberTy,
           IGM.getTypeInfoForUnlowered(
               IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-          IGM, false);
+          IGM);
       unsigned OffsetInBits = 0;
       llvm::DIType *DITy = createMemberType(DbgTy, VD->getName().str(),
                                             OffsetInBits, Scope, File, Flags);
@@ -1176,8 +1176,7 @@ private:
     UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
 
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-        UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM,
-        false);
+        UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
     Mangle::ASTMangler Mangler;
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
         UnsubstitutedTy->mapTypeOutOfContext(), {});
@@ -1195,8 +1194,7 @@ private:
       auto SuperClassTy = ClassTy->getSuperclass();
       if (SuperClassTy) {
         auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
-            SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM,
-            false);
+            SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM);
 
         llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
         assert(SuperClassDITy && "getOrCreateType should never return null!");
@@ -1376,7 +1374,7 @@ private:
         // A variant case which carries a payload.
         ArgTy = ElemDecl->getParentEnum()->mapTypeIntoContext(ArgTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
-            ArgTy, IGM.getTypeInfoForUnlowered(ArgTy), IGM, false);
+            ArgTy, IGM.getTypeInfoForUnlowered(ArgTy), IGM);
         unsigned Offset = 0;
         auto MTy =
             createMemberType(*ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
@@ -1419,8 +1417,7 @@ private:
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
     DebugTypeInfo BlandDbgTy(Ty, DbgTy.getFragmentStorageType(),
                              DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
-                             DbgTy.isMetadataType(), DbgTy.isSizeFragmentSize(),
-                             DbgTy.isFixedBuffer());
+                             DbgTy.isMetadataType(), DbgTy.isFixedBuffer());
     return getOrCreateType(BlandDbgTy);
   }
 
@@ -1450,7 +1447,7 @@ private:
         // For full debug info don't generate just a forward declaration  for
         // the generic type parameters.
         ParamDebugType = DebugTypeInfo::getFromTypeInfo(
-            Param, IGM.getTypeInfoForUnlowered(Param), IGM, false);
+            Param, IGM.getTypeInfoForUnlowered(Param), IGM);
       else
         ParamDebugType = DebugTypeInfo::getForwardDecl(Param);
 
@@ -1621,7 +1618,7 @@ private:
       auto &elemTI = IGM.getTypeInfoForUnlowered(
           AbstractionPattern(genericSig, ElemTy->getCanonicalType()), ElemTy);
       auto DbgTy =
-            DebugTypeInfo::getFromTypeInfo(ElemTy, elemTI, IGM, false);
+            DebugTypeInfo::getFromTypeInfo(ElemTy, elemTI, IGM);
         Elements.push_back(
             createMemberType(DbgTy, "", OffsetInBits, Scope, MainFile, Flags));
     }
@@ -1823,8 +1820,7 @@ private:
         auto SuperClassTy = ClassTy->getSuperclass();
         if (SuperClassTy) {
           auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
-              SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM,
-              false);
+              SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM);
 
           llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
           assert(SuperClassDITy && "getOrCreateType should never return null!");
@@ -1969,7 +1965,7 @@ private:
             IGM.getLoweredType(ProtocolDecl->getInterfaceType()).getASTType();
         auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
             ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy),
-            IGM, false);
+            IGM);
         auto PDITy = getOrCreateType(PDbgTy);
         Protocols.push_back(
             DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
@@ -2033,8 +2029,7 @@ private:
         UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
 
         auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-            UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM,
-            false);
+            UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
         Mangle::ASTMangler Mangler;
         std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
             UnsubstitutedTy->mapTypeOutOfContext(), {});
@@ -2061,7 +2056,7 @@ private:
       auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
       auto ElemTy = BuiltinVectorTy->getElementType();
       auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
-          ElemTy, IGM.getTypeInfoForUnlowered(ElemTy), IGM, false);
+          ElemTy, IGM.getTypeInfoForUnlowered(ElemTy), IGM);
       unsigned Count = BuiltinVectorTy->getNumElements();
       auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
       return DBuilder.createVectorType(SizeInBits, AlignInBits,
@@ -2096,8 +2091,7 @@ private:
       DebugTypeInfo AliasedDbgTy(
           AliasedTy, DbgTy.getFragmentStorageType(),
           DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
-          DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer(),
-          DbgTy.getNumExtraInhabitants());
+          DbgTy.isFixedBuffer(), DbgTy.getNumExtraInhabitants());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     L.File, 0, Scope);
     }
@@ -2216,7 +2210,7 @@ private:
       return;
     for (auto BuiltinType: IGM.getOrCreateSpecialStlibBuiltinTypes()) {
       auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-          BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM, false);
+          BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM);
       DBuilder.retainType(getOrCreateType(DbgTy));
     }
   }
@@ -2861,7 +2855,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
 
       auto DTI = DebugTypeInfo::getFromTypeInfo(
           errorResultTy,
-          IGM.getTypeInfo(SILTy), IGM, false);
+          IGM.getTypeInfo(SILTy), IGM);
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 
