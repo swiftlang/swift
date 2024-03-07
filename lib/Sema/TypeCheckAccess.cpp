@@ -543,6 +543,9 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
                               : typeAccessScope.requiredAccessForDiagnostics();
         auto diag = D->diagnose(diag::global_actor_access, declAccess, VD,
                                 typeAccess, globalActorDecl->getName());
+        if (auto func = dyn_cast<FuncDecl>(VD)) {
+          diag.limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 6);
+        }
         highlightOffendingType(diag, complainRepr);
         noteLimitingImport(D->getASTContext(), importLimit, complainRepr);
       });

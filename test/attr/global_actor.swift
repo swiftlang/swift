@@ -107,13 +107,13 @@ extension SomeActor {
 // -----------------------------------------------------------------------
 
 @globalActor
-private struct PrivateGA { // expected-note 3 {{type declared here}}
+private struct PrivateGA { // expected-note 5 {{type declared here}}
   actor Actor {}
   static let shared = Actor()
 }
 
 @globalActor
-internal struct InternalGA { // expected-note 2 {{type declared here}}
+internal struct InternalGA { // expected-note 3 {{type declared here}}
   actor Actor {}
   static let shared = Actor()
 }
@@ -205,4 +205,37 @@ do {
       @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
     }
   }
+}
+
+internal struct TestInternalMethods {
+  func fn() {}
+  @InternalGA internal func internalGAMethod() {}
+  @PrivateGA internal func privateGAMethod() {}
+  // expected-warning@-1  {{internal instance method 'privateGAMethod()' cannot have private global actor 'PrivateGA'}}
+  @PublicGA internal func publicGAMethod() {}
+  @PrivateGA internal var privateGAVar : Int {
+    get { return 1 }
+    set {}
+  }
+}
+
+public struct TestPublicMethods {
+    @InternalGA public func internalGAMethod() {}
+    // expected-warning@-1 {{public instance method 'internalGAMethod()' cannot have internal global actor 'InternalGA'}}
+    @PrivateGA public func privateGAMethod() {}
+    // expected-warning@-1 {{public instance method 'privateGAMethod()' cannot have private global actor 'PrivateGA'}}
+    @PublicGA public func publicActorMethod()  {}
+    @InternalGA public var privateGAVar : Int {
+      get { return 1 }
+      set {}
+    }
+}
+
+@InternalGA public var fn : ()  = TestInternalMethods().fn()
+@PrivateGA public var fn2 : ()  = TestInternalMethods().fn()
+@PrivateGA internal var fn3 : ()  = TestInternalMethods().fn()
+
+public actor D {
+  @InternalGA public var fn: (@Sendable () -> Void)? = nil
+  @PrivateGA public var fn2: (@Sendable () -> Void)? = nil
 }

@@ -4908,10 +4908,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // Any other isolation is an error.
     std::optional<ActorIsolation> mainIsolation =
         getActorIsolationForMainFuncDecl(fd);
-    
+
     if (mainIsolation)
       return *mainIsolation;
-    
   }
   // If this declaration has one of the actor isolation attributes, report
   // that.
@@ -4926,7 +4925,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // If no explicit annotation is provided, determine the default isolation
-  // for this declaration, which may still be overridden by other inference rules.
+  // for this declaration, which may still be overridden by other inference
+  // rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
