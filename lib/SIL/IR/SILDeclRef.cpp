@@ -856,6 +856,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Anything else that is not public is not serializable.
+  // ES TODO: should it check against ::Package?
   if (d->getEffectiveAccess() < AccessLevel::Public)
     return IsNotSerialized;
 

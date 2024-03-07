@@ -161,6 +161,35 @@ public:
   }
 };
 
+StringRef static linkageDesc(SILLinkage linkage) {
+  auto v = linkage == SILLinkage::Shared ? "shared" :
+  (linkage == SILLinkage::PackageExternal ? "pkg external" :
+   (linkage == SILLinkage::PackageNonABI ? "pkg non_abi" :
+    (linkage == SILLinkage::Package ? "packge" :
+     (linkage == SILLinkage::Public ? "public" :
+      (linkage == SILLinkage::PublicExternal ? "public external" :
+       (linkage == SILLinkage::PublicNonABI ? "pubilc non_abi" :
+        (linkage == SILLinkage::Hidden ? "hidden" :
+         (linkage == SILLinkage::HiddenExternal ? "hidden external" :
+          (linkage == SILLinkage::Private ? "private" : "--")
+          ))))))));
+  return v;
+}
+
+void static dbgDesc(SILGlobalVariable *f, StringRef str = "") {
+    llvm::dbgs() << "\nES: " << str << ": " << f->getName() << ": " << linkageDesc(f->getLinkage());
+}
+void static dbgDesc(SILFunction *f, StringRef str = "") {
+    llvm::dbgs() << "\nES: " << str << ": " << f->getName() << ": " << linkageDesc(f->getLinkage());
+}
+void static dbgDesc(SILInstruction *f, StringRef str = "") {
+  llvm::dbgs() << "\nES: INST: " << str;
+  f->dump();
+}
+void static dbgDesc(StringRef str) {
+  llvm::dbgs() << "\nES: " << str;
+}
+
 /// Select functions in the module which should be serialized.
 void CrossModuleOptimization::serializeFunctionsInModule() {
 
@@ -168,8 +197,13 @@ void CrossModuleOptimization::serializeFunctionsInModule() {
 
   // Start with public functions.
   for (SILFunction &F : M) {
-    if (F.getLinkage() == SILLinkage::Public || everything) {
+    // ES TODO: add a flag check for package
+    if (F.getLinkage() == SILLinkage::Public ||
+        F.getLinkage() == SILLinkage::Package ||
+        everything) {
+      dbgDesc(&F, "****");
       if (canSerializeFunction(&F, canSerializeFlags, /*maxDepth*/ 64)) {
+        dbgDesc(&F, "CAN serialize!");
         serializeFunction(&F, canSerializeFlags);
       }
     }
@@ -184,8 +218,9 @@ bool CrossModuleOptimization::canSerializeFunction(
                                SILFunction *function,
                                FunctionFlags &canSerializeFlags,
                                int maxDepth) {
+
   auto iter = canSerializeFlags.find(function);
-  
+
   // Avoid infinite recursion in case it's a cycle in the call graph.
   if (iter != canSerializeFlags.end())
     return iter->second;
@@ -232,24 +267,50 @@ bool CrossModuleOptimization::canSerializeFunction(
   if (!shouldSerialize(function))
     return false;
 
+  dbgDesc(function, "LLL");
+
   // Check if any instruction prevents serializing the function.
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (!canSerializeInstruction(&inst, canSerializeFlags, maxDepth)) {
+        dbgDesc(function, "RETURN");
         return false;
       }
     }
   }
+  dbgDesc(function, "MMM");
+
   canSerializeFlags[function] = true;
   return true;
 }
+
+inline bool hasPackageOrMoreVisibility(SILLinkage linkage) {
+  switch (linkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::PackageNonABI:
+      return true;
+  case SILLinkage::Hidden:
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+  case SILLinkage::HiddenExternal:
+    return false;
+  }
+
+  llvm_unreachable("Unhandled SILLinkage in switch.");
+}
+
+
 
 /// Returns true if \p inst can be serialized.
 ///
 /// If \p inst is a function_ref, recursively visits the referenced function.
 bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
                       FunctionFlags &canSerializeFlags, int maxDepth) {
-
+  dbgDesc(inst, "AAA");
   // First check if any result or operand types prevent serialization.
   for (SILValue result : inst->getResults()) {
     if (!canSerializeType(result->getType()))
@@ -264,13 +325,13 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     SILFunction *callee = FRI->getReferencedFunctionOrNull();
     if (!callee)
       return false;
-
     // In conservative mode we don't want to turn non-public functions into
     // public functions, because that can increase code size. E.g. if the
     // function is completely inlined afterwards.
     // Also, when emitting TBD files, we cannot introduce a new public symbol.
     if ((conservative || M.getOptions().emitTBD) &&
-        !hasPublicVisibility(callee->getLinkage())) {
+        !hasPackageOrMoreVisibility(callee->getLinkage())) {
+      dbgDesc(callee, "BBB");
       return false;
     }
 
@@ -280,23 +341,27 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
       return false;
 
     // Recursively walk down the call graph.
-    if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
-      return true;
+    if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1)) {
+      dbgDesc(callee, "HHH");
 
+      return true;
+    }
     // In case a public/internal/private function cannot be serialized, it's
     // still possible to make them public and reference them from the serialized
     // caller function.
     // Note that shared functions can be serialized, but not used from
     // inline.
-    if (!canUseFromInline(callee))
+    if (!canUseFromInline(callee)) {
+      dbgDesc(callee, "CCC");
       return false;
-  
+    }
     return true;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
     SILGlobalVariable *global = GAI->getReferencedGlobal();
     if ((conservative || M.getOptions().emitTBD) &&
-        !hasPublicVisibility(global->getLinkage())) {
+        !hasPackageOrMoreVisibility(global->getLinkage())) {
+      dbgDesc(global, "DDD");
       return false;
     }
 
@@ -321,12 +386,15 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     return canUse;
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
+    dbgDesc("EEE");
     return !MI->getMember().isForeign;
   }
   if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
     // In conservative mode, we don't support class field accesses of non-public
     // properties, because that would require to make the field decl public -
     // which keeps more metadata alive.
+    dbgDesc("FFF");
+
     return !conservative ||
            REAI->getField()->getEffectiveAccess() >= AccessLevel::Package;
   }
@@ -344,7 +412,7 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
       // function is completely inlined afterwards.
       // Also, when emitting TBD files, we cannot introduce a new public symbol.
       if ((conservative || M.getOptions().emitTBD) &&
-          !hasPublicVisibility(referencedFunc->getLinkage())) {
+          !hasPackageOrMoreVisibility(referencedFunc->getLinkage())) {
         return false;
       }
 
@@ -369,12 +437,21 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
           return true;
         }
       
+        // ES TODO: check opt-in flag
+        if (conservative && subNT->getEffectiveAccess() == AccessLevel::Package) {
+          llvm::dbgs() << "\nES: subNT: " << subNT->getBaseIdentifier().str() << ": package";
+          return true;
+        }
+
         // Exclude types which are defined in an @_implementationOnly imported
         // module. Such modules are not transitively available.
         if (!canUseFromInline(subNT)) {
           return true;
         }
       }
+      dbgDesc("SSS");
+      dbgDesc(subType->getString());
+
       return false;
     });
   typesChecked[type] = success;
@@ -491,14 +568,18 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                        const FunctionFlags &canSerializeFlags) {
+  dbgDesc(function, "Is this serialized?");
   if (function->isSerialized())
     return;
   
+  dbgDesc(function, "No. Is this in serl map?");
   if (!canSerializeFlags.lookup(function))
     return;
 
+  dbgDesc(function, "Found in map, so serialize now");
   function->setSerialized(IsSerialized);
 
+  dbgDesc(function, "Serialize inst in this");
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       InstructionVisitor::makeTypesUsableFromInline(&inst, *this);
@@ -512,6 +593,10 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
 /// If \p inst is a function_ref, recursively visits the referenced function.
 void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
                                        const FunctionFlags &canSerializeFlags) {
+  llvm::dbgs() << "\nES: ser INST------\n";
+  inst->dump();
+  llvm::dbgs() << "\n-------------------\n";
+
   // Put callees onto the worklist if they should be serialized as well.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
     SILFunction *callee = FRI->getReferencedFunctionOrNull();
@@ -527,12 +612,14 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
           if (callee->getEffectiveSymbolLinkage() == SILLinkage::Public) {
             // It's a internal/private class method. There is no harm in making
             // it public, because it gets public symbol linkage anyway.
+            dbgDesc(callee, "999");
             makeFunctionUsableFromInline(callee);
           } else {
             // Treat the function like a 'shared' function, e.g. like a
             // specialization. This is better for code size than to make it
             // public, because in conservative mode we are only do this for very
             // small functions.
+            dbgDesc(callee, "111");
             callee->setLinkage(SILLinkage::Shared);
           }
         }
@@ -542,7 +629,11 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
       }
     }
     serializeFunction(callee, canSerializeFlags);
-    assert(callee->isSerialized() || callee->getLinkage() == SILLinkage::Public);
+    // ES TODO: add a flag
+    dbgDesc(callee);
+    assert(callee->isSerialized() ||
+           callee->getLinkage() == SILLinkage::Public ||
+           callee->getLinkage() == SILLinkage::Package);
     return;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
@@ -550,8 +641,8 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     if (canSerializeGlobal(global)) {
       serializeGlobal(global);
     }
-    if (!hasPublicVisibility(global->getLinkage())) {
-      global->setLinkage(SILLinkage::Public);
+    if (!hasPackageOrMoreVisibility(global->getLinkage())) {
+      global->setLinkage(SILLinkage::Public); // ES TODO: package?
     }
     return;
   }
@@ -599,14 +690,20 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
 
 /// Make a nominal type, including it's context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
-  if (decl->getEffectiveAccess() >= AccessLevel::Package)
+  // ES TODO: check opt flag
+  // If enabled, don't return if package
+  if (decl->getEffectiveAccess() > AccessLevel::Package) {
     return;
+  }
+  // ES TODO: Uncomment below
+//  else if (decl->getEffectiveAccess() >= AccessLevel::Package)
+//    return;
 
   // We must not modify decls which are defined in other modules.
   if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
     return;
-
-  if (decl->getFormalAccess() < AccessLevel::Public &&
+  // ES TODO: add a flag
+  if (decl->getFormalAccess() < AccessLevel::Package &&
       !decl->isUsableFromInline()) {
     // Mark the nominal type as "usableFromInline".
     // TODO: find a way to do this without modifying the AST. The AST should be
