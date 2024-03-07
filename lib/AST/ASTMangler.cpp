@@ -450,9 +450,6 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   assert(ThunkType->getPatternSubstitutions().empty() && "not implemented");
   GenericSignature GenSig = ThunkType->getInvocationGenericSignature();
 
-  // Reabstraction thunks never reference inverse conformances.
-  llvm::SaveAndRestore X(AllowInverses, false);
-
   beginMangling();
   appendType(FromType, GenSig);
   appendType(ToType, GenSig);
