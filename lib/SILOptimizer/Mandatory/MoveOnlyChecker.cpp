@@ -186,7 +186,7 @@ void MoveOnlyChecker::checkAddresses() {
   llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
       moveIntroducersToProcess;
   searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-      fn, moveIntroducersToProcess, diagnosticEmitter);
+      fn, poa, moveIntroducersToProcess, diagnosticEmitter);
 
   LLVM_DEBUG(
       llvm::dbgs()

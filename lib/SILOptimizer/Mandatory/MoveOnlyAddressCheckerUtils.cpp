@@ -479,14 +479,14 @@ static bool isCopyableValue(SILValue value) {
 
 void swift::siloptimizer::
     searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-        SILFunction *fn,
+        SILFunction *fn, PostOrderAnalysis *poa,
         llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
             &moveIntroducersToProcess,
         DiagnosticEmitter &diagnosticEmitter) {
-  for (auto &block : *fn) {
-    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&*ii);
-      ++ii;
+  auto *po = poa->get(fn);
+  for (auto *block : po->getPostOrder()) {
+    for (auto &ii : llvm::make_range(block->rbegin(), block->rend())) {
+      auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&ii);
 
       if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isAddress())
         continue;
@@ -3877,6 +3877,9 @@ bool MoveOnlyAddressChecker::check(
       // If we fail the address check in some way, set the diagnose!
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
     }
+
+    markedValue->replaceAllUsesWith(markedValue->getOperand());
+    markedValue->eraseFromParent();
   }
 
   if (DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst) {
