@@ -2496,7 +2496,7 @@ ERROR(inferred_opaque_type,none,
 
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
-      "type %0 is not invertible", (Type))
+      "type %0 cannot be suppressed", (Type))
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -3168,12 +3168,11 @@ ERROR(requires_not_suitable_archetype,none,
       (Type))
 
 ERROR(requires_not_suitable_inverse_subject,none,
-      "cannot apply inverse '~%1' to type %0 in conformance requirement",
+      "cannot suppress '~%1' on type %0",
       (Type, StringRef))
 
 ERROR(requires_not_suitable_inverse_outer_subject,none,
-      "cannot add inverse constraint '%0: ~%1' "
-      "on generic parameter '%0' defined in outer scope",
+      "cannot suppress '~%1' on generic parameter '%0' defined in outer scope",
       (StringRef, StringRef))
 
 ERROR(invalid_shape_requirement,none,
@@ -7619,7 +7618,7 @@ ERROR(inverse_conflicts_explicit_composition, none,
       "composition cannot contain '~%0' when another member requires '%0'",
       (StringRef))
 ERROR(inverse_extension, none,
-      "cannot apply inverse %0 to extension",
+      "cannot suppress %0 in extension",
       (Type))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
