@@ -210,6 +210,7 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   public typealias Distance = Int
 
   /// The underlying raw (untyped) pointer.
+  @_preInverseGenerics
   public let _rawValue: Builtin.RawPointer
 
   /// Creates an `UnsafePointer` from a builtin raw pointer.
@@ -602,6 +603,7 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   public typealias Distance = Int
 
   /// The underlying raw (untyped) pointer.
+  @_preInverseGenerics
   public let _rawValue: Builtin.RawPointer
 
   /// Creates an `UnsafeMutablePointer` from a builtin raw pointer.
