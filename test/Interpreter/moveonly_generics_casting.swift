@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 protocol P {
   func speak()
 }
