@@ -1653,10 +1653,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back("-disable-availability-checking");
   }
 
-  if (bool(requireNCGenerics)) {
-    genericSubInvocation.getLangOptions()
-                        .enableFeature(Feature::NoncopyableGenerics);
-  }
+  genericSubInvocation.getLangOptions().EnableNCGenericsInfrastructure =
+      bool(requireNCGenerics);
 
   // Pass-down the obfuscators so we can get the serialized search paths properly.
   genericSubInvocation.setSerializedPathObfuscator(
@@ -1963,7 +1961,7 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       // Whether or not NoncopyableGenerics are enabled, as that influences
       // many things like generic signatures and conformances.
       unsigned(genericSubInvocation.getLangOptions()
-               .hasFeature(Feature::NoncopyableGenerics))
+               .EnableNCGenericsInfrastructure)
       );
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
@@ -2326,7 +2324,7 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(),
       Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
+      Ctx.LangOpts.EnableNCGenericsInfrastructure,
       Ctx.LangOpts.SDKName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
@@ -2665,7 +2663,7 @@ bool ExplicitCASModuleLoader::canImportModule(
   }
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
+      Ctx.LangOpts.EnableNCGenericsInfrastructure,
       Ctx.LangOpts.SDKName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
