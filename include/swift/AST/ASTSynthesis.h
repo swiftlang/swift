@@ -16,6 +16,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 
@@ -171,7 +172,7 @@ Type synthesizeType(SynthesisContext &SC,
 }
 
 MetatypeRepresentation
-synthesizeMetatypeRepresentation(RepresentationSynthesizer rep) {
+inline synthesizeMetatypeRepresentation(RepresentationSynthesizer rep) {
   switch (rep) {
   case _thin: return MetatypeRepresentation::Thin;
   case _thick: return MetatypeRepresentation::Thick;
@@ -299,10 +300,12 @@ Type synthesizeType(SynthesisContext &SC,
 
 /// Synthesize parameter declarations.
 template <class S>
-ParamDecl *synthesizeParamDecl(SynthesisContext &SC, const S &s) {
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC, const S &s,
+                               const char *label = nullptr) {
+  auto argLabelIdent = (label ? SC.Context.getIdentifier(label) : Identifier());
   auto type = synthesizeType(SC, s);
   auto PD = new (SC.Context) ParamDecl(SourceLoc(), SourceLoc(),
-                                       Identifier(), SourceLoc(),
+                                       argLabelIdent, SourceLoc(),
                                        Identifier(), SC.DC);
   PD->setSpecifier(ParamSpecifier::Default);
   PD->setInterfaceType(type);
@@ -330,8 +333,9 @@ constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
 }
 template <class S>
 ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
-                               const SpecifiedParamSynthesizer<S> &s) {
-  auto param = synthesizeParamDecl(SC, s.sub);
+                               const SpecifiedParamSynthesizer<S> &s,
+                               const char *label = nullptr) {
+  auto param = synthesizeParamDecl(SC, s.sub, label);
   param->setSpecifier(s.specifier);
   return param;
 }
@@ -343,6 +347,61 @@ FunctionType::Param synthesizeParamType(SynthesisContext &SC,
   if (s.specifier != ParamSpecifier::Default)
     flags = flags.withValueOwnership(s.specifier);
   return param.withFlags(flags);
+}
+
+template <class S>
+void synthesizeDefaultArgument(SynthesisContext &SC, const S &s,
+                               ParamDecl *param) {
+  synthesizeDefaultArgumentFromExpr(SC, s, param);
+}
+template <class S>
+void synthesizeDefaultArgumentFromExpr(SynthesisContext &SC, const S &s,
+                                       ParamDecl *param) {
+  // FIXME: this works except that we tend to crash in diagnostics trying
+  // to render the default argument if you mess up the call.
+  auto expr = synthesizeExpr(SC, s);
+  param->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+  param->setDefaultExpr(expr, /*type checked*/ false);
+}
+
+/// Default arguments.
+template <class S, class A>
+struct DefaultedSynthesizer { S sub; A arg; };
+template <class S, class A>
+constexpr DefaultedSynthesizer<S, A> _defaulted(S sub, A arg) {
+  return {sub, arg};
+}
+template <class S, class A>
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
+                               const DefaultedSynthesizer<S, A> &s,
+                               const char *label = nullptr) {
+  auto param = synthesizeParamDecl(SC, s.sub, label);
+  synthesizeDefaultArgument(SC, s.arg, param);
+  return param;
+}
+template <class S, class A>
+FunctionType::Param synthesizeParamType(SynthesisContext &SC,
+                                        const DefaultedSynthesizer<S, A> &s) {
+  return synthesizeParamType(s.sub);
+}
+
+/// Labels.
+template <class S>
+struct LabelSynthesizer { const char *label; S sub; };
+template <class S>
+constexpr LabelSynthesizer<S> _label(const char *label, S sub) {
+  return {label, sub};
+}
+template <class S>
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
+                               const LabelSynthesizer<S> &s) {
+  return synthesizeParamDecl(SC, s.sub, s.label);
+}
+template <class S>
+FunctionType::Param synthesizeParamType(SynthesisContext &SC,
+                                        const LabelSynthesizer<S> &s) {
+  auto label = SC.Context.getIdentifier(s.label);
+  return synthesizeParamType(SC, s.sub).withLabel(label);
 }
 
 /// Synthesize a parameter list.
@@ -466,6 +525,36 @@ constexpr OptionalSynthesizer<S> _optional(S sub) { return {sub}; }
 template <class S>
 Type synthesizeType(SynthesisContext &SC, const OptionalSynthesizer<S> &s) {
   return OptionalType::get(synthesizeType(SC, s.sub));
+}
+
+/// Expressions.
+enum SingletonExprSynthesizer {
+  _nil
+};
+inline Expr *synthesizeExpr(SynthesisContext &SC, SingletonExprSynthesizer s) {
+  switch (s) {
+  case _nil:
+    return new (SC.Context) NilLiteralExpr(SourceLoc(), /*implicit*/true);
+  }
+  llvm_unreachable("bad singleton kind");
+}
+inline void synthesizeDefaultArgument(SynthesisContext &SC,
+                                      SingletonExprSynthesizer s,
+                                      ParamDecl *param) {
+  switch (s) {
+  case _nil: {
+    auto expr = synthesizeExpr(SC, s);
+    param->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
+    param->setDefaultExpr(expr, /*type checked*/ false);
+    return;
+  }
+
+  /*
+  default:
+    synthesizeDefaultArgumentFromExpr(SC, s, param);
+    return;
+   */
+  }
 }
 
 } // end namespace swift
