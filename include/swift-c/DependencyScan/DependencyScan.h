@@ -202,8 +202,8 @@ SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_binary_detail_get_swift_overlay_dependencies(
     swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_set_t *
-swiftscan_swift_binary_detail_get_header_dependencies(
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_header_dependency(
     swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC bool

@@ -523,10 +523,10 @@ ModuleDependencyScanner::resolveDirectModuleDependencies(
   // A record of all of the Clang modules referenced from this Swift module.
   std::vector<std::string> allClangModules;
   llvm::StringSet<> knownModules;
-  // Find and add all bridging header dependencies.
-  if (moduleDependencyInfo->isTextualSwiftModule())
-    resolveBridgingHeaderDependencies(moduleID, cache, allClangModules,
-                                      knownModules, directDependencies);
+
+  // Find and add all header header dependencies.
+  resolveHeaderDependencies(moduleID, cache, allClangModules, knownModules,
+                            directDependencies);
 
   // Find all of the discovered Clang modules that this module depends on.
   for (const auto &dep : directDependencies) {
@@ -679,7 +679,7 @@ void ModuleDependencyScanner::resolveImportDependencies(
   }
 }
 
-void ModuleDependencyScanner::resolveBridgingHeaderDependencies(
+void ModuleDependencyScanner::resolveHeaderDependencies(
     const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
     std::vector<std::string> &allClangModules,
     llvm::StringSet<> &alreadyKnownModules,
@@ -688,36 +688,27 @@ void ModuleDependencyScanner::resolveBridgingHeaderDependencies(
   assert(optionalModuleDependencyInfo.has_value());
   auto moduleDependencyInfo = optionalModuleDependencyInfo.value();
 
-  // If the Swift module has a bridging header, scan the header for dependencies
-  // and add them to the module's direct dependencies.
-  /// TODO: separate this out of here as well into a separate entry in
-  /// `CommonSwiftTextualModuleDependencyDetails`
-  if (moduleDependencyInfo->getBridgingHeader()) {
+  bool isTextualModuleWithABridgingHeader =
+      moduleDependencyInfo->isTextualSwiftModule() &&
+      moduleDependencyInfo->getBridgingHeader();
+  bool isBinaryModuleWithHeaderInput =
+      moduleDependencyInfo->isSwiftBinaryModule() &&
+      !moduleDependencyInfo->getAsSwiftBinaryModule()->headerImport.empty();
+
+  if (isTextualModuleWithABridgingHeader || isBinaryModuleWithHeaderInput) {
     withDependencyScanningWorker([&](ModuleDependencyScanningWorker
                                          *ScanningWorker) {
       auto clangImporter = static_cast<ClangImporter *>(
           ScanningWorker->clangScannerModuleLoader.get());
-
-      if (!clangImporter->addBridgingHeaderDependencies(
+      if (!clangImporter->addHeaderDependencies(
               moduleID, ScanningWorker->clangScanningTool, cache)) {
         // Grab the updated module dependencies.
-        // FIXME: This is such a hack.
-        const ModuleDependencyInfo *updatedDependencyInfo =
+        const auto *updatedDependencyInfo =
             cache.findDependency(moduleID).value();
-
-        // Add the Clang modules referenced from the bridging header to the
+        // Add the Clang modules referenced from the header to the
         // set of Clang modules we know about.
-        const std::vector<std::string> *bridgingModuleDependencies = nullptr;
-        if (auto swiftDeps = updatedDependencyInfo->getAsSwiftInterfaceModule())
-          bridgingModuleDependencies =
-              &(swiftDeps->textualModuleDetails.bridgingModuleDependencies);
-        else if (auto sourceDeps =
-                     updatedDependencyInfo->getAsSwiftSourceModule())
-          bridgingModuleDependencies =
-              &(sourceDeps->textualModuleDetails.bridgingModuleDependencies);
-
-        assert(bridgingModuleDependencies);
-        for (const auto &clangDep : *bridgingModuleDependencies) {
+        for (const auto &clangDep :
+             updatedDependencyInfo->getHeaderDependencies()) {
           directDependencies.insert({clangDep, ModuleDependencyKind::Clang});
           findAllImportedClangModules(clangDep, cache, allClangModules,
                                       alreadyKnownModules);
@@ -750,9 +741,10 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
       return;
 
     auto moduleDependencies = withDependencyScanningWorker(
-        [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
-          return ScanningWorker->scanFilesystemForSwiftModuleDependency(moduleIdentifier,
-                                                                        cache);
+        [&cache,
+         moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
+          return ScanningWorker->scanFilesystemForSwiftModuleDependency(
+              moduleIdentifier, cache);
         });
     swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
   };

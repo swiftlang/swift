@@ -326,13 +326,13 @@ public:
                                      const std::string &sourceInfoPath,
                                      const std::vector<std::string> &moduleImports,
                                      const std::vector<std::string> &optionalModuleImports,
-                                     const std::vector<std::string> &headerImports,
+                                     const std::string &headerImport,
                                      const bool isFramework,
                                      const std::string &moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
-        sourceInfoPath(sourceInfoPath), preCompiledBridgingHeaderPaths(headerImports),
+        sourceInfoPath(sourceInfoPath), headerImport(headerImport),
         isFramework(isFramework) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -348,8 +348,14 @@ public:
   /// The path to the .swiftSourceInfo file.
   const std::string sourceInfoPath;
 
-  /// The paths of all the .pch dependencies of this module.
-  const std::vector<std::string> preCompiledBridgingHeaderPaths;
+  /// The path of the .h dependency of this module.
+  const std::string headerImport;
+
+  /// Source files on which the header inputs depend.
+  std::vector<std::string> headerSourceFiles;
+
+  /// (Clang) modules on which the header inputs depend.
+  std::vector<std::string> headerModuleDependencies;
 
   /// A flag that indicates this dependency is a framework
   const bool isFramework;
@@ -508,13 +514,13 @@ public:
       const std::string &sourceInfoPath,
       const std::vector<std::string> &moduleImports,
       const std::vector<std::string> &optionalModuleImports,
-      const std::vector<std::string> &headerImports,
+      const std::string &headerImport,
       bool isFramework, const std::string &moduleCacheKey) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
           compiledModulePath, moduleDocPath, sourceInfoPath,
           moduleImports, optionalModuleImports,
-          headerImports, isFramework, moduleCacheKey));
+          headerImport, isFramework, moduleCacheKey));
   }
 
   /// Describe the main Swift module.
@@ -596,6 +602,26 @@ public:
 
   const ArrayRef<ModuleDependencyID> getSwiftOverlayDependencies() const {
     return storage->swiftOverlayDependencies;
+  }
+
+  const ArrayRef<std::string> getHeaderInputSourceFiles() const {
+    if (auto *detail = getAsSwiftInterfaceModule())
+      return detail->textualModuleDetails.bridgingSourceFiles;
+    else if (auto *detail = getAsSwiftSourceModule())
+      return detail->textualModuleDetails.bridgingSourceFiles;
+    else if (auto *detail = getAsSwiftBinaryModule())
+      return detail->headerSourceFiles;
+    return {};
+  }
+
+  const ArrayRef<std::string> getHeaderDependencies() const {
+    if (auto *detail = getAsSwiftInterfaceModule())
+      return detail->textualModuleDetails.bridgingModuleDependencies;
+    else if (auto *detail = getAsSwiftSourceModule())
+      return detail->textualModuleDetails.bridgingModuleDependencies;
+    else if (auto *detail = getAsSwiftBinaryModule())
+      return detail->headerModuleDependencies;
+    return {};
   }
 
   std::vector<std::string> getCommandline() const {
@@ -751,12 +777,12 @@ public:
   /// Add source files
   void addSourceFile(StringRef sourceFile);
 
-  /// Add source files that the bridging header depends on.
-  void addBridgingSourceFile(StringRef bridgingSourceFile);
+  /// Add source files that the header input depends on.
+  void addHeaderSourceFile(StringRef bridgingSourceFile);
 
-  /// Add (Clang) module on which the bridging header depends.
-  void addBridgingModuleDependency(StringRef module,
-                                   llvm::StringSet<> &alreadyAddedModules);
+  /// Add (Clang) modules on which a non-bridging header input depends.
+  void addHeaderInputModuleDependency(StringRef module,
+                                      llvm::StringSet<> &alreadyAddedModules);
 
   /// Add bridging header include tree.
   void addBridgingHeaderIncludeTree(StringRef ID);
