@@ -126,6 +126,14 @@ public:
   /// Controls whether cross module optimization is enabled.
   CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
 
+  /// Optimization to perform default CMO within a package boundary.
+  /// Unlike the existing CMO, package CMO can be built with
+  /// -enable-library-evolution since package modules are required
+  /// to be built in the same project. To enable this optimization, the
+  /// module also needs to opt in to allow non-resilient access with
+  /// -experimental-allow-non-resilient-access.
+  bool EnableSerializePackage = true;
+
   /// Enables the emission of stack protectors in functions.
   bool EnableStackProtection = true;
 
