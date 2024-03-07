@@ -467,6 +467,8 @@ public:
   /// Use relative (and constant) protocol witness tables.
   unsigned UseRelativeProtocolWitnessTables : 1;
 
+  unsigned UseFragileResilientProtocolWitnesses : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -555,6 +557,7 @@ public:
         EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
+        UseFragileResilientProtocolWitnesses(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

@@ -227,6 +227,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-tracing                          ""                "whether to enable tracing signposts for the stdlib; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-use-relative-protocol-witness-tables "0"            "whether to use relative protocol witness table"
+    swift-stdlib-use-fragile-resilient-protocol-witness-tables "0"            "whether to use fragile resilient protocol witness table"
     swift-enable-runtime-function-counters        ""                "whether to enable runtime function counters"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
@@ -2000,6 +2001,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES:BOOL=$(true_false "${SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES}")
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES:BOOL=$(true_false "${SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES}")
                     )
                 fi
 

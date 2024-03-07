@@ -626,6 +626,12 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")
   endif()
 
+  if (SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES)
+    list(APPEND swift_flags "-Xfrontend" "-validate-tbd-against-ir=none")
+    list(APPEND swift_flags "-Xfrontend" "-enable-fragile-relative-protocol-tables")
+    list(APPEND swift_flags "-enable-library-evolution")
+  endif()
+
   if(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES)
     list(APPEND swift_flags "-Xfrontend" "-disable-preallocated-instantiation-caches")
   endif()
