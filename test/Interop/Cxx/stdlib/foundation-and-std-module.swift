@@ -12,6 +12,9 @@
 
 // REQUIRES: OS=macosx || OS=linux-gnu
 
+// rdar://121125636
+// UNSUPPORTED: OS=maccatalyst
+
 #if canImport(Foundation)
 import Foundation
 #endif
