@@ -278,10 +278,10 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         };
 
         if (sourcekitd::requestIsEnableBarriers(req)) {
+          RequestBarriersEnabled = true;
           dispatch_barrier_async(requestQueue, ^{
             auto Responder = std::make_shared<XPCResponder>(event, peer);
             xpc_release(event);
-            RequestBarriersEnabled = true;
             sourcekitd::sendBarriersEnabledResponse([Responder](sourcekitd_response_t response) {
               Responder->sendReply(response);
             });
