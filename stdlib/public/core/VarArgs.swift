@@ -350,6 +350,7 @@ extension OpaquePointer: CVarArg {
   }
 }
 
+@_preInverseGenerics
 extension UnsafePointer: CVarArg where Pointee: ~Copyable {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
@@ -360,6 +361,7 @@ extension UnsafePointer: CVarArg where Pointee: ~Copyable {
   }
 }
 
+@_preInverseGenerics
 extension UnsafeMutablePointer: CVarArg where Pointee: ~Copyable {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
