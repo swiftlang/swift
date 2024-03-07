@@ -878,13 +878,9 @@ static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarge
     return true;
   }
 
-  SmallPtrSet<ProtocolDecl *, 2> requirementProtos;
-  if (getSerializationRequirementTypesForMember(distributedTarget,
-                                                requirementProtos)) {
-    return true;
-  }
-
-  return false;
+  auto serializationTy =
+      getDistributedActorSerializationType(distributedTarget->getDeclContext());
+  return serializationTy && !serializationTy->hasDependentMember();
 }
 
 /******************************************************************************/

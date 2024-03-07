@@ -106,42 +106,6 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
-Type swift::getSerializationRequirementTypesForMember(
-    ValueDecl *member,
-    llvm::SmallPtrSet<ProtocolDecl *, 2> &serializationRequirements) {
-  auto &C = member->getASTContext();
-  auto *DC = member->getDeclContext();
-  auto DA = C.getDistributedActorDecl();
-
-  // === When declared inside an actor, we can get the type directly
-  if (auto classDecl = DC->getSelfClassDecl()) {
-    return getDistributedSerializationRequirementType(classDecl, C.getDistributedActorDecl());
-  }
-
-  auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
-      ->getDeclaredInterfaceType();
-
-  if (DC->getSelfProtocolDecl()) {
-    GenericSignature signature;
-    if (auto *genericContext = member->getAsGenericContext()) {
-      signature = genericContext->getGenericSignature();
-    } else {
-      signature = DC->getGenericSignatureOfContext();
-    }
-
-    // Also store all `SerializationRequirement : SomeProtocol` requirements
-    for (auto proto: signature->getRequiredProtocols(SerReqAssocType)) {
-      serializationRequirements.insert(proto);
-    }
-
-    // Note that this may be null, e.g. if we're a distributed func inside
-    // a protocol that did not declare a specific actor system requirement.
-    return signature->getConcreteType(SerReqAssocType);
-  }
-
-  llvm_unreachable("Unable to fetch SerializationRequirement type!");
-}
-
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(!dyn_cast<ProtocolDecl>(actor) &&
          "Use getConcreteReplacementForProtocolActorSystemType instead to get"
@@ -163,68 +127,84 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   auto &C = actor->getASTContext();
-  return C.getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
+  return getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
+}
+
+static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
+                                 Identifier member) {
+  if (!protocol)
+    return ErrorType::get(type->getASTContext());
+
+  auto module = type->getParentModule();
+  Type selfType = type->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, protocol);
+  if (!conformance || conformance.isInvalid())
+    return Type();
+  return conformance.getTypeWitnessByName(selfType, member);
+}
+
+Type swift::getDistributedActorSerializationType(
+    DeclContext *actorOrExtension) {
+  auto &ctx = actorOrExtension->getASTContext();
+  auto resultTy = getAssociatedTypeOfDistributedSystemOfActor(
+      actorOrExtension,
+      ctx.Id_SerializationRequirement);
+
+  // Protocols are allowed to either not provide a `SerializationRequirement`
+  // at all or provide it in a conformance requirement.
+  if ((!resultTy || resultTy->hasDependentMember()) &&
+      actorOrExtension->getSelfProtocolDecl()) {
+    auto sig = actorOrExtension->getGenericSignatureOfContext();
+
+    auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+    if (!actorProtocol)
+      return Type();
+
+    auto serializationTy =
+        actorProtocol->getAssociatedType(ctx.Id_SerializationRequirement)
+            ->getDeclaredInterfaceType();
+
+    return sig->getExistentialType(serializationTy);
+  }
+
+  return resultTy;
+}
+
+Type swift::getDistributedActorSystemSerializationType(
+    NominalTypeDecl *system) {
+  assert(!system->isDistributedActor());
+  auto &ctx = system->getASTContext();
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_SerializationRequirement);
 }
 
 Type swift::getDistributedActorSystemActorIDType(NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorID);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_ActorID);
 }
 
 Type swift::getDistributedActorSystemResultHandlerType(
     NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_ResultHandler);
 }
 
 Type swift::getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_InvocationEncoder);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_InvocationEncoder);
 }
 
 Type swift::getDistributedActorSystemInvocationDecoderType(NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
-
-  auto DAS = ctx.getDistributedActorSystemDecl();
-  if (!DAS)
-    return Type();
-
-  // Dig out the serialization requirement type.
-  auto module = system->getParentModule();
-  Type selfType = system->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAS);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_InvocationDecoder);
+  return getTypeWitnessByName(system, ctx.getDistributedActorSystemDecl(),
+                              ctx.Id_InvocationDecoder);
 }
 
 Type swift::getDistributedSerializationRequirementType(
@@ -247,8 +227,6 @@ AbstractFunctionDecl *
 swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
     ValueDecl *thunk) {
   assert(thunk);
-  auto &C = thunk->getASTContext();
-
   auto *actor = thunk->getDeclContext()->getSelfNominalTypeDecl();
   if (!actor)
     return nullptr;
@@ -265,17 +243,17 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
   if (!decoderTy)
     return nullptr;
 
-  return C.getDecodeNextArgumentOnDistributedInvocationDecoder(
+  return getDecodeNextArgumentOnDistributedInvocationDecoder(
       decoderTy->getAnyNominal());
 }
 
-Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
-    NominalTypeDecl *actor, Identifier member) {
-  auto &ctx = actor->getASTContext();
+Type swift::getAssociatedTypeOfDistributedSystemOfActor(
+    DeclContext *actorOrExtension, Identifier member) {
+  auto &ctx = actorOrExtension->getASTContext();
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   if (!actorProtocol)
-    return ErrorType::get(ctx);
+    return Type();
 
   AssociatedTypeDecl *actorSystemDecl =
       actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
@@ -286,56 +264,55 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
   if (!actorSystemProtocol)
     return Type();
 
-  AssociatedTypeDecl *assocTypeDecl =
+  AssociatedTypeDecl *memberTypeDecl =
       actorSystemProtocol->getAssociatedType(member);
-  if (!assocTypeDecl)
+  if (!memberTypeDecl)
     return Type();
 
-  auto module = actor->getParentModule();
+  Type memberTy = DependentMemberType::get(
+    DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
+                             actorSystemDecl),
+    memberTypeDecl);
 
-  // In case of protocol, let's find a concrete `ActorSystem`
-  if (auto *protocol = dyn_cast<ProtocolDecl>(actor)) {
-    auto signature = protocol->getGenericSignatureOfContext();
+  auto sig = actorOrExtension->getGenericSignatureOfContext();
 
-    auto systemTy =
-        signature->getConcreteType(actorSystemDecl->getDeclaredInterfaceType());
-    if (!systemTy)
-      return Type();
+  auto *actorType = actorOrExtension->getSelfNominalTypeDecl();
+  if (isa<ProtocolDecl>(actorType))
+    return memberTy->getReducedType(sig);
 
-    auto conformance = module->lookupConformance(systemTy, actorSystemProtocol);
-    if (conformance.isInvalid())
-      return Type();
+  auto actorConformance =
+      actorOrExtension->getParentModule()->lookupConformance(
+          actorType->getDeclaredInterfaceType(), actorProtocol);
+  if (!actorConformance || actorConformance.isInvalid())
+    return Type();
 
-    return conformance.getTypeWitnessByName(systemTy, member);
-  }
+  auto subs = SubstitutionMap::getProtocolSubstitutions(
+      actorProtocol, actorType->getDeclaredInterfaceType(), actorConformance);
 
-  Type selfType = actor->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, actorProtocol);
-  Type dependentType = actorProtocol->getSelfInterfaceType();
-  dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
-  dependentType = DependentMemberType::get(dependentType, assocTypeDecl);
-
-  return dependentType.subst(SubstitutionMap::getProtocolSubstitutions(
-      actorProtocol, selfType, conformance));
+  return memberTy.subst(subs)->getReducedType(sig);
 }
 
 /******************************************************************************/
 /******** Functions on DistributedActorSystem and friends *********************/
 /******************************************************************************/
 
-FuncDecl*
-ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
+FuncDecl *
+swift::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
+  auto &ctx = actor->getASTContext();
   return evaluateOrDefault(
-      evaluator, GetDistributedActorConcreteArgumentDecodingMethodRequest{actor}, nullptr);
+      ctx.evaluator,
+      GetDistributedActorConcreteArgumentDecodingMethodRequest{actor}, nullptr);
 }
 
-NominalTypeDecl*
-ASTContext::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
+NominalTypeDecl *
+swift::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
   if (!actor->isDistributedActor())
     return nullptr;
 
-  return evaluateOrDefault(
-      evaluator, GetDistributedActorInvocationDecoderRequest{actor}, nullptr);
+  auto &ctx = actor->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           GetDistributedActorInvocationDecoderRequest{actor},
+                           nullptr);
 }
 
 bool
@@ -1300,8 +1277,9 @@ NominalTypeDecl::getDistributedRemoteCallArgumentInitFunction() const {
       nullptr);
 }
 
-AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
+AbstractFunctionDecl *
+swift::getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
+                                             bool isVoidReturn) {
   assert(actorOrSystem && "distributed actor (or system) decl must be provided");
   const NominalTypeDecl *system = actorOrSystem;
   if (actorOrSystem->isDistributedActor()) {
@@ -1311,15 +1289,17 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
     }
   }
 
+  auto &ctx = actorOrSystem->getASTContext();
+
   // If no concrete system was found, return the general protocol:
   if (!system)
-    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
+    system = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
 
   auto mutableSystem = const_cast<NominalTypeDecl *>(system);
-  return evaluateOrDefault(
-      system->getASTContext().evaluator,
-      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
-      nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           GetDistributedActorSystemRemoteCallFunctionRequest{
+                               mutableSystem, /*isVoidReturn=*/isVoidReturn},
+                           nullptr);
 }
 
 /******************************************************************************/
@@ -1369,4 +1349,126 @@ NominalTypeDecl::getDistributedActorIDProperty() const {
       getASTContext().evaluator,
       GetDistributedActorIDPropertyRequest{mutableThis},
       nullptr);
+}
+
+FuncDecl *swift::getMakeInvocationEncoderOnDistributedActorSystem(
+    AbstractFunctionDecl *thunk) {
+  auto &ctx = thunk->getASTContext();
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
+  assert(systemTy && "No specific ActorSystem type found!");
+
+  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  assert(systemNominal && "No system nominal type found!");
+
+  for (auto result :
+       systemNominal->lookupDirect(ctx.Id_makeInvocationEncoder)) {
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func && func->isDistributedActorSystemMakeInvocationEncoder()) {
+      return func;
+    }
+  }
+
+  return nullptr;
+}
+
+FuncDecl *swift::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  auto &ctx = nominal->getASTContext();
+  for (auto result : nominal->lookupDirect(ctx.Id_recordGenericSubstitution)) {
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func &&
+        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
+      return func;
+    }
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *swift::getRecordArgumentOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *swift::getRecordReturnTypeOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *swift::getRecordErrorTypeOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *
+swift::getDecodeNextArgumentOnDistributedInvocationDecoder(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *
+swift::getOnReturnOnDistributedTargetInvocationResultHandler(
+    NominalTypeDecl *nominal) {
+  if (!nominal)
+    return nullptr;
+
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{
+          nominal},
+      nullptr);
+}
+
+FuncDecl *swift::getDoneRecordingOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) {
+  auto &ctx = nominal->getASTContext();
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  nominal->lookupQualified(nominal, DeclNameRef(ctx.Id_doneRecording),
+                           SourceLoc(), NL_QualifiedDefault, results);
+  for (auto result : results) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+
+    if (fd->getParameters()->size() != 0)
+      continue;
+
+    if (fd->getResultInterfaceType()->isVoid() && fd->hasThrows() &&
+        !fd->hasAsync())
+      return fd;
+  }
+
+  return nullptr;
 }

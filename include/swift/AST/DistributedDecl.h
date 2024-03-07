@@ -31,6 +31,16 @@ class DeclContext;
 class FuncDecl;
 class NominalTypeDecl;
 
+Type getAssociatedTypeOfDistributedSystemOfActor(DeclContext *actorOrExtension,
+                                                 Identifier member);
+
+/// Find the concrete invocation decoder associated with the given actor.
+NominalTypeDecl *getDistributedActorInvocationDecoder(NominalTypeDecl *);
+
+/// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
+/// invocation decoder of the given distributed actor.
+FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
+
 /// Determine the concrete type of 'ActorSystem' as seen from the member.
 /// E.g. when in a protocol, and trying to determine what the actor system was
 /// constrained to.
@@ -47,12 +57,6 @@ Type getDistributedActorSystemType(NominalTypeDecl *actor);
 /// Determine the `ID` type for the given actor.
 Type getDistributedActorIDType(NominalTypeDecl *actor);
 
-/// Similar to `getDistributedSerializationRequirementType`, however, from the
-/// perspective of a concrete function. This way we're able to get the
-/// serialization requirement for specific members, also in protocols.
-Type getSerializationRequirementTypesForMember(
-    ValueDecl *member, llvm::SmallPtrSet<ProtocolDecl *, 2> &serializationRequirements);
-
 /// Get specific 'SerializationRequirement' as defined in 'nominal'
 /// type, which must conform to the passed 'protocol' which is expected
 /// to require the 'SerializationRequirement'.
@@ -65,6 +69,12 @@ Type getDistributedSerializationRequirementType(
 AbstractFunctionDecl *
 getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
     ValueDecl *thunk);
+
+Type getDistributedActorSerializationType(DeclContext *actorOrExtension);
+
+/// Get the specific 'SerializationRequirement' type of a specific distributed
+/// actor system.
+Type getDistributedActorSystemSerializationType(NominalTypeDecl *system);
 
 /// Get the specific 'InvocationEncoder' type of a specific distributed actor
 /// system.
@@ -80,17 +90,6 @@ Type getDistributedActorSystemResultHandlerType(NominalTypeDecl *system);
 
 /// Get the 'ActorID' type of a specific distributed actor system.
 Type getDistributedActorSystemActorIDType(NominalTypeDecl *system);
-
-/// Get the specific protocols that the `SerializationRequirement` specifies,
-/// and all parameters / return types of distributed targets must conform to.
-///
-/// E.g. if a system declares `typealias SerializationRequirement = Codable`
-/// then this will return `{encodableProtocol, decodableProtocol}`.
-///
-/// Returns an empty set if the requirement was `Any`.
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-getDistributedSerializationRequirementProtocols(
-    NominalTypeDecl *decl, ProtocolDecl* protocol);
 
 /// Check if the `allRequirements` represent *exactly* the
 /// `Encodable & Decodable` (also known as `Codable`) requirement.
@@ -115,6 +114,70 @@ getDistributedSerializationRequirements(
     ProtocolDecl *protocol,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &requirementProtos);
 
+/// Retrieve the declaration of DistributedActorSystem.remoteCall(Void)(...).
+///
+/// \param actorOrSystem distributed actor or actor system to get the
+/// remoteCall function for. Since the method we're looking for is an ad-hoc
+/// requirement, a specific type MUST be passed here as it is not possible
+/// to obtain the decl from just the `DistributedActorSystem` protocol type.
+/// \param isVoidReturn true if the call will be returning `Void`.
+AbstractFunctionDecl *
+getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
+                                      bool isVoidReturn);
+
+/// Retrieve the declaration of DistributedActorSystem.make().
+///
+/// \param thunk the function from which we'll be invoking things on the
+/// obtained actor system; This way we'll always get the right type, taking care
+/// of any where clauses etc.
+FuncDecl *
+getMakeInvocationEncoderOnDistributedActorSystem(AbstractFunctionDecl *thunk);
+
+// Retrieve the declaration of
+// DistributedInvocationEncoder.recordGenericSubstitution(_:).
+//
+// \param nominal optionally provide a 'NominalTypeDecl' from which the
+// function decl shall be extracted. This is useful to avoid witness calls
+// through the protocol which is looked up when nominal is null.
+FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal);
+
+// Retrieve the declaration of
+// DistributedTargetInvocationEncoder.recordArgument(_:).
+//
+// \param nominal optionally provide a 'NominalTypeDecl' from which the
+// function decl shall be extracted. This is useful to avoid witness calls
+// through the protocol which is looked up when nominal is null.
+AbstractFunctionDecl *
+getRecordArgumentOnDistributedInvocationEncoder(NominalTypeDecl *nominal);
+
+// Retrieve the declaration of
+// DistributedTargetInvocationEncoder.recordReturnType(_:).
+AbstractFunctionDecl *
+getRecordReturnTypeOnDistributedInvocationEncoder(NominalTypeDecl *nominal);
+
+// Retrieve the declaration of
+// DistributedTargetInvocationEncoder.recordErrorType(_:).
+AbstractFunctionDecl *
+getRecordErrorTypeOnDistributedInvocationEncoder(NominalTypeDecl *nominal);
+
+// Retrieve the declaration of
+// DistributedTargetInvocationDecoder.getDecodeNextArgumentOnDistributedInvocationDecoder(_:).
+AbstractFunctionDecl *
+getDecodeNextArgumentOnDistributedInvocationDecoder(NominalTypeDecl *nominal);
+
+// Retrieve the declaration of
+// getOnReturnOnDistributedTargetInvocationResultHandler.onReturn(_:).
+AbstractFunctionDecl *
+getOnReturnOnDistributedTargetInvocationResultHandler(NominalTypeDecl *nominal);
+
+// Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
+//
+// \param nominal optionally provide a 'NominalTypeDecl' from which the
+// function decl shall be extracted. This is useful to avoid witness calls
+// through the protocol which is looked up when nominal is null.
+FuncDecl *
+getDoneRecordingOnDistributedInvocationEncoder(NominalTypeDecl *nominal);
 }
 
 #endif /* SWIFT_DECL_DISTRIBUTEDDECL_H */
