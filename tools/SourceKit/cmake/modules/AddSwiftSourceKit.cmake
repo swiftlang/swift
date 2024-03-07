@@ -115,11 +115,14 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
       else()
         set(host_lib_dir "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       endif()
+      set(host_lib_arch_dir "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}")
 
+      set(swiftrt "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
       target_link_libraries(${target} PRIVATE ${swiftrt})
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
+      target_link_directories(${target} PRIVATE ${host_lib_arch_dir})
 
       file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
