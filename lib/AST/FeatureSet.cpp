@@ -14,7 +14,6 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -29,62 +28,6 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
     if (Type type = value->getInterfaceType()) {
       return type.findIf(fn);
     }
-  }
-
-  return false;
-}
-
-/// \param isRelevantInverse the function used to inspect a mark corresponding
-/// to an inverse to determine whether it "has" an inverse that we care about.
-static bool hasInverse(
-    Decl *decl, InvertibleProtocolKind ip,
-    std::function<bool(InverseMarking::Mark const &)> isRelevantInverse) {
-
-  auto getTypeDecl = [](Type type) -> TypeDecl * {
-    if (auto genericTy = type->getAnyGeneric())
-      return genericTy;
-    if (auto gtpt = dyn_cast<GenericTypeParamType>(type))
-      return gtpt->getDecl();
-    return nullptr;
-  };
-
-  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto *nominal = extension->getSelfNominalTypeDecl())
-      return hasInverse(nominal, ip, isRelevantInverse);
-    return false;
-  }
-
-  auto hasInverseInType = [&](Type type) {
-    return type.findIf([&](Type type) -> bool {
-      if (auto *typeDecl = getTypeDecl(type))
-        return hasInverse(typeDecl, ip, isRelevantInverse);
-      return false;
-    });
-  };
-
-  if (auto *TD = dyn_cast<TypeDecl>(decl)) {
-    if (auto *alias = dyn_cast<TypeAliasDecl>(TD))
-      return hasInverseInType(alias->getUnderlyingType());
-
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(TD)) {
-      if (isRelevantInverse(NTD->hasInverseMarking(ip)))
-        return true;
-    }
-
-    if (auto *P = dyn_cast<ProtocolDecl>(TD)) {
-      // Check the protocol's associated types too.
-      return llvm::any_of(
-          P->getAssociatedTypeMembers(), [&](AssociatedTypeDecl *ATD) {
-            return isRelevantInverse(ATD->hasInverseMarking(ip));
-          });
-    }
-
-    return false;
-  }
-
-  if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-    if (VD->hasInterfaceType())
-      return hasInverseInType(VD->getInterfaceType());
   }
 
   return false;
@@ -256,10 +199,39 @@ static bool usesFeatureExtensionMacros(Decl *decl) {
 }
 
 static bool usesFeatureMoveOnly(Decl *decl) {
-  return hasInverse(decl, InvertibleProtocolKind::Copyable,
-                    [](auto &marking) -> bool {
-                      return marking.is(InverseMarking::Kind::LegacyExplicit);
-                    });
+  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto *nominal = extension->getExtendedNominal())
+      return usesFeatureMoveOnly(nominal);
+    return false;
+  }
+
+  auto hasInverseInType = [&](Type type) {
+    return type.findIf([&](Type type) -> bool {
+      if (auto *NTD = type->getAnyNominal()) {
+        if (NTD->getAttrs().hasAttribute<MoveOnlyAttr>())
+          return true;
+      }
+      return false;
+    });
+  };
+
+  if (auto *TD = dyn_cast<TypeDecl>(decl)) {
+    if (auto *alias = dyn_cast<TypeAliasDecl>(TD))
+      return hasInverseInType(alias->getUnderlyingType());
+
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(TD)) {
+      if (NTD->getAttrs().hasAttribute<MoveOnlyAttr>())
+        return true;
+    }
+
+    return false;
+  }
+
+  if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+    return hasInverseInType(VD->getInterfaceType());
+  }
+
+  return false;
 }
 
 static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
