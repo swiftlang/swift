@@ -3704,6 +3704,20 @@ Type ProtocolCompositionType::getInverseOf(const ASTContext &C,
                                       /*HasExplicitAnyObject=*/false);
 }
 
+Type ProtocolCompositionType::withoutMarkerProtocols() const {
+  SmallVector<Type, 4> newMembers;
+  llvm::copy_if(getMembers(), std::back_inserter(newMembers), [](Type member) {
+    auto *P = member->getAs<ProtocolType>();
+    return !(P && P->getDecl()->isMarkerProtocol());
+  });
+
+  if (newMembers.size() == getMembers().size())
+    return Type(const_cast<ProtocolCompositionType *>(this));
+
+  return ProtocolCompositionType::get(getASTContext(), newMembers,
+                                      getInverses(), hasExplicitAnyObject());
+}
+
 Type ProtocolCompositionType::get(const ASTContext &C,
                                   ArrayRef<Type> Members,
                                   InvertibleProtocolSet Inverses,
