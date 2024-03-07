@@ -32,11 +32,11 @@ public:
 };
 
 /// Checks that all stored properties or associated values are Copyable.
-bool checkCopyableConformance(DeclContext *dc,
+void checkCopyableConformance(DeclContext *dc,
                               ProtocolConformance *conformance);
 
 /// Checks that all stored properties or associated values are Escapable.
-bool checkEscapableConformance(DeclContext *dc,
+void checkEscapableConformance(DeclContext *dc,
                                ProtocolConformance *conformance);
 }
 
