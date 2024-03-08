@@ -106,7 +106,7 @@ Constructor Result.init(catching:) has been removed
 Func Result.get() has been renamed to Func __abi_get()
 Func Result.get() has mangled name changing from 'Swift.Result.get() throws -> A' to 'Swift.Result.__abi_get() throws -> A'
 Func withUnsafeMutablePointer(to:_:) has been renamed to Func __abi_se0413_withUnsafeMutablePointer(to:_:)
-Func withUnsafeMutablePointer(to:_:) has mangled name changing from 'Swift.withUnsafeMutablePointer<A, B>(to: A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeMutablePointer<A, B>(to: A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B'
+Func withUnsafeMutablePointer(to:_:) has mangled name changing from 'Swift.withUnsafeMutablePointer<A, B>(to: inout A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeMutablePointer<A, B>(to: inout A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B'
 Func withUnsafeMutablePointer(to:_:) is now without @rethrows
 Func withUnsafePointer(to:_:) has been renamed to Func __abi_withUnsafePointer(to:_:)
 Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
