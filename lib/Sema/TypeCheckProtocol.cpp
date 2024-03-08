@@ -4391,11 +4391,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     return ResolveWitnessResult::ExplicitFailed;
   }
 
+  if (!shouldRecordMissingWitness(Proto, Conformance, requirement))
+    return ResolveWitnessResult::Missing;
 
   if (!numViable) {
     // Save the missing requirement for later diagnosis.
-    if (shouldRecordMissingWitness(Proto, Conformance, requirement))
-      getASTContext().addDelayedMissingWitness(Conformance, {requirement, matches});
+    getASTContext().addDelayedMissingWitness(Conformance, {requirement, matches});
     return ResolveWitnessResult::Missing;
   }
 
