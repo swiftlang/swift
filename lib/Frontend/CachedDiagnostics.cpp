@@ -159,8 +159,14 @@ private:
   llvm::Expected<DiagnosticInfo::FixIt>
   deserializeFixIt(const SerializedFixIt &);
 
+  // Stores the temporary data from deserialization.
+  struct DiagnosticStorage {
+    SmallVector<DiagnosticInfo, 2> ChildDiag;
+    SmallVector<CharSourceRange, 2> Ranges;
+    SmallVector<DiagnosticInfo::FixIt, 2> FixIts;
+  };
   llvm::Error deserializeDiagnosticInfo(const SerializedDiagnosticInfo &,
-                                        ReplayFunc);
+                                        DiagnosticStorage &, ReplayFunc);
 
   // Deserialize File and return the bufferID in serializing SourceManager.
   unsigned deserializeFile(const SerializedFile &File);
@@ -288,8 +294,10 @@ void DiagnosticSerializer::handleDiagnostic(SourceManager &SM,
                                             const DiagnosticInfo &Info,
                                             ReplayFunc Fn) {
   DiagInfos.emplace_back(convertDiagnosticInfo(SM, Info));
-  if (Fn)
-    cantFail(deserializeDiagnosticInfo(DiagInfos.back(), Fn));
+  if (Fn) {
+    DiagnosticStorage Storage;
+    cantFail(deserializeDiagnosticInfo(DiagInfos.back(), Storage, Fn));
+  }
 }
 
 unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
@@ -537,7 +545,8 @@ llvm::Error DiagnosticSerializer::deserializeGeneratedFileInfo(
 }
 
 llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
-    const SerializedDiagnosticInfo &Info, ReplayFunc callback) {
+    const SerializedDiagnosticInfo &Info, DiagnosticStorage &Storage,
+    ReplayFunc callback) {
   DiagID ID = (DiagID)Info.ID;
   auto Loc = deserializeSourceLoc(Info.Loc);
   if (!Loc)
@@ -546,33 +555,32 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
   auto BICD = deserializeSourceLoc(Info.BufferIndirectlyCausingDiagnostic);
   if (!BICD)
     return BICD.takeError();
-  SmallVector<DiagnosticInfo, 2> ChildDiag;
+
+  llvm::TinyPtrVector<DiagnosticInfo *> ChildDiagPtrs;
   for (auto &CD : Info.ChildDiagnosticInfo) {
-    auto E = deserializeDiagnosticInfo(CD, [&](const DiagnosticInfo &Info) {
-      ChildDiag.emplace_back(Info);
-      return llvm::Error::success();
-    });
+    auto E =
+        deserializeDiagnosticInfo(CD, Storage, [&](const DiagnosticInfo &Info) {
+          Storage.ChildDiag.emplace_back(Info);
+          ChildDiagPtrs.push_back(&Storage.ChildDiag.back());
+          return llvm::Error::success();
+        });
     if (E)
       return E;
   }
-  llvm::TinyPtrVector<DiagnosticInfo*> ChildDiagPtrs;
-  llvm::for_each(ChildDiag, [&ChildDiagPtrs](DiagnosticInfo &I) {
-    ChildDiagPtrs.push_back(&I);
-  });
-  SmallVector<CharSourceRange, 2> Ranges;
   for (auto &R : Info.Ranges) {
     auto Range = deserializeSourceRange(R);
     if (!Range)
       return Range.takeError();
-    Ranges.emplace_back(*Range);
+    Storage.Ranges.emplace_back(*Range);
   }
-  SmallVector<DiagnosticInfo::FixIt, 2> FixIts;
+  auto Ranges = ArrayRef(Storage.Ranges).take_back(Info.Ranges.size());
   for (auto &F : Info.FixIts) {
     auto FixIt = deserializeFixIt(F);
     if (!FixIt)
       return FixIt.takeError();
-    FixIts.emplace_back(*FixIt);
+    Storage.FixIts.emplace_back(*FixIt);
   }
+  auto FixIts = ArrayRef(Storage.FixIts).take_back(Info.FixIts.size());
 
   DiagnosticInfo DeserializedInfo{ID,
                                   *Loc,
@@ -623,11 +631,13 @@ llvm::Error DiagnosticSerializer::doEmitFromCached(llvm::StringRef Buffer,
   }
 
   for (auto &Info : DiagInfos) {
-    auto E = deserializeDiagnosticInfo(Info, [&](const DiagnosticInfo &Info) {
-      for (auto *Diag : Diags.getConsumers())
-        Diag->handleDiagnostic(SrcMgr, Info);
-      return llvm::Error::success();
-    });
+    DiagnosticStorage Storage;
+    auto E = deserializeDiagnosticInfo(Info, Storage,
+                                       [&](const DiagnosticInfo &Info) {
+                                         for (auto *Diag : Diags.getConsumers())
+                                           Diag->handleDiagnostic(SrcMgr, Info);
+                                         return llvm::Error::success();
+                                       });
     if (E)
       return E;
   }
