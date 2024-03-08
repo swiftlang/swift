@@ -820,10 +820,10 @@ public:
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
-  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
-                                     IsLexical_t isLexical = IsNotLexical,
-                                     bool hasPointerEscape = false,
-                                     bool fromVarDecl = false) {
+  BeginBorrowInst *createBeginBorrow(
+      SILLocation Loc, SILValue LV, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())

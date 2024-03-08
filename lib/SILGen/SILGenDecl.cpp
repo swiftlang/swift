@@ -568,7 +568,7 @@ public:
       // requires one.
       Box = SGF.B.createBeginBorrow(
           decl, Box, IsLexical_t(lifetime.isLexical()),
-          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
+          DoesNotHavePointerEscape, /*fromVarDecl=*/true);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -839,14 +839,14 @@ public:
       return SGF.B.createBeginBorrow(
           PrologueLoc, value,
           IsLexical_t(SGF.F.getLifetime(vd, value->getType()).isLexical()),
-          /*hasPointerEscape=*/false,
+          DoesNotHavePointerEscape,
           /*fromVarDecl=*/true);
     }
 
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
     value = SGF.B.createBeginBorrow(PrologueLoc, value, IsLexical,
-                                    /*hasPointerEscape=*/false,
+                                    DoesNotHavePointerEscape,
                                     /*fromVarDecl=*/true);
     value = SGF.B.createCopyValue(PrologueLoc, value);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
