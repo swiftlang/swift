@@ -62,7 +62,7 @@ public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSys
 // CHECK: public static func resolve(id: ActorSystem.ActorID, using system: ActorSystem) throws -> Library.DAG<ActorSystem>
 // CHECK: public typealias ID = ActorSystem.ActorID
 // CHECK: public typealias SerializationRequirement = any Swift.Decodable & Swift.Encodable
-// CHECK: @objc deinit
+// CHECK: {{@objc deinit|deinit}}
 // CHECK: nonisolated public var hashValue: Swift.Int {
 // CHECK:   get
 // CHECK: }
