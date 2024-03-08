@@ -58,6 +58,12 @@ struct MainActorIsolatedStruct {
   let ns = NonSendableKlass()
 }
 
+@MainActor
+enum MainActorIsolatedEnum {
+  case first
+  case second(NonSendableKlass)
+}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -124,9 +130,45 @@ func useTransferredResult() async {
 
 extension MainActorIsolatedStruct {
   func testNonSendableErrorReturnWithTransfer() -> transferring NonSendableKlass {
-    return ns
+    return ns // expected-warning {{call site passes `self`}}
   }
   func testNonSendableErrorReturnNoTransfer() -> NonSendableKlass {
     return ns
   }
+}
+
+extension MainActorIsolatedEnum {
+  func testSwitchReturn() -> transferring NonSendableKlass? {
+    switch self {
+    case .first:
+      return nil
+    case .second(let ns):
+      return ns
+    }
+    // TODO: This should be on return ns.
+  } // expected-warning {{call site passes `self`}}
+
+  func testSwitchReturnNoTransfer() -> NonSendableKlass? {
+    switch self {
+    case .first:
+      return nil
+    case .second(let ns):
+      return ns
+    }
+  }
+
+  func testIfLetReturn() -> transferring NonSendableKlass? {
+    if case .second(let ns) = self {
+      return ns // TODO: The error below should be here.
+    }
+    return nil
+  } // expected-warning {{call site passes `self`}} 
+
+  func testIfLetReturnNoTransfer() -> NonSendableKlass? {
+    if case .second(let ns) = self {
+      return ns
+    }
+    return nil
+  }
+
 }

@@ -13,6 +13,7 @@ sil_stage raw
 
 import Swift
 import Builtin
+import _Concurrency
 
 ////////////////////////
 // MARK: Declarations //
@@ -76,6 +77,17 @@ case some(T)
 
 sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+
+@MainActor
+struct MainActorIsolatedStruct {
+  let ns: NonSendableKlass
+}
+
+@MainActor
+enum MainActorIsolatedEnum {
+  case first
+  case second(NonSendableKlass)
+}
 
 /////////////////
 // MARK: Tests //
@@ -199,10 +211,60 @@ bb1:
   return %9999 : $()
 }
 
-sil [ossa] @synchronous_returns_transferring_error : $@convention(method) (@guaranteed NonSendableStruct) -> @sil_transferring @owned NonSendableKlass {
+sil [ossa] @synchronous_returns_transferring : $@convention(method) (@guaranteed NonSendableStruct) -> @sil_transferring @owned NonSendableKlass {
 bb0(%0 : @guaranteed $NonSendableStruct):
   debug_value %0 : $NonSendableStruct, var, name "myname"
   %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_struct_structextract : $@convention(method) (@guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  debug_value %0 : $MainActorIsolatedStruct, var, name "myname"
+  %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  %3 = copy_value %2 : $NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_struct_structelementaddr : $@convention(method) (@in_guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : $*MainActorIsolatedStruct):
+  debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
+  %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  %3 = load [copy] %2 : $*NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedenumdata : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : @guaranteed $MainActorIsolatedEnum):
+  debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
+  %2 = unchecked_enum_data %0 : $MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
+  %3 = copy_value %2 : $NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedtakeenumdataaddr : $@convention(method) (@in MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : $*MainActorIsolatedEnum):
+  debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
+  %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
+  %3 = load [take] %2 : $*NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_switchenum : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned FakeOptional<NonSendableKlass> {
+bb0(%0 : @guaranteed $MainActorIsolatedEnum):
+  debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
+  switch_enum %0 : $MainActorIsolatedEnum, case #MainActorIsolatedEnum.first!enumelt: bb1, case #MainActorIsolatedEnum.second!enumelt: bb2
+
+bb1:
+  %nil = enum $FakeOptional<NonSendableKlass>, #FakeOptional.none!enumelt
+  br bb3(%nil : $FakeOptional<NonSendableKlass>)
+
+bb2(%1 : @guaranteed $NonSendableKlass):
+  %2 = copy_value %1 : $NonSendableKlass
+  %3 = enum $FakeOptional<NonSendableKlass>, #FakeOptional.some!enumelt, %2 : $NonSendableKlass
+  br bb3(%3 : $FakeOptional<NonSendableKlass>)
+
+bb3(%4 : @owned $FakeOptional<NonSendableKlass>):
+  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{call site passes `self`}}
 }
