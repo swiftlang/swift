@@ -36,6 +36,12 @@ extension DistributedProtocolMacro {
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
     guard let proto = declaration.as(ProtocolDeclSyntax.self) else {
+      // we diagnose here, only once
+      try throwIllegalTargetDecl(node: node, declaration)
+    }
+
+    guard !proto.memberBlock.members.isEmpty else {
+      // ok, the protocol has no requirements so we no-op it
       return []
     }
 
@@ -44,17 +50,7 @@ extension DistributedProtocolMacro {
         member.trimmed
       }
     let requirementStubs = requirements
-      .map { req in
-        """
-        \(req) {
-            if #available(SwiftStdlib 6.0, *) {
-              Distributed._distributedStubFatalError()
-            } else {
-              fatalError()
-            }
-        }
-        """
-      }.joined(separator: "\n    ")
+      .map(stubMethod).joined(separator: "\n    ")
 
     let extensionDecl: DeclSyntax =
       """
@@ -63,6 +59,24 @@ extension DistributedProtocolMacro {
       }
       """
     return [extensionDecl.cast(ExtensionDeclSyntax.self)]
+  }
+
+  static func stubMethod(_ requirementDeclaration: MemberBlockItemListSyntax.Element) -> String {
+    """
+    \(requirementDeclaration) {
+      \(stubFunctionBody())
+    }
+    """
+  }
+
+  static func stubFunctionBody() -> DeclSyntax {
+    """
+    if #available(SwiftStdlib 6.0, *) {
+      Distributed._distributedStubFatalError()
+    } else {
+      fatalError()
+    }
+    """
   }
 }
 
@@ -76,7 +90,9 @@ extension DistributedProtocolMacro {
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     guard let proto = declaration.as(ProtocolDeclSyntax.self) else {
-      try throwIllegalTargetDecl(node: node, declaration)
+      // don't diagnose here (again),
+      // we'll already report an error here from the other macro role
+      return []
     }
 
     var isGenericStub = false
@@ -84,7 +100,20 @@ extension DistributedProtocolMacro {
     // FIXME must detect this off the protocol
     let serializationRequirementType: String = "Codable"
 
-    for req in proto.genericWhereClause?.requirements ?? [] {
+    guard let genericWhereClause = proto.genericWhereClause else {
+      guard !proto.memberBlock.members.isEmpty else {
+        // ok, the protocol has no requirements so we no-op it
+        return []
+      }
+      throw DiagnosticsError(
+        syntax: node,
+        message: """
+                 Distributed protocol must declare actor system with SerializationRequirement, for example:
+                    protocol Greeter<ActorSystem>: DistributedActor where ActorSystem: DistributedActorSystem<any Codable>
+                 """, id: .invalidApplication)
+    }
+
+    for req in genericWhereClause.requirements {
       print("req.requirement: \(req.requirement)")
       switch req.requirement {
       case .conformanceRequirement(let conformanceReq)
@@ -125,7 +154,7 @@ extension DistributedProtocolMacro {
       } else {
         throw DiagnosticsError(
           syntax: node,
-          message: "'@DistributedProtocolMacro' cannot be applied to ", id: .invalidApplication)
+          message: "'@DistributedProtocol' cannot be applied to ", id: .invalidApplication)
       }
 
     return [stubActorDecl]

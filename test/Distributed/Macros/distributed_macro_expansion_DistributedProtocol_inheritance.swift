@@ -17,16 +17,8 @@ typealias System = LocalTestingDistributedActorSystem
 protocol EmptyBase {}
 
 // @_DistributedProtocol ->
-//
-// CHECK: distributed actor $EmptyBase<ActorSystem>: EmptyBase,
-// CHECK:   Distributed._DistributedActorStub
-// CHECK:   where ActorSystem: DistributedActorSystem<any Codable>,
-// CHECK:         ActorSystem.ActorID: Codable
-// CHECK:  {
-// CHECK:  }
 
-// CHECK: extension EmptyBase where Self: Distributed._DistributedActorStub {
-// CHECK: }
+// nothing, no-op
 
 // ==== ------------------------------------------------------------------------
 
