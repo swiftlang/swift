@@ -228,5 +228,5 @@ do {
   }
 
   func forward<T>(_ v: T) -> T { v }
-  let _: KeyPath<String, Int> = forward(kp()) // Ok
+  let _: KeyPath<String, Int> = forward(kp()) // Alright
 }
