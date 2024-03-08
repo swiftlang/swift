@@ -97,6 +97,21 @@ public:
   }
 };
 
+/// Task option to specify the initial serial executor for the task.
+class InitialSerialExecutorTaskOptionRecord : public TaskOptionRecord {
+  const SerialExecutorRef Executor;
+public:
+  InitialSerialExecutorTaskOptionRecord(SerialExecutorRef executor)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialSerialExecutor),
+        Executor(executor) {}
+
+  SerialExecutorRef getExecutorRef() const { return Executor; }
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::InitialSerialExecutor;
+  }
+};
+
 /// DEPRECATED. AsyncLetWithBufferTaskOptionRecord is used instead.
 /// Task option to specify that the created task is for an 'async let'.
 class AsyncLetTaskOptionRecord : public TaskOptionRecord {
