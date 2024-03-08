@@ -362,7 +362,6 @@ bb0(%0 :  @guaranteed $Optional<T>):
   return %res : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_store_borrow_take_enum: store-borrow location cannot be written
 sil [ossa] @test_store_borrow_take_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
 bb0(%0 :  @guaranteed $Optional<T>):
   %s = alloc_stack $Optional<T>
