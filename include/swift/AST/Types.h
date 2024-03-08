@@ -6050,6 +6050,10 @@ public:
     return Bits.ProtocolCompositionType.HasExplicitAnyObject;
   }
 
+  /// Produce a new type (potentially not be a protoocl composition)
+  /// which drops all of the marker protocol types associated with this one.
+  Type withoutMarkerProtocols() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ProtocolComposition;
