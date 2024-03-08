@@ -474,13 +474,14 @@ public:
 
   /// Helper function that calls \p createAllocBox after constructing a
   /// SILBoxType for \p fieldType.
-  AllocBoxInst *
-  createAllocBox(SILLocation loc, SILType fieldType,
-                 std::optional<SILDebugVariable> Var = std::nullopt,
-                 bool hasDynamicLifetime = false, bool reflection = false,
-                 UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
-                     DoesNotUseMoveableValueDebugInfo,
-                 bool hasPointerEscape = false) {
+  AllocBoxInst *createAllocBox(
+      SILLocation loc, SILType fieldType,
+      std::optional<SILDebugVariable> Var = std::nullopt,
+      HasDynamicLifetime_t hasDynamicLifetime = DoesNotHaveDynamicLifetime,
+      bool reflection = false,
+      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+          DoesNotUseMoveableValueDebugInfo,
+      bool hasPointerEscape = false) {
     return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
                           hasDynamicLifetime, reflection,
                           usesMoveableValueDebugInfo,
@@ -488,14 +489,14 @@ public:
                           hasPointerEscape);
   }
 
-  AllocBoxInst *
-  createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
-                 std::optional<SILDebugVariable> Var = std::nullopt,
-                 bool hasDynamicLifetime = false, bool reflection = false,
-                 UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
-                     DoesNotUseMoveableValueDebugInfo,
-                 bool skipVarDeclAssert = false,
-                 bool hasPointerEscape = false) {
+  AllocBoxInst *createAllocBox(
+      SILLocation Loc, CanSILBoxType BoxType,
+      std::optional<SILDebugVariable> Var = std::nullopt,
+      HasDynamicLifetime_t hasDynamicLifetime = DoesNotHaveDynamicLifetime,
+      bool reflection = false,
+      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+          DoesNotUseMoveableValueDebugInfo,
+      bool skipVarDeclAssert = false, bool hasPointerEscape = false) {
 #if NDEBUG
     (void)skipVarDeclAssert;
 #endif
