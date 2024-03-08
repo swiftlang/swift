@@ -113,10 +113,14 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> ([StoreInst], 
     return nil
   }
   let structAddr = elementAddr.struct
-  if structAddr.type.isMoveOnly {
+  let structType = structAddr.type
+  if structType.isMoveOnly {
     return nil
   }
-  guard let fields = structAddr.type.getNominalFields(in: firstStore.parentFunction) else {
+  if structType.nominal.isStructWithUnreferenceableStorage {
+    return nil
+  }
+  guard let fields = structType.getNominalFields(in: firstStore.parentFunction) else {
     return nil
   }
   let numElements = fields.count
