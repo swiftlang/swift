@@ -1104,7 +1104,7 @@ SILGenBuilder::createFormalAccessOpaqueConsumeBeginAccess(SILLocation loc,
 
 ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
                                               ManagedValue value,
-                                              bool isLexical,
+                                              IsLexical_t isLexical,
                                               bool isFixed) {
   auto *newValue =
       SILBuilder::createBeginBorrow(loc, value.getValue(),
@@ -1114,9 +1114,9 @@ ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
 }
 
 ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(SILLocation loc,
-                                              ManagedValue value,
-                                              bool isLexical,
-                                              bool isFixed) {
+                                                          ManagedValue value,
+                                                          IsLexical_t isLexical,
+                                                          bool isFixed) {
   auto *newValue =
       SILBuilder::createBeginBorrow(loc, value.getValue(),
                                     isLexical, false, false, isFixed);

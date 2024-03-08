@@ -823,7 +823,7 @@ public:
   }
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
-                                     bool isLexical = false,
+                                     IsLexical_t isLexical = IsNotLexical,
                                      bool hasPointerEscape = false,
                                      bool fromVarDecl = false,
                                      bool fixed = false) {
@@ -851,7 +851,7 @@ public:
   }
 
   SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v,
-                                    bool isLexical = false,
+                                    IsLexical_t isLexical = IsNotLexical,
                                     bool hasPointerEscape = false,
                                     bool fromVarDecl = false) {
     if (!hasOwnership() ||

@@ -200,7 +200,7 @@ public:
                       boxLayout,
                       layoutSubs));
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      resultBox = SGF.B.createBeginBorrow(loc, resultBox, /*isLexical=*/true);
+      resultBox = SGF.B.createBeginBorrow(loc, resultBox, IsLexical);
     }
 
     // Complete the cleanup to deallocate this buffer later, after we're

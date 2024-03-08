@@ -572,7 +572,7 @@ public:
       // Only add a lexical lifetime to the box if the variable it stores
       // requires one.
       Box = SGF.B.createBeginBorrow(
-          decl, Box, /*isLexical=*/lifetime.isLexical(),
+          decl, Box, IsLexical_t(lifetime.isLexical()),
           /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
     }
 
@@ -862,7 +862,7 @@ public:
                                    /*hasPointerEscape=*/false,
                                    /*fromVarDecl=*/true);
 
-    return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ isLexical,
+    return SGF.B.createBeginBorrow(PrologueLoc, value, IsLexical_t(isLexical),
                                    /*hasPointerEscape=*/false,
                                    /*fromVarDecl=*/true);
   }

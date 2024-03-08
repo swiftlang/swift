@@ -2282,7 +2282,7 @@ bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
                                roots);
   return llvm::all_of(roots, [](auto root) {
     if (auto *outerBBI = dyn_cast<BeginBorrowInst>(root)) {
-      return outerBBI->isLexical();
+      return (bool)outerBBI->isLexical();
     }
     if (auto *arg = dyn_cast<SILFunctionArgument>(root)) {
       return arg->getOwnershipKind() == OwnershipKind::Guaranteed;

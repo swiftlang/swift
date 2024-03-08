@@ -480,13 +480,13 @@ public:
 
   using SILBuilder::createBeginBorrow;
   ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
-                                 bool isLexical = false,
+                                 IsLexical_t isLexical = IsNotLexical,
                                  bool isFixed = false);
 
-  ManagedValue createFormalAccessBeginBorrow(SILLocation loc,
-                                             ManagedValue value,
-                                             bool isLexical = false,
-                                             bool isFixed = false);
+  ManagedValue
+  createFormalAccessBeginBorrow(SILLocation loc, ManagedValue value,
+                                IsLexical_t isLexical = IsNotLexical,
+                                bool isFixed = false);
 
   using SILBuilder::createMoveValue;
   ManagedValue createMoveValue(SILLocation loc, ManagedValue value,
