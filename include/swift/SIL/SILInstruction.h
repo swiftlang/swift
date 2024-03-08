@@ -8278,10 +8278,10 @@ class MoveValueInst
 
   USE_SHARED_UINT8;
 
-  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isLexical,
-                bool hasPointerEscape, bool fromVarDecl)
+  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                IsLexical_t isLexical, bool hasPointerEscape, bool fromVarDecl)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
-    sharedUInt8().MoveValueInst.lexical = isLexical;
+    sharedUInt8().MoveValueInst.lexical = (bool)isLexical;
     sharedUInt8().MoveValueInst.pointerEscape = hasPointerEscape;
     sharedUInt8().MoveValueInst.fromVarDecl = fromVarDecl;
   }
@@ -8297,8 +8297,12 @@ public:
     sharedUInt8().MoveValueInst.allowDiagnostics = newValue;
   }
 
-  bool isLexical() const { return sharedUInt8().MoveValueInst.lexical; }
-  void removeIsLexical() { sharedUInt8().MoveValueInst.lexical = false; }
+  IsLexical_t isLexical() const {
+    return IsLexical_t(sharedUInt8().MoveValueInst.lexical);
+  }
+  void removeIsLexical() {
+    sharedUInt8().MoveValueInst.lexical = (bool)IsNotLexical;
+  }
 
   bool hasPointerEscape() const {
     return sharedUInt8().MoveValueInst.pointerEscape;

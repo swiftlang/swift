@@ -469,7 +469,7 @@ public:
 
   using SILBuilder::createMoveValue;
   ManagedValue createMoveValue(SILLocation loc, ManagedValue value,
-                               bool isLexical = false);
+                               IsLexical_t isLexical = IsNotLexical);
 
   using SILBuilder::createOwnedMoveOnlyWrapperToCopyableValue;
   ManagedValue createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,

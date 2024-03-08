@@ -1420,7 +1420,7 @@ public:
   }
 
   MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
-                                 bool isLexical = false,
+                                 IsLexical_t isLexical = IsNotLexical,
                                  bool hasPointerEscape = false,
                                  bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());

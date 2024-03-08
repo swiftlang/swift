@@ -1038,7 +1038,7 @@ ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
 }
 
 ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,
-                                            bool isLexical) {
+                                            IsLexical_t isLexical) {
   assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
   CleanupCloner cloner(*this, value);
   auto *mdi =

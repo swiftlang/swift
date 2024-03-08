@@ -776,7 +776,7 @@ public:
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
       if (value->getType().isPureMoveOnly()) {
-        value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
         return SGF.B.createMarkUnresolvedNonCopyableValueInst(
             PrologueLoc, value,
             MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -792,7 +792,7 @@ public:
       // move only wrapper and mark it as needing checking by the move cherk.
       value =
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -826,7 +826,7 @@ public:
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
         value->getType().isPureMoveOnly()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
           MarkUnresolvedNonCopyableValueInst::CheckKind::

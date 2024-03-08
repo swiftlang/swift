@@ -721,16 +721,16 @@ SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
                                                unsigned index) {
   auto scope = scopeForArgument(Scope::None, callArg, index,
                                 Apply.getFunction(), getCalleeFunction());
-  bool isLexical;
+  IsLexical_t isLexical;
   switch (scope) {
   case Scope::None:
     return SILValue();
   case Scope::Bare:
     assert(false && "Non-lexical move produced during inlining!?");
-    isLexical = false;
+    isLexical = IsNotLexical;
     break;
   case Scope::Lexical:
-    isLexical = true;
+    isLexical = IsLexical;
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
