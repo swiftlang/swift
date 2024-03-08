@@ -23,6 +23,9 @@ struct NC: ~Copyable {
     borrowing func b() {}
     mutating func m() {}
     consuming func c() {}
+
+    consuming func c2() -> NC { c2() } // expected-warning{{}}
+    consuming func c3() -> NCAO { c3() } // expected-warning{{}}
 }
 
 struct NCAO: ~Copyable {
@@ -31,6 +34,9 @@ struct NCAO: ~Copyable {
     borrowing func b() {}
     mutating func m() {}
     consuming func c() {}
+
+    consuming func c2() -> NC { c2() } // expected-warning{{}}
+    consuming func c3() -> NCAO { c3() } // expected-warning{{}}
 }
 
 func borrowingChains(nc: borrowing NC?, // expected-error{{'nc' is borrowed and cannot be consumed}}
@@ -139,4 +145,28 @@ func consumingChains2(nc: consuming NC?,
     ncao?.b()
     ncao?.m()
     ncao?.c()
+}
+
+func consumingSwitchSubject(nc: consuming NC?,
+                            ncao: consuming NCAO?) {
+    switch nc?.c2() {
+    default:
+      break
+    }
+    switch ncao?.c2() {
+    default:
+      break
+    }
+}
+
+func consumingSwitchSubject2(nc: consuming NC?,
+                             ncao: consuming NCAO?) {
+    switch nc?.c3() {
+    default:
+      break
+    }
+    switch ncao?.c3() {
+    default:
+      break
+    }
 }

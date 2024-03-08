@@ -315,10 +315,25 @@ struct TypeTreeLeafTypeRange {
       return std::nullopt;
 
     // A drop_deinit only consumes the deinit bit of its operand.
-    auto *ddi = dyn_cast<DropDeinitInst>(op->getUser());
-    if (ddi) {
+    if (isa<DropDeinitInst>(op->getUser())) {
       auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
       return {{upperBound - 1, upperBound}};
+    }
+
+    // An `inject_enum_addr` only initializes the enum tag.
+    if (auto inject = dyn_cast<InjectEnumAddrInst>(op->getUser())) {
+      auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
+      unsigned payloadUpperBound = 0;
+      if (inject->getElement()->hasAssociatedValues()) {
+        auto payloadTy = projectedValue->getType()
+          .getEnumElementType(inject->getElement(), op->getFunction());
+        
+        payloadUpperBound = *startEltOffset
+          + TypeSubElementCount(payloadTy, op->getFunction());
+      }
+      // TODO: account for deinit component if enum has deinit.
+      assert(!projectedValue->getType().isValueTypeWithDeinit());
+      return {{payloadUpperBound, upperBound}};
     }
 
     // Uses that borrow a value do not involve the deinit bit.
@@ -984,7 +999,7 @@ public:
     return *&iter->second;
   }
 
-  /// If \p user has had uses recored, return a pointer to the InterestingUser
+  /// If \p user has had uses recorded, return a pointer to the InterestingUser
   /// where they've been recorded.
   InterestingUser const *getInterestingUser(SILInstruction *user) const {
     auto iter = users.find(user);
