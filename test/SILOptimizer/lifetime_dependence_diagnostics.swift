@@ -3,7 +3,6 @@
 // RUN:   -module-name test \
 // RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: asserts

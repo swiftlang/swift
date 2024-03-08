@@ -65,18 +65,6 @@ static llvm::cl::opt<bool>
     EnableDeinitDevirtualizer("enable-deinit-devirtualizer", llvm::cl::init(false),
                           llvm::cl::desc("Enable the DestroyHoisting pass."));
 
-// Temporary flag until the stdlib builds with ~Escapable
-static llvm::cl::opt<bool>
-EnableLifetimeDependenceInsertion(
-  "enable-lifetime-dependence-insertion", llvm::cl::init(false),
-  llvm::cl::desc("Enable lifetime dependence insertion."));
-
-// Temporary flag until the stdlib builds with ~Escapable
-static llvm::cl::opt<bool>
-EnableLifetimeDependenceDiagnostics(
-  "enable-lifetime-dependence-diagnostics", llvm::cl::init(false),
-  llvm::cl::desc("Enable lifetime dependence diagnostics."));
-
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -184,7 +172,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMoveOnlyChecker();
 
   // Check ~Escapable.
-  if (EnableLifetimeDependenceDiagnostics) {
+  if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceDiagnostics();
   }
   if (EnableDeinitDevirtualizer)
@@ -296,10 +284,8 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   P.startPipeline("SILGen Passes");
 
   P.addSILGenCleanup();
-  if (EnableLifetimeDependenceDiagnostics || EnableLifetimeDependenceInsertion) {
+  if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceInsertion();
-  }
-  if (EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceScopeFixup();
   }
   if (SILViewSILGenCFG) {

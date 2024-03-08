@@ -1109,16 +1109,24 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // There must be a property named "pointee".
   auto identifier = ctx.getIdentifier("pointee");
   auto results = nominal->lookupDirect(identifier);
-  if (results.size() != 1) return nullptr;
+  for (auto result : results) {
+    // The property must have type T.
+    auto *property = dyn_cast<VarDecl>(result);
+    if (!property)
+      continue;
 
-  // The property must have type T.
-  auto *property = dyn_cast<VarDecl>(results[0]);
-  if (!property) return nullptr;
-  if (!property->getInterfaceType()->isEqual(sig.getGenericParams()[0]))
-    return nullptr;
+    if (!property->getInterfaceType()->isEqual(sig.getGenericParams()[0]))
+      continue;
 
-  cache = property;
-  return property;
+    if (property->getFormalAccess() != AccessLevel::Public)
+      continue;
+
+    cache = property;
+    return property;
+  }
+
+  llvm_unreachable("Could not find pointee property");
+  return nullptr;
 }
 
 VarDecl *
