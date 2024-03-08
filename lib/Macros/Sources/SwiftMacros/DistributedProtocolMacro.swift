@@ -105,6 +105,10 @@ extension DistributedProtocolMacro {
     var specificActorSystemRequirement: TypeSyntax?
 
     if proto.genericWhereClause == nil {
+      guard !proto.memberBlock.members.isEmpty else {
+        // ok, the protocol has no requirements so we no-op it
+        return []
+      }
       throw DiagnosticsError(
         syntax: node,
         message: """
@@ -115,7 +119,7 @@ extension DistributedProtocolMacro {
 
     let accessModifiers = proto.accessModifiersString
 
-    for req in proto.genericWhereClause?.requirements ?? [] {
+    for req in genericWhereClause.requirements {
       switch req.requirement {
       case .conformanceRequirement(let conformanceReq)
            where conformanceReq.leftType.isActorSystem:
