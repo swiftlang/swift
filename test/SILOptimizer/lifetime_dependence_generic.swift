@@ -5,7 +5,6 @@
 // RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics \
 // RUN:   -parse-stdlib -module-name Swift
 
 // REQUIRES: asserts

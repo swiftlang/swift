@@ -2,7 +2,8 @@
 // RUN: %target-swift-frontend -emit-module -o %t  %S/Inputs/def_explicit_lifetime_dependence.swift \
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -disable-experimental-parser-round-trip \
-// RUN: -enable-experimental-feature NoncopyableGenerics
+// RUN: -enable-experimental-feature NoncopyableGenerics \
+// RUN: -disable-lifetime-dependence-diagnostics
 
 // RUN: llvm-bcanalyzer %t/def_explicit_lifetime_dependence.swiftmodule 
 

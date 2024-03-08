@@ -4,8 +4,7 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -disable-experimental-parser-round-trip \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler

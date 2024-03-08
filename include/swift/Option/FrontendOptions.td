@@ -1240,6 +1240,13 @@ def disable_import_ptrauth_field_function_pointers :
   Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
   HelpText<"Disable import of custom ptrauth qualified field function pointers">;
 
+def enable_lifetime_dependence_diagnostics :
+  Flag<["-"], "enable-lifetime-dependence-diagnostics">,
+  HelpText<"Enable lifetime dependence diagnostics for Nonescapable types.">;
+def disable_lifetime_dependence_diagnostics :
+  Flag<["-"], "disable-lifetime-dependence-diagnostics">,
+  HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
+
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,
   HelpText<"Enable collocate metadata functions">;
