@@ -60,6 +60,10 @@ extension Context {
       _bridged.lookupFunction($0).function
     }
   }
+
+  func notifyNewFunction(function: Function, derivedFrom: Function) {
+    _bridged.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
+  }
 }
 
 /// A context which allows mutation of a function's SIL.
@@ -357,7 +361,7 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: _bridged.mangleOutlinedVariable(function.bridged))
   }
 
-  func mangle(withClosureArgs closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
+  func mangle(withClosureArguments closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
     closureArgs.withBridgedValues { bridgedClosureArgsRef in
       closureArgIndices.withBridgedArrayRef{bridgedClosureArgIndicesRef in 
         String(taking: _bridged.mangleWithClosureArgs(
@@ -392,13 +396,13 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func buildSpecializedFunction(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> ()) {
+  func buildSpecializedFunction<T>(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> T) -> T {
     let nestedFunctionPassContext = 
         FunctionPassContext(_bridged: _bridged.initializeNestedPassContext(specializedFunction.bridged))
 
       defer { _bridged.deinitializedNestedPassContext() }
 
-      buildFn(specializedFunction, nestedFunctionPassContext)
+      return buildFn(specializedFunction, nestedFunctionPassContext)
   }
 }
 

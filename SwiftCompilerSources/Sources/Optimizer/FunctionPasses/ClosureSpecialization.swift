@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -118,10 +118,55 @@ let generalClosureSpecialization = FunctionPass(name: "experimental-swift-based-
 
 let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-specialization") {
   (function: Function, context: FunctionPassContext) in
-  // TODO: Pass is a WIP and current implementation is incomplete
-  if !function.isAutodiffVJP {
+
+  guard !function.isAvailableExternally,
+        function.isAutodiffVJP,
+        function.blocks.singleElement != nil else {
     return
   }
+  
+  var remainingSpecializationRounds = 5
+  var callerModified = false
+
+  repeat {
+    var callSites = gatherCallSites(in: function, context)
+
+    if !callSites.isEmpty {
+      for callSite in callSites {
+        var (specializedFunction, alreadyExists) = getOrCreateSpecializedFunction(basedOn: callSite, context)
+
+        if !alreadyExists {
+          context.notifyNewFunction(function: specializedFunction, derivedFrom: callSite.applyCallee)
+        }
+
+        rewriteApplyInstruction(using: specializedFunction, callSite: callSite, context)
+      }
+
+      var deadClosures: InstructionWorklist = callSites.reduce(into: InstructionWorklist(context)) { deadClosures, callSite in
+        callSite.closureArgDescriptors
+          .map { $0.closure }
+          .forEach { deadClosures.pushIfNotVisited($0) }
+      }
+
+      defer {
+        deadClosures.deinitialize()
+      }
+
+      while let deadClosure = deadClosures.pop() {
+        let isDeleted = context.tryDeleteDeadClosure(closure: deadClosure as! SingleValueInstruction)
+        if isDeleted {
+          context.notifyInvalidatedStackNesting()
+        }
+      }
+
+      if context.needFixStackNesting {
+        function.fixStackNesting(context)
+      }
+    }
+
+    callerModified = callSites.count > 0
+    remainingSpecializationRounds -= 1
+  } while callerModified && remainingSpecializationRounds > 0
 }
 
 // =========== Top-level functions ========== //
@@ -199,8 +244,59 @@ private func getOrCreateSpecializedFunction(basedOn callSite: CallSite, _ contex
   return (specializedFunction, false)
 }
 
-private func rewriteApplyInstruction(in caller: Function, _ context: FunctionPassContext) {
-  fatalError("Not implemented")
+private func rewriteApplyInstruction(using specializedCallee: Function, callSite: CallSite, 
+                                     _ context: FunctionPassContext) {
+  let newApplyArgs = callSite.getArgumentsForSpecializedApply(of: specializedCallee)
+
+  for newApplyArg in newApplyArgs {
+    if case let .PreviouslyCaptured(capturedArg, needsRetain, parentClosureArgIndex) = newApplyArg,
+       needsRetain 
+    {
+      let closureArgDesc = callSite.closureArgDesc(at: parentClosureArgIndex)!
+      var builder = Builder(before: closureArgDesc.closure, context)
+
+      if callSite.applySite.parentBlock != closureArgDesc.closure.parentBlock {
+        // Emit the retain and release that keeps the argument live across the callee using the closure.
+        builder.createCopyValue(operand: capturedArg)
+
+        for instr in closureArgDesc.lifetimeFrontier {
+          builder = Builder(before: instr, context)
+          builder.createDestroyValue(operand: capturedArg)
+        }
+
+        // Emit the retain that matches the captured argument by the partial_apply in the callee that is consumed by
+        // the partial_apply.
+        builder = Builder(before: callSite.applySite, context)
+        builder.createCopyValue(operand: capturedArg)
+      } else {
+        builder.createCopyValue(operand: capturedArg)
+      }
+    }
+  }
+
+  // Rewrite apply instruction
+  var builder = Builder(before: callSite.applySite, context)
+  let oldApply = callSite.applySite as! PartialApplyInst
+  let funcRef = builder.createFunctionRef(specializedCallee)
+  let capturedArgs = Array(newApplyArgs.map { $0.value })
+
+  let newApply = builder.createPartialApply(function: funcRef, substitutionMap: SubstitutionMap(), 
+                                            capturedArguments: capturedArgs, calleeConvention: oldApply.calleeConvention,
+                                            hasUnknownResultIsolation: oldApply.hasUnknownResultIsolation,
+                                            isOnStack: oldApply.isOnStack)
+
+  builder = Builder(before: callSite.applySite.next!, context)
+  for closureArgDesc in callSite.closureArgDescriptors {
+    if closureArgDesc.isClosureConsumed,
+       !closureArgDesc.isPartialApplyOnStack,
+       !closureArgDesc.parameterInfo.isTrivialNoescapeClosure
+    {
+      builder.createDestroyValue(operand: closureArgDesc.closure)
+    }
+  }
+
+  oldApply.uses.replaceAll(with: newApply, context)
+  context.erase(instruction: oldApply)
 }
 
 // ===================== Utility functions and extensions ===================== //
@@ -337,14 +433,6 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
       possibleMarkDependenceBases.insert(mv)
       rootClosurePossibleLiveRange.insert(use.instruction)
 
-    // Uses of a copy of root-closure do not count as
-    // uses of the root-closure
-    case is CopyValueInst:
-      rootClosurePossibleLiveRange.insert(use.instruction)
-    
-    case is DestroyValueInst:
-      rootClosurePossibleLiveRange.insert(use.instruction)
-
     case let mdi as MarkDependenceInst:
       if possibleMarkDependenceBases.contains(mdi.base),  
           mdi.value == use.value,
@@ -355,6 +443,24 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
         rootClosurePossibleLiveRange.insert(use.instruction)
       }
     
+    case is CopyValueInst,
+         is DestroyValueInst,
+         is RetainValueInst,
+         is ReleaseValueInst,
+         is StrongRetainInst,
+         is StrongReleaseInst:
+      rootClosurePossibleLiveRange.insert(use.instruction)
+
+    case let ti as TupleInst:
+      if ti.parentFunction.isAutodiffVJP,
+         let returnInst = ti.parentFunction.returnInstruction,
+         ti == returnInst.returnedValue
+      {
+        // This is the pullback closure returned from an Autodiff VJP and we don't need to handle it.
+      } else {
+        fallthrough
+      }
+
     default:
       foundUnexpectedUse = true
       log("Found unexpected direct or transitive user of root closure: \(use.instruction)")
@@ -510,7 +616,7 @@ private func isClosureApplied(in callee: Function, closureArgIndex index: Int) -
     let closureArg = callee.argument(at: index)
 
     for use in closureArg.uses {
-      if let fai = use.instruction as? FullApplySite {
+      if let fai = use.instruction as? ApplySite {
         if fai.callee == closureArg {
           return true
         }
@@ -657,7 +763,7 @@ private extension SpecializationCloner {
                   ? Builder(atStartOf: clonedFunction, self.context)
                   : Builder(atEndOf: clonedEntryBlock, location: clonedEntryBlock.instructions.last!.location, self.context)
 
-    let clonedRootClosure = builder.cloneRootClosure(representedBy: closureArgDesc, capturedArgs: clonedClosureArgs)
+    let clonedRootClosure = builder.cloneRootClosure(representedBy: closureArgDesc, capturedArguments: clonedClosureArgs)
 
     let (finalClonedReabstractedClosure, releasableClonedReabstractedClosures) = 
       builder.cloneRootClosureReabstractions(rootClosure: closureArgDesc.closure, clonedRootClosure: clonedRootClosure,
@@ -673,28 +779,27 @@ private extension SpecializationCloner {
     -> (origToClonedValueMap: [HashableValue: Value], capturedArgRange: Range<Int>) 
   {
     var origToClonedValueMap: [HashableValue: Value] = [:]
-    var capturedArgRange = 0..<0
     let clonedFunction = self.cloned
     let clonedEntryBlock = self.entryBlock
 
-    if let capturedArgs = closureArgDesc.arguments {
-      let capturedArgRangeStart = clonedEntryBlock.arguments.count
-
-      for arg in capturedArgs {
-        let capturedArg = clonedEntryBlock.addFunctionArgument(type: arg.type.getLoweredType(in: clonedFunction), 
-                                                               self.context)
-        origToClonedValueMap[arg] = capturedArg
-      }
-
-      let capturedArgRangeEnd = clonedEntryBlock.arguments.count
-      capturedArgRange = capturedArgRangeStart..<capturedArgRangeEnd
+    let capturedArgRangeStart = clonedEntryBlock.arguments.count
+      
+    for arg in closureArgDesc.arguments {
+      let capturedArg = clonedEntryBlock.addFunctionArgument(type: arg.type.getLoweredType(in: clonedFunction), 
+                                                              self.context)
+      origToClonedValueMap[arg] = capturedArg
     }
+
+    let capturedArgRangeEnd = clonedEntryBlock.arguments.count
+    let capturedArgRange = capturedArgRangeStart == capturedArgRangeEnd 
+                           ? 0..<0 
+                           : capturedArgRangeStart..<capturedArgRangeEnd
 
     return (origToClonedValueMap, capturedArgRange)
   }
 
   private func insertCleanupCodeForClonedReleasableClosures(from callSite: CallSite, 
-                                                            closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]]) 
+                                                            closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]])
   {
     for closureArgDesc in callSite.closureArgDescriptors {
       let allClonedReleasableClosures = closureArgIndexToAllClonedReleasableClosures[closureArgDesc.closureArgIndex]!
@@ -716,15 +821,19 @@ private extension SpecializationCloner {
 
           for closure in allClonedReleasableClosures {
             if let pai = closure as? PartialApplyInst,
-               pai.isOnStack  
+               pai.isOnStack
             {
-              builder.destroyPartialApplyOnStack(paiOnStack: pai)
-            } else{
+              builder.destroyPartialApplyOnStack(paiOnStack: pai, self.context)  
+            } else {
               builder.createDestroyValue(operand: closure)
             }
           }
         }
       }
+    }
+
+    if (self.context.needFixStackNesting) {
+      self.cloned.fixStackNesting(self.context)
     }
   }
 }
@@ -740,15 +849,73 @@ private extension [HashableValue: Value] {
   }
 }
 
+private extension CallSite {
+  enum NewApplyArg {
+    case Original(Value)
+    // TODO: This can be simplified in OSSA. We can just do a copy_value for everything - except for addresses???
+    case PreviouslyCaptured(
+      value: Value, needsRetain: Bool, parentClosureArgIndex: Int)
+
+    var value: Value {
+      switch self {
+      case let .Original(originalArg):
+        return originalArg
+      case let .PreviouslyCaptured(capturedArg, _, _):
+        return capturedArg
+      }
+    }
+  }
+
+  func getArgumentsForSpecializedApply(of specializedCallee: Function) -> [NewApplyArg]
+  {
+    var newApplyArgs: [NewApplyArg] = []
+
+    // Original arguments
+    for (applySiteIndex, arg) in self.applySite.arguments.enumerated() {
+      let calleeArgIndex = self.applySite.unappliedArgumentCount + applySiteIndex
+      if !self.hasClosureArg(at: calleeArgIndex) {
+        newApplyArgs.append(.Original(arg))
+      }
+    }
+
+    // Previously captured arguments
+    for closureArgDesc in self.closureArgDescriptors {
+      for (applySiteIndex, capturedArg) in closureArgDesc.arguments.enumerated() {
+        let needsRetain = closureArgDesc.isCapturedArgNonTrivialObjectType(applySiteIndex: applySiteIndex, 
+                                                                           specializedCallee: specializedCallee)
+
+        newApplyArgs.append(.PreviouslyCaptured(value: capturedArg, needsRetain: needsRetain, 
+                                                parentClosureArgIndex: closureArgDesc.closureArgIndex))
+      }
+    }
+
+    return newApplyArgs
+  }
+}
+
+private extension ClosureArgDescriptor {
+  func isCapturedArgNonTrivialObjectType(applySiteIndex: Int, specializedCallee: Function) -> Bool {
+    precondition(self.closure is PartialApplyInst, "ClosureArgDescriptor is not for a partial_apply closure!")
+
+    let capturedArg = self.arguments[applySiteIndex]
+    let pai = self.closure as! PartialApplyInst
+    let capturedArgIndexInCallee = applySiteIndex + pai.unappliedArgumentCount
+    let capturedArgConvention = self.callee.argumentConventions[capturedArgIndexInCallee]
+
+    return !capturedArg.type.isTrivial(in: specializedCallee) && 
+           !capturedArgConvention.isAllowedIndirectConvForClosureSpec
+  }
+}
+
 private extension Builder {
-  func cloneRootClosure(representedBy closureArgDesc: ClosureArgDescriptor, capturedArgs: [Value]) 
+  func cloneRootClosure(representedBy closureArgDesc: ClosureArgDescriptor, capturedArguments: [Value]) 
     -> SingleValueInstruction 
   {
     let function = self.createFunctionRef(closureArgDesc.callee)
 
     if let pai = closureArgDesc.closure as? PartialApplyInst {
       return self.createPartialApply(function: function, substitutionMap: SubstitutionMap(), 
-                                     capturedArguments: capturedArgs, calleeConvention: pai.calleeConvention,
+                                     capturedArguments: capturedArguments, calleeConvention: pai.calleeConvention,
                                      hasUnknownResultIsolation: pai.hasUnknownResultIsolation, 
                                      isOnStack: pai.isOnStack)
     } else {
@@ -822,7 +989,7 @@ private extension Builder {
     return (finalClonedReabstractedClosure as! SingleValueInstruction, releasableClonedReabstractedClosures)
   }
 
-  func destroyPartialApplyOnStack(paiOnStack: PartialApplyInst) {
+  func destroyPartialApplyOnStack(paiOnStack: PartialApplyInst, _ context: FunctionPassContext){
     precondition(paiOnStack.isOnStack, "Function must only be called for `partial_apply`s on stack!")
 
     for arg in paiOnStack.arguments {
@@ -1040,6 +1207,9 @@ private struct ClosureArgDescriptor {
   var closure: SingleValueInstruction {
     closureInfo.closure
   }
+  var lifetimeFrontier: [Instruction] {
+    closureInfo.lifetimeFrontier
+  }
 
   var isPartialApplyOnStack: Bool {
     if let pai = closure as? PartialApplyInst {
@@ -1076,11 +1246,12 @@ private struct ClosureArgDescriptor {
     }
   }
 
-  var arguments: LazyMapSequence<OperandArray, Value>? {
+  var arguments: LazyMapSequence<OperandArray, Value> {
     if let pai = closure as? PartialApplyInst {
       return pai.arguments
     }
-    return nil as LazyMapSequence<OperandArray, Value>?
+
+    return OperandArray.empty.lazy.map { $0.value } as LazyMapSequence<OperandArray, Value>
   }
 
   var isClosureGuaranteed: Bool {
@@ -1133,7 +1304,7 @@ private struct CallSite {
     let closureArgs = Array(self.closureArgDescriptors.map { $0.closure })
     let closureIndices = Array(self.closureArgDescriptors.map { $0.closureArgIndex })
 
-    return context.mangle(withClosureArgs: closureArgs, closureArgIndices: closureIndices, 
+    return context.mangle(withClosureArguments: closureArgs, closureArgIndices: closureIndices, 
                           from: applyCallee)
   }
 }
@@ -1165,5 +1336,17 @@ let specializedFunctionSignatureAndBodyTest = FunctionTest(
     let (specializedFunction, _) = getOrCreateSpecializedFunction(basedOn: callSite, context)
     print("Generated specialized function: \(specializedFunction.name)")
     print("\(specializedFunction)\n")
+  }
+}
+
+let rewrittenCallerBodyTest = FunctionTest("closure_specialize_rewritten_caller_body") { function, arguments, context in
+  var callSites = gatherCallSites(in: function, context)
+
+  for callSite in callSites {
+    let (specializedFunction, _) = getOrCreateSpecializedFunction(basedOn: callSite, context)
+    rewriteApplyInstruction(using: specializedFunction, callSite: callSite, context)
+
+    print("Rewritten caller body for: \(function.name):")
+    print("\(function)\n")
   }
 }

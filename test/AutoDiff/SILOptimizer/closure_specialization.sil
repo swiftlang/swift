@@ -51,6 +51,22 @@ bb0(%0 : $Float):
   // CHECK: strong_release %4 : $@callee_guaranteed (Float) -> (Float, Float) // id: %6
   // CHECK: return
 
+   //=========== Test rewritten body ===========//
+  specify_test "closure_specialize_rewritten_caller_body"
+  // CHECK-LABEL: Rewritten caller body for: $s4test1fyS2fFTJrSpSr
+  // CHECK: sil hidden @$s4test1fyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {                                 
+  // CHECK: bb0(%0 : $Float):
+  // CHECK: %2 = struct_extract %0 : $Float, #Float._value  // users: %3, %3
+  // CHECK: %3 = builtin "fmul_FPIEEE32"(%2 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %4
+  // CHECK: %4 = struct $Float (%3 : $Builtin.FPIEEE32)     // user: %11
+  // CHECK: %5 = function_ref @$vjpMultiply : $@convention(thin) (Float, Float, Float) -> (Float, Float) // user: %6
+  // CHECK: %6 = partial_apply [callee_guaranteed] %5(%0, %0) : $@convention(thin) (Float, Float, Float) -> (Float, Float) // user: %10
+  // CHECK: %8 = function_ref @$s11$pullback_f12$vjpMultiplyS2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float // user: %9
+  // CHECK: %9 = partial_apply [callee_guaranteed] %8(%0, %0) : $@convention(thin) (Float, Float, Float) -> Float // user: %11
+  // CHECK: release_value %6 : $@callee_guaranteed (Float) -> (Float, Float) // id: %10
+  // CHECK: %11 = tuple (%4 : $Float, %9 : $@callee_guaranteed (Float) -> Float) // user: %12
+  // CHECK: return %11
+
   debug_value %0 : $Float, let, name "x", argno 1 // id: %1
   %2 = struct_extract %0 : $Float, #Float._value  // users: %3, %3
   %3 = builtin "fmul_FPIEEE32"(%2 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %4
@@ -120,6 +136,32 @@ bb0(%0 : $Float):
   // CHECK: %17 = apply %6(%13) : $@callee_guaranteed (Float) -> Float // user: %20
   // CHECK: strong_release %6 : $@callee_guaranteed (Float) -> Float // id: %18
   // CHECK: return  
+
+  //=========== Test rewritten body ===========//
+  specify_test "closure_specialize_rewritten_caller_body"
+  // CHECK-LABEL: Rewritten caller body for: $s4test1gyS2fFTJrSpSr
+  // CHECK: sil hidden @$s4test1gyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+  // CHECK: bb0(%0 : $Float):
+  // CHECK:  %2 = struct_extract %0 : $Float, #Float._value  // users: %7, %3
+  // CHECK:  %3 = builtin "int_sin_FPIEEE32"(%2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %11, %4
+  // CHECK:  %4 = struct $Float (%3 : $Builtin.FPIEEE32)     // users: %17, %14
+  // CHECK:  %5 = function_ref @$vjpSin : $@convention(thin) (Float, Float) -> Float // user: %6
+  // CHECK:  %6 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (Float, Float) -> Float // user: %18
+  // CHECK:  %7 = builtin "int_cos_FPIEEE32"(%2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %11, %8
+  // CHECK:  %8 = struct $Float (%7 : $Builtin.FPIEEE32)     // users: %17, %14
+  // CHECK:  %9 = function_ref @$vjpCos : $@convention(thin) (Float, Float) -> Float // user: %10
+  // CHECK:  %10 = partial_apply [callee_guaranteed] %9(%0) : $@convention(thin) (Float, Float) -> Float // user: %19
+  // CHECK:  %11 = builtin "fmul_FPIEEE32"(%3 : $Builtin.FPIEEE32, %7 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %12
+  // CHECK:  %12 = struct $Float (%11 : $Builtin.FPIEEE32)   // user: %21
+  // CHECK:  %13 = function_ref @$vjpMultiply : $@convention(thin) (Float, Float, Float) -> (Float, Float) // user: %14
+  // CHECK:  %14 = partial_apply [callee_guaranteed] %13(%8, %4) : $@convention(thin) (Float, Float, Float) -> (Float, Float) // user: %20
+  // CHECK:  %16 = function_ref @$s11$pullback_g7$vjpSinSf0B3CosSf0B8MultiplyS2fTf1nccc_n : $@convention(thin) (Float, Float, Float, Float, Float) -> Float // user: %17
+  // CHECK:  %17 = partial_apply [callee_guaranteed] %16(%0, %0, %8, %4) : $@convention(thin) (Float, Float, Float, Float, Float) -> Float // user: %21
+  // CHECK:  release_value %6 : $@callee_guaranteed (Float) -> Float // id: %18
+  // CHECK:  release_value %10 : $@callee_guaranteed (Float) -> Float // id: %19
+  // CHECK:  release_value %14 : $@callee_guaranteed (Float) -> (Float, Float) // id: %20
+  // CHECK:  %21 = tuple (%12 : $Float, %17 : $@callee_guaranteed (Float) -> Float) // user: %22
+  // CHECK:  return %21
 
   debug_value %0 : $Float, let, name "x", argno 1 // id: %1
   %2 = struct_extract %0 : $Float, #Float._value  // users: %7, %3
@@ -197,7 +239,23 @@ bb0(%0 : $X):
   // CHECK:   %5 = apply %4(%0) : $@callee_guaranteed (Float) -> X.TangentVector // user: %7
   // CHECK:   strong_release %4 : $@callee_guaranteed (Float) -> X.TangentVector // id: %6
   // CHECK:   return %5 : $X.TangentVector                    // id: %7
-
+  
+  //=========== Test rewritten body ===========//
+  specify_test "closure_specialize_rewritten_caller_body"
+  // CHECK-LABEL: Rewritten caller body for: $s5test21g1xSfAA1XV_tFTJrSpSr
+  // CHECK: sil hidden @$s5test21g1xSfAA1XV_tFTJrSpSr : $@convention(thin) (X) -> (Float, @owned @callee_guaranteed (Float) -> X.TangentVector) {
+  // CHECK: bb0(%0 : $X):
+  // CHECK:  %1 = struct_extract %0 : $X, #X.a               // user: %10
+  // CHECK:  %2 = function_ref @pullback_f : $@convention(thin) (Float, Double) -> X.TangentVector // user: %3
+  // CHECK:  %3 = thin_to_thick_function %2 : $@convention(thin) (Float, Double) -> X.TangentVector to $@callee_guaranteed (Float, Double) -> X.TangentVector // users: %9, %5
+  // CHECK:  %4 = function_ref @subset_parameter_thunk : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector // user: %5
+  // CHECK:  %5 = partial_apply [callee_guaranteed] %4(%3) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
+  // CHECK:  %7 = function_ref @$s10pullback_g0A2_fTf1nc_n : $@convention(thin) (Float) -> X.TangentVector // user: %8
+  // CHECK:  %8 = partial_apply [callee_guaranteed] %7() : $@convention(thin) (Float) -> X.TangentVector // user: %10
+  // CHECK:  release_value %3 : $@callee_guaranteed (Float, Double) -> X.TangentVector // id: %9
+  // CHECK:  %10 = tuple (%1 : $Float, %8 : $@callee_guaranteed (Float) -> X.TangentVector) // user: %11
+  // CHECK:  return %10
+  
   %1 = struct_extract %0 : $X, #X.a               // user: %8
   // function_ref pullback_f
   %2 = function_ref @pullback_f : $@convention(thin) (Float, Double) -> X.TangentVector // user: %3
@@ -263,6 +321,29 @@ bb0(%0 : $Float):
   // CHECK:   strong_release %11 : $@callee_guaranteed (Float) -> Float // id: %13
   // CHECK:   return %12 : $Float
 
+  //=========== Test rewritten body ===========//
+  specify_test "closure_specialize_rewritten_caller_body"
+  // CHECK-LABEL: Rewritten caller body for: $s5test21h1xS2f_tFTJrSpSr
+  // CHECK:sil hidden @$s5test21h1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+  // CHECK:bb0(%0 : $Float):
+  // CHECK:  %1 = struct_extract %0 : $Float, #Float._value  // users: %2, %2
+  // CHECK:  %2 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %12
+  // CHECK:  %3 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float) // user: %4
+  // CHECK:  %4 = partial_apply [callee_guaranteed] %3(%0, %0) : $@convention(thin) (Float, Float, Float) -> (Float, Float) // users: %16, %6
+  // CHECK:  %5 = function_ref @$sS3fIegydd_S3fIegnrr_TR : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> (@out Float, @out Float) // user: %6
+  // CHECK:  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> (@out Float, @out Float) // user: %7
+  // CHECK:  %7 = convert_function %6 : $@callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float) to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float> // user: %9
+  // CHECK:  %8 = function_ref @pullback_f_specialized : $@convention(thin) (@in_guaranteed Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> @out Float // user: %9
+  // CHECK:  %9 = partial_apply [callee_guaranteed] %8(%7) : $@convention(thin) (@in_guaranteed Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> @out Float // user: %11
+  // CHECK:  %10 = function_ref @$sS2fIegnr_S2fIegyd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float // user: %11
+  // CHECK:  %11 = partial_apply [callee_guaranteed] %10(%9) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
+  // CHECK:  %12 = struct $Float (%2 : $Builtin.FPIEEE32)    // user: %17
+  // CHECK:  %14 = function_ref @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float // user: %15
+  // CHECK:  %15 = partial_apply [callee_guaranteed] %14(%0, %0) : $@convention(thin) (Float, Float, Float) -> Float // user: %17
+  // CHECK:  release_value %4 : $@callee_guaranteed (Float) -> (Float, Float) // id: %16
+  // CHECK:  %17 = tuple (%12 : $Float, %15 : $@callee_guaranteed (Float) -> Float) // user: %18
+  // CHECK:  return %17
+
   %1 = struct_extract %0 : $Float, #Float._value  // users: %2, %2
   %2 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %12
   
@@ -327,6 +408,21 @@ bb0(%0 : $Float):
   // CHECK:   %5 = apply %4(%0) : $@callee_guaranteed (Float) -> Float // user: %7
   // CHECK:   strong_release %4 : $@callee_guaranteed (Float) -> Float // id: %6
   // CHECK:   return %5 : $Float
+
+  //=========== Test rewritten body ===========//
+  specify_test "closure_specialize_rewritten_caller_body"
+  // CHECK-LABEL: Rewritten caller body for: $s5test21z1xS2f_tFTJrSpSr
+  // CHECK: sil hidden @$s5test21z1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+  // CHECK: bb0(%0 : $Float):
+  // CHECK:   %1 = function_ref @pullback_y_specialized : $@convention(thin) (@in_guaranteed Float) -> @out Float // user: %2
+  // CHECK:   %2 = thin_to_thick_function %1 : $@convention(thin) (@in_guaranteed Float) -> @out Float to $@callee_guaranteed (@in_guaranteed Float) -> @out Float // users: %8, %4
+  // CHECK:   %3 = function_ref @reabstraction_thunk : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float // user: %4
+  // CHECK:   %4 = partial_apply [callee_guaranteed] %3(%2) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
+  // CHECK:   %6 = function_ref @$s10pullback_z0A14_y_specializedTf1nc_n : $@convention(thin) (Float) -> Float // user: %7
+  // CHECK:   %7 = partial_apply [callee_guaranteed] %6() : $@convention(thin) (Float) -> Float // user: %9
+  // CHECK:   release_value %2 : $@callee_guaranteed (@in_guaranteed Float) -> @out Float // id: %8
+  // CHECK:   %9 = tuple (%0 : $Float, %7 : $@callee_guaranteed (Float) -> Float) // user: %10
+  // CHECK:   return %9
 
   // function_ref pullback_y_specialized
   %1 = function_ref @pullback_y_specialized : $@convention(thin) (@in_guaranteed Float) -> @out Float // user: %2
