@@ -1656,8 +1656,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   if (bool(requireNCGenerics)) {
     genericSubInvocation.getLangOptions()
                         .enableFeature(Feature::NoncopyableGenerics);
-    genericSubInvocation.getLangOptions()
-      .EnableExperimentalAssociatedTypeInference = true;
   }
 
   // Pass-down the obfuscators so we can get the serialized search paths properly.
