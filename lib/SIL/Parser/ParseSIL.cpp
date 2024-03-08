@@ -2606,7 +2606,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AllocBoxInst: {
     bool hasDynamicLifetime = false;
     bool hasReflection = false;
-    bool usesMoveableValueDebugInfo = false;
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+        DoesNotUseMoveableValueDebugInfo;
     bool hasPointerEscape = false;
     StringRef attrName;
     SourceLoc attrLoc;
@@ -2616,7 +2617,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       } else if (attrName.equals("reflection")) {
         hasReflection = true;
       } else if (attrName.equals("moveable_value_debuginfo")) {
-        usesMoveableValueDebugInfo = true;
+        usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
       } else if (attrName.equals("pointer_escape")) {
         hasPointerEscape = true;
       } else {
@@ -2636,7 +2637,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     if (Ty.isMoveOnly())
-      usesMoveableValueDebugInfo = true;
+      usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
     ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
                                  hasDynamicLifetime, hasReflection,

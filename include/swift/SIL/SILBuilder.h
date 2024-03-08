@@ -478,7 +478,8 @@ public:
   createAllocBox(SILLocation loc, SILType fieldType,
                  std::optional<SILDebugVariable> Var = std::nullopt,
                  bool hasDynamicLifetime = false, bool reflection = false,
-                 bool usesMoveableValueDebugInfo = false,
+                 UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+                     DoesNotUseMoveableValueDebugInfo,
                  bool hasPointerEscape = false) {
     return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
                           hasDynamicLifetime, reflection,
@@ -491,7 +492,8 @@ public:
   createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                  std::optional<SILDebugVariable> Var = std::nullopt,
                  bool hasDynamicLifetime = false, bool reflection = false,
-                 bool usesMoveableValueDebugInfo = false,
+                 UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+                     DoesNotUseMoveableValueDebugInfo,
                  bool skipVarDeclAssert = false,
                  bool hasPointerEscape = false) {
 #if NDEBUG

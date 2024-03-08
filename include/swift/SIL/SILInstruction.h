@@ -2424,15 +2424,17 @@ class AllocBoxInst final
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                std::optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-               bool reflection = false, bool usesMoveableValueDebugInfo = false,
+               bool reflection = false,
+               UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+                   DoesNotUseMoveableValueDebugInfo,
                bool hasPointerEscape = false);
 
-  static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
-                              SILFunction &F,
-                              std::optional<SILDebugVariable> Var,
-                              bool hasDynamicLifetime, bool reflection = false,
-                              bool usesMoveableValueDebugInfo = false,
-                              bool hasPointerEscape = false);
+  static AllocBoxInst *create(
+      SILDebugLocation Loc, CanSILBoxType boxType, SILFunction &F,
+      std::optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+      bool reflection = false,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool hasPointerEscape = false);
 
 public:
   CanSILBoxType getBoxType() const {
@@ -2470,7 +2472,8 @@ public:
   };
 
   void setUsesMoveableValueDebugInfo() {
-    sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo = true;
+    sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
+        (bool)UsesMoveableValueDebugInfo;
   }
 
   bool usesMoveableValueDebugInfo() const {
