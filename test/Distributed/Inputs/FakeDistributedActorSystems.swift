@@ -385,6 +385,8 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
   var returnType: Any.Type? = nil
   var errorType: Any.Type? = nil
 
+  public init() {}
+
   public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
     print(" > encode generic sub: \(String(reflecting: type))")
     genericSubs.append(type)
