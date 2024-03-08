@@ -406,7 +406,7 @@ public:
       SILLocation Loc, SILType elementType,
       std::optional<SILDebugVariable> Var = std::nullopt,
       HasDynamicLifetime_t dynamic = DoesNotHaveDynamicLifetime,
-      bool isLexical = false,
+      IsLexical_t isLexical = IsNotLexical,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;

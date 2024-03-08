@@ -1093,7 +1093,7 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
                                                  HasDynamicLifetime_t dynamic,
-                                                 bool isLexical,
+                                                 IsLexical_t isLexical,
                                                  bool generateDebugInfo) {
   ty = ty.getObjectType();
   std::optional<SILDebugVariable> DbgVar;
