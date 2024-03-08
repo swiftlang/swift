@@ -19,7 +19,7 @@
 // CHECK-LABEL: .Outer.InnerStruct.init()@
 // CHECK: Generic signature: <A, C where A : Escapable, C : Escapable>
 
-// CHECK: (normal_conformance type="Outer<A>.InnerStruct<C>" protocol="Escapable")
+// CHECK: (builtin_conformance type="Outer<A>.InnerStruct<C>" protocol="Escapable")
 
 // CHECK-LABEL: .Outer.InnerVariation1@
 // CHECK: Generic signature: <A, D where A : Escapable, D : Escapable>

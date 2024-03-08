@@ -1,8 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// rdar://122287787 (NCGenerics performance issues in regression tests)
-// UNSUPPORTED: noncopyable_generics
-
 struct SelfRecursiveStruct {
   let a: SelfRecursiveStruct // expected-error{{value type 'SelfRecursiveStruct' cannot have a stored property that recursively contains it}}
 }

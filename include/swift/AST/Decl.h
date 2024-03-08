@@ -3919,10 +3919,6 @@ public:
         TypeDecl::getOverriddenDecl());
   }
 
-  /// Determine whether this type has ~<target>` stated as
-  /// one of its inherited types.
-  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
-
   /// Retrieve the set of associated types overridden by this associated
   /// type.
   llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
@@ -4223,7 +4219,7 @@ public:
   ///
   /// This is used by deserialization of module files to report
   /// conformances.
-  void registerProtocolConformance(ProtocolConformance *conformance,
+  void registerProtocolConformance(NormalProtocolConformance *conformance,
                                    bool synthesized = false);
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
@@ -5258,10 +5254,6 @@ public:
   /// Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
-
-  /// Determine whether this protocol has ~<target>` stated on
-  /// itself, one of its inherited types or `Self` requirements.
-  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {

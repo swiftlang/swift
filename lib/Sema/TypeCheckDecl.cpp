@@ -3088,9 +3088,6 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
     return deriveImplicitSendableConformance(evaluator, nominal);
   case KnownProtocolKind::BitwiseCopyable:
     return deriveImplicitBitwiseCopyableConformance(nominal);
-  case KnownProtocolKind::Escapable:
-  case KnownProtocolKind::Copyable:
-    return deriveConformanceForInvertible(evaluator, nominal, kp);
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }

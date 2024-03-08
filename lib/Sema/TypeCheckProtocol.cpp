@@ -6106,10 +6106,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       tryDiagnoseExecutorConformance(Context, nominal, proto);
     } else if (NoncopyableGenerics
         && proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      checkCopyableConformance(conformance);
+      checkCopyableConformance(dc, conformance);
     } else if (NoncopyableGenerics
         && proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
-      checkEscapableConformance(conformance);
+      checkEscapableConformance(dc, conformance);
     } else if (Context.LangOpts.hasFeature(Feature::BitwiseCopyable) &&
                proto->isSpecificProtocol(KnownProtocolKind::BitwiseCopyable)) {
       checkBitwiseCopyableConformance(

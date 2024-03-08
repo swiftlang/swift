@@ -6657,16 +6657,6 @@ findInverseInInheritance(InheritedTypes inherited,
 }
 
 InverseMarking::Mark
-AssociatedTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  auto &ctx = getASTContext();
-
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::Mark();
-
-  return findInverseInInheritance(getInherited(), target);
-}
-
-InverseMarking::Mark
 NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   switch (target) {
   case InvertibleProtocolKind::Copyable:
@@ -6698,47 +6688,11 @@ NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   if (isa<BuiltinTupleDecl>(this))
     return InverseMarking::Mark(InverseMarking::Kind::Explicit);
 
-  if (auto P = dyn_cast<ProtocolDecl>(this))
-    return P->hasInverseMarking(target);
+  assert(!isa<ProtocolDecl>(this));
 
   // Search the inheritance clause first.
   if (auto inverse = findInverseInInheritance(getInherited(), target))
     return inverse;
-
-  return InverseMarking::Mark();
-}
-
-InverseMarking::Mark
-ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  auto &ctx = getASTContext();
-
-  // Legacy support stops here.
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::Mark();
-
-  if (auto inverse = findInverseInInheritance(getInherited(), target))
-    return inverse;
-
-  auto *whereClause = getTrailingWhereClause();
-  if (!whereClause)
-    return InverseMarking::Mark();
-
-  for (const auto &reqRepr : whereClause->getRequirements()) {
-    if (reqRepr.isInvalid() ||
-        reqRepr.getKind() != RequirementReprKind::TypeConstraint)
-      continue;
-
-    auto *subjectRepr =
-        dyn_cast<UnqualifiedIdentTypeRepr>(reqRepr.getSubjectRepr());
-    auto *constraintRepr = reqRepr.getConstraintRepr();
-
-    if (!subjectRepr || !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
-      continue;
-
-    if (constraintRepr->isInverseOf(target, getDeclContext()))
-      return InverseMarking::Mark(InverseMarking::Kind::Explicit,
-                                  constraintRepr->getLoc());
-  }
 
   return InverseMarking::Mark();
 }
