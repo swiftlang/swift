@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-6 -O)
 
-// XFAIL: noncopyable_generics
-
 //
 // REQUIRES: executable_test
 
