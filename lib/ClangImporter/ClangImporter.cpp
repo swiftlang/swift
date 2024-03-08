@@ -512,6 +512,7 @@ importer::getNormalInvocationArguments(
 
   bool EnableCXXInterop = LangOpts.EnableCXXInterop;
 
+  clang::Language interopLanguage;
   if (LangOpts.EnableObjCInterop) {
     invocationArgStrs.insert(invocationArgStrs.end(), {"-fobjc-arc"});
     // TODO: Investigate whether 7.0 is a suitable default version.
@@ -519,35 +520,22 @@ importer::getNormalInvocationArguments(
       invocationArgStrs.insert(invocationArgStrs.end(),
                                {"-fobjc-runtime=ios-7.0"});
 
+    interopLanguage = EnableCXXInterop ? clang::Language::ObjCXX : clang::Language::ObjC;
     invocationArgStrs.insert(invocationArgStrs.end(), {
       "-x", EnableCXXInterop ? "objective-c++" : "objective-c",
     });
   } else {
+    interopLanguage = EnableCXXInterop ? clang::Language::CXX : clang::Language::C;
     invocationArgStrs.insert(invocationArgStrs.end(), {
       "-x", EnableCXXInterop ? "c++" : "c",
     });
   }
 
   {
-    const clang::LangStandard &stdcxx =
-#if defined(CLANG_DEFAULT_STD_CXX)
-        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_CXX);
-#else
-        clang::LangStandard::getLangStandardForKind(
-            clang::LangStandard::lang_gnucxx14);
-#endif
-
-    const clang::LangStandard &stdc =
-#if defined(CLANG_DEFAULT_STD_C)
-        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_C);
-#else
-        clang::LangStandard::getLangStandardForKind(
-            clang::LangStandard::lang_gnu11);
-#endif
-
+    const clang::LangStandard &std =
+        clang::LangStandard::getDefaultLanguageStandard(interopLanguage, triple);
     invocationArgStrs.insert(invocationArgStrs.end(), {
-      (Twine("-std=") + StringRef(EnableCXXInterop ? stdcxx.getName()
-                                                   : stdc.getName())).str()
+      (Twine("-std=") + StringRef(std.getName())).str()
     });
   }
 
