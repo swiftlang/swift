@@ -1046,15 +1046,15 @@ public:
         MarkFunctionEscapeInst::create(getSILDebugLocation(Loc), vars, getFunction()));
   }
 
-  DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
-                                   SILDebugVariable Var,
-                                   bool poisonRefs = false,
-                                   bool wasMoved = false,
-                                   bool trace = false);
-  DebugValueInst *createDebugValueAddr(SILLocation Loc, SILValue src,
-                                       SILDebugVariable Var,
-                                       bool wasMoved = false,
-                                       bool trace = false);
+  DebugValueInst *createDebugValue(
+      SILLocation Loc, SILValue src, SILDebugVariable Var,
+      bool poisonRefs = false,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
+  DebugValueInst *createDebugValueAddr(
+      SILLocation Loc, SILValue src, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
 
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));

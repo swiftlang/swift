@@ -489,7 +489,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
             builder.createDebugValue(
                 dbgVarInst->getLoc(),
                 SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
-                false /*poison*/, true /*moved*/);
+                false /*poison*/, UsesMoveableValueDebugInfo);
           }
         }
         foundMove = true;
