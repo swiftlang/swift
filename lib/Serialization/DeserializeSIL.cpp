@@ -1333,7 +1333,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::AllocBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
-    bool hasDynamicLifetime = Attr & 0x1;
+    auto hasDynamicLifetime = HasDynamicLifetime_t(Attr & 0x1);
     bool reflection = (Attr >> 1) & 0x1;
     auto usesMoveableValueDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);

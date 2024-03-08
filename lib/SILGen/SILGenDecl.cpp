@@ -544,7 +544,7 @@ public:
     if (generateDebugInfo)
       DbgVar = SILDebugVariable(decl->isLet(), ArgNo);
     Box = SGF.B.createAllocBox(
-        decl, boxType, DbgVar, /*hasDynamicLifetime*/ false,
+        decl, boxType, DbgVar, DoesNotHaveDynamicLifetime,
         /*reflection*/ false, DoesNotUseMoveableValueDebugInfo,
         !generateDebugInfo);
 

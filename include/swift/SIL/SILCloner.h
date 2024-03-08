@@ -961,7 +961,7 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
       Inst,
       getBuilder().createAllocBox(
           Loc, this->getOpType(Inst->getType()).template castTo<SILBoxType>(),
-          VarInfo, /*hasDynamicLifetime*/ false,
+          VarInfo, DoesNotHaveDynamicLifetime,
           /*reflection*/ false, DoesNotUseMoveableValueDebugInfo,
           /*skipVarDeclAssert*/ true));
 }

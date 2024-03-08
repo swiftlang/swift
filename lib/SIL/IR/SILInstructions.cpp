@@ -378,8 +378,9 @@ bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() 
 AllocBoxInst::AllocBoxInst(
     SILDebugLocation Loc, CanSILBoxType BoxType,
     ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-    llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-    bool reflection, UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
+    llvm::Optional<SILDebugVariable> Var,
+    HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
     bool hasPointerEscape)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
@@ -402,7 +403,7 @@ AllocBoxInst::AllocBoxInst(
 AllocBoxInst *
 AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                      SILFunction &F, llvm::Optional<SILDebugVariable> Var,
-                     bool hasDynamicLifetime, bool reflection,
+                     HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
                      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
                      bool hasPointerEscape) {
   SmallVector<SILValue, 8> TypeDependentOperands;

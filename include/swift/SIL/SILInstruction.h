@@ -2362,16 +2362,16 @@ class AllocBoxInst final
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-               llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-               bool reflection = false,
+               llvm::Optional<SILDebugVariable> Var,
+               HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
                UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
                    DoesNotUseMoveableValueDebugInfo,
                bool hasPointerEscape = false);
 
   static AllocBoxInst *create(
       SILDebugLocation Loc, CanSILBoxType boxType, SILFunction &F,
-      llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-      bool reflection = false,
+      llvm::Optional<SILDebugVariable> Var,
+      HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool hasPointerEscape = false);
 
@@ -2381,11 +2381,11 @@ public:
   }
 
   void setDynamicLifetime() {
-    sharedUInt8().AllocBoxInst.dynamicLifetime = true;
+    sharedUInt8().AllocBoxInst.dynamicLifetime = (bool)HasDynamicLifetime;
   }
 
-  bool hasDynamicLifetime() const {
-    return sharedUInt8().AllocBoxInst.dynamicLifetime;
+  HasDynamicLifetime_t hasDynamicLifetime() const {
+    return HasDynamicLifetime_t(sharedUInt8().AllocBoxInst.dynamicLifetime);
   }
 
   void setHasPointerEscape(bool pointerEscape) {
