@@ -1125,7 +1125,7 @@ ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(SILLocation loc,
 }
 
 ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,
-                                            bool isLexical) {
+                                            IsLexical_t isLexical) {
   assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
   auto *mdi =
       createMoveValue(loc, value.forward(getSILGenFunction()), isLexical);

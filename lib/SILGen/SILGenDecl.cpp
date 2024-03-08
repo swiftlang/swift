@@ -781,7 +781,7 @@ public:
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
       if (value->getType().isMoveOnly(/*orWrapped=*/false)) {
-        value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
         return SGF.B.createMarkUnresolvedNonCopyableValueInst(
             PrologueLoc, value,
             MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -797,7 +797,7 @@ public:
       // move only wrapper and mark it as needing checking by the move cherk.
       value =
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -831,7 +831,7 @@ public:
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
         value->getType().isMoveOnly(/*orWrapped=*/false)) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -841,7 +841,7 @@ public:
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
     if (vd->isNoImplicitCopy()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true,
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical,
                                     /*hasPointerEscape=*/false,
                                     /*fromVarDecl=*/true);
       value =
@@ -855,14 +855,15 @@ public:
     // Otherwise, if we do not have a no implicit copy variable, just follow
     // the "normal path".
 
-    auto isLexical = SGF.F.getLifetime(vd, value->getType()).isLexical();
+    auto isLexical =
+        IsLexical_t(SGF.F.getLifetime(vd, value->getType()).isLexical());
 
     if (value->getOwnershipKind() == OwnershipKind::Owned)
-      return SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ isLexical,
+      return SGF.B.createMoveValue(PrologueLoc, value, isLexical,
                                    /*hasPointerEscape=*/false,
                                    /*fromVarDecl=*/true);
 
-    return SGF.B.createBeginBorrow(PrologueLoc, value, IsLexical_t(isLexical),
+    return SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
                                    /*hasPointerEscape=*/false,
                                    /*fromVarDecl=*/true);
   }

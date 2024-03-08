@@ -1426,7 +1426,7 @@ public:
   }
 
   MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
-                                 bool isLexical = false,
+                                 IsLexical_t isLexical = IsNotLexical,
                                  bool hasPointerEscape = false,
                                  bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
@@ -2849,7 +2849,7 @@ public:
   /// Convenience function that is a no-op for trivial values and inserts a
   /// move_value on non-trivial instructions.
   SILValue emitMoveValueOperation(SILLocation Loc, SILValue v,
-                                  bool isLexical = false,
+                                  IsLexical_t isLexical = IsNotLexical,
                                   bool hasPointerEscape = false,
                                   bool fromVarDecl = false) {
     assert(!v->getType().isAddress());

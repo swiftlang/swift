@@ -777,7 +777,7 @@ beginOwnedLexicalLifetimeAfterStore(AllocStackInst *asi, StoreInst *inst) {
 
   MoveValueInst *mvi = nullptr;
   SILBuilderWithScope::insertAfter(inst, [&](SILBuilder &builder) {
-    mvi = builder.createMoveValue(loc, stored, /*isLexical*/ true);
+    mvi = builder.createMoveValue(loc, stored, IsLexical);
   });
   StorageStateTracking<LiveValues> vals = {LiveValues::forOwned(stored, mvi),
                                            /*isStorageValid=*/true};
