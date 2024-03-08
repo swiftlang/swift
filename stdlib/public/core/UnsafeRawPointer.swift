@@ -490,7 +490,12 @@ extension UnsafeRawPointer: Strideable {
   // custom version for raw pointers
   @_transparent
   public func advanced(by n: Int) -> UnsafeRawPointer {
-    return UnsafeRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
+    _debugPrecondition(
+      n == 0 ||
+      (n > 0 ? (self < Self(bitPattern: -n)!) : (Self(bitPattern: -n)! < self)),
+      "Overflow in pointer arithmetic"
+    )
+    return .init(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 
@@ -1420,7 +1425,12 @@ extension UnsafeMutableRawPointer: Strideable {
   // custom version for raw pointers
   @_transparent
   public func advanced(by n: Int) -> UnsafeMutableRawPointer {
-    return UnsafeMutableRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
+    _debugPrecondition(
+      n == 0 ||
+      (n > 0 ? (self < Self(bitPattern: -n)!) : (Self(bitPattern: -n)! < self)),
+      "Overflow in pointer arithmetic"
+    )
+    return .init(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 
