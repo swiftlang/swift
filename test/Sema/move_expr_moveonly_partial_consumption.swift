@@ -18,10 +18,10 @@ extension Quad_NC {
   consuming func explicitEveryLeaf() {
     _ = consume p1.u1
     _ = consume p1.u2
-    _ = consume p1.c
+    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
     _ = consume p2.u1
     _ = consume p2.u2
-    _ = consume p2.c
+    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
   }
 
   consuming func explicitSomeNonStorage() {
@@ -112,18 +112,18 @@ func decompose(_ c: consuming Container_NC) {
 // ====================== NONCOPYABLE GENERIC (BEGIN) ========================{{
 // =============================================================================
 
-extension Quad_NCG {
+extension Quad_NCG where T : ~Copyable {
   consuming func explicitEveryLeaf() {
     _ = consume p1.u1
     _ = consume p1.u1.t
     _ = consume p1.u2
     _ = consume p1.u2.t
-    _ = consume p1.c
+    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
     _ = consume p2.u1
     _ = consume p2.u1.t
     _ = consume p2.u2
     _ = consume p2.u2.t
-    _ = consume p2.c
+    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
   }
 
   consuming func explicitSomeNonStorage() {
