@@ -1335,7 +1335,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     bool hasDynamicLifetime = Attr & 0x1;
     bool reflection = (Attr >> 1) & 0x1;
-    bool usesMoveableValueDebugInfo = (Attr >> 2) & 0x1;
+    auto usesMoveableValueDebugInfo =
+        UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
     bool pointerEscape = (Attr >> 3) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),

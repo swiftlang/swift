@@ -545,7 +545,7 @@ public:
       DbgVar = SILDebugVariable(decl->isLet(), ArgNo);
     Box = SGF.B.createAllocBox(
         decl, boxType, DbgVar, /*hasDynamicLifetime*/ false,
-        /*reflection*/ false, /*usesMoveableValueDebugInfo*/ false,
+        /*reflection*/ false, DoesNotUseMoveableValueDebugInfo,
         !generateDebugInfo);
 
     // Mark the memory as uninitialized, so DI will track it for us.

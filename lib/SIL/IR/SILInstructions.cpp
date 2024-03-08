@@ -373,12 +373,12 @@ bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() 
   return false;
 }
 
-AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
-                           ArrayRef<SILValue> TypeDependentOperands,
-                           SILFunction &F, llvm::Optional<SILDebugVariable> Var,
-                           bool hasDynamicLifetime, bool reflection,
-                           bool usesMoveableValueDebugInfo,
-                           bool hasPointerEscape)
+AllocBoxInst::AllocBoxInst(
+    SILDebugLocation Loc, CanSILBoxType BoxType,
+    ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
+    llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+    bool reflection, UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
+    bool hasPointerEscape)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
@@ -386,21 +386,23 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
   sharedUInt8().AllocBoxInst.reflection = reflection;
 
   // If we have a noncopyable type, always set uses mvoeable value debug info.
-  usesMoveableValueDebugInfo |=
-      BoxType->getLayout()->getFields()[0].getObjectType().isMoveOnly();
+  auto fieldTy = BoxType->getLayout()->getFields()[0].getObjectType();
+  if (fieldTy.isMoveOnly()) {
+    usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
+  }
 
   sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
-      usesMoveableValueDebugInfo;
+      (bool)usesMoveableValueDebugInfo;
 
   sharedUInt8().AllocBoxInst.pointerEscape = hasPointerEscape;
 }
 
-AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
-                                   SILFunction &F,
-                                   llvm::Optional<SILDebugVariable> Var,
-                                   bool hasDynamicLifetime, bool reflection,
-                                   bool usesMoveableValueDebugInfo,
-                                   bool hasPointerEscape) {
+AllocBoxInst *
+AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
+                     SILFunction &F, llvm::Optional<SILDebugVariable> Var,
+                     bool hasDynamicLifetime, bool reflection,
+                     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
+                     bool hasPointerEscape) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
