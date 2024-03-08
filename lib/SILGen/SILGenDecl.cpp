@@ -573,7 +573,7 @@ public:
       // requires one.
       Box = SGF.B.createBeginBorrow(
           decl, Box, IsLexical_t(lifetime.isLexical()),
-          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
+          DoesNotHavePointerEscape, /*fromVarDecl=*/true);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -864,7 +864,7 @@ public:
                                    /*fromVarDecl=*/true);
 
     return SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
-                                   /*hasPointerEscape=*/false,
+                                   DoesNotHavePointerEscape,
                                    /*fromVarDecl=*/true);
   }
 

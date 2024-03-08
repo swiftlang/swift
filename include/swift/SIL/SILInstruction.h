@@ -4564,7 +4564,7 @@ class BeginBorrowInst
   USE_SHARED_UINT8;
 
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue,
-                  IsLexical_t isLexical, bool hasPointerEscape,
+                  IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
                   bool fromVarDecl, bool fixed)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
@@ -4597,8 +4597,8 @@ public:
   }
 
   /// WARNING: this flag is not yet implemented!
-  bool hasPointerEscape() const {
-    return sharedUInt8().BeginBorrowInst.pointerEscape;
+  HasPointerEscape_t hasPointerEscape() const {
+    return HasPointerEscape_t(sharedUInt8().BeginBorrowInst.pointerEscape);
   }
   void setHasPointerEscape(bool pointerEscape) {
     sharedUInt8().BeginBorrowInst.pointerEscape = pointerEscape;

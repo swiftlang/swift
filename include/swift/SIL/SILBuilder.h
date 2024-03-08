@@ -823,11 +823,10 @@ public:
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
-  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
-                                     IsLexical_t isLexical = IsNotLexical,
-                                     bool hasPointerEscape = false,
-                                     bool fromVarDecl = false,
-                                     bool fixed = false) {
+  BeginBorrowInst *createBeginBorrow(
+      SILLocation Loc, SILValue LV, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool fromVarDecl = false, bool fixed = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
@@ -851,10 +850,10 @@ public:
     return createLoadBorrow(loc, v);
   }
 
-  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v,
-                                    IsLexical_t isLexical = IsNotLexical,
-                                    bool hasPointerEscape = false,
-                                    bool fromVarDecl = false) {
+  SILValue emitBeginBorrowOperation(
+      SILLocation loc, SILValue v, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool fromVarDecl = false) {
     if (!hasOwnership() ||
         v->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
       return v;
