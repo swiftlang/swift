@@ -653,6 +653,11 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   RunInlineTaskOptionRecord *runInlineOption = nullptr;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
+    case TaskOptionRecordKind::InitialSerialExecutor:
+      serialExecutor = cast<InitialSerialExecutorTaskOptionRecord>(option)
+                          ->getExecutorRef();
+      break;
+
     case TaskOptionRecordKind::InitialTaskExecutor:
       taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
