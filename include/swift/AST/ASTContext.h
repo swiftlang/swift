@@ -1302,15 +1302,17 @@ public:
   /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
-                            RootProtocolConformance *generic,
+                            NormalProtocolConformance *generic,
                             SubstitutionMap substitutions);
 
-  /// Produce an inherited conformance, for subclasses of a type
-  /// that already conforms to a protocol.
+  /// Produce an inherited conformance, which forwards all operations to a
+  /// base conformance, except for getType(), which must return some subclass
+  /// of the base conformance's conforming type. This models the case where a
+  /// subclass conforms to a protocol because its superclass already conforms.
   ///
   /// \param type The type for which we are retrieving the conformance.
   ///
-  /// \param inherited The inherited conformance.
+  /// \param inherited A normal or specialized conformance.
   ProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 

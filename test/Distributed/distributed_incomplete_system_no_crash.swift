@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking 2>&1 %s
 
-// XFAIL: noncopyable_generics
-
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

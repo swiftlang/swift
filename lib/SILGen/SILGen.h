@@ -85,7 +85,7 @@ public:
 
   /// The conformance for any DistributedActor to the Actor protocol,
   /// used only by the `distributedActorAsAnyActor` builtin.
-  RootProtocolConformance *distributedActorAsActorConformance = nullptr;
+  NormalProtocolConformance *distributedActorAsActorConformance = nullptr;
 
   size_t anonymousSymbolCounter = 0;
 

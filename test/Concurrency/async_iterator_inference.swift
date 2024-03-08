@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -disable-availability-checking -enable-experimental-associated-type-inference
-// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -disable-availability-checking -disable-experimental-associated-type-inference
+// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -disable-availability-checking
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)

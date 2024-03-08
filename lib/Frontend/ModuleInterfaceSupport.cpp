@@ -473,7 +473,7 @@ class InheritedProtocolCollector {
   }
 
   static bool isUncheckedConformance(ProtocolConformance *conformance) {
-    if (auto normal = conformance->getRootNormalConformance())
+    if (auto normal = dyn_cast<NormalProtocolConformance>(conformance->getRootConformance()))
       return normal->isUnchecked();
     return false;
   }

@@ -166,14 +166,13 @@ struct Silly: ~Copyable, Copyable {} // expected-error {{struct 'Silly' required
 enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sally' required to be 'Copyable' but is marked with '~Copyable'}}
 
 class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Copyable'}}
-                                      // expected-error@-1 {{class 'NiceTry' required to be 'Copyable' but is marked with '~Copyable}}
 
 @_moveOnly class NiceTry2: Copyable {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}
-                                       // expected-error@-1 {{class 'NiceTry2' required to be 'Copyable' but is marked with '~Copyable'}}
 
 
 struct Extendo: ~Copyable {}
 extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
+// expected-error@-1 {{struct 'Extendo' required to be 'Copyable' but is marked with '~Copyable'}}
 
 enum EnumExtendo {}
 extension EnumExtendo: ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
