@@ -1931,6 +1931,11 @@ enum HasDynamicLifetime_t : bool {
   HasDynamicLifetime = true,
 };
 
+enum IsLexical_t : bool {
+  IsNotLexical = false,
+  IsLexical = true,
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -1950,14 +1955,14 @@ class AllocStackInst final
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  llvm::Optional<SILDebugVariable> Var,
-                 HasDynamicLifetime_t hasDynamicLifetime, bool isLexical,
+                 HasDynamicLifetime_t hasDynamicLifetime, IsLexical_t isLexical,
                  UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F,
                                 llvm::Optional<SILDebugVariable> Var,
                                 HasDynamicLifetime_t hasDynamicLifetime,
-                                bool isLexical,
+                                IsLexical_t isLexical,
                                 UsesMoveableValueDebugInfo_t wasMoved);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
@@ -2006,15 +2011,21 @@ public:
   }
 
   /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
-  bool isLexical() const { return sharedUInt8().AllocStackInst.lexical; }
+  IsLexical_t isLexical() const {
+    return IsLexical_t(sharedUInt8().AllocStackInst.lexical);
+  }
 
   /// If this is a lexical alloc_stack, eliminate the lexical bit. If this
   /// alloc_stack doesn't have a lexical bit, do not do anything.
-  void removeIsLexical() { sharedUInt8().AllocStackInst.lexical = false; }
+  void removeIsLexical() {
+    sharedUInt8().AllocStackInst.lexical = (bool)IsNotLexical;
+  }
 
   /// If this is not a lexical alloc_stack, set the lexical bit. If this
   /// alloc_stack is already lexical, this does nothing.
-  void setIsLexical() { sharedUInt8().AllocStackInst.lexical = true; }
+  void setIsLexical() {
+    sharedUInt8().AllocStackInst.lexical = (bool)IsLexical;
+  }
 
   /// Return the debug variable information attached to this instruction.
   llvm::Optional<SILDebugVariable> getVarInfo() const {

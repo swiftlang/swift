@@ -1347,7 +1347,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     auto hasDynamicLifetime = HasDynamicLifetime_t(Attr & 0x1);
-    bool isLexical = (Attr >> 1) & 0x1;
+    auto isLexical = IsLexical_t((Attr >> 1) & 0x1);
     auto wasMoved = UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),

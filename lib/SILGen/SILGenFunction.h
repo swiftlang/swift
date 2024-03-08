@@ -1231,7 +1231,7 @@ public:
   SILValue emitTemporaryAllocation(
       SILLocation loc, SILType ty,
       HasDynamicLifetime_t hasDynamicLifetime = DoesNotHaveDynamicLifetime,
-      bool isLexical = false, bool generateDebugInfo = true);
+      IsLexical_t isLexical = IsNotLexical, bool generateDebugInfo = true);
 
   /// Emits a temporary allocation for a pack that will be deallocated
   /// automatically at the end of the current scope.  Returns the address

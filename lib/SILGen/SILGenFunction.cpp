@@ -692,9 +692,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
         assert(!isPack);
 
-        auto addr = emitTemporaryAllocation(vd, entryValue->getType(),
-                                            DoesNotHaveDynamicLifetime, false,
-                                            /*generateDebugInfo*/ false);
+        auto addr = emitTemporaryAllocation(
+            vd, entryValue->getType(), DoesNotHaveDynamicLifetime, IsNotLexical,
+            /*generateDebugInfo*/ false);
         auto val = B.emitCopyValueOperation(loc, entryValue);
         auto &lowering = getTypeLowering(entryValue->getType());
         lowering.emitStore(B, loc, val, addr, StoreOwnershipQualifier::Init);

@@ -703,7 +703,8 @@ public:
       bool lexicalLifetimesEnabled =
           SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule());
       auto lifetime = SGF.F.getLifetime(vd, lowering->getLoweredType());
-      auto isLexical = lexicalLifetimesEnabled && lifetime.isLexical();
+      auto isLexical =
+          IsLexical_t(lexicalLifetimesEnabled && lifetime.isLexical());
       address =
           SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
                                       DoesNotHaveDynamicLifetime, isLexical);

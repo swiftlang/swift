@@ -1111,7 +1111,8 @@ struct BridgedBuilder{
                                       bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
     return {builder().createAllocStack(
         regularLoc(), type, llvm::None,
-        swift::HasDynamicLifetime_t(hasDynamicLifetime), isLexical,
+        swift::HasDynamicLifetime_t(hasDynamicLifetime),
+        swift::IsLexical_t(isLexical),
         swift::UsesMoveableValueDebugInfo_t(wasMoved))};
   }
 

@@ -415,7 +415,7 @@ public:
       SILLocation Loc, SILType elementType,
       llvm::Optional<SILDebugVariable> Var = llvm::None,
       HasDynamicLifetime_t dynamic = DoesNotHaveDynamicLifetime,
-      bool isLexical = false,
+      IsLexical_t isLexical = IsNotLexical,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;
