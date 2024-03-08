@@ -1420,10 +1420,10 @@ public:
                                                      operand, poisonRefs));
   }
 
-  MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
-                                 IsLexical_t isLexical = IsNotLexical,
-                                 bool hasPointerEscape = false,
-                                 bool fromVarDecl = false) {
+  MoveValueInst *createMoveValue(
+      SILLocation loc, SILValue operand, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "

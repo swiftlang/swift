@@ -8284,10 +8284,11 @@ class MoveValueInst
   USE_SHARED_UINT8;
 
   MoveValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                IsLexical_t isLexical, bool hasPointerEscape, bool fromVarDecl)
+                IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
+                bool fromVarDecl)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
     sharedUInt8().MoveValueInst.lexical = (bool)isLexical;
-    sharedUInt8().MoveValueInst.pointerEscape = hasPointerEscape;
+    sharedUInt8().MoveValueInst.pointerEscape = (bool)hasPointerEscape;
     sharedUInt8().MoveValueInst.fromVarDecl = fromVarDecl;
   }
 
@@ -8309,8 +8310,8 @@ public:
     sharedUInt8().MoveValueInst.lexical = (bool)IsNotLexical;
   }
 
-  bool hasPointerEscape() const {
-    return sharedUInt8().MoveValueInst.pointerEscape;
+  HasPointerEscape_t hasPointerEscape() const {
+    return HasPointerEscape_t(sharedUInt8().MoveValueInst.pointerEscape);
   }
   void setHasPointerEscape(bool pointerEscape) {
     sharedUInt8().MoveValueInst.pointerEscape = pointerEscape;

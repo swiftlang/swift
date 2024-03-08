@@ -3802,7 +3802,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::MoveValueInst: {
     bool allowsDiagnostics = false;
     auto isLexical = IsNotLexical;
-    bool hasPointerEscape = false;
+    auto hasPointerEscape = DoesNotHavePointerEscape;
     bool fromVarDecl = false;
 
     StringRef AttrName;
@@ -3813,7 +3813,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       else if (AttrName == "lexical")
         isLexical = IsLexical;
       else if (AttrName == "pointer_escape")
-        hasPointerEscape = true;
+        hasPointerEscape = HasPointerEscape;
       else if (AttrName == "var_decl")
         fromVarDecl = true;
       else {
