@@ -41,6 +41,7 @@ module SwiftWASILibc [system] {
   header "langinfo.h"
   header "libgen.h"
   header "monetary.h"
+  header "netdb.h"
   header "netinet/in.h"
   header "netinet/tcp.h"
   header "nl_types.h"
