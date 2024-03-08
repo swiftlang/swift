@@ -61,8 +61,12 @@ if(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER)
 
   swift_install_in_component(FILES
                              "${CMAKE_CURRENT_SOURCE_DIR}/bridging"
-                             "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap"
+                             "${CMAKE_CURRENT_SOURCE_DIR}/bridging.modulemap"
                              DESTINATION "include/swift"
+                             COMPONENT compiler)
+  swift_install_in_component(FILES
+                             "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap"
+                             DESTINATION "include"
                              COMPONENT compiler)
 
   add_dependencies(swiftClangImporter
