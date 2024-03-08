@@ -178,12 +178,20 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       }
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-      auto *bitwiseCopyableProtocol =
-          ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
-      if (bitwiseCopyableProtocol && mod->checkConformance(type, bitwiseCopyableProtocol)) {
-        diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
-        return true;
+    // Diagnose when we have lifetime dependence on a type that is
+    // BitwiseCopyable & Escapable.
+    // ~Escapable types are non-trivial in SIL and we should not raise this
+    // error.
+    // TODO: Diagnose ~Escapable types are always non-trivial in SIL.
+    if (type->isEscapable()) {
+      if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+        auto *bitwiseCopyableProtocol =
+            ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+        if (bitwiseCopyableProtocol &&
+            mod->checkConformance(type, bitwiseCopyableProtocol)) {
+          diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
+          return true;
+        }
       }
     }
 
@@ -379,7 +387,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     // TODO: rdar://123555720: Remove this check after another round of
     // surveying builtins
     if (auto *fd = dyn_cast<FuncDecl>(afd)) {
-      if (fd->isImplicit()) {
+      if (fd->isImplicit() && fd->getModuleContext()->isBuiltinModule()) {
         return std::nullopt;
       }
     }

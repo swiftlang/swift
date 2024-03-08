@@ -617,6 +617,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-enable-experimental-associated-type-inference")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
+    list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
+  endif()
+
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
     list(APPEND swift_flags "-strict-concurrency=complete")
   endif()

@@ -62,6 +62,9 @@ class Swift(product.Product):
         # Add experimental NoncopyableGenerics flag.
         self.cmake_options.extend(self._enable_experimental_noncopyable_generics)
 
+        # Add experimental NonescapableTypes flag.
+        self.cmake_options.extend(self._enable_experimental_nonescapable_types)
+
         # Add backtracing flag.
         self.cmake_options.extend(self._enable_backtracing)
 
@@ -197,6 +200,11 @@ updated without updating swift.py?")
     def _enable_experimental_noncopyable_generics(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS:BOOL',
                  self.args.enable_experimental_noncopyable_generics)]
+
+    @property
+    def _enable_experimental_nonescapable_types(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL',
+                 self.args.enable_experimental_nonescapable_types)]
 
     @property
     def _enable_backtracing(self):
