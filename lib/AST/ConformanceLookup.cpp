@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -622,7 +623,8 @@ LookupConformanceInModuleRequest::evaluate(
       }
     } else if (protocol->isSpecificProtocol(KnownProtocolKind::Encodable) ||
                protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
-      if (nominal->isDistributedActor()) {
+      // if (nominal->isDistributedActor()) {
+      if (canSynthesizeDistributedActorCodableConformance(nominal)) {
         auto protoKind =
             protocol->isSpecificProtocol(KnownProtocolKind::Encodable)
                 ? KnownProtocolKind::Encodable

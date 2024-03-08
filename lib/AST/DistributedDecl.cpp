@@ -61,6 +61,23 @@
 using namespace swift;
 
 /******************************************************************************/
+/************* Implicit Distributed Actor Codable Conformance *****************/
+/******************************************************************************/
+
+bool swift::canSynthesizeDistributedActorCodableConformance(NominalTypeDecl *actor) {
+  auto &C = actor->getASTContext();
+
+  if (!actor->isDistributedActor())
+    return false;
+
+  return evaluateOrDefault(
+      C.evaluator,
+      CanSynthesizeDistributedActorCodableConformanceRequest{actor},
+      false);
+}
+
+
+/******************************************************************************/
 /************** Distributed Actor System Associated Types *********************/
 /******************************************************************************/
 
@@ -210,8 +227,10 @@ Type swift::getDistributedActorSystemInvocationDecoderType(NominalTypeDecl *syst
 Type swift::getDistributedSerializationRequirementType(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
   assert(nominal);
-  assert(protocol);
   auto &ctx = nominal->getASTContext();
+
+  if (!protocol)
+    return Type();
 
   // Dig out the serialization requirement type.
   auto module = nominal->getParentModule();
@@ -220,7 +239,8 @@ Type swift::getDistributedSerializationRequirementType(
   if (conformance.isInvalid())
     return Type();
 
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_SerializationRequirement);
+  return conformance.getTypeWitnessByName(selfType,
+                                          ctx.Id_SerializationRequirement);
 }
 
 AbstractFunctionDecl *

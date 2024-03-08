@@ -37,6 +37,17 @@ Type getAssociatedTypeOfDistributedSystemOfActor(DeclContext *actorOrExtension,
 /// Find the concrete invocation decoder associated with the given actor.
 NominalTypeDecl *getDistributedActorInvocationDecoder(NominalTypeDecl *);
 
+/// Determine if this distributed actor can synthesize a `Codable` conformance.
+/// This is based on the actor's `ID` being `Codable`.
+///
+///  It is possible for the `ID` to be `Codable` but the
+/// `SerializationRequirement` used by the actor (and its actor system to not
+/// be `Codable`). In such situation the conformance is synthesized, however
+/// the user may need to provide an explicit conformance to the
+/// `SerializationRequirement` if they wanted to pass the actor to distributed
+/// methods.
+bool canSynthesizeDistributedActorCodableConformance(NominalTypeDecl *actor);
+
 /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
 /// invocation decoder of the given distributed actor.
 FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);

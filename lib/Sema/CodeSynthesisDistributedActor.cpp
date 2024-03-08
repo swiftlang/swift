@@ -1043,3 +1043,29 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
   return addDistributedActorCodableConformance(classDecl,
                                                C.getProtocol(protoKind));
 }
+
+bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *actor) const {
+
+  if (actor && !isa<ClassDecl>(actor))
+    return false;
+
+  if (!actor->isDistributedActor())
+    return false;
+
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(actor);
+  if (!systemTy)
+    return false;
+
+  if (!systemTy->getAnyNominal())
+    return false;
+
+  auto idTy = getDistributedActorSystemActorIDType(systemTy->getAnyNominal());
+  if (!idTy)
+    return false;
+
+  return TypeChecker::conformsToKnownProtocol(
+             idTy, KnownProtocolKind::Decodable, actor->getParentModule()) &&
+         TypeChecker::conformsToKnownProtocol(
+             idTy, KnownProtocolKind::Encodable, actor->getParentModule());
+}
