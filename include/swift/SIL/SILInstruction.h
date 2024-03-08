@@ -1969,7 +1969,7 @@ public:
 
   /// Set to true if this alloc_stack's memory location was passed to _move at
   /// any point of the program.
-  bool getUsesMoveableValueDebugInfo() const {
+  bool usesMoveableValueDebugInfo() const {
     return sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo;
   }
 
@@ -2394,7 +2394,7 @@ public:
     sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo = true;
   }
 
-  bool getUsesMoveableValueDebugInfo() const {
+  bool usesMoveableValueDebugInfo() const {
     return sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo;
   }
 };
@@ -5088,7 +5088,7 @@ public:
   ///
   /// IRGen uses this information to determine if we should use llvm.dbg.addr or
   /// llvm.dbg.declare.
-  bool getUsesMoveableValueDebugInfo() const {
+  bool usesMoveableValueDebugInfo() const {
     return sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo;
   }
 

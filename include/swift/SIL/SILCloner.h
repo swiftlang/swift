@@ -880,9 +880,10 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   auto *NewInst = getBuilder().createAllocStack(
       Loc, getOpType(Inst->getElementType()), VarInfo,
       Inst->hasDynamicLifetime(), Inst->isLexical(),
-      Inst->getUsesMoveableValueDebugInfo()
+      Inst->usesMoveableValueDebugInfo()
 #ifndef NDEBUG
-    , true
+          ,
+      true
 #endif
   );
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
@@ -1397,8 +1398,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   auto *NewInst = getBuilder().createDebugValue(
       Inst->getLoc(), getOpValue(Inst->getOperand()), VarInfo,
-      Inst->poisonRefs(), Inst->getUsesMoveableValueDebugInfo(),
-      Inst->hasTrace());
+      Inst->poisonRefs(), Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
