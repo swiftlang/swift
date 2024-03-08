@@ -2608,7 +2608,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool hasReflection = false;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
-    bool hasPointerEscape = false;
+    auto hasPointerEscape = DoesNotHavePointerEscape;
     StringRef attrName;
     SourceLoc attrLoc;
     while (parseSILOptional(attrName, attrLoc, *this)) {
@@ -2619,7 +2619,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       } else if (attrName.equals("moveable_value_debuginfo")) {
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
       } else if (attrName.equals("pointer_escape")) {
-        hasPointerEscape = true;
+        hasPointerEscape = HasPointerEscape;
       } else {
         P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
                    "dynamic_lifetime, reflection, pointer_escape or "
