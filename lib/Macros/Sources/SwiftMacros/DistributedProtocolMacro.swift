@@ -21,6 +21,7 @@ import SwiftSyntaxBuilder
 public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
 }
 
+
 // ===== -----------------------------------------------------------------------
 // MARK: Default Stub implementations Extension
 
@@ -127,6 +128,7 @@ extension DistributedProtocolMacro {
         isGenericStub = false
 
       default:
+        print("SKIP: \(req)")
         continue
       }
     }
@@ -137,6 +139,7 @@ extension DistributedProtocolMacro {
         \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
           Distributed._DistributedActorStub
           where ActorSystem: \(specificActorSystemRequirement) 
+            ActorSystem.ActorID: \(raw: serializationRequirementType) 
         { }
         """
       ]
