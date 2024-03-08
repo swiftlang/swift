@@ -183,21 +183,21 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   # the following are all ELF targets
   if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
-      "armv6m   armv6m-none-none-eabi     armv6-none-none-eabi"
-      "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
-      "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+      "armv6    armv6-unknown-none-eabi      armv6-unknown-none-eabi"
+      "armv6m   armv6m-unknown-none-eabi     armv6-unknown-none-eabi"
+      "armv7    armv7-unknown-none-eabi      armv7-unknown-none-eabi"
+      "armv7em  armv7em-unknown-none-eabi    armv7em-unknown-none-eabi"
     )
   endif()
   if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
+      "aarch64  aarch64-unknown-none-elf     aarch64-unknown-none-elf"
     )
   endif()
   if("RISCV" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
-      "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
+      "riscv32  riscv32-unknown-none-eabi    riscv32-unknown-none-eabi"
+      "riscv64  riscv64-unknown-none-eabi    riscv64-unknown-none-eabi"
     )
   endif()
   if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
