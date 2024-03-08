@@ -110,6 +110,13 @@ Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePo
 Func withUnsafePointer(to:_:) has been renamed to Func __abi_se0413_withUnsafePointer(to:_:)
 Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: inout A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafePointer<A, B>(to: inout A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
 Func withUnsafePointer(to:_:) is now without @rethrows
+Func withUnsafeBytes(of:_:) has been renamed to Func __abi_se0413_withUnsafeBytes(of:_:)
+Func withUnsafeBytes(of:_:) has mangled name changing from 'Swift.withUnsafeBytes<A, B>(of: A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeBytes<A, B>(of: A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B'
+Func withUnsafeBytes(of:_:) has mangled name changing from 'Swift.withUnsafeBytes<A, B>(of: inout A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeBytes<A, B>(of: inout A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B'
+Func withUnsafeBytes(of:_:) is now without @rethrows
+Func withUnsafeMutableBytes(of:_:) has been renamed to Func __abi_se0413_withUnsafeMutableBytes(of:_:)
+Func withUnsafeMutableBytes(of:_:) has mangled name changing from 'Swift.withUnsafeMutableBytes<A, B>(of: inout A, _: (Swift.UnsafeMutableRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeMutableBytes<A, B>(of: inout A, _: (Swift.UnsafeMutableRawBufferPointer) throws -> B) throws -> B'
+Func withUnsafeMutableBytes(of:_:) is now without @rethrows
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
 Func withoutActuallyEscaping(_:do:) is now without @rethrows
