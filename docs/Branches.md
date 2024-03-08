@@ -4,13 +4,13 @@
 
 | Swift  | LLVM Project
 | ------ | ------------
-| main   | swift/main
+| main   | archived/swift/main
 
 `main` is the place for active development on Swift. If you're just working on Swift, that's where you'll spend most of your time.
 
-LLVM Project repo automatically merge changes from the latest release branch (see below) into `swift/main`. This generally means `swift/main` is just an alias for the latest release branch. If you want to do Swift-related development on LLVM projects, see "The Upstream Branches" below.
+LLVM Project repo automatically merge changes from the latest release branch (see below) into `archived/swift/main`. This generally means `archived/swift/main` is just an alias for the latest release branch. If you want to do Swift-related development on LLVM projects, see "The Upstream Branches" below.
 
-To switch from one set of branches to another, you can use `utils/update-checkout` in the Swift repository with the `--scheme` option. You can use any of the branch names as the argument to `--scheme`: in this case, either `main` or `swift/main`.
+To switch from one set of branches to another, you can use `utils/update-checkout` in the Swift repository with the `--scheme` option. You can use any of the branch names as the argument to `--scheme`: in this case, either `main` or `archived/swift/main`.
 
   [release manager]: https://swift.org/blog/5-2-release-process/
   [lldb]: http://lldb.llvm.org
