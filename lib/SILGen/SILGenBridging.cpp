@@ -1619,9 +1619,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // executor, since the task will end after we invoke the completion handler.
       emitPrologGlobalActorHop(loc, isolation->getGlobalActor());
     } else {
-      auto executor =
-        emitLoadGlobalActorExecutor(isolation->getGlobalActor());
-      emitPreconditionCheckExpectedExecutor(loc, executor);
+      emitPreconditionCheckExpectedExecutor(loc, *isolation, std::nullopt);
     }
   }
 
