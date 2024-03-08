@@ -117,7 +117,7 @@ public:
   /// change.
   bool hasMovedElt() const {
     return llvm::any_of(Elts, [](AllocStackInst *asi) {
-      return asi->getUsesMoveableValueDebugInfo();
+      return asi->usesMoveableValueDebugInfo();
     });
   }
 };
