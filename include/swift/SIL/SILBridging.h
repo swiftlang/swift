@@ -1110,7 +1110,8 @@ struct BridgedBuilder{
   BridgedInstruction createAllocStack(swift::SILType type,
                                       bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
     return {builder().createAllocStack(
-        regularLoc(), type, llvm::None, hasDynamicLifetime, isLexical,
+        regularLoc(), type, llvm::None,
+        swift::HasDynamicLifetime_t(hasDynamicLifetime), isLexical,
         swift::UsesMoveableValueDebugInfo_t(wasMoved))};
   }
 

@@ -1076,9 +1076,8 @@ public:
     // Allocate a temporary.
     // It's flagged with "hasDynamicLifetime" because it's not possible to
     // statically verify the lifetime of the value.
-    SILValue errorTemp =
-        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType(),
-                                    /*hasDynamicLifetime*/ true);
+    SILValue errorTemp = SGF.emitTemporaryAllocation(
+        loc, errorTL.getLoweredType(), HasDynamicLifetime);
 
     // Nil-initialize it.
     SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);

@@ -414,7 +414,8 @@ public:
   AllocStackInst *createAllocStack(
       SILLocation Loc, SILType elementType,
       llvm::Optional<SILDebugVariable> Var = llvm::None,
-      bool hasDynamicLifetime = false, bool isLexical = false,
+      HasDynamicLifetime_t dynamic = DoesNotHaveDynamicLifetime,
+      bool isLexical = false,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;
@@ -428,8 +429,7 @@ public:
 #endif
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
-        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
-        wasMoved));
+        substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical, wasMoved));
   }
 
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {

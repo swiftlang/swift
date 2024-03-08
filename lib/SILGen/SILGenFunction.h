@@ -1228,10 +1228,10 @@ public:
   ///
   /// \p isLexical if set to true, this is a temporary that we are using for a
   /// local let that we need to mark with the lexical flag.
-  SILValue emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                   bool hasDynamicLifetime = false,
-                                   bool isLexical = false,
-                                   bool generateDebugInfo = true);
+  SILValue emitTemporaryAllocation(
+      SILLocation loc, SILType ty,
+      HasDynamicLifetime_t hasDynamicLifetime = DoesNotHaveDynamicLifetime,
+      bool isLexical = false, bool generateDebugInfo = true);
 
   /// Emits a temporary allocation for a pack that will be deallocated
   /// automatically at the end of the current scope.  Returns the address

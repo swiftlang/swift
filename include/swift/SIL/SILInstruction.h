@@ -1926,6 +1926,11 @@ enum UsesMoveableValueDebugInfo_t : bool {
   UsesMoveableValueDebugInfo = true,
 };
 
+enum HasDynamicLifetime_t : bool {
+  DoesNotHaveDynamicLifetime = false,
+  HasDynamicLifetime = true,
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -1944,14 +1949,15 @@ class AllocStackInst final
 
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-                 llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-                 bool isLexical,
+                 llvm::Optional<SILDebugVariable> Var,
+                 HasDynamicLifetime_t hasDynamicLifetime, bool isLexical,
                  UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F,
                                 llvm::Optional<SILDebugVariable> Var,
-                                bool hasDynamicLifetime, bool isLexical,
+                                HasDynamicLifetime_t hasDynamicLifetime,
+                                bool isLexical,
                                 UsesMoveableValueDebugInfo_t wasMoved);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
@@ -1986,14 +1992,18 @@ public:
   ///
   /// As an example if an alloc_stack is known to be only conditionally
   /// initialized.
-  void setDynamicLifetime() { sharedUInt8().AllocStackInst.dynamicLifetime = true; }
+  void setDynamicLifetime() {
+    sharedUInt8().AllocStackInst.dynamicLifetime = (bool)HasDynamicLifetime;
+  }
 
   /// Returns true if the alloc_stack's initialization can not be ascertained
   /// from uses directly (so should be treated conservatively).
   ///
   /// An example of an alloc_stack with dynamic lifetime is an alloc_stack that
   /// is conditionally initialized.
-  bool hasDynamicLifetime() const { return sharedUInt8().AllocStackInst.dynamicLifetime; }
+  HasDynamicLifetime_t hasDynamicLifetime() const {
+    return HasDynamicLifetime_t(sharedUInt8().AllocStackInst.dynamicLifetime);
+  }
 
   /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
   bool isLexical() const { return sharedUInt8().AllocStackInst.lexical; }

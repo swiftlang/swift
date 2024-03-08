@@ -5008,7 +5008,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::AllocStackInst: {
-    bool hasDynamicLifetime = false;
+    auto hasDynamicLifetime = DoesNotHaveDynamicLifetime;
     bool isLexical = false;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
@@ -5017,7 +5017,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc attributeLoc;
     while (parseSILOptional(attributeName, attributeLoc, *this)) {
       if (attributeName == "dynamic_lifetime")
-        hasDynamicLifetime = true;
+        hasDynamicLifetime = HasDynamicLifetime;
       else if (attributeName == "lexical")
         isLexical = true;
       else if (attributeName == "moveable_value_debuginfo")
