@@ -225,12 +225,11 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
   return VarInfo;
 }
 
-AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
-                               ArrayRef<SILValue> TypeDependentOperands,
-                               SILFunction &F,
-                               llvm::Optional<SILDebugVariable> Var,
-                               bool hasDynamicLifetime, bool isLexical,
-                               bool usesMoveableValueDebugInfo)
+AllocStackInst::AllocStackInst(
+    SILDebugLocation Loc, SILType elementType,
+    ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
+    llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+    bool isLexical, UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
                                  Var ? Var->Type.has_value() : false,
@@ -242,7 +241,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
   sharedUInt8().AllocStackInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocStackInst.lexical = isLexical;
   sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
-      usesMoveableValueDebugInfo || elementType.isMoveOnly();
+      (bool)usesMoveableValueDebugInfo || elementType.isMoveOnly();
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
 
   // VarInfo must be initialized after
@@ -269,7 +268,7 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
                                        SILType elementType, SILFunction &F,
                                        llvm::Optional<SILDebugVariable> Var,
                                        bool hasDynamicLifetime, bool isLexical,
-                                       bool wasMoved) {
+                                       UsesMoveableValueDebugInfo_t wasMoved) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                elementType.getASTType());

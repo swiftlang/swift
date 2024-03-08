@@ -411,11 +411,12 @@ public:
     return Var;
   }
 
-  AllocStackInst *
-  createAllocStack(SILLocation Loc, SILType elementType,
-                   llvm::Optional<SILDebugVariable> Var = llvm::None,
-                   bool hasDynamicLifetime = false, bool isLexical = false,
-                   bool wasMoved = false, bool skipVarDeclAssert = false) {
+  AllocStackInst *createAllocStack(
+      SILLocation Loc, SILType elementType,
+      llvm::Optional<SILDebugVariable> Var = llvm::None,
+      bool hasDynamicLifetime = false, bool isLexical = false,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
 #ifndef NDEBUG

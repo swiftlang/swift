@@ -648,14 +648,14 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     }
     return false;
   };
-  auto *ASI =
-      Builder.createAllocStack(ABI->getLoc(), ty, ABI->getVarInfo(),
-                               ABI->hasDynamicLifetime(), isLexical(), false
+  auto *ASI = Builder.createAllocStack(ABI->getLoc(), ty, ABI->getVarInfo(),
+                                       ABI->hasDynamicLifetime(), isLexical(),
+                                       DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
-                               ,
-                               true
+                                       ,
+                                       true
 #endif
-      );
+  );
 
   // Transfer a mark_uninitialized if we have one.
   SingleValueInstruction *StackBox = ASI;

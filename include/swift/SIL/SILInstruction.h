@@ -1921,6 +1921,11 @@ public:
 
 class DeallocStackInst;
 
+enum UsesMoveableValueDebugInfo_t : bool {
+  DoesNotUseMoveableValueDebugInfo = false,
+  UsesMoveableValueDebugInfo = true,
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -1940,13 +1945,14 @@ class AllocStackInst final
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  llvm::Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-                 bool isLexical, bool usesMoveableValueDebugInfo);
+                 bool isLexical,
+                 UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F,
                                 llvm::Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime, bool isLexical,
-                                bool usesMoveableValueDebugInfo);
+                                UsesMoveableValueDebugInfo_t wasMoved);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -1964,13 +1970,15 @@ public:
   }
 
   void markUsesMoveableValueDebugInfo() {
-    sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo = true;
+    sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
+        (bool)UsesMoveableValueDebugInfo;
   }
 
   /// Set to true if this alloc_stack's memory location was passed to _move at
   /// any point of the program.
-  bool usesMoveableValueDebugInfo() const {
-    return sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo;
+  UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo() const {
+    return UsesMoveableValueDebugInfo_t(
+        sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo);
   }
 
   /// Set to true that this alloc_stack contains a value whose lifetime can not
