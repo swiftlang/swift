@@ -38,8 +38,6 @@ BUILTIN_CAST_OPERATION(PtrToInt, "ptrtoint", "n")
 BUILTIN_CAST_OPERATION(IntToPtr, "inttoptr", "n")
 BUILTIN_CAST_OPERATION(BitCast , "bitcast",  "n")
 
-#undef BUILTIN_CAST_OPERATION
-
 /// Cast-or-bitcast operations have type T1 -> T2.
 /// T1 and T2 may be the same size, unlike the corresponding true casts.
 #ifndef BUILTIN_CAST_OR_BITCAST_OPERATION
@@ -48,7 +46,6 @@ BUILTIN_CAST_OPERATION(BitCast , "bitcast",  "n")
 BUILTIN_CAST_OR_BITCAST_OPERATION(TruncOrBitCast, "truncOrBitCast", "n")
 BUILTIN_CAST_OR_BITCAST_OPERATION(ZExtOrBitCast,  "zextOrBitCast",  "n")
 BUILTIN_CAST_OR_BITCAST_OPERATION(SExtOrBitCast,  "sextOrBitCast",  "n")
-#undef BUILTIN_CAST_OR_BITCAST_OPERATION
 
 /// Binary operations have type (T,T) -> T.
 ///
@@ -139,11 +136,6 @@ BUILTIN_BINARY_OPERATION_ALL(URem,    urem,     "n", Integer)
 BUILTIN_BINARY_OPERATION_ALL(FRem,    frem,     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION_ALL(Xor,     xor,      "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(Expect, "int_expect", "n", Integer)
-#undef BUILTIN_BINARY_OPERATION_ALL
-#undef BUILTIN_BINARY_OPERATION_POLYMORPHIC
-#undef BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC
-#undef BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR
-#undef BUILTIN_BINARY_OPERATION
 
 /// These builtins are analogous the similarly named llvm intrinsics. The
 /// difference between the two is that these are not expected to overflow,
@@ -165,7 +157,6 @@ BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SMulOver,
                                        "smul_with_overflow", Mul, "n", Integer)
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(UMulOver,
                                        "umul_with_overflow", Mul, "n", Integer)
-#undef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
 
 /// Unary operations have type (T) -> T.
 #ifndef BUILTIN_UNARY_OPERATION
@@ -184,8 +175,6 @@ BUILTIN_UNARY_OPERATION(FNeg, "fneg", "n", FloatOrVector)
 BUILTIN_UNARY_OPERATION(AssumeNonNegative, "assumeNonNegative", "n", Integer)
 // It only works on i1.
 BUILTIN_UNARY_OPERATION(AssumeTrue, "assume", "", Integer)
-
-#undef BUILTIN_UNARY_OPERATION
 
 // Binary predicates have type (T,T) -> i1 or (T, T) -> Vector<i1> for scalars
 // and vectors, respectively.
@@ -217,7 +206,6 @@ BUILTIN_BINARY_PREDICATE(FCMP_ULT, "fcmp_ult", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_ULE, "fcmp_ule", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
-#undef BUILTIN_BINARY_PREDICATE
 
 // BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
 // These have various types.
@@ -549,8 +537,6 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
-#undef BUILTIN_SIL_OPERATION
-
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
 // These functions accept a single argument of any type.
 #ifndef BUILTIN_RUNTIME_CALL
@@ -568,8 +554,6 @@ BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 /// This builtin takes a metatype and returns true if the metatype's
 /// nominal type is Optional.
 BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
-
-#undef BUILTIN_RUNTIME_CALL
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
 // These have various types.
@@ -968,15 +952,35 @@ BUILTIN_MISC_OPERATION(AddressOfBorrowOpaque, "addressOfBorrowOpaque", "", Speci
 /// AddressLowering.
 BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBorrowOpaque", "", Special)
 
+/// createTask<T>(flags: Int,
+///               taskGroup: Builtin.RawPointer? = nil,
+///               initialTaskExecutor: (Builtin.Executor)? = nil,
+///               initialExecutor: (Builtin.Executor)? = nil,
+///               operation: @escaping () async throws -> T)
+///  -> Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Create a new task.
+BUILTIN_SIL_OPERATION(CreateTask, "createTask", Special)
+
+/// createDiscardingTask(flags: Int,
+///                      taskGroup: Builtin.RawPointer? = nil,
+///                      initialTaskExecutor: (Builtin.Executor)? = nil,
+///                      initialExecutor: (Builtin.Executor)? = nil,
+///                      operation: @escaping () async throws -> ())
+///  -> (Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Create a new discarding task.
+BUILTIN_SIL_OPERATION(CreateDiscardingTask, "createDiscardingTask", Special)
+
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task, given flags, options, and a function to
-/// execute.
+/// Legacy spelling of:
+///   createTask(flags: $0, operation: $1)
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
-    "createAsyncTask", "", Special)
+                                   "createAsyncTask", "", Special)
 
 /// createAsyncTaskInGroup(): (
 ///     Int,                            // flags
@@ -984,10 +988,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
-    "createAsyncTaskInGroup", "", Special)
+/// Legacy spelling of:
+///   createTask(flags: $0, taskGroup: $1, operation: $2)
+BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroup,
+                      "createAsyncTaskInGroup", Special)
 
 /// createAsyncDiscardingTaskInGroup(): (
 ///     Int,                               // flags
@@ -995,10 +999,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
 ///     @escaping () async throws -> Void  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous discarding task, given flags, a parent task,
-/// task group and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroup,
-    "createAsyncDiscardingTaskInGroup", "", Special)
+/// Legacy spelling of:
+///   createDiscardingTask(flags: $0, taskGroup: $1, operation: $2)
+BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroup,
+                      "createAsyncDiscardingTaskInGroup", Special)
 
 /// createAsyncTaskWithExecutor(): (
 ///     Int,                            // flags
@@ -1006,10 +1010,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroup,
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
-    "createAsyncTaskWithExecutor", "", Special)
+/// Legacy spelling of:
+///   createTask(flags: $0, initialTaskExecutor: $1, operation: $2)
+BUILTIN_SIL_OPERATION(CreateAsyncTaskWithExecutor,
+                      "createAsyncTaskWithExecutor", Special)
 
 /// createAsyncTaskInGroupWithExecutor(): (
 ///     Int,                            // flags
@@ -1018,10 +1022,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
-    "createAsyncTaskInGroupWithExecutor", "", Special)
+/// Legacy spelling of:
+///   createTask(flags: $0, taskGroup: $1, initialTaskExecutor: $2, operation: $3)
+BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroupWithExecutor,
+                      "createAsyncTaskInGroupWithExecutor", Special)
 
 /// createAsyncDiscardingTaskInGroupWithExecutor(): (
 ///     Int,                               // flags
@@ -1030,10 +1034,11 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
 ///     @escaping () async throws -> Void  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous discarding task, given flags, a parent task,
-/// task group and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroupWithExecutor,
-    "createAsyncDiscardingTaskInGroupWithExecutor", "", Special)
+/// Legacy spelling of:
+///   createDiscardingTask(flags: $0, taskGroup: $1, initialTaskExecutor: $2,
+///                        operation: $3)
+BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroupWithExecutor,
+                      "createAsyncDiscardingTaskInGroupWithExecutor", Special)
 
 /// Build a Builtin.Executor value from an "ordinary" task executor
 /// reference.
@@ -1102,10 +1107,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(InjectEnumTag, "injectEnumTag", "", Special)
 /// `any Actor` existential that refers to the local actor.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActorAsAnyActor", "n", Special)
 
-#undef BUILTIN_MISC_OPERATION_WITH_SILGEN
-
-#undef BUILTIN_MISC_OPERATION
-
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
@@ -1114,8 +1115,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActor
 /// Builtin representing a call to Thread Sanitizer instrumentation.
 /// TSanInoutAccess has type (T) -> ()
 BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
-
-#undef BUILTIN_SANITIZER_OPERATION
 
 /// Builtins for compile-time type-checking operations used for unit testing.
 #ifndef BUILTIN_TYPE_CHECKER_OPERATION
@@ -1126,8 +1125,6 @@ BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
 BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagnostic)
-
-#undef BUILTIN_TYPE_CHECKER_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
 #ifndef BUILTIN_TYPE_TRAIT_OPERATION
@@ -1142,5 +1139,20 @@ BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagn
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeClass)
 
 #undef BUILTIN_TYPE_TRAIT_OPERATION
-
+#undef BUILTIN_UNARY_OPERATION
+#undef BUILTIN_BINARY_PREDICATE
+#undef BUILTIN_RUNTIME_CALL
+#undef BUILTIN_MISC_OPERATION_WITH_SILGEN
+#undef BUILTIN_MISC_OPERATION
+#undef BUILTIN_SANITIZER_OPERATION
+#undef BUILTIN_TYPE_CHECKER_OPERATION
+#undef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
+#undef BUILTIN_BINARY_OPERATION_ALL
+#undef BUILTIN_BINARY_OPERATION_POLYMORPHIC
+#undef BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC
+#undef BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR
+#undef BUILTIN_BINARY_OPERATION
+#undef BUILTIN_CAST_OPERATION
+#undef BUILTIN_CAST_OR_BITCAST_OPERATION
+#undef BUILTIN_SIL_OPERATION
 #undef BUILTIN

@@ -130,6 +130,7 @@ UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor)
 UNINTERESTING_FEATURE(BuiltinUnprotectedStackAlloc)
 UNINTERESTING_FEATURE(BuiltinAllocVector)
+UNINTERESTING_FEATURE(BuiltinCreateTask)
 
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();

@@ -75,6 +75,7 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenClass.h"
+#include "GenConcurrency.h"
 #include "GenConstant.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
@@ -602,6 +603,28 @@ public:
   /// SIL value.
   Explosion getLoweredExplosion(SILValue v) {
     return getLoweredValue(v).getExplosion(*this, v->getType());
+  }
+
+  /// Get the lowered value for the given value of optional type in a
+  /// way that allows immediate peepholing.
+  OptionalExplosion getLoweredOptionalExplosion(SILValue v) {
+    assert(v->getType().getOptionalObjectType());
+
+    if (auto enumInst = dyn_cast<EnumInst>(v)) {
+      if (enumInst->hasOperand()) {
+        assert(enumInst->getElement() == IGM.Context.getOptionalSomeDecl());
+        return OptionalExplosion::forSome([&](Explosion &out) {
+          getLoweredExplosion(enumInst->getOperand(), out);
+        });
+      } else {
+        assert(enumInst->getElement() == IGM.Context.getOptionalNoneDecl());
+        return OptionalExplosion::forNone();
+      }
+    }
+
+    return OptionalExplosion::forOptional([&](Explosion &out) {
+      getLoweredExplosion(v, out);
+    });
   }
 
   /// Return the single member of the lowered explosion for the
@@ -3517,49 +3540,68 @@ static Alignment getStackAllocationAlignment(IRGenSILFunction &IGF,
   return Alignment(MaximumAlignment);
 }
 
-/// Emit a call to a stack allocation builtin (stackAlloc() or stackDealloc().)
-///
-/// Returns whether or not `i` was such a builtin (true if so, false if it was
-/// some other builtin.)
-static bool emitStackAllocBuiltinCall(IRGenSILFunction &IGF,
-                                      swift::BuiltinInst *i) {
-  if (i->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
-      i->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
-    // Stack-allocate a buffer with the specified size/alignment.
-    auto loc = i->getLoc().getSourceLoc();
-    auto size = getStackAllocationSize(
-      IGF, i->getOperand(0), i->getOperand(1), loc);
-    auto align = getStackAllocationAlignment(IGF, i->getOperand(2), loc);
+static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
+                                  swift::BuiltinInst *i) {
+  // Stack-allocate a buffer with the specified size/alignment.
+  auto loc = i->getLoc().getSourceLoc();
+  auto size = getStackAllocationSize(
+    IGF, i->getOperand(0), i->getOperand(1), loc);
+  auto align = getStackAllocationAlignment(IGF, i->getOperand(2), loc);
 
-    auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
-                                              false, "temp_alloc");
-    IGF.setLoweredStackAddress(i, stackAddress);
+  auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
+                                            false, "temp_alloc");
+  IGF.setLoweredStackAddress(i, stackAddress);
+}
 
-    return true;
+static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
+                                    swift::BuiltinInst *i) {
+  // Deallocate a stack address previously allocated with the StackAlloc
+  // builtin above.
+  auto address = i->getOperand(0);
+  auto stackAddress = IGF.getLoweredStackAddress(address);
 
-  } else if (i->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
-    // Deallocate a stack address previously allocated with the StackAlloc
-    // builtin above.
-    auto address = i->getOperand(0);
-    auto stackAddress = IGF.getLoweredStackAddress(address);
-
-    if (stackAddress.getAddress().isValid()) {
-      IGF.emitDeallocateDynamicAlloca(stackAddress, false);
-    }
-
-    return true;
+  if (stackAddress.getAddress().isValid()) {
+    IGF.emitDeallocateDynamicAlloca(stackAddress, false);
   }
+}
 
-  return false;
+static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
+                                       swift::BuiltinInst *i) {
+  auto flags = IGF.getLoweredSingletonExplosion(i->getOperand(0));
+  auto taskGroup = IGF.getLoweredOptionalExplosion(i->getOperand(1));
+  auto taskExecutor = IGF.getLoweredOptionalExplosion(i->getOperand(2));
+  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(3));
+
+  auto taskAndContext =
+    emitTaskCreate(IGF, flags, taskGroup, taskExecutor, taskFunction,
+                   i->getSubstitutions());
+  Explosion out;
+  out.add(taskAndContext.first);
+  out.add(taskAndContext.second);
+  IGF.setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
   const BuiltinInfo &builtin = getSILModule().getBuiltinInfo(i->getName());
 
-  if (emitStackAllocBuiltinCall(*this, i)) {
-    return;
+  // Handle some builtins specially.
+  switch (builtin.ID) {
+  case BuiltinValueKind::StackAlloc:
+  case BuiltinValueKind::UnprotectedStackAlloc:
+    return emitBuiltinStackAlloc(*this, i);
+
+  case BuiltinValueKind::StackDealloc:
+    return emitBuiltinStackDealloc(*this, i);
+
+  case BuiltinValueKind::CreateAsyncTask:
+    return emitBuiltinCreateAsyncTask(*this, i);
+
+  default:
+    break;
   }
 
+  // Otherwise, collect all the values into a single explosion and forward
+  // over to the general path.
   auto argValues = i->getArguments();
   Explosion args;
   SmallVector<SILType, 4> argTypes;

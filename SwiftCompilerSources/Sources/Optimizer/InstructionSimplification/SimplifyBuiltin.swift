@@ -44,11 +44,6 @@ extension BuiltinInst : OnoneSimplifyable {
            .AllocVector,
            .IsPOD:
         optimizeArgumentToThinMetatype(argument: 0, context)
-      case .CreateAsyncTask:
-        // In embedded Swift, CreateAsyncTask needs a thin metatype
-        if context.options.enableEmbeddedSwift {
-          optimizeArgumentToThinMetatype(argument: 1, context)
-        }
       case .ICMP_EQ:
         constantFoldIntegerEquality(isEqual: true, context)
       case .ICMP_NE:
