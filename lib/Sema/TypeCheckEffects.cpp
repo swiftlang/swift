@@ -800,6 +800,24 @@ static bool isRethrowingDueToAsyncSequence(DeclContext *rethrowsDC) {
   return true;
 }
 
+/// Type-erase the opened archetypes in the given type, if there is one.
+static Type typeEraseOpenedArchetypes(Type type) {
+  if (!type || !type->hasOpenedExistential())
+    return type;
+
+  const OpenedArchetypeType *root = nullptr;
+  type.visit([&](Type type) {
+    if (auto opened = dyn_cast<OpenedArchetypeType>(type.getPointer())) {
+      root = opened->getRoot();
+    }
+  });
+
+  if (!root)
+    return type;
+
+  return constraints::typeEraseOpenedArchetypesWithRoot(type, root);
+}
+
 /// A type expressing the result of classifying whether a call or function
 /// throws or is async.
 class Classification {
@@ -928,7 +946,7 @@ public:
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
-    result.ThrownError = thrownError;
+    result.ThrownError = typeEraseOpenedArchetypes(thrownError);
     return result;
   }
 
