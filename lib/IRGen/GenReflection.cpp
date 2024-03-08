@@ -411,10 +411,28 @@ getTypeRefImpl(IRGenModule &IGM,
     // signal from future runtimes whether they support noncopyable types before
     // exposing their metadata to them.
     Type contextualTy = type;
-    if (sig)
+    if (sig) {
       contextualTy = sig.getGenericEnvironment()->mapTypeIntoContext(type);
+    }
 
+    bool isAlwaysNoncopyable = false;
     if (contextualTy->isNoncopyable()) {
+      // If the contextual type has any archetypes in it, it's plausible that
+      // we could end up with a copyable type in some instances. Look for those.
+      if (contextualTy->hasArchetype()) {
+        // If this is a nominal type, check whether it can ever be copyable.
+        if (auto nominal = contextualTy->getAnyNominal()) {
+          if (!nominal->canBeCopyable())
+            isAlwaysNoncopyable = true;
+        } else {
+          // Assume that we could end up with a copyable type somehow.
+        }
+      } else {
+        isAlwaysNoncopyable = true;
+      }
+    }
+
+    if (isAlwaysNoncopyable) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
       return getTypeRefByFunction(IGM, sig, type);
     }
