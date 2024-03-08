@@ -947,6 +947,35 @@ extension String.UTF16View {
       }
     }
   }
+  
+  @inline(__always)
+  private func _transcodeASCIIScalar(
+    from utf8: UnsafeBufferPointer<UInt8>, at readIdx: inout Int,
+    to buffer: UnsafeMutableBufferPointer<UInt16>, at writeIdx: inout Int
+  ) {
+    _internalInvariant(utf8[readIdx] < 0x80)
+    buffer[_unchecked: writeIdx] = UInt16(
+      truncatingIfNeeded: utf8[_unchecked: readIdx])
+    readIdx &+= 1
+    writeIdx &+= 1
+  }
+  
+  @inline(__always)
+  private func _transcodeComplexScalar(
+    from utf8: UnsafeBufferPointer<UInt8>, at readIdx: inout Int,
+    to buffer: UnsafeMutableBufferPointer<UInt16>, at writeIdx: inout Int
+  ) {
+    let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
+    buffer[writeIdx] = scalar.utf16[0]
+    readIdx &+= len
+    writeIdx &+= 1
+    if _slowPath(scalar.utf16.count == 2) {
+      // Note: this is intentionally not using the _unchecked subscript.
+      // (We rely on debug assertions to catch out of bounds access.)
+      buffer[writeIdx] = scalar.utf16[1]
+      writeIdx &+= 1
+    }
+  }
 
   // Copy (i.e. transcode to UTF-16) our contents into a buffer. `alignedRange`
   // means that the indices are part of the UTF16View.indices -- they are either
@@ -975,11 +1004,10 @@ extension String.UTF16View {
         _internalInvariant(range.lowerBound.transcodedOffset == 0)
         _internalInvariant(range.upperBound.transcodedOffset == 0)
         while readIdx < readEnd {
-          _internalInvariant(utf8[readIdx] < 0x80)
-          buffer[_unchecked: writeIdx] = UInt16(
-            truncatingIfNeeded: utf8[_unchecked: readIdx])
-          readIdx &+= 1
-          writeIdx &+= 1
+          _transcodeASCIIScalar(
+            from: utf8, at: &readIdx,
+            to: buffer, at: &writeIdx
+          )
         }
         return
       }
@@ -995,20 +1023,34 @@ extension String.UTF16View {
         writeIdx &+= 1
       }
 
+      let raw = UnsafeRawPointer(utf8.baseAddress.unsafelyUnwrapped)
       // Transcode middle
-      while readIdx < readEnd {
-        let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
-        buffer[writeIdx] = scalar.utf16[0]
-        readIdx &+= len
-        writeIdx &+= 1
-        if _slowPath(scalar.utf16.count == 2) {
-          // Note: this is intentionally not using the _unchecked subscript.
-          // (We rely on debug assertions to catch out of bounds access.)
-          buffer[writeIdx] = scalar.utf16[1]
-          writeIdx &+= 1
+      while readIdx &+ 7 < readEnd {
+        let word = raw.loadUnaligned(fromByteOffset: readIdx, as: UInt64.self)
+        if word & 0x8080808080808080 == 0 { //all ASCII
+          for _ in 0..<8 {
+            _transcodeASCIIScalar(
+              from: utf8, at: &readIdx,
+              to: buffer, at: &writeIdx
+            )
+          }
+        } else {
+          for _ in 0..<8 where readIdx < readEnd {
+            _transcodeComplexScalar(
+              from: utf8, at: &readIdx,
+              to: buffer, at: &writeIdx
+            )
+          }
         }
       }
-
+      
+      while readIdx < readEnd {
+        _transcodeComplexScalar(
+          from: utf8, at: &readIdx,
+          to: buffer, at: &writeIdx
+        )
+      }
+      
       // Handle mid-transcoded-scalar final index
       if _slowPath(range.upperBound.transcodedOffset == 1) {
         _internalInvariant(writeIdx < writeEnd)
