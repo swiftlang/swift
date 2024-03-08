@@ -407,6 +407,7 @@ public:
       std::optional<SILDebugVariable> Var = std::nullopt,
       HasDynamicLifetime_t dynamic = DoesNotHaveDynamicLifetime,
       IsLexical_t isLexical = IsNotLexical,
+      IsFromVarDecl_t isFromVarDecl = IsNotFromVarDecl,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;
@@ -420,7 +421,8 @@ public:
 #endif
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
-        substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical, wasMoved));
+        substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical,
+        isFromVarDecl, wasMoved));
   }
 
   AllocVectorInst *

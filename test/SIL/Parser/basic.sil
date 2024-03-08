@@ -1253,25 +1253,35 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @test_alloc_stack_flags
-sil @test_alloc_stack_flags : $() -> () {
-  // CHECK: alloc_stack $Builtin.NativeObject
+// CHECK-LABEL: sil @alloc_stack_test
+sil @alloc_stack_test : $() -> () {
+// CHECK: alloc_stack $Builtin.NativeObject
   %instance = alloc_stack $Builtin.NativeObject
   dealloc_stack %instance : $*Builtin.NativeObject
-  // CHECK: alloc_stack [dynamic_lifetime]
+// CHECK: alloc_stack [dynamic_lifetime]
   %instance2 = alloc_stack [dynamic_lifetime] $Builtin.NativeObject
   dealloc_stack %instance2 : $*Builtin.NativeObject
-  // CHECK: alloc_stack [lexical]
+// CHECK: alloc_stack [lexical]
   %instance3 = alloc_stack [lexical] $Builtin.NativeObject
   dealloc_stack %instance3 : $*Builtin.NativeObject
-  // CHECK: alloc_stack [dynamic_lifetime] [lexical]
-  %instance4 = alloc_stack [dynamic_lifetime] [lexical] $Builtin.NativeObject
-  dealloc_stack %instance4 : $*Builtin.NativeObject
-  // CHECK: alloc_stack [dynamic_lifetime] [lexical]
-  %instance5 = alloc_stack [lexical] [dynamic_lifetime] $Builtin.NativeObject
+// CHECK: alloc_stack [var_decl]
+  %instance5 = alloc_stack [var_decl] $Builtin.NativeObject
   dealloc_stack %instance5 : $*Builtin.NativeObject
+// CHECK: alloc_stack [dynamic_lifetime] [lexical]
+  %instance4 = alloc_stack [lexical] [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance4 : $*Builtin.NativeObject
+// CHECK: alloc_stack [dynamic_lifetime] [var_decl]
+  %instance6 = alloc_stack [dynamic_lifetime] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance6 : $*Builtin.NativeObject
+// CHECK: alloc_stack [lexical] [var_decl]
+  %instance7 = alloc_stack [lexical] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance7 : $*Builtin.NativeObject
+// CHECK: alloc_stack [dynamic_lifetime] [lexical] [var_decl]
+  %instance8 = alloc_stack [lexical] [var_decl] [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance8 : $*Builtin.NativeObject
   %res = tuple ()
   return %res : $()
+// CHECK: } // end sil function 'alloc_stack_test'
 }
 
 sil_global @staticProp: $Int

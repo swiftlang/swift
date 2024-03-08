@@ -1440,6 +1440,8 @@ public:
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
       *this << "[lexical] ";
+    if (AVI->isFromVarDecl())
+      *this << "[var_decl] ";
     if (AVI->usesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();

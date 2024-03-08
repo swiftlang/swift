@@ -1465,7 +1465,8 @@ BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
       regularLoc(), type.unbridged(), std::nullopt,
       swift::HasDynamicLifetime_t(hasDynamicLifetime),
       swift::IsLexical_t(isLexical),
-      swift::UsesMoveableValueDebugInfo_t(wasMoved))};
+      // TODO: Add this as an argument.
+      swift::IsNotFromVarDecl, swift::UsesMoveableValueDebugInfo_t(wasMoved))};
 }
 
 BridgedInstruction BridgedBuilder::createAllocVector(BridgedValue capacity, BridgedType type) const {
