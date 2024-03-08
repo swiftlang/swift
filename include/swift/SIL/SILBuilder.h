@@ -1425,10 +1425,10 @@ public:
                                                      operand, poisonRefs));
   }
 
-  MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
-                                 IsLexical_t isLexical = IsNotLexical,
-                                 bool hasPointerEscape = false,
-                                 bool fromVarDecl = false) {
+  MoveValueInst *createMoveValue(
+      SILLocation loc, SILValue operand, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
@@ -2848,10 +2848,10 @@ public:
 
   /// Convenience function that is a no-op for trivial values and inserts a
   /// move_value on non-trivial instructions.
-  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v,
-                                  IsLexical_t isLexical = IsNotLexical,
-                                  bool hasPointerEscape = false,
-                                  bool fromVarDecl = false) {
+  SILValue emitMoveValueOperation(
+      SILLocation Loc, SILValue v, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool fromVarDecl = false) {
     assert(!v->getType().isAddress());
     if (v->getType().isTrivial(*getInsertionBB()->getParent()))
       return v;
