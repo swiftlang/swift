@@ -580,6 +580,8 @@ private:
       // Leave <compiler-generated> & friends as is, without directory.
       if (!(File.startswith("<") && File.endswith(">")))
         Dir = CurDir;
+      else
+        Dir = llvm::sys::path::root_directory(CurDir);
     }
     llvm::DIFile *F =
         DBuilder.createFile(DebugPrefixMap.remapPath(File),
