@@ -217,3 +217,16 @@ do {
   let _: [PartialKeyPath<S>] = [\.a, \.b] // Ok
   let _: [any PartialKeyPath<S> & Sendable] = [\.a, \.b] // Ok
 }
+
+do {
+  func kp() -> KeyPath<String, Int> & Sendable {
+    fatalError()
+  }
+
+  func test() -> KeyPath<String, Int> {
+    true ? kp() : kp() // Ok
+  }
+
+  func forward<T>(_ v: T) -> T { v }
+  let _: KeyPath<String, Int> = forward(kp()) // Ok
+}
