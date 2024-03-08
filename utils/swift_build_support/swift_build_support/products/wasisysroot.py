@@ -194,7 +194,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.cmake_options.define('UNIX:BOOL', 'TRUE')
 
         self.build_with_cmake([], self.args.build_variant, [],
-                              prefer_just_built_toolchain=True)
+                              prefer_native_toolchain=True)
         self.install_with_cmake(
             ["install"], WASILibc.sysroot_install_path(build_root))
 

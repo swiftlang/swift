@@ -117,7 +117,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
         # Configure with WebAssembly target variant, and build with just-built toolchain
         self.build_with_cmake([], self._build_variant, [],
-                              prefer_just_built_toolchain=True)
+                              prefer_native_toolchain=True)
 
     def test(self, host_target):
         build_root = os.path.dirname(self.build_dir)
