@@ -1966,14 +1966,14 @@ class AllocStackInst final
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  llvm::Optional<SILDebugVariable> Var,
                  HasDynamicLifetime_t hasDynamicLifetime, IsLexical_t isLexical,
+                 IsFromVarDecl_t isFromVarDecl,
                  UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo);
 
-  static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
-                                SILFunction &F,
-                                llvm::Optional<SILDebugVariable> Var,
-                                HasDynamicLifetime_t hasDynamicLifetime,
-                                IsLexical_t isLexical,
-                                UsesMoveableValueDebugInfo_t wasMoved);
+  static AllocStackInst *
+  create(SILDebugLocation Loc, SILType elementType, SILFunction &F,
+         llvm::Optional<SILDebugVariable> Var,
+         HasDynamicLifetime_t hasDynamicLifetime, IsLexical_t isLexical,
+         IsFromVarDecl_t isFromVarDecl, UsesMoveableValueDebugInfo_t wasMoved);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -2020,7 +2020,7 @@ public:
     return HasDynamicLifetime_t(sharedUInt8().AllocStackInst.dynamicLifetime);
   }
 
-  /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
+  /// Whether the alloc_stack instruction has a lexical lifetime.
   IsLexical_t isLexical() const {
     return IsLexical_t(sharedUInt8().AllocStackInst.lexical);
   }
@@ -2036,6 +2036,15 @@ public:
   void setIsLexical() {
     sharedUInt8().AllocStackInst.lexical = (bool)IsLexical;
   }
+
+  /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
+  IsFromVarDecl_t isFromVarDecl() const {
+    return IsFromVarDecl_t(sharedUInt8().AllocStackInst.fromVarDecl);
+  }
+
+  /// Set that the alloc_stack instruction corresponds to a source-level
+  /// VarDecl.
+  void setIsFromVarDecl() { sharedUInt8().AllocStackInst.fromVarDecl = true; }
 
   /// Return the debug variable information attached to this instruction.
   llvm::Optional<SILDebugVariable> getVarInfo() const {

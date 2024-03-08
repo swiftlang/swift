@@ -5010,6 +5010,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AllocStackInst: {
     auto hasDynamicLifetime = DoesNotHaveDynamicLifetime;
     auto isLexical = IsNotLexical;
+    auto isFromVarDecl = IsNotFromVarDecl;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
 
@@ -5020,6 +5021,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         hasDynamicLifetime = HasDynamicLifetime;
       else if (attributeName == "lexical")
         isLexical = IsLexical;
+      else if (attributeName == "var_decl")
+        isFromVarDecl = IsFromVarDecl;
       else if (attributeName == "moveable_value_debuginfo")
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
       else {
@@ -5043,10 +5046,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     // It doesn't make sense to attach a debug var info if the name is empty
     if (VarInfo.Name.size())
       ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
-                                     isLexical, usesMoveableValueDebugInfo);
+                                     isLexical, isFromVarDecl,
+                                     usesMoveableValueDebugInfo);
     else
-      ResultVal = B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime,
-                                     isLexical, usesMoveableValueDebugInfo);
+      ResultVal =
+          B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
+                             isFromVarDecl, usesMoveableValueDebugInfo);
     break;
   }
   case SILInstructionKind::MetatypeInst: {

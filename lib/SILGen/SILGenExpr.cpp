@@ -1089,13 +1089,14 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
   if (generateDebugInfo)
     if (auto *VD = loc.getAsASTNode<VarDecl>())
       DbgVar = SILDebugVariable(VD->isLet(), 0);
-  auto *alloc = B.createAllocStack(loc, ty, DbgVar, dynamic, isLexical,
-                                   DoesNotUseMoveableValueDebugInfo
+  auto *alloc =
+      B.createAllocStack(loc, ty, DbgVar, dynamic, isLexical, IsNotFromVarDecl,
+                         DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
-                                   ,
-                                   !generateDebugInfo
+                         ,
+                         !generateDebugInfo
 #endif
-  );
+      );
   enterDeallocStackCleanup(alloc);
   return alloc;
 }

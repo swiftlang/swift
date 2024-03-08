@@ -230,6 +230,7 @@ AllocStackInst::AllocStackInst(
     ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
     llvm::Optional<SILDebugVariable> Var,
     HasDynamicLifetime_t hasDynamicLifetime, IsLexical_t isLexical,
+    IsFromVarDecl_t isFromVarDecl,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
@@ -241,6 +242,7 @@ AllocStackInst::AllocStackInst(
       VarInfo(0) {
   sharedUInt8().AllocStackInst.dynamicLifetime = (bool)hasDynamicLifetime;
   sharedUInt8().AllocStackInst.lexical = (bool)isLexical;
+  sharedUInt8().AllocStackInst.fromVarDecl = (bool)isFromVarDecl;
   sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
       (bool)usesMoveableValueDebugInfo || elementType.isMoveOnly();
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
@@ -270,6 +272,7 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
                                        llvm::Optional<SILDebugVariable> Var,
                                        HasDynamicLifetime_t hasDynamicLifetime,
                                        IsLexical_t isLexical,
+                                       IsFromVarDecl_t isFromVarDecl,
                                        UsesMoveableValueDebugInfo_t wasMoved) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
@@ -278,7 +281,7 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       F.getModule(), Var, TypeDependentOperands);
   return ::new (Buffer)
       AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
-                     hasDynamicLifetime, isLexical, wasMoved);
+                     hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
 }
 
 VarDecl *AllocationInst::getDecl() const {

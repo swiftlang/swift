@@ -879,7 +879,7 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocStack(
       Loc, getOpType(Inst->getElementType()), VarInfo,
-      Inst->hasDynamicLifetime(), Inst->isLexical(),
+      Inst->hasDynamicLifetime(), Inst->isLexical(), Inst->isFromVarDecl(),
       Inst->usesMoveableValueDebugInfo()
 #ifndef NDEBUG
           ,

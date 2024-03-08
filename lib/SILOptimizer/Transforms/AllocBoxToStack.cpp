@@ -648,12 +648,12 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     }
     return IsNotLexical;
   };
-  auto *ASI = Builder.createAllocStack(ABI->getLoc(), ty, ABI->getVarInfo(),
-                                       ABI->hasDynamicLifetime(), isLexical(),
-                                       DoesNotUseMoveableValueDebugInfo
+  auto *ASI = Builder.createAllocStack(
+      ABI->getLoc(), ty, ABI->getVarInfo(), ABI->hasDynamicLifetime(),
+      isLexical(), IsNotFromVarDecl, DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
-                                       ,
-                                       true
+      ,
+      true
 #endif
   );
 

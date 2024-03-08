@@ -1113,6 +1113,8 @@ struct BridgedBuilder{
         regularLoc(), type, llvm::None,
         swift::HasDynamicLifetime_t(hasDynamicLifetime),
         swift::IsLexical_t(isLexical),
+        // TODO: Add this as an argument.
+        swift::IsNotFromVarDecl,
         swift::UsesMoveableValueDebugInfo_t(wasMoved))};
   }
 
