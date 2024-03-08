@@ -31,8 +31,7 @@ protocol G3<ActorSystem>: DistributedActor, EmptyBase where ActorSystem: Distrib
 // @_DistributedProtocol ->
 // CHECK: distributed actor $G3<ActorSystem>: G3
 // CHECK:   Distributed._DistributedActorStub
-// CHECK:   where ActorSystem: DistributedActorSystem<any Codable>,
-// CHECK:         ActorSystem.ActorID: Codable
+// CHECK:   where ActorSystem: DistributedActorSystem<any Codable>
 // CHECK: {
 // CHECK: }
 

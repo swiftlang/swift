@@ -12,28 +12,28 @@
 
 import Distributed
 
-//@_DistributedProtocol
-//protocol Greeter: DistributedActor where ActorSystem == FakeActorSystem {
-//  distributed func greet(name: String) -> String
-//}
+@_DistributedProtocol
+protocol Greeter: DistributedActor where ActorSystem == FakeActorSystem {
+  distributed func greet(name: String) -> String
+}
 
 // @_DistributedProtocol ->
 
-// CHECK:      distributed actor $Greeter: Greeter,
-// CHECK-NEXT:    Distributed._DistributedActorStub
-// CHECK-NEXT: {
-// CHECK-NEXT:   typealias ActorSystem = FakeActorSystem
-// CHECK-NEXT: }
+// CHECK: distributed actor $Greeter: Greeter,
+// CHECK:    Distributed._DistributedActorStub
+// CHECK: {
+// CHECK:   typealias ActorSystem = FakeActorSystem
+// CHECK: }
 
-// CHECK:      extension Greeter where Self: Distributed._DistributedActorStub {
-// CHECK-NEXT:   distributed func greet(name: String) -> String {
-// CHECK-NEXT:     if #available (SwiftStdlib 6.0, *) {
-// CHECK-NEXT:       Distributed._distributedStubFatalError()
-// CHECK-NEXT:     } else {
-// CHECK-NEXT:       fatalError()
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
-// CHECK-NEXT: }
+// CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
+// CHECK:   distributed func greet(name: String) -> String {
+// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
 
 @_DistributedProtocol
 protocol Greeter2: DistributedActor where ActorSystem: FakeRoundtripActorSystem {
@@ -42,18 +42,18 @@ protocol Greeter2: DistributedActor where ActorSystem: FakeRoundtripActorSystem 
 
 // @_DistributedProtocol ->
 
-// CHECK:        distributed actor $Greeter2: Greeter,
-//// CHECK-NEXT:     Distributed._DistributedActorStub
-//// CHECK-NEXT:     where ActorSystem: FakeActorSystem
-//// CHECK-NEXT: {
-//// CHECK-NEXT: }
+// CHECK: distributed actor $Greeter2<ActorSystem>: Greeter2,
+// CHECK:   Distributed._DistributedActorStub
+// CHECK:   where ActorSystem: FakeRoundtripActorSystem
+// CHECK: {
+// CHECK: }
 
-// CHECK:      extension Greeter2 where Self: Distributed._DistributedActorStub {
-// CHECK-NEXT:   distributed func greet(name: String) -> String {
-// CHECK-NEXT:     if #available (SwiftStdlib 6.0, *) {
-// CHECK-NEXT:       Distributed._distributedStubFatalError()
-// CHECK-NEXT:     } else {
-// CHECK-NEXT:       fatalError()
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
-// CHECK-NEXT: }
+// CHECK: extension Greeter2 where Self: Distributed._DistributedActorStub {
+// CHECK:   distributed func greet(name: String) -> String {
+// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK: }

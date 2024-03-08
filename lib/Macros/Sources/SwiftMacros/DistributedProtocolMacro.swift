@@ -21,11 +21,11 @@ import SwiftSyntaxBuilder
 public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
 }
 
-
 // ===== -----------------------------------------------------------------------
 // MARK: Default Stub implementations Extension
 
 extension DistributedProtocolMacro {
+
   /// Introduce the `extension MyDistributedActor` which contains default
   /// implementations of the protocol's requirements.
   public static func expansion(
@@ -97,8 +97,6 @@ extension DistributedProtocolMacro {
 
     var isGenericStub = false
     var specificActorSystemRequirement: TypeSyntax?
-    // FIXME must detect this off the protocol
-    let serializationRequirementType: String = "Codable"
 
     guard let genericWhereClause = proto.genericWhereClause else {
       guard !proto.memberBlock.members.isEmpty else {
@@ -135,20 +133,19 @@ extension DistributedProtocolMacro {
     }
 
     let stubActorDecl: DeclSyntax =
-      if (isGenericStub) {
+      if isGenericStub, let specificActorSystemRequirement {
         """
-        distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
+        \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
           Distributed._DistributedActorStub
-          where ActorSystem: DistributedActorSystem<any \(raw: serializationRequirementType)>, 
-            ActorSystem.ActorID: \(raw: serializationRequirementType) 
+          where ActorSystem: \(specificActorSystemRequirement) 
         { }
         """
-     } else if let specificActorSystemRequirement {
+      } else if let specificActorSystemRequirement {
         """
-        distributed actor $\\(proto.name.trimmed): \\(proto.name.trimmed), 
+        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
           Distributed._DistributedActorStub
         { 
-          \(typealiasActorSystem(specificActorSystemRequirement)) 
+          \(typealiasActorSystem(proto, specificActorSystemRequirement)) 
         }
         """
       } else {
@@ -160,7 +157,7 @@ extension DistributedProtocolMacro {
     return [stubActorDecl]
   }
 
-  private static func typealiasActorSystem(_ type: TypeSyntax) -> DeclSyntax {
+  private static func typealiasActorSystem(_ proto: ProtocolDeclSyntax, _ type: TypeSyntax) -> DeclSyntax {
     "typealias ActorSystem = \(type)"
   }
 }
