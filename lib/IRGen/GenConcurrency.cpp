@@ -292,7 +292,8 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   }
 
   // In embedded Swift, create and pass result type info.
-  taskOptions = addEmbeddedSwiftResultTypeInfo(IGF, taskOptions, subs);
+  taskOptions =
+    maybeAddEmbeddedSwiftResultTypeInfo(IGF, taskOptions, futureResultType);
   
   llvm::CallInst *call;
   if (localResultBuffer) {
@@ -403,4 +404,312 @@ void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
       {result, closure, closureContext, resultTypeMetadata});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+
+void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
+  if (task->getType() != IGF.IGM.SwiftTaskPtrTy) {
+    task = IGF.Builder.CreateBitCast(task, IGF.IGM.SwiftTaskPtrTy);
+  }
+
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskCancelFunctionPointer(), {task});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+template <class RecordTraits>
+static Address allocateOptionRecord(IRGenFunction &IGF,
+                                    const RecordTraits &traits) {
+  return IGF.createAlloca(RecordTraits::getRecordType(IGF.IGM),
+                          IGF.IGM.getPointerAlignment(),
+                          traits.getLabel() + "_record");
+}
+
+static void initializeOptionRecordHeader(IRGenFunction &IGF,
+                                         Address recordAddr,
+                                         TaskOptionRecordFlags flags,
+                                         llvm::Value *curRecordPointer) {
+  auto baseRecordAddr =
+    IGF.Builder.CreateStructGEP(recordAddr, 0, Size(0));
+
+  // Flags
+  auto flagsValue =
+    llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getOpaqueValue());
+  IGF.Builder.CreateStore(flagsValue,
+    IGF.Builder.CreateStructGEP(baseRecordAddr, 0, Size(0)));
+
+  // Parent
+  IGF.Builder.CreateStore(curRecordPointer,
+    IGF.Builder.CreateStructGEP(baseRecordAddr, 1, IGF.IGM.getPointerSize()));
+}
+
+
+template <class RecordTraits, class... Args>
+static llvm::Value *initializeOptionRecord(IRGenFunction &IGF,
+                                           Address recordAddr,
+                                           llvm::Value *curRecordPointer,
+                                           const RecordTraits &traits,
+                                           Args &&... args) {
+  initializeOptionRecordHeader(IGF, recordAddr, traits.getRecordFlags(),
+                               curRecordPointer);
+
+  traits.initialize(IGF, recordAddr, std::forward<Args>(args)...);
+
+  llvm::Value *newRecordPointer = IGF.Builder.CreateBitOrPointerCast(
+      recordAddr.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
+  return newRecordPointer;
+}
+
+template <class RecordTraits, class... Args>
+static llvm::Value *addOptionRecord(IRGenFunction &IGF,
+                                    llvm::Value *curRecordPointer,
+                                    const RecordTraits &traits,
+                                    Args &&... args) {
+  auto recordAddr = allocateOptionRecord(IGF, traits);
+  return initializeOptionRecord(IGF, recordAddr, curRecordPointer, traits,
+                                std::forward<Args>(args)...);
+}
+
+/// Add a task option record to the options list if the given value
+/// is presernt.
+template <class RecordTraits>
+static llvm::Value *maybeAddOptionRecord(IRGenFunction &IGF,
+                                         llvm::Value *curRecordPointer,
+                                         const RecordTraits &traits,
+                                         OptionalExplosion &value) {
+  // We can completely avoid doing any work if the value is statically nil.
+  if (value.isNone()) return curRecordPointer;
+
+  // Otherwise, allocate the option record.
+  auto recordAddr = allocateOptionRecord(IGF, traits);
+
+  // If the value is statically non-nil, we can unconditionally
+  // initialize the record and add it to the chain.
+  if (value.isSome()) {
+    return initializeOptionRecord(IGF, recordAddr, curRecordPointer,
+                                  traits, value.getSomeExplosion());
+  }
+
+  // Otherwise, we have to check whether the value is nil dynamically.
+  llvm::BasicBlock *contBB = IGF.createBasicBlock(traits.getLabel() + ".cont");
+  llvm::BasicBlock *someBB = IGF.createBasicBlock(traits.getLabel() + ".some");
+
+  auto &ctx = IGF.IGM.Context;
+
+  SILType optionalType =
+    IGF.IGM.getLoweredType(traits.getValueType(ctx).wrapInOptionalType());
+  auto &optionalStrategy = getEnumImplStrategy(IGF.IGM, optionalType);
+
+  // Branch based on whether the value is nil.  We're going to use the
+  // value twice, so borrow it the first time.
+  value.getOptionalExplosion().borrowing([&](Explosion &borrowedValue) {
+    optionalStrategy.emitValueSwitch(IGF, borrowedValue,
+                                     {{ctx.getOptionalSomeDecl(), someBB},
+                                      {ctx.getOptionalNoneDecl(), contBB}},
+                                     /*default*/ nullptr);
+  });
+  auto noneOriginBB = IGF.Builder.GetInsertBlock();
+
+  // Enter the block for the case where the value is non-nil.
+  IGF.Builder.emitBlock(someBB);
+
+  // Project the payload from the optional value.
+  Explosion objectValue;
+  optionalStrategy.emitValueProject(IGF, value.getOptionalExplosion(),
+                                    ctx.getOptionalSomeDecl(),
+                                    objectValue);
+
+  // Initialize the record.
+  llvm::Value *someRecordPointer =
+    initializeOptionRecord(IGF, recordAddr, curRecordPointer,
+                           traits, objectValue);
+
+  auto someOriginBB = IGF.Builder.GetInsertBlock();
+  IGF.Builder.CreateBr(contBB);
+
+  // Enter the continuation block and create a phi to merge the two cases.
+  IGF.Builder.emitBlock(contBB);
+  auto recordPointerPHI =
+    IGF.Builder.CreatePHI(IGF.IGM.SwiftTaskOptionRecordPtrTy, /*num cases*/ 2);
+  recordPointerPHI->addIncoming(curRecordPointer, noneOriginBB);
+  recordPointerPHI->addIncoming(someRecordPointer, someOriginBB);
+
+  return recordPointerPHI;
+}
+
+namespace {
+struct EmbeddedSwiftResultTypeOptionRecordTraits {
+  CanType formalResultType;
+
+  static StringRef getLabel() {
+    return "result_type_info";
+  }
+  static llvm::StructType *getRecordType(IRGenModule &IGM) {
+    return IGM.SwiftResultTypeInfoTaskOptionRecordTy;
+  }
+  static TaskOptionRecordFlags getRecordFlags() {
+    return TaskOptionRecordFlags(TaskOptionRecordKind::ResultTypeInfo);
+  }
+
+  void initialize(IRGenFunction &IGF, Address optionsRecord) const {
+    SILType lowered = IGF.IGM.getLoweredType(formalResultType);
+    const TypeInfo &TI = IGF.IGM.getTypeInfo(lowered);
+    CanType canType = lowered.getASTType();
+    FixedPacking packing = TI.getFixedPacking(IGF.IGM);
+
+    // Size
+    IGF.Builder.CreateStore(
+        TI.getStaticSize(IGF.IGM),
+        IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+    // Align mask
+    IGF.Builder.CreateStore(
+        TI.getStaticAlignmentMask(IGF.IGM),
+        IGF.Builder.CreateStructGEP(optionsRecord, 2, Size()));
+    // initializeWithCopy witness
+    IGF.Builder.CreateStore(
+        IGF.IGM.getOrCreateValueWitnessFunction(
+            ValueWitness::InitializeWithCopy, packing, canType, lowered, TI),
+        IGF.Builder.CreateStructGEP(optionsRecord, 3, Size()));
+    // storeEnumTagSinglePayload witness
+    IGF.Builder.CreateStore(
+        IGF.IGM.getOrCreateValueWitnessFunction(
+            ValueWitness::StoreEnumTagSinglePayload, packing, canType, lowered,
+            TI),
+        IGF.Builder.CreateStructGEP(optionsRecord, 4, Size()));
+    // destroy witness
+    IGF.Builder.CreateStore(
+        IGF.IGM.getOrCreateValueWitnessFunction(ValueWitness::Destroy, packing,
+                                                canType, lowered, TI),
+        IGF.Builder.CreateStructGEP(optionsRecord, 5, Size()));
+  }
+};
+} // end anonymous namespace
+
+llvm::Value *irgen::maybeAddEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
+                                                        llvm::Value *taskOptions,
+                                                        CanType formalResultType) {
+  if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded))
+    return taskOptions;
+
+  EmbeddedSwiftResultTypeOptionRecordTraits traits{formalResultType};
+  return addOptionRecord(IGF, taskOptions, traits);
+}
+
+namespace {
+
+struct TaskGroupRecordTraits {
+  static StringRef getLabel() {
+    return "task_group";
+  }
+  static llvm::StructType *getRecordType(IRGenModule &IGM) {
+    return IGM.SwiftTaskGroupTaskOptionRecordTy;
+  }
+  static TaskOptionRecordFlags getRecordFlags() {
+    return TaskOptionRecordFlags(TaskOptionRecordKind::TaskGroup);
+  }
+  static CanType getValueType(ASTContext &ctx) {
+    return ctx.TheRawPointerType;
+  }
+
+  void initialize(IRGenFunction &IGF, Address recordAddr,
+                  Explosion &taskGroup) const {
+    IGF.Builder.CreateStore(
+        taskGroup.claimNext(),
+        IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize()));
+  }
+};
+
+struct InitialTaskExecutorRecordTraits {
+  static StringRef getLabel() {
+    return "task_executor";
+  }
+  static llvm::StructType *getRecordType(IRGenModule &IGM) {
+    return IGM.SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy;
+  }
+  static TaskOptionRecordFlags getRecordFlags() {
+    return TaskOptionRecordFlags(TaskOptionRecordKind::InitialTaskExecutor);
+  }
+  static CanType getValueType(ASTContext &ctx) {
+    return ctx.TheExecutorType;
+  }
+
+  void initialize(IRGenFunction &IGF, Address recordAddr,
+                  Explosion &taskExecutor) const {
+    auto executorRecord =
+      IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
+    IGF.Builder.CreateStore(taskExecutor.claimNext(),
+      IGF.Builder.CreateStructGEP(executorRecord, 0, Size()));
+    IGF.Builder.CreateStore(taskExecutor.claimNext(),
+      IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
+  }
+};
+
+} // end anonymous namespace
+
+static llvm::Value *
+maybeAddTaskGroupOptionRecord(IRGenFunction &IGF, llvm::Value *prevOptions,
+                              OptionalExplosion &taskGroup) {
+  return maybeAddOptionRecord(IGF, prevOptions, TaskGroupRecordTraits(),
+                              taskGroup);
+}
+
+static llvm::Value *
+maybeAddInitialTaskExecutorOptionRecord(IRGenFunction &IGF,
+                                        llvm::Value *prevOptions,
+                                        OptionalExplosion &taskExecutor) {
+  return maybeAddOptionRecord(IGF, prevOptions,
+                              InitialTaskExecutorRecordTraits(),
+                              taskExecutor);
+}
+
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+                      OptionalExplosion &taskGroup,
+                      OptionalExplosion &taskExecutor,
+                      Explosion &taskFunction,
+                      SubstitutionMap subs) {
+  llvm::Value *taskOptions =
+    llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+
+  CanType resultType;
+  if (subs) {
+    resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  } else {
+    resultType = IGF.IGM.Context.TheEmptyTupleType;
+  }
+
+  llvm::Value *resultTypeMetadata;
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    resultTypeMetadata = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+  } else {
+    resultTypeMetadata = IGF.emitTypeMetadataRef(resultType);
+  }
+
+  // Add an option record for the task group, if present.
+  taskOptions = maybeAddTaskGroupOptionRecord(IGF, taskOptions, taskGroup);
+
+  // Add an option record for the initial task executor, if present.
+  taskOptions =
+    maybeAddInitialTaskExecutorOptionRecord(IGF, taskOptions, taskExecutor);
+
+  // In embedded Swift, create and pass result type info.
+  taskOptions = maybeAddEmbeddedSwiftResultTypeInfo(IGF, taskOptions, resultType);
+
+  auto taskFunctionPtr = taskFunction.claimNext();
+  auto taskFunctionContext = taskFunction.claimNext();
+
+  llvm::CallInst *result = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskCreateFunctionPointer(),
+      {flags, taskOptions, resultTypeMetadata,
+       taskFunctionPtr, taskFunctionContext});
+  result->setDoesNotThrow();
+  result->setCallingConv(IGF.IGM.SwiftCC);
+
+  // Cast back to NativeObject/RawPointer.
+  auto newTask = IGF.Builder.CreateExtractValue(result, { 0 });
+  newTask = IGF.Builder.CreateBitCast(newTask, IGF.IGM.RefCountedPtrTy);
+  auto newContext = IGF.Builder.CreateExtractValue(result, { 1 });
+  newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
+  return { newTask, newContext };
 }

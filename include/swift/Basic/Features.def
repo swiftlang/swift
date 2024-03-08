@@ -168,6 +168,7 @@ LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters"
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
+LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
