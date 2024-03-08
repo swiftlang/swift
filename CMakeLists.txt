@@ -488,6 +488,14 @@ set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
 #
+# User-configurable WebAssembly specific options.
+#
+
+option(SWIFT_ENABLE_WASI_THREADS
+  "Build the Standard Library with WASI threads support"
+  FALSE)
+
+#
 # User-configurable Darwin-specific options.
 #
 option(SWIFT_EMBED_BITCODE_SECTION
