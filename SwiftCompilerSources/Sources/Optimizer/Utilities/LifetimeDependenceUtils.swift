@@ -219,7 +219,7 @@ extension LifetimeDependence {
   //
   // TODO: handle indirect results
   init?(unsafeApplyResult value: Value, _ context: some Context) {
-    if value.type.isEscapable {
+    if value.isEscapable {
       return nil
     }
     if (value.definingInstruction as! FullApplySite).hasResultDependence {
@@ -832,7 +832,7 @@ extension LifetimeDependenceDefUseWalker {
   mutating func walkDownUses(of value: Value, using operand: Operand?)
     -> WalkResult {
     // Only track ~Escapable and @noescape types.
-    if value.type.mayEscape {
+    if value.mayEscape {
       return .continueWalk
     }
     return walkDownUsesDefault(forwarding: value, using: operand)
@@ -857,10 +857,10 @@ extension LifetimeDependenceDefUseWalker {
     if let apply = operand.instruction as? FullApplySite {
       return visitAppliedUse(of: operand, by: apply)
     }
-    if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
+    if operand.instruction is ReturnInst, !operand.value.isEscapable {
       return returnedDependence(result: operand)
     }
-    if operand.instruction is YieldInst, !operand.value.type.isEscapable {
+    if operand.instruction is YieldInst, !operand.value.isEscapable {
       return yieldedDependence(result: operand)
     }
     return escapingDependence(on: operand)
@@ -1025,10 +1025,10 @@ extension LifetimeDependenceDefUseWalker {
       assert(!mdi.isUnresolved && !mdi.isNonEscaping,
              "should be handled as a dependence by AddressUseVisitor")
     }
-    if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
+    if operand.instruction is ReturnInst, !operand.value.isEscapable {
       return returnedDependence(result: operand)
     }
-    if operand.instruction is YieldInst, !operand.value.type.isEscapable {
+    if operand.instruction is YieldInst, !operand.value.isEscapable {
       return yieldedDependence(result: operand)
     }
     return escapingDependence(on: operand)
@@ -1088,7 +1088,7 @@ extension LifetimeDependenceDefUseWalker {
     case let .argument(arg):
       if arg.convention.isIndirectIn || arg.convention.isInout {
         allocation = arg
-      } else if arg.convention.isIndirectOut, !arg.type.isEscapable {
+      } else if arg.convention.isIndirectOut, !arg.isEscapable {
         return returnedDependence(address: arg, using: operand)
       }
       break
@@ -1096,11 +1096,11 @@ extension LifetimeDependenceDefUseWalker {
       break
     }
     if let allocation = allocation {
-      if !allocation.type.objectType.isEscapable {
+      if !allocation.isEscapable {
         return visitLocalStore(allocation: allocation, storedOperand: operand, storeAddress: address)
       }
     }
-    if address.type.objectType.isEscapable {
+    if address.isEscapable {
       return .continueWalk
     }
     return escapingDependence(on: operand)
@@ -1179,13 +1179,13 @@ extension LifetimeDependenceDefUseWalker {
       // If the lifetime dependence is scoped, then we can ignore it
       // because a mark_dependence [nonescaping] represents the
       // dependence.
-      if let result = apply.singleDirectResult, !result.type.isEscapable {
+      if let result = apply.singleDirectResult, !result.isEscapable {
         if dependentUse(of: operand, into: result) == .abortWalk {
           return .abortWalk
         }
       }
       for resultAddr in apply.indirectResultOperands
-          where !resultAddr.value.type.isEscapable {
+          where !resultAddr.value.isEscapable {
         if visitStoredUses(of: operand, into: resultAddr.value) == .abortWalk {
           return .abortWalk
         }

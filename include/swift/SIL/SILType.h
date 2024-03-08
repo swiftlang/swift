@@ -897,13 +897,15 @@ public:
 
   /// False if SILValues of this type cannot be used outside the scope of their
   /// lifetime dependence.
-  bool isEscapable() const;
+  bool isEscapable(const SILFunction &function) const;
 
   /// True for (isEscapable && !isNoEscapeFunction)
   ///
   /// Equivalent to getASTType()->mayEscape(), but handles SIL-specific types,
   /// namely SILFunctionType.
-  bool mayEscape() const { return !isNoEscapeFunction() && isEscapable(); }
+  bool mayEscape(const SILFunction &function) const {
+    return !isNoEscapeFunction() && isEscapable(function);
+  }
 
   //
   // Accessors for types used in SIL instructions:

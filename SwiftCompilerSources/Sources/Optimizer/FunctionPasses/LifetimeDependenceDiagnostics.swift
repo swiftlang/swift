@@ -35,7 +35,9 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   log(" --- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
 
-  for argument in function.arguments where !argument.type.isEscapable {
+  for argument in function.arguments
+      where !argument.type.isEscapable(in: function)
+  {
     // Indirect results are not checked here. Type checking ensures
     // that they have a lifetime dependence.
     if let lifetimeDep = LifetimeDependence(argument, context) {
