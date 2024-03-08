@@ -274,8 +274,8 @@ bool BridgedType::isMoveOnly() const {
   return unbridged().isMoveOnly();
 }
 
-bool BridgedType::isEscapable() const {
-  return unbridged().isEscapable();
+bool BridgedType::isEscapable(BridgedFunction f) const {
+  return unbridged().isEscapable(*f.getFunction());
 }
 
 bool BridgedType::isOrContainsObjectiveCClass() const {

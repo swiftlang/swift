@@ -1051,7 +1051,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
   return SILType();
 }
 
-bool SILType::isEscapable() const {
+bool SILType::isEscapable(const SILFunction &function) const {
   CanType ty = getASTType();
 
   // For storage with reference ownership, check the referent.
@@ -1065,7 +1065,8 @@ bool SILType::isEscapable() const {
   if (auto boxTy = getAs<SILBoxType>()) {
     auto fields = boxTy->getLayout()->getFields();
     assert(fields.size() == 1);
-    ty = fields[0].getLoweredType();
+    ty = ::getSILBoxFieldLoweredType(function.getTypeExpansionContext(), boxTy,
+                                     function.getModule().Types, 0);
   }
 
   // TODO: Support ~Escapable in parameter packs.
