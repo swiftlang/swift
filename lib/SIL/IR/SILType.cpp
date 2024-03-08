@@ -22,6 +22,7 @@
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/Test.h"
 #include "swift/SIL/TypeLowering.h"
 #include <tuple>
 
@@ -1288,3 +1289,21 @@ SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
 bool SILType::isSendable(SILFunction *fn) const {
   return getASTType()->isSendableType();
 }
+
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - message
+static FunctionTest IsSILTrivial("is-sil-trivial", [](auto &function,
+                                                      auto &arguments,
+                                                      auto &test) {
+  SILValue value = arguments.takeValue();
+  llvm::outs() << value;
+  if (value->getType().isTrivial(value->getFunction())) {
+    llvm::outs() << " is trivial\n";
+  } else {
+    llvm::outs() << " is not trivial\n";
+  }
+});
+} // end namespace swift::test

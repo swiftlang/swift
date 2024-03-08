@@ -70,10 +70,46 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
   assert(type->isExistentialType());
 
+  auto getConstraintType = [&type]() {
+    if (auto *existentialTy = type->getAs<ExistentialType>())
+      return existentialTy->getConstraintType();
+    return type;
+  };
+
+  auto lookupSuperclassConformance = [&](ExistentialLayout &layout) {
+    if (auto superclass = layout.explicitSuperclass) {
+      if (auto result =
+              lookupConformance(superclass, protocol, /*allowMissing=*/false)) {
+        if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+            result.hasUnavailableConformance())
+          return ProtocolConformanceRef::forInvalid();
+        return result;
+      }
+    }
+    return ProtocolConformanceRef::forInvalid();
+  };
+
   // If the existential type cannot be represented or the protocol does not
   // conform to itself, there's no point in looking further.
-  if (!protocol->existentialConformsToSelf())
+  if (!protocol->existentialConformsToSelf()) {
+    // If type is a protocol composition with marker protocols
+    // check whether superclass conforms, and if it does form
+    // an inherited conformance. This means that types like:
+    // `KeyPath<String, Int> & Sendable` don't have to be "opened"
+    // to satisfy conformance to i.e. `Equatable`.
+    if (getConstraintType()->is<ProtocolCompositionType>()) {
+      auto layout = type->getExistentialLayout();
+      if (llvm::all_of(layout.getProtocols(),
+                       [](const auto *P) { return P->isMarkerProtocol(); })) {
+        if (auto conformance = lookupSuperclassConformance(layout)) {
+          return ProtocolConformanceRef(
+              ctx.getInheritedConformance(type, conformance.getConcrete()));
+        }
+      }
+    }
+
     return ProtocolConformanceRef::forInvalid();
+  }
 
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
       && !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
@@ -89,10 +125,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // existential to an archetype parameter, so for now we restrict this to
   // @objc protocols and marker protocols.
   if (!layout.isObjC() && !protocol->isMarkerProtocol()) {
-    auto constraint = type;
-    if (auto existential = constraint->getAs<ExistentialType>())
-      constraint = existential->getConstraintType();
-
+    auto constraint = getConstraintType();
     // There's a specific exception for protocols with self-conforming
     // witness tables, but the existential has to be *exactly* that type.
     // TODO: synthesize witness tables on-demand for protocol compositions
@@ -107,16 +140,8 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
   // If the existential is class-constrained, the class might conform
   // concretely.
-  if (auto superclass = layout.explicitSuperclass) {
-    if (auto result = lookupConformance(
-            superclass, protocol, /*allowMissing=*/false)) {
-      if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
-          result.hasUnavailableConformance())
-        result = ProtocolConformanceRef::forInvalid();
-
-      return result;
-    }
-  }
+  if (auto conformance = lookupSuperclassConformance(layout))
+    return conformance;
 
   // Otherwise, the existential might conform abstractly.
   for (auto protoDecl : layout.getProtocols()) {
