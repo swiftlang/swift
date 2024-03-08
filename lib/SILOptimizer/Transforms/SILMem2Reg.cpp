@@ -799,7 +799,7 @@ beginGuaranteedLexicalLifetimeAfterStore(AllocStackInst *asi,
     return {LiveValues::forGuaranteed(stored, {}), /*isStorageValid*/ true};
   }
   auto *borrow = SILBuilderWithScope(inst->getNextInstruction())
-                     .createBeginBorrow(loc, stored, /*isLexical*/ true);
+                     .createBeginBorrow(loc, stored, IsLexical);
   return {LiveValues::forGuaranteed(stored, borrow), /*isStorageValid*/ true};
 }
 

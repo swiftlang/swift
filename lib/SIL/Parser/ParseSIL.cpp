@@ -4036,7 +4036,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::BeginBorrowInst: {
     SourceLoc AddrLoc;
 
-    bool isLexical = false;
+    auto isLexical = IsNotLexical;
     bool hasPointerEscape = false;
     bool fromVarDecl = false;
 
@@ -4044,7 +4044,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc AttrLoc;
     while (parseSILOptional(AttrName, AttrLoc, *this)) {
       if (AttrName == "lexical")
-        isLexical = true;
+        isLexical = IsLexical;
       else if (AttrName == "pointer_escape")
         hasPointerEscape = true;
       else if (AttrName == "var_decl")

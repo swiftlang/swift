@@ -966,7 +966,7 @@ namespace {
         if (!base.getValue()->getType().isAddress()) {
           assert(!SGF.useLoweredAddresses());
           auto borrow =
-              SGF.B.createBeginBorrow(loc, base.getValue(), /*isLexical=*/false,
+              SGF.B.createBeginBorrow(loc, base.getValue(), IsNotLexical,
                                       /*hasPointerEscape=*/false);
           auto value =
               SGF.B.createOpenExistentialValue(loc, borrow, getTypeOfRValue());

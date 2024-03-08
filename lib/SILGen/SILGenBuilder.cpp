@@ -1030,7 +1030,7 @@ ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
 
 ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
                                               ManagedValue value,
-                                              bool isLexical) {
+                                              IsLexical_t isLexical) {
   auto *newValue =
       SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical);
   SGF.emitManagedBorrowedRValueWithCleanup(newValue);
