@@ -381,7 +381,7 @@ AllocBoxInst::AllocBoxInst(
     llvm::Optional<SILDebugVariable> Var,
     HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
-    bool hasPointerEscape)
+    HasPointerEscape_t hasPointerEscape)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
@@ -397,7 +397,7 @@ AllocBoxInst::AllocBoxInst(
   sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
       (bool)usesMoveableValueDebugInfo;
 
-  sharedUInt8().AllocBoxInst.pointerEscape = hasPointerEscape;
+  sharedUInt8().AllocBoxInst.pointerEscape = (bool)hasPointerEscape;
 }
 
 AllocBoxInst *
@@ -405,7 +405,7 @@ AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                      SILFunction &F, llvm::Optional<SILDebugVariable> Var,
                      HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
                      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
-                     bool hasPointerEscape) {
+                     HasPointerEscape_t hasPointerEscape) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),

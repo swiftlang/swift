@@ -1936,6 +1936,11 @@ enum IsLexical_t : bool {
   IsLexical = true,
 };
 
+enum HasPointerEscape_t : bool {
+  DoesNotHavePointerEscape = false,
+  HasPointerEscape = true,
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -2377,14 +2382,14 @@ class AllocBoxInst final
                HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
                UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
                    DoesNotUseMoveableValueDebugInfo,
-               bool hasPointerEscape = false);
+               HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape);
 
   static AllocBoxInst *create(
       SILDebugLocation Loc, CanSILBoxType boxType, SILFunction &F,
       llvm::Optional<SILDebugVariable> Var,
       HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool hasPointerEscape = false);
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape);
 
 public:
   CanSILBoxType getBoxType() const {
@@ -2403,8 +2408,8 @@ public:
     sharedUInt8().AllocBoxInst.pointerEscape = pointerEscape;
   }
 
-  bool hasPointerEscape() const {
-    return sharedUInt8().AllocBoxInst.pointerEscape;
+  HasPointerEscape_t hasPointerEscape() const {
+    return HasPointerEscape_t(sharedUInt8().AllocBoxInst.pointerEscape);
   }
 
   /// True if the box should be emitted with reflection metadata for its

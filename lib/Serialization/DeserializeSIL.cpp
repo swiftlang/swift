@@ -1337,7 +1337,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool reflection = (Attr >> 1) & 0x1;
     auto usesMoveableValueDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
-    bool pointerEscape = (Attr >> 3) & 0x1;
+    auto pointerEscape = HasPointerEscape_t((Attr >> 3) & 0x1);
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
         llvm::None, hasDynamicLifetime, reflection, usesMoveableValueDebugInfo,

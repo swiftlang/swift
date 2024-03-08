@@ -480,7 +480,7 @@ public:
       bool reflection = false,
       UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
           DoesNotUseMoveableValueDebugInfo,
-      bool hasPointerEscape = false) {
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape) {
     return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
                           hasDynamicLifetime, reflection,
                           usesMoveableValueDebugInfo,
@@ -495,7 +495,8 @@ public:
       bool reflection = false,
       UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
           DoesNotUseMoveableValueDebugInfo,
-      bool skipVarDeclAssert = false, bool hasPointerEscape = false) {
+      bool skipVarDeclAssert = false,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape) {
 #if NDEBUG
     (void)skipVarDeclAssert;
 #endif
