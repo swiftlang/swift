@@ -640,6 +640,8 @@ static bool usesFeatureDynamicActorIsolation(Decl *decl) {
 
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
+UNINTERESTING_FEATURE(ClosureIsolation)
+
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {
     if (auto fnType = type->getAs<AnyFunctionType>()) {

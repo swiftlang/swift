@@ -14,21 +14,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/EditorPlaceholder.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
+#include "swift/Parse/Parser.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include <utility>
 
 using namespace swift;
 
@@ -2579,8 +2580,16 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     BacktrackingScope backtrack(*this);
 
     // Consume attributes.
-    while (Tok.is(tok::at_sign)) {
-      skipAnyAttribute();
+    auto parsingNonisolated = [this] {
+      return Context.LangOpts.hasFeature(Feature::ClosureIsolation) &&
+             Tok.isContextualKeyword("nonisolated");
+    };
+    while (Tok.is(tok::at_sign) || parsingNonisolated()) {
+      if (parsingNonisolated()) {
+        consumeToken();
+      } else {
+        skipAnyAttribute();
+      }
     }
 
     // Skip by a closure capture list if present.
@@ -2644,7 +2653,12 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     return makeParserSuccess();
   }
   ParserStatus status;
-  (void)parseDeclAttributeList(attributes);
+  // 'nonisolated' cannot be parameterized in a closure due to ambiguity with
+  // closure parameters.
+  const auto entryNonisolatedState =
+      std::exchange(EnableParameterizedNonisolated, false);
+  (void)parseClosureDeclAttributeList(attributes);
+  EnableParameterizedNonisolated = entryNonisolatedState;
 
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     SourceLoc lBracketLoc = consumeToken(tok::l_square);
@@ -2814,6 +2828,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     } else {
       // Parse identifier (',' identifier)*
       SmallVector<ParamDecl*, 4> elements;
+      const auto parameterListLoc = Tok.getLoc();
       bool HasNext;
       do {
         if (Tok.isNot(tok::identifier, tok::kw__, tok::code_complete)) {
@@ -2843,6 +2858,15 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       } while (HasNext);
 
       params = ParameterList::create(Context, elements);
+
+      if (Context.LangOpts.hasFeature(Feature::ClosureIsolation) && params &&
+          (params->size() > 0) && attributes.hasAttribute<NonisolatedAttr>()) {
+        diagnose(parameterListLoc,
+                 diag::nonisolated_closure_parameter_parentheses)
+            .fixItInsert(parameterListLoc, "(")
+            .fixItInsert(Tok.getLoc(), ")");
+        status.setIsParseError();
+      }
     }
 
     TypeRepr *thrownTypeRepr = nullptr;
@@ -2973,13 +2997,13 @@ ParserResult<Expr> Parser::parseExprClosure() {
   DeclAttributes attributes;
   SourceRange bracketRange;
   SmallVector<CaptureListEntry, 2> captureList;
-  VarDecl *capturedSelfDecl;
+  VarDecl *capturedSelfDecl = nullptr;
   ParameterList *params = nullptr;
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
-  TypeExpr *thrownType;
+  TypeExpr *thrownType = nullptr;
   SourceLoc arrowLoc;
-  TypeExpr *explicitResultType;
+  TypeExpr *explicitResultType = nullptr;
   SourceLoc inLoc;
   Status |= parseClosureSignatureIfPresent(
       attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,

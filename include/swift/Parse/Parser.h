@@ -114,6 +114,7 @@ class Parser {
   void operator=(const Parser&) = delete;
 
   bool IsInputIncomplete = false;
+  bool EnableParameterizedNonisolated = true; // HACK: for closures
   std::vector<Token> SplitTokens;
 
 public:
@@ -1041,6 +1042,9 @@ public:
   ParserStatus parseDeclAttributeList(DeclAttributes &Attributes,
                                       bool IfConfigsAreDeclAttrs,
                                       PatternBindingInitializer *initContext);
+
+  /// Parse the optional attributes before a closure declaration.
+  ParserStatus parseClosureDeclAttributeList(DeclAttributes &Attributes);
 
   /// Parse the optional modifiers before a declaration.
   ParserStatus parseDeclModifierList(DeclAttributes &Attributes,
