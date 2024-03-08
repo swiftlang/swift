@@ -405,7 +405,8 @@ public:
   AllocStackInst *createAllocStack(
       SILLocation Loc, SILType elementType,
       std::optional<SILDebugVariable> Var = std::nullopt,
-      bool hasDynamicLifetime = false, bool isLexical = false,
+      HasDynamicLifetime_t dynamic = DoesNotHaveDynamicLifetime,
+      bool isLexical = false,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;
@@ -419,8 +420,7 @@ public:
 #endif
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
-        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
-        wasMoved));
+        substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical, wasMoved));
   }
 
   AllocVectorInst *
