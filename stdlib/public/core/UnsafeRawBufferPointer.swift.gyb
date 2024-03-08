@@ -294,8 +294,8 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
     guard i != j else { return }
     _debugPrecondition(i >= 0 && j >= 0)
     _debugPrecondition(i < endIndex && j < endIndex)
-    let pi = (_position! + i)
-    let pj = (_position! + j)
+    let pi = _position._unsafelyUnwrappedUnchecked + i
+    let pj = _position._unsafelyUnwrappedUnchecked + j
     let tmp = pi.load(fromByteOffset: 0, as: UInt8.self)
     pi.copyMemory(from: pj, byteCount: MemoryLayout<UInt8>.size)
     pj.storeBytes(of: tmp, toByteOffset: 0, as: UInt8.self)
