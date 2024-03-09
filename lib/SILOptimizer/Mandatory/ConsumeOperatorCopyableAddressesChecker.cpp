@@ -1507,10 +1507,9 @@ bool DataflowState::cleanupAllDestroyAddr(
           SILBuilderWithScope dbgValueInsertBuilder(dvi);
           dbgValueInsertBuilder.setCurrentDebugScope(
               addressDebugInst->getDebugScope());
-          dbgValueInsertBuilder.createDebugValue((*addressDebugInst)->getLoc(),
-                                                 SILUndef::get(address),
-                                                 *varInfo, false,
-                                                 /*was moved*/ true);
+          dbgValueInsertBuilder.createDebugValue(
+              (*addressDebugInst)->getLoc(), SILUndef::get(address), *varInfo,
+              false, UsesMoveableValueDebugInfo);
         }
       }
       useState.destroys.insert(dvi);
@@ -1551,7 +1550,7 @@ bool DataflowState::cleanupAllDestroyAddr(
         reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         reinitBuilder.createDebugValue((*addressDebugInst)->getLoc(), address,
                                        *varInfo, false,
-                                       /*was moved*/ true);
+                                       UsesMoveableValueDebugInfo);
       }
     }
     madeChange = true;
@@ -1792,9 +1791,9 @@ bool DataflowState::process(
         if (auto varInfo = addressDebugInst.getVarInfo()) {
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-          undefBuilder.createDebugValue(addressDebugInst->getLoc(),
-                                        SILUndef::get(address), *varInfo,
-                                        false /*poison*/, true /*was moved*/);
+          undefBuilder.createDebugValue(
+              addressDebugInst->getLoc(), SILUndef::get(address), *varInfo,
+              false /*poison*/, UsesMoveableValueDebugInfo);
         }
       }
 
@@ -2090,7 +2089,7 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         undefBuilder.createDebugValue(addressDebugInst->getLoc(),
                                       SILUndef::get(address), *varInfo, false,
-                                      /*was moved*/ true);
+                                      UsesMoveableValueDebugInfo);
       }
       addressDebugInst.markAsMoved();
     }
@@ -2199,7 +2198,7 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
           undefBuilder.createDebugValue(addressDebugInst->getLoc(),
                                         SILUndef::get(address), *varInfo, false,
-                                        /*was moved*/ true);
+                                        UsesMoveableValueDebugInfo);
         }
         {
           // Make sure at the reinit point to create a new debug value after the
@@ -2209,7 +2208,7 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
           reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
           reinitBuilder.createDebugValue(addressDebugInst->getLoc(), address,
                                          *varInfo, false,
-                                         /*was moved*/ true);
+                                         UsesMoveableValueDebugInfo);
         }
       }
       addressDebugInst.markAsMoved();
@@ -2249,7 +2248,7 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         undefBuilder.createDebugValue(addressDebugInst->getLoc(),
                                       SILUndef::get(address), *varInfo, false,
-                                      /*was moved*/ true);
+                                      UsesMoveableValueDebugInfo);
       }
       addressDebugInst.markAsMoved();
     }
@@ -2476,8 +2475,8 @@ class ConsumeOperatorCopyableAddressesCheckerPass
         ++ii;
 
         if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
-          // Only check lexical alloc_stack that were not emitted as vars.
-          if (asi->isLexical()) {
+          // Only check var_decl alloc_stack insts.
+          if (asi->isFromVarDecl()) {
             LLVM_DEBUG(llvm::dbgs() << "Found lexical alloc_stack: " << *asi);
             addressesToCheck.insert(asi);
             continue;

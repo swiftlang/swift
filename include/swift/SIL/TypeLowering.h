@@ -170,12 +170,6 @@ enum IsInfiniteType_t : bool {
   IsInfiniteType = true,
 };
 
-/// Does this type contain at least one non-trivial, non-eager-move type?
-enum IsLexical_t : bool {
-  IsNotLexical = false,
-  IsLexical = true,
-};
-
 /// Does this type contain any pack-like thing.
 enum HasPack_t : bool {
   HasNoPack = false,

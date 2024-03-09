@@ -1378,10 +1378,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::AllocBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
-    bool hasDynamicLifetime = Attr & 0x1;
+    auto hasDynamicLifetime = HasDynamicLifetime_t(Attr & 0x1);
     bool reflection = (Attr >> 1) & 0x1;
-    bool usesMoveableValueDebugInfo = (Attr >> 2) & 0x1;
-    bool pointerEscape = (Attr >> 3) & 0x1;
+    auto usesMoveableValueDebugInfo =
+        UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
+    auto pointerEscape = HasPointerEscape_t((Attr >> 3) & 0x1);
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
         std::nullopt, hasDynamicLifetime, reflection,
@@ -1391,12 +1392,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
-    bool hasDynamicLifetime = Attr & 0x1;
-    bool isLexical = (Attr >> 1) & 0x1;
-    bool wasMoved = (Attr >> 2) & 0x1;
+    auto hasDynamicLifetime = HasDynamicLifetime_t(Attr & 0x1);
+    auto isLexical = IsLexical_t((Attr >> 1) & 0x1);
+    auto isFromVarDecl = IsFromVarDecl_t((Attr >> 2) & 0x1);
+    auto wasMoved = UsesMoveableValueDebugInfo_t((Attr >> 3) & 0x1);
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        std::nullopt, hasDynamicLifetime, isLexical, wasMoved);
+        std::nullopt, hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
     break;
   }
   case SILInstructionKind::AllocPackInst: {
@@ -2268,10 +2270,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::BeginBorrowInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    bool isLexical = Attr & 0x1;
-    bool hasPointerEscape = (Attr >> 1) & 0x1;
-    bool fromVarDecl = (Attr >> 2) & 0x1;
-    bool isFixed = (Attr >> 3) & 0x1;
+    auto isLexical = IsLexical_t(Attr & 0x1);
+    auto hasPointerEscape = HasPointerEscape_t((Attr >> 1) & 0x1);
+    auto fromVarDecl = IsFromVarDecl_t((Attr >> 2) & 0x1);
+    auto isFixed = BeginBorrowInst::IsFixed_t((Attr >> 3) & 0x1);
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(
@@ -2370,14 +2372,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::MoveValueInst: {
     auto Ty = MF->getType(TyID);
     bool AllowsDiagnostics = Attr & 0x1;
-    bool IsLexical = (Attr >> 1) & 0x1;
-    bool IsEscaping = (Attr >> 2) & 0x1;
-    bool IsFromVarDecl = (Attr >> 3) & 0x1;
+    IsLexical_t isLexical = IsLexical_t((Attr >> 1) & 0x1);
+    auto isEscaping = HasPointerEscape_t((Attr >> 2) & 0x1);
+    auto isFromVarDecl = IsFromVarDecl_t((Attr >> 3) & 0x1);
     auto *MVI = Builder.createMoveValue(
         Loc,
         getLocalValue(Builder.maybeGetFunction(), ValID,
                       getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        IsLexical, IsEscaping, IsFromVarDecl);
+        isLexical, isEscaping, isFromVarDecl);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
     break;

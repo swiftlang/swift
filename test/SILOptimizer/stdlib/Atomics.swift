@@ -9,7 +9,7 @@ import Synchronization
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: sil {{.*}} @localLoad {{.*}} {
-// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] $Atomic<Int>
+// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
 // CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
 // CHECK:         builtin "atomicload_monotonic_Int64"([[ATOMIC_PTR]] : $Builtin.RawPointer)
 // CHECK:         destroy_addr [[ATOMIC]] : $*Atomic<Int>
@@ -22,7 +22,7 @@ func localLoad() -> Int {
 }
 
 // CHECK-LABEL: sil {{.*}} @localStore {{.*}} {
-// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] $Atomic<Int>
+// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
 // CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
 // CHECK:         builtin "atomicstore_release_Int64"([[ATOMIC_PTR]] : $Builtin.RawPointer
 // CHECK:         destroy_addr [[ATOMIC]] : $*Atomic<Int>
@@ -35,7 +35,7 @@ func localStore() {
 }
 
 // CHECK-LABEL: sil {{.*}} @localExchange {{.*}} {
-// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] $Atomic<Int>
+// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
 // CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
 // CHECK:         builtin "atomicrmw_xchg_acquire_Int64"([[ATOMIC_PTR]] : $Builtin.RawPointer
 // CHECK:         destroy_addr [[ATOMIC]] : $*Atomic<Int>
@@ -48,7 +48,7 @@ func localExchange() -> Int {
 }
 
 // CHECK-LABEL: sil {{.*}} @localCompareExchange {{.*}} {
-// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] $Atomic<Int>
+// CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
 // CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
 // CHECK:         builtin "cmpxchg_seqcst_seqcst_Int64"([[ATOMIC_PTR]] : $Builtin.RawPointer
 // CHECK:         destroy_addr [[ATOMIC]] : $*Atomic<Int>

@@ -3786,6 +3786,7 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' alloc-stack-option* sil-type (',' debug-var-attr)*
   alloc-stack-option ::= '[dynamic_lifetime]'
   alloc-stack-option ::= '[lexical]'
+  alloc-stack-option ::= '[var_decl]'
   alloc-stack-option ::= '[moveable_value_debuginfo]'
 
   %1 = alloc_stack $T
@@ -3805,7 +3806,12 @@ The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
 
-The optional ``lexical`` attribute specifies that the storage corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
+local variable with a lexical lifetime in the Swift source, so special care
+must be taken when hoisting ``destroy_addr``s.  Compare to the ``var_decl``
+attribute.
+
+The optional ``var_decl`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
 
 The optional ``moveable_value_debuginfo`` attribute specifies that when emitting

@@ -2604,21 +2604,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   switch (Opcode) {
   case SILInstructionKind::AllocBoxInst: {
-    bool hasDynamicLifetime = false;
+    auto hasDynamicLifetime = DoesNotHaveDynamicLifetime;
     bool hasReflection = false;
-    bool usesMoveableValueDebugInfo = false;
-    bool hasPointerEscape = false;
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+        DoesNotUseMoveableValueDebugInfo;
+    auto hasPointerEscape = DoesNotHavePointerEscape;
     StringRef attrName;
     SourceLoc attrLoc;
     while (parseSILOptional(attrName, attrLoc, *this)) {
       if (attrName.equals("dynamic_lifetime")) {
-        hasDynamicLifetime = true;
+        hasDynamicLifetime = HasDynamicLifetime;
       } else if (attrName.equals("reflection")) {
         hasReflection = true;
       } else if (attrName.equals("moveable_value_debuginfo")) {
-        usesMoveableValueDebugInfo = true;
+        usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
       } else if (attrName.equals("pointer_escape")) {
-        hasPointerEscape = true;
+        hasPointerEscape = HasPointerEscape;
       } else {
         P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
                    "dynamic_lifetime, reflection, pointer_escape or "
@@ -2636,7 +2637,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     if (Ty.isMoveOnly())
-      usesMoveableValueDebugInfo = true;
+      usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
     ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
                                  hasDynamicLifetime, hasReflection,
@@ -3386,7 +3387,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::DebugValueInst: {
     bool poisonRefs = false;
     bool hasTrace = false;
-    bool usesMoveableValueDebugInfo = false;
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+        DoesNotUseMoveableValueDebugInfo;
     SILDebugVariable VarInfo;
 
     // Allow for poison and moved to be in either order.
@@ -3398,7 +3400,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       else if (attributeName == "trace")
         hasTrace = true;
       else if (attributeName == "moveable_value_debuginfo")
-        usesMoveableValueDebugInfo = true;
+        usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
                    attributeName, "debug_value");
@@ -3413,7 +3415,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       assert(!poisonRefs && "debug_value w/ address value does not support poison");
 
     if (Val->getType().isMoveOnly())
-      usesMoveableValueDebugInfo = true;
+      usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
     ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs,
                                    usesMoveableValueDebugInfo, hasTrace);
@@ -3492,9 +3494,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::MoveValueInst: {
     bool allowsDiagnostics = false;
-    bool isLexical = false;
-    bool hasPointerEscape = false;
-    bool fromVarDecl = false;
+    auto isLexical = IsNotLexical;
+    auto hasPointerEscape = DoesNotHavePointerEscape;
+    auto fromVarDecl = IsNotFromVarDecl;
 
     StringRef AttrName;
     SourceLoc AttrLoc;
@@ -3502,11 +3504,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (AttrName == "allows_diagnostics")
         allowsDiagnostics = true;
       else if (AttrName == "lexical")
-        isLexical = true;
+        isLexical = IsLexical;
       else if (AttrName == "pointer_escape")
-        hasPointerEscape = true;
+        hasPointerEscape = HasPointerEscape;
       else if (AttrName == "var_decl")
-        fromVarDecl = true;
+        fromVarDecl = IsFromVarDecl;
       else {
         P.diagnose(InstLoc.getSourceLoc(),
                    diag::sil_invalid_attribute_for_instruction, AttrName,
@@ -3738,22 +3740,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::BeginBorrowInst: {
     SourceLoc AddrLoc;
 
-    bool isLexical = false;
-    bool hasPointerEscape = false;
-    bool fromVarDecl = false;
-    bool fixed = false;
+    auto isLexical = IsNotLexical;
+    auto hasPointerEscape = DoesNotHavePointerEscape;
+    auto fromVarDecl = IsNotFromVarDecl;
+    auto fixed = BeginBorrowInst::IsNotFixed;
 
     StringRef AttrName;
     SourceLoc AttrLoc;
     while (parseSILOptional(AttrName, AttrLoc, *this)) {
       if (AttrName == "lexical")
-        isLexical = true;
+        isLexical = IsLexical;
       else if (AttrName == "pointer_escape")
-        hasPointerEscape = true;
+        hasPointerEscape = HasPointerEscape;
       else if (AttrName == "var_decl")
-        fromVarDecl = true;
+        fromVarDecl = IsFromVarDecl;
       else if (AttrName == "fixed")
-        fixed = true;
+        fixed = BeginBorrowInst::IsFixed;
       else {
         P.diagnose(InstLoc.getSourceLoc(),
                    diag::sil_invalid_attribute_for_instruction, AttrName,
@@ -4738,19 +4740,23 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::AllocStackInst: {
-    bool hasDynamicLifetime = false;
-    bool isLexical = false;
-    bool usesMoveableValueDebugInfo = false;
+    auto hasDynamicLifetime = DoesNotHaveDynamicLifetime;
+    auto isLexical = IsNotLexical;
+    auto isFromVarDecl = IsNotFromVarDecl;
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+        DoesNotUseMoveableValueDebugInfo;
 
     StringRef attributeName;
     SourceLoc attributeLoc;
     while (parseSILOptional(attributeName, attributeLoc, *this)) {
       if (attributeName == "dynamic_lifetime")
-        hasDynamicLifetime = true;
+        hasDynamicLifetime = HasDynamicLifetime;
       else if (attributeName == "lexical")
-        isLexical = true;
+        isLexical = IsLexical;
+      else if (attributeName == "var_decl")
+        isFromVarDecl = IsFromVarDecl;
       else if (attributeName == "moveable_value_debuginfo")
-        usesMoveableValueDebugInfo = true;
+        usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
                    attributeName, "alloc_stack");
@@ -4767,15 +4773,17 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     if (Ty.isMoveOnly())
-      usesMoveableValueDebugInfo = true;
+      usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
     // It doesn't make sense to attach a debug var info if the name is empty
     if (VarInfo.Name.size())
       ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
-                                     isLexical, usesMoveableValueDebugInfo);
+                                     isLexical, isFromVarDecl,
+                                     usesMoveableValueDebugInfo);
     else
-      ResultVal = B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime,
-                                     isLexical, usesMoveableValueDebugInfo);
+      ResultVal =
+          B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
+                             isFromVarDecl, usesMoveableValueDebugInfo);
     break;
   }
   case SILInstructionKind::AllocVectorInst: {

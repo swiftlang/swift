@@ -984,9 +984,8 @@ namespace {
       case ExistentialRepresentation::Opaque:
         if (!base.getValue()->getType().isAddress()) {
           assert(!SGF.useLoweredAddresses());
-          auto borrow =
-              SGF.B.createBeginBorrow(loc, base.getValue(), /*isLexical=*/false,
-                                      /*hasPointerEscape=*/false);
+          auto borrow = SGF.B.createBeginBorrow(
+              loc, base.getValue(), IsNotLexical, DoesNotHavePointerEscape);
           auto value =
               SGF.B.createOpenExistentialValue(loc, borrow, getTypeOfRValue());
 
@@ -4394,9 +4393,8 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
           optBase = SGF.B.createFormalAccessLoadBorrow(e, optBase);
         }
       } else {
-        optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase,
-                                                      false,
-                                                      /*fixed*/ true);
+        optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase, IsNotLexical,
+                                                      BeginBorrowInst::IsFixed);
       }
     }
   } else {

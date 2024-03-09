@@ -1102,30 +1102,29 @@ SILGenBuilder::createFormalAccessOpaqueConsumeBeginAccess(SILLocation loc,
   return SGF.emitFormalAccessManagedRValueWithCleanup(loc, access);
 }
 
-ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
-                                              ManagedValue value,
-                                              bool isLexical,
-                                              bool isFixed) {
-  auto *newValue =
-      SILBuilder::createBeginBorrow(loc, value.getValue(),
-                                    isLexical, false, false, isFixed);
+ManagedValue
+SILGenBuilder::createBeginBorrow(SILLocation loc, ManagedValue value,
+                                 IsLexical_t isLexical,
+                                 BeginBorrowInst::IsFixed_t isFixed) {
+  auto *newValue = SILBuilder::createBeginBorrow(
+      loc, value.getValue(), isLexical, DoesNotHavePointerEscape,
+      IsNotFromVarDecl, isFixed);
   SGF.emitManagedBorrowedRValueWithCleanup(newValue);
   return ManagedValue::forBorrowedObjectRValue(newValue);
 }
 
-ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(SILLocation loc,
-                                              ManagedValue value,
-                                              bool isLexical,
-                                              bool isFixed) {
-  auto *newValue =
-      SILBuilder::createBeginBorrow(loc, value.getValue(),
-                                    isLexical, false, false, isFixed);
+ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(
+    SILLocation loc, ManagedValue value, IsLexical_t isLexical,
+    BeginBorrowInst::IsFixed_t isFixed) {
+  auto *newValue = SILBuilder::createBeginBorrow(
+      loc, value.getValue(), isLexical, DoesNotHavePointerEscape,
+      IsNotFromVarDecl, isFixed);
   return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
                                                     value.getValue(), newValue);
 }
 
 ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,
-                                            bool isLexical) {
+                                            IsLexical_t isLexical) {
   assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
   auto *mdi =
       createMoveValue(loc, value.forward(getSILGenFunction()), isLexical);
