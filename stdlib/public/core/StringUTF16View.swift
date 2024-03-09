@@ -910,17 +910,38 @@ extension String.UTF16View {
     if remaining == 0 { return crumb }
 
     return _guts.withFastUTF8 { utf8 in
-      var readIdx = crumb._encodedOffset
+      var utf16I = 0
+      var guessedIndex = crumb
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+      if remaining >= 32 {
+        // Assumption: most UTF16 is mostly 2 code unit scalars
+        let guessedOffset = _scalarAlign(utf8, crumb._encodedOffset + remaining)
+        guessedIndex = String.Index(
+          encodedOffset: guessedOffset,
+          transcodedOffset: 0
+        )._knownUTF8
+        let actualDistance = _utf16Distance(
+          from: crumb,
+          to: guessedIndex
+        )
+        if actualDistance == remaining {
+          return guessedIndex
+        }
+        utf16I &+= actualDistance
+        _internalInvariant(actualDistance <= remaining)
+      }
+#endif
+      
+      var readIdx = guessedIndex._encodedOffset
       let readEnd = utf8.count
       _internalInvariant(readIdx < readEnd)
 
-      var utf16I = 0
       let utf16End: Int = remaining
 
       // Adjust for sub-scalar initial transcoding: If we're starting the scan
       // at a trailing surrogate, then we set our starting count to be -1 so as
       // offset counting the leading surrogate.
-      if crumb.transcodedOffset != 0 {
+      if guessedIndex.transcodedOffset != 0 {
         utf16I = -1
       }
 
