@@ -4390,7 +4390,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // The compiler will reject actual uses.
   auto Attrs = requirement->getAttrs();
   if (Attrs.hasAttribute<OptionalAttr>() ||
-      Attrs.isUnavailable(getASTContext())) {
+      Attrs.isUnavailable(getASTContext()) ||
+      !shouldRecordMissingWitness(Proto, Conformance, requirement)) {
     return ResolveWitnessResult::Missing;
   }
 
@@ -4402,9 +4403,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   if (doNotDiagnoseMatches) {
     return ResolveWitnessResult::ExplicitFailed;
   }
-
-  if (!shouldRecordMissingWitness(Proto, Conformance, requirement))
-    return ResolveWitnessResult::Missing;
 
   if (!numViable) {
     // Save the missing requirement for later diagnosis.
@@ -5109,13 +5107,13 @@ void ConformanceChecker::resolveValueWitnesses() {
     // async-looking ObjC protocol method requirement into two Swift protocol
     // requirements: an async version and a sync version. Exactly one of the two
     // must be witnessed by the conformer.
-    if (!requirement->isImplicit() &&
-        getObjCRequirementSibling(
-            Proto, requirement, objcRequirementMap,
-            [this](AbstractFunctionDecl *cand) {
-              return !cand->getAttrs().hasAttribute<OptionalAttr>() &&
-                     !cand->isImplicit() && this->Conformance->hasWitness(cand);
-            })) {
+    if (getObjCRequirementSibling(Proto, requirement, objcRequirementMap,
+                                  [this](AbstractFunctionDecl *cand) {
+                                    return static_cast<bool>(
+                                        this->Conformance->getWitness(cand));
+                                  })) {
+      recordOptionalWitness(requirement);
+      finalizeWitness();
       continue;
     }
 
