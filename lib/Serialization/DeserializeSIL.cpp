@@ -2235,11 +2235,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool AllowsDiagnostics = Attr & 0x1;
     IsLexical_t isLexical = IsLexical_t((Attr >> 1) & 0x1);
     auto isEscaping = HasPointerEscape_t((Attr >> 2) & 0x1);
-    bool IsFromVarDecl = (Attr >> 3) & 0x1;
+    auto isFromVarDecl = IsFromVarDecl_t((Attr >> 3) & 0x1);
     auto *MVI = Builder.createMoveValue(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        isLexical, isEscaping, IsFromVarDecl);
+        isLexical, isEscaping, isFromVarDecl);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
     break;

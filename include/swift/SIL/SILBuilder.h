@@ -1423,7 +1423,7 @@ public:
   MoveValueInst *createMoveValue(
       SILLocation loc, SILValue operand, IsLexical_t isLexical = IsNotLexical,
       HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
-      bool fromVarDecl = false) {
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl) {
     assert(getFunction().hasOwnership());
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "

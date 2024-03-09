@@ -8290,11 +8290,11 @@ class MoveValueInst
 
   MoveValueInst(SILDebugLocation DebugLoc, SILValue operand,
                 IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
-                bool fromVarDecl)
+                IsFromVarDecl_t fromVarDecl)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
     sharedUInt8().MoveValueInst.lexical = (bool)isLexical;
     sharedUInt8().MoveValueInst.pointerEscape = (bool)hasPointerEscape;
-    sharedUInt8().MoveValueInst.fromVarDecl = fromVarDecl;
+    sharedUInt8().MoveValueInst.fromVarDecl = (bool)fromVarDecl;
   }
 
 public:
@@ -8322,7 +8322,9 @@ public:
     sharedUInt8().MoveValueInst.pointerEscape = pointerEscape;
   }
 
-  bool isFromVarDecl() const { return sharedUInt8().MoveValueInst.fromVarDecl; }
+  IsFromVarDecl_t isFromVarDecl() const {
+    return IsFromVarDecl_t(sharedUInt8().MoveValueInst.fromVarDecl);
+  }
 };
 
 class DropDeinitInst
