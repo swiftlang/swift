@@ -44,7 +44,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
 
         # Toolchain configuration
-        toolchain_path = self.install_toolchain_path(host_target)
+        toolchain_path = self.native_toolchain_path(host_target)
         # Explicitly set the CMake AR and RANLIB to force it to use llvm-ar/llvm-ranlib
         # instead of the system ar/ranlib, which usually don't support WebAssembly
         # object files.
@@ -117,7 +117,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
         # Configure with WebAssembly target variant, and build with just-built toolchain
         self.build_with_cmake([], self._build_variant, [],
-                              prefer_just_built_toolchain=True)
+                              prefer_native_toolchain=True)
 
     def test(self, host_target):
         build_root = os.path.dirname(self.build_dir)
