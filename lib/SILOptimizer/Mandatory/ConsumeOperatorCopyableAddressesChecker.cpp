@@ -2485,8 +2485,8 @@ class ConsumeOperatorCopyableAddressesCheckerPass
         ++ii;
 
         if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
-          // Only check lexical alloc_stack that were not emitted as vars.
-          if (asi->isLexical()) {
+          // Only check var_decl alloc_stack insts.
+          if (asi->isFromVarDecl()) {
             LLVM_DEBUG(llvm::dbgs() << "Found lexical alloc_stack: " << *asi);
             addressesToCheck.insert(asi);
             continue;
