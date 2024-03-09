@@ -168,6 +168,9 @@ public:
   /// particular requirement and adoptee is required, before the
   /// conformance has been completed checked.
   void resolveSingleWitness(ValueDecl *requirement);
+
+private:
+  bool allowOptionalWitness(ValueDecl *requirement);
 };
 
 /// Match the given witness to the given requirement.

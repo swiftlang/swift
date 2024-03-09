@@ -4388,10 +4388,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   //
   // Treat 'unavailable' implicitly as if it were 'optional'.
   // The compiler will reject actual uses.
-  auto Attrs = requirement->getAttrs();
-  if (Attrs.hasAttribute<OptionalAttr>() ||
-      Attrs.isUnavailable(getASTContext()) ||
-      !shouldRecordMissingWitness(Proto, Conformance, requirement)) {
+  if (allowOptionalWitness(requirement)) {
     return ResolveWitnessResult::Missing;
   }
 
@@ -4564,11 +4561,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
                        ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
-  // An optional requirement is trivially satisfied with an empty requirement.
-  // An 'unavailable' requirement is treated like an optional requirement.
-  auto Attrs = requirement->getAttrs();
-  if (Attrs.hasAttribute<OptionalAttr>() ||
-      Attrs.isUnavailable(getASTContext())) {
+  if (allowOptionalWitness(requirement)) {
     recordOptionalWitness(requirement);
     return ResolveWitnessResult::Success;
   }
@@ -4637,6 +4630,25 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   case ResolveWitnessResult::Missing:
     llvm_unreachable("Should have failed");
   }
+}
+
+bool ConformanceChecker::allowOptionalWitness(ValueDecl *requirement) {
+  auto Attrs = requirement->getAttrs();
+
+  // An optional requirement is trivially satisfied with an empty requirement.
+  if (Attrs.hasAttribute<OptionalAttr>())
+    return true;
+
+  // An 'unavailable' requirement is treated like an optional requirement.
+  if (Attrs.isUnavailable(getASTContext()))
+    return true;
+
+  // A requirement with a satisfied Obj-C alternative requirement is effectively
+  // optional.
+  if (!shouldRecordMissingWitness(Proto, Conformance, requirement))
+    return true;
+
+  return false;
 }
 
 /// FIXME: It feels like this could be part of findExistentialSelfReferences().
