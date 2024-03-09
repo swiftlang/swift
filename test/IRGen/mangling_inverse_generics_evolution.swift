@@ -12,7 +12,7 @@ public protocol P: ~Copyable { }
 
 public protocol Hello<Person>: ~Copyable {
   // CHECK: @"$s4test5HelloP6PersonAC_AA1PTn"
-  // CHECK: @"$s6Person4test5HelloPTl" = alias
+  // CHECK: @"$s6Person4test5HelloPTl" =
   associatedtype Person: P & ~Copyable
 
   // CHECK: @"$s4test5HelloP14favoritePerson0D0QzvrTq" = alias
