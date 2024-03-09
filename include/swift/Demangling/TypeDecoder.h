@@ -116,6 +116,7 @@ using ImplParameterInfoOptions = OptionSet<ImplParameterInfoFlags>;
 
 enum class ImplResultInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
+  IsTransferring = 0x2,
 };
 
 using ImplResultInfoOptions = OptionSet<ImplResultInfoFlags>;

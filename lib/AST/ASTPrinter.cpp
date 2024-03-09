@@ -6740,10 +6740,6 @@ public:
       }
       sub->Printer << ") -> ";
 
-      if (T->hasTransferringResult()) {
-        sub->Printer << "transferring ";
-      }
-
       auto lifetimeDependenceInfo = T->getLifetimeDependenceInfo();
       if (!lifetimeDependenceInfo.empty()) {
         sub->Printer << lifetimeDependenceInfo.getString() << " ";
@@ -7530,6 +7526,11 @@ void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   if (options.contains(SILResultInfo::NotDifferentiable)) {
     options -= SILResultInfo::NotDifferentiable;
     Printer << "@noDerivative ";
+  }
+
+  if (options.contains(SILResultInfo::IsTransferring)) {
+    options -= SILResultInfo::IsTransferring;
+    Printer << "@sil_transferring ";
   }
 
   assert(!bool(options) && "ResultInfo has option that was not handled?!");

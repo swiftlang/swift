@@ -390,3 +390,18 @@ bb0(%0 : @owned $Klass, %1 : @guaranteed $KlassWithKlassPair):
   %37 = tuple ()
   return %37 : $()
 }
+
+// CHECK-LABEL: begin running test 1 of 1 on function_argument_inference_from_result: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %3 = copy_value %2 : $Klass
+// CHECK: Name: 'self.lhs'
+// CHECK: Root: %0 = argument of bb0 : $KlassPair
+// CHECK: end running test 1 of 1 on function_argument_inference_from_result: variable-name-inference with: @trace[0]
+sil [ossa] @function_argument_inference_from_result : $@convention(thin) (@guaranteed KlassPair) -> @owned Klass {
+bb0(%0 : @guaranteed $KlassPair):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $KlassPair, let, name "self", argno 1, implicit
+  %2 = struct_extract %0 : $KlassPair, #KlassPair.lhs
+  %3 = copy_value %2 : $Klass
+  debug_value [trace] %3 : $Klass
+  return %3 : $Klass
+}
