@@ -411,34 +411,18 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl) {
   return conditionalStmt->rebindsSelf(Ctx);
 }
 
-// Finds the nearest parent closure, which would define the
-// permitted usage of implicit self. In closures this is most
-// often just `dc` itself, but in functions defined in the
-// closure body this would be some parent context.
-ClosureExpr *closestParentClosure(DeclContext *dc) {
+ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
+    const DeclContext *baseDC) const {
+  auto dc = factory->DC;
   if (!dc) {
     return nullptr;
   }
 
-  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
-    return closure;
-  }
-
-  // Stop searching if we find a type decl, since types always
-  // redefine what 'self' means, even when nested inside a closure.
-  if (dc->getContextKind() == DeclContextKind::GenericTypeDecl) {
-    return nullptr;
-  }
-
-  return closestParentClosure(dc->getParent());
-}
-
-ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
-    const DeclContext *baseDC) const {
   // Perform an unqualified lookup for the base decl of this result. This
   // handles cases where self was rebound (e.g. `guard let self = self`)
   // earlier in this closure or some outer closure.
-  auto closureExpr = closestParentClosure(factory->DC);
+  auto closureExpr =
+      dyn_cast_or_null<ClosureExpr>(dc->getInnermostClosureForSelfCapture());
   if (!closureExpr) {
     return nullptr;
   }

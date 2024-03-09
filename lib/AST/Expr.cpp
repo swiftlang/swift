@@ -1350,21 +1350,30 @@ VarDecl *CaptureListEntry::getVar() const {
   return PBD->getSingleVar();
 }
 
-bool CaptureListEntry::isSimpleSelfCapture() const {
+bool CaptureListEntry::isSimpleSelfCapture(bool excludeWeakCaptures) const {
   auto *Var = getVar();
   auto &ctx = Var->getASTContext();
 
   if (Var->getName() != ctx.Id_self)
     return false;
 
-  if (auto *attr = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-    if (attr->get() == ReferenceOwnership::Weak)
-      return false;
-
   if (PBD->getPatternList().size() != 1)
     return false;
 
   auto *expr = PBD->getInit(0);
+
+  if (auto *attr = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+    if (attr->get() == ReferenceOwnership::Weak) {
+      if (excludeWeakCaptures) {
+        return false;
+      }
+
+      // If not excluding weak captures, look through any InjectIntoOptionalExpr
+      if (auto injectExpr = dyn_cast_or_null<InjectIntoOptionalExpr>(expr)) {
+        expr = injectExpr->getSubExpr();
+      }
+    }
+  }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
