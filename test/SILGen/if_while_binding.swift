@@ -110,7 +110,7 @@ func while_loop() {
 // CHECK-LABEL: sil hidden [ossa] @$s16if_while_binding0B13_loop_generic{{[_0-9a-zA-Z]*}}F
 // CHECK:         br [[COND:bb[0-9]+]]
 // CHECK:       [[COND]]:
-// CHECK:         [[X:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:         [[X:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:         [[OPTBUF:%[0-9]+]] = alloc_stack $Optional<T>
 // CHECK:         switch_enum_addr {{.*}}, case #Optional.some!enumelt: [[LOOPBODY:bb.*]], case #Optional.none!enumelt: [[OUT:bb[0-9]+]]
 // CHECK:       [[LOOPBODY]]:

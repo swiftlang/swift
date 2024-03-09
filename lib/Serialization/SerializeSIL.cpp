@@ -1063,7 +1063,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned flags = 0;
     flags |= unsigned(ABI->hasDynamicLifetime());
     flags |= unsigned(ABI->emitReflectionMetadata()) << 1;
-    flags |= unsigned(ABI->getUsesMoveableValueDebugInfo()) << 2;
+    flags |= unsigned(ABI->usesMoveableValueDebugInfo()) << 2;
     flags |= unsigned(ABI->hasPointerEscape()) << 3;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
@@ -1109,7 +1109,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attr = 0;
     attr |= unsigned(ASI->hasDynamicLifetime());
     attr |= unsigned(ASI->isLexical()) << 1;
-    attr |= unsigned(ASI->getUsesMoveableValueDebugInfo()) << 2;
+    attr |= unsigned(ASI->isFromVarDecl()) << 2;
+    attr |= unsigned(ASI->usesMoveableValueDebugInfo()) << 3;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }

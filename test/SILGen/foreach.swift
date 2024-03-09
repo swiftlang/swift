@@ -223,7 +223,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<any P>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $any P, let, name "x"
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $any P, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<any P>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -384,7 +384,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $GenericStruct<T>, let, name "x"
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $GenericStruct<T>, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -491,7 +491,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<T.Element>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $T.Element, let, name "x"
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $T.Element, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -633,7 +633,7 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
 // CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [init] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
 // CHECK: switch_enum_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
 // CHECK: [[BB_SOME]]:
-// CHECK: [[X_BINDING:%.*]] = alloc_stack [lexical] $Optional<T>, let, name "x"
+// CHECK: [[X_BINDING:%.*]] = alloc_stack [lexical] [var_decl] $Optional<T>, let, name "x"
 // CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: [[X_ADDR:%.*]] = init_enum_data_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: copy_addr [take] [[ADDR]] to [init] [[X_ADDR]] : $*T

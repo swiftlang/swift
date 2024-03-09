@@ -479,18 +479,17 @@ public:
                                                           ManagedValue address);
 
   using SILBuilder::createBeginBorrow;
-  ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
-                                 bool isLexical = false,
-                                 bool isFixed = false);
+  ManagedValue createBeginBorrow(
+      SILLocation loc, ManagedValue value, IsLexical_t isLexical = IsNotLexical,
+      BeginBorrowInst::IsFixed_t isFixed = BeginBorrowInst::IsNotFixed);
 
-  ManagedValue createFormalAccessBeginBorrow(SILLocation loc,
-                                             ManagedValue value,
-                                             bool isLexical = false,
-                                             bool isFixed = false);
+  ManagedValue createFormalAccessBeginBorrow(
+      SILLocation loc, ManagedValue value, IsLexical_t isLexical = IsNotLexical,
+      BeginBorrowInst::IsFixed_t isFixed = BeginBorrowInst::IsNotFixed);
 
   using SILBuilder::createMoveValue;
   ManagedValue createMoveValue(SILLocation loc, ManagedValue value,
-                               bool isLexical = false);
+                               IsLexical_t isLexical = IsNotLexical);
 
   using SILBuilder::createOwnedMoveOnlyWrapperToCopyableValue;
   ManagedValue createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,

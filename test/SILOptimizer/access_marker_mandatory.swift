@@ -7,7 +7,7 @@ public struct S {
 
 // CHECK-LABEL: sil [noinline] @$s23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S {
 // CHECK: bb0(%0 : $Int, %1 : $AnyObject):
-// CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
+// CHECK: [[STK:%.*]] = alloc_stack [var_decl] $S, var, name "s"
 // CHECK: cond_br %{{.*}}, bb1, bb2
 // CHECK: bb1:
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*S
@@ -41,7 +41,7 @@ func takeS(_ s: S) {}
 
 // CHECK-LABEL: sil @$s23access_marker_mandatory14modifyAndReadS1oyyXl_tF : $@convention(thin) (@guaranteed AnyObject) -> () {
 // CHECK: bb0(%0 : $AnyObject):
-// CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
+// CHECK: [[STK:%.*]] = alloc_stack [var_decl] $S, var, name "s"
 // CHECK: [[FINIT:%.*]] = function_ref @$s23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S
 // CHECK: [[INITS:%.*]] = apply [[FINIT]](%{{.*}}, %0) : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S
 // CHECK: store [[INITS]] to [[STK]] : $*S
@@ -66,7 +66,7 @@ public func modifyAndReadS(o: AnyObject) {
 //
 // CHECK-LABEL: sil hidden @$s23access_marker_mandatory19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
 // CHECK-LABEL: bb0:
-// CHECK: [[STK:%.*]] = alloc_stack $Int, var, name "x"
+// CHECK: [[STK:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*Int
 // CHECK: store %{{.*}} to [[WRITE]] : $*Int
 // CHECK: end_access [[WRITE]] : $*Int

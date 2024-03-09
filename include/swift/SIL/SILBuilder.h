@@ -402,11 +402,14 @@ public:
   substituteAnonymousArgs(llvm::SmallString<4> Name,
                           std::optional<SILDebugVariable> Var, SILLocation Loc);
 
-  AllocStackInst *
-  createAllocStack(SILLocation Loc, SILType elementType,
-                   std::optional<SILDebugVariable> Var = std::nullopt,
-                   bool hasDynamicLifetime = false, bool isLexical = false,
-                   bool wasMoved = false, bool skipVarDeclAssert = false) {
+  AllocStackInst *createAllocStack(
+      SILLocation Loc, SILType elementType,
+      std::optional<SILDebugVariable> Var = std::nullopt,
+      HasDynamicLifetime_t dynamic = DoesNotHaveDynamicLifetime,
+      IsLexical_t isLexical = IsNotLexical,
+      IsFromVarDecl_t isFromVarDecl = IsNotFromVarDecl,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
 #ifndef NDEBUG
@@ -418,8 +421,8 @@ public:
 #endif
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
-        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
-        wasMoved));
+        substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical,
+        isFromVarDecl, wasMoved));
   }
 
   AllocVectorInst *
@@ -473,12 +476,14 @@ public:
 
   /// Helper function that calls \p createAllocBox after constructing a
   /// SILBoxType for \p fieldType.
-  AllocBoxInst *
-  createAllocBox(SILLocation loc, SILType fieldType,
-                 std::optional<SILDebugVariable> Var = std::nullopt,
-                 bool hasDynamicLifetime = false, bool reflection = false,
-                 bool usesMoveableValueDebugInfo = false,
-                 bool hasPointerEscape = false) {
+  AllocBoxInst *createAllocBox(
+      SILLocation loc, SILType fieldType,
+      std::optional<SILDebugVariable> Var = std::nullopt,
+      HasDynamicLifetime_t hasDynamicLifetime = DoesNotHaveDynamicLifetime,
+      bool reflection = false,
+      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+          DoesNotUseMoveableValueDebugInfo,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape) {
     return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
                           hasDynamicLifetime, reflection,
                           usesMoveableValueDebugInfo,
@@ -486,13 +491,15 @@ public:
                           hasPointerEscape);
   }
 
-  AllocBoxInst *
-  createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
-                 std::optional<SILDebugVariable> Var = std::nullopt,
-                 bool hasDynamicLifetime = false, bool reflection = false,
-                 bool usesMoveableValueDebugInfo = false,
-                 bool skipVarDeclAssert = false,
-                 bool hasPointerEscape = false) {
+  AllocBoxInst *createAllocBox(
+      SILLocation Loc, CanSILBoxType BoxType,
+      std::optional<SILDebugVariable> Var = std::nullopt,
+      HasDynamicLifetime_t hasDynamicLifetime = DoesNotHaveDynamicLifetime,
+      bool reflection = false,
+      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+          DoesNotUseMoveableValueDebugInfo,
+      bool skipVarDeclAssert = false,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape) {
 #if NDEBUG
     (void)skipVarDeclAssert;
 #endif
@@ -818,11 +825,11 @@ public:
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
-  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
-                                     bool isLexical = false,
-                                     bool hasPointerEscape = false,
-                                     bool fromVarDecl = false,
-                                     bool fixed = false) {
+  BeginBorrowInst *createBeginBorrow(
+      SILLocation Loc, SILValue LV, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl,
+      BeginBorrowInst::IsFixed_t fixed = BeginBorrowInst::IsNotFixed) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
@@ -846,10 +853,10 @@ public:
     return createLoadBorrow(loc, v);
   }
 
-  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v,
-                                    bool isLexical = false,
-                                    bool hasPointerEscape = false,
-                                    bool fromVarDecl = false) {
+  SILValue emitBeginBorrowOperation(
+      SILLocation loc, SILValue v, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl) {
     if (!hasOwnership() ||
         v->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
       return v;
@@ -1050,15 +1057,15 @@ public:
         MarkFunctionEscapeInst::create(getSILDebugLocation(Loc), vars, getFunction()));
   }
 
-  DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
-                                   SILDebugVariable Var,
-                                   bool poisonRefs = false,
-                                   bool wasMoved = false,
-                                   bool trace = false);
-  DebugValueInst *createDebugValueAddr(SILLocation Loc, SILValue src,
-                                       SILDebugVariable Var,
-                                       bool wasMoved = false,
-                                       bool trace = false);
+  DebugValueInst *createDebugValue(
+      SILLocation Loc, SILValue src, SILDebugVariable Var,
+      bool poisonRefs = false,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
+  DebugValueInst *createDebugValueAddr(
+      SILLocation Loc, SILValue src, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
 
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
@@ -1421,10 +1428,10 @@ public:
                                                      operand, poisonRefs));
   }
 
-  MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
-                                 bool isLexical = false,
-                                 bool hasPointerEscape = false,
-                                 bool fromVarDecl = false) {
+  MoveValueInst *createMoveValue(
+      SILLocation loc, SILValue operand, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl) {
     assert(getFunction().hasOwnership());
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
@@ -2844,10 +2851,10 @@ public:
 
   /// Convenience function that is a no-op for trivial values and inserts a
   /// move_value on non-trivial instructions.
-  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v,
-                                  bool isLexical = false,
-                                  bool hasPointerEscape = false,
-                                  bool fromVarDecl = false) {
+  SILValue emitMoveValueOperation(
+      SILLocation Loc, SILValue v, IsLexical_t isLexical = IsNotLexical,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl) {
     assert(!v->getType().isAddress());
     if (v->getType().isTrivial(*getInsertionBB()->getParent()))
       return v;

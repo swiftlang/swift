@@ -78,7 +78,7 @@ protocol P {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr25testCopyAddressOnlyRValueyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
-// CHECK:   [[BOX:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[BOX:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   [[TMP:%.*]] = alloc_stack $T
 // CHECK:   explicit_copy_addr [[BOX]] to [init] [[TMP]]
 // CHECK: } // end sil function '$s9copy_expr25testCopyAddressOnlyRValueyyxmAA1PRzlF'
@@ -316,7 +316,7 @@ func testCallMethodOnLoadableGlobal() {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr34testCallMethodOnAddressOnlyLetCopyyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
-// CHECK: [[X:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK: [[X:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 //
 // Calling consumeFunc.
 // CHECK: [[TEMP:%.*]] = alloc_stack $T

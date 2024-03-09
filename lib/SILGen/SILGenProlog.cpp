@@ -789,7 +789,7 @@ private:
       SILValue value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
           loc, argrv.getValue());
       argrv = SGF.emitManagedRValueWithCleanup(value);
-      argrv = SGF.B.createMoveValue(loc, argrv, /*isLexical=*/true);
+      argrv = SGF.B.createMoveValue(loc, argrv, IsLexical);
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
@@ -824,7 +824,7 @@ private:
       // If we have an owned value, forward it into the
       // mark_unresolved_non_copyable_value to avoid an extra destroy_value.
       argrv = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, argrv);
-      argrv = SGF.B.createMoveValue(loc, argrv, true /*is lexical*/);
+      argrv = SGF.B.createMoveValue(loc, argrv, IsLexical);
       argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           loc, argrv,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -863,6 +863,7 @@ private:
 
     if (auto *allocStack = dyn_cast<AllocStackInst>(argrv.getValue())) {
       allocStack->setArgNo(ArgNo);
+      allocStack->setIsFromVarDecl();
       if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
               SGF.getModule()) &&
           SGF.F.getLifetime(pd, allocStack->getType()).isLexical())
