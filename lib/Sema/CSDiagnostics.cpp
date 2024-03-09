@@ -8202,7 +8202,6 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
 
 bool UnableToInferGenericPackElementType::diagnoseAsError() {
   auto *locator = getLocator();
-  auto path = locator->getPath();
 
   auto packElementElt = locator->getLastElementAs<LocatorPathElt::PackElement>();
   assert(packElementElt && "Expected path to end with a pack element locator");
