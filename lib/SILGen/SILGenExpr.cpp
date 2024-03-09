@@ -1094,19 +1094,21 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
                                                  HasDynamicLifetime_t dynamic,
                                                  IsLexical_t isLexical,
+                                                 IsFromVarDecl_t isFromVarDecl,
                                                  bool generateDebugInfo) {
   ty = ty.getObjectType();
   std::optional<SILDebugVariable> DbgVar;
   if (generateDebugInfo)
     if (auto *VD = loc.getAsASTNode<VarDecl>())
       DbgVar = SILDebugVariable(VD->isLet(), 0);
-  auto *alloc = B.createAllocStack(loc, ty, DbgVar, dynamic, isLexical,
-                                   DoesNotUseMoveableValueDebugInfo
+  auto *alloc =
+      B.createAllocStack(loc, ty, DbgVar, dynamic, isLexical, isFromVarDecl,
+                         DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
-                                   ,
-                                   !generateDebugInfo
+                         ,
+                         !generateDebugInfo
 #endif
-  );
+      );
   enterDeallocStackCleanup(alloc);
   return alloc;
 }
