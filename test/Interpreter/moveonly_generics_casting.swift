@@ -47,8 +47,7 @@ func main() {
   // CHECK: hello
   attemptCall(Cat<Noncopyable, Ordinary>())
 
-  // FIXME: this should succeeed!!
-  // CHECK: failed to cast (test_radar124171788)
+  // CHECK: cast succeeded
   test_radar124171788(.nothing)
 }
 
@@ -58,8 +57,8 @@ enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   case nothing
 }
 extension Maybe: Copyable {}
-extension Maybe: CustomStringConvertible {
-  var description: String {
+extension Maybe: CustomDebugStringConvertible {
+  var debugDescription: String {
     "cast succeeded"
   }
 }
