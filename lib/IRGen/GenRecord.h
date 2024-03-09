@@ -487,8 +487,6 @@ public:
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     for (auto &field : getFields()) {
-      if (field.isEmpty())
-        continue;
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
