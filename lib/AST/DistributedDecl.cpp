@@ -309,7 +309,16 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
   auto subs = SubstitutionMap::getProtocolSubstitutions(
       actorProtocol, actorType->getDeclaredInterfaceType(), actorConformance);
 
-  return memberTy.subst(subs)->getReducedType(sig);
+  memberTy = memberTy.subst(subs);
+
+  // If substitution is still not fully resolved, let's see if we can
+  // find a concrete replacement in the generic signature.
+  if (memberTy->hasTypeParameter() && sig) {
+    if (auto concreteTy = sig->getConcreteType(memberTy))
+      return concreteTy;
+  }
+
+  return memberTy;
 }
 
 /******************************************************************************/
