@@ -440,3 +440,26 @@ public func takeOuterMultiPayloadNC_3<T>(_ e: consuming OuterMultiPayloadNC_3<T>
 // CHECK-SAME:        ptr noalias swiftself %0)
 // CHECK:       }
 public func takeOuterMultiPayloadNC_4<T>(_ e: consuming OuterMultiPayloadNC_4<T>) {}
+
+public struct EmptyDeinitingNC_1<Wrapped: ~Copyable>: ~Copyable {
+  deinit {}
+}
+
+public enum SinglePayloadNC_1<Element: Equatable>: ~Copyable {
+  case empty
+  case node(EmptyDeinitingNC_1<Self>, Element)
+}
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions18EmptyDeinitingNC_1VyAA013SinglePayloadF2_1OyxGG_xtSQRzlWOh"(
+// CHECK-SAME:      ptr %0, 
+// CHECK-SAME:      ptr %Element,
+// CHECK-SAME:      ptr %Element.Equatable)
+// CHECK-SAME:  {
+// CHECK:         [[RESPONSE:%[^,]+]] = call swiftcc %swift.metadata_response @"$s24moveonly_value_functions17SinglePayloadNC_1OMa"(
+//           :        i64 0, 
+// CHECK-SAME:        ptr %Element,
+// CHECK-SAME:        ptr %Element.Equatable)
+// CHECK:         [[METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK:         call swiftcc void @"$s24moveonly_value_functions18EmptyDeinitingNC_1VAARiczrlEfD"(
+// CHECK-SAME:        ptr [[METADATA]])
+// CHECK:       }
+
