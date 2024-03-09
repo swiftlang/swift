@@ -842,8 +842,7 @@ public:
     // that the move checker knows to check this variable.
     if (vd->isNoImplicitCopy()) {
       value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical,
-                                    DoesNotHavePointerEscape,
-                                    /*fromVarDecl=*/true);
+                                    DoesNotHavePointerEscape, IsFromVarDecl);
       value =
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
@@ -860,8 +859,7 @@ public:
 
     if (value->getOwnershipKind() == OwnershipKind::Owned)
       return SGF.B.createMoveValue(PrologueLoc, value, isLexical,
-                                   DoesNotHavePointerEscape,
-                                   /*fromVarDecl=*/true);
+                                   DoesNotHavePointerEscape, IsFromVarDecl);
 
     return SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
                                    DoesNotHavePointerEscape, IsFromVarDecl);
