@@ -3711,20 +3711,20 @@ filterProtocolRequirements(
 /// Sometimes a witness isn't really diagnosed as missing if we have two
 /// complementary Objective-C protocol requirements, only one of which must
 /// be witnessed.
-static bool shouldRecordMissingWitness(
-    ProtocolDecl *proto,
-    NormalProtocolConformance *conformance,
-    ValueDecl *requirement) {
+static bool
+hasSatisfiedObjCSiblingRequirement(ProtocolDecl *proto,
+                                   NormalProtocolConformance *conformance,
+                                   ValueDecl *requirement) {
   assert(proto == requirement->getDeclContext());
   assert(proto == conformance->getProtocol());
 
   // We only care about functions.
   auto fnRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
   if (fnRequirement == nullptr)
-    return true;
+    return false;
 
   if (!proto->isObjC())
-    return true;
+    return false;
 
   auto map = getObjCRequirementMap(proto);
 
@@ -3751,10 +3751,10 @@ static bool shouldRecordMissingWitness(
             // record a missing witness.
             return static_cast<bool>(conformance->getWitness(candidate));
           })) {
-    return false;
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 static void diagnoseProtocolStubFixit(
@@ -4645,7 +4645,7 @@ bool ConformanceChecker::allowOptionalWitness(ValueDecl *requirement) {
 
   // A requirement with a satisfied Obj-C alternative requirement is effectively
   // optional.
-  if (!shouldRecordMissingWitness(Proto, Conformance, requirement))
+  if (hasSatisfiedObjCSiblingRequirement(Proto, Conformance, requirement))
     return true;
 
   return false;
