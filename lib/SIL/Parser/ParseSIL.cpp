@@ -4038,7 +4038,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto isLexical = IsNotLexical;
     auto hasPointerEscape = DoesNotHavePointerEscape;
-    bool fromVarDecl = false;
+    auto fromVarDecl = IsNotFromVarDecl;
 
     StringRef AttrName;
     SourceLoc AttrLoc;
@@ -4048,7 +4048,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       else if (AttrName == "pointer_escape")
         hasPointerEscape = HasPointerEscape;
       else if (AttrName == "var_decl")
-        fromVarDecl = true;
+        fromVarDecl = IsFromVarDecl;
       else {
         P.diagnose(InstLoc.getSourceLoc(),
                    diag::sil_invalid_attribute_for_instruction, AttrName,

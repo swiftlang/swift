@@ -2143,7 +2143,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     auto isLexical = IsLexical_t(Attr & 0x1);
     auto hasPointerEscape = HasPointerEscape_t((Attr >> 1) & 0x1);
-    bool fromVarDecl = (Attr >> 2) & 0x1;
+    auto fromVarDecl = IsFromVarDecl_t((Attr >> 2) & 0x1);
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID),

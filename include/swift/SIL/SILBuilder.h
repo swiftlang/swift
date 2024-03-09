@@ -823,7 +823,7 @@ public:
   BeginBorrowInst *createBeginBorrow(
       SILLocation Loc, SILValue LV, IsLexical_t isLexical = IsNotLexical,
       HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
-      bool fromVarDecl = false) {
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())

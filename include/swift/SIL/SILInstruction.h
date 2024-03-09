@@ -1941,6 +1941,11 @@ enum HasPointerEscape_t : bool {
   HasPointerEscape = true,
 };
 
+enum IsFromVarDecl_t : bool {
+  IsNotFromVarDecl = false,
+  IsFromVarDecl = true,
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -4396,12 +4401,12 @@ class BeginBorrowInst
 
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue,
                   IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
-                  bool fromVarDecl)
+                  IsFromVarDecl_t fromVarDecl)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
     sharedUInt8().BeginBorrowInst.lexical = isLexical;
     sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
-    sharedUInt8().BeginBorrowInst.fromVarDecl = fromVarDecl;
+    sharedUInt8().BeginBorrowInst.fromVarDecl = (bool)fromVarDecl;
   }
 
 public:
@@ -4431,8 +4436,8 @@ public:
     sharedUInt8().BeginBorrowInst.pointerEscape = pointerEscape;
   }
 
-  bool isFromVarDecl() const {
-    return sharedUInt8().BeginBorrowInst.fromVarDecl;
+  IsFromVarDecl_t isFromVarDecl() const {
+    return IsFromVarDecl_t(sharedUInt8().BeginBorrowInst.fromVarDecl);
   }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.

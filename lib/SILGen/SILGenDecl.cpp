@@ -566,9 +566,9 @@ public:
       //
       // Only add a lexical lifetime to the box if the the variable it stores
       // requires one.
-      Box = SGF.B.createBeginBorrow(
-          decl, Box, IsLexical_t(lifetime.isLexical()),
-          DoesNotHavePointerEscape, /*fromVarDecl=*/true);
+      Box =
+          SGF.B.createBeginBorrow(decl, Box, IsLexical_t(lifetime.isLexical()),
+                                  DoesNotHavePointerEscape, IsFromVarDecl);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -839,15 +839,13 @@ public:
       return SGF.B.createBeginBorrow(
           PrologueLoc, value,
           IsLexical_t(SGF.F.getLifetime(vd, value->getType()).isLexical()),
-          DoesNotHavePointerEscape,
-          /*fromVarDecl=*/true);
+          DoesNotHavePointerEscape, IsFromVarDecl);
     }
 
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
     value = SGF.B.createBeginBorrow(PrologueLoc, value, IsLexical,
-                                    DoesNotHavePointerEscape,
-                                    /*fromVarDecl=*/true);
+                                    DoesNotHavePointerEscape, IsFromVarDecl);
     value = SGF.B.createCopyValue(PrologueLoc, value);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
     return SGF.B.createMarkUnresolvedNonCopyableValueInst(
