@@ -4394,7 +4394,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
         }
       } else {
         optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase, IsNotLexical,
-                                                      /*fixed*/ true);
+                                                      BeginBorrowInst::IsFixed);
       }
     }
   } else {

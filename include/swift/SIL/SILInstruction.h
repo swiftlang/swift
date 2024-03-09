@@ -4563,15 +4563,22 @@ class BeginBorrowInst
 
   USE_SHARED_UINT8;
 
+public:
+  enum IsFixed_t : bool {
+    IsNotFixed = false,
+    IsFixed = true,
+  };
+
+private:
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue,
                   IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
-                  bool fromVarDecl, bool fixed)
+                  bool fromVarDecl, IsFixed_t fixed)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
     sharedUInt8().BeginBorrowInst.lexical = isLexical;
     sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
     sharedUInt8().BeginBorrowInst.fromVarDecl = fromVarDecl;
-    sharedUInt8().BeginBorrowInst.fixed = fixed;
+    sharedUInt8().BeginBorrowInst.fixed = (bool)fixed;
   }
 
 public:
@@ -4610,8 +4617,8 @@ public:
 
   /// Whether the borrow scope is fixed during move checking and should be
   /// treated as an opaque use of the value.
-  bool isFixed() const {
-    return sharedUInt8().BeginBorrowInst.fixed;
+  IsFixed_t isFixed() const {
+    return IsFixed_t(sharedUInt8().BeginBorrowInst.fixed);
   }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.

@@ -2272,7 +2272,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto isLexical = IsLexical_t(Attr & 0x1);
     auto hasPointerEscape = HasPointerEscape_t((Attr >> 1) & 0x1);
     bool fromVarDecl = (Attr >> 2) & 0x1;
-    bool isFixed = (Attr >> 3) & 0x1;
+    auto isFixed = BeginBorrowInst::IsFixed_t((Attr >> 3) & 0x1);
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(

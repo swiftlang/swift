@@ -3408,11 +3408,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           } else {
             // Initiate a fixed borrow on the subject, so that it's treated as
             // opaque by the move checker.
-            subjectMV = subjectUndergoesFormalAccess
-                            ? B.createFormalAccessBeginBorrow(
-                                  S, subjectMV, IsNotLexical, /*fixed*/ true)
-                            : B.createBeginBorrow(S, subjectMV, IsNotLexical,
-                                                  /*fixed*/ true);
+            subjectMV =
+                subjectUndergoesFormalAccess
+                    ? B.createFormalAccessBeginBorrow(
+                          S, subjectMV, IsNotLexical, BeginBorrowInst::IsFixed)
+                    : B.createBeginBorrow(S, subjectMV, IsNotLexical,
+                                          BeginBorrowInst::IsFixed);
           }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
           
@@ -3440,8 +3441,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           if (subjectMV.getType().isAddress()) {
             subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
           } else {
-            subjectMV =
-                B.createBeginBorrow(S, subjectMV, IsNotLexical, /*fixed*/ true);
+            subjectMV = B.createBeginBorrow(S, subjectMV, IsNotLexical,
+                                            BeginBorrowInst::IsFixed);
           }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
         }
