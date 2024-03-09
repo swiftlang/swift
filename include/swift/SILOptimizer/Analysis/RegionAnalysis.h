@@ -125,24 +125,133 @@ enum class TrackableValueFlag {
 
   /// Set to true if this TrackableValue's representative is Sendable.
   isSendable = 0x2,
-
-  /// Set to true if this TrackableValue is a non-sendable object derived from
-  /// an actor. Example: a value loaded from a ref_element_addr from an actor.
-  ///
-  /// NOTE: We track values with an actor representative even though actors are
-  /// sendable to be able to properly identify values that escape an actor since
-  /// if we escape an actor into a closure, we want to mark the closure as actor
-  /// derived.
-  isActorDerived = 0x4,
 };
 
 using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
+
+class ValueIsolationRegionInfo {
+public:
+  /// The lattice is:
+  ///
+  /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
+  ///
+  /// Unknown means no information. We error when merging on it.
+  enum Kind {
+    Unknown,
+    Disconnected,
+    Actor,
+  };
+
+private:
+  Kind kind;
+
+  /// When this is set it corresponds to a specific ActorIsolation from the AST
+  /// that we found.
+  ///
+  /// NOTE: actorInstanceType and actorIsolation should never be both set!
+  std::optional<ActorIsolation> actorIsolation;
+
+  /// When this is set it corresponds to a specific Actor type that we
+  /// identified as being actor isolated from a SIL level type. We do not have
+  /// the ActorIsolation information, so this is artificial.
+  ///
+  /// NOTE: actorInstanceType and actorIsolation should never be both set!
+  NominalTypeDecl *actorInstanceType = nullptr;
+
+  ValueIsolationRegionInfo(Kind kind,
+                           std::optional<ActorIsolation> actorIsolation,
+                           NominalTypeDecl *actorInstanceType = nullptr)
+      : kind(kind), actorIsolation(actorIsolation),
+        actorInstanceType(actorInstanceType) {}
+
+public:
+  ValueIsolationRegionInfo() : kind(Kind::Unknown), actorIsolation() {}
+
+  operator bool() const { return kind != Kind::Unknown; }
+
+  operator Kind() const { return kind; }
+
+  Kind getKind() const { return kind; }
+
+  bool isDisconnected() const { return kind == Kind::Disconnected; }
+  bool isActorIsolated() const { return kind == Kind::Actor; }
+
+  void print(llvm::raw_ostream &os) const {
+    switch (Kind(*this)) {
+    case Unknown:
+      os << "unknown";
+      return;
+    case Disconnected:
+      os << "disconnected";
+      return;
+    case Actor:
+      os << "actor";
+      return;
+    }
+  }
+
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
+
+  std::optional<ActorIsolation> getActorIsolation() const {
+    assert(!actorInstanceType &&
+           "Should never be set if getActorIsolation is called");
+    return actorIsolation;
+  }
+
+  NominalTypeDecl *getActorInstance() const {
+    assert(!actorIsolation.has_value());
+    return actorInstanceType;
+  }
+
+  [[nodiscard]] ValueIsolationRegionInfo
+  merge(ValueIsolationRegionInfo other) const {
+    // If we are greater than the other kind, then we are further along the
+    // lattice. We ignore the change.
+    if (unsigned(other.kind) < unsigned(kind))
+      return *this;
+
+    assert(kind != ValueIsolationRegionInfo::Actor &&
+           "Actor should never be merged with another actor?!");
+
+    // Otherwise, take the other value.
+    return other;
+  }
+
+  ValueIsolationRegionInfo withActorIsolated(ActorIsolation isolation) {
+    return ValueIsolationRegionInfo::getActorIsolated(isolation);
+  }
+
+  static ValueIsolationRegionInfo getDisconnected() {
+    return {Kind::Disconnected, {}};
+  }
+
+  static ValueIsolationRegionInfo
+  getActorIsolated(ActorIsolation actorIsolation) {
+    return {Kind::Actor, actorIsolation};
+  }
+
+  /// Sometimes we may have something that is actor isolated or that comes from
+  /// a type. First try getActorIsolation and otherwise, just use the type.
+  static ValueIsolationRegionInfo getActorIsolated(NominalTypeDecl *nomDecl) {
+    auto actorIsolation = swift::getActorIsolation(nomDecl);
+    if (actorIsolation.isActorIsolated())
+      return getActorIsolated(actorIsolation);
+    if (nomDecl->isActor())
+      return {Kind::Actor, {}, nomDecl};
+    return {};
+  }
+};
 
 } // namespace regionanalysisimpl
 
 class regionanalysisimpl::TrackableValueState {
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
+  ValueIsolationRegionInfo regionInfo =
+      ValueIsolationRegionInfo::getDisconnected();
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
@@ -159,9 +268,19 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  bool isActorDerived() const {
-    return flagSet.contains(TrackableValueFlag::isActorDerived);
+  ValueIsolationRegionInfo::Kind getRegionInfoKind() {
+    return regionInfo.getKind();
   }
+
+  ActorIsolation getActorIsolation() const {
+    return regionInfo.getActorIsolation().value();
+  }
+
+  void mergeIsolationRegionInfo(ValueIsolationRegionInfo newRegionInfo) {
+    regionInfo = regionInfo.merge(newRegionInfo);
+  }
+
+  ValueIsolationRegionInfo getIsolationRegionInfo() const { return regionInfo; }
 
   TrackableValueID getID() const { return TrackableValueID(id); }
 
@@ -173,7 +292,9 @@ public:
     os << "TrackableValueState[id: " << id
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
-       << "][is_actor_derived: " << (isActorDerived() ? "yes" : "no") << "].";
+       << "][region_value_kind: ";
+    getIsolationRegionInfo().print(os);
+    os << "].";
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -257,7 +378,9 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  bool isActorDerived() const { return valueState.isActorDerived(); }
+  ValueIsolationRegionInfo getIsolationRegionInfo() const {
+    return valueState.getIsolationRegionInfo();
+  }
 
   TrackableValueID getID() const {
     return TrackableValueID(valueState.getID());
@@ -293,6 +416,7 @@ public:
   using TrackableValueState = regionanalysisimpl::TrackableValueState;
   using TrackableValueID = Element;
   using RepresentativeValue = regionanalysisimpl::RepresentativeValue;
+  using ValueIsolationRegionInfo = regionanalysisimpl::ValueIsolationRegionInfo;
 
 private:
   /// A map from the representative of an equivalence class of values to their
@@ -326,7 +450,7 @@ public:
   /// value" returns an empty SILValue.
   SILValue maybeGetRepresentative(Element trackableValueID) const;
 
-  bool isActorDerived(Element trackableValueID) const;
+  ValueIsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
 
   ArrayRef<Element> getNonTransferrableElements() const {
     return neverTransferredValueIDs;
@@ -345,8 +469,10 @@ private:
   std::optional<TrackableValue> getValueForId(TrackableValueID id) const;
   std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
   TrackableValue
-  getActorIntroducingRepresentative(SILInstruction *introducingInst) const;
-  bool markValueAsActorDerived(SILValue value);
+  getActorIntroducingRepresentative(SILInstruction *introducingInst,
+                                    ValueIsolationRegionInfo isolation) const;
+  bool mergeIsolationRegionInfo(SILValue value,
+                                ValueIsolationRegionInfo isolation);
   void addNeverTransferredValueID(TrackableValueID valueID) {
     neverTransferredValueIDs.push_back(valueID);
   }

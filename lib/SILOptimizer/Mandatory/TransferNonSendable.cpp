@@ -1205,7 +1205,7 @@ struct DiagnosticEvaluator final
   }
 
   bool isActorDerived(Element element) const {
-    return info->getValueMap().isActorDerived(element);
+    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
   }
 
   bool isClosureCaptured(Element element, Operand *op) const {
