@@ -87,10 +87,10 @@ public func withUnsafeMutablePointer<T, Result>(
 /// This function is similar to `withUnsafeMutablePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeMutablePointer<T, Result>(
+public func _withUnprotectedUnsafeMutablePointer<T, E: Error, Result>(
   to value: inout T,
-  _ body: (UnsafeMutablePointer<T>) throws -> Result
-) rethrows -> Result
+  _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
+) throws(E) -> Result
 {
 #if $BuiltinUnprotectedAddressOf
   return try body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
