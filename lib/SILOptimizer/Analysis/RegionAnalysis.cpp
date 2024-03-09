@@ -69,9 +69,26 @@ static bool isIsolationBoundaryCrossingApply(SILInstruction *inst) {
 
 namespace {
 
+struct UnderlyingTrackedValueInfo {
+  SILValue value;
+
+  /// Only used for addresses.
+  bool isActorIsolated;
+
+  explicit UnderlyingTrackedValueInfo(SILValue value)
+      : value(value), isActorIsolated(false) {}
+
+  UnderlyingTrackedValueInfo(SILValue value, bool isActorIsolated)
+      : value(value), isActorIsolated(isActorIsolated) {}
+};
+
 struct UseDefChainVisitor
     : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
   bool isMerge = false;
+
+  /// The actor isolation that we found while walking from use->def. Always set
+  /// to the first one encountered.
+  std::optional<ActorIsolation> actorIsolation;
 
   SILValue visitAll(SILValue sourceAddr) {
     SILValue result = visit(sourceAddr);
@@ -142,9 +159,21 @@ struct UseDefChainVisitor
         // Index is always a merge.
         isMerge = true;
         break;
-      case ProjectionKind::Enum:
-        // Enum is never a merge since it always has a single field.
+      case ProjectionKind::Enum: {
+        // Enum is never a merge since it always has a single tuple field... but
+        // it can be actor isolated.
+        if (!bool(actorIsolation)) {
+          auto *uedi = cast<UncheckedTakeEnumDataAddrInst>(inst);
+          auto i = getActorIsolation(uedi->getEnumDecl());
+          // If our operand decl is actor isolated, then we want to stop looking
+          // through since it is Sendable.
+          if (i.isActorIsolated()) {
+            actorIsolation = i;
+            return SILValue();
+          }
+        }
         break;
+      }
       case ProjectionKind::Tuple: {
         // These are merges if we have multiple fields.
         auto *tti = cast<TupleElementAddrInst>(inst);
@@ -162,6 +191,17 @@ struct UseDefChainVisitor
       }
       case ProjectionKind::Struct:
         auto *sea = cast<StructElementAddrInst>(inst);
+
+        // See if our type is actor isolated.
+        if (!bool(actorIsolation)) {
+          auto i = getActorIsolation(sea->getStructDecl());
+          // If our parent type is actor isolated then we do not want to keep on
+          // walking up from use->def since the value is considered Sendable.
+          if (i.isActorIsolated()) {
+            actorIsolation = i;
+            return SILValue();
+          }
+        }
 
         // See if our result type is a sendable type. In such a case, we do not
         // want to look through the struct_element_addr since we do not want to
@@ -248,8 +288,6 @@ static bool isLookThroughIfResultNonSendable(SILInstruction *inst) {
   switch (inst->getKind()) {
   default:
     return false;
-  case SILInstructionKind::TupleElementAddrInst:
-  case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::RawPointerToRefInst:
     return true;
   }
@@ -264,13 +302,16 @@ static bool isLookThroughIfOperandNonSendable(SILInstruction *inst) {
   }
 }
 
-static bool isLookThroughIfOperandAndResultSendable(SILInstruction *inst) {
+static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   switch (inst->getKind()) {
   default:
     return false;
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedValueCastInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     return true;
   }
 }
@@ -293,7 +334,7 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
-      if (isLookThroughIfOperandAndResultSendable(svi)) {
+      if (isLookThroughIfOperandAndResultNonSendable(svi)) {
         if (isNonSendableType(svi->getType(), fn) &&
             isNonSendableType(svi->getOperand(0)->getType(), fn)) {
           temp = svi->getOperand(0);
@@ -329,21 +370,21 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
   }
 }
 
-static SILValue getUnderlyingTrackedValue(SILValue value) {
+static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
-    return getUnderlyingTrackedObjectValue(value);
+    return UnderlyingTrackedValueInfo(getUnderlyingTrackedObjectValue(value));
   }
 
   UseDefChainVisitor visitor;
   SILValue base = visitor.visitAll(value);
   assert(base);
   if (base->getType().isObject())
-    return getUnderlyingObject(base);
-  return base;
+    return {getUnderlyingObject(base), visitor.actorIsolation.has_value()};
+  return {base, visitor.actorIsolation.has_value()};
 }
 
 SILValue RegionAnalysisFunctionInfo::getUnderlyingTrackedValue(SILValue value) {
-  return ::getUnderlyingTrackedValue(value);
+  return ::getUnderlyingTrackedValue(value).value;
 }
 
 namespace {
@@ -650,7 +691,7 @@ struct PartialApplyReachabilityDataflow {
 
 private:
   SILValue getRootValue(SILValue value) const {
-    return getUnderlyingTrackedValue(value);
+    return getUnderlyingTrackedValue(value).value;
   }
 
   unsigned getBitForValue(SILValue value) const {
@@ -2150,7 +2191,7 @@ public:
       assert((isStaticallyLookThroughInst(inst) ||
               isLookThroughIfResultNonSendable(inst) ||
               isLookThroughIfOperandNonSendable(inst) ||
-              isLookThroughIfOperandAndResultSendable(inst)) &&
+              isLookThroughIfOperandAndResultNonSendable(inst)) &&
              "Out of sync... should return true for one of these categories!");
       return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
 
@@ -2379,7 +2420,6 @@ CONSTANT_TRANSLATION(EndInitLetRefInst, LookThrough)
 CONSTANT_TRANSLATION(InitEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(OpenExistentialAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedRefCastInst, LookThrough)
-CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UpcastInst, LookThrough)
 CONSTANT_TRANSLATION(MoveValueInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUnresolvedNonCopyableValueInst, LookThrough)
@@ -2598,39 +2638,6 @@ CONSTANT_TRANSLATION(VectorInst, Asserting)
 
 #undef CONSTANT_TRANSLATION
 
-#ifdef LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE
-#error "LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE already defined?!"
-#endif
-
-// If our result is non-Sendable, treat this as a lookthrough.
-// Otherwise, we are extracting a sendable field from a non-Sendable base
-// type. We need to track this as an assignment so that if we transferred
-//
-// the value we emit an error. Since we do not track uses of Sendable
-// values this is the best place to emit the error since we do not look
-// further to find the actual use site.
-//
-// TODO: We could do a better job here and attempt to find the actual
-// use
-// of the Sendable addr. That would require adding more logic though.
-#define LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(INST)              \
-  TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
-    assert(isLookThroughIfResultNonSendable(inst) && "Out of sync?!");         \
-    if (isNonSendableType(inst->getType())) {                                  \
-      return TranslationSemantics::LookThrough;                                \
-    }                                                                          \
-    return TranslationSemantics::Require;                                      \
-  }
-
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(TupleElementAddrInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(StructElementAddrInst)
-
-#undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE
-
-#ifdef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
-#error IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE already defined
-#endif
-
 #define IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(INST)                       \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
     if (!isNonSendableType(inst->getType())) {                                 \
@@ -2644,14 +2651,14 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 
 #undef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
 
-#ifdef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
-#error "CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT already defined"
+#ifdef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
+#error "LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND already defined"
 #endif
 
-#define CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(INST)               \
+#define LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(INST)                    \
                                                                                \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *cast) {        \
-    assert(isLookThroughIfOperandAndResultSendable(cast) && "Out of sync");    \
+    assert(isLookThroughIfOperandAndResultNonSendable(cast) && "Out of sync"); \
     bool isOperandNonSendable =                                                \
         isNonSendableType(cast->getOperand()->getType());                      \
     bool isResultNonSendable = isNonSendableType(cast->getType());             \
@@ -2670,11 +2677,14 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
     return TranslationSemantics::Ignored;                                      \
   }
 
-CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedTrivialBitCastInst)
-CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedBitwiseCastInst)
-CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTrivialBitCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedBitwiseCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedValueCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(TupleElementAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(StructElementAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
 
-#undef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
+#undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
 
 //===---
 // Custom Handling
@@ -3146,7 +3156,8 @@ bool RegionAnalysisValueMap::isActorDerived(Element trackableValueID) const {
 /// may alias.
 TrackableValue RegionAnalysisValueMap::getTrackableValue(
     SILValue value, bool isAddressCapturedByPartialApply) const {
-  value = getUnderlyingTrackedValue(value);
+  auto info = getUnderlyingTrackedValue(value);
+  value = info.value;
 
   auto *self = const_cast<RegionAnalysisValueMap *>(this);
   auto iter = self->equivalenceClassValuesToState.try_emplace(
@@ -3163,6 +3174,12 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
 
   // First for addresses.
   if (value->getType().isAddress()) {
+    // If we were able to find this was actor isolated from finding our
+    // underlying object, use that. It is never wrong.
+    if (info.isActorIsolated) {
+      iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+    }
+
     auto storage = AccessStorageWithBase::compute(value);
     if (storage.storage) {
       // Check if we have a uniquely identified address that was not captured
@@ -3214,10 +3231,50 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   // mark this value as actor derived.
   if (isa<LoadInst, LoadBorrowInst>(iter.first->first.getValue())) {
     auto *svi = cast<SingleValueInstruction>(iter.first->first.getValue());
+
+    // See if we can use get underlying tracked value to find if it is actor
+    // isolated.
+    //
+    // TODO: Instead of using AccessStorageBase, just use our own visitor
+    // everywhere. Just haven't done it due to possible perturbations.
+    auto parentAddrInfo = getUnderlyingTrackedValue(svi);
+    if (parentAddrInfo.isActorIsolated)
+      iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
-    if (storage.storage && isa<RefElementAddrInst>(storage.base)) {
-      if (storage.storage.getRoot()->getType().isActor()) {
-        iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+    if (storage.storage) {
+      if (isa<RefElementAddrInst>(storage.base)) {
+        if (storage.storage.getRoot()->getType().isActor()) {
+          iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+        }
+      }
+    }
+  }
+
+  // See if we have a struct_extract from a global actor isolated type.
+  if (auto *sei = dyn_cast<StructExtractInst>(iter.first->first.getValue())) {
+    if (getActorIsolation(sei->getStructDecl()).isActorIsolated()) {
+      iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+    }
+  }
+
+  // See if we have an unchecked_enum_data from a global actor isolated type.
+  if (auto *uedi =
+          dyn_cast<UncheckedEnumDataInst>(iter.first->first.getValue())) {
+    if (getActorIsolation(uedi->getEnumDecl()).isActorIsolated()) {
+      iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+    }
+  }
+
+  // Handle a switch_enum from a global actor isolated type.
+  if (auto *arg = dyn_cast<SILPhiArgument>(iter.first->first.getValue())) {
+    if (auto *singleTerm = arg->getSingleTerminator()) {
+      if (auto *sei = dyn_cast<SwitchEnumInst>(singleTerm)) {
+        auto enumDecl =
+            sei->getOperand()->getType().getEnumOrBoundGenericEnum();
+        if (getActorIsolation(enumDecl).isActorIsolated()) {
+          iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+        }
       }
     }
   }
@@ -3266,7 +3323,7 @@ TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
 }
 
 bool RegionAnalysisValueMap::markValueAsActorDerived(SILValue value) {
-  value = getUnderlyingTrackedValue(value);
+  value = getUnderlyingTrackedValue(value).value;
   auto iter = equivalenceClassValuesToState.find(value);
   if (iter == equivalenceClassValuesToState.end())
     return false;

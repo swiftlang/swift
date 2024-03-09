@@ -558,6 +558,11 @@ getResultOptions(ImplResultInfoOptions implOptions) {
     result |= SILResultInfo::NotDifferentiable;
   }
 
+  if (implOptions.contains(ImplResultInfoFlags::IsTransferring)) {
+    implOptions -= ImplResultInfoFlags::IsTransferring;
+    result |= SILResultInfo::IsTransferring;
+  }
+
   // If we did not remove all of the options from implOptions, someone forgot to
   // update this code for a new type of flag. Return none to signal error!
   if (bool(implOptions))
@@ -664,8 +669,7 @@ Type ASTBuilder::createImplFunctionType(
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
                    flags.isSendable(), flags.isAsync(), unimplementable,
-                   isolation, diffKind, clangFnType, LifetimeDependenceInfo(),
-                   flags.hasTransferringResult())
+                   isolation, diffKind, clangFnType, LifetimeDependenceInfo())
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,

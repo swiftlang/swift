@@ -4293,14 +4293,10 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  bool hasTransferringResult =
-      isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr());
-
   // TODO: Handle LifetimeDependenceInfo here.
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType, LifetimeDependenceInfo(),
-      hasTransferringResult);
+      isolation, diffKind, clangFnType, LifetimeDependenceInfo());
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -4631,6 +4627,10 @@ bool TypeResolver::resolveSingleSILResult(
     // Recognize `@noDerivative`.
     if (claim<NoDerivativeTypeAttr>(attrs)) {
       resultInfoOptions |= SILResultInfo::NotDifferentiable;
+    }
+
+    if (claim<SILTransferringTypeAttr>(attrs)) {
+      resultInfoOptions |= SILResultInfo::IsTransferring;
     }
 
     type = resolveAttributedType(repr, options, attrs);

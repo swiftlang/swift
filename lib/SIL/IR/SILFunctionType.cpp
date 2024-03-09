@@ -1254,12 +1254,15 @@ class DestructureResults {
   const Conventions &Convs;
   SmallVectorImpl<SILResultInfo> &Results;
   TypeExpansionContext context;
+  bool hasTransferringResult;
 
 public:
   DestructureResults(TypeExpansionContext context, TypeConverter &TC,
                      const Conventions &conventions,
-                     SmallVectorImpl<SILResultInfo> &results)
-      : TC(TC), Convs(conventions), Results(results), context(context) {}
+                     SmallVectorImpl<SILResultInfo> &results,
+                     bool hasTransferringResult)
+      : TC(TC), Convs(conventions), Results(results), context(context),
+        hasTransferringResult(hasTransferringResult) {}
 
   void destructure(AbstractionPattern origType, CanType substType) {
     // Recur into tuples.
@@ -1290,6 +1293,8 @@ public:
         SILPackType::ExtInfo extInfo(indirect);
         auto packType = SILPackType::get(TC.Context, extInfo, packElts);
         SILResultInfo result(packType, ResultConvention::Pack);
+        if (hasTransferringResult)
+          result = result.addingOption(SILResultInfo::IsTransferring);
         Results.push_back(result);
       });
       return;
@@ -1331,6 +1336,8 @@ public:
     
     SILResultInfo result(substResultTL.getLoweredType().getASTType(),
                          convention);
+    if (hasTransferringResult)
+      result = result.addingOption(SILResultInfo::IsTransferring);
     Results.push_back(result);
   }
 
@@ -2359,8 +2366,8 @@ static CanSILFunctionType getSILFunctionType(
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
   {
-    DestructureResults destructurer(expansionContext, TC, conventions,
-                                    results);
+    DestructureResults destructurer(expansionContext, TC, conventions, results,
+                                    hasTransferringResult);
     destructurer.destructure(origResultType, substFormalResultType);
   }
 
@@ -2405,7 +2412,6 @@ static CanSILFunctionType getSILFunctionType(
                         .withUnimplementable(unimplementable)
                         .withLifetimeDependenceInfo(
                             extInfoBuilder.getLifetimeDependenceInfo())
-                        .withTransferringResult(hasTransferringResult)
                         .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,

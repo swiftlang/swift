@@ -6518,6 +6518,17 @@ public:
     require(!FTy->hasErasedIsolation() ||
              FTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "only thick function types can have erased isolation");
+
+    // If our function hasTransferringResult, then /all/ results must be
+    // transferring.
+    require(FTy->hasTransferringResult() ==
+                (FTy->getResults().size() &&
+                 llvm::all_of(FTy->getResults(),
+                              [](SILResultInfo result) {
+                                return result.hasOption(
+                                    SILResultInfo::IsTransferring);
+                              })),
+            "transferring result means all results are transferring");
   }
 
   struct VerifyFlowSensitiveRulesDetails {
