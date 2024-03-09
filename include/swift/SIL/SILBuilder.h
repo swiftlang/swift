@@ -826,7 +826,7 @@ public:
   BeginBorrowInst *createBeginBorrow(
       SILLocation Loc, SILValue LV, IsLexical_t isLexical = IsNotLexical,
       HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
-      bool fromVarDecl = false,
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl,
       BeginBorrowInst::IsFixed_t fixed = BeginBorrowInst::IsNotFixed) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
@@ -854,7 +854,7 @@ public:
   SILValue emitBeginBorrowOperation(
       SILLocation loc, SILValue v, IsLexical_t isLexical = IsNotLexical,
       HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
-      bool fromVarDecl = false) {
+      IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl) {
     if (!hasOwnership() ||
         v->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
       return v;

@@ -1106,9 +1106,9 @@ ManagedValue
 SILGenBuilder::createBeginBorrow(SILLocation loc, ManagedValue value,
                                  IsLexical_t isLexical,
                                  BeginBorrowInst::IsFixed_t isFixed) {
-  auto *newValue =
-      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical,
-                                    DoesNotHavePointerEscape, false, isFixed);
+  auto *newValue = SILBuilder::createBeginBorrow(
+      loc, value.getValue(), isLexical, DoesNotHavePointerEscape,
+      IsNotFromVarDecl, isFixed);
   SGF.emitManagedBorrowedRValueWithCleanup(newValue);
   return ManagedValue::forBorrowedObjectRValue(newValue);
 }
@@ -1116,9 +1116,9 @@ SILGenBuilder::createBeginBorrow(SILLocation loc, ManagedValue value,
 ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(
     SILLocation loc, ManagedValue value, IsLexical_t isLexical,
     BeginBorrowInst::IsFixed_t isFixed) {
-  auto *newValue =
-      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical,
-                                    DoesNotHavePointerEscape, false, isFixed);
+  auto *newValue = SILBuilder::createBeginBorrow(
+      loc, value.getValue(), isLexical, DoesNotHavePointerEscape,
+      IsNotFromVarDecl, isFixed);
   return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
                                                     value.getValue(), newValue);
 }

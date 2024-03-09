@@ -1983,6 +1983,11 @@ enum HasPointerEscape_t : bool {
   HasPointerEscape = true,
 };
 
+enum IsFromVarDecl_t : bool {
+  IsNotFromVarDecl = false,
+  IsFromVarDecl = true,
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -4572,12 +4577,12 @@ public:
 private:
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue,
                   IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
-                  bool fromVarDecl, IsFixed_t fixed)
+                  IsFromVarDecl_t fromVarDecl, IsFixed_t fixed)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
     sharedUInt8().BeginBorrowInst.lexical = isLexical;
     sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
-    sharedUInt8().BeginBorrowInst.fromVarDecl = fromVarDecl;
+    sharedUInt8().BeginBorrowInst.fromVarDecl = (bool)fromVarDecl;
     sharedUInt8().BeginBorrowInst.fixed = (bool)fixed;
   }
 
@@ -4611,8 +4616,8 @@ public:
     sharedUInt8().BeginBorrowInst.pointerEscape = pointerEscape;
   }
 
-  bool isFromVarDecl() const {
-    return sharedUInt8().BeginBorrowInst.fromVarDecl;
+  IsFromVarDecl_t isFromVarDecl() const {
+    return IsFromVarDecl_t(sharedUInt8().BeginBorrowInst.fromVarDecl);
   }
 
   /// Whether the borrow scope is fixed during move checking and should be

@@ -571,9 +571,9 @@ public:
       //
       // Only add a lexical lifetime to the box if the variable it stores
       // requires one.
-      Box = SGF.B.createBeginBorrow(
-          decl, Box, IsLexical_t(lifetime.isLexical()),
-          DoesNotHavePointerEscape, /*fromVarDecl=*/true);
+      Box =
+          SGF.B.createBeginBorrow(decl, Box, IsLexical_t(lifetime.isLexical()),
+                                  DoesNotHavePointerEscape, IsFromVarDecl);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -864,8 +864,7 @@ public:
                                    /*fromVarDecl=*/true);
 
     return SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
-                                   DoesNotHavePointerEscape,
-                                   /*fromVarDecl=*/true);
+                                   DoesNotHavePointerEscape, IsFromVarDecl);
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,

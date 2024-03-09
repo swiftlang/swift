@@ -3742,7 +3742,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto isLexical = IsNotLexical;
     auto hasPointerEscape = DoesNotHavePointerEscape;
-    bool fromVarDecl = false;
+    auto fromVarDecl = IsNotFromVarDecl;
     auto fixed = BeginBorrowInst::IsNotFixed;
 
     StringRef AttrName;
@@ -3753,7 +3753,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       else if (AttrName == "pointer_escape")
         hasPointerEscape = HasPointerEscape;
       else if (AttrName == "var_decl")
-        fromVarDecl = true;
+        fromVarDecl = IsFromVarDecl;
       else if (AttrName == "fixed")
         fixed = BeginBorrowInst::IsFixed;
       else {
