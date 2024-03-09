@@ -726,6 +726,11 @@ namespace {
     }
 
     template <class G>
+    void addConformanceRequirement(const G &generator, KnownProtocolKind kp) {
+      addConformanceRequirement(generator, Context.getProtocol(kp));
+    }
+
+    template <class G>
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
       assert(proto && "missing protocol");
       Requirement req(RequirementKind::Conformance,
@@ -1194,14 +1199,23 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
   }
 
   BuiltinFunctionBuilder builder(Context);
+
+  auto genParam = makeGenericParam();
+
+  // Add safety, unless requested.
+  if (BV != BuiltinValueKind::UnsafeCastToNativeObject) {
+    builder.addConformanceRequirement(genParam, KnownProtocolKind::Copyable);
+    builder.addConformanceRequirement(genParam, KnownProtocolKind::Escapable);
+  }
+
   if (BV == BuiltinValueKind::CastToNativeObject ||
       BV == BuiltinValueKind::UnsafeCastToNativeObject ||
       BV == BuiltinValueKind::BridgeToRawPointer) {
-    builder.addParameter(makeGenericParam(), ownership);
+    builder.addParameter(genParam, ownership);
     builder.setResult(makeConcrete(builtinTy));
   } else {
     builder.addParameter(makeConcrete(builtinTy), ownership);
-    builder.setResult(makeGenericParam());
+    builder.setResult(genParam);
   }
   return builder.build(Id);
 }
@@ -1303,7 +1317,9 @@ static ValueDecl *getZeroInitializerOperation(ASTContext &Context,
                                              Identifier Id) {
   // <T> () -> T
   BuiltinFunctionBuilder builder(Context);
-  builder.setResult(makeGenericParam());
+  auto genParam = makeGenericParam();
+  builder.addConformanceRequirement(genParam, KnownProtocolKind::Escapable);
+  builder.setResult(genParam);
   return builder.build(Id);
 }
 

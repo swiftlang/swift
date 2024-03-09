@@ -174,7 +174,7 @@ class MinimalStdlib(cmake_product.CMakeProduct):
 
         # Build!
         self.build_with_cmake(["swift-stdlib-freestanding"], build_variant, [],
-                              prefer_just_built_toolchain=True)
+                              prefer_native_toolchain=True)
 
     def should_test(self, host_target):
         return False
