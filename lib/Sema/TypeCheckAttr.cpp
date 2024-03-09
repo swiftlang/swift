@@ -6909,17 +6909,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
                                 diag::nonisolated_distributed_actor_storage);
           return;
         }
-
-        // 'nonisolated' is redundant for the stored properties of a struct.
-        if (isa<StructDecl>(nominal) &&
-            !var->isStatic() &&
-            var->isOrdinaryStoredProperty() &&
-            !isWrappedValueOfPropWrapper(var)) {
-          diagnoseAndRemoveAttr(attr, diag::nonisolated_storage_value_type,
-                                nominal->getDescriptiveKind())
-            .warnUntilSwiftVersion(6);
-          return;
-        }
       }
     }
 
