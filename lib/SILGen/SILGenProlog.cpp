@@ -845,6 +845,7 @@ private:
 
     if (auto *allocStack = dyn_cast<AllocStackInst>(argrv.getValue())) {
       allocStack->setArgNo(ArgNo);
+      allocStack->setIsFromVarDecl();
       if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
               SGF.getModule()) &&
           SGF.F.getLifetime(pd, allocStack->getType()).isLexical())

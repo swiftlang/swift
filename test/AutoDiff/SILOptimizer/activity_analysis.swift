@@ -840,12 +840,12 @@ func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
 // CHECK: [ACTIVE]   %3 = alloc_stack $IndirectEnum<T>
 // CHECK: bb1:
 // CHECK: [ACTIVE]   %6 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case1!enumelt
-// CHECK: [ACTIVE]   %7 = alloc_stack [lexical] $T, let, name "y1"
+// CHECK: [ACTIVE]   %7 = alloc_stack [lexical] [var_decl] $T, let, name "y1"
 // CHECK: bb2:
 // CHECK: [ACTIVE] {{.*}} = unchecked_take_enum_data_addr {{.*}} : $*IndirectEnum<T>, #IndirectEnum.case2!enumelt
 // CHECK: [ACTIVE] {{.*}} = tuple_element_addr {{.*}} : $*(Float, T), 0
 // CHECK: [VARIED] {{.*}} = load [trivial] {{.*}} : $*Float
 // CHECK: [ACTIVE] {{.*}} = tuple_element_addr {{.*}} : $*(Float, T), 1
-// CHECK: [ACTIVE] {{.*}} = alloc_stack [lexical] $T, let, name "y2"
+// CHECK: [ACTIVE] {{.*}} = alloc_stack [lexical] [var_decl] $T, let, name "y2"
 // CHECK: bb3:
 // CHECK: [NONE]   {{.*}} = tuple ()

@@ -705,9 +705,9 @@ public:
       auto lifetime = SGF.F.getLifetime(vd, lowering->getLoweredType());
       auto isLexical =
           IsLexical_t(lexicalLifetimesEnabled && lifetime.isLexical());
-      address =
-          SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
-                                      DoesNotHaveDynamicLifetime, isLexical);
+      address = SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
+                                            DoesNotHaveDynamicLifetime,
+                                            isLexical, IsFromVarDecl);
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
