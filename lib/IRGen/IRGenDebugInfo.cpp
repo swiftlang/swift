@@ -2868,9 +2868,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   // Because there's no good way to cross the CU boundary to insert a nested
   // DISubprogram definition in one CU into a type defined in another CU when
   // doing LTO builds.
-  if (Rep == SILFunctionTypeRepresentation::Method ||
-      Rep == SILFunctionTypeRepresentation::ObjCMethod ||
-      Rep == SILFunctionTypeRepresentation::WitnessMethod) {
+  if (llvm::isa<llvm::DICompositeType>(Scope)) {
     llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
         /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
         /*IsDefinition=*/false, /*IsOptimized=*/Opts.shouldOptimize());
