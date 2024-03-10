@@ -563,8 +563,6 @@ static bool matchCallArgumentsImpl(
       // backward-match rule that skips this parameter if doing so is the only
       // way to successfully match arguments to parameters.
       if (!parameterRequiresArgument(params, paramInfo, paramIdx) &&
-          !param.getPlainType()->getASTContext().LangOpts.hasFeature(
-              Feature::ForwardTrailingClosures) &&
           anyParameterRequiresArgument(
               params, paramInfo, paramIdx + 1,
               nextArgIdx + 1 < numArgs
