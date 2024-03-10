@@ -800,6 +800,12 @@ public:
                 ConsumableAndAssignable);
       }
 
+      if (!value->getType().isTrivial(SGF.F)) {
+        // A value without ownership of non-trivial type, e.g. Optional<K>.none.
+        // Mark that it is from a VarDecl.
+        return SGF.B.createMoveValue(PrologueLoc, value, IsNotLexical,
+                                     DoesNotHavePointerEscape, IsFromVarDecl);
+      }
 
       return value;
     }
