@@ -360,9 +360,11 @@ How swift-C++ bridging code is compiled:
 ]=] DEFAULT)
 
 option(SWIFT_USE_SYMLINKS "Use symlinks instead of copying binaries" ${CMAKE_HOST_UNIX})
-set(SWIFT_COPY_OR_SYMLINK "copy")
+set(SWIFT_COPY_OR_SYMLINK "copy_if_different")
+set(SWIFT_COPY_OR_SYMLINK_DIR "copy_directory")
 if(SWIFT_USE_SYMLINKS)
   set(SWIFT_COPY_OR_SYMLINK "create_symlink")
+  set(SWIFT_COPY_OR_SYMLINK_DIR "create_symlink")
 endif()
 
 # The following only works with the Ninja generator in CMake >= 3.0.

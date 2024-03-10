@@ -129,17 +129,11 @@ else()
   set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION_MAJOR}")
 endif()
 
-if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Windows")
-  set(cmake_symlink_option "copy_directory")
-else()
-  set(cmake_symlink_option "create_symlink")
-endif()
-
 add_custom_command_target(unused_var
     COMMAND
       "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}"
     COMMAND
-      "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+      "${CMAKE_COMMAND}" "-E" "${SWIFT_COPY_OR_SYMLINK_DIR}"
       "${clang_headers_location}"
       "${SWIFTLIB_DIR}/clang"
 
@@ -154,7 +148,7 @@ if(SWIFT_BUILD_STATIC_STDLIB)
       COMMAND
         "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTSTATICLIB_DIR}"
       COMMAND
-        "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+        "${CMAKE_COMMAND}" "-E" "${SWIFT_COPY_OR_SYMLINK_DIR}"
         "${clang_headers_location}"
         "${SWIFTSTATICLIB_DIR}/clang"
 
@@ -193,10 +187,10 @@ if(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" "${outdir}"
         COMMAND
-          "${CMAKE_COMMAND}" "-E" ${cmake_symlink_option}
+          "${CMAKE_COMMAND}" "-E" ${SWIFT_COPY_OR_SYMLINK_DIR}
           ${output_dir} "${outdir}/shims"
         COMMAND
-          "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+          "${CMAKE_COMMAND}" "-E" "${SWIFT_COPY_OR_SYMLINK_DIR}"
           "${clang_headers_location}"
           "${outdir}/clang"
 
@@ -212,7 +206,7 @@ if(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
           COMMAND
             "${CMAKE_COMMAND}" "-E" "make_directory" "${outdir}"
           COMMAND
-            "${CMAKE_COMMAND}" "-E" ${cmake_symlink_option}
+            "${CMAKE_COMMAND}" "-E" ${SWIFT_COPY_OR_SYMLINK_DIR}
             "${output_dir}/../module.modulemap" "${outdir}/module.modulemap"
 
           CUSTOM_TARGET_NAME ${modulemap_target_name}
