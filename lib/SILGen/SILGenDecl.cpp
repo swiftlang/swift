@@ -788,20 +788,20 @@ public:
                 ConsumableAndAssignable);
       }
 
-      // Otherwise, if we don't have a no implicit copy trivial type, just
-      // return value.
-      if (!vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
-        return value;
+      // If we have a no implicit copy trivial type, wrap it in the move only
+      // wrapper and mark it as needing checking by the move checker.
+      if (vd->isNoImplicitCopy() && value->getType().isTrivial(SGF.F)) {
+        value =
+            SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
+        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
+        return SGF.B.createMarkUnresolvedNonCopyableValueInst(
+            PrologueLoc, value,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
+      }
 
-      // Otherwise, we have a no implicit copy trivial type, so wrap it in the
-      // move only wrapper and mark it as needing checking by the move cherk.
-      value =
-          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
-      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-          PrologueLoc, value,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
+
+      return value;
     }
 
     // Otherwise, we need to perform some additional processing. First, if we
