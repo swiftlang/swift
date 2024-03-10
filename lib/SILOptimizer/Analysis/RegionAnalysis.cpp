@@ -1729,33 +1729,9 @@ public:
       }
     }
 
-    ValueIsolationRegionInfo actorIsolation;
-    for (auto &op : pai->getAllOperands()) {
-      if (auto value = tryToTrackValue(op.get())) {
-        if (auto isolation = value->getValueState().getIsolationRegionInfo()) {
-          actorIsolation = actorIsolation.merge(isolation);
-        }
-      } else {
-        // We only treat Sendable values as propagating actor self if the
-        // partial apply has operand as an sil_isolated parameter.
-        ApplySite applySite(pai);
-        if (applySite.isArgumentOperand(op) &&
-            ApplySite(pai).getArgumentParameterInfo(op).hasOption(
-                SILParameterInfo::Isolated)) {
-          if (auto isolation =
-                  value->getValueState().getIsolationRegionInfo()) {
-            actorIsolation = actorIsolation.merge(isolation);
-          }
-        }
-      }
-    }
-
-    if (actorIsolation.isDisconnected())
-      actorIsolation = ValueIsolationRegionInfo();
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(pai, applyResults);
-    translateSILMultiAssign(applyResults, pai->getOperandValues(),
-                            actorIsolation);
+    translateSILMultiAssign(applyResults, pai->getOperandValues());
   }
 
   void translateSILBuiltin(BuiltinInst *bi) {
