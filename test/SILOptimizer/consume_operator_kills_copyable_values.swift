@@ -362,6 +362,15 @@ public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x
     }
 }
 
+func f(x:[Int]?)
+{
+}
+func g()
+{
+    let x:[Int]? = nil
+    f(x: consume x)
+}
+
 /////////////////////////
 // Partial Apply Tests //
 /////////////////////////

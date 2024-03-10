@@ -706,9 +706,7 @@ actor OhBrother {
     let blah = { (x: OhBrother) -> Int in 0 }
     giver = blah
 
-    // TODO: would be nice if we didn't say "after this closure" since it's not a capture, but a call.
-
-    _ = blah(self) // expected-note {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+    _ = blah(self) // expected-note {{after a call involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
     whatever = 2 // expected-warning {{cannot access property 'whatever' here in non-isolated initializer; this is an error in the Swift 6 language mode}}
   }
@@ -788,7 +786,7 @@ func testActorWithInitAccessorInit() {
       let escapingSelf: (EscapeBeforeFullInit) -> Void = { _ in }
 
       escapingSelf(self) // expected-error {{'self' used before all stored properties are initialized}}
-      // expected-note@-1 {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+      // expected-note@-1 {{after a call involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
       self.a = v
       // expected-warning@-1 {{cannot access property '_a' here in non-isolated initializer; this is an error in the Swift 6 language mode}}
