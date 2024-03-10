@@ -36,7 +36,7 @@ struct InferredFromContext {
     get { [] }
   }
 
-  nonisolated let flag: Bool = false // expected-error {{'nonisolated' is redundant on struct's stored properties}}{{3-15=}}
+  nonisolated let flag: Bool = false
 
   subscript(_ i: Int) -> Int { return i }
 
@@ -49,14 +49,19 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   // these do not need an await, since it's a value type
   _ = ext.point
   _ = formance.counter
-  _ = anno.point
   _ = anno.counter
 
   // make sure it's just a warning if someone was awaiting on it previously
   _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}
   _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await anno.point  // expected-warning {{no 'async' operations occur within 'await' expression}}
   _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
+
+  // We could extend the 'nonisolated within the module' rule to vars
+  // value types types if the property type is 'Sendable'.
+  _ = anno.point
+  // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-2 {{property access is 'async'}}
+  _ = await anno.point
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter
@@ -68,11 +73,10 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = await NoGlobalActorValueType.polygon
 }
 
-// check for instance members that do not need global-actor protection
 struct NoGlobalActorValueType {
-  @SomeGlobalActor var point: ImmutablePoint // expected-error {{stored property 'point' within struct cannot have a global actor}}
+  @SomeGlobalActor var point: ImmutablePoint
 
-  @MainActor let counter: Int // expected-error {{stored property 'counter' within struct cannot have a global actor}}
+  @MainActor let counter: Int
 
   @MainActor static var polygon: [ImmutablePoint] = []
 }

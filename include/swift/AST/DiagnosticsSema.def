@@ -5501,9 +5501,6 @@ ERROR(distributed_actor_remote_func_implemented_manually,none,
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
-ERROR(nonisolated_storage_value_type,none,
-      "'nonisolated' is redundant on %0's stored properties",
-      (DescriptiveDeclKind))
 ERROR(distributed_actor_func_nonisolated, none,
       "cannot declare method %0 as both 'nonisolated' and 'distributed'",
       (DeclName))
@@ -5780,9 +5777,6 @@ ERROR(global_actor_on_actor_class,none,
       "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
-ERROR(global_actor_on_storage_of_value_type,none,
-      "stored property %0 within struct cannot have a global actor",
-      (DeclName))
 ERROR(unsafe_global_actor,none,
       "'(unsafe)' global actors are deprecated; "
       "use '@preconcurrency' instead",
