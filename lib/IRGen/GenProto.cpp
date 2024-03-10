@@ -2538,7 +2538,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     auto sig = nominal->getGenericSignatureOfContext();
     sig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
                       if (param->isParameterPack()) {
+#ifndef NDEBUG
                         wt->dump();
+#endif
                         llvm::report_fatal_error("use of relative protcol witness tables not supported");
                       }});
   }
