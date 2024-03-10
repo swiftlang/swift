@@ -225,7 +225,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     case llvm::Triple::Itanium:
       return "windows";
     default:
-      llvm_unreachable("unsupported Windows environment");
+      return "none";
     }
   case llvm::Triple::PS4:
     return "ps4";
