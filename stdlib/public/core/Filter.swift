@@ -199,10 +199,6 @@ extension LazyFilterCollection: Collection {
 
   @inlinable // lazy-performance
   public func distance(from start: Index, to end: Index) -> Int {
-    // The following line makes sure that distance(from:to:) is invoked on the
-    // _base at least once, to trigger a _precondition in forward only
-    // collections.
-    _ = _base.distance(from: start, to: end)
     var _start: Index
     let _end: Index
     let step: Int
