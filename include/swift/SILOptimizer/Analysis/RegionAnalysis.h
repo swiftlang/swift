@@ -139,33 +139,34 @@ public:
   enum Kind {
     Unknown,
     Disconnected,
+    Task,
     Actor,
   };
 
 private:
   Kind kind;
-
-  /// When this is set it corresponds to a specific ActorIsolation from the AST
-  /// that we found.
-  ///
-  /// NOTE: actorInstanceType and actorIsolation should never be both set!
-  std::optional<ActorIsolation> actorIsolation;
-
-  /// When this is set it corresponds to a specific Actor type that we
-  /// identified as being actor isolated from a SIL level type. We do not have
-  /// the ActorIsolation information, so this is artificial.
-  ///
-  /// NOTE: actorInstanceType and actorIsolation should never be both set!
-  NominalTypeDecl *actorInstanceType = nullptr;
+  // clang-format off
+  std::variant<
+    // Used for actor isolated when we have ActorIsolation info from the AST.
+    std::optional<ActorIsolation>,
+    // Used for actor isolation when we infer the actor at the SIL level.
+    NominalTypeDecl *,
+    // The task isolated parameter when we find a task isolated value.
+    SILValue
+  > data;
+  // clang-format on
 
   ValueIsolationRegionInfo(Kind kind,
-                           std::optional<ActorIsolation> actorIsolation,
-                           NominalTypeDecl *actorInstanceType = nullptr)
-      : kind(kind), actorIsolation(actorIsolation),
-        actorInstanceType(actorInstanceType) {}
+                           std::optional<ActorIsolation> actorIsolation)
+      : kind(kind), data(actorIsolation) {}
+  ValueIsolationRegionInfo(Kind kind, NominalTypeDecl *decl)
+      : kind(kind), data(decl) {}
+
+  ValueIsolationRegionInfo(Kind kind, SILValue value)
+      : kind(kind), data(value) {}
 
 public:
-  ValueIsolationRegionInfo() : kind(Kind::Unknown), actorIsolation() {}
+  ValueIsolationRegionInfo() : kind(Kind::Unknown), data() {}
 
   operator bool() const { return kind != Kind::Unknown; }
 
@@ -175,6 +176,7 @@ public:
 
   bool isDisconnected() const { return kind == Kind::Disconnected; }
   bool isActorIsolated() const { return kind == Kind::Actor; }
+  bool isTaskIsolated() const { return kind == Kind::Task; }
 
   void print(llvm::raw_ostream &os) const {
     switch (Kind(*this)) {
@@ -187,6 +189,9 @@ public:
     case Actor:
       os << "actor";
       return;
+    case Task:
+      os << "task";
+      return;
     }
   }
 
@@ -196,14 +201,24 @@ public:
   }
 
   std::optional<ActorIsolation> getActorIsolation() const {
-    assert(!actorInstanceType &&
-           "Should never be set if getActorIsolation is called");
-    return actorIsolation;
+    assert(kind == Actor);
+    assert(std::holds_alternative<NominalTypeDecl *>(data) &&
+           "Doesn't have an actor isolation?!");
+    return std::get<std::optional<ActorIsolation>>(data);
   }
 
   NominalTypeDecl *getActorInstance() const {
-    assert(!actorIsolation.has_value());
-    return actorInstanceType;
+    assert(kind == Actor);
+    assert(std::holds_alternative<NominalTypeDecl *>(data) &&
+           "Doesn't have an actor instance?!");
+    return std::get<NominalTypeDecl *>(data);
+  }
+
+  SILValue getTaskIsolatedValue() const {
+    assert(kind == Task);
+    assert(std::holds_alternative<SILValue>(data) &&
+           "Doesn't have a task isolated value");
+    return std::get<SILValue>(data);
   }
 
   [[nodiscard]] ValueIsolationRegionInfo
@@ -240,8 +255,12 @@ public:
     if (actorIsolation.isActorIsolated())
       return getActorIsolated(actorIsolation);
     if (nomDecl->isActor())
-      return {Kind::Actor, {}, nomDecl};
+      return {Kind::Actor, nomDecl};
     return {};
+  }
+
+  static ValueIsolationRegionInfo getTaskIsolated(SILValue value) {
+    return {Kind::Task, value};
   }
 };
 
@@ -432,11 +451,6 @@ private:
       equivalenceClassValuesToState;
   llvm::DenseMap<unsigned, RepresentativeValue> stateIndexToEquivalenceClass;
 
-  /// A list of values that can never be transferred.
-  ///
-  /// This only includes function arguments.
-  std::vector<TrackableValueID> neverTransferredValueIDs;
-
   SILFunction *fn;
 
 public:
@@ -451,12 +465,7 @@ public:
   SILValue maybeGetRepresentative(Element trackableValueID) const;
 
   ValueIsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
-
-  ArrayRef<Element> getNonTransferrableElements() const {
-    return neverTransferredValueIDs;
-  }
-
-  void sortUniqueNeverTransferredValues();
+  ValueIsolationRegionInfo getIsolationRegion(SILValue trackableValueID) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -473,9 +482,6 @@ private:
                                     ValueIsolationRegionInfo isolation) const;
   bool mergeIsolationRegionInfo(SILValue value,
                                 ValueIsolationRegionInfo isolation);
-  void addNeverTransferredValueID(TrackableValueID valueID) {
-    neverTransferredValueIDs.push_back(valueID);
-  }
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   TrackableValueID lookupValueID(SILValue value);
 };

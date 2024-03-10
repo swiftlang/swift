@@ -544,7 +544,7 @@ getGlobalActorInitIsolation(SILFunction *fn) {
 /// in the body of our function.
 static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
   // Indirect out parameters cannot be an input transferring parameter.
-  if (arg->getArgumentConvention().isIndirectOutParameter())
+  if (arg->isIndirectResult() || arg->isIndirectErrorResult())
     return false;
 
   // If we have a function argument that is closure captured by a Sendable
@@ -563,6 +563,10 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
   // 2. If we have an async-let based Sendable closure, we want to allow
   // for the argument to be transferred in the async let's statement and
   // not emit an error.
+  //
+  // TODO: Once the async let refactoring change this will no longer be needed
+  // since closure captures will have transferring parameters and be
+  // non-Sendable.
   if (arg->isClosureCapture() &&
       arg->getFunction()->getLoweredFunctionType()->isSendable())
     return true;
@@ -1414,7 +1418,8 @@ public:
         // Otherwise, it is one of our merged parameters. Add it to the never
         // transfer list and to the region join list.
         LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
-        valueMap.addNeverTransferredValueID(state->getID());
+        valueMap.mergeIsolationRegionInfo(
+            arg, ValueIsolationRegionInfo::getTaskIsolated(arg));
         nonSendableJoinedIndices.push_back(state->getID());
       }
     }
@@ -1466,10 +1471,6 @@ private:
     return valueMap.mergeIsolationRegionInfo(value, isolationRegion);
   }
 
-  void addNeverTransferredValueID(TrackableValueID valueID) {
-    valueMap.addNeverTransferredValueID(valueID);
-  }
-
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false) {
     return valueMap.valueHasID(value, dumpIfHasNoID);
   }
@@ -1477,18 +1478,6 @@ private:
   TrackableValueID lookupValueID(SILValue value) {
     return valueMap.lookupValueID(value);
   }
-
-  void sortUniqueNeverTransferredValues() {
-    valueMap.sortUniqueNeverTransferredValues();
-  }
-
-  /// Get the vector of IDs that cannot be legally transferred at any point in
-  /// this function.
-  ArrayRef<TrackableValueID> getNeverTransferredValues() const {
-    return valueMap.getNonTransferrableElements();
-  }
-
-  // ===========================================================================
 
 public:
   /// Return the partition consisting of all function arguments.
@@ -3098,10 +3087,6 @@ void RegionAnalysisFunctionInfo::runDataflow() {
       }
     }
   }
-
-  // Now that we have finished processing, sort/unique our non transferred
-  // array.
-  translator->getValueMap().sortUniqueNeverTransferredValues();
 }
 
 //===----------------------------------------------------------------------===//
@@ -3135,6 +3120,14 @@ RegionAnalysisValueMap::getIsolationRegion(Element trackableValueID) const {
   if (!iter)
     return {};
   return iter->getValueState().getIsolationRegionInfo();
+}
+
+ValueIsolationRegionInfo
+RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
+  auto iter = equivalenceClassValuesToState.find(RepresentativeValue(value));
+  if (iter == equivalenceClassValuesToState.end())
+    return {};
+  return iter->getSecond().getIsolationRegionInfo();
 }
 
 /// If \p isAddressCapturedByPartialApply is set to true, then this value is
@@ -3213,9 +3206,11 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     }
   }
 
-  // Otherwise refer to the oracle.
-  if (!isNonSendableType(value->getType(), fn))
+  // Otherwise refer to the oracle. If we have a Sendable value, just return.
+  if (!isNonSendableType(value->getType(), fn)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
+  }
 
   // Check if our base is a ref_element_addr from an actor. In such a case,
   // mark this value as actor derived.
@@ -3285,8 +3280,15 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     }
   }
 
-  // If our access storage is from a class, then see if we have an actor. In
-  // such a case, we need to add this id to the neverTransferred set.
+  // See if we have a non-transferring argument from a function. In such a case,
+  // mark the value as task isolated.
+  if (auto *fArg =
+          dyn_cast<SILFunctionArgument>(iter.first->first.getValue())) {
+    if (!isTransferrableFunctionArgument(fArg)) {
+      iter.first->getSecond().mergeIsolationRegionInfo(
+          ValueIsolationRegionInfo::getTaskIsolated(fArg));
+    }
+  }
 
   return {iter.first->first, iter.first->second};
 }
@@ -3346,10 +3348,6 @@ TrackableValueID RegionAnalysisValueMap::lookupValueID(SILValue value) {
   assert(state.isNonSendable() &&
          "only non-Sendable values should be entered in the map");
   return state.getID();
-}
-
-void RegionAnalysisValueMap::sortUniqueNeverTransferredValues() {
-  sortUnique(neverTransferredValueIDs);
 }
 
 void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
