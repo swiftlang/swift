@@ -5513,8 +5513,8 @@ void Decl::printInherited(ASTPrinter &Printer, const PrintOptions &Opts) const {
 }
 
 /// Determine whether this typealias is an inferred typealias "Failure" that
-/// would conflict with another entity named failure in the same type.
-static bool isConflictingFailureTypeWitness(
+/// for AsyncSequence.
+static bool isFailureTypeWitness(
     const TypeAliasDecl *typealias) {
   if (!typealias->isImplicit())
     return false;
@@ -5523,15 +5523,19 @@ static bool isConflictingFailureTypeWitness(
   if (typealias->getName() != ctx.Id_Failure)
     return false;
 
+  // Check whether the context of this typealias conforms to AsyncSequence.
   auto nominal = typealias->getDeclContext()->getSelfNominalTypeDecl();
   if (!nominal)
     return false;
 
-  // Look for another entity with the same name.
-  auto lookupResults = nominal->lookupDirect(
-      typealias->getName(), typealias->getLoc());
-  for (auto found : lookupResults) {
-    if (found != typealias)
+  auto asyncSequence = ctx.getProtocol(KnownProtocolKind::AsyncSequence);
+  if (!asyncSequence)
+    return false;
+
+  SmallVector<ProtocolConformance *, 1> conformances;
+  nominal->lookupConformance(asyncSequence, conformances);
+  for (auto conformance : conformances) {
+    if (conformance->getDeclContext() == typealias->getDeclContext())
       return true;
   }
 
@@ -5581,7 +5585,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
   // witness for AsyncSequence.Failure. It is always determined from the
   // AsyncIteratorProtocol witness.
   if (auto typealias = dyn_cast<TypeAliasDecl>(this)) {
-    if (isConflictingFailureTypeWitness(typealias))
+    if (isFailureTypeWitness(typealias))
       return false;
   }
 

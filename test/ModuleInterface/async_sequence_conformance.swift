@@ -22,8 +22,8 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-LABEL: public func makeAsyncIterator
   public func makeAsyncIterator() -> AsyncIterator { AsyncIterator() }
 
-  // CHECK: @available(
-  // CHECK-NEXT: public typealias Failure = Base.Failure
+  // CHECK-NOT: public typealias Failure =
+  // CHECK: }
 }
 
 // CHECK: @available(
