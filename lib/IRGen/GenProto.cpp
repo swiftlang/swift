@@ -2534,8 +2534,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     IRGen.Opts.UseRelativeProtocolWitnessTables;
   if (useRelativeProtocolWitnessTable &&
       !conf->getConditionalRequirements().empty()) {
-    auto nominal = conf->getType()->getAnyNominal();
-    auto sig = nominal->getGenericSignatureOfContext();
+    auto sig = conf->getGenericSignature();
     sig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
                       if (param->isParameterPack()) {
 #ifndef NDEBUG
