@@ -30,3 +30,4 @@ distributed actor Caplin {
 protocol Fail: DistributedActor {
   distributed func method() -> String
 }
+

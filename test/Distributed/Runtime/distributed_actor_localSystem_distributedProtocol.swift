@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -module-name main -j2 -parse-as-library -I %t %s -o %t/a.out
+// RUN: %target-build-swift -module-name main -j2 -parse-as-library -I %t %s -plugin-path %swift-plugin-dir -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
@@ -16,8 +16,14 @@
 
 import Distributed
 
+@_DistributedProtocol
 @available(SwiftStdlib 6.0, *)
-distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable> {
+protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
+  distributed func hi(name: String)
+}
+
+@available(SwiftStdlib 6.0, *)
+distributed actor Worker: WorkerProtocol {
   distributed func hi(name: String) {
     print("Hi, \(name)!")
   }

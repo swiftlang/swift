@@ -161,10 +161,6 @@ swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
                                              size_t targetNameLength) {
   auto &S = Functions.get();
 
-  fprintf(stderr, "[%s:%d](%s) searching for: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          targetNameStart);
-  _dumpAccessibleFunctionRecords();
-
   llvm::StringRef name{targetNameStart, targetNameLength};
   // Look for an existing entry.
   {

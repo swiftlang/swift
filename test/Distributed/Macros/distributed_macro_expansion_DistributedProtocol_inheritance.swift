@@ -14,21 +14,33 @@ import Distributed
 typealias System = LocalTestingDistributedActorSystem
 
 @_DistributedProtocol
-protocol EmptyBase {}
+protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
+  distributed func base() -> Int
+}
+// CHECK: distributed actor $Base<ActorSystem>: Base
+// CHECK:   Distributed._DistributedActorStub
+// CHECK:   where ActorSystem: DistributedActorSystem<any Codable>
+// CHECK: {
+// CHECK: }
 
-// @_DistributedProtocol ->
-
-// nothing, no-op
+// CHECK: extension Base where Self: Distributed._DistributedActorStub {
+// CHECK:   distributed func base() -> Int {
+// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
 
 // ==== ------------------------------------------------------------------------
 
 @_DistributedProtocol
-protocol G3<ActorSystem>: DistributedActor, EmptyBase where ActorSystem: DistributedActorSystem<any Codable> {
+protocol G3<ActorSystem>: DistributedActor, Base where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func get() -> String
   distributed func greet(name: String) -> String
 }
 
-// @_DistributedProtocol ->
 // CHECK: distributed actor $G3<ActorSystem>: G3
 // CHECK:   Distributed._DistributedActorStub
 // CHECK:   where ActorSystem: DistributedActorSystem<any Codable>

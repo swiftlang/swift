@@ -84,6 +84,8 @@ extension DistributedProtocolMacro {
 // MARK: Distributed Actor Stub type
 
 extension DistributedProtocolMacro {
+
+  /// Introduce the `distributed actor` stub type.
   public static func expansion(
     of node: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
@@ -98,11 +100,7 @@ extension DistributedProtocolMacro {
     var isGenericStub = false
     var specificActorSystemRequirement: TypeSyntax?
 
-    guard let genericWhereClause = proto.genericWhereClause else {
-      guard !proto.memberBlock.members.isEmpty else {
-        // ok, the protocol has no requirements so we no-op it
-        return []
-      }
+    if proto.genericWhereClause == nil {
       throw DiagnosticsError(
         syntax: node,
         message: """
@@ -111,50 +109,58 @@ extension DistributedProtocolMacro {
                  """, id: .invalidApplication)
     }
 
-    for req in genericWhereClause.requirements {
-      print("req.requirement: \(req.requirement)")
+    for req in proto.genericWhereClause?.requirements ?? [] {
       switch req.requirement {
       case .conformanceRequirement(let conformanceReq)
            where conformanceReq.leftType.isActorSystem:
-        print("conf: \(conformanceReq)")
         specificActorSystemRequirement = conformanceReq.rightType.trimmed
         isGenericStub = true
 
       case .sameTypeRequirement(let sameTypeReq)
            where sameTypeReq.leftType.isActorSystem:
-        print("same type: \(sameTypeReq)")
         specificActorSystemRequirement = sameTypeReq.rightType.trimmed
         isGenericStub = false
 
       default:
-        print("SKIP: \(req)")
         continue
       }
     }
 
-    let stubActorDecl: DeclSyntax =
       if isGenericStub, let specificActorSystemRequirement {
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-          where ActorSystem: \(specificActorSystemRequirement) 
-        { }
-        """
+        return [
+          """
+          \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
+            Distributed._DistributedActorStub
+            where ActorSystem: \(specificActorSystemRequirement) 
+          { }
+          """
+        ]
       } else if let specificActorSystemRequirement {
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-        { 
-          \(typealiasActorSystem(proto, specificActorSystemRequirement)) 
-        }
-        """
+        return [
+          """
+          \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
+            Distributed._DistributedActorStub
+          { 
+            \(typealiasActorSystem(proto, specificActorSystemRequirement)) 
+          }
+          """
+        ]
       } else {
-        throw DiagnosticsError(
-          syntax: node,
-          message: "'@DistributedProtocol' cannot be applied to ", id: .invalidApplication)
+        // there may be no `where` clause specifying an actor system,
+        // but perhaps there is a typealias (or extension with a typealias),
+        // specifying a concrete actor system so we let this synthesize
+        // an empty `$Greeter` -- this may fail, or succeed depending on
+        // surrounding code using a default distributed actor system,
+        // or extensions providing it.
+        return [
+          """
+          \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
+            Distributed._DistributedActorStub
+          {
+          }
+          """
+        ]
       }
-
-    return [stubActorDecl]
   }
 
   private static func typealiasActorSystem(_ proto: ProtocolDeclSyntax, _ type: TypeSyntax) -> DeclSyntax {
