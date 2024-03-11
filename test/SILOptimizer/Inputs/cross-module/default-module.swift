@@ -63,13 +63,14 @@ package struct PkgModuleStruct {
   package static var prvtFunctionPointer: (Int) -> (Int) = { $0 }
 }
 
+public func callPrivateCFunc() -> Int {
+  return Int(privateCFunc())
+}
+
+public func usePrivateCVar() -> Int {
+  return Int(privateCVar);
+}
+
 //public struct Gen<T> {
 //  static func myFunction() { print(Self.Type) } // TODO: look up metatype or not in this line
-//}
-//public func callPrivateCFunc() -> Int {
-//  return Int(privateCFunc())
-//}
-//
-//public func usePrivateCVar() -> Int {
-//  return Int(privateCVar);
 //}
