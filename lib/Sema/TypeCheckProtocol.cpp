@@ -1154,8 +1154,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     witnessType = witness->getInterfaceType();
     // FIXME: witness as a base locator?
     locator = cs->getConstraintLocator({});
-    witnessLocator = cs->getConstraintLocator({},
-                                              LocatorPathElt::Witness(witness));
+    witnessLocator =
+        cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       openWitnessType = cs->getTypeOfMemberReference(
           selfTy, witness, dc, /*isDynamicResult=*/false,
