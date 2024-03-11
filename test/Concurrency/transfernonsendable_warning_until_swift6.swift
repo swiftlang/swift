@@ -24,12 +24,12 @@ func testIsolationError() async {
   useValue(x) // expected-note {{access here could race}}
 }
 
-func testTransferArgumentError(_ x: NonSendableType) async { // expected-note {{value is task isolated since it is in the same region as 'x'}}
-  await transferToMain(x) // expected-error {{task isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
+func testTransferArgumentError(_ x: NonSendableType) async { // expected-note {{value is task-isolated since it is in the same region as 'x'}}
+  await transferToMain(x) // expected-error {{task-isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
 }
 
 func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {
-  transferValue(x) // expected-error {{task isolated value of type 'NonSendableType' passed as a strongly transferred parameter; later accesses could race}}
+  transferValue(x) // expected-error {{task-isolated value of type 'NonSendableType' passed as a strongly transferred parameter; later accesses could race}}
 }
 
 func testAssignmentIntoTransferringParameter(_ x: transferring NonSendableType) async {
@@ -53,7 +53,7 @@ func testIsolationCrossingDueToCapture() async {
 
 func testIsolationCrossingDueToCaptureParameter(_ x: NonSendableType) async {
   let _ = { @MainActor in
-    print(x) // expected-error {{task isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
+    print(x) // expected-error {{task-isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
   }
   useValue(x)
 }

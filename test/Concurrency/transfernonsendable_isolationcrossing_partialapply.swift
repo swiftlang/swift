@@ -38,17 +38,17 @@ actor ProtectsNonSendable {
 
   nonisolated func testParameter(_ ns: NonSendableKlass) async {
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = ns // expected-warning {{task isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+      isolatedSelf.ns = ns // expected-warning {{task-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
     }
   }
 
   // This should get the note since l is different from 'ns'.
   nonisolated func testParameterMergedIntoLocal(_ ns: NonSendableKlass) async {
-    // expected-note @-1 {{value is task isolated since it is in the same region as 'ns'}}
+    // expected-note @-1 {{value is task-isolated since it is in the same region as 'ns'}}
     let l = NonSendableKlass()
     doSomething(l, ns)
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = l // expected-warning {{task isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+      isolatedSelf.ns = l // expected-warning {{task-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
     }
   }
 

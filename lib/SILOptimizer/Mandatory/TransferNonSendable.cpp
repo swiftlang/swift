@@ -909,7 +909,7 @@ public:
         diagnoseNote(
             fArg->getDecl()->getLoc(),
             diag::regionbasedisolation_isolated_since_in_same_region_basename,
-            "task isolated", fArg->getDecl()->getBaseName());
+            "task-isolated", fArg->getDecl()->getBaseName());
       }
     }
   }
@@ -930,7 +930,7 @@ public:
     diagnoseNote(
         fArg->getDecl()->getLoc(),
         diag::regionbasedisolation_isolated_since_in_same_region_basename,
-        "task isolated", fArg->getDecl()->getBaseName());
+        "task-isolated", fArg->getDecl()->getBaseName());
   }
 
   void emitFunctionArgumentApplyStronglyTransferred(SILLocation loc,
