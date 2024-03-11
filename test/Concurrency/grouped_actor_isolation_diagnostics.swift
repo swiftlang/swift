@@ -105,9 +105,8 @@ struct HasWrapperOnActor {
   @MainActor
   func testMA(){ }
 
-  // expected-error@+2{{calls to '@MainActor'-isolated' code in instance method 'testErrors()'}}
   // expected-note@+1{{add '@MainActor' to make instance method 'testErrors()' part of global actor 'MainActor'}}
-  func testErrors() {
+  func testErrors() {  // expected-error{{calls to '@MainActor'-isolated' code in instance method 'testErrors()'}}
     testMA() // expected-error{{call to main actor-isolated instance method 'testMA()' in a synchronous nonisolated context}}
   }
 }
@@ -117,9 +116,21 @@ class MainActorPreconcurrency {}
 
 class InferMainActorPreconcurrency: MainActorPreconcurrency {
   static func predatesConcurrency() {}
+  func predatesConcurrency (s: String) -> String { return s }
+  func predatesConcurrency (n: Int) -> Int  { return n }
 }
 
 nonisolated func testPreconcurrency() {
   InferMainActorPreconcurrency.predatesConcurrency()
   // expected-warning@-1 {{call to main actor-isolated static method 'predatesConcurrency()' in a synchronous nonisolated context}}
+}
+
+func testPreconcurrencyGrouped() {  // expected-warning {{calls to '@MainActor'-isolated' code in global function 'testPreconcurrencyGrouped()'}}
+  // expected-note@-1 {{add '@MainActor' to make global function 'testPreconcurrencyGrouped()' part of global actor 'MainActor'}}
+  InferMainActorPreconcurrency.predatesConcurrency()
+  // expected-note@-1 {{call to main actor-isolated static method 'predatesConcurrency()' in a synchronous nonisolated context}}
+  let _ = InferMainActorPreconcurrency().predatesConcurrency(s:"swift 6")
+  // expected-note@-1 {{call to main actor-isolated instance method 'predatesConcurrency(s:)' in a synchronous nonisolated context}}
+  let _ = InferMainActorPreconcurrency().predatesConcurrency(n:4)
+  // expected-note@-1 {{call to main actor-isolated instance method 'predatesConcurrency(n:)' in a synchronous nonisolated context}}
 }
