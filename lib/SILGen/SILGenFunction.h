@@ -1167,6 +1167,13 @@ public:
 
   /// Emit a precondition check to ensure that the function is executing in
   /// the expected isolation context.
+  void
+  emitPreconditionCheckExpectedExecutor(SILLocation loc,
+                                        ActorIsolation isolation,
+                                        std::optional<ManagedValue> actorSelf);
+
+  /// Emit a precondition check to ensure that the function is executing in
+  /// the expected isolation context.
   void emitPreconditionCheckExpectedExecutor(
       SILLocation loc, SILValue executor);
 

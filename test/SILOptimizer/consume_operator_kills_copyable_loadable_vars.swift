@@ -718,6 +718,11 @@ func consumeArray() {
   _ = consume x
 }
 
+func consumeInitdArray() {
+  let x:[Int] ; x = []
+  _ = consume x
+}
+
 //////////////////////
 // Reinit in pieces //
 //////////////////////
