@@ -96,6 +96,8 @@ public actor MyActor: MyProto {
 
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1) // expected-targeted-and-complete-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{transferring 'ns1' may cause a race}}
+    // expected-tns-note @-2 {{transferring actor-isolated 'ns1' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
     _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
@@ -352,13 +354,12 @@ func testPointersAreNotSendable() {
 extension SynthesizedConformances.NotSendable: Sendable {}
 
 enum SynthesizedConformances {
-  // expected-note@+1 2 {{consider making struct 'NotSendable' conform to the 'Sendable' protocol}}
   struct NotSendable: Equatable {}
 
-  // expected-warning@+2 2{{non-sendable type 'SynthesizedConformances.NotSendable' in asynchronous access to main actor-isolated property 'x' cannot cross actor boundary}}
-  // expected-note@+1 2 {{in derived conformance to 'Equatable'}}
+  // expected-warning@+2 2{{main actor-isolated property 'x' can not be referenced from a non-isolated context}}
+  // expected-note@+1 2{{in static method '==' for derived conformance to 'Equatable'}}
   @MainActor struct Isolated: Equatable {
-    let x: NotSendable
+    let x: NotSendable // expected-note 2{{property declared here}}
   }
 }
 
