@@ -70,6 +70,7 @@ namespace trace {
 extern os_log_t ActorLog;
 extern os_log_t TaskLog;
 extern swift::once_t LogsToken;
+extern bool TracingEnabled;
 
 void setupLogs(void *unused);
 
@@ -78,9 +79,9 @@ void setupLogs(void *unused);
 // optimized out.
 #define ENSURE_LOGS(...)                                                       \
   do {                                                                         \
-    if (!SWIFT_RUNTIME_WEAK_CHECK(os_signpost_enabled))                        \
-      return __VA_ARGS__;                                                      \
     swift::once(LogsToken, setupLogs, nullptr);                                \
+    if (!TracingEnabled)                                                       \
+      return __VA_ARGS__;                                                      \
   } while (0)
 
 // Every function does ENSURE_LOGS() before making any os_signpost calls, so
