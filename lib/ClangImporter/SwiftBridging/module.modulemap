@@ -10,8 +10,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-module SwiftBridging {
-    header "bridging"
-
-    export *
-}
+extern module SwiftBridging "swift/bridging.modulemap"
