@@ -1116,8 +1116,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       selfTy = syntheticEnv->mapTypeIntoContext(selfTy);
 
     // Open up the type of the requirement.
-    reqLocator = cs->getConstraintLocator(
-        static_cast<Expr *>(nullptr), LocatorPathElt::ProtocolRequirement(req));
+    reqLocator =
+        cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
     OpenedTypeMap reqReplacements;
     reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
                                            /*isDynamicResult=*/false,
