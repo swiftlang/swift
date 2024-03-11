@@ -186,8 +186,14 @@ namespace {
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
-      if (fieldInfo.isEmpty())
-        return fieldInfo.getTypeInfo().getUndefAddress();
+      if (fieldInfo.isEmpty()) {
+        // For fields with empty types, we could return undef.
+        // But if this is a struct_element_addr which is a result of an optimized
+        // `MemoryLayout<S>.offset(of: \.field)` we cannot return undef. We have
+        // to be consistent with `offset(of:)`, which returns 0. Therefore we
+        // return the base address of the struct.
+        return addr;
+      }
 
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return fieldInfo.projectAddress(IGF, addr, offsets);
