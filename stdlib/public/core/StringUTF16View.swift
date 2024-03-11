@@ -782,15 +782,12 @@ extension String.UTF16View {
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
       // TODO: Currently, using SIMD sizes above SIMD8 is slower
       // Once that's fixed we should go up to SIMD64 here
-      
       utf16Count &+= _utf16Length(
         readPtr: &readPtr,
         endPtr: endPtr,
         unsignedSIMDType: SIMD8<UInt8>.self,
         signedSIMDType: SIMD8<Int8>.self
       )
-   
-      //TO CONSIDER: SIMD widths <8 here
       
       //back up to the start of the current scalar if we may have a trailing
       //incomplete scalar
@@ -997,6 +994,33 @@ extension String.UTF16View {
       writeIdx &+= 1
     }
   }
+  
+  // This is separated out in an attempt to convince the inliner to fully inline
+  private func _nativeCopyMiddle(
+    from utf8: UnsafeBufferPointer<UInt8>, at readIdx: inout Int, end readEnd: Int,
+    to buffer: UnsafeMutableBufferPointer<UInt16>, at writeIdx: inout Int, end writeEnd: Int
+  ) {
+    let raw = UnsafeRawPointer(utf8.baseAddress.unsafelyUnwrapped)
+    // Transcode middle
+    while readIdx &+ 7 < readEnd {
+      let word = raw.loadUnaligned(fromByteOffset: readIdx, as: UInt64.self)
+      if word & 0x8080808080808080 == 0 { //all ASCII
+        for _ in 0..<8 {
+          _transcodeASCIIScalar(
+            from: utf8, at: &readIdx,
+            to: buffer, at: &writeIdx
+          )
+        }
+      } else {
+        for _ in 0..<8 where readIdx < readEnd {
+          _transcodeComplexScalar(
+            from: utf8, at: &readIdx,
+            to: buffer, at: &writeIdx
+          )
+        }
+      }
+    }
+  }
 
   // Copy (i.e. transcode to UTF-16) our contents into a buffer. `alignedRange`
   // means that the indices are part of the UTF16View.indices -- they are either
@@ -1044,26 +1068,10 @@ extension String.UTF16View {
         writeIdx &+= 1
       }
 
-      let raw = UnsafeRawPointer(utf8.baseAddress.unsafelyUnwrapped)
-      // Transcode middle
-      while readIdx &+ 7 < readEnd {
-        let word = raw.loadUnaligned(fromByteOffset: readIdx, as: UInt64.self)
-        if word & 0x8080808080808080 == 0 { //all ASCII
-          for _ in 0..<8 {
-            _transcodeASCIIScalar(
-              from: utf8, at: &readIdx,
-              to: buffer, at: &writeIdx
-            )
-          }
-        } else {
-          for _ in 0..<8 where readIdx < readEnd {
-            _transcodeComplexScalar(
-              from: utf8, at: &readIdx,
-              to: buffer, at: &writeIdx
-            )
-          }
-        }
-      }
+      _nativeCopyMiddle(
+        from: utf8, at: &readIdx, end: readEnd,
+        to: buffer, at: &writeIdx, end: writeEnd
+      )
       
       while readIdx < readEnd {
         _transcodeComplexScalar(
