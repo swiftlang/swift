@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 
 #include <optional>
+#include <variant>
 
 namespace swift {
 
