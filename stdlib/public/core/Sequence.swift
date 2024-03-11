@@ -453,7 +453,7 @@ public protocol Sequence<Element> {
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.
 extension Sequence where Self: IteratorProtocol {
-  // @_implements(Sequence, Iterator)
+  @_implements(Sequence, Iterator)
   public typealias _Default_Iterator = Self
 }
 

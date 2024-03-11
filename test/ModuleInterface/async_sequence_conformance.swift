@@ -4,16 +4,21 @@
 
 // REQUIRES: concurrency, OS=macosx
 
-// CHECK: @available(
-// CHECK-NEXT: public struct SequenceAdapte
+// CHECK: public struct SequenceAdapte
 @available(SwiftStdlib 5.1, *)
 public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-LABEL: public struct AsyncIterator
   // CHECK: @available{{.*}}macOS 10.15
   // CHECK-NEXT: public typealias Element = Base.Element
+
+  // CHECK: #if compiler(>=5.3) && $AssociatedTypeImplements
   // CHECK: @available(
   // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
   // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
+  // CHECK-NEXT: #else
+  // CHECK-NOT: @_implements
+  // CHECK: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
+  // CHECK-NEXT: #endif
   public typealias Element = Base.Element
 
   public struct AsyncIterator: AsyncIteratorProtocol {
@@ -28,8 +33,7 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-SAME: public typealias __AsyncSequence_Failure = Base.Failure
 }
 
-// CHECK: @available(
-// CHECK-NEXT: public struct OtherSequenceAdapte
+// CHECK: public struct OtherSequenceAdapte
 @available(SwiftStdlib 5.1, *)
 public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK: public typealias Element = Base.Element

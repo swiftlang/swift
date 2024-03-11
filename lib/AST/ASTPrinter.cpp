@@ -3083,6 +3083,14 @@ static void suppressingFeatureIsolatedAny(PrintOptions &options,
   action();
 }
 
+static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Implements);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
