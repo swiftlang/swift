@@ -713,6 +713,11 @@ func consumeString() {
   _ = consume s
 }
 
+func consumeArray() {
+  var x:[Int] = [] // expected-warning{{}}
+  _ = consume x
+}
+
 //////////////////////
 // Reinit in pieces //
 //////////////////////
