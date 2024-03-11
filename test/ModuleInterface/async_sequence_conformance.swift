@@ -12,7 +12,8 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK: @available{{.*}}macOS 10.15
   // CHECK-NEXT: public typealias Element = Base.Element
   // CHECK: @available(
-  // CHECK-NEXT: public typealias Failure = Base.Failure
+  // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
   public typealias Element = Base.Element
 
   public struct AsyncIterator: AsyncIteratorProtocol {
@@ -23,7 +24,8 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   public func makeAsyncIterator() -> AsyncIterator { AsyncIterator() }
 
   // CHECK: @available(
-  // CHECK-NEXT: public typealias Failure = Base.Failure
+  // CHECK: @_implements(_Concurrency.AsyncSequence, Failure)
+  // CHECK-SAME: public typealias __AsyncSequence_Failure = Base.Failure
 }
 
 // CHECK: @available(
@@ -37,7 +39,8 @@ public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-LABEL: public struct AsyncIterator
   // CHECK: @available{{.*}}macOS 10.15
   // CHECK: @available(
-  // CHECK-NEXT: public typealias Failure = Base.Failure
+  // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
   public typealias Element = Base.Element
 
   public struct Failure: Error { }

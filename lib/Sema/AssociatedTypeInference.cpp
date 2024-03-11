@@ -231,6 +231,17 @@ static bool containsConcreteDependentMemberType(Type ty) {
   });
 }
 
+/// Determine whether this is the AsyncIteratorProtocol.Failure or
+/// AsyncSequence.Failure associated type.
+static bool isAsyncIteratorOrSequenceFailure(AssociatedTypeDecl *assocType) {
+  auto proto = assocType->getProtocol();
+  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) &&
+      !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
+    return false;
+
+  return assocType->getName() == assocType->getASTContext().Id_Failure;
+}
+
 static void recordTypeWitness(NormalProtocolConformance *conformance,
                               AssociatedTypeDecl *assocType,
                               Type type,
@@ -254,13 +265,39 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
 
   // If there was no type declaration, synthesize one.
   if (typeDecl == nullptr) {
+    Identifier name;
+    bool needsImplementsAttr;
+    if (isAsyncIteratorOrSequenceFailure(assocType)) {
+      // Use __<protocol>_<assocType> as the name, to keep it out of the
+      // way of other names.
+      llvm::SmallString<32> nameBuffer;
+      nameBuffer += "__";
+      nameBuffer += assocType->getProtocol()->getName().str();
+      nameBuffer += "_";
+      nameBuffer += assocType->getName().str();
+
+      name = ctx.getIdentifier(nameBuffer);
+      needsImplementsAttr = true;
+    } else {
+      // Declare a typealias with the same name as the associated type.
+      name = assocType->getName();
+      needsImplementsAttr = false;
+    }
+
     auto aliasDecl = new (ctx) TypeAliasDecl(
-        SourceLoc(), SourceLoc(), assocType->getName(), SourceLoc(),
+        SourceLoc(), SourceLoc(), name, SourceLoc(),
         /*genericparams*/ nullptr, dc);
     aliasDecl->setUnderlyingType(type);
     
     aliasDecl->setImplicit();
     aliasDecl->setSynthesized();
+
+    // If needed, add an @_implements(Protocol, Name) attribute.
+    if (needsImplementsAttr) {
+      auto attr = ImplementsAttr::create(
+          dc, assocType->getProtocol(), assocType->getName());
+      aliasDecl->getAttrs().add(attr);
+    }
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     auto nominal = dc->getSelfNominalTypeDecl();
@@ -390,17 +427,6 @@ static bool isAsyncIteratorProtocolFailure(AssociatedTypeDecl *assocType) {
 static bool isAsyncSequenceFailure(AssociatedTypeDecl *assocType) {
   auto proto = assocType->getProtocol();
   if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
-    return false;
-
-  return assocType->getName() == assocType->getASTContext().Id_Failure;
-}
-
-/// Determine whether this is the AsyncIteratorProtocol.Failure or
-/// AsyncSequence.Failure associated type.
-static bool isAsyncIteratorOrSequenceFailure(AssociatedTypeDecl *assocType) {
-  auto proto = assocType->getProtocol();
-  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) &&
-      !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
     return false;
 
   return assocType->getName() == assocType->getASTContext().Id_Failure;
