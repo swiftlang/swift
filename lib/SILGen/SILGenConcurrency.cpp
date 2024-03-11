@@ -15,6 +15,7 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Range.h"
 
@@ -589,10 +590,38 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
                         executor, /*mandatory*/ true);
 }
 
-void SILGenFunction::emitPreconditionCheckExpectedExecutor(
-    SILLocation loc, SILValue executorOrActor) {
+static bool isCheckExpectedExecutorIntrinsicAvailable(SILGenModule &SGM) {
   auto checkExecutor = SGM.getCheckExpectedExecutor();
   if (!checkExecutor)
+    return false;
+
+  // Forego a check if instrinsic is unavailable, this could happen
+  // in main-actor context.
+  auto &C = checkExecutor->getASTContext();
+  if (!C.LangOpts.DisableAvailabilityChecking) {
+    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(C);
+    auto declAvailability =
+        AvailabilityInference::availableRange(checkExecutor, C);
+    return deploymentAvailability.isContainedIn(declAvailability);
+  }
+
+  return true;
+}
+
+void SILGenFunction::emitPreconditionCheckExpectedExecutor(
+    SILLocation loc, ActorIsolation isolation,
+    std::optional<ManagedValue> actorSelf) {
+  if (!isCheckExpectedExecutorIntrinsicAvailable(SGM))
+    return;
+
+  auto executor = emitExecutor(loc, isolation, actorSelf);
+  assert(executor);
+  emitPreconditionCheckExpectedExecutor(loc, *executor);
+}
+
+void SILGenFunction::emitPreconditionCheckExpectedExecutor(
+    SILLocation loc, SILValue executorOrActor) {
+  if (!isCheckExpectedExecutorIntrinsicAvailable(SGM))
     return;
 
   // We don't want the debugger to step into these.
@@ -605,7 +634,7 @@ void SILGenFunction::emitPreconditionCheckExpectedExecutor(
   auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
 
   emitApplyOfLibraryIntrinsic(
-      loc, checkExecutor, SubstitutionMap(),
+      loc, SGM.getCheckExpectedExecutor(), SubstitutionMap(),
       {args.filenameStartPointer, args.filenameLength, args.filenameIsAscii,
        args.line, ManagedValue::forObjectRValueWithoutOwnership(executor)},
       SGFContext());
