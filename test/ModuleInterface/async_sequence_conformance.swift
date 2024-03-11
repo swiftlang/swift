@@ -55,3 +55,16 @@ public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
 
   // CHECK-NOT: public typealias Failure
 }
+
+// CHECK: public struct MineOwnIterator
+@available(SwiftStdlib 5.1, *)
+public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
+  public mutating func next() async -> Element? { nil }
+  public func makeAsyncIterator() -> Self { self }
+
+  // CHECK:      @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Swift.Never
+
+  // CHECK:      @_implements(_Concurrency.AsyncSequence, Failure)
+  // CHECK-SAME: public typealias __AsyncSequence_Failure = Swift.Never
+}
