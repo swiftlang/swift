@@ -8552,7 +8552,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto synthesizeConformance = [&]() {
           ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
-              /*anchor=*/{}, LocatorPathElt::Witness(witness));
+              locator.getAnchor(), LocatorPathElt::Witness(witness));
           SynthesizedConformances.insert({witnessLoc, synthesized});
           return recordConformance(synthesized);
         };
