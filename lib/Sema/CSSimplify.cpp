@@ -9215,6 +9215,23 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       }
     }
 
+    // Peel off marker protocol requirements if this is an existential->concrete
+    // cast. Handles cases like `WritableKeyPath<...> & Sendable as KeyPath`
+    // that require inference which is only attempted if both sides are classes.
+    if (fromType->isExistentialType() && !toType->isExistentialType()) {
+      if (auto *existential = fromType->getAs<ExistentialType>()) {
+        if (auto *PCT = existential->getConstraintType()
+                            ->getAs<ProtocolCompositionType>()) {
+          auto newConstraintTy = PCT->withoutMarkerProtocols();
+          if (!newConstraintTy->isEqual(PCT)) {
+            fromType = newConstraintTy->getClassOrBoundGenericClass()
+                           ? newConstraintTy
+                           : ExistentialType::get(newConstraintTy);
+          }
+        }
+      }
+    }
+
     // We've decomposed the types further, so adopt the subflags.
     flags = subflags;
 
