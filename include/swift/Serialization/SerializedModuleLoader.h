@@ -18,6 +18,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace swift {
 class ModuleFile;
@@ -552,9 +553,10 @@ public:
 };
 
 /// Extract compiler arguments from an interface file buffer.
-bool extractCompilerFlagsFromInterface(StringRef interfacePath,
-                                       StringRef buffer, llvm::StringSaver &ArgSaver,
-                                       SmallVectorImpl<const char *> &SubArgs);
+bool extractCompilerFlagsFromInterface(
+    StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
+    SmallVectorImpl<const char *> &SubArgs,
+    std::optional<llvm::Triple> PreferredTarget = std::nullopt);
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);

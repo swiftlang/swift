@@ -1652,43 +1652,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
-  for (const Arg *A : Args.filtered(OPT_file_prefix_map,
-                                    OPT_debug_prefix_map)) {
-    std::string Val(A->getValue());
-    // Forward -debug-prefix-map arguments from Swift to Clang as
-    // -fdebug-prefix-map= and -file-prefix-map as -ffile-prefix-map=.
-    //
-    // This is required to ensure DIFiles created there, like
-    /// "<swift-imported-modules>", as well as index data, have their paths
-    // remapped properly.
-    //
-    // (Note, however, that Clang's usage of std::map means that the remapping
-    // may not be applied in the same order, which can matter if one mapping is
-    // a prefix of another.)
-    if (A->getOption().matches(OPT_file_prefix_map))
-      Opts.ExtraArgs.push_back("-ffile-prefix-map=" + Val);
-    else
-      Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
-  }
-
-  if (auto *A = Args.getLastArg(OPT_file_compilation_dir)) {
-    // Forward the -file-compilation-dir flag to correctly set the
-    // debug compilation directory.
-    std::string Val(A->getValue());
-    Opts.ExtraArgs.push_back("-ffile-compilation-dir=" + Val);
-  }
-
-  if (CASOpts.CASFSRootIDs.empty() &&
-      CASOpts.ClangIncludeTrees.empty()) {
-    if (!workingDirectory.empty()) {
-      // Provide a working directory to Clang as well if there are any -Xcc
-      // options, in case some of them are search-related. But do it at the
-      // beginning, so that an explicit -Xcc -working-directory will win.
-      Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
-                            {"-working-directory", workingDirectory.str()});
-    }
-  }
-
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   // When the repl is invoked directly (ie. `lldb --repl="..."`) the action
@@ -1739,6 +1702,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
 
+  Opts.ClangImporterDirectCC1Scan |=
+      Args.hasArg(OPT_experimental_clang_importer_direct_cc1_scan);
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
   if (CASOpts.EnableCaching) {
@@ -1746,6 +1711,47 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     // useful in non-caching context.
     Opts.UseClangIncludeTree |= !Args.hasArg(OPT_no_clang_include_tree);
     Opts.HasClangIncludeTreeRoot |= Args.hasArg(OPT_clang_include_tree_root);
+    // Caching requires direct clang import cc1 scanning.
+    Opts.ClangImporterDirectCC1Scan = true;
+  }
+
+  // If in direct clang cc1 module build mode, return early.
+  if (Opts.DirectClangCC1ModuleBuild)
+    return false;
+
+  // Only amend the following path option when not in direct cc1 mode.
+  for (const Arg *A : Args.filtered(OPT_file_prefix_map,
+                                    OPT_debug_prefix_map)) {
+    std::string Val(A->getValue());
+    // Forward -debug-prefix-map arguments from Swift to Clang as
+    // -fdebug-prefix-map= and -file-prefix-map as -ffile-prefix-map=.
+    //
+    // This is required to ensure DIFiles created there, like
+    /// "<swift-imported-modules>", as well as index data, have their paths
+    // remapped properly.
+    //
+    // (Note, however, that Clang's usage of std::map means that the remapping
+    // may not be applied in the same order, which can matter if one mapping is
+    // a prefix of another.)
+    if (A->getOption().matches(OPT_file_prefix_map))
+      Opts.ExtraArgs.push_back("-ffile-prefix-map=" + Val);
+    else
+      Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
+  }
+
+  if (auto *A = Args.getLastArg(OPT_file_compilation_dir)) {
+    // Forward the -file-compilation-dir flag to correctly set the
+    // debug compilation directory.
+    std::string Val(A->getValue());
+    Opts.ExtraArgs.push_back("-ffile-compilation-dir=" + Val);
+  }
+
+  if (!workingDirectory.empty()) {
+    // Provide a working directory to Clang as well if there are any -Xcc
+    // options, in case some of them are search-related. But do it at the
+    // beginning, so that an explicit -Xcc -working-directory will win.
+    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
+                          {"-working-directory", workingDirectory.str()});
   }
 
   return false;

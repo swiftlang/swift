@@ -157,10 +157,23 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         // Add explicit Swift dependency compilation flags
         Args.push_back("-explicit-interface-module-build");
         Args.push_back("-disable-implicit-swift-modules");
-        Args.push_back("-Xcc");
-        Args.push_back("-fno-implicit-modules");
-        Args.push_back("-Xcc");
-        Args.push_back("-fno-implicit-module-maps");
+
+        // Handle clang arguments. For caching build, all arguments are passed
+        // with `-direct-clang-cc1-module-build`.
+        if (Ctx.ClangImporterOpts.ClangImporterDirectCC1Scan) {
+          Args.push_back("-direct-clang-cc1-module-build");
+          auto *importer =
+              static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+          for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args()) {
+            Args.push_back("-Xcc");
+            Args.push_back(Arg);
+          }
+        } else {
+          Args.push_back("-Xcc");
+          Args.push_back("-fno-implicit-modules");
+          Args.push_back("-Xcc");
+          Args.push_back("-fno-implicit-module-maps");
+        }
         for (const auto &candidate : compiledCandidates) {
           Args.push_back("-candidate-module-file");
           Args.push_back(candidate);
