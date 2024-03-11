@@ -873,7 +873,11 @@ ProtocolConformanceDeserializer::readInheritedProtocolConformance(
   InheritedProtocolConformanceLayout::readRecord(scratch, conformanceID,
                                                  conformingTypeID);
 
-  Type conformingType = MF.getType(conformingTypeID);
+  auto conformingTypeOrError =
+    MF.getTypeChecked(conformingTypeID);
+  if (!conformingTypeOrError)
+    return conformingTypeOrError.takeError();
+  Type conformingType = conformingTypeOrError.get();
 
   PrettyStackTraceType trace(ctx, "reading inherited conformance for",
                              conformingType);
