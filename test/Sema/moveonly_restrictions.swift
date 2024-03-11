@@ -7,12 +7,12 @@
 class CopyableKlass {}
 
 @_moveOnly
-class MoveOnlyKlass {
+class MoveOnlyKlass { // expected-note 6{{class 'MoveOnlyKlass' has '~Copyable' constraint preventing 'Copyable' conformance}}
     init?() {} // expected-error {{noncopyable types cannot have failable initializers yet}}
 }
 
 @_moveOnly
-class MoveOnlyStruct {
+struct MoveOnlyStruct { // expected-note {{struct 'MoveOnlyStruct' has '~Copyable' constraint preventing 'Copyable' conformance}}
     init?(one: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
     init!(two: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
 }
@@ -30,9 +30,9 @@ class CMoveOnly {
     var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'Optional<Wrapped>' yet}}
 }
 
-struct OptionalGrandField<T> { // expected-error {{generic struct 'OptionalGrandField' cannot contain a noncopyable type without also being noncopyable}}
+struct OptionalGrandField<T> {
     var moveOnly3: T?
-    var moveOnly2: MoveOnlyKlass // expected-note {{contained noncopyable property 'OptionalGrandField.moveOnly2'}}
+    var moveOnly2: MoveOnlyKlass // expected-error {{stored property 'moveOnly2' of 'Copyable'-conforming generic struct 'OptionalGrandField' has non-Copyable type 'MoveOnlyKlass'}}
 }
 
 struct S0 {
@@ -44,10 +44,10 @@ struct SCopyable {
     var copyable: CopyableKlass
 }
 
-struct S { // expected-error {{struct 'S' cannot contain a noncopyable type without also being noncopyable}}
+struct S {
     var copyable: CopyableKlass
     var moveOnly2: MoveOnlyStruct? // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'Optional<Wrapped>' yet}}
-    var moveOnly: MoveOnlyStruct // expected-note {{contained noncopyable property 'S.moveOnly'}}
+    var moveOnly: MoveOnlyStruct // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S' has non-Copyable type 'MoveOnlyStruct'}}
     var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'OptionalGrandField<T>' yet}}
     var moveOnly3: OptionalGrandField<MoveOnlyStruct> // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'OptionalGrandField<T>' yet}}
 }
@@ -58,9 +58,9 @@ struct SMoveOnly {
     var moveOnly: MoveOnlyKlass
 }
 
-enum E { // expected-error {{enum 'E' cannot contain a noncopyable type without also being noncopyable}}
+enum E {
     case lhs(CopyableKlass)
-    case rhs(MoveOnlyKlass) // expected-note {{contained noncopyable enum case 'E.rhs'}}
+    case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E' has non-Copyable type 'MoveOnlyKlass'}}
     case rhs2(OptionalGrandField<MoveOnlyKlass>) // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'OptionalGrandField<T>' yet}}
 }
 
@@ -76,8 +76,12 @@ extension EMoveOnly {
     init!(three: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
 }
 
-extension MoveOnlyStruct {
+extension MoveOnlyKlass {
     convenience init?(three: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
+}
+
+extension MoveOnlyStruct {
+    init?(three: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
 }
 
 func foo() {
@@ -92,9 +96,9 @@ func foo() {
         var moveOnly: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
     }
 
-    struct S2 { // expected-error {{struct 'S2' cannot contain a noncopyable type without also being noncopyable}}
+    struct S2 {
         var copyable: CopyableKlass
-        var moveOnly: MoveOnlyKlass // expected-note {{contained noncopyable property 'S2.moveOnly'}}
+        var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-Copyable type 'MoveOnlyKlass'}}
     }
 
     @_moveOnly
@@ -103,9 +107,9 @@ func foo() {
         var moveOnly: MoveOnlyKlass
     }
 
-    enum E2 { // expected-error {{enum 'E2' cannot contain a noncopyable type without also being noncopyable}}
+    enum E2 {
         case lhs(CopyableKlass)
-        case rhs(MoveOnlyKlass) // expected-note {{contained noncopyable enum case 'E2.rhs'}}
+        case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E2' has non-Copyable type 'MoveOnlyKlass'}}
     }
 
     @_moveOnly
@@ -125,9 +129,9 @@ func foo() {
             var moveOnly: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
         }
 
-        struct S3 { // expected-error {{struct 'S3' cannot contain a noncopyable type without also being noncopyable}}
+        struct S3 {
             var copyable: CopyableKlass
-            var moveOnly: MoveOnlyKlass // expected-note {{contained noncopyable property 'S3.moveOnly'}}
+            var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S3' has non-Copyable type 'MoveOnlyKlass'}}
         }
 
         @_moveOnly
@@ -136,9 +140,9 @@ func foo() {
             var moveOnly: MoveOnlyKlass
         }
 
-        enum E3 { // expected-error {{enum 'E3' cannot contain a noncopyable type without also being noncopyable}}
+        enum E3 {
             case lhs(CopyableKlass)
-            case rhs(MoveOnlyKlass) // expected-note {{contained noncopyable enum case 'E3.rhs'}}
+            case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E3' has non-Copyable type 'MoveOnlyKlass'}}
         }
 
         @_moveOnly
@@ -245,4 +249,12 @@ struct StructHolder {
     }
 }
 
+struct BarStruct {
+  init() {}
+  deinit {} // expected-error {{deinitializer cannot be declared in struct 'BarStruct' that conforms to 'Copyable'}}
+}
 
+enum BarUnion {
+  init() {}
+  deinit {} // expected-error {{deinitializer cannot be declared in enum 'BarUnion' that conforms to 'Copyable'}}
+}

@@ -46,7 +46,8 @@ func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
   fatalError()
 }
 
-struct FileDescriptor: ~Copyable {
+// FIXME: this error isn't correct to emit. the parsing might be ignoring the ~
+struct FileDescriptor: ~Copyable { // expected-error {{struct 'FileDescriptor' required to be 'Copyable' but is marked with '~Copyable'}}
   var fd = 1
 }
 

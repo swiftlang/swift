@@ -3055,7 +3055,7 @@ public:
       ED->diagnose(diag::noncopyable_objc_enum);
     }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
-    diagnoseCopyableTypeContainingMoveOnlyType(ED);
+    forceCopyableConformanceCheckIfNeeded(ED);
     diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
 
     checkExplicitAvailability(ED);
@@ -3117,7 +3117,7 @@ public:
 
     // If this struct is not move only, check that all vardecls of nominal type
     // are not move only.
-    diagnoseCopyableTypeContainingMoveOnlyType(SD);
+    forceCopyableConformanceCheckIfNeeded(SD);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(SD);
   }
@@ -4130,19 +4130,12 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    // Only check again for destructor decl outside of a class if our destructor
-    // is not marked as invalid.
+    // Only check again for destructor decl outside of a struct/enum/class
+    // if our destructor is not marked as invalid.
     if (!DD->isInvalid()) {
       auto *nom = dyn_cast<NominalTypeDecl>(
                              DD->getDeclContext()->getImplementedObjCContext());
-      if (!nom || isa<ProtocolDecl>(nom)) {
-        DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
-
-      } else if (!Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
-                  && !isa<ClassDecl>(nom)
-                  && nom->canBeCopyable()) {
-        // When we have NoncopyableGenerics, deinits get validated as part of
-        // Copyable-conformance checking.
+      if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }
 
