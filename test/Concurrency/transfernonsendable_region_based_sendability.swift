@@ -424,8 +424,7 @@ actor A_Sendable {
         // actor and is non-Sendable. For now, we ban this since we do not
         // support the ability to dynamically invoke the synchronous closure on
         // the specific actor.
-        // TODO: Should use special closure error.
-        await a.foo(captures_self) // expected-tns-warning {{task-isolated value of type '() -> ()' transferred to actor-isolated context}}
+        await a.foo(captures_self) // expected-tns-warning {{actor-isolated value of type '() -> ()' transferred to actor-isolated context}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
         // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }

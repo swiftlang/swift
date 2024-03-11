@@ -129,9 +129,8 @@ actor MyActor {
   var field = Klass()
 
   func canTransferWithTransferringMethodArg(_ x: transferring Klass, _ y: Klass) async {
-    // expected-note @-1:72 {{value is task-isolated since it is in the same region as 'y'}}
     await transferToMain(x)
-    await transferToMain(y) // expected-warning {{task-isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
+    await transferToMain(y) // expected-warning {{actor-isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
@@ -169,12 +168,13 @@ actor MyActor {
 
 @MainActor func canAssignTransferringIntoGlobalActor2(_ x: transferring Klass) async {
   globalKlass = x
+  // TODO: This is incorrect! transferring should be independent of @MainActor.
   await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring main actor-isolated 'x' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
-  await transferToCustom(globalKlass) // expected-warning {{task-isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
+  await transferToCustom(globalKlass) // expected-warning {{main actor-isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
 }
 
 func canTransferAssigningIntoLocal(_ x: transferring Klass) async {

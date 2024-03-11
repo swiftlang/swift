@@ -577,6 +577,32 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
 }
 
 //===----------------------------------------------------------------------===//
+//                       MARK: ValueIsolationRegionInfo
+//===----------------------------------------------------------------------===//
+
+void ValueIsolationRegionInfo::printForDiagnostics(
+    llvm::raw_ostream &os) const {
+  switch (Kind(*this)) {
+  case Unknown:
+    llvm::report_fatal_error("Printing unknown for diagnostics?!");
+    return;
+  case Disconnected:
+    os << "disconnected";
+    return;
+  case Actor:
+    if (hasActorIsolation() && getActorIsolation()) {
+      getActorIsolation()->printForDiagnostics(os);
+    } else {
+      os << "actor-isolated";
+    }
+    return;
+  case Task:
+    os << "task-isolated";
+    return;
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                            MARK: TrackableValue
 //===----------------------------------------------------------------------===//
 
@@ -3093,6 +3119,17 @@ void RegionAnalysisFunctionInfo::runDataflow() {
 //                              MARK: Value Map
 //===----------------------------------------------------------------------===//
 
+SILInstruction *RegionAnalysisValueMap::maybeGetActorIntroducingInst(
+    Element trackableValueID) const {
+  if (auto value = getValueForId(trackableValueID)) {
+    auto rep = value->getRepresentative();
+    if (rep.hasRegionIntroducingInst())
+      return rep.getActorRegionIntroducingInst();
+  }
+
+  return nullptr;
+}
+
 std::optional<TrackableValue>
 RegionAnalysisValueMap::getValueForId(TrackableValueID id) const {
   auto iter = stateIndexToEquivalenceClass.find(id);
@@ -3281,16 +3318,38 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   }
 
   // See if we have a non-transferring argument from a function. In such a case,
-  // mark the value as task isolated.
+  // mark the value as actor isolated if self is actor isolated and task
+  // isolated otherwise.
   if (auto *fArg =
           dyn_cast<SILFunctionArgument>(iter.first->first.getValue())) {
     if (!isTransferrableFunctionArgument(fArg)) {
-      iter.first->getSecond().mergeIsolationRegionInfo(
-          ValueIsolationRegionInfo::getTaskIsolated(fArg));
+      auto *self =
+          iter.first->first.getValue()->getFunction()->maybeGetSelfArgument();
+      NominalTypeDecl *nomDecl = nullptr;
+      if (self &&
+          ((nomDecl = self->getType().getNominalOrBoundGenericNominal()))) {
+        iter.first->getSecond().mergeIsolationRegionInfo(
+            ValueIsolationRegionInfo::getActorIsolated(nomDecl));
+      } else {
+        iter.first->getSecond().mergeIsolationRegionInfo(
+            ValueIsolationRegionInfo::getTaskIsolated(fArg));
+      }
     }
   }
 
   return {iter.first->first, iter.first->second};
+}
+
+std::optional<TrackableValue>
+RegionAnalysisValueMap::getTrackableValueForActorIntroducingInst(
+    SILInstruction *inst) const {
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.find(inst);
+  if (iter == self->equivalenceClassValuesToState.end())
+    return {};
+
+  // Otherwise, we need to compute our flags.
+  return {{iter->first, iter->second}};
 }
 
 std::optional<TrackableValue>

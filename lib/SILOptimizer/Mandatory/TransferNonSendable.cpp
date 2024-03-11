@@ -394,12 +394,16 @@ struct TransferredNonTransferrableInfo {
 
   /// The non-transferrable value that is in the same region as \p
   /// transferredOperand.get().
-  SILValue nonTransferrableValue;
+  llvm::PointerUnion<SILValue, SILInstruction *> nonTransferrable;
 
   TransferredNonTransferrableInfo(Operand *transferredOperand,
                                   SILValue nonTransferrableValue)
       : transferredOperand(transferredOperand),
-        nonTransferrableValue(nonTransferrableValue) {}
+        nonTransferrable(nonTransferrableValue) {}
+  TransferredNonTransferrableInfo(Operand *transferredOperand,
+                                  SILInstruction *nonTransferrableInst)
+      : transferredOperand(transferredOperand),
+        nonTransferrable(nonTransferrableInst) {}
 };
 
 class TransferNonSendableImpl {
@@ -879,13 +883,28 @@ public:
   Operand *getOperand() const { return info.transferredOperand; }
 
   SILValue getNonTransferrableValue() const {
-    return info.nonTransferrableValue;
+    return info.nonTransferrable.dyn_cast<SILValue>();
+  }
+
+  SILInstruction *getNonTransferringActorIntroducingInst() const {
+    return info.nonTransferrable.dyn_cast<SILInstruction *>();
   }
 
   /// Return the isolation region info for \p getNonTransferrableValue().
   ValueIsolationRegionInfo getIsolationRegionInfo() const {
-    return regionInfo->getValueMap().getIsolationRegion(
-        info.nonTransferrableValue);
+    // If we have a value, then lookup the value isolation info.
+    if (auto value = getNonTransferrableValue()) {
+      return regionInfo->getValueMap().getIsolationRegion(value);
+    }
+
+    // If we have an instruction, then we have an actor in
+    auto *inst = getNonTransferringActorIntroducingInst();
+    auto trackableValue =
+        regionInfo->getValueMap().getTrackableValueForActorIntroducingInst(
+            inst);
+    if (!trackableValue)
+      return {};
+    return trackableValue->getIsolationRegionInfo();
   }
 
   void emitUnknownPatternError() {
@@ -900,11 +919,19 @@ public:
   void emitFunctionArgumentApply(SILLocation loc, Type type,
                                  ValueIsolationRegionInfo regionInfo,
                                  ApplyIsolationCrossing crossing) {
-    diagnoseError(loc, diag::regionbasedisolation_arg_transferred, type,
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      regionInfo.printForDiagnostics(os);
+    }
+    diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
+                  StringRef(descriptiveKindStr), type,
                   crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+
     if (regionInfo.isTaskIsolated()) {
-      auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
+      auto *fArg =
+          cast<SILFunctionArgument>(info.nonTransferrable.get<SILValue>());
       if (fArg->getDecl()) {
         diagnoseNote(
             fArg->getDecl()->getLoc(),
@@ -916,17 +943,19 @@ public:
 
   void emitFunctionArgumentClosure(SourceLoc loc, Type type,
                                    ApplyIsolationCrossing crossing) {
-    diagnoseError(loc, diag::regionbasedisolation_arg_transferred, type,
-                  crossing.getCalleeIsolation())
+    diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
+                  "task-isolated", type, crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
     // Only emit the note if our value is different from the function
     // argument.
     auto rep = regionInfo->getValueMap()
                    .getTrackableValue(getOperand()->get())
                    .getRepresentative();
-    if (rep.maybeGetValue() == info.nonTransferrableValue)
+    if (!info.nonTransferrable.is<SILValue>() ||
+        rep.maybeGetValue() == info.nonTransferrable.get<SILValue>())
       return;
-    auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
+    auto *fArg =
+        cast<SILFunctionArgument>(info.nonTransferrable.get<SILValue>());
     diagnoseNote(
         fArg->getDecl()->getLoc(),
         diag::regionbasedisolation_isolated_since_in_same_region_basename,
@@ -1223,8 +1252,17 @@ struct DiagnosticEvaluator final
     // the value that actually introduced the actor isolation.
     if (auto nonTransferrableValue = info->getValueMap().maybeGetRepresentative(
             actualNonTransferrableValue)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        ActualTransfer: " << nonTransferrableValue);
       self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
                                                      nonTransferrableValue);
+    } else if (auto *nonTransferrableInst =
+                   info->getValueMap().maybeGetActorIntroducingInst(
+                       actualNonTransferrableValue)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        ActualTransfer: " << *nonTransferrableInst);
+      self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
+                                                     nonTransferrableInst);
     } else {
       // Otherwise, just use the actual value.
       //

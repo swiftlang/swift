@@ -221,7 +221,7 @@ extension Actor {
     let x = (1, closure)
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type '(Int, () -> ())' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-    // expected-tns-warning @-2 {{task-isolated value of type '(Int, () -> ())' transferred to main actor-isolated context}}
+    // expected-tns-warning @-2 {{actor-isolated value of type '(Int, () -> ())' transferred to main actor-isolated context}}
   }
 
   // TODO: Why is this task-isolated?
@@ -231,7 +231,7 @@ extension Actor {
     }
 
     let x = (closure, 1)
-    await transferToMain(x) // expected-tns-warning {{task-isolated value of type '(() -> (), Int)' transferred to main actor-isolated context}}
+    await transferToMain(x) // expected-tns-warning {{actor-isolated value of type '(() -> (), Int)' transferred to main actor-isolated context}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type '(() -> (), Int)' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
@@ -1366,26 +1366,25 @@ actor ActorWithSetter {
   var recursive: ActorWithSetter? = nil
   var classBox = TwoFieldKlassClassBox()
 
-  // TODO: Why is this task-isolated? This should be actor isolated?
   func test1() async {
     let x = NonSendableKlass()
     self.field = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test2() async {
     let x = NonSendableKlass()
     self.twoFieldBox.k1 = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test3() async {
     let x = NonSendableKlass()
     self.twoFieldBoxInTuple.1.k1 = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   // This triggers a crash in SILGen with tns enabled.
@@ -1405,7 +1404,7 @@ actor ActorWithSetter {
     let x = NonSendableKlass()
     self.classBox.k1 = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 }
 
@@ -1420,21 +1419,21 @@ final actor FinalActorWithSetter {
     let x = NonSendableKlass()
     self.field = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test2() async {
     let x = NonSendableKlass()
     self.twoFieldBox.k1 = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test3() async {
     let x = NonSendableKlass()
     self.twoFieldBoxInTuple.1.k1 = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   // This triggers a crash in SILGen with tns enabled.
@@ -1454,7 +1453,7 @@ final actor FinalActorWithSetter {
     let x = NonSendableKlass()
     self.classBox.k1 = x
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-tns-warning @-1 {{actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 }
 

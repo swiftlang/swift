@@ -195,6 +195,8 @@ public:
     }
   }
 
+  void printForDiagnostics(llvm::raw_ostream &os) const;
+
   SWIFT_DEBUG_DUMP {
     print(llvm::dbgs());
     llvm::dbgs() << '\n';
@@ -202,7 +204,7 @@ public:
 
   std::optional<ActorIsolation> getActorIsolation() const {
     assert(kind == Actor);
-    assert(std::holds_alternative<NominalTypeDecl *>(data) &&
+    assert(std::holds_alternative<std::optional<ActorIsolation>>(data) &&
            "Doesn't have an actor isolation?!");
     return std::get<std::optional<ActorIsolation>>(data);
   }
@@ -219,6 +221,18 @@ public:
     assert(std::holds_alternative<SILValue>(data) &&
            "Doesn't have a task isolated value");
     return std::get<SILValue>(data);
+  }
+
+  bool hasActorIsolation() const {
+    return std::holds_alternative<std::optional<ActorIsolation>>(data);
+  }
+
+  bool hasActorInstance() const {
+    return std::holds_alternative<NominalTypeDecl *>(data);
+  }
+
+  bool hasTaskIsolatedValue() const {
+    return std::holds_alternative<SILValue>(data);
   }
 
   [[nodiscard]] ValueIsolationRegionInfo
@@ -355,6 +369,7 @@ public:
 
   SILValue getValue() const { return value.get<SILValue>(); }
   SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
+  bool hasRegionIntroducingInst() const { return value.is<SILInstruction *>(); }
   SILInstruction *getActorRegionIntroducingInst() const {
     return value.get<SILInstruction *>();
   }
@@ -464,6 +479,10 @@ public:
   /// value" returns an empty SILValue.
   SILValue maybeGetRepresentative(Element trackableValueID) const;
 
+  /// Returns the fake "representative value" for this element if it
+  /// exists. Returns nullptr otherwise.
+  SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
+
   ValueIsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
   ValueIsolationRegionInfo getIsolationRegion(SILValue trackableValueID) const;
 
@@ -473,6 +492,15 @@ public:
   TrackableValue
   getTrackableValue(SILValue value,
                     bool isAddressCapturedByPartialApply = false) const;
+
+  /// An actor introducing inst is an instruction that doesn't have any
+  /// non-Sendable parameters and produces a new value that has to be actor
+  /// isolated.
+  ///
+  /// This is just for looking up the ValueIsolationRegionInfo for a
+  /// instructionInst if we have one. So it is a find like function.
+  std::optional<TrackableValue> getTrackableValueForActorIntroducingInst(
+      SILInstruction *introducingInst) const;
 
 private:
   std::optional<TrackableValue> getValueForId(TrackableValueID id) const;
