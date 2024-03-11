@@ -10208,6 +10208,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // where the base type has a conditional Sendable conformance
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
     auto shouldCheckSendabilityOfBase = [&]() {
+      if (!Context.getProtocol(KnownProtocolKind::Sendable))
+        return false;
+
       // Static members are always sendable because they only capture
       // metatypes which are Sendable.
       if (baseObjTy->is<AnyMetatypeType>())
