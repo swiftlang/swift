@@ -45,12 +45,15 @@ extension DistributedProtocolMacro {
       return []
     }
 
+    let accessModifiers: String = proto.accessModifiersString
+
     let requirements =
       proto.memberBlock.members.map { member in
         member.trimmed
       }
     let requirementStubs = requirements
-      .map(stubMethod).joined(separator: "\n    ")
+      .map { stubMethod(access: accessModifiers, $0) }
+      .joined(separator: "\n    ")
 
     let extensionDecl: DeclSyntax =
       """
@@ -61,9 +64,9 @@ extension DistributedProtocolMacro {
     return [extensionDecl.cast(ExtensionDeclSyntax.self)]
   }
 
-  static func stubMethod(_ requirementDeclaration: MemberBlockItemListSyntax.Element) -> String {
+  static func stubMethod(access: String, _ requirementDeclaration: MemberBlockItemListSyntax.Element) -> String {
     """
-    \(requirementDeclaration) {
+    \(access)\(requirementDeclaration) {
       \(stubFunctionBody())
     }
     """
@@ -109,6 +112,8 @@ extension DistributedProtocolMacro {
                  """, id: .invalidApplication)
     }
 
+    let accessModifiers = proto.accessModifiersString
+
     for req in proto.genericWhereClause?.requirements ?? [] {
       switch req.requirement {
       case .conformanceRequirement(let conformanceReq)
@@ -126,50 +131,67 @@ extension DistributedProtocolMacro {
       }
     }
 
-      if isGenericStub, let specificActorSystemRequirement {
-        return [
-          """
-          \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
-            Distributed._DistributedActorStub
-            where ActorSystem: \(specificActorSystemRequirement) 
-          { }
-          """
-        ]
-      } else if let specificActorSystemRequirement {
-        return [
-          """
-          \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
-            Distributed._DistributedActorStub
-          { 
-            \(typealiasActorSystem(proto, specificActorSystemRequirement)) 
-          }
-          """
-        ]
-      } else {
-        // there may be no `where` clause specifying an actor system,
-        // but perhaps there is a typealias (or extension with a typealias),
-        // specifying a concrete actor system so we let this synthesize
-        // an empty `$Greeter` -- this may fail, or succeed depending on
-        // surrounding code using a default distributed actor system,
-        // or extensions providing it.
-        return [
-          """
-          \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
-            Distributed._DistributedActorStub
-          {
-          }
-          """
-        ]
-      }
+    if isGenericStub, let specificActorSystemRequirement {
+      return [
+        """
+        \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
+          Distributed._DistributedActorStub
+          where ActorSystem: \(specificActorSystemRequirement) 
+        { }
+        """
+      ]
+    } else if let specificActorSystemRequirement {
+      return [
+        """
+        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
+          Distributed._DistributedActorStub
+        { 
+          \(typealiasActorSystem(access: accessModifiers, proto, specificActorSystemRequirement)) 
+        }
+        """
+      ]
+    } else {
+      // there may be no `where` clause specifying an actor system,
+      // but perhaps there is a typealias (or extension with a typealias),
+      // specifying a concrete actor system so we let this synthesize
+      // an empty `$Greeter` -- this may fail, or succeed depending on
+      // surrounding code using a default distributed actor system,
+      // or extensions providing it.
+      return [
+        """
+        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
+          Distributed._DistributedActorStub
+        {
+        }
+        """
+      ]
+    }
   }
 
-  private static func typealiasActorSystem(_ proto: ProtocolDeclSyntax, _ type: TypeSyntax) -> DeclSyntax {
-    "typealias ActorSystem = \(type)"
+  private static func typealiasActorSystem(access: String, _ proto: ProtocolDeclSyntax, _ type: TypeSyntax) -> DeclSyntax {
+    "\(raw: access)typealias ActorSystem = \(type)"
   }
 }
 
 // ===== -----------------------------------------------------------------------
 // MARK: Convenience Extensions
+
+extension ProtocolDeclSyntax {
+  var accessModifiersString: String {
+    let modifiers = modifiers.filter { modifier in
+        modifier.isAccessControl
+      }
+
+    guard !modifiers.isEmpty else {
+      return ""
+    }
+
+    let string = modifiers
+      .map { "\($0.trimmed)" }
+      .joined(separator: " ")
+    return "\(string) "
+  }
+}
 
 extension TypeSyntax {
   fileprivate var isActorSystem: Bool {
@@ -195,23 +217,38 @@ extension DeclSyntaxProtocol {
   }
 }
 
+extension DeclModifierSyntax {
+  var isAccessControl: Bool {
+    switch self.name.tokenKind {
+    case .keyword(.private): fallthrough
+    case .keyword(.fileprivate): fallthrough
+    case .keyword(.internal): fallthrough
+    case .keyword(.package): fallthrough
+    case .keyword(.public):
+      return true
+    default:
+      return false
+    }
+  }
+}
+
 // ===== -----------------------------------------------------------------------
 // MARK: DistributedProtocol macro errors
 
 extension DistributedProtocolMacro {
   static func throwIllegalTargetDecl(node: AttributeSyntax, _ declaration: some DeclSyntaxProtocol) throws -> Never {
-    let kind =
-      if declaration.isClass {
-        "class"
-      } else if declaration.isActor {
-        "actor"
-      } else if declaration.isStruct {
-        "struct"
-      } else if declaration.isStruct {
-        "enum"
-      } else {
-        "\(declaration.kind)"
-      }
+    let kind: String
+    if declaration.isClass {
+      kind = "class"
+    } else if declaration.isActor {
+      kind = "actor"
+    } else if declaration.isStruct {
+      kind = "struct"
+    } else if declaration.isStruct {
+      kind = "enum"
+    } else {
+      kind = "\(declaration.kind)"
+    }
 
     throw DiagnosticsError(
       syntax: node,
