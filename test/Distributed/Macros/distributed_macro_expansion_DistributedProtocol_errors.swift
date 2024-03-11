@@ -25,3 +25,8 @@ actor Act {}
 distributed actor Caplin {
   typealias ActorSystem = FakeActorSystem
 }
+
+@_DistributedProtocol // expected-error{{Distributed protocol must declare actor system with SerializationRequirement}}
+protocol Fail: DistributedActor {
+  distributed func method() -> String
+}
