@@ -81,7 +81,7 @@ bb0(%owned_value : @owned $T):
   %unowned_value = unowned_copy_value %owned_value : $T
 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<@sil_unowned T>(%unowned_value) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{task isolated value of type 'T' transferred to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<@sil_unowned T>(%unowned_value) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{task-isolated value of type 'T' transferred to global actor '<null>'-isolated context}}
 
   destroy_value %unowned_value : $@sil_unowned T
   //destroy_value %value : $T

@@ -954,10 +954,10 @@ ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, non
       "binding of non-Sendable type %0 accessed after being transferred; later accesses could race",
       (Type))
 ERROR(regionbasedisolation_arg_transferred, none,
-      "task isolated value of type %0 transferred to %1 context; later accesses to value could race",
-      (Type, ActorIsolation))
+      "%0 value of type %1 transferred to %2 context; later accesses to value could race",
+      (StringRef, Type, ActorIsolation))
 ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
-      "task isolated value of type %0 passed as a strongly transferred parameter; later accesses could race",
+      "task-isolated value of type %0 passed as a strongly transferred parameter; later accesses could race",
       (Type))
 NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
      "value is %0 since it is in the same region as %1",
@@ -974,7 +974,7 @@ ERROR(regionbasedisolation_stronglytransfer_assignment_yields_race_name, none,
       "assigning %0 to transferring parameter %1 may cause a race",
       (Identifier, Identifier))
 NOTE(regionbasedisolation_stronglytransfer_taskisolated_assign_note, none,
-      "%0 is a task isolated value that is assigned into transferring parameter %1. Transferred uses of %1 may race with caller uses of %0",
+      "%0 is a task-isolated value that is assigned into transferring parameter %1. Transferred uses of %1 may race with caller uses of %0",
       (Identifier, Identifier))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
@@ -987,7 +987,7 @@ NOTE(regionbasedisolation_named_info_isolated_capture, none,
      "%1 value %0 is captured by %2 closure. Later local uses could race",
      (Identifier, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_named_arg_info, none,
-     "Transferring task isolated function argument %0 could yield races with caller uses",
+     "Transferring task-isolated function argument %0 could yield races with caller uses",
      (Identifier))
 NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
      "Cannot access a transferring parameter after the parameter has been transferred", ())

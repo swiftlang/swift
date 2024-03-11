@@ -40,16 +40,15 @@ struct CustomActor {
 
 @MainActor func testTransferGlobalActorGuardedValue() async {
   // TODO: Global actor error needed.
-  await transferToCustom(globalKlass) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
+  await transferToCustom(globalKlass) // expected-warning {{main actor-isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
 }
 
 @MainActor func testTransferGlobalActorGuardedValueWithlet() async {
   let x = globalKlass
-  await transferToCustom(x) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
+  await transferToCustom(x) // expected-warning {{main actor-isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
 }
 
 @MainActor func testTransferGlobalActorGuardedValueWithlet(_ k: Klass) async {
-  // expected-note @-1 {{value is task isolated since it is in the same region as 'k'}}
   globalKlass = k
-  await transferToCustom(k) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context; later accesses to value could race}}
+  await transferToCustom(k) // expected-warning {{main actor-isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context; later accesses to value could race}}
 }
