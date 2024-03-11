@@ -45,7 +45,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
 
   switch value {
   case _: break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 
   // Test being part of other spaces.
@@ -144,7 +144,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
 
   switch value {
   case _: break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 
   // Test being part of other spaces.

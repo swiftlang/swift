@@ -1058,16 +1058,18 @@ namespace {
                              unknownCase);
         return;
       }
-      
+
       auto uncovered = diff.value();
-      if (unknownCase && uncovered.isEmpty()) {
-        DE.diagnose(unknownCase->getLoc(), diag::redundant_particular_case)
-          .highlight(unknownCase->getSourceRange());
-      }
 
       // Account for unknown cases. If the developer wrote `unknown`, they're
       // all handled; otherwise, we ignore the ones that were added for enums
       // that are implicitly frozen.
+      //
+      // Note that we do not diagnose an unknown case as redundant, even if the
+      // uncovered space is empty because we trust that if the developer went to
+      // the trouble of writing @unknown that it was for a good reason, like
+      // addressing diagnostics in another build configuration where there are
+      // potentially unknown cases.
       uncovered = *uncovered.minus(Space::forUnknown(unknownCase == nullptr),
                                    DC, /*&minusCount*/ nullptr);
 
