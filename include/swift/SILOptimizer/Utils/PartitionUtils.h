@@ -1040,19 +1040,24 @@ public:
     return asImpl().handleTransferNonTransferrable(op, elt);
   }
 
+  /// Just call our CRTP subclass.
+  void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
+                                      Element otherElement) const {
+    return asImpl().handleTransferNonTransferrable(op, elt, otherElement);
+  }
+
   /// Call isActorDerived on our CRTP subclass.
   bool isActorDerived(Element elt) const {
     return asImpl().isActorDerived(elt);
   }
 
+  bool isTaskIsolatedDerived(Element elt) const {
+    return asImpl().isTaskIsolatedDerived(elt);
+  }
+
   /// Call isClosureCaptured on our CRTP subclass.
   bool isClosureCaptured(Element elt, Operand *op) const {
     return asImpl().isClosureCaptured(elt, op);
-  }
-
-  /// Call getNonTransferrableElements() on our CRTP subclass.
-  ArrayRef<Element> getNonTransferrableElements() const {
-    return asImpl().getNonTransferrableElements();
   }
 
   /// Apply \p op to the partition op.
@@ -1093,47 +1098,49 @@ public:
       p.trackNewElement(op.getOpArgs()[0]);
       return;
     case PartitionOpKind::Transfer: {
-      assert(op.getOpArgs().size() == 1 &&
-             "Transfer PartitionOp should be passed 1 argument");
-      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
-             "Transfer PartitionOp's argument should already be tracked");
-
-      // check if any nontransferrables are transferred here, and handle the
-      // failure if so
-      for (Element nonTransferrable : getNonTransferrableElements()) {
-        assert(
-            p.isTrackingElement(nonTransferrable) &&
-            "nontransferrables should be function args and self, and therefore"
-            "always present in the label map because of initialization at "
-            "entry");
-        if (!p.isTransferred(nonTransferrable) &&
-            p.areElementsInSameRegion(nonTransferrable, op.getOpArgs()[0])) {
-          return handleTransferNonTransferrable(op, nonTransferrable);
-        }
-      }
-
-      // If this value is actor derived or if any elements in its region are
-      // actor derived, we need to treat as nontransferrable.
-      if (isActorDerived(op.getOpArgs()[0]))
-        return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
-
       // NOTE: We purposely do not check here if a transferred value is already
       // transferred. Callers are expected to put a require for that
       // purpose. This ensures that if we pass the same argument multiple times
       // to the same transferring function as weakly transferred arguments, we
       // do not get an error.
+      assert(op.getOpArgs().size() == 1 &&
+             "Transfer PartitionOp should be passed 1 argument");
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
+             "Transfer PartitionOp's argument should already be tracked");
 
+      // If we know our direct value is actor derived... immediately emit an
+      // error.
+      if (isActorDerived(op.getOpArgs()[0]))
+        return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+
+      // Otherwise, we may have a value that is actor derived or task isolated
+      // from another value. We need to prefer actor derived.
+      //
       // While we are checking for actor derived, also check if our value or any
       // value in our region is closure captured and propagate that bit in our
       // transferred inst.
       bool isClosureCapturedElt =
           isClosureCaptured(op.getOpArgs()[0], op.getSourceOp());
-
       Region elementRegion = p.getRegion(op.getOpArgs()[0]);
+      std::optional<Element> actorDerivedElt;
+      std::optional<Element> taskDerivedElt;
       for (const auto &pair : p.range()) {
-        if (pair.second == elementRegion && isActorDerived(pair.first))
-          return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
-        isClosureCapturedElt |= isClosureCaptured(pair.first, op.getSourceOp());
+        if (pair.second == elementRegion) {
+          if (isActorDerived(pair.first))
+            actorDerivedElt = pair.first;
+          if (isTaskIsolatedDerived(pair.first))
+            taskDerivedElt = pair.first;
+          isClosureCapturedElt |=
+              isClosureCaptured(pair.first, op.getSourceOp());
+        }
+      }
+
+      // Now try to add the actor derived elt first and then the task derived
+      // elt, preferring actor derived.
+      if (actorDerivedElt.has_value() || taskDerivedElt.has_value()) {
+        return handleTransferNonTransferrable(
+            op, op.getOpArgs()[0],
+            actorDerivedElt.has_value() ? *actorDerivedElt : *taskDerivedElt);
       }
 
       // Mark op.getOpArgs()[0] as transferred.
@@ -1229,21 +1236,25 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   void handleFailure(const PartitionOp &op, Element elt,
                      TransferringOperand transferringOp) const {}
 
-  /// A list of elements that cannot be transferred. Whenever we transfer, we
-  /// check this list to see if we are transferring the element and then call
-  /// transferNonTransferrableCallback. This should consist only of function
-  /// arguments.
-  ArrayRef<Element> getNonTransferrableElements() const { return {}; }
-
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.
   void handleTransferNonTransferrable(const PartitionOp &op,
                                       Element elt) const {}
 
+  /// This is called if we detect a never transferred element that was passed to
+  /// a transfer instruction but the actual element that could not be
+  /// transferred is a different element in its region.
+  void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
+                                      Element otherEltInRegion) const {}
+
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
   /// since actor regions cannot be transferred.
   bool isActorDerived(Element elt) const { return false; }
+
+  /// This is used to determine if an element is in the same region as a task
+  /// isolated value.
+  bool isTaskIsolatedDerived(Element elt) const { return false; }
 
   /// Check if the representative value of \p elt is closure captured at \p
   /// op.

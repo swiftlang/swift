@@ -310,7 +310,7 @@ bb0(%0 : @owned $NonSendableStruct):
 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableStruct>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{task isolated value of type 'NonSendableStruct' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type 'NonSendableStruct' transferred to global actor '<null>'-isolated context}}
 
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableStruct>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -328,7 +328,7 @@ bb0(%0 : $*NonSendableStruct):
   %2 = moveonlywrapper_to_copyable_addr %1 : $*@moveOnly NonSendableStruct
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableStruct>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{task isolated value of type 'NonSendableStruct' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type 'NonSendableStruct' transferred to global actor '<null>'-isolated context}}
   %9999 = tuple ()
   return %9999 : $()
 }
@@ -340,7 +340,7 @@ bb0(%0 : @owned $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for 
   store %0 to [init] %blockAddr : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<() -> ()>(%blockAddr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{task isolated value of type '@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type '@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>' transferred to global actor '<null>'-isolated context}}
 
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<() -> ()>(%blockAddr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -393,7 +393,7 @@ bb0(%0 : $*NonSendableKlass):
   mark_unresolved_move_addr %0 to %1 : $*NonSendableKlass
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%1) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
   destroy_addr %0 : $*NonSendableKlass
   destroy_addr %1 : $*NonSendableKlass
   dealloc_stack %1 : $*NonSendableKlass
@@ -529,9 +529,9 @@ bb0(%0 : $Builtin.RawPointer):
   // Should error on both since the raw pointer is from an argument.
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%4) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%6) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
 
   destroy_value %4 : $NonSendableKlass
   destroy_value %6 : $NonSendableKlass
@@ -563,9 +563,9 @@ bb0(%0 : $Builtin.RawPointer):
   // But if we transfer the raw pointers and use them later we get separate errors.
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%0) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{task isolated value of type 'Builtin.RawPointer' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type 'Builtin.RawPointer' transferred to global actor '<null>'-isolated context}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%2) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{task isolated value of type 'Builtin.RawPointer' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{task-isolated value of type 'Builtin.RawPointer' transferred to global actor '<null>'-isolated context}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%3a) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%5a) : $@convention(thin) @async (Builtin.RawPointer) -> ()
