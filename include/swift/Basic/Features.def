@@ -238,7 +238,7 @@ EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
 EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
-EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure, true)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
