@@ -5481,14 +5481,11 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   VarInfo->Name = getVarName(i, IsAnonymous);
   DebugTypeInfo DbgTy;
   SILType SILTy;
-  bool IsFragmentType = false;
   if (auto MaybeSILTy = VarInfo->Type) {
     // If there is auxiliary type info, use it
     SILTy = *MaybeSILTy;
   } else {
     SILTy = SILVal->getType();
-    if (VarInfo->DIExpr)
-      IsFragmentType = VarInfo->DIExpr.hasFragment();
   }
 
   auto RealTy = SILTy.getASTType();
@@ -5513,11 +5510,10 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Figure out the debug variable type
   if (VD) {
     DbgTy = DebugTypeInfo::getLocalVariable(VD, RealTy, getTypeInfo(SILTy),
-                                            IGM, IsFragmentType);
+                                            IGM);
   } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
     // Handle the cases that read from a SIL file
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy), IGM,
-                                           IsFragmentType);
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy), IGM);
   } else
     return;
 
@@ -5906,24 +5902,19 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   }
 
   SILType SILTy;
-  bool IsFragmentType = false;
   if (auto MaybeSILTy = VarInfo->Type) {
     // If there is auxiliary type info, use it
     SILTy = *MaybeSILTy;
   } else {
     SILTy = i->getType();
-    if (VarInfo->DIExpr)
-      IsFragmentType = VarInfo->DIExpr.hasFragment();
   }
   auto RealType = SILTy.getASTType();
   DebugTypeInfo DbgTy;
   if (Decl) {
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM,
-                                            IsFragmentType);
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
   } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
              !VarInfo->Name.empty()) {
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM,
-                                           IsFragmentType);
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
   } else
     return;
 
@@ -6180,7 +6171,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
   auto DbgTy =
-      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM, false);
+      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
 
   auto VarInfo = i->getVarInfo();
   if (!VarInfo)

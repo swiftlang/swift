@@ -296,16 +296,6 @@ public:
     return Elements.size() &&
            Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
   }
-
-  /// Return true if this DIExpression has a fragment (at the end)
-  bool hasFragment() const {
-    return (Elements.size() >= 2 &&
-           Elements[Elements.size() - 2].getAsOperator() ==
-            SILDIExprOperator::Fragment) ||
-            (Elements.size() >= 3 &&
-             Elements[Elements.size() - 3].getAsOperator() ==
-             SILDIExprOperator::TupleFragment);
-  }
 };
 
 /// Returns the hashcode for the di expr element.
