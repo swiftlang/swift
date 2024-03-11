@@ -598,6 +598,31 @@ llvm::Value *irgen::maybeAddEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
 
 namespace {
 
+struct InitialSerialExecutorRecordTraits {
+  static StringRef getLabel() {
+    return "initial_serial_executor";
+  }
+  static llvm::StructType *getRecordType(IRGenModule &IGM) {
+    return IGM.SwiftInitialSerialExecutorTaskOptionRecordTy;
+  }
+  static TaskOptionRecordFlags getRecordFlags() {
+    return TaskOptionRecordFlags(TaskOptionRecordKind::InitialSerialExecutor);
+  }
+  static CanType getValueType(ASTContext &ctx) {
+    return ctx.TheExecutorType;
+  }
+
+  void initialize(IRGenFunction &IGF, Address recordAddr,
+                  Explosion &serialExecutor) const {
+    auto executorRecord =
+      IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
+    IGF.Builder.CreateStore(serialExecutor.claimNext(),
+      IGF.Builder.CreateStructGEP(executorRecord, 0, Size()));
+    IGF.Builder.CreateStore(serialExecutor.claimNext(),
+      IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
+  }
+};
+
 struct TaskGroupRecordTraits {
   static StringRef getLabel() {
     return "task_group";
@@ -648,6 +673,15 @@ struct InitialTaskExecutorRecordTraits {
 } // end anonymous namespace
 
 static llvm::Value *
+maybeAddInitialSerialExecutorOptionRecord(IRGenFunction &IGF,
+                                          llvm::Value *prevOptions,
+                                          OptionalExplosion &serialExecutor) {
+  return maybeAddOptionRecord(IGF, prevOptions,
+                              InitialSerialExecutorRecordTraits(),
+                              serialExecutor);
+}
+
+static llvm::Value *
 maybeAddTaskGroupOptionRecord(IRGenFunction &IGF, llvm::Value *prevOptions,
                               OptionalExplosion &taskGroup) {
   return maybeAddOptionRecord(IGF, prevOptions, TaskGroupRecordTraits(),
@@ -665,6 +699,7 @@ maybeAddInitialTaskExecutorOptionRecord(IRGenFunction &IGF,
 
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+                      OptionalExplosion &serialExecutor,
                       OptionalExplosion &taskGroup,
                       OptionalExplosion &taskExecutor,
                       Explosion &taskFunction,
@@ -685,6 +720,10 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
   } else {
     resultTypeMetadata = IGF.emitTypeMetadataRef(resultType);
   }
+
+  // Add an option record for the initial serial executor, if present.
+  taskOptions =
+    maybeAddInitialSerialExecutorOptionRecord(IGF, taskOptions, serialExecutor);
 
   // Add an option record for the task group, if present.
   taskOptions = maybeAddTaskGroupOptionRecord(IGF, taskOptions, taskGroup);
