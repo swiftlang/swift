@@ -15,7 +15,7 @@ public protocol Hello<Person>: ~Copyable {
   // CHECK: @"$s6Person4test5HelloPTl" =
   associatedtype Person: P & ~Copyable
 
-  // CHECK: @"$s4test5HelloP14favoritePerson0D0QzvrTq" = alias
+  // CHECK: @"$s4test5HelloP14favoritePerson0D0QzvrTq" =
   var favoritePerson: Person { get }
 
   // CHECK: @"$s4test5HelloP5greetyy6PersonQzFTq"
