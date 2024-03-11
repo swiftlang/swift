@@ -1136,7 +1136,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
                   return item.getPattern()->getKind() == PatternKind::Expr;
                 });
             isParentDoCatch = CS->getParentKind() == CaseParentKind::DoCatch;
-            isDefault = CS->isDefault();
+            isDefault = CS->isDefault() && !CS->hasUnknownAttr();
           }
         } else {
           Loc = clauses[firstRow].getCasePattern()->getStartLoc();
