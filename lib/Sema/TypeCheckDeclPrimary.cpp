@@ -563,6 +563,12 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   if (!currentFile)
     return std::make_tuple<>();
 
+  if (auto func = dyn_cast<AbstractFunctionDecl>(current)) {
+    if (func->isDistributedThunk()) {
+      return std::make_tuple<>();
+    }
+  }
+
   auto &ctx = current->getASTContext();
 
   // Find other potential definitions.

@@ -1346,6 +1346,9 @@ FuncDecl *AbstractStorageDecl::getDistributedThunk() const {
 
 FuncDecl*
 AbstractFunctionDecl::getDistributedThunk() const {
+  if (isDistributedThunk())
+    return const_cast<FuncDecl *>(dyn_cast<FuncDecl>(this));
+
   if (!isDistributed())
     return nullptr;
 

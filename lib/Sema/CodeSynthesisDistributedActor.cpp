@@ -724,13 +724,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
 
-  // NOTE: So we don't need a thunk in the protocol, we should call the
-  // underlying thing instead, which MUST have a thunk, since it must be a
-  // distributed func as well...
-  if (isa<ProtocolDecl>(DC)) {
-    return nullptr;
-  }
-
   DeclName thunkName;
 
   // Since accessors don't have names, let's generate one based on
@@ -754,7 +747,9 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   thunk->getAttrs().add(
       new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
-  thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
+  // Protocol requirements don't have bodies.
+  if (func->hasBody())
+    thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
   /// Record which function this is a thunk for, we'll need this to link back
   /// calls in case this is a distributed requirement witness.
@@ -874,6 +869,10 @@ void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
 }
 
 static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarget) {
+  // `distributed` protocol requirements are allowed without additional checks.
+  if (isa<ProtocolDecl>(distributedTarget->getDeclContext()))
+    return true;
+
   if (getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
     return true;
   }
