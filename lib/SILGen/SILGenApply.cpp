@@ -685,8 +685,10 @@ public:
         if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
           // If we're calling cross-actor, we must always use a distributed thunk
           if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            // We must adjust the constant to use a distributed thunk.
-            constant = constant->asDistributed();
+            // the protocol witness must always be a distributed thunk, as we
+            // may be crossing a remote boundary here.
+            auto thunk = func->getDistributedThunk();
+            constant = SILDeclRef(thunk).asDistributed();
           }
         }
       }

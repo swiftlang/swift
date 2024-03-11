@@ -686,6 +686,13 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
          "requirement in wrong protocol");
   assert(Mapping.count(requirement) == 0 && "Witness already known");
   assert((!isComplete() || isInvalid() ||
+          // TODO(distributed): properly handle isComplete() for distributed
+          //  funcs; there seems to be a problem that we mark completed, but
+          //  afterwards will record the thunk witness;
+          (dyn_cast<FuncDecl>(requirement)
+            ? (dyn_cast<FuncDecl>(requirement)->isDistributed() ||
+               dyn_cast<FuncDecl>(requirement)->isDistributedThunk())
+            : false) ||
           requirement->getAttrs().hasAttribute<OptionalAttr>() ||
           requirement->getAttrs().isUnavailable(
                                         requirement->getASTContext())) &&

@@ -918,8 +918,10 @@ namespace {
 
       {
         auto *requirement = cast<AbstractFunctionDecl>(func.getDecl());
-        if (requirement->isDistributed())
+        if (requirement->isDistributedThunk()) {
+          // when thunk, because in protocol we want accessof for the thunk
           IGM.emitDistributedTargetAccessor(requirement);
+        }
       }
 
       // Classify the function.

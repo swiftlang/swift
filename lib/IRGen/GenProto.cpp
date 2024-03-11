@@ -2464,6 +2464,7 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 
     auto mw = entry.getMethodWitness();
     auto member = mw.Requirement;
+
     auto &fnProtoInfo =
         IGM.getProtocolInfo(conf->getProtocol(), ProtocolInfoKind::Full);
     auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable();
