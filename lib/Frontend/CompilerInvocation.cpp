@@ -2521,6 +2521,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
 
   Opts.VirtualFunctionElimination = Args.hasArg(OPT_enable_llvm_vfe);
   Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
+  Opts.FragileResilientProtocols =
+    Args.hasArg(OPT_enable_fragile_resilient_protocol_witnesses);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();

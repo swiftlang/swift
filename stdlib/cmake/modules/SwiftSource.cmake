@@ -627,7 +627,6 @@ function(_compile_swift_files
   endif()
 
   if (SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES)
-    list(APPEND swift_flags "-Xfrontend" "-validate-tbd-against-ir=none")
     list(APPEND swift_flags "-Xfrontend" "-enable-fragile-relative-protocol-tables")
     list(APPEND swift_flags "-enable-library-evolution")
   endif()
