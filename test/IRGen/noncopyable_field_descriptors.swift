@@ -8,6 +8,9 @@
 
 // RUN: %FileCheck %s < %t/test.irgen
 
+// rdar://124401253
+// REQUIRES: OS=macosx || OS=linux || OS=windows-msvc
+
 @frozen
 public enum ConditionallyCopyable<Wrapped: ~Copyable>: ~Copyable {
   case none
