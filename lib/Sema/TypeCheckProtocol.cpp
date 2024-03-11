@@ -1281,18 +1281,18 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   return matchWitness(dc, req, witness, setup, matchTypes, finalize);
 }
 
-static bool
-witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
-                                        ValueDecl *requirement) {
+bool
+swift::witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
+                                               ValueDecl *requirement) {
   if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
     return A->getMemberName() == requirement->getName();
   }
   return false;
 }
 
-static bool
-witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
-                                            ValueDecl *requirement) {
+bool
+swift::witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
+                                                   ValueDecl *requirement) {
   assert(requirement->isProtocolRequirement());
   auto *PD = cast<ProtocolDecl>(requirement->getDeclContext());
   if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {

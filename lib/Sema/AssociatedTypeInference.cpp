@@ -429,7 +429,8 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     abort();
   }
 
-  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers);
+  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes |
+                          NL_ProtocolMembers | NL_IncludeAttributeImplements);
 
   // Look for a member type with the same name as the associated type.
   SmallVector<ValueDecl *, 4> candidates;
@@ -453,6 +454,16 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
 
     // Skip other associated types.
     if (isa<AssociatedTypeDecl>(typeDecl))
+      continue;
+
+    // If the name doesn't match and there's no appropriate @_implements
+    // attribute, skip this candidate.
+    //
+    // Also skip candidates in protocol extensions, because they tend to cause
+    // request cycles. We'll look at those during associated type inference.
+    if (assocType->getName() != typeDecl->getName() &&
+        !(witnessHasImplementsAttrForRequiredName(typeDecl, assocType) &&
+          !typeDecl->getDeclContext()->getSelfProtocolDecl()))
       continue;
 
     auto *genericDecl = cast<GenericTypeDecl>(typeDecl);
@@ -2039,7 +2050,8 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
 
   NLOptions subOptions = (NL_QualifiedDefault |
                           NL_OnlyTypes |
-                          NL_ProtocolMembers);
+                          NL_ProtocolMembers |
+                          NL_IncludeAttributeImplements);
 
   // Look for types with the given default name that have appropriate
   // @_implements attributes.
@@ -2059,6 +2071,12 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     // We only find these within a protocol extension.
     auto defaultProto = typeDecl->getDeclContext()->getSelfProtocolDecl();
     if (!defaultProto)
+      continue;
+
+    // If the name doesn't match and there's no appropriate @_implements
+    // attribute, skip this candidate.
+    if (defaultName.getBaseName() != typeDecl->getName() &&
+        !witnessHasImplementsAttrForRequiredName(typeDecl, assocType))
       continue;
 
     // Determine the witness type.
