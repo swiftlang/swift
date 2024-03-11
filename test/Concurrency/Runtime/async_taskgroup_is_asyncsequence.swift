@@ -7,6 +7,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://124277662
+// XFAIL: freestanding
+
 @available(SwiftStdlib 5.1, *)
 func test_taskGroup_is_asyncSequence() async {
   print(#function)

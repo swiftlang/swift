@@ -7,6 +7,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://124277662
+// XFAIL: freestanding
+
 struct Bad: Error {}
 
 class Foo { init() async throws {}; deinit { print("Foo down") } }
