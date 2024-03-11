@@ -834,16 +834,9 @@ bool TypeBase::isSendableType() {
   if (auto *fas = getAs<AnyFunctionType>())
     return fas->isSendable();
 
-  auto conformance = proto->getParentModule()->checkConformance(this, proto);
-  if (conformance.isInvalid())
-    return false;
-
-  // Look for missing Sendable conformances.
-  return !conformance.forEachMissingConformance(
-      [](BuiltinProtocolConformance *missing) {
-        return missing->getProtocol()->isSpecificProtocol(
-            KnownProtocolKind::Sendable);
-      });
+  auto conformance = proto->getParentModule()->checkConformance(
+      this, proto, false /*allow missing*/);
+  return conformance && !conformance.hasUnavailableConformance();
 }
 
 ///
