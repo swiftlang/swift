@@ -1,4 +1,4 @@
-//===--- Tracing.cpp - Support code for runtime tracing ------------*- C++ -*-//
+//===--- TracingCommon.h - Common code for runtime/Concurrency -----*- C++ -*-//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,34 +10,32 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Support code for tracing events in the Swift runtime
+// Support code shared between swiftCore and swift_Concurrency.
 //
 //===----------------------------------------------------------------------===//
 
-#include "Tracing.h"
-#include "swift/Runtime/TracingCommon.h"
+#ifndef SWIFT_TRACING_COMMON_H
+#define SWIFT_TRACING_COMMON_H
 
 #if SWIFT_STDLIB_TRACING
 
-#define SWIFT_LOG_SUBSYSTEM "com.apple.swift"
-#define SWIFT_LOG_SECTION_SCAN_CATEGORY "SectionScan"
+#include "swift/Runtime/Config.h"
+#include <os/signpost.h>
+
+extern const char *__progname;
 
 namespace swift {
 namespace runtime {
 namespace trace {
 
-os_log_t ScanLog;
-swift::once_t LogsToken;
-bool TracingEnabled;
-
-void setupLogs(void *unused) {
-  if (!shouldEnableTracing()) {
-    TracingEnabled = false;
-    return;
-  }
-
-  TracingEnabled = true;
-  ScanLog = os_log_create(SWIFT_LOG_SUBSYSTEM, SWIFT_LOG_SECTION_SCAN_CATEGORY);
+static inline bool shouldEnableTracing() {
+  if (!SWIFT_RUNTIME_WEAK_CHECK(os_signpost_enabled))
+    return false;
+  if (__progname && (strcmp(__progname, "logd") == 0 ||
+                     strcmp(__progname, "diagnosticd") == 0 ||
+                     strcmp(__progname, "notifyd") == 0))
+    return false;
+  return true;
 }
 
 } // namespace trace
@@ -45,3 +43,5 @@ void setupLogs(void *unused) {
 } // namespace swift
 
 #endif
+
+#endif // SWIFT_TRACING_H
