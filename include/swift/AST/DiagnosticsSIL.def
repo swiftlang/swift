@@ -939,8 +939,6 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 // Old Transfer Non Sendable Diagnostics
 //
 
-ERROR(regionbasedisolation_selforargtransferred, none,
-      "call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller", ())
 ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
       "transferring value of non-Sendable type %0; later accesses could race",
       (Type))
@@ -997,6 +995,9 @@ NOTE(regionbasedisolation_note_arg_passed_to_strongly_transferred_param, none,
 ERROR(regionbasedisolation_named_arg_passed_to_strongly_transferred_param, none,
       "%0 %1 passed as a strongly transferred parameter; Uses in callee could race with later %0 uses",
       (StringRef, Identifier))
+
+ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,
+      "task or actor isolated value cannot be transferred", ())
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,

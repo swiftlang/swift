@@ -912,8 +912,10 @@ public:
                   diag::regionbasedisolation_unknown_pattern);
   }
 
-  void emitMiscUses(SILLocation loc) {
-    diagnoseError(loc, diag::regionbasedisolation_selforargtransferred);
+  void emitUnknownUse(SILLocation loc) {
+    // TODO: This will eventually be an unknown pattern error.
+    diagnoseError(
+        loc, diag::regionbasedisolation_task_or_actor_isolated_transferred);
   }
 
   void emitFunctionArgumentApply(SILLocation loc, Type type,
@@ -1169,7 +1171,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
     }
   }
 
-  diagnosticEmitter.emitMiscUses(loc);
+  diagnosticEmitter.emitUnknownUse(loc);
   return true;
 }
 

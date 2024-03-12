@@ -110,7 +110,7 @@ func transferInAndOut(_ x: transferring NonSendableKlass) -> transferring NonSen
 
 
 func transferReturnArg(_ x: NonSendableKlass) -> transferring NonSendableKlass {
-  return x // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  return x // expected-warning {{task or actor isolated value cannot be transferred}}
 }
 
 // This is safe since we are returning the whole tuple fresh. In contrast,
@@ -130,7 +130,7 @@ func useTransferredResult() async {
 
 extension MainActorIsolatedStruct {
   func testNonSendableErrorReturnWithTransfer() -> transferring NonSendableKlass {
-    return ns // expected-warning {{call site passes `self`}}
+    return ns // expected-warning {{task or actor isolated value cannot be transferred}}
   }
   func testNonSendableErrorReturnNoTransfer() -> NonSendableKlass {
     return ns
@@ -146,7 +146,7 @@ extension MainActorIsolatedEnum {
       return ns
     }
     // TODO: This should be on return ns.
-  } // expected-warning {{call site passes `self`}}
+  } // expected-warning {{task or actor isolated value cannot be transferred}}
 
   func testSwitchReturnNoTransfer() -> NonSendableKlass? {
     switch self {
@@ -162,7 +162,7 @@ extension MainActorIsolatedEnum {
       return ns // TODO: The error below should be here.
     }
     return nil
-  } // expected-warning {{call site passes `self`}} 
+  } // expected-warning {{task or actor isolated value cannot be transferred}} 
 
   func testIfLetReturnNoTransfer() -> NonSendableKlass? {
     if case .second(let ns) = self {
