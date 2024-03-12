@@ -371,6 +371,11 @@ func g()
     f(x: consume x)
 }
 
+func consumeArrayAny() {
+  let a: [Any] = []
+  _ = consume a
+}
+
 /////////////////////////
 // Partial Apply Tests //
 /////////////////////////
