@@ -751,10 +751,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   if (func->hasBody())
     thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
-  /// Record which function this is a thunk for, we'll need this to link back
-  /// calls in case this is a distributed requirement witness.
-  thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));
-
   return thunk;
 }
 
