@@ -559,3 +559,7 @@ SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
 SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
               ArrayRef<TypeDecl *>(SourceFile *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ObjCRequirementMapRequest,
+              ObjCRequirementMap(const ProtocolDecl *proto),
+              Cached, NoLocationInfo)
+

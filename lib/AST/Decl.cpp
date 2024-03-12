@@ -6467,6 +6467,15 @@ ProtocolDecl::getInvertibleProtocolKind() const {
   return std::nullopt;
 }
 
+ObjCRequirementMap ProtocolDecl::getObjCRequiremenMap() const {
+  ObjCRequirementMap defaultMap;
+  if (!isObjC())
+    return defaultMap;
+
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ObjCRequirementMapRequest{this}, defaultMap);
+}
+
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,

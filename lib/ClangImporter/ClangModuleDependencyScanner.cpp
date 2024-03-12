@@ -455,7 +455,6 @@ bool ClangImporter::addHeaderDependencies(
     ModuleDependencyID moduleID,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     ModuleDependenciesCache &cache) {
-  auto &ctx = Impl.SwiftContext;
   auto optionalTargetModule = cache.findDependency(moduleID);
   assert(optionalTargetModule.has_value());
   auto targetModule = *(optionalTargetModule.value());

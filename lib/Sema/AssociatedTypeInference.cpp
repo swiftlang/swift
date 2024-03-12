@@ -1172,23 +1172,6 @@ AssociatedTypeInference::AssociatedTypeInference(
     : ctx(ctx), conformance(conformance), proto(conformance->getProtocol()),
       dc(conformance->getDeclContext()), adoptee(conformance->getType()) {}
 
-static bool associatedTypesAreSameEquivalenceClass(AssociatedTypeDecl *a,
-                                                   AssociatedTypeDecl *b) {
-  if (a == b)
-    return true;
-
-  // TODO: Do a proper equivalence check here by looking for some relationship
-  // between a and b's protocols. In practice today, it's unlikely that
-  // two same-named associated types can currently be independent, since we
-  // don't have anything like `@implements(P.foo)` to rename witnesses (and
-  // we still fall back to name lookup for witnesses in more cases than we
-  // should).
-  if (a->getName() == b->getName())
-    return true;
-
-  return false;
-}
-
 namespace {
 
 /// Try to avoid situations where resolving the type of a witness calls back
@@ -1428,8 +1411,6 @@ static InferenceCandidateKind checkInferenceCandidate(
     NormalProtocolConformance *conformance,
     ValueDecl *witness,
     Type selfTy) {
-  auto &ctx = selfTy->getASTContext();
-
   // The unbound form of `Self.A`.
   auto selfAssocTy = DependentMemberType::get(selfTy, result->first->getName());
   auto genericSig = witness->getInnermostDeclContext()
@@ -1855,16 +1836,6 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   return result;
 }
 
-/// Map error types back to their original types.
-static Type mapErrorTypeToOriginal(Type type) {
-  if (auto errorType = type->getAs<ErrorType>()) {
-    if (auto originalType = errorType->getOriginalType())
-      return originalType.transform(mapErrorTypeToOriginal);
-  }
-
-  return type;
-}
-
 /// Desugar protocol type aliases, since they can cause request cycles in
 /// type resolution if printed in a module interface and parsed back in.
 static Type getWithoutProtocolTypeAliases(Type type) {
@@ -1936,8 +1907,6 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
     return type.subst(QueryTypeSubstitutionMap{substitutions},
                       LookUpConformanceInModule(module));
   }
-
-  auto &ctx = conformance->getDeclContext()->getASTContext();
 
   auto proto = conformance->getProtocol();
   auto selfTy = proto->getSelfInterfaceType();
@@ -2905,8 +2874,6 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   // Attempt to compute abstract type witnesses for associated types that could
   // not resolve otherwise.
   llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
-
-  auto selfTypeInContext = dc->getSelfTypeInContext();
 
   TypeWitnessSystem system(unresolvedAssocTypes);
   collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
