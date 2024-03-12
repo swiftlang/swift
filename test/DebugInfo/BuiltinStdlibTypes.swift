@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend %s -Onone -emit-ir -gdwarf-types -o - | %FileCheck %s
 
+// rdar://124465351
+// UNSUPPORTED: CPU=armv7k
+
 // File is empty as this test check for the builtin stdlib types that should 
 // always be emitted.
 

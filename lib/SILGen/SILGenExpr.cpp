@@ -5422,7 +5422,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   // For move checking purposes, binding always consumes the value whole.
   if (optValue.getType().isMoveOnly() && optValue.getType().isAddress()) {
-    optValue = B.createFormalAccessOpaqueConsumeBeginAccess(loc, optValue);
+    optValue = B.createOpaqueConsumeBeginAccess(loc, optValue);
   }
 
   SILType optValueTy = optValue.getType();

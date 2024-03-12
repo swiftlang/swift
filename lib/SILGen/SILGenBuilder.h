@@ -470,13 +470,8 @@ public:
 
   ManagedValue createOpaqueBorrowBeginAccess(SILLocation loc,
                                              ManagedValue address);
-  ManagedValue createFormalAccessOpaqueBorrowBeginAccess(SILLocation loc,
-                                                         ManagedValue address);
-
   ManagedValue createOpaqueConsumeBeginAccess(SILLocation loc,
                                               ManagedValue address);
-  ManagedValue createFormalAccessOpaqueConsumeBeginAccess(SILLocation loc,
-                                                          ManagedValue address);
 
   using SILBuilder::createBeginBorrow;
   ManagedValue createBeginBorrow(
