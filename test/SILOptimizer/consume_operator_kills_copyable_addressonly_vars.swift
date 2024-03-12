@@ -254,13 +254,12 @@ extension DeferTestProtocol {
         print("123")
     }
 
-    // We do not support moving within a defer right now.
     mutating func deferTestFail1() {
         let selfType = type(of: self)
         let _ = (consume self)
         defer {
             self = selfType.getP()
-            let _ = (consume self) // expected-error {{'consume' applied to value that the compiler does not support}}
+            let _ = (consume self)
         }
         print("123")
     }
@@ -713,4 +712,12 @@ func inoutAndUseTest<T>(_ x: T) {
                                   // expected-note @-1 {{consumed here}}
     useValueAndInOut(&y, consume y) // expected-note {{used here}}
                                   // expected-note @-1 {{consumed here}}
+}
+
+@_silgen_name("consumeInoutAliasable")
+func consumeInoutAliasable<T>(_ x: inout T, other: T) {
+  {
+    _ = consume x
+    x = other
+  }()
 }
