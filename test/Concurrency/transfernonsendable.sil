@@ -249,7 +249,8 @@ bb0(%0 : @guaranteed $MainActorIsolatedEnum):
   debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_enum_data %0 : $MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a race}}
+  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedtakeenumdataaddr : $@convention(method) (@in MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
@@ -257,7 +258,8 @@ bb0(%0 : $*MainActorIsolatedEnum):
   debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = load [take] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a race}}
+  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_enum_switchenum : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned FakeOptional<NonSendableKlass> {
