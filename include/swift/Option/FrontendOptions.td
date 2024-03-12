@@ -306,6 +306,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "disable-objc-interop">,
     HelpText<"Disable Objective-C interop code generation and config directives">;
 
+  def enable_experimental_opaque_type_erasure :
+    Flag<["-"], "enable-experimental-opaque-type-erasure">,
+    HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
+
   def enable_objc_attr_requires_foundation_module :
     Flag<["-"], "enable-objc-attr-requires-foundation-module">,
     HelpText<"Enable requiring uses of @objc to require importing the "
@@ -696,10 +700,6 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
 def bypass_resilience : Flag<["-"], "bypass-resilience-checks">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Ignore all checks for module resilience.">;
-  
-def enable_experimental_opaque_type_erasure : Flag<["-"], "enable-experimental-opaque-type-erasure">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
 
 def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
