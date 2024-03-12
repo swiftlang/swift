@@ -96,3 +96,31 @@ public protocol Greeter4: DistributedActor where ActorSystem == FakeActorSystem 
 // CHECK:     }
 // CHECK:   }
 // CHECK: }
+
+@_DistributedProtocol
+public protocol GreeterMore: DistributedActor where ActorSystem == FakeActorSystem {
+  distributed var name: String { get }
+  distributed func greet(name: String) -> String
+}
+// CHECK: public distributed actor $GreeterMore: GreeterMore,
+// CHECK:    Distributed._DistributedActorStub
+// CHECK: {
+// CHECK:   public typealias ActorSystem = FakeActorSystem
+// CHECK: }
+
+// CHECK: extension GreeterMore where Self: Distributed._DistributedActorStub {
+// CHECK:   public distributed var  name : String {
+// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK:   public distributed func greet(name: String) -> String {
+// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
