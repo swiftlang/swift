@@ -64,6 +64,9 @@ open class ManagedBuffer<Header, Element> {
   deinit {}
 }
 
+@available(*, unavailable)
+extension ManagedBuffer: Sendable {}
+
 extension ManagedBuffer {
   /// Create a new instance of the most-derived class, calling
   /// `factory` on the partially-constructed object to generate
