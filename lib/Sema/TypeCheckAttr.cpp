@@ -4681,6 +4681,16 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     attr->setInvalid();
   }
 
+  // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
+  if (var->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (ownershipKind == ReferenceOwnership::Weak ||
+        ownershipKind == ReferenceOwnership::Unowned) {
+      Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
+               ownershipKind);
+      attr->setInvalid();
+    }
+  }
+
   if (attr->isInvalid())
     return type;
 
