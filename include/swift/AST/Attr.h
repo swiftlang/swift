@@ -2609,28 +2609,6 @@ public:
   }
 };
 
-/// The @_distributedThunkTarget(for:) attribute.
-class DistributedThunkTargetAttr final
-    : public DeclAttribute {
-
-  AbstractFunctionDecl *TargetFunction;
-
-public:
-  DistributedThunkTargetAttr(AbstractFunctionDecl *target)
-      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(),
-                      SourceRange(),
-                      /*Implicit=*/false),
-        TargetFunction(target) {}
-
-  AbstractFunctionDecl *getTargetFunction() const {
-    return TargetFunction;
-  }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::DistributedThunkTarget;
-  }
-};
-
 /// Predicate used to filter MatchingAttributeRange.
 template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
   ToAttributeKind() {}

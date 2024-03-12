@@ -97,3 +97,13 @@ func falseWhenSpecificType(_ x: SpecificType) -> Bool { return x == x }
 
 assert(trueWhenJustEquatable(SpecificType()))
 assert(!falseWhenSpecificType(SpecificType()))
+
+// @_implements on associated types
+protocol PWithAssoc {
+  associatedtype A
+}
+
+struct XWithAssoc: PWithAssoc {
+  @_implements(PWithAssoc, A)
+  typealias __P_A = Int
+}

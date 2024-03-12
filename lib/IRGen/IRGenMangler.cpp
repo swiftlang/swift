@@ -214,6 +214,9 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptorRecord(
                                  const RootProtocolConformance *conformance) {
+  llvm::SaveAndRestore X(AllowInverses,
+                         inversesAllowedIn(conformance->getDeclContext()));
+
   beginMangling();
   appendProtocolConformance(conformance);
   appendOperator("Hc");
@@ -222,6 +225,9 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptorRecord(
 
 std::string IRGenMangler::mangleProtocolConformanceInstantiationCache(
                                  const RootProtocolConformance *conformance) {
+  llvm::SaveAndRestore X(AllowInverses,
+                         inversesAllowedIn(conformance->getDeclContext()));
+
   beginMangling();
   if (isa<NormalProtocolConformance>(conformance)) {
     appendProtocolConformance(conformance);
@@ -511,3 +517,17 @@ IRGenMangler::appendExtendedExistentialTypeShape(CanGenericSignature genSig,
   appendOperator(genSig ? "XG" : "Xg");
 }
 
+std::string
+IRGenMangler::mangleConformanceSymbol(Type type,
+                                      const ProtocolConformance *Conformance,
+                                      const char *Op) {
+llvm::SaveAndRestore X(AllowInverses,
+                       inversesAllowedIn(Conformance->getDeclContext()));
+
+  beginMangling();
+  if (type)
+    appendType(type, nullptr);
+  appendProtocolConformance(Conformance);
+  appendOperator(Op);
+  return finalize();
+}
