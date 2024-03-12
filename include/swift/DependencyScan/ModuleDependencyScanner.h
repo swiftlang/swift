@@ -72,9 +72,8 @@ public:
                           DiagnosticEngine &diags, bool ParallelScan);
 
   /// Identify the scanner invocation's main module's dependencies
-  llvm::ErrorOr<ModuleDependencyInfo> getMainModuleDependencyInfo(
-      ModuleDecl *mainModule,
-      std::optional<SwiftDependencyTracker> tracker = std::nullopt);
+  llvm::ErrorOr<ModuleDependencyInfo>
+  getMainModuleDependencyInfo(ModuleDecl *mainModule);
 
   /// Resolve module dependencies of the given module, computing a full
   /// transitive closure dependency graph.

@@ -446,11 +446,19 @@ NOTE(compiled_module_ignored_reason,none,
      "|it belongs to a framework in the SDK"
      "|loading from module interfaces is preferred"
      "|it's a compiler host module"
-     "|the module name is blocklisted}1",
+     "|the module name is blocklisted,"
+     "|the default is to load from module interfaces}1",
      (StringRef, unsigned))
 NOTE(out_of_date_module_here,none,
      "%select{compiled|cached|forwarding|prebuilt}0 module is out of date: '%1'",
      (unsigned, StringRef))
+NOTE(module_interface_ignored_reason,none,
+     "not defaulting to module interface because %select{%error"
+     "|it is a local module"
+     "|it was blocklisted"
+     "|the reader is a debugger}1"
+     ", preferring binary module at '%0'",
+     (StringRef, unsigned))
 NOTE(module_interface_dependency_out_of_date,none,
      "dependency is out of date: '%0'",
      (StringRef))
