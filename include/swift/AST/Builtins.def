@@ -953,9 +953,9 @@ BUILTIN_MISC_OPERATION(AddressOfBorrowOpaque, "addressOfBorrowOpaque", "", Speci
 BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBorrowOpaque", "", Special)
 
 /// createTask<T>(flags: Int,
+///               initialSerialExecutor: (Builtin.Executor)? = nil,
 ///               taskGroup: Builtin.RawPointer? = nil,
 ///               initialTaskExecutor: (Builtin.Executor)? = nil,
-///               initialExecutor: (Builtin.Executor)? = nil,
 ///               operation: @escaping () async throws -> T)
 ///  -> Builtin.NativeObject, Builtin.RawPointer)
 ///
@@ -963,9 +963,9 @@ BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBo
 BUILTIN_SIL_OPERATION(CreateTask, "createTask", Special)
 
 /// createDiscardingTask(flags: Int,
+///                      initialSerialExecutor: (Builtin.Executor)? = nil,
 ///                      taskGroup: Builtin.RawPointer? = nil,
 ///                      initialTaskExecutor: (Builtin.Executor)? = nil,
-///                      initialExecutor: (Builtin.Executor)? = nil,
 ///                      operation: @escaping () async throws -> ())
 ///  -> (Builtin.NativeObject, Builtin.RawPointer)
 ///

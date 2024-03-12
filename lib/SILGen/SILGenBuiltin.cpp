@@ -1576,6 +1576,14 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   ManagedValue flags = nextArg().getAsSingleValue(SGF);
 
+  ManagedValue initialExecutor = [&] {
+    if (options & CreateTaskOptions::OptionalEverything) {
+      return nextArg().getAsSingleValue(SGF);
+    } else {
+      return emitOptionalNone(ctx.TheExecutorType);
+    }
+  }();
+
   ManagedValue taskGroup = [&] {
     if (options & CreateTaskOptions::OptionalEverything) {
       return nextArg().getAsSingleValue(SGF);
@@ -1638,6 +1646,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   SILValue builtinArgs[] = {
     flags.getUnmanagedValue(),
+    initialExecutor.getUnmanagedValue(),
     taskGroup.getUnmanagedValue(),
     taskExecutor.getUnmanagedValue(),
     functionValue.forward(SGF)

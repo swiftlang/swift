@@ -819,6 +819,7 @@ public:
   llvm::IntegerType *SwiftTaskOptionRecordPtrTy;
   llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::StructType  *SwiftTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialSerialExecutorTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
