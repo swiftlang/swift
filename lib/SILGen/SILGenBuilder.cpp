@@ -1081,28 +1081,6 @@ SILGenBuilder::createOpaqueConsumeBeginAccess(SILLocation loc,
 }
 
 ManagedValue
-SILGenBuilder::createFormalAccessOpaqueBorrowBeginAccess(SILLocation loc,
-                                                         ManagedValue address) {
-  auto access = createBeginAccess(loc, address.getValue(),
-                                  SILAccessKind::Read,
-                                  SILAccessEnforcement::Static,
-                                  /*no nested conflict*/ true, false);
-  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
-  return ManagedValue::forBorrowedAddressRValue(access);
-}
-
-ManagedValue
-SILGenBuilder::createFormalAccessOpaqueConsumeBeginAccess(SILLocation loc,
-                                                          ManagedValue address) {
-  auto access = createBeginAccess(loc, address.forward(SGF),
-                                  SILAccessKind::Deinit,
-                                  SILAccessEnforcement::Static,
-                                  /*no nested conflict*/ true, false);
-  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
-  return SGF.emitFormalAccessManagedRValueWithCleanup(loc, access);
-}
-
-ManagedValue
 SILGenBuilder::createBeginBorrow(SILLocation loc, ManagedValue value,
                                  IsLexical_t isLexical,
                                  BeginBorrowInst::IsFixed_t isFixed) {

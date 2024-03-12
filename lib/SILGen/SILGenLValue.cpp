@@ -634,7 +634,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
                                  LValueTypeData typeData,
                                  SGFAccessKind accessKind,
                                  SILAccessEnforcement enforcement,
-                                 std::optional<ActorIsolation> actorIso) {
+                                 std::optional<ActorIsolation> actorIso,
+                                 bool noNestedConflict = false) {
   auto silAccessKind = SILAccessKind::Modify;
   if (isReadAccess(accessKind))
     silAccessKind = SILAccessKind::Read;
@@ -649,7 +650,7 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
 
   // Enter the access.
   addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
-                                 /*hasNoNestedConflict=*/false,
+                                 noNestedConflict,
                                  /*fromBuiltin=*/false);
 
   // Push a writeback to end it.
@@ -667,10 +668,11 @@ static ManagedValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
                                      LValueTypeData typeData,
                                      SGFAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
-                                     std::optional<ActorIsolation> actorIso) {
+                                     std::optional<ActorIsolation> actorIso,
+                                     bool noNestedConflict = false) {
   return ManagedValue::forLValue(
-      enterAccessScope(SGF, loc, base, addr.getLValueAddress(), typeData,
-                       accessKind, enforcement, actorIso));
+      enterAccessScope(SGF, loc, base, addr.getValue(), typeData,
+                       accessKind, enforcement, actorIso, noNestedConflict));
 }
 
 // Find the base of the formal access at `address`. If the base requires an
@@ -4373,22 +4375,27 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   // Do formal evaluation of the base l-value.
   LValue optLV = visitRec(e->getSubExpr(), baseAccessKind,
                           options.forComputedBaseLValue());
-
+  // For move-checking purposes, the binding is also treated as an opaque use
+  // of the entire value, since we can't leave the value partially initialized
+  // across multiple optional binding expressions.
   LValueTypeData optTypeData = optLV.getTypeData();
   LValueTypeData valueTypeData =
     getOptionalObjectTypeData(SGF, accessKind, optTypeData);
 
   // The chaining operator immediately evaluates the base.
-  // For move-checking purposes, the binding is also treated as an opaque use
-  // of the entire value, since we can't leave the value partially initialized
-  // across multiple optional binding expressions.
+  
   ManagedValue optBase;
   if (isBorrowAccess(baseAccessKind)) {
     optBase = SGF.emitBorrowedLValue(e, std::move(optLV));
     
     if (optBase.getType().isMoveOnly()) {
       if (optBase.getType().isAddress()) {
-        optBase = SGF.B.createFormalAccessOpaqueBorrowBeginAccess(e, optBase);
+        optBase = enterAccessScope(SGF, e, ManagedValue(),
+                                   optBase, optTypeData,
+                                   baseAccessKind,
+                                   SILAccessEnforcement::Static,
+                                   std::nullopt,
+                                   /*no nested conflict*/ true);
         if (optBase.getType().isLoadable(SGF.F)) {
           optBase = SGF.B.createFormalAccessLoadBorrow(e, optBase);
         }
@@ -4400,9 +4407,14 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   } else {
     optBase = SGF.emitAddressOfLValue(e, std::move(optLV));
     
-    if (isConsumeAccess(accessKind)) {
+    if (isConsumeAccess(baseAccessKind)) {
       if (optBase.getType().isMoveOnly()) {
-        optBase = SGF.B.createFormalAccessOpaqueConsumeBeginAccess(e, optBase);
+        optBase = enterAccessScope(SGF, e, ManagedValue(),
+                                   optBase, optTypeData,
+                                   baseAccessKind,
+                                   SILAccessEnforcement::Static,
+                                   std::nullopt,
+                                   /*no nested conflict*/ true);
       } else {
         // Take ownership of the base.
         optBase = SGF.emitFormalAccessManagedRValueWithCleanup(e,
