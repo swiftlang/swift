@@ -1363,16 +1363,14 @@ bool CaptureListEntry::isSimpleSelfCapture(bool excludeWeakCaptures) const {
   auto *expr = PBD->getInit(0);
 
   if (auto *attr = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
-    if (attr->get() == ReferenceOwnership::Weak) {
-      if (excludeWeakCaptures) {
-        return false;
-      }
-
-      // If not excluding weak captures, look through any InjectIntoOptionalExpr
-      if (auto injectExpr = dyn_cast_or_null<InjectIntoOptionalExpr>(expr)) {
-        expr = injectExpr->getSubExpr();
-      }
+    if (attr->get() == ReferenceOwnership::Weak && excludeWeakCaptures) {
+      return false;
     }
+  }
+
+  // Look through any ImplicitConversionExpr that may contain the DRE
+  if (auto conversion = dyn_cast_or_null<ImplicitConversionExpr>(expr)) {
+    expr = conversion->getSubExpr();
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
