@@ -1108,13 +1108,12 @@ struct BridgedBuilder{
 
   SWIFT_IMPORT_UNSAFE
   BridgedInstruction createAllocStack(swift::SILType type,
-                                      bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
+                                      bool hasDynamicLifetime, bool isLexical,
+                                      bool isFromVarDecl, bool wasMoved) const {
     return {builder().createAllocStack(
         regularLoc(), type, llvm::None,
         swift::HasDynamicLifetime_t(hasDynamicLifetime),
-        swift::IsLexical_t(isLexical),
-        // TODO: Add this as an argument.
-        swift::IsNotFromVarDecl,
+        swift::IsLexical_t(isLexical), swift::IsFromVarDecl_t(isFromVarDecl),
         swift::UsesMoveableValueDebugInfo_t(wasMoved))};
   }
 
