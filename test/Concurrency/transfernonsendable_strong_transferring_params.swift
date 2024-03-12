@@ -333,10 +333,19 @@ func testTransferOtherParamTuple(_ x: transferring Klass, y: (Klass, Klass)) asy
   x = y.0
 }
 
-func useSugaredTypeNameWhenEmittingTaskIsolationError(_ x: @escaping @MainActor () async -> ()) {
+func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
   func fakeInit(operation: transferring @escaping () async -> ()) {}
 
-  fakeInit(operation: x) // expected-warning {{task-isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter}}
+  fakeInit(operation: x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
+}
+
+@MainActor func actorIsolatedError(_ x: @escaping @MainActor () async -> ()) {
+  func fakeInit(operation: transferring @escaping () async -> ()) {}
+
+  // TODO: This needs to say actor-isolated.
+  fakeInit(operation: x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
 }
 
 // Make sure we error here on only the second since x by being assigned a part
@@ -347,4 +356,10 @@ func testMergeWithTaskIsolated(_ x: transferring Klass, y: Klass) async {
   // TODO: We need to say that this is task-isolated.
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring nonisolated 'x' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+}
+
+@MainActor func testMergeWithActorIsolated(_ x: transferring Klass, y: Klass) async {
+  x = y
+  await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring main actor-isolated 'x' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
