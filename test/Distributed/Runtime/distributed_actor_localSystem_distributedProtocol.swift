@@ -20,12 +20,24 @@ import Distributed
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
   distributed func hi(name: String)
+
+  distributed var variable: String { get }
+
+  distributed func generic<T: Codable & Sendable>(incoming: T) throws -> T
 }
 
 @available(SwiftStdlib 6.0, *)
 distributed actor Worker: WorkerProtocol {
   distributed func hi(name: String) {
     print("Hi, \(name)!")
+  }
+
+  distributed var variable: String {
+    "implemented!"
+  }
+
+  distributed func generic<T: Codable & Sendable>(incoming: T) throws -> T {
+    return incoming
   }
 }
 
@@ -35,8 +47,16 @@ distributed actor Worker: WorkerProtocol {
   static func main() async throws {
     let system = LocalTestingDistributedActorSystem()
 
-    let actor = Worker(actorSystem: system)
-    try await actor.hi(name: "P") // local calls should still just work
+    let actor: any WorkerProtocol = Worker(actorSystem: system)
+
+    // local calls should still just work
+    try await actor.hi(name: "P")
     // CHECK: Hi, P!
+
+    let v = try await actor.variable
+    print("v = \(v)") // CHECK: v = implemented!
+
+    let echo = try await actor.generic(incoming: "echo!!!")
+    print("echo = \(echo)") // CHECK: echo = echo!!!
   }
 }
