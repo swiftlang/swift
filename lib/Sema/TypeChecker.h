@@ -286,6 +286,8 @@ enum class CheckedCastContextKind {
 };
 
 namespace TypeChecker {
+// DANGER: callers must verify that elementType satisfies the requirements of
+// the Wrapped generic parameter, as this function will not do so!
 Type getOptionalType(SourceLoc loc, Type elementType);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
