@@ -2032,6 +2032,9 @@ ERROR(attr_only_at_non_generic_scope, none,
 ERROR(attr_only_on_static_properties, none,
       "properties with attribute '_section' must be static", (StringRef))
 
+ERROR(weak_unowned_in_embedded_swift, none,
+      "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
+
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 NOTE(access_control_in_protocol_detail,none,
