@@ -21,11 +21,11 @@ public struct ConcreteP: P, Hashable {
 // Check with -enable-experimental-opaque-type-erasure
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t/test1/erasure.swiftinterface) %s -module-name erasure -enable-experimental-opaque-type-erasure -enable-library-evolution
+// RUN: %target-swift-emit-module-interface(%t/test1/erasure.swiftinterface) %s -module-name erasure -enable-experimental-opaque-type-erasure -enable-library-evolution -disable-availability-checking
 // RUN: %FileCheck %s --check-prefix CHECK-INTERFACE < %t/test1/erasure.swiftinterface
 // CHECK-INTERFACE: swift-module-flags:{{.*}} -enable-experimental-opaque-type-erasure
 
-// RUN: %target-swift-frontend -I %t/test1/ -emit-sil %S/Inputs/import_with_opaque_type_erasure.swift | %FileCheck %s --check-prefix CHECK-UNDERLYING-TYPE
+// RUN: %target-swift-frontend -disable-availability-checking -I %t/test1/ -emit-sil %S/Inputs/import_with_opaque_type_erasure.swift | %FileCheck %s --check-prefix CHECK-UNDERLYING-TYPE
 // CHECK-UNDERLYING-TYPE-LABEL: s31import_with_opaque_type_erasure6erasedQrvg
 // CHECK-UNDERLYING-TYPE: bb0(%0 : $*AnyP):
 // CHECK-UNDERLYING-TYPE: function_ref @$s7erasure14testTypeErasedQryF : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <AnyP>
@@ -33,11 +33,11 @@ public struct ConcreteP: P, Hashable {
 
 // Check with -enable-experimental-feature OpaqueTypeErasure
 
-// RUN: %target-swift-emit-module-interface(%t/test2/erasure.swiftinterface) %s -module-name erasure -enable-experimental-feature OpaqueTypeErasure -enable-library-evolution
+// RUN: %target-swift-emit-module-interface(%t/test2/erasure.swiftinterface) %s -module-name erasure -enable-experimental-feature OpaqueTypeErasure -enable-library-evolution -disable-availability-checking
 // RUN: %FileCheck %s --check-prefix CHECK-INTERFACE2 < %t/test2/erasure.swiftinterface
 // CHECK-INTERFACE2: swift-module-flags:{{.*}} -enable-experimental-feature OpaqueTypeErasure
 
-// RUN: %target-swift-frontend -I %t/test2/ -emit-sil %S/Inputs/import_with_opaque_type_erasure.swift | %FileCheck %s --check-prefix CHECK-UNDERLYING-TYPE2
+// RUN: %target-swift-frontend -disable-availability-checking -I %t/test2/ -emit-sil %S/Inputs/import_with_opaque_type_erasure.swift | %FileCheck %s --check-prefix CHECK-UNDERLYING-TYPE2
 // CHECK-UNDERLYING-TYPE2-LABEL: s31import_with_opaque_type_erasure6erasedQrvg
 // CHECK-UNDERLYING-TYPE2: bb0(%0 : $*AnyP):
 // CHECK-UNDERLYING-TYPE2: function_ref @$s7erasure14testTypeErasedQryF : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <AnyP>
