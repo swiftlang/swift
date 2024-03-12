@@ -110,7 +110,14 @@ func transferInAndOut(_ x: transferring NonSendableKlass) -> transferring NonSen
 
 
 func transferReturnArg(_ x: NonSendableKlass) -> transferring NonSendableKlass {
-  return x // expected-warning {{task or actor isolated value cannot be transferred}}
+  return x // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{task-isolated 'x' cannot be a transferring result. task-isolated uses may race with caller uses}}
+}
+
+// TODO: This will be fixed once I represent @MainActor on func types.
+@MainActor func transferReturnArgMainActor(_ x: NonSendableKlass) -> transferring NonSendableKlass {
+  return x // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{task-isolated 'x' cannot be a transferring result. task-isolated uses may race with caller uses}}
 }
 
 // This is safe since we are returning the whole tuple fresh. In contrast,
@@ -130,7 +137,8 @@ func useTransferredResult() async {
 
 extension MainActorIsolatedStruct {
   func testNonSendableErrorReturnWithTransfer() -> transferring NonSendableKlass {
-    return ns // expected-warning {{task or actor isolated value cannot be transferred}}
+    return ns // expected-warning {{transferring 'self.ns' may cause a race}}
+    // expected-note @-1 {{main actor-isolated 'self.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
   }
   func testNonSendableErrorReturnNoTransfer() -> NonSendableKlass {
     return ns

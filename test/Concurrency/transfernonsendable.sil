@@ -222,7 +222,8 @@ bb0(%0 : @guaranteed $NonSendableStruct):
   debug_value %0 : $NonSendableStruct, var, name "myname"
   %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a race}}
+  // expected-note @-1 {{task-isolated 'myname.ns' cannot be a transferring result. task-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_struct_structextract : $@convention(method) (@guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
@@ -230,7 +231,8 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
   debug_value %0 : $MainActorIsolatedStruct, var, name "myname"
   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a race}}
+  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_struct_structelementaddr : $@convention(method) (@in_guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
@@ -238,7 +240,8 @@ bb0(%0 : $*MainActorIsolatedStruct):
   debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = load [copy] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a race}}
+  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedenumdata : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
