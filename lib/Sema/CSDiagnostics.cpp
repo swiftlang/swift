@@ -5863,12 +5863,16 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
 
     // Move requires postfix comma only if argument is moved in-between
     // other arguments.
-    bool requiresComma =
-        !isExpr<BinaryExpr>(anchor) && PrevArgIdx != args->size() - 1;
+    std::string argumentSeparator;
+    if (auto *BE = getAsExpr<BinaryExpr>(anchor)) {
+      auto operatorName = std::string(*getOperatorName(BE->getFn()));
+      argumentSeparator = " " + operatorName + " ";
+    } else if (PrevArgIdx != args->size() - 1) {
+      argumentSeparator = ", ";
+    }
 
     diag.fixItRemove(removalRange);
-    diag.fixItInsert(secondRange.Start,
-                     text.str() + (requiresComma ? ", " : ""));
+    diag.fixItInsert(secondRange.Start, text.str() + argumentSeparator);
   };
 
   // There are 4 diagnostic messages variations depending on
