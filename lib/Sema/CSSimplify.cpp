@@ -5578,6 +5578,35 @@ bool ConstraintSystem::repairFailures(
     return false;
   }
 
+  if (auto *VD = getAsDecl<ValueDecl>(anchor)) {
+    // Matching a witness to a ObjC protocol requirement.
+    if (VD->isObjC() && VD->isProtocolRequirement() &&
+        path[0].is<LocatorPathElt::Witness>() && 
+        // Note that the condition below is very important,
+        // we need to wait until the very last moment to strip
+        // the concurrency annotations from the inner most type.
+        conversionsOrFixes.empty()) {
+      // `swift_attr` attributes in the type context were ignored before,
+      // which means that we need to maintain status quo to avoid breaking
+      // witness matching by stripping everything concurrency related from
+      // inner types in non-full checking mode.
+      if (!(Context.isSwiftVersionAtLeast(6) ||
+            Context.LangOpts.StrictConcurrencyLevel ==
+                StrictConcurrency::Complete)) {
+        auto strippedLHS = lhs->stripConcurrency(/*resursive=*/true,
+                                                 /*dropGlobalActor=*/true);
+        auto strippedRHS = rhs->stripConcurrency(/*resursive=*/true,
+                                                 /*dropGlobalActor=*/true);
+        auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
+                                 flags | TMF_ApplyingFix, locator);
+        if (!result.isFailure()) {
+          increaseScore(SK_MissingSynthesizableConformance, locator);
+          return true;
+        }
+      }
+    }
+  }
+
   auto elt = path.back();
   switch (elt.getKind()) {
   case ConstraintLocator::LValueConversion: {
