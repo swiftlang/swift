@@ -54,11 +54,52 @@ public enum CommandLine {
     return _unsafeArgv
   }
 
-  /// Access to the Swift command line arguments.
-  // Use lazy initialization of static properties to 
-  // safely initialize the swift arguments.
-  public static var arguments: [String]
-    = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
+  // This is extremely unsafe and allows for concurrent writes with no
+  // synchronization to the underlying data. In a future version of Swift you
+  // will not be able to write to 'CommandLine.arguments'.
+  static nonisolated(unsafe) var _arguments: [String] = (0 ..< Int(argc)).map {
+    String(cString: _unsafeArgv[$0]!)
+  }
+
+  /// An array that provides access to this program's command line arguments.
+  ///
+  /// Use `CommandLine.arguments` to access the command line arguments used
+  /// when executing the current program. The name of the executed program is
+  /// the first argument.
+  ///
+  /// The following example shows a command line executable that squares the
+  /// integer given as an argument.
+  ///
+  ///     if CommandLine.arguments.count == 2,
+  ///        let number = Int(CommandLine.arguments[1]) {
+  ///         print("\(number) x \(number) is \(number * number)")
+  ///     } else {
+  ///         print(
+  ///           """
+  ///           Error: Please provide a number to square.
+  ///           Usage: command <number>
+  ///           """
+  ///         )
+  ///     }
+  ///
+  /// Running the program results in the following output:
+  ///
+  ///     $ command 5
+  ///     5 x 5 is 25
+  ///     $ command ZZZ
+  ///     Error: Please provide a number to square.
+  ///     Usage: command <number>
+  public static var arguments: [String] {
+    get {
+      _arguments
+    }
+
+    @available(*, deprecated, message: "Do not modify CommandLine.arguments. It will become read-only in a future version of Swift.")
+    @available(swift, obsoleted: 6.0)
+    set {
+      _arguments = newValue
+    }
+  }
 }
 
 @available(*, unavailable)
