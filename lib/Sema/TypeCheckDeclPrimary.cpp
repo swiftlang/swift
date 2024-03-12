@@ -3332,9 +3332,8 @@ public:
       }
     }
 
-    if (CD->isDistributedActor()) {
-      TypeChecker::checkDistributedActor(SF, CD);
-    }
+    // Check distributed actors
+    TypeChecker::checkDistributedActor(SF, CD);
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
@@ -3945,8 +3944,7 @@ public:
 
     checkExplicitAvailability(ED);
 
-    if (nominal->isDistributedActor())
-      TypeChecker::checkDistributedActor(SF, nominal);
+    TypeChecker::checkDistributedActor(SF, nominal);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
     diagnoseExtensionOfMarkerProtocol(ED);
