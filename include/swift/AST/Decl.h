@@ -5074,6 +5074,35 @@ enum class KnownDerivableProtocolKind : uint8_t {
 
 using PrimaryAssociatedTypeName = std::pair<Identifier, SourceLoc>;
 
+/// A wrapper for a dictionary that maps Obj-C protocol requirement selectors to
+/// a list of function decls.
+class ObjCRequirementMap {
+public:
+  using FunctionList = TinyPtrVector<AbstractFunctionDecl *>;
+
+private:
+  using MethodKey = std::pair<ObjCSelector, char>;
+  llvm::SmallDenseMap<MethodKey, FunctionList, 4> storage;
+
+  static MethodKey getObjCMethodKey(AbstractFunctionDecl *func);
+
+public:
+  void addRequirement(AbstractFunctionDecl *requirement) {
+    storage[getObjCMethodKey(requirement)].push_back(requirement);
+  }
+
+  /// Retrieve the Objective-C requirements in this protocol that have the
+  /// given Objective-C method key.
+  FunctionList getRequirements(AbstractFunctionDecl *requirement) const {
+    auto key = getObjCMethodKey(requirement);
+    auto known = storage.find(key);
+    if (known == storage.end())
+      return {};
+
+    return known->second;
+  }
+};
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -5302,6 +5331,10 @@ public:
   /// Determine if this is an invertible protocol and return its kind,
   /// i.e., for a protocol P, returns the kind if inverse constraint ~P exists.
   std::optional<InvertibleProtocolKind> getInvertibleProtocolKind() const;
+
+  /// Returns a dictionary that maps Obj-C protocol requirement selectors to a
+  /// list of function decls.
+  ObjCRequirementMap getObjCRequiremenMap() const;
 
 private:
   void computeKnownProtocolKind() const;
