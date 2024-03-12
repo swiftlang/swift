@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -strict-concurrency=targeted -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
