@@ -598,6 +598,12 @@ bool specializeClassMethodInst(ClassMethodInst *cm);
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
                                  bool isMandatory);
+
+/// Instantiate the specified type by recursively tupling and structing the
+/// unique instances of the empty types and undef "instances" of the non-empty
+/// types aggregated together at each level.
+SILValue createEmptyAndUndefValue(SILType ty, SILInstruction *insertionPoint,
+                                  SILBuilderContext &ctx, bool noUndef = false);
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
