@@ -240,12 +240,21 @@ struct ModuleRebuildInfo {
     InterfacePreferred,
     CompilerHostModule,
     Blocklisted,
+    DistributedInterfaceByDefault,
+  };
+  // Keep aligned with diag::module_interface_ignored_reason.
+  enum class ReasonModuleInterfaceIgnored {
+    NotIgnored,
+    LocalModule,
+    Blocklisted,
+    Debugger,
   };
   struct CandidateModule {
     std::string path;
     std::optional<serialization::Status> serializationStatus;
     ModuleKind kind;
     ReasonIgnored reasonIgnored;
+    ReasonModuleInterfaceIgnored reasonModuleInterfaceIgnored;
     SmallVector<std::string, 10> outOfDateDependencies;
     SmallVector<std::string, 10> missingDependencies;
   };
@@ -259,6 +268,7 @@ struct ModuleRebuildInfo {
                                 std::nullopt,
                                 ModuleKind::Normal,
                                 ReasonIgnored::NotIgnored,
+                                ReasonModuleInterfaceIgnored::NotIgnored,
                                 {},
                                 {}});
     return candidateModules.back();
@@ -290,11 +300,19 @@ struct ModuleRebuildInfo {
         .missingDependencies.push_back(depPath.str());
   }
 
-  /// Sets the reason that the module at \c path was ignored. If this is
+  /// Sets the reason that the module at \c modulePath was ignored. If this is
   /// anything besides \c NotIgnored a note will be added stating why the module
   /// was ignored.
   void addIgnoredModule(StringRef modulePath, ReasonIgnored reasonIgnored) {
     getOrInsertCandidateModule(modulePath).reasonIgnored = reasonIgnored;
+  }
+
+  /// Record why no swiftinterfaces were preferred over the binary swiftmodule
+  /// at \c modulePath.
+  void addIgnoredModuleInterface(StringRef modulePath,
+                                 ReasonModuleInterfaceIgnored reasonIgnored) {
+    getOrInsertCandidateModule(modulePath).reasonModuleInterfaceIgnored =
+                                                                 reasonIgnored;
   }
 
   /// Determines if we saw the given module path and registered is as out of
@@ -367,7 +385,7 @@ struct ModuleRebuildInfo {
     // We may have found multiple failing modules, that failed for different
     // reasons. Emit a note for each of them.
     for (auto &mod : candidateModules) {
-      // If a the compiled module was ignored, diagnose the reason.
+      // If the compiled module was ignored, diagnose the reason.
       if (mod.reasonIgnored != ReasonIgnored::NotIgnored) {
         diags.diagnose(loc, diag::compiled_module_ignored_reason, mod.path,
                        (unsigned)mod.reasonIgnored);
@@ -397,6 +415,19 @@ struct ModuleRebuildInfo {
           diags.diagnose(loc, diag::compiled_module_invalid, mod.path);
         }
       }
+    }
+  }
+
+  /// Emits a diagnostic for the reason why binary swiftmodules were preferred
+  /// over textual swiftinterfaces.
+  void diagnoseIgnoredModuleInterfaces(ASTContext &ctx, SourceLoc loc) {
+    for (auto &mod : candidateModules) {
+      auto interfaceIgnore = mod.reasonModuleInterfaceIgnored;
+      if (interfaceIgnore == ReasonModuleInterfaceIgnored::NotIgnored)
+        continue;
+
+      ctx.Diags.diagnose(loc, diag::module_interface_ignored_reason,
+                         mod.path, (unsigned)interfaceIgnore);
     }
   }
 };
@@ -761,6 +792,12 @@ class ModuleInterfaceLoaderImpl {
     return pathStartsWith(hostPath, path);
   }
 
+  bool isInSDK(StringRef path) {
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
+    if (sdkPath.empty()) return false;
+    return pathStartsWith(sdkPath, path);
+  }
+
   bool isInSystemFrameworks(StringRef path, bool publicFramework) {
     StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
     if (sdkPath.empty()) return false;
@@ -775,26 +812,64 @@ class ModuleInterfaceLoaderImpl {
 
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
     using ReasonIgnored = ModuleRebuildInfo::ReasonIgnored;
+    using ReasonModuleInterfaceIgnored =
+                               ModuleRebuildInfo::ReasonModuleInterfaceIgnored;
     std::pair<std::string, std::string> result;
-    // Should we attempt to load a swiftmodule adjacent to the swiftinterface?
-    bool shouldLoadAdjacentModule = !ctx.IgnoreAdjacentModules;
 
-    if (modulePath.contains(".sdk")) {
-      if (ctx.blockListConfig.hasBlockListAction(moduleName,
-          BlockListKeyKind::ModuleName, BlockListAction::ShouldUseTextualModule)) {
-        shouldLoadAdjacentModule = false;
-        rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::Blocklisted);
+    bool ignoreByDefault = ctx.blockListConfig.hasBlockListAction(
+                                       "Swift_UseSwiftinterfaceByDefault",
+                                       BlockListKeyKind::ModuleName,
+                                       BlockListAction::ShouldUseBinaryModule);
+    bool shouldLoadAdjacentModule;
+    if (ignoreByDefault) {
+      ReasonModuleInterfaceIgnored ignore =
+        ReasonModuleInterfaceIgnored::NotIgnored;
+
+      if (!isInSDK(modulePath) &&
+          !isInResourceHostDir(modulePath)) {
+        ignore = ReasonModuleInterfaceIgnored::LocalModule;
+      } else if (ctx.blockListConfig.hasBlockListAction(moduleName,
+                                     BlockListKeyKind::ModuleName,
+                                     BlockListAction::ShouldUseBinaryModule)) {
+        ignore = ReasonModuleInterfaceIgnored::Blocklisted;
+      } else if (ctx.LangOpts.DebuggerSupport) {
+        ignore = ReasonModuleInterfaceIgnored::Debugger;
       }
-    }
 
-    // Don't use the adjacent swiftmodule for frameworks from the public
-    // Frameworks folder of the SDK.
-    if (isInSystemFrameworks(modulePath, /*publicFramework*/true)) {
-      shouldLoadAdjacentModule = false;
-      rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::PublicFramework);
-    } else if (isInResourceHostDir(modulePath)) {
-      shouldLoadAdjacentModule = false;
-      rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::CompilerHostModule);
+      shouldLoadAdjacentModule =
+        ignore != ReasonModuleInterfaceIgnored::NotIgnored;
+      if (shouldLoadAdjacentModule) {
+        // Prefer the swiftmodule.
+        rebuildInfo.addIgnoredModuleInterface(modulePath, ignore);
+      } else {
+        // Prefer the swiftinterface.
+        rebuildInfo.addIgnoredModule(modulePath,
+                                 ReasonIgnored::DistributedInterfaceByDefault);
+      }
+    } else {
+      // Should we attempt to load a swiftmodule adjacent to the swiftinterface?
+      shouldLoadAdjacentModule = !ctx.IgnoreAdjacentModules;
+
+      if (modulePath.contains(".sdk")) {
+        if (ctx.blockListConfig.hasBlockListAction(moduleName,
+                                    BlockListKeyKind::ModuleName,
+                                    BlockListAction::ShouldUseTextualModule)) {
+          shouldLoadAdjacentModule = false;
+          rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::Blocklisted);
+        }
+      }
+
+      // Don't use the adjacent swiftmodule for frameworks from the public
+      // Frameworks folder of the SDK.
+      if (isInSystemFrameworks(modulePath, /*publicFramework*/true)) {
+        shouldLoadAdjacentModule = false;
+        rebuildInfo.addIgnoredModule(modulePath,
+                                     ReasonIgnored::PublicFramework);
+      } else if (isInResourceHostDir(modulePath)) {
+        shouldLoadAdjacentModule = false;
+        rebuildInfo.addIgnoredModule(modulePath,
+                                     ReasonIgnored::CompilerHostModule);
+      }
     }
 
     switch (loadMode) {
@@ -1081,8 +1156,10 @@ class ModuleInterfaceLoaderImpl {
     // If we errored with anything other than 'no such file or directory',
     // fail this load and let the other module loader diagnose it.
     if (!moduleOrErr &&
-        moduleOrErr.getError() != std::errc::no_such_file_or_directory)
+        moduleOrErr.getError() != std::errc::no_such_file_or_directory) {
+      rebuildInfo.diagnoseIgnoredModuleInterfaces(ctx, diagnosticLoc);
       return moduleOrErr.getError();
+    }
 
     // We discovered a module! Return that module's buffer so we can load it.
     if (moduleOrErr) {
@@ -1104,6 +1181,7 @@ class ModuleInterfaceLoaderImpl {
                                            /*IsSystem=*/dep.isSDKRelative());
         }
       }
+
 
       return std::move(module.moduleBuffer);
     }
