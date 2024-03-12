@@ -2106,9 +2106,6 @@ namespace {
       repr->setInvalid();
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
-
-    bool diagnoseMoveOnlyGeneric(TypeRepr *repr,
-                                 Type unboundTy, Type genericArgTy);
     
     bool diagnoseDisallowedExistential(TypeRepr *repr);
     
@@ -2496,33 +2493,6 @@ bool TypeResolver::diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr) {
   if (repr->getConstraint()->isInvalid()){
     if (isa<PlaceholderTypeRepr>(repr->getConstraint()))
       return true;
-  }
-  return false;
-}
-
-/// Checks the given type, assuming that it appears as an argument for a
-/// generic parameter in the \c repr, to see if it is move-only.
-///
-/// Because generic type parameters currently all assume copyability of
-/// the substituted type, it's an error for a move-only type to appear
-/// as an argument for type parameters.
-///
-/// returns true if an error diagnostic was emitted
-bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
-                                           Type unboundTy,
-                                           Type genericArgTy) {
-  if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return false;
-
-  if (genericArgTy->isNoncopyable()) {
-    if (unboundTy) {
-      diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_specific,
-                      genericArgTy, unboundTy);
-    } else {
-      diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics,
-                      genericArgTy);
-    }
-    return true;
   }
   return false;
 }
@@ -5011,17 +4981,26 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   // If the standard library isn't loaded, we ought to let the user know
   // something has gone terribly wrong, since the rest of the compiler is going
   // to assume it can canonicalize [T] to Array<T>.
-  if (!ctx.getArrayDecl()) {
-    ctx.Diags.diagnose(repr->getBrackets().Start,
-                       diag::sugar_type_not_found, 0);
-    return ErrorType::get(ctx);
-  }
+  {
+    // Check that we can validly substitute the baseTy into an array. We do not
+    // actually resolve to that valid array type, as we want to return the
+    // sugared Type node ArraySliceType instead!
+    auto *arrayDecl = ctx.getArrayDecl();
+    if (!arrayDecl) {
+      ctx.Diags.diagnose(repr->getBrackets().Start,
+                         diag::sugar_type_not_found, 0);
+      return ErrorType::get(ctx);
+    }
 
-  // do not allow move-only types in an array
-  if (diagnoseMoveOnlyGeneric(repr,
-                              ctx.getArrayDecl()->getDeclaredInterfaceType(),
-                              baseTy)) {
-    return ErrorType::get(ctx);
+    Type genericArgs[1] = {baseTy};
+    auto arrayTy =
+        resolution.applyUnboundGenericArguments(arrayDecl,
+            /*parentTy=*/nullptr,
+                                                repr->getBrackets().Start,
+                                                genericArgs);
+    if (arrayTy->hasError()) {
+      return ErrorType::get(ctx);
+    }
   }
 
   return ArraySliceType::get(baseTy);
@@ -5116,11 +5095,17 @@ NeverNullType TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
     return ErrorType::get(ctx);
   }
 
-  // do not allow move-only types in an optional
-  if (diagnoseMoveOnlyGeneric(repr,
-                              ctx.getOptionalDecl()->getDeclaredInterfaceType(),
-                              baseTy)) {
-    return ErrorType::get(ctx);
+  {
+    // Check that we can validly substitute the baseTy into an Optional
+    Type genericArgs[1] = {baseTy};
+    auto substTy =
+        resolution.applyUnboundGenericArguments(ctx.getOptionalDecl(),
+                                                /*parentTy=*/nullptr,
+                                                repr->getQuestionLoc(),
+                                                genericArgs);
+    if (substTy->hasError()) {
+      return ErrorType::get(ctx);
+    }
   }
 
   return optionalTy;
@@ -5221,11 +5206,17 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     return ErrorType::get(ctx);
   }
 
-  // do not allow move-only types in an implicitly-unwrapped optional
-  if (diagnoseMoveOnlyGeneric(repr,
-                              ctx.getOptionalDecl()->getDeclaredInterfaceType(),
-                              baseTy)) {
-    return ErrorType::get(ctx);
+  {
+    // Check that we can validly substitute the baseTy into an Optional
+    Type genericArgs[1] = {baseTy};
+    auto substTy =
+        resolution.applyUnboundGenericArguments(ctx.getOptionalDecl(),
+            /*parentTy=*/nullptr,
+                                                repr->getExclamationLoc(),
+                                                genericArgs);
+    if (substTy->hasError()) {
+      return ErrorType::get(ctx);
+    }
   }
 
   return uncheckedOptionalTy;

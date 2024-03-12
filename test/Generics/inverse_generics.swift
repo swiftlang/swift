@@ -484,3 +484,14 @@ struct SSS: ~Copyable, PPP {}
 protocol PPP: ~Copyable {}
 let global__old__: any PPP = SSS() // expected-error {{value of type 'SSS' does not conform to specified type 'Copyable'}}
 let global__new__: any PPP & ~Copyable = SSS()
+
+
+struct Example<T> {}
+
+struct TestResolution {
+  var maybeNC: NC? = nil // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var maybeIOUNC: NC! = nil // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var arrayNC: [NC] = [] // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var dictNC: [String: NC] = [:] // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var exampleNC: Example<NC> = Example() // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+}
