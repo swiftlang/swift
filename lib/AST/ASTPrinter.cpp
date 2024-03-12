@@ -3083,6 +3083,14 @@ static void suppressingFeatureIsolatedAny(PrintOptions &options,
   action();
 }
 
+static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Implements);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -5512,32 +5520,6 @@ void Decl::printInherited(ASTPrinter &Printer, const PrintOptions &Opts) const {
   printer.printInherited(this);
 }
 
-/// Determine whether this typealias is an inferred typealias "Failure" that
-/// would conflict with another entity named failure in the same type.
-static bool isConflictingFailureTypeWitness(
-    const TypeAliasDecl *typealias) {
-  if (!typealias->isImplicit())
-    return false;
-
-  ASTContext &ctx = typealias->getASTContext();
-  if (typealias->getName() != ctx.Id_Failure)
-    return false;
-
-  auto nominal = typealias->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  // Look for another entity with the same name.
-  auto lookupResults = nominal->lookupDirect(
-      typealias->getName(), typealias->getLoc());
-  for (auto found : lookupResults) {
-    if (found != typealias)
-      return true;
-  }
-
-  return false;
-}
-
 bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
   // Skip getters/setters. They are part of the variable or subscript.
   if (isa<AccessorDecl>(this))
@@ -5575,14 +5557,6 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
 
   if (isa<IfConfigDecl>(this)) {
     return PO.PrintIfConfig;
-  }
-
-  // Prior to Swift 6, we shouldn't print the inferred associated type
-  // witness for AsyncSequence.Failure. It is always determined from the
-  // AsyncIteratorProtocol witness.
-  if (auto typealias = dyn_cast<TypeAliasDecl>(this)) {
-    if (isConflictingFailureTypeWitness(typealias))
-      return false;
   }
 
   // Print everything else.

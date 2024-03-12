@@ -231,6 +231,17 @@ static bool containsConcreteDependentMemberType(Type ty) {
   });
 }
 
+/// Determine whether this is the AsyncIteratorProtocol.Failure or
+/// AsyncSequence.Failure associated type.
+static bool isAsyncIteratorOrSequenceFailure(AssociatedTypeDecl *assocType) {
+  auto proto = assocType->getProtocol();
+  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) &&
+      !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
+    return false;
+
+  return assocType->getName() == assocType->getASTContext().Id_Failure;
+}
+
 static void recordTypeWitness(NormalProtocolConformance *conformance,
                               AssociatedTypeDecl *assocType,
                               Type type,
@@ -254,13 +265,39 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
 
   // If there was no type declaration, synthesize one.
   if (typeDecl == nullptr) {
+    Identifier name;
+    bool needsImplementsAttr;
+    if (isAsyncIteratorOrSequenceFailure(assocType)) {
+      // Use __<protocol>_<assocType> as the name, to keep it out of the
+      // way of other names.
+      llvm::SmallString<32> nameBuffer;
+      nameBuffer += "__";
+      nameBuffer += assocType->getProtocol()->getName().str();
+      nameBuffer += "_";
+      nameBuffer += assocType->getName().str();
+
+      name = ctx.getIdentifier(nameBuffer);
+      needsImplementsAttr = true;
+    } else {
+      // Declare a typealias with the same name as the associated type.
+      name = assocType->getName();
+      needsImplementsAttr = false;
+    }
+
     auto aliasDecl = new (ctx) TypeAliasDecl(
-        SourceLoc(), SourceLoc(), assocType->getName(), SourceLoc(),
+        SourceLoc(), SourceLoc(), name, SourceLoc(),
         /*genericparams*/ nullptr, dc);
     aliasDecl->setUnderlyingType(type);
     
     aliasDecl->setImplicit();
     aliasDecl->setSynthesized();
+
+    // If needed, add an @_implements(Protocol, Name) attribute.
+    if (needsImplementsAttr) {
+      auto attr = ImplementsAttr::create(
+          dc, assocType->getProtocol(), assocType->getName());
+      aliasDecl->getAttrs().add(attr);
+    }
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     auto nominal = dc->getSelfNominalTypeDecl();
@@ -395,17 +432,6 @@ static bool isAsyncSequenceFailure(AssociatedTypeDecl *assocType) {
   return assocType->getName() == assocType->getASTContext().Id_Failure;
 }
 
-/// Determine whether this is the AsyncIteratorProtocol.Failure or
-/// AsyncSequence.Failure associated type.
-static bool isAsyncIteratorOrSequenceFailure(AssociatedTypeDecl *assocType) {
-  auto proto = assocType->getProtocol();
-  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) &&
-      !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
-    return false;
-
-  return assocType->getName() == assocType->getASTContext().Id_Failure;
-}
-
 /// Attempt to resolve a type witness via member name lookup.
 static ResolveWitnessResult resolveTypeWitnessViaLookup(
                        NormalProtocolConformance *conformance,
@@ -429,7 +455,8 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     abort();
   }
 
-  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers);
+  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes |
+                          NL_ProtocolMembers | NL_IncludeAttributeImplements);
 
   // Look for a member type with the same name as the associated type.
   SmallVector<ValueDecl *, 4> candidates;
@@ -453,6 +480,16 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
 
     // Skip other associated types.
     if (isa<AssociatedTypeDecl>(typeDecl))
+      continue;
+
+    // If the name doesn't match and there's no appropriate @_implements
+    // attribute, skip this candidate.
+    //
+    // Also skip candidates in protocol extensions, because they tend to cause
+    // request cycles. We'll look at those during associated type inference.
+    if (assocType->getName() != typeDecl->getName() &&
+        !(witnessHasImplementsAttrForRequiredName(typeDecl, assocType) &&
+          !typeDecl->getDeclContext()->getSelfProtocolDecl()))
       continue;
 
     auto *genericDecl = cast<GenericTypeDecl>(typeDecl);
@@ -2008,7 +2045,8 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
 
   NLOptions subOptions = (NL_QualifiedDefault |
                           NL_OnlyTypes |
-                          NL_ProtocolMembers);
+                          NL_ProtocolMembers |
+                          NL_IncludeAttributeImplements);
 
   // Look for types with the given default name that have appropriate
   // @_implements attributes.
@@ -2028,6 +2066,12 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     // We only find these within a protocol extension.
     auto defaultProto = typeDecl->getDeclContext()->getSelfProtocolDecl();
     if (!defaultProto)
+      continue;
+
+    // If the name doesn't match and there's no appropriate @_implements
+    // attribute, skip this candidate.
+    if (defaultName.getBaseName() != typeDecl->getName() &&
+        !witnessHasImplementsAttrForRequiredName(typeDecl, assocType))
       continue;
 
     // Determine the witness type.
