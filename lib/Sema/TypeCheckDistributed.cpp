@@ -686,7 +686,7 @@ void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal) {
-  if (!nominal)
+  if (!nominal || !nominal->isDistributedActor())
     return;
 
   // ==== Ensure the Distributed module is available,
