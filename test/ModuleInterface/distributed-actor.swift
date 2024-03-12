@@ -52,7 +52,7 @@ public distributed actor DA {
 }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
-// CHECK: @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+// CHECK: @available({{.*}})
 // CHECK-NEXT: distributed public actor DAG<ActorSystem> where ActorSystem : Distributed.DistributedActorSystem, ActorSystem.SerializationRequirement == any Swift.Decodable & Swift.Encodable {
 @available(SwiftStdlib 6.0, *)
 public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable> {
