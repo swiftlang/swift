@@ -2387,14 +2387,6 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
-  using DistributedThunkTargetDeclAttrLayout = BCRecordLayout<
-      DistributedThunkTarget_DECL_ATTR,
-      BCFixed<1>, // implicit flag
-      DeclIDField // target function
-          // FIXME: not entirely right?
-  >;
-
-
   using TypeEraserDeclAttrLayout = BCRecordLayout<
     TypeEraser_DECL_ATTR,
     BCFixed<1>, // implicit flag

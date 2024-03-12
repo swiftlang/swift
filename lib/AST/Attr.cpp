@@ -1918,8 +1918,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "_section";
   case DeclAttrKind::Documentation:
     return "_documentation";
-  case DeclAttrKind::DistributedThunkTarget:
-    return "_distributedThunkTarget";
   case DeclAttrKind::Nonisolated:
     if (cast<NonisolatedAttr>(this)->isUnsafe()) {
         return "nonisolated(unsafe)";
