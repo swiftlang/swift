@@ -260,6 +260,8 @@ public:
   }
 
   void emitVTable() {
+    PrettyStackTraceDecl("silgen emitVTable", theClass);
+
     // Imported types don't have vtables right now.
     if (theClass->hasClangNode())
       return;
@@ -1118,6 +1120,8 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
+    PrettyStackTraceDecl("silgen emitType", theType);
+
     SGM.emitLazyConformancesForType(theType);
 
     for (Decl *member : theType->getABIMembers()) {
@@ -1292,6 +1296,8 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
+    PrettyStackTraceDecl("silgen emitExtension", e);
+
     // Arguably, we should divert to SILGenType::emitType() here if it's an
     // @_objcImplementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
