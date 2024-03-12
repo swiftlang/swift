@@ -222,7 +222,7 @@ bb0(%0 : @guaranteed $NonSendableStruct):
   debug_value %0 : $NonSendableStruct, var, name "myname"
   %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_struct_structextract : $@convention(method) (@guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
@@ -230,7 +230,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
   debug_value %0 : $MainActorIsolatedStruct, var, name "myname"
   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_struct_structelementaddr : $@convention(method) (@in_guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
@@ -238,7 +238,7 @@ bb0(%0 : $*MainActorIsolatedStruct):
   debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = load [copy] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedenumdata : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
@@ -246,7 +246,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedEnum):
   debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_enum_data %0 : $MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedtakeenumdataaddr : $@convention(method) (@in MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
@@ -254,7 +254,7 @@ bb0(%0 : $*MainActorIsolatedEnum):
   debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = load [take] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{call site passes `self`}}
+  return %3 : $NonSendableKlass // expected-warning {{task or actor isolated value cannot be transferred}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_enum_switchenum : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned FakeOptional<NonSendableKlass> {
@@ -272,7 +272,7 @@ bb2(%1 : @guaranteed $NonSendableKlass):
   br bb3(%3 : $FakeOptional<NonSendableKlass>)
 
 bb3(%4 : @owned $FakeOptional<NonSendableKlass>):
-  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{call site passes `self`}}
+  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{task or actor isolated value cannot be transferred}}
 }
 
 sil [ossa] @warningIfCallingGetter : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> () {

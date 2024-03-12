@@ -912,24 +912,25 @@ public:
                   diag::regionbasedisolation_unknown_pattern);
   }
 
-  void emitMiscUses(SILLocation loc) {
-    diagnoseError(loc, diag::regionbasedisolation_selforargtransferred);
+  void emitUnknownUse(SILLocation loc) {
+    // TODO: This will eventually be an unknown pattern error.
+    diagnoseError(
+        loc, diag::regionbasedisolation_task_or_actor_isolated_transferred);
   }
 
   void emitFunctionArgumentApply(SILLocation loc, Type type,
-                                 ValueIsolationRegionInfo regionInfo,
                                  ApplyIsolationCrossing crossing) {
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      regionInfo.printForDiagnostics(os);
+      getIsolationRegionInfo().printForDiagnostics(os);
     }
     diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
                   StringRef(descriptiveKindStr), type,
                   crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
 
-    if (regionInfo.isTaskIsolated()) {
+    if (getIsolationRegionInfo().isTaskIsolated()) {
       auto *fArg =
           cast<SILFunctionArgument>(info.nonTransferrable.get<SILValue>());
       if (fArg->getDecl()) {
@@ -964,21 +965,44 @@ public:
 
   void emitFunctionArgumentApplyStronglyTransferred(SILLocation loc,
                                                     Type type) {
-    diagnoseError(
-        loc,
-        diag::regionbasedisolation_arg_passed_to_strongly_transferred_param,
-        type)
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+    auto diag =
+        diag::regionbasedisolation_arg_passed_to_strongly_transferred_param;
+    diagnoseError(loc, diag, descriptiveKindStr, type)
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+  }
+
+  void emitNamedOnlyError(SILLocation loc, Identifier name) {
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
   }
 
   void emitNamedIsolation(SILLocation loc, Identifier name,
                           ApplyIsolationCrossing isolationCrossing) {
-    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
-                  name);
+    emitNamedOnlyError(loc, name);
     diagnoseNote(
         loc, diag::regionbasedisolation_transfer_non_transferrable_named_note,
         name, isolationCrossing.getCallerIsolation(),
         isolationCrossing.getCalleeIsolation());
+  }
+
+  void emitNamedFunctionArgumentApplyStronglyTransferred(
+      SILLocation loc, Identifier varName,
+      ValueIsolationRegionInfo isolationRegionInfo) {
+    emitNamedOnlyError(loc, varName);
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+    auto diag =
+        diag::regionbasedisolation_named_transfer_into_transferring_param;
+    diagnoseNote(loc, diag, descriptiveKindStr, varName);
   }
 
 private:
@@ -1073,29 +1097,35 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   auto loc = op->getUser()->getLoc();
 
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
-    std::optional<ApplyIsolationCrossing> isolation = {};
+    // First see if we have a transferring argument.
+    if (auto fas = FullApplySite::isa(op->getUser())) {
+      if (fas.getArgumentParameterInfo(*op).hasOption(
+              SILParameterInfo::Transferring)) {
+
+        // See if we can infer a name from the value.
+        SmallString<64> resultingName;
+        if (auto varName = inferNameFromValue(op->get())) {
+          diagnosticEmitter.emitNamedFunctionArgumentApplyStronglyTransferred(
+              loc, *varName, diagnosticEmitter.getIsolationRegionInfo());
+          return true;
+        }
+
+        Type type = op->get()->getType().getASTType();
+        if (auto *inferredArgExpr =
+                inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
+          type = inferredArgExpr->findOriginalType();
+        }
+        diagnosticEmitter.emitFunctionArgumentApplyStronglyTransferred(loc,
+                                                                       type);
+        return true;
+      }
+    }
 
     // First try to get the apply from the isolation crossing.
-    if (auto value = sourceApply->getIsolationCrossing())
-      isolation = value;
+    auto isolation = sourceApply->getIsolationCrossing();
 
     // If we could not infer an isolation...
     if (!isolation) {
-      // First see if we have a transferring argument.
-      if (auto fas = FullApplySite::isa(op->getUser())) {
-        if (fas.getArgumentParameterInfo(*op).hasOption(
-                SILParameterInfo::Transferring)) {
-          Type type = op->get()->getType().getASTType();
-          if (auto *inferredArgExpr =
-              inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
-            type = inferredArgExpr->findOriginalType();
-          }
-          diagnosticEmitter.emitFunctionArgumentApplyStronglyTransferred(loc,
-                                                                         type);
-          return true;
-        }
-      }
-
       // Otherwise, emit a "we don't know error" that tells the user to file a
       // bug.
       diagnoseError(op->getUser(), diag::regionbasedisolation_unknown_pattern);
@@ -1120,9 +1150,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       }
     }
 
-    auto isolationRegionInfo = diagnosticEmitter.getIsolationRegionInfo();
-    diagnosticEmitter.emitFunctionArgumentApply(loc, type, isolationRegionInfo,
-                                                *isolation);
+    diagnosticEmitter.emitFunctionArgumentApply(loc, type, *isolation);
     return true;
   }
 
@@ -1137,15 +1165,13 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   // See if we are in SIL and have an apply site specified isolation.
   if (auto fas = FullApplySite::isa(op->getUser())) {
     if (auto isolation = fas.getIsolationCrossing()) {
-      auto isolationRegionInfo = diagnosticEmitter.getIsolationRegionInfo();
       diagnosticEmitter.emitFunctionArgumentApply(
-          loc, op->get()->getType().getASTType(), isolationRegionInfo,
-          *isolation);
+          loc, op->get()->getType().getASTType(), *isolation);
       return true;
     }
   }
 
-  diagnosticEmitter.emitMiscUses(loc);
+  diagnosticEmitter.emitUnknownUse(loc);
   return true;
 }
 
