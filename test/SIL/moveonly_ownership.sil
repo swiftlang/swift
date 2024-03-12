@@ -1,5 +1,8 @@
 // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
+// rdar://124466060
+// UNSUPPORTED: CPU=armv7k
+
 sil_stage raw
 
 import Builtin
