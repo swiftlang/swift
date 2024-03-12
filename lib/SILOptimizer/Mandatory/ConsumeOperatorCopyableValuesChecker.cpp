@@ -400,7 +400,9 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   llvm::SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Owned &&
+    auto ownership = arg->getOwnershipKind();
+    if ((ownership == OwnershipKind::Owned ||
+         ownership == OwnershipKind::Guaranteed) &&
         !arg->getType().isMoveOnly()) {
       LLVM_DEBUG(llvm::dbgs() << "Found owned arg to check: " << *arg);
       valuesToCheck.insert(arg);
