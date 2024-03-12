@@ -72,9 +72,13 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
     unsigned argNum = [&]() -> unsigned {
       if (fai.isCalleeOperand(*op))
         return op->getOperandNumber();
-      return fai.getAppliedArgIndex(*op);
+      return fai.getAppliedArgIndexWithoutIndirectResult(*op);
     }();
-    assert(argNum < sourceApply->getArgs()->size());
+
+    // Something happened that we do not understand.
+    if (argNum >= sourceApply->getArgs()->size()) {
+      return nullptr;
+    }
 
     foundExpr = sourceApply->getArgs()->getExpr(argNum);
 
