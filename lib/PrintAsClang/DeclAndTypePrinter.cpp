@@ -958,11 +958,26 @@ private:
 
   template <typename T>
   static const T *findClangBase(const T *member) {
-    while (member) {
-      if (member->getClangDecl())
-        return member;
-      member = member->getOverriddenDecl();
+    // Search overridden members.
+    const T *ancestorMember = member;
+    while (ancestorMember) {
+      if (ancestorMember->getClangDecl())
+        return ancestorMember;
+      ancestorMember = ancestorMember->getOverriddenDecl();
     }
+
+    // Search witnessed requirements.
+    // FIXME: Semi-arbitrary behavior if `member` witnesses several requirements
+    // (The conformance which sorts first will be used; the others will be
+    // ignored.)
+    for (const ValueDecl *requirementVD :
+            member->getSatisfiedProtocolRequirements(/*Sorted=*/true)) {
+      const T *requirement = dyn_cast<T>(requirementVD);
+      if (requirement && requirement->getClangDecl())
+        return requirement;
+    }
+
+    // No related clang members found.
     return nullptr;
   }
 

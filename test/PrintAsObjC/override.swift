@@ -45,6 +45,18 @@ class A_Child : Base {
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
 
+// CHECK-LABEL: @interface A_Child ({{.*}}) <Proto>
+extension A_Child : Proto {
+  // CHECK-NEXT: - (NSUInteger)proto SWIFT_WARN_UNUSED_RESULT;
+  func proto() -> Int { return 0 }
+
+  // CHECK-NEXT: - (NSUInteger)proto:(NSUInteger)_ SWIFT_WARN_UNUSED_RESULT;
+  func proto(_: Int) -> Int { return 0 }
+
+  // CHECK-NEXT: - (NSUInteger)proto:(NSUInteger)_ y:(NSUInteger)y SWIFT_WARN_UNUSED_RESULT;
+  func proto(_: Int, y: Int) -> Int { return 0 }
+} // CHECK-NEXT: @end
+
 // CHECK-LABEL: @interface A_Grandchild : A_Child
 class A_Grandchild : A_Child {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
