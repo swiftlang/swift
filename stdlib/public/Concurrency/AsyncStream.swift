@@ -330,8 +330,20 @@ public struct AsyncStream<Element> {
   ///     }
   ///
   ///
+  @_alwaysEmitIntoClient
   public init(
-    unfolding produce: @escaping () async -> Element?, 
+    unfolding produce: @escaping @Sendable () async -> Element?,
+    onCancel: (@Sendable () -> Void)? = nil
+  ) {
+    self.init(
+      unfolding: produce as () async -> Element?,
+      onCancel: onCancel
+    )
+  }
+
+  @usableFromInline
+  internal init(
+    unfolding produce: @escaping () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
