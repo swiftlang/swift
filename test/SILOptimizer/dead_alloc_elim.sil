@@ -710,3 +710,14 @@ bb0(%0 : $_ContiguousArrayStorage<Element>):
   return %15 : $()
 }
 
+// CHECK-LABEL: @dead_zero_init
+// CHECK-NOT: alloc_stack
+// // CHECK: } // end sil function 'dead_zero_init'
+sil @dead_zero_init : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Kl
+  %empty = builtin "zeroInitializer"(%0 : $*Kl) : $()
+  dealloc_stack %0 : $*Kl
+  %1 = tuple ()
+  return %1 : $()
+}
