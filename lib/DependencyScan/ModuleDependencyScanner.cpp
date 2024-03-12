@@ -326,8 +326,7 @@ static void findAllImportedClangModules(StringRef moduleName,
 }
 
 llvm::ErrorOr<ModuleDependencyInfo>
-ModuleDependencyScanner::getMainModuleDependencyInfo(
-    ModuleDecl *mainModule, std::optional<SwiftDependencyTracker> tracker) {
+ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   // Main module file name.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> mainModulePath = mainModule->getName().str();
@@ -345,35 +344,9 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
         ExtraPCMArgs.begin(),
         {"-Xcc", "-target", "-Xcc", ScanASTContext.LangOpts.Target.str()});
 
-  std::string rootID;
-  std::vector<std::string> buildArgs;
   auto clangImporter =
       static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
-  if (tracker) {
-    tracker->startTracking();
-    for (auto fileUnit : mainModule->getFiles()) {
-      auto sf = dyn_cast<SourceFile>(fileUnit);
-      if (!sf)
-        continue;
-      tracker->trackFile(sf->getFilename());
-    }
-    tracker->addCommonSearchPathDeps(
-        ScanCompilerInvocation.getSearchPathOptions());
-    // Fetch some dependency files from clang importer.
-    std::vector<std::string> clangDependencyFiles;
-    clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
-    llvm::for_each(clangDependencyFiles,
-                   [&](std::string &file) { tracker->trackFile(file); });
-
-    auto root = tracker->createTreeFromDependencies();
-    if (!root) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
-                           toString(root.takeError()));
-      return std::make_error_code(std::errc::io_error);
-    }
-    rootID = root->getID().toString();
-  }
-
+  std::vector<std::string> buildArgs;
   if (ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
     buildArgs.push_back("-direct-clang-cc1-module-build");
     for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
@@ -389,7 +362,15 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
   });
 
   auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
-      rootID, buildCommands, {}, ExtraPCMArgs);
+      {}, buildCommands, {}, ExtraPCMArgs);
+
+  if (ScanASTContext.CASOpts.EnableCaching) {
+    std::vector<std::string> clangDependencyFiles;
+    clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
+    llvm::for_each(clangDependencyFiles, [&](std::string &file) {
+      mainDependencies.addAuxiliaryFile(file);
+    });
+  }
 
   llvm::StringSet<> alreadyAddedModules;
   // Compute Implicit dependencies of the main module
@@ -808,6 +789,7 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
+  std::vector<std::string> overlayFiles;
   for (auto dep : allDependencies) {
     auto moduleName = dep.ModuleName;
     // Do not look for overlays of main module under scan
@@ -817,7 +799,7 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
     auto dependencies = cache.findDependency(moduleName, dep.Kind).value();
     // Collect a map from secondary module name to cross-import overlay names.
     auto overlayMap = dependencies->collectCrossImportOverlayNames(
-        ScanASTContext, moduleName);
+        ScanASTContext, moduleName, overlayFiles);
     if (overlayMap.empty())
       continue;
     for (const auto &dependencyId : allDependencies) {
@@ -879,11 +861,9 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
 
   // Update main module's dependencies to include these new overlays.
   auto resolvedDummyDep =
-      *(cache.findDependency(dummyMainName, ModuleDependencyKind::SwiftSource)
-            .value());
+      **cache.findDependency(dummyMainName, ModuleDependencyKind::SwiftSource);
   auto mainDep =
-      *(cache.findDependency(mainModuleName, ModuleDependencyKind::SwiftSource)
-            .value());
+      **cache.findDependency(mainModuleName, ModuleDependencyKind::SwiftSource);
   auto newOverlayDeps = resolvedDummyDep.getDirectModuleDependencies();
   auto existingMainDeps = mainDep.getDirectModuleDependencies();
   ModuleDependencyIDSet existingMainDepsSet(existingMainDeps.begin(),
@@ -895,6 +875,11 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
                   if (!existingMainDepsSet.count(crossImportOverlayModID))
                     mainDep.addModuleDependency(crossImportOverlayModID);
                 });
+
+  llvm::for_each(overlayFiles, [&mainDep](const std::string &file) {
+    mainDep.addAuxiliaryFile(file);
+  });
+
   cache.updateDependency(
       {mainModuleName.str(), ModuleDependencyKind::SwiftSource}, mainDep);
 

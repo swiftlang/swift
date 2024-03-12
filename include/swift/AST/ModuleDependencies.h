@@ -172,6 +172,10 @@ public:
   /// The cache key for the produced module.
   std::string moduleCacheKey;
 
+  /// Auxiliary files that help to construct other dependencies (e.g.
+  /// command-line), no need to be saved to reconstruct from cache.
+  std::vector<std::string> auxiliaryFiles;
+
   /// The direct dependency of the module is resolved by scanner.
   bool resolved;
   /// ModuleDependencyInfo is finalized (with all transitive dependencies
@@ -661,6 +665,24 @@ public:
     llvm_unreachable("Unexpected type");
   }
 
+  void addAuxiliaryFile(const std::string &file) {
+    storage->auxiliaryFiles.emplace_back(file);
+  }
+
+  void updateCASFileSystemRootID(const std::string &rootID) {
+    if (isSwiftInterfaceModule())
+      cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())
+          ->textualModuleDetails.CASFileSystemRootID = rootID;
+    else if (isSwiftSourceModule())
+      cast<SwiftSourceModuleDependenciesStorage>(storage.get())
+          ->textualModuleDetails.CASFileSystemRootID = rootID;
+    else if (isClangModule())
+      cast<ClangModuleDependencyStorage>(storage.get())->CASFileSystemRootID =
+          rootID;
+    else
+      llvm_unreachable("Unexpected type");
+  }
+
   bool isResolved() const {
     return storage->resolved;
   }
@@ -790,7 +812,8 @@ public:
   /// Collect a map from a secondary module name to a list of cross-import
   /// overlays, when this current module serves as the primary module.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
-  collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName) const;
+  collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName,
+                                 std::vector<std::string> &overlayFiles) const;
 };
 
 using ModuleDependencyVector = llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>;
