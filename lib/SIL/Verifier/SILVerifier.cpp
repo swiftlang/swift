@@ -2292,15 +2292,17 @@ public:
     if (builtinKind == BuiltinValueKind::CreateAsyncTask) {
       requireType(BI->getType(), _object(_tuple(_nativeObject, _rawPointer)),
                   "result of createAsyncTask");
-      require(arguments.size() == 4,
-              "createAsyncTask expects four arguments");
+      require(arguments.size() == 5,
+              "createAsyncTask expects five arguments");
       requireType(arguments[0]->getType(), _object(_swiftInt),
                   "first argument of createAsyncTask");
-      requireType(arguments[1]->getType(), _object(_optional(_rawPointer)),
+      requireType(arguments[1]->getType(), _object(_optional(_executor)),
                   "second argument of createAsyncTask");
-      requireType(arguments[2]->getType(), _object(_optional(_executor)),
+      requireType(arguments[2]->getType(), _object(_optional(_rawPointer)),
                   "third argument of createAsyncTask");
-      auto fnType = requireObjectType(SILFunctionType, arguments[3],
+      requireType(arguments[3]->getType(), _object(_optional(_executor)),
+                  "fourth argument of createAsyncTask");
+      auto fnType = requireObjectType(SILFunctionType, arguments[4],
                                       "result of createAsyncTask");
       auto expectedExtInfo =
         SILExtInfoBuilder().withAsync(true).withConcurrent(true).build();

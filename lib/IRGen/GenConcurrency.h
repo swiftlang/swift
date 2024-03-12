@@ -102,6 +102,7 @@ llvm::Value *maybeAddEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
 /// task function.
 std::pair<llvm::Value *, llvm::Value *>
 emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+               OptionalExplosion &initialExecutor,
                OptionalExplosion &taskGroup,
                OptionalExplosion &taskExecutor,
                Explosion &taskFunction,
