@@ -1027,7 +1027,6 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Initialized by the setup operation.
   std::optional<ConstraintSystem> cs;
-  ConstraintLocator *locator = nullptr;
   ConstraintLocator *reqLocator = nullptr;
   ConstraintLocator *witnessLocator = nullptr;
   Type witnessType, openWitnessType;
@@ -1152,8 +1151,6 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     // Open up the witness type.
     witnessType = witness->getInterfaceType();
-    // FIXME: witness as a base locator?
-    locator = cs->getConstraintLocator({});
     witnessLocator =
         cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
@@ -1212,7 +1209,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       }
     }
 
-    cs->addConstraint(ConstraintKind::Bind, reqType, witnessType, locator);
+    cs->addConstraint(ConstraintKind::Bind, reqType, witnessType,
+                      witnessLocator);
     // FIXME: Check whether this has already failed.
     return std::nullopt;
   };
