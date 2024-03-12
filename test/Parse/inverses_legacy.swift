@@ -35,6 +35,7 @@ protocol Rope<Element>: ~Copyable { // expected-error {{cannot suppress conforma
 
 extension S: ~Copyable {} // expected-error {{cannot suppress conformances here}}
                           // expected-error@-1 {{noncopyable struct 'S' cannot conform to 'Copyable'}}
+                          // expected-error@-2 {{struct 'S' required to be 'Copyable' but is marked with '~Copyable'}}
 
 func takeNoncopyableGeneric<T: ~Copyable>(_ t: T) {} // expected-error {{cannot suppress conformances here}}
 

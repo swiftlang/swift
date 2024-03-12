@@ -10037,8 +10037,8 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Reject 'destructor' functions outside of structs, enums, classes, or
   // extensions that provide objc implementations.
   //
-  // Later in the type checker, we validate that structs/enums only do this if
-  // they are move only and that @objcImplementations are main-body.
+  // Later in the type checker, we validate that structs/enums are noncopyable
+  // and that @objcImplementations are main-body.
   auto rejectDestructor = [](DeclContext *dc) {
     if (isa<StructDecl>(dc) || isa<EnumDecl>(dc) ||
         isa<ClassDecl>(dc))

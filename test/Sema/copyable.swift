@@ -10,7 +10,9 @@ typealias WhatIfIQualify = Swift.Copyable
 
 class C: Copyable {} 
 
-@_moveOnly struct MOStruct: Copyable {} // expected-error {{noncopyable struct 'MOStruct' cannot conform to 'Copyable'}}
+@_moveOnly struct MOStruct: Copyable {}
+// expected-error@-1 {{noncopyable struct 'MOStruct' cannot conform to 'Copyable'}}
+// expected-error@-2 {{struct 'MOStruct' required to be 'Copyable' but is marked with '~Copyable'}}
 
 
 func whatever<T>(_ t: T) where T: Copyable {} 

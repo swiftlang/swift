@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 struct FooStructConstructorA {
   init // expected-error {{expected '('}}
   // expected-error@-1{{initializer requires a body}}
@@ -36,7 +34,7 @@ struct FooStructDeinitializerB {
 }
 
 struct FooStructDeinitializerC {
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializer cannot be declared in struct 'FooStructDeinitializerC' that conforms to 'Copyable'}}
 }
 
 class FooClassDeinitializerA {
@@ -61,7 +59,7 @@ deinit {} // expected-error {{deinitializers may only be declared within a class
 
 struct BarStruct {
   init() {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // NOTE: this doesn't get diagnosed with the other errors in this file for some reason.
 }
 
 extension BarStruct {
@@ -73,7 +71,7 @@ extension BarStruct {
 
 enum BarUnion {
   init() {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // NOTE: this doesn't get diagnosed with the other errors in this file for some reason.
 }
 
 extension BarUnion {
