@@ -73,6 +73,12 @@ case none
 case some(T)
 }
 
+open class ParentClass {
+}
+class ChildClass : ParentClass {}
+
+sil @copyParentClass : $@convention(thin) (@guaranteed ParentClass) -> @owned ParentClass
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -1485,7 +1491,7 @@ bb0:
   // Now transfer %addr and use it.
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %f2 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  apply %f2<NonSendableKlass>(%addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access here could race}}  
+  apply %f2<NonSendableKlass>(%addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access here could race}}
 
   dealloc_pack %pack2 : $*Pack{NonSendableKlass, repeat each T}
   dealloc_pack %pack : $*Pack{NonSendableKlass, repeat each T}
@@ -1648,4 +1654,21 @@ bb0(%arg : $Builtin.Word):
   destroy_value %b : $Builtin.BridgeObject
   %9999 = tuple ()
   return %9999 : $()
+}
+
+sil hidden [ossa] @test_unconditional_checked_cast : $@convention(method) (@guaranteed ChildClass) -> @owned ChildClass {
+bb0(%0 : @guaranteed $ChildClass):
+  debug_value %0 : $ChildClass, let, name "self", argno 1, implicit
+  %2 = copy_value %0 : $ChildClass
+  %3 = upcast %2 : $ChildClass to $ParentClass
+  %4 = function_ref @copyParentClass : $@convention(thin) (@guaranteed ParentClass) -> @owned ParentClass
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed ParentClass) -> @owned ParentClass
+  %6 = unchecked_ref_cast %5 : $ParentClass to $ChildClass
+  %7 = unconditional_checked_cast %6 : $ChildClass to @dynamic_self ChildClass
+  %8 = move_value [lexical] [var_decl] %7 : $ChildClass
+  debug_value %8 : $ChildClass, let, name "copy"
+  destroy_value %3 : $ParentClass
+  %11 = copy_value %8 : $ChildClass
+  destroy_value %8 : $ChildClass
+  return %11 : $ChildClass
 }
