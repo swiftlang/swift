@@ -262,15 +262,9 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 }
 
-@available(*, unavailable)
-extension AnyKeyPath: Sendable {}
-
 /// A partially type-erased key path, from a concrete root type to any
 /// resulting value type.
 public class PartialKeyPath<Root>: AnyKeyPath { }
-
-@available(*, unavailable)
-extension PartialKeyPath: Sendable {}
 
 // MARK: Concrete implementations
 internal enum KeyPathKind { case readOnly, value, reference }
@@ -377,9 +371,6 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
 }
 
-@available(*, unavailable)
-extension KeyPath: Sendable {}
-
 /// A key path that supports reading from and writing to the resulting value.
 public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   // MARK: Implementation detail
@@ -447,9 +438,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
     }
   }
 }
-
-@available(*, unavailable)
-extension WritableKeyPath: Sendable {}
 
 /// A key path that supports reading from and writing to the resulting value
 /// with reference semantics.
@@ -521,9 +509,6 @@ public class ReferenceWritableKeyPath<
     return (address, keepAlive)
   }
 }
-
-@available(*, unavailable)
-extension ReferenceWritableKeyPath: Sendable {}
 
 // MARK: Implementation details
 
