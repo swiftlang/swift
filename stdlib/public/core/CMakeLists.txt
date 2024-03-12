@@ -316,6 +316,9 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowingSwitch")
 
+# FIXME(NCG): This should not be necessary
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-disable-round-trip-debug-types")
+
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
   set(swift_lib_dir "${CMAKE_BINARY_DIR}/lib")
