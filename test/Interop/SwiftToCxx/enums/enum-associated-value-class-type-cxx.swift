@@ -4,6 +4,9 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
 
+// rdar://124466216
+// UNSUPPORTED: CPU=armv7k
+
 public class C {
     public var x: Int
     public init(x: Int) { self.x = x }
