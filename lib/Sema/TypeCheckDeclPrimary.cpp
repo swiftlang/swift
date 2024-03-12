@@ -41,7 +41,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -3224,21 +3223,17 @@ public:
   static void diagnoseInverseOnClass(ClassDecl *decl) {
     auto &ctx = decl->getASTContext();
 
-    for (auto ip : InvertibleProtocolSet::full()) {
-      auto inverseMarking = decl->hasInverseMarking(ip);
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void) getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject);
 
-      // Inferred inverses are already ignored for classes.
-      // FIXME: we can also diagnose @_moveOnly here if we use `isAnyExplicit`
-      if (!inverseMarking.is(InverseMarking::Kind::Explicit))
-        continue;
-
+    for (auto ip : inverses) {
       // Allow ~Copyable when MoveOnlyClasses is enabled
       if (ip == InvertibleProtocolKind::Copyable
           && ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
         continue;
 
-
-      ctx.Diags.diagnose(inverseMarking.getLoc(),
+      ctx.Diags.diagnose(decl->getLoc(),
                          diag::inverse_on_class,
                          getProtocolName(getKnownProtocolKind(ip)));
     }

@@ -2418,8 +2418,16 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       implyingConf = implyingConf->getImplyingConformance();
     }
 
+    // If the conditional requirements all have the form `T : Copyable`, then
+    // we accept the implied conformance with the same conditional requirements.
     auto implyingCondReqs = implyingConf->getConditionalRequirements();
-    if (!implyingCondReqs.empty()) {
+    bool allCondReqsInvertible = llvm::all_of(implyingCondReqs,
+        [&](Requirement req) {
+          return (req.getKind() == RequirementKind::Conformance &&
+                  req.getProtocolDecl()->getInvertibleProtocolKind());
+        });
+
+    if (!allCondReqsInvertible) {
       // FIXME:
       // We shouldn't suggest including witnesses for the conformance, because
       // those suggestions will go in the current DeclContext, but really they

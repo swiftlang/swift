@@ -3060,9 +3060,10 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                                    inverseRepr->getConstraint(), dc,
                                                    allowUsableFromInline);
     if (innerResult.first.size() == 1) {
-      auto *proto = dyn_cast<ProtocolDecl>(innerResult.first[0]);
-      if (auto ip = proto->getInvertibleProtocolKind()) {
-        result.second.insert(*ip);
+      if (auto *proto = dyn_cast<ProtocolDecl>(innerResult.first[0])) {
+        if (auto ip = proto->getInvertibleProtocolKind()) {
+          result.second.insert(*ip);
+        }
       }
     }
 
