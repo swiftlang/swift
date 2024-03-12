@@ -7676,13 +7676,6 @@ ERROR(bitwise_copyable_outside_module,none,
       (const ValueDecl *))
 
 // -- older ones below --
-
-ERROR(noncopyable_within_copyable, none,
-      "%kind0 cannot contain a noncopyable type without also being noncopyable",
-      (const ValueDecl *))
-NOTE(noncopyable_within_copyable_location, none,
-     "contained noncopyable %0 '%1.%2'",
-     (DescriptiveDeclKind, StringRef, StringRef))
 ERROR(noncopyable_cannot_conform_to_type, none,
      "noncopyable %kind0 cannot conform to %1",
      (const ValueDecl *, Type))

@@ -40,6 +40,7 @@ extension NC: Compare { // expected-error {{noncopyable struct 'NC' cannot confo
 
 extension NC: Sortable { // expected-error {{noncopyable struct 'NC' cannot conform to 'Sortable'}}
                          // expected-error@-1 {{type 'NC' does not conform to protocol 'Sortable'}}
+                         // expected-error@-2 {{struct 'NC' required to be 'Copyable' but is marked with '~Copyable'}}
   typealias Element = NC // expected-note {{possibly intended match 'NC.Element' (aka 'NC') does not conform to 'Copyable'}}
 
   mutating func sort() { }

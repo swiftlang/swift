@@ -108,11 +108,12 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
 
 /// MARK: conformance checking
 static void checkInvertibleConformanceCommon(DeclContext *dc,
-                                             ProtocolConformance *conformance,
+                                             ProtocolConformanceRef conformance,
                                              InvertibleProtocolKind ip) {
+  assert(!conformance.isInvalid());
+
   const auto kp = getKnownProtocolKind(ip);
-  auto *proto = conformance->getProtocol();
-  assert(proto->isSpecificProtocol(kp));
+  assert(conformance.getRequirement()->isSpecificProtocol(kp));
 
   auto *nominalDecl = dc->getSelfNominalTypeDecl();
   assert(isa<StructDecl>(nominalDecl) ||
@@ -133,17 +134,26 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
 
   bool hasExplicitInverse = inverses.contains(ip);
 
-  bool hasUnconditionalConformance = false;
-  auto *normalConf = dyn_cast<NormalProtocolConformance>(conformance);
-  if (normalConf && normalConf->getConditionalRequirements().empty())
-    hasUnconditionalConformance = true;
+  bool hasUnconditionalConformance = conformance.isAbstract();
+  SourceLoc conformanceLoc = nominalDecl->getLoc();
+
+  if (conformance.isConcrete()) {
+    auto concrete = conformance.getConcrete();
+    if (auto *normalConf = dyn_cast<NormalProtocolConformance>(concrete)) {
+      hasUnconditionalConformance =
+          normalConf->getConditionalRequirements().empty();
+      conformanceLoc = normalConf->getLoc();
+      assert(conformanceLoc);
+    }
+  }
+  assert(!conformance.isPack() && "not handled");
 
   if (!isa<ClassDecl>(nominalDecl) ||
       ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)) {
     // If the inheritance clause contains ~Copyable, reject an unconditional
     // conformance to Copyable.
     if (hasExplicitInverse && hasUnconditionalConformance) {
-      ctx.Diags.diagnose(normalConf->getLoc(),
+      ctx.Diags.diagnose(conformanceLoc,
                          diag::inverse_but_also_conforms,
                          nominalDecl, getProtocolName(kp));
     }
@@ -224,13 +234,13 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
 }
 
 void swift::checkEscapableConformance(DeclContext *dc,
-                                      ProtocolConformance *conformance) {
+                                      ProtocolConformanceRef conformance) {
   checkInvertibleConformanceCommon(dc, conformance,
                                    InvertibleProtocolKind::Escapable);
 }
 
 void swift::checkCopyableConformance(DeclContext *dc,
-                                     ProtocolConformance *conformance) {
+                                     ProtocolConformanceRef conformance) {
   checkInvertibleConformanceCommon(dc, conformance,
                                    InvertibleProtocolKind::Copyable);
 }

@@ -158,8 +158,7 @@ namespace swift {
     static bool shouldWalkIntoDeclInClosureContext(Decl *D);
   };
 
-void diagnoseCopyableTypeContainingMoveOnlyType(
-    NominalTypeDecl *copyableNominalType);
+void forceCopyableConformanceCheckIfNeeded(NominalTypeDecl *nominal);
 
 } // namespace swift
 
