@@ -712,3 +712,6 @@ final internal class __VaListBuilder {
 }
 
 #endif
+
+@available(*, unavailable)
+extension __VaListBuilder: Sendable {}

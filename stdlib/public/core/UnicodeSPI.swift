@@ -25,6 +25,9 @@ extension Unicode {
 }
 
 @available(SwiftStdlib 5.7, *)
+extension Unicode._NFD: Sendable {}
+
+@available(SwiftStdlib 5.7, *)
 extension Unicode._NFD {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -32,6 +35,9 @@ extension Unicode._NFD {
     var base: Unicode._InternalNFD<Substring>.Iterator
   }
 }
+
+@available(SwiftStdlib 5.7, *)
+extension Unicode._NFD.Iterator: Sendable {}
 
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD.Iterator: IteratorProtocol {
@@ -80,6 +86,9 @@ extension Unicode {
 }
 
 @available(SwiftStdlib 5.7, *)
+extension Unicode._NFC: Sendable {}
+
+@available(SwiftStdlib 5.7, *)
 extension Unicode._NFC {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -87,6 +96,9 @@ extension Unicode._NFC {
     var base: Unicode._InternalNFC<Substring>.Iterator
   }
 }
+
+@available(SwiftStdlib 5.7, *)
+extension Unicode._NFC.Iterator: Sendable {}
 
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC.Iterator: IteratorProtocol {

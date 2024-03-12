@@ -465,6 +465,9 @@ internal struct _SliceBuffer<Element>
   }
 }
 
+@available(*, unavailable)
+extension _SliceBuffer: Sendable {}
+
 extension _SliceBuffer {
   @inlinable
   internal __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
