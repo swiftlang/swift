@@ -376,6 +376,26 @@ func consumeArrayAny() {
   _ = consume a
 }
 
+func consumeConsuming(_ k: consuming Klass) {
+  _ = consume k
+}
+
+func consumeBorrowing(_ k: borrowing Klass) { // expected-error{{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note{{consumed here}}
+}
+
+func consumeOwned(_ k: __owned Klass) {
+  _ = consume k
+}
+
+func consumeShared(_ k: __shared Klass) {
+  _ = consume k
+}
+
+func consumeBare(_ k: Klass) {
+  _ = consume k
+}
+
 /////////////////////////
 // Partial Apply Tests //
 /////////////////////////
