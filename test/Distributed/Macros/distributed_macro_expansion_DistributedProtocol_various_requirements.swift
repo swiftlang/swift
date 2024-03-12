@@ -101,6 +101,7 @@ public protocol Greeter4: DistributedActor where ActorSystem == FakeActorSystem 
 public protocol GreeterMore: DistributedActor where ActorSystem == FakeActorSystem {
   distributed var name: String { get }
   distributed func greet(name: String) -> String
+  distributed func another(string: String, int: Int) async throws -> Double
 }
 // CHECK: public distributed actor $GreeterMore: GreeterMore,
 // CHECK:    Distributed._DistributedActorStub
@@ -117,6 +118,13 @@ public protocol GreeterMore: DistributedActor where ActorSystem == FakeActorSyst
 // CHECK:     }
 // CHECK:   }
 // CHECK:   public distributed func greet(name: String) -> String {
+// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK:   public distributed func another(string: String, int: Int) async throws -> Double {
 // CHECK:     if #available (SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
