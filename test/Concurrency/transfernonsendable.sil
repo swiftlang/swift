@@ -277,7 +277,8 @@ bb2(%1 : @guaranteed $NonSendableKlass):
   br bb3(%3 : $FakeOptional<NonSendableKlass>)
 
 bb3(%4 : @owned $FakeOptional<NonSendableKlass>):
-  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{task or actor isolated value cannot be transferred}}
+  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{transferring 'myname.some' may cause a race}}
+  // expected-note @-1 {{main actor-isolated 'myname.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @warningIfCallingGetter : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> () {
