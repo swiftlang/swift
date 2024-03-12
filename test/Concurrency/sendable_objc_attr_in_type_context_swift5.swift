@@ -58,6 +58,7 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 @end
 
 @protocol InnerSendableTypes
+-(void) testComposition:(SWIFT_SENDABLE MyValue *)composition;
 -(void) test:(NSDictionary<NSString *, SWIFT_SENDABLE id> *)options;
 -(void) testWithCallback:(NSString *)name handler:(MAIN_ACTOR void (^)(NSDictionary<NSString *, SWIFT_SENDABLE id> *, NSError * _Nullable))handler;
 @end
@@ -109,6 +110,10 @@ func test_sendable_attr_in_type_context(test: Test) {
 }
 
 class TestConformanceWithStripping : InnerSendableTypes {
+  func testComposition(_: MyValue) {
+    // expected-warning@-1 {{sendability of function types in instance method 'testComposition' does not match requirement in protocol 'InnerSendableTypes'; this is an error in the Swift 6 language mode}}
+  }
+
   func test(_ options: [String: Any]) {
     // expected-warning@-1 {{sendability of function types in instance method 'test' does not match requirement in protocol 'InnerSendableTypes'; this is an error in the Swift 6 language mode}}
   }
@@ -119,6 +124,9 @@ class TestConformanceWithStripping : InnerSendableTypes {
 }
 
 class TestConformanceWithoutStripping : InnerSendableTypes {
+  func testComposition(_: any MyValue & Sendable) { // Ok
+  }
+
   func test(_ options: [String: any Sendable]) { // Ok
   }
 
