@@ -441,6 +441,12 @@ function(_add_host_variant_link_flags target)
         "SHELL:-Xlinker -dead_strip")
     endif()
   endif()
+
+  if(SWIFT_LINKER_SUPPORTS_NO_WARN_DUPLICATE_LIBRARIES)
+    target_link_options(${target} PRIVATE
+      "SHELL:-Xlinker -no_warn_duplicate_libraries")
+  endif()
+
 endfunction()
 
 function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
