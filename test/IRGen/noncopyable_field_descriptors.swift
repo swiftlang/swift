@@ -10,6 +10,7 @@
 
 // rdar://124401253
 // REQUIRES: OS=macosx || OS=linux || OS=windows-msvc
+// UNSUPPORTED: CPU=arm64e
 
 @frozen
 public enum ConditionallyCopyable<Wrapped: ~Copyable>: ~Copyable {
