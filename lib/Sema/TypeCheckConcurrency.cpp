@@ -4232,7 +4232,6 @@ static bool hasExplicitIsolationAttribute(const Decl *decl) {
     if (!globalActorAttr->first->isImplicit())
       return true;
   }
-
   return false;
 }
 

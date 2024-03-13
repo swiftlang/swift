@@ -696,6 +696,11 @@ public:
              lifetimeDependenceInfo);
   }
 
+  [[nodiscard]]
+  ASTExtInfoBuilder withGlobalActorIsolation(Type globalActor) const {
+    return withIsolation(FunctionTypeIsolation::forGlobalActor(globalActor));
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger(bits);
     ID.AddPointer(clangTypeInfo.getType());

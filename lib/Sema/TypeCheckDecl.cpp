@@ -2570,9 +2570,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
               fd->getASTContext().Diags.diagnose(
                   fd->getLoc(), diag::main_function_must_be_mainActor);
             }
-            auto isolation = FunctionTypeIsolation::forGlobalActor(
-                mainIsolation->getGlobalActor());
-            infoBuilder = infoBuilder.withIsolation(isolation);
+            infoBuilder = infoBuilder.withGlobalActorIsolation(mainIsolation->getGlobalActor());
           }
         }
       }
