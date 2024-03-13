@@ -4669,6 +4669,11 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::Struct:
     case DeclKind::Class:
       sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+
+      // Protocol members never mangle inverse constraints on `Self`.
+      if (isa<ProtocolDecl>(decl->getDeclContext()))
+        setDepth(0);
+
       break;
 
     case DeclKind::TypeAlias: // FIXME: is this right? typealiases have a generic signature!

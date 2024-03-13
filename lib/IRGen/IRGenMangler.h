@@ -46,9 +46,6 @@ public:
   IRGenMangler() { }
 
   std::string mangleDispatchThunk(const FuncDecl *func) {
-    // Dispatch thunks do not mangle inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendEntity(func);
     appendOperator("Tj");
@@ -58,9 +55,6 @@ public:
   std::string mangleDerivativeDispatchThunk(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
-    // Dispatch thunks do not mangle inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -77,9 +71,6 @@ public:
 
   std::string mangleConstructorDispatchThunk(const ConstructorDecl *ctor,
                                              bool isAllocating) {
-    // Dispatch thunks do not mangle inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tj");
@@ -87,9 +78,6 @@ public:
   }
 
   std::string mangleMethodDescriptor(const FuncDecl *func) {
-    // Method descriptors do not mangle inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendEntity(func);
     appendOperator("Tq");
@@ -99,9 +87,6 @@ public:
   std::string mangleDerivativeMethodDescriptor(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
-    // Method descriptors do not mangle inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -118,9 +103,6 @@ public:
 
   std::string mangleConstructorMethodDescriptor(const ConstructorDecl *ctor,
                                                 bool isAllocating) {
-    // Method descriptors do not mangle inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tq");
@@ -346,9 +328,6 @@ public:
     llvm::SaveAndRestore<bool> optimizeProtocolNames(OptimizeProtocolNames,
                                                      false);
 
-    // No mangling of inverse conformances inside protocols.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     bool isAssocTypeAtDepth = false;
     (void)appendAssocType(
@@ -363,9 +342,6 @@ public:
       const ProtocolDecl *proto,
       CanType subject,
       const ProtocolDecl *requirement) {
-    // No mangling of inverse conformances inside protocols.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendAnyGenericType(proto);
     if (isa<GenericTypeParamType>(subject)) {
@@ -382,9 +358,6 @@ public:
   std::string mangleBaseConformanceDescriptor(
       const ProtocolDecl *proto,
       const ProtocolDecl *requirement) {
-    // No mangling of inverse conformances inside protocols.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendAnyGenericType(proto);
     appendProtocolName(requirement);
@@ -396,9 +369,6 @@ public:
       const ProtocolDecl *proto,
       CanType subject,
       const ProtocolDecl *requirement) {
-    // No mangling of inverse conformances inside protocols.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendAnyGenericType(proto);
     bool isFirstAssociatedTypeIdentifier = true;
@@ -424,9 +394,6 @@ public:
   }
 
   std::string mangleFieldOffset(const ValueDecl *Decl) {
-    // No mangling of inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendEntity(Decl);
     appendOperator("Wvd");
