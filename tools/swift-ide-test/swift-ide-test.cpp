@@ -3405,6 +3405,9 @@ public:
       case AccessorKind::Get:
         OS << "<getter for ";
         break;
+      case AccessorKind::DistributedGet:
+        OS << "<_distributed_getter for ";
+        break;
       case AccessorKind::Set:
         OS << "<setter for ";
         break;

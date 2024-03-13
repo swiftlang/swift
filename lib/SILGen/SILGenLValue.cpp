@@ -3229,7 +3229,8 @@ namespace {
       case AccessorKind::Set: {
         LLVM_FALLTHROUGH;
       }
-      case AccessorKind::Get: {
+      case AccessorKind::Get:
+      case AccessorKind::DistributedGet: {
         auto typeData = getLogicalStorageTypeData(
             SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
         return asImpl().emitUsingGetterSetter(accessor, isDirect, typeData);

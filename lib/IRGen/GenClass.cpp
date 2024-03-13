@@ -1855,6 +1855,7 @@ namespace {
 
       switch (accessor->getAccessorKind()) {
       case AccessorKind::Get:
+      case AccessorKind::DistributedGet: // TODO: maybe dont do this?
         return emitObjCGetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 

@@ -82,6 +82,8 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
     return "g";
+  case AccessorKind::DistributedGet:
+    return "g";
   case AccessorKind::Set:
     return "s";
   case AccessorKind::WillSet:
@@ -4283,7 +4285,14 @@ void ASTMangler::appendDistributedThunk(
     appendContextOf(thunk, base);
   }
 
-  appendIdentifier(thunk->getBaseName().getIdentifier().str());
+  // TODO:
+  if (auto accessor = dyn_cast<AccessorDecl>(thunk)) {
+    assert(accessor->getAccessorKind() == AccessorKind::DistributedGet);
+    appendIdentifier(accessor->getStorage()->getBaseIdentifier().str());
+  } else {
+    appendIdentifier(thunk->getBaseIdentifier().str());
+  }
+
   appendDeclType(thunk, base, FunctionMangling);
   appendOperator("F");
   appendSymbolKind(SymbolKind::DistributedThunk);

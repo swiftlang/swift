@@ -679,6 +679,7 @@ bool swift::isRepresentableInObjC(
     }
 
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
       if (!storageIsObjC) {
         auto error = isa<VarDecl>(storage)
                        ? diag::objc_getter_for_nonobjc_property
@@ -1413,6 +1414,7 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       case AccessorKind::Read:
       case AccessorKind::WillSet:
       case AccessorKind::Init:
+      case AccessorKind::DistributedGet:
         return false;
 
       case AccessorKind::MutableAddress:
@@ -2032,6 +2034,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
       llvm_unreachable("Not an Objective-C entry point");
 
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 5, var->getName() };
 

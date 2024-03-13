@@ -257,6 +257,8 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
       return Flags::Kind::Getter;
+    case AccessorKind::DistributedGet:
+      return Flags::Kind::Getter; // TODO: ???
     case AccessorKind::Set:
       return Flags::Kind::Setter;
     case AccessorKind::Read:

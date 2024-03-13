@@ -8057,7 +8057,7 @@ class AccessorDecl final : public FuncDecl {
                  throws, throwsLoc, thrownTy, hasImplicitSelfDecl,
                  /*genericParams*/ nullptr, parent),
         AccessorKeywordLoc(accessorKeywordLoc), Storage(storage) {
-    assert(!async || accessorKind == AccessorKind::Get
+    assert(!async || (accessorKind == AccessorKind::Get || accessorKind == AccessorKind::DistributedGet)
            && "only get accessors can be async");
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
   }
@@ -8089,6 +8089,14 @@ public:
          TypeLoc thrownType, ParameterList *parameterList, Type fnRetType,
          DeclContext *parent, ClangNode clangNode = ClangNode());
 
+  static AccessorDecl *createImplicit(ASTContext &Context,
+                                  AccessorKind accessorKind,
+                                  AbstractStorageDecl *storage,
+                                  bool async,
+                                  bool throws, TypeLoc thrownType,
+                                  Type fnRetType,
+                                  DeclContext *parent);
+
   /// Create a parsed accessor.
   ///
   /// \param paramList A parameter list for e.g \c set(newValue), or \c nullptr
@@ -8117,6 +8125,7 @@ public:
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
+  bool isDistributedGetter() const { return getAccessorKind() == AccessorKind::DistributedGet; }
   bool isSetter() const { return getAccessorKind() == AccessorKind::Set; }
   bool isAnyAddressor() const {
     auto kind = getAccessorKind();
