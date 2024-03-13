@@ -126,10 +126,12 @@ BridgedDeclNameRef
 BridgedDeclNameRef_createParsed(BridgedDeclBaseName cBaseName);
 
 class BridgedDeclNameLoc {
-  const void *_Nonnull LocationInfo;
+  const void *_Nullable LocationInfo;
   size_t NumArgumentLabels;
 
 public:
+  BridgedDeclNameLoc() : LocationInfo(nullptr), NumArgumentLabels(0) {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedDeclNameLoc(swift::DeclNameLoc loc)
       : LocationInfo(loc.LocationInfo),
@@ -1033,6 +1035,10 @@ BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl);
 // MARK: VarDecl
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME("BridgedVarDecl.createImplicitStringInterpolationVar(_:)")
+BridgedVarDecl BridgedVarDec_createImplicitStringInterpolationVar(
+    BridgedDeclContext cDeclContext);
+
 SWIFT_NAME("BridgedVarDecl.getSourceLocation(self:)")
 BRIDGED_INLINE BridgedSourceLoc BridgedVarDecl_getSourceLocation(BridgedVarDecl decl);
 
@@ -1061,6 +1067,11 @@ struct BridgedCallArgument {
   }
 #endif
 };
+
+SWIFT_NAME("BridgedArgumentList.createImplicitUnlabeled(_:exprs:)")
+BridgedArgumentList
+BridgedArgumentList_createImplicitUnlabeled(BridgedASTContext cContext,
+                                            BridgedArrayRef cExprs);
 
 SWIFT_NAME("BridgedArgumentList.createParsed(_:lParenLoc:args:rParenLoc:"
            "firstTrailingClosureIndex:)")
@@ -1137,6 +1148,12 @@ BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
                                              BridgedSourceLoc cCopyLoc,
                                              BridgedExpr cSubExpr);
 
+SWIFT_NAME("BridgedDeclRefExpr.create(_:decl:loc:isImplicit:)")
+BridgedDeclRefExpr BridgedDeclRefExpr_create(BridgedASTContext cContext,
+                                             BridgedDecl cDecl,
+                                             BridgedDeclNameLoc cLoc,
+                                             bool IsImplicit);
+
 SWIFT_NAME("BridgedDictionaryExpr.createParsed(_:lBracketLoc:elements:"
            "colonLocs:rBracketLoc:)")
 BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
@@ -1172,6 +1189,13 @@ BridgedIntegerLiteralExpr
 BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
                                        BridgedStringRef cStr,
                                        BridgedSourceLoc cTokenLoc);
+
+SWIFT_NAME("BridgedInterpolatedStringLiteralExpr.createParsed(_:loc:"
+           "literalCapacity:interpolationCount:appendingExpr:)")
+BridgedInterpolatedStringLiteralExpr
+BridgedInterpolatedStringLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLoc, size_t literalCapacity,
+    size_t interpolationCount, BridgedTapExpr cAppendingExpr);
 
 SWIFT_NAME("BridgedIsExpr.createParsed(_:isLoc:type:)")
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
@@ -1225,6 +1249,10 @@ BridgedStringLiteralExpr
 BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
                                       BridgedStringRef cStr,
                                       BridgedSourceLoc cTokenLoc);
+
+SWIFT_NAME("BridgedTapExpr.create(_:body:)")
+BridgedTapExpr BridgedTapExpr_create(BridgedASTContext cContext,
+                                     BridgedBraceStmt cBody);
 
 SWIFT_NAME("BridgedTernaryExpr.createParsed(_:questionLoc:thenExpr:colonLoc:)")
 BridgedTernaryExpr BridgedTernaryExpr_createParsed(
