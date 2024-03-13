@@ -670,9 +670,9 @@ static ManagedValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
                                      SILAccessEnforcement enforcement,
                                      std::optional<ActorIsolation> actorIso,
                                      bool noNestedConflict = false) {
-  return ManagedValue::forLValue(
-      enterAccessScope(SGF, loc, base, addr.getValue(), typeData,
-                       accessKind, enforcement, actorIso, noNestedConflict));
+  auto access = enterAccessScope(SGF, loc, base, addr.getValue(), typeData,
+                           accessKind, enforcement, actorIso, noNestedConflict);
+  return ManagedValue::forLValue(access);
 }
 
 // Find the base of the formal access at `address`. If the base requires an
@@ -4415,11 +4415,9 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
                                    SILAccessEnforcement::Static,
                                    std::nullopt,
                                    /*no nested conflict*/ true);
-      } else {
-        // Take ownership of the base.
-        optBase = SGF.emitFormalAccessManagedRValueWithCleanup(e,
-                                                           optBase.getValue());
       }
+      // Take ownership of the base.
+      optBase = SGF.emitManagedRValueWithCleanup(optBase.getValue());
     }
   }
   // Bind the value, branching to the destination address if there's no
@@ -4440,11 +4438,16 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   // Reset the insertion point at the end of hasValueBB so we can
   // continue to emit code there.
   SGF.B.setInsertionPoint(someBB);
-
+  
   // Project out the payload on the success branch.  We can just use a
   // naked ValueComponent here; this is effectively a separate l-value.
   ManagedValue optPayload =
     getPayloadOfOptionalValue(SGF, e, optBase, valueTypeData, accessKind);
+  // Disable the cleanup if consuming since the consumer should pull straight
+  // from the address we give them.
+  if (optBase.getType().isMoveOnly() && isConsumeAccess(baseAccessKind)) {
+    optPayload = ManagedValue::forLValue(optPayload.forward(SGF));
+  }
   LValue valueLV;
   valueLV.add<ValueComponent>(optPayload, std::nullopt, valueTypeData,
                               /*is rvalue*/optBase.getType().isObject());

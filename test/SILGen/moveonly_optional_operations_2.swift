@@ -74,7 +74,7 @@ func consumingSwitchSubject3(ncp: consuming NCPair) {
     // CHECK:   [[PAIR_MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[PAIR_ACCESS]]
     // CHECK:   [[FIELD:%.*]] = struct_element_addr [[PAIR_MARK]]
     // CHECK:   [[FIELD_ACCESS:%.*]] = begin_access [deinit] [static] [no_nested_conflict] [[FIELD]]
-    // CHECK:   cond_br {{.*}}, [[SOME_BB:bb[0-9]+]],
+    // CHECK:   cond_br {{.*}}, [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
     // CHECK: [[SOME_BB]]:
     // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr [[FIELD_ACCESS]]
     // CHECK:   [[PAYLOAD:%.*]] = load [take] [[PAYLOAD_ADDR]]
@@ -85,6 +85,9 @@ func consumingSwitchSubject3(ncp: consuming NCPair) {
     // CHECK-NEXT: end_access [[PAIR_ACCESS]]
     // CHECK-NEXT: inject_enum_addr 
     // CHECK-NEXT: br 
+    // CHECK: [[NONE_BB]]:
+    // CHECK:   destroy_addr [[FIELD_ACCESS]]
+    // CHECK-NEXT: end_access [[FIELD_ACCESS]]
 
     switch ncp.first?.c3() {
     default:

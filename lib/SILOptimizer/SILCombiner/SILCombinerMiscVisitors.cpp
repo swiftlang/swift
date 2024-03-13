@@ -1471,9 +1471,15 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     if (!CBI->getTrueArgs().empty() || !CBI->getFalseArgs().empty())
       return nullptr;
     auto EnumOperandTy = SEI->getEnumOperand()->getType();
-    // Type should be loadable
-    if (!EnumOperandTy.isLoadable(*SEI->getFunction()))
+    // Type should be loadable and copyable.
+    // TODO: Generalize to work without copying address-only or noncopyable
+    // values.
+    if (!EnumOperandTy.isLoadable(*SEI->getFunction())) {
       return nullptr;
+    }
+    if (EnumOperandTy.isMoveOnly()) {
+      return nullptr;
+    }
 
     // Result of the select_enum should be a boolean.
     if (SEI->getType() != CBI->getCondition()->getType())
