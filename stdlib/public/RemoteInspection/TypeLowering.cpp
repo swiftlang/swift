@@ -450,6 +450,17 @@ public:
   }
 };
 
+// Old bit hack for setting all the bits lower than
+// the highest set bit.
+static uint32_t maskForCount(uint32_t t) {
+  t |= t >> 16;
+  t |= t >> 8;
+  t |= t >> 4;
+  t |= t >> 2;
+  t |= t >> 1;
+  return t;
+}
+
 // Enum with 2 or more non-payload cases and no payload cases
 class NoPayloadEnumTypeInfo: public EnumTypeInfo {
 public:
@@ -489,6 +500,9 @@ public:
     if (!reader.readInteger(address, getSize(), &tag)) {
       return false;
     }
+    // Strip bits that might be used by a containing MPE:
+    uint32_t mask = maskForCount(getNumCases());
+    tag &= mask;
     if (tag < getNumCases()) {
       *CaseIndex = tag;
       return true;
