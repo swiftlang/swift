@@ -50,9 +50,9 @@ for filename in os.listdir(sdk_overlay_dir):
     ]:
         continue
 
-    # These modules are built without library evolution and don't have a
+    # Cxx and CxxStdlib are built without library evolution and don't have a
     # .swiftinterface file
-    if module_name in ["Cxx", "CxxStdlib", "_RegexParser"]:
+    if module_name in ["Cxx", "CxxStdlib"]:
         if not os.path.exists(interface_file):
             continue
 
