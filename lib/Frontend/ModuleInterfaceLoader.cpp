@@ -212,11 +212,9 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    RequireNoncopyableGenerics_t reqNCGenerics,
                                     StringRef requiredSDK) {
   auto VI = serialization::validateSerializedAST(buf.getBuffer(),
                                                  requiresOSSAModules,
-                                                 bool(reqNCGenerics),
                                                  requiredSDK);
   return VI.status == serialization::Status::Valid;
 }
@@ -338,8 +336,6 @@ struct ModuleRebuildInfo {
       return "compiled for a different distribution channel";
     case Status::NotInOSSA:
       return "module was not built with OSSA";
-    case Status::NoncopyableGenericsMismatch:
-      return "module was not built with matching NoncopyableGenerics feature";
     case Status::MissingDependency:
       return "missing dependency";
     case Status::MissingUnderlyingModule:
@@ -449,16 +445,13 @@ class UpToDateModuleCheker {
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
   RequireOSSAModules_t requiresOSSAModules;
-  RequireNoncopyableGenerics_t requiresNCGenerics;
 
 public:
   UpToDateModuleCheker(ASTContext &ctx,
-                       RequireOSSAModules_t requiresOSSAModules,
-                       RequireNoncopyableGenerics_t requiresNCGenerics)
+                       RequireOSSAModules_t requiresOSSAModules)
      : ctx(ctx),
        fs(*ctx.SourceMgr.getFileSystem()),
-       requiresOSSAModules(requiresOSSAModules),
-       requiresNCGenerics(requiresNCGenerics) {}
+       requiresOSSAModules(requiresOSSAModules) {}
   
   // Check if all the provided file dependencies are up-to-date compared to
   // what's currently on disk.
@@ -503,7 +496,7 @@ public:
 
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
-        buf.getBuffer(), requiresOSSAModules, bool(requiresNCGenerics),
+        buf.getBuffer(), requiresOSSAModules,
         ctx.LangOpts.SDKName, /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
@@ -595,7 +588,6 @@ class ModuleInterfaceLoaderImpl {
   const ModuleLoadingMode loadMode;
   ModuleInterfaceLoaderOptions Opts;
   RequireOSSAModules_t requiresOSSAModules;
-  RequireNoncopyableGenerics_t requiresNCGenerics;
 
   ModuleInterfaceLoaderImpl(
       ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
@@ -603,19 +595,17 @@ class ModuleInterfaceLoaderImpl {
       StringRef backupInterfaceDir,
       SourceLoc diagLoc, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t requiresOSSAModules,
-      RequireNoncopyableGenerics_t requiresNCGenerics,
       DependencyTracker *dependencyTracker = nullptr,
       ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
       : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
-        upToDateChecker(ctx, requiresOSSAModules, requiresNCGenerics),
+        upToDateChecker(ctx, requiresOSSAModules),
         modulePath(modulePath), interfacePath(interfacePath),
         moduleName(moduleName),
         prebuiltCacheDir(prebuiltCacheDir),
         backupInterfaceDir(backupInterfaceDir),
         cacheDir(cacheDir), diagnosticLoc(diagLoc),
         dependencyTracker(dependencyTracker), loadMode(loadMode), Opts(Opts),
-        requiresOSSAModules(requiresOSSAModules),
-        requiresNCGenerics(requiresNCGenerics) {}
+        requiresOSSAModules(requiresOSSAModules) {}
 
   std::string getBackupPublicModuleInterfacePath() {
     return getBackupPublicModuleInterfacePath(ctx.SourceMgr, backupInterfaceDir,
@@ -669,7 +659,6 @@ class ModuleInterfaceLoaderImpl {
 
     auto looksValid = serializedASTLooksValid(*modBuf.get(),
                                               requiresOSSAModules,
-                                              requiresNCGenerics,
                                               ctx.LangOpts.SDKName);
     if (!looksValid)
       return false;
@@ -946,10 +935,7 @@ class ModuleInterfaceLoaderImpl {
                    loadMode == ModuleLoadingMode::PreferSerialized &&
                    !version::isCurrentCompilerTagged() &&
                    rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
-                     serialization::Status::SDKMismatch &&
-                     // FIXME(kavon): temporary while we bootstrap NoncopyableGenerics.
-                   rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
-                     serialization::Status::NoncopyableGenericsMismatch) {
+                     serialization::Status::SDKMismatch) {
           // Special-case here: If we're loading a .swiftmodule from the resource
           // dir adjacent to the compiler, defer to the serialized loader instead
           // of falling back. This is to support local development of Swift,
@@ -1137,8 +1123,7 @@ class ModuleInterfaceLoaderImpl {
         /*buildModuleCacheDirIfAbsent*/ true, cacheDir, prebuiltCacheDir,
         backupInterfaceDir,
         /*serializeDependencyHashes*/ false, trackSystemDependencies,
-        requiresOSSAModules,
-        requiresNCGenerics);
+        requiresOSSAModules);
 
     // Compute the output path if we're loading or emitting a cached module.
     llvm::SmallString<256> cachedOutputPath;
@@ -1355,7 +1340,6 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
       InterfaceChecker.PrebuiltCacheDir, InterfaceChecker.BackupInterfaceDir,
       ModuleID.Loc, InterfaceChecker.Opts,
       InterfaceChecker.RequiresOSSAModules,
-      InterfaceChecker.RequireNCGenerics,
       dependencyTracker,
       llvm::is_contained(PreferInterfaceForModules, ModuleName)
           ? ModuleLoadingMode::PreferInterface
@@ -1410,7 +1394,6 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(StringRef mo
                                  CacheDir, PrebuiltCacheDir, BackupInterfaceDir,
                                  SourceLoc(), Opts,
                                  RequiresOSSAModules,
-                                 RequireNCGenerics,
                                  nullptr,
                                  ModuleLoadingMode::PreferSerialized);
   std::vector<std::string> results;
@@ -1435,7 +1418,6 @@ bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
                                  CacheDir, PrebuiltCacheDir,
                                  BackupInterfaceDir, SourceLoc(), Opts,
                                  RequiresOSSAModules,
-                                 RequireNCGenerics,
                                  nullptr,
                                  ModuleLoadingMode::PreferSerialized);
   SmallVector<FileDependency, 16> deps;
@@ -1468,14 +1450,13 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     StringRef OutPath, StringRef ABIOutputPath, bool SerializeDependencyHashes,
     bool TrackSystemDependencies, ModuleInterfaceLoaderOptions LoaderOpts,
     RequireOSSAModules_t RequireOSSAModules,
-    RequireNoncopyableGenerics_t RequireNCGenerics,
     bool silenceInterfaceDiagnostics) {
   InterfaceSubContextDelegateImpl astDelegate(
       SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts, LoaderOpts,
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
       BackupInterfaceDir,
       SerializeDependencyHashes, TrackSystemDependencies,
-      RequireOSSAModules, RequireNCGenerics);
+      RequireOSSAModules);
   ImplicitModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
                                          SearchPathOpts.getSDKPath(),
                                          ModuleName, CacheDir, PrebuiltCacheDir,
@@ -1600,8 +1581,7 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     // exit.
     UpToDateModuleCheker checker(
         Instance.getASTContext(),
-        RequireOSSAModules_t(Instance.getSILOptions()),
-        RequireNoncopyableGenerics_t(Instance.getASTContext()));
+        RequireOSSAModules_t(Instance.getSILOptions()));
     ModuleRebuildInfo rebuildInfo;
     SmallVector<FileDependency, 3> allDeps;
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
@@ -1648,8 +1628,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
-    bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules,
-    RequireNoncopyableGenerics_t requireNCGenerics) {
+    bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1729,11 +1708,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   if (LangOpts.DisableAvailabilityChecking) {
     genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
     GenericArgs.push_back("-disable-availability-checking");
-  }
-
-  if (bool(requireNCGenerics)) {
-    genericSubInvocation.getLangOptions()
-                        .enableFeature(Feature::NoncopyableGenerics);
   }
 
   // Pass-down the obfuscators so we can get the serialized search paths properly.
@@ -1825,15 +1799,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
     bool serializeDependencyHashes, bool trackSystemDependencies,
-    RequireOSSAModules_t requireOSSAModules,
-    RequireNoncopyableGenerics_t requireNCGenerics)
+    RequireOSSAModules_t requireOSSAModules)
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts,
                                      clangImporterOpts, casOpts,
                                      Diags->getSuppressRemarks(),
-                                     requireOSSAModules,
-                                     requireNCGenerics);
+                                     requireOSSAModules);
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
   SubFEOpts.RequestedAction = LoaderOpts.requestedAction;
@@ -2041,12 +2013,7 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       //
       // If OSSA modules are enabled, we use a separate namespace of modules to
       // ensure that we compile all swift interface files with the option set.
-      unsigned(genericSubInvocation.getSILOptions().EnableOSSAModules),
-
-      // Whether or not NoncopyableGenerics are enabled, as that influences
-      // many things like generic signatures and conformances.
-      unsigned(genericSubInvocation.getLangOptions()
-               .hasFeature(Feature::NoncopyableGenerics))
+      unsigned(genericSubInvocation.getSILOptions().EnableOSSAModules)
       );
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
@@ -2390,7 +2357,6 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(),
       Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
       Ctx.LangOpts.SDKName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
@@ -2734,7 +2700,6 @@ bool ExplicitCASModuleLoader::canImportModule(
   }
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
       Ctx.LangOpts.SDKName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);

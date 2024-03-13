@@ -158,15 +158,6 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
       proto->isComputingRequirementSignature())
     return CheckTypeWitnessResult::forError();
 
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
-      && type->isNoncopyable()) {
-    // No move-only type can witness an associatedtype requirement.
-    // Pretend the failure is a lack of Copyable conformance.
-    auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    assert(copyable && "missing Copyable protocol!");
-    return CheckTypeWitnessResult::forConformance(copyable);
-  }
-
   const auto depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                               assocType);
 
