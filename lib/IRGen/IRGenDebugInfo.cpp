@@ -2954,8 +2954,8 @@ bool IRGenDebugInfoImpl::handleFragmentDIExpr(
   if (!FieldTypeInfo)
     return false;
   llvm::Type *FieldTy = FieldTypeInfo->getStorageType();
-  // Doesn't support non-fixed type right now
-  if (!Offset || !FieldTy)
+  // Doesn't support non-fixed or empty types right now.
+  if (!Offset || !FieldTy || !FieldTy->isSized())
     return false;
 
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
@@ -2989,8 +2989,8 @@ bool IRGenDebugInfoImpl::handleTupleFragmentDIExpr(
   auto Offset = getFixedTupleElementOffset(IGM, ParentSILType, *Idx);
   auto ElementType = TT->getElement(*Idx).getType()->getCanonicalType();
   llvm::Type *FieldTy = IGM.getStorageTypeForLowered(ElementType);
-  // Doesn't support non-fixed type right now
-  if (!Offset || !FieldTy)
+  // Doesn't support non-fixed or empty types right now.
+  if (!Offset || !FieldTy || !FieldTy->isSized())
     return false;
 
   uint64_t SizeInBits = IGM.DataLayout.getTypeSizeInBits(FieldTy);
