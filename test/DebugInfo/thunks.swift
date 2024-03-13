@@ -16,7 +16,7 @@ let i = foo.foo(-, x: y)
 // CHECK: define {{.*}}@"$ss5Int64VABIyByd_A2BIegyd_TR"
 // CHECK-NOT: ret
 // CHECK: call {{.*}}, !dbg ![[LOC:.*]]
-// CHECK: ![[FILE:[0-9]+]] = !DIFile(filename: "<compiler-generated>", directory: "")
+// CHECK: ![[FILE:[0-9]+]] = !DIFile(filename: "<compiler-generated>", directory: "/")
 // CHECK: ![[THUNK:.*]] = distinct !DISubprogram(linkageName: "$ss5Int64VABIyByd_A2BIegyd_TR"
 // CHECK-SAME:                          file: ![[FILE]]
 // CHECK-NOT:                           line:
