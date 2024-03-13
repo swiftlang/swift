@@ -314,12 +314,11 @@ extension KlassWrapper {
         print("123")
     }
 
-    // We do not support moving within a defer right now.
     mutating func deferTestFail1() {
         let _ = (consume self)
         defer {
             self = KlassWrapper(k: Klass())
-            let _ = (consume self) // expected-error {{'consume' applied to value that the compiler does not support}}
+            let _ = (consume self)
         }
         print("123")
     }
