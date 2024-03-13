@@ -394,8 +394,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
 llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
 SerializedModuleLoaderBase::getImportsOfModule(
     Twine modulePath, ModuleLoadingBehavior transitiveBehavior,
-    bool isFramework, bool isRequiredOSSAModules,
-    bool isRequiredNoncopyableGenerics, StringRef SDKName,
+    bool isFramework, bool isRequiredOSSAModules, StringRef SDKName,
     StringRef packageName, llvm::vfs::FileSystem *fileSystem,
     PathObfuscator &recoverer) {
   auto moduleBuf = fileSystem->getBufferForFile(modulePath);
@@ -408,7 +407,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules, isRequiredNoncopyableGenerics,
+      isRequiredOSSAModules,
       SDKName, recoverer, loadedModuleFile);
 
   for (const auto &dependency : loadedModuleFile->getDependencies()) {
@@ -455,7 +454,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
       ModuleLoadingBehavior::Required;
   auto binaryModuleImports = getImportsOfModule(
       modulePath, transitiveLoadingBehavior, isFramework,
-      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SourceMgr.getFileSystem().get(),
       Ctx.SearchPathOpts.DeserializedPathRecoverer);
@@ -465,7 +464,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   // Lookup optional imports of this module also
   auto binaryModuleOptionalImports = getImportsOfModule(
       modulePath, ModuleLoadingBehavior::Optional, isFramework,
-      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SourceMgr.getFileSystem().get(),
       Ctx.SearchPathOpts.DeserializedPathRecoverer);
@@ -889,7 +888,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       moduleInterfacePath, moduleInterfaceSourcePath,
       std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
       std::move(moduleSourceInfoInputBuffer), isFramework,
-      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
@@ -1028,10 +1027,6 @@ bool SerializedModuleLoaderBase::isRequiredOSSAModules() const {
   return Ctx.SILOpts.EnableOSSAModules;
 }
 
-bool SerializedModuleLoaderBase::isRequiredNoncopyableGenerics() const {
-  return Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
-}
-
 void swift::serialization::diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc,
     const serialization::ValidationInfo &loadInfo,
@@ -1068,9 +1063,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
       break;
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
-    break;
-  case serialization::Status::NoncopyableGenericsMismatch:
-    // Ignore; the module should get rebuilt from its interface.
     break;
   case serialization::Status::NotInOSSA:
     // soft reject, silently ignore.
@@ -1170,7 +1162,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::FormatTooNew:
   case serialization::Status::FormatTooOld:
   case serialization::Status::NotInOSSA:
-  case serialization::Status::NoncopyableGenericsMismatch:
   case serialization::Status::RevisionIncompatible:
   case serialization::Status::ChannelIncompatible:
   case serialization::Status::Malformed:
@@ -1412,7 +1403,6 @@ bool SerializedModuleLoaderBase::canImportModule(
     auto metaData = serialization::validateSerializedAST(
         moduleInputBuffer->getBuffer(),
         Ctx.SILOpts.EnableOSSAModules,
-        Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
         Ctx.LangOpts.SDKName);
     versionInfo->setVersion(metaData.userModuleVersion,
                             ModuleVersionSourceKind::SwiftBinaryModule);

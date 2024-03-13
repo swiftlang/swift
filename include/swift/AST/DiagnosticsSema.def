@@ -7676,9 +7676,6 @@ ERROR(bitwise_copyable_outside_module,none,
       (const ValueDecl *))
 
 // -- older ones below --
-ERROR(noncopyable_cannot_conform_to_type, none,
-     "noncopyable %kind0 cannot conform to %1",
-     (const ValueDecl *, Type))
 ERROR(noncopyable_parameter_requires_ownership, none,
       "parameter of noncopyable type %0 must specify ownership", (Type))
 ERROR(noncopyable_parameter_subscript_unsupported, none,

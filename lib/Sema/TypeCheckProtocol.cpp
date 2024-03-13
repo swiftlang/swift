@@ -6029,8 +6029,6 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();
-  const bool NoncopyableGenerics =
-      Context.LangOpts.hasFeature(Feature::NoncopyableGenerics);
   MultiConformanceChecker groupChecker(Context);
 
   ProtocolConformance *SendableConformance = nullptr;
@@ -6114,11 +6112,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       hasDeprecatedUnsafeSendable = true;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Executor)) {
       tryDiagnoseExecutorConformance(Context, nominal, proto);
-    } else if (NoncopyableGenerics
-        && proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       checkCopyableConformance(dc, ProtocolConformanceRef(conformance));
-    } else if (NoncopyableGenerics
-        && proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
       checkEscapableConformance(dc, ProtocolConformanceRef(conformance));
     } else if (Context.LangOpts.hasFeature(Feature::BitwiseCopyable) &&
                proto->isSpecificProtocol(KnownProtocolKind::BitwiseCopyable)) {

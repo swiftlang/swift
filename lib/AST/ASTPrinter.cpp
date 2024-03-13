@@ -7770,17 +7770,15 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   InvertibleProtocolSet inverses = InvertibleProtocolSet::full();
 
   for (auto *inherited : proto->getInheritedProtocols()) {
-    if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-      if (auto ip = inherited->getInvertibleProtocolKind()) {
-        inverses.remove(*ip);
-        continue;
-      }
+    if (auto ip = inherited->getInvertibleProtocolKind()) {
+      inverses.remove(*ip);
+      continue;
+    }
 
-      for (auto ip : InvertibleProtocolSet::full()) {
-        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
-        if (inherited->inheritsFrom(proto))
-          inverses.remove(ip);
-      }
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      if (inherited->inheritsFrom(proto))
+        inverses.remove(ip);
     }
 
     Results.emplace_back(TypeLoc::withoutLoc(inherited->getDeclaredInterfaceType()),
@@ -7789,19 +7787,17 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
                          /*isPreconcurrency=*/false);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto ip : inverses) {
-      InvertibleProtocolSet singleton;
-      singleton.insert(ip);
+  for (auto ip : inverses) {
+    InvertibleProtocolSet singleton;
+    singleton.insert(ip);
 
-      auto inverseTy = ProtocolCompositionType::get(
-          ctx, ArrayRef<Type>(), singleton,
-          /*hasExplicitAnyObject=*/false);
-      Results.emplace_back(TypeLoc::withoutLoc(inverseTy),
-                           /*isUnchecked=*/false,
-                           /*isRetroactive=*/false,
-                           /*isPreconcurrency=*/false);
-    }
+    auto inverseTy = ProtocolCompositionType::get(
+        ctx, ArrayRef<Type>(), singleton,
+        /*hasExplicitAnyObject=*/false);
+    Results.emplace_back(TypeLoc::withoutLoc(inverseTy),
+                         /*isUnchecked=*/false,
+                         /*isRetroactive=*/false,
+                         /*isPreconcurrency=*/false);
   }
 }
 

@@ -1324,12 +1324,10 @@ static GenericSignature getPlaceholderGenericSignature(
       auto type = genericParam->getDeclaredInterfaceType();
       genericParams.push_back(type->castTo<GenericTypeParamType>());
 
-      if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-        for (auto ip : InvertibleProtocolSet::full()) {
-          auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-          requirements.emplace_back(RequirementKind::Conformance, type,
-                                    proto->getDeclaredInterfaceType());
-        }
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        requirements.emplace_back(RequirementKind::Conformance, type,
+                                  proto->getDeclaredInterfaceType());
       }
     }
   }
@@ -4947,22 +4945,10 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
 }
 
 TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeCopyable() const {
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return !hasInverseMarking(InvertibleProtocolKind::Copyable)
-               ? CanBeInvertible::Always
-               : CanBeInvertible::Never;
-  }
-
   return conformanceExists(this, InvertibleProtocolKind::Copyable);
 }
 
 TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeEscapable() const {
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return !hasInverseMarking(InvertibleProtocolKind::Escapable)
-               ? CanBeInvertible::Always
-               : CanBeInvertible::Never;
-  }
-
   return conformanceExists(this, InvertibleProtocolKind::Escapable);
 }
 
@@ -6663,47 +6649,6 @@ findInverseInInheritance(InheritedTypes inherited,
                       return true;
                     });
   return inverse;
-}
-
-InverseMarking::Mark
-NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  switch (target) {
-  case InvertibleProtocolKind::Copyable:
-    // Handle the legacy '@_moveOnly' for types they can validly appear.
-    // TypeCheckAttr handles the illegal situations for us.
-    if (auto attr = getAttrs().getAttribute<MoveOnlyAttr>())
-      if (isa<StructDecl, EnumDecl, ClassDecl>(this))
-        return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
-                                    attr->getLocation());
-    break;
-
-  case InvertibleProtocolKind::Escapable:
-    // Handle the legacy '@_nonEscapable' attribute
-    if (auto attr = getAttrs().getAttribute<NonEscapableAttr>()) {
-      assert((isa<ClassDecl, StructDecl, EnumDecl>(this)));
-      return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
-                                  attr->getLocation());
-    }
-    break;
-  }
-
-  auto &ctx = getASTContext();
-
-  // Legacy support stops here.
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::Mark(InverseMarking::Kind::None);
-
-  // Claim that the tuple decl has an explicit ~TARGET marking.
-  if (isa<BuiltinTupleDecl>(this))
-    return InverseMarking::Mark(InverseMarking::Kind::Explicit);
-
-  assert(!isa<ProtocolDecl>(this));
-
-  // Search the inheritance clause first.
-  if (auto inverse = findInverseInInheritance(getInherited(), target))
-    return inverse;
-
-  return InverseMarking::Mark();
 }
 
 bool ProtocolDecl::requiresClass() const {

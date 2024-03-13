@@ -1033,29 +1033,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   return result;
 }
 
-/// if any of the generic args are a concrete move-only type, emit an error.
-/// returns true iff an error diagnostic was emitted
-static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
-                                         SourceLoc loc,
-                                         Type unboundTy,
-                                         ArrayRef<Type> genericArgs,
-                                         const DeclContext *dc) {
-
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return false;
-
-  bool didEmitDiag = false;
-  for (auto t: genericArgs) {
-    if (!t->isNoncopyable())
-      continue;
-
-    ctx.Diags.diagnose(loc, diag::noncopyable_generics_specific, t, unboundTy);
-    didEmitDiag = true;
-  }
-
-  return didEmitDiag;
-}
-
 /// Apply generic arguments to the given type.
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
@@ -1075,12 +1052,6 @@ Type TypeResolution::applyUnboundGenericArguments(
   // or unbound generics, let's skip the check here, and let the solver
   // do it when missing types are deduced.
   bool skipRequirementsCheck = false;
-
-  // check for generic args that are move-only
-  auto &ctx = getASTContext();
-  if (didDiagnoseMoveOnlyGenericArgs(ctx, loc, resultType, genericArgs, dc))
-    return ErrorType::get(ctx);
-
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       if (nominal->isOptionalDecl()) {
