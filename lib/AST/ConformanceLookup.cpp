@@ -111,14 +111,6 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     return ProtocolConformanceRef::forInvalid();
   }
 
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
-      && !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // Prior to noncopyable generics, all existentials conform to Copyable.
-        return ProtocolConformanceRef(
-            ctx.getBuiltinConformance(type, protocol,
-                                      BuiltinConformanceKind::Synthesized));
-  }
-
   auto layout = type->getExistentialLayout();
 
   // Due to an IRGen limitation, witness tables cannot be passed from an
@@ -503,12 +495,6 @@ LookupConformanceInModuleRequest::evaluate(
   // archetype's list of conformances, or if the archetype has a superclass
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
-
-    // Without noncopyable generics, all archetypes are Copyable
-    if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-      if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
-        return ProtocolConformanceRef(protocol);
-
     // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
     // conformance first, since an abstract conformance might not be
