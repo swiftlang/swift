@@ -58,7 +58,8 @@ function(get_test_dependencies SDK result_var_name)
       swift-ide-test
       swift-refactor
       swift-reflection-dump
-      swift-remoteast-test)
+      swift-remoteast-test
+      swift-scan-test)
 
     if(SWIFT_BUILD_SOURCEKIT)
       list(APPEND deps_binaries sourcekitd-test complete-test)
