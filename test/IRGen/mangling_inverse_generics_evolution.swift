@@ -12,8 +12,8 @@ public protocol P: ~Copyable { }
 
 public struct CallMe<U: ~Copyable> {
   public enum Maybe<T: ~Copyable>: ~Copyable {
-    // CHECK-LABEL: @"$s4test6CallMeV5MaybeO4someyAEyx_qd__Gqd__cAGmr__lFWC"
-    // CHECK: @"$s4test6CallMeV5MaybeO4noneyAEyx_qd__GAGmr__lFWC"
+    // CHECK-LABEL: @"$s4test6CallMeV5MaybeOAARiczrlE4someyAEyx_qd__Gqd__cAGmr__lFWC"
+    // CHECK: @"$s4test6CallMeV5MaybeOAARiczrlE4noneyAEyx_qd__GAGmr__lFWC"
     case none
     case some(T)
   }

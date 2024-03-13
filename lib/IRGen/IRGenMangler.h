@@ -401,9 +401,6 @@ public:
   }
 
   std::string mangleEnumCase(const ValueDecl *Decl) {
-    // No mangling of inverse conformances.
-    llvm::SaveAndRestore X(AllowInverses, false);
-
     beginMangling();
     appendEntity(Decl);
     appendOperator("WC");
