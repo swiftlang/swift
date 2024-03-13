@@ -214,7 +214,7 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
       where condition(x):
         nibble(payload: x)
         eat(payload: x)
-    case .payload(let x) // expected-error {{'unknown' is borrowed and cannot be consumed}}
+    case .payload(let x) // expected-error {{'bas.payload' is borrowed and cannot be consumed}}
       where hungryCondition(x): // expected-note {{consumed here}}
         nibble(payload: x)
         eat(payload: x)
@@ -222,7 +222,7 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
       where condition(x):
         nibble(payload: x)
         eat(payload: x)
-    case .payload(.loadablePayload(.payload(let x))) // expected-error{{'unknown' is borrowed and cannot be consumed}}
+    case .payload(.loadablePayload(.payload(let x))) // expected-error{{'bas.payload.loadablePayload' is borrowed and cannot be consumed}}
       where hungryCondition(x): // expected-note{{consumed here}}
         nibble(payload: x)
         eat(payload: x)

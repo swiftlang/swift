@@ -2217,11 +2217,6 @@ public:
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E, StringRef label) {
     printCommon(E, "interpolated_string_literal_expr", label);
 
-    // Print the trailing quote location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
-      printSourceLoc(E->getTrailingQuoteLoc(), &Ctx, "trailing_quote_loc");
-    }
     printField(E->getLiteralCapacity(), "literal_capacity", ExprModifierColor);
     printField(E->getInterpolationCount(), "interpolation_count",
                ExprModifierColor);
@@ -3044,12 +3039,6 @@ public:
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, StringRef label) {
     printCommon(E, "editor_placeholder_expr", label);
 
-    // Print the trailing angle bracket location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
-      printSourceLoc(E->getTrailingAngleBracketLoc(), &Ctx,
-                     "trailing_angle_bracket_loc");
-    }
     auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
