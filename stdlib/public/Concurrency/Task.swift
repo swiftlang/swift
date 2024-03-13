@@ -911,7 +911,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   return try body(UnsafeCurrentTask(_task))
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
     return try await body(nil)
@@ -1051,7 +1051,7 @@ internal func _getMainExecutor() -> Builtin.Executor
 ///
 /// It is used by default used by tasks and default actors,
 /// unless other executors are specified.
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @usableFromInline
 internal func _getGenericSerialExecutor() -> Builtin.Executor {
   // The `SerialExecutorRef` to "default generic executor" is guaranteed
