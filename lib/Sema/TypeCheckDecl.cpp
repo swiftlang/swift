@@ -2870,9 +2870,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
 
     if (isDerivable) {
-      evaluateOrDefault(ctx.evaluator,
-                        ResolveValueWitnessesRequest{normal},
-                        evaluator::SideEffect());
+      normal->resolveValueWitnesses();
     }
   }
 

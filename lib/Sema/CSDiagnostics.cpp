@@ -3473,9 +3473,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
       evaluateOrDefault(getASTContext().evaluator,
                         ResolveTypeWitnessesRequest{conformance},
                         evaluator::SideEffect());
-      evaluateOrDefault(getASTContext().evaluator,
-                        ResolveValueWitnessesRequest{conformance},
-                        evaluator::SideEffect());
+      conformance->resolveValueWitnesses();
 
       fakeConformances.push_back(conformance);
     }

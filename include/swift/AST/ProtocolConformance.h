@@ -747,6 +747,9 @@ public:
   /// Override the witness for a given requirement.
   void overrideWitness(ValueDecl *requirement, Witness newWitness);
 
+  /// Triggers a request that resolves all of the conformance's value witnesses.
+  void resolveValueWitnesses() const;
+
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {

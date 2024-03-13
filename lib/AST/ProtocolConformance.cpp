@@ -706,6 +706,13 @@ void NormalProtocolConformance::overrideWitness(ValueDecl *requirement,
   Mapping[requirement] = witness;
 }
 
+void NormalProtocolConformance::resolveValueWitnesses() const {
+  auto mutableThis = const_cast<NormalProtocolConformance *>(this);
+  evaluateOrDefault(getProtocol()->getASTContext().evaluator,
+                    ResolveValueWitnessesRequest{mutableThis},
+                    evaluator::SideEffect());
+}
+
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     NormalProtocolConformance *genericConformance,
