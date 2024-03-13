@@ -6318,25 +6318,3 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
 
   return false;
 }
-
-// If we haven't enabled the NoncopyableGenerics feature, force a
-// Copyable conformance check now.
-void swift::forceCopyableConformanceCheckIfNeeded(NominalTypeDecl *nom) {
-  auto &ctx = nom->getASTContext();
-
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return; // taken care of in conformance checking
-
-  auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-  Type selfTy = nom->getDeclaredInterfaceType();
-
-  auto conformanceRef = nom->getModuleContext()->lookupConformance(selfTy,
-                                                                   copyable,
-      /*allowMissing=*/false);
-
-  // it's never copyable
-  if (conformanceRef.isInvalid())
-    return;
-
-  swift::checkCopyableConformance(nom, conformanceRef);
-}

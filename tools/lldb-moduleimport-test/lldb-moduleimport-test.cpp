@@ -46,12 +46,11 @@ using namespace llvm::MachO;
 
 static bool validateModule(
     llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
-    bool requiresNoncopyableGenerics,
     swift::serialization::ValidationInfo &info,
     swift::serialization::ExtendedValidationInfo &extendedInfo,
     llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
   info = swift::serialization::validateSerializedAST(
-      data, requiresOSSAModules, requiresNoncopyableGenerics,
+      data, requiresOSSAModules,
       /*requiredSDK*/ StringRef(), &extendedInfo, /* dependencies*/ nullptr,
       &searchPaths);
   if (info.status != swift::serialization::Status::Valid) {
@@ -320,8 +319,6 @@ int main(int argc, char **argv) {
   if (Modules.empty())
     return 0;
 
-  bool enableNoncopyableGenerics = SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS;
-
   swift::serialization::ValidationInfo info;
   swift::serialization::ExtendedValidationInfo extendedInfo;
   llvm::SmallVector<swift::serialization::SearchPath> searchPaths;
@@ -329,7 +326,7 @@ int main(int argc, char **argv) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules, enableNoncopyableGenerics,
+                        EnableOSSAModules,
                         info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;

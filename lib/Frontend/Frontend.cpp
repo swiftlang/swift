@@ -782,8 +782,7 @@ bool CompilerInstance::setUpModuleLoaders() {
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
           FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-          RequireOSSAModules_t(Invocation.getSILOptions()),
-          RequireNoncopyableGenerics_t(Invocation.getLangOptions())));
+          RequireOSSAModules_t(Invocation.getSILOptions())));
 
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
@@ -825,8 +824,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
-        RequireOSSAModules_t(Invocation.getSILOptions()),
-        RequireNoncopyableGenerics_t(Invocation.getLangOptions()));
+        RequireOSSAModules_t(Invocation.getSILOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
         std::make_unique<PlaceholderSwiftModuleScanner>(

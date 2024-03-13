@@ -182,7 +182,6 @@ protected:
                      ModuleLoadingBehavior transitiveBehavior,
                      bool isFramework,
                      bool isRequiredOSSAModules,
-                     bool isRequiredNoncopyableGenerics,
                      StringRef SDKName,
                      StringRef packageName,
                      llvm::vfs::FileSystem *fileSystem,
@@ -212,7 +211,6 @@ public:
           bool isFramework);
 
   bool isRequiredOSSAModules() const;
-  bool isRequiredNoncopyableGenerics() const;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.

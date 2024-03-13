@@ -158,8 +158,6 @@ namespace swift {
     static bool shouldWalkIntoDeclInClosureContext(Decl *D);
   };
 
-void forceCopyableConformanceCheckIfNeeded(NominalTypeDecl *nominal);
-
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

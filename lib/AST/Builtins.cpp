@@ -296,12 +296,6 @@ struct CollectGenericParams {
     auto protocolType = synthesizeType(SC, conf.Protocol);
     Requirement req = {RequirementKind::Conformance, type, protocolType};
 
-    // If it's an invertible protocol and NoncopyableGenerics is disabled
-    // then skip the requirement.
-    if (req.getProtocolDecl()->getInvertibleProtocolKind())
-      if (!SC.Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-        return;
-
     AddedRequirements.push_back(req);
   }
 
@@ -736,13 +730,6 @@ namespace {
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
                       proto->getDeclaredInterfaceType());
-
-      // If it's an invertible protocol and NoncopyableGenerics is disabled
-      // then skip the requirement.
-      if (req.getProtocolDecl()->getInvertibleProtocolKind())
-        if (!Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-          return;
-
       addedRequirements.push_back(req);
     }
 
