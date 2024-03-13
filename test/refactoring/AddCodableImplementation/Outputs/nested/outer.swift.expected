@@ -1,0 +1,30 @@
+struct Response: Codable {
+  let pages: [Page]
+
+  struct Page: Codable {
+    let results: [Result]
+
+    struct Result: Codable {
+      let title: String
+    }
+  }
+
+  private enum CodingKeys: CodingKey {
+    case pages
+  }
+
+  init(from decoder: any Decoder) throws {
+    let container: KeyedDecodingContainer<Response.CodingKeys> = try decoder.container(keyedBy: Response.CodingKeys.self)
+
+    self.pages = try container.decode([Response.Page].self, forKey: Response.CodingKeys.pages)
+
+  }
+
+  func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: Response.CodingKeys.self)
+
+    try container.encode(self.pages, forKey: Response.CodingKeys.pages)
+  }
+}
+
+
