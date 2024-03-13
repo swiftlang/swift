@@ -979,6 +979,18 @@ endif()
 set(SWIFT_USE_LINKER ${SWIFT_USE_LINKER_default} CACHE STRING
     "Build Swift with a non-default linker")
 
+include(CheckLinkerFlag)
+
+# Apple's linker complains about duplicate libraries, which CMake likes to do
+# to support ELF platforms. To silence that warning, we can use
+# -no_warn_duplicate_libraries, but only in versions of the linker that
+# support that flag.
+if(NOT LLVM_USE_LINKER AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  check_linker_flag(C "-Wl,-no_warn_duplicate_libraries" SWIFT_LINKER_SUPPORTS_NO_WARN_DUPLICATE_LIBRARIES)
+else()
+  set(SWIFT_LINKER_SUPPORTS_NO_WARN_DUPLICATE_LIBRARIES OFF CACHE INTERNAL "")
+endif()
+
 #
 # Enable additional warnings.
 #
