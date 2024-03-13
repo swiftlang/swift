@@ -6661,6 +6661,11 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
+
+  if (constant.isDistributedThunk()) {
+      decl = constant.getFuncDecl()->getDistributedThunk();
+  }
+
   bool isObjCReplacementSelfCall = false;
   if (isOnSelfParameter &&
       SGF.getOptions()

@@ -1349,10 +1349,16 @@ AbstractFunctionDecl::getDistributedThunk() const {
   if (isDistributedThunk())
     return const_cast<FuncDecl *>(dyn_cast<FuncDecl>(this));
 
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+
+  if (auto accessor = dyn_cast<AccessorDecl>(mutableThis)) {
+    auto Storage = accessor->getStorage();
+    return Storage->getDistributedThunk();
+  }
+
   if (!isDistributed())
     return nullptr;
 
-  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedThunkRequest{mutableThis},

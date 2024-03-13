@@ -4085,10 +4085,15 @@ void LValue::addMemberVarComponent(
                           SILDeclRef::Kind::Func,
                           /*isForeign=*/false, /*isDistributed=*/true);
 
+//      auto thunkDecl = var->getDistributedThunk();
+//      thunkDecl->dump();
+
       auto typeData = getLogicalStorageTypeData(
           SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
 
-      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/true, typeData);
+      asImpl().emitUsingGetterSetter(accessor,
+                                     /*isDirect=*/false, // TODO?
+                                     typeData);
     }
 
   } emitter(SGF, loc, var, subs, isSuper, accessKind,

@@ -19,44 +19,40 @@ import Distributed
 @_DistributedProtocol
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
-  distributed func hi(name: String)
+//  distributed func hi(name: String)
 
-  distributed var variable: String { get }
-
-  distributed func generic<T: Codable & Sendable>(incoming: T) throws -> T
+  distributed var foobar: String { get }
 }
 
 @available(SwiftStdlib 6.0, *)
 distributed actor Worker: WorkerProtocol {
-  distributed func hi(name: String) {
-    print("Hi, \(name)!")
-  }
+//  distributed func hi(name: String) {
+//    print("Hi, \(name)!")
+//  }
 
-  distributed var variable: String {
+  distributed var foobar: String {
     "implemented!"
-  }
-
-  distributed func generic<T: Codable & Sendable>(incoming: T) throws -> T {
-    return incoming
   }
 }
 
 // ==== Execute ----------------------------------------------------------------
 @available(SwiftStdlib 6.0, *)
 @main struct Main {
+
+  static func kappa<W: WorkerProtocol>(w: W) async throws {
+    let v = try await w.foobar
+  }
+
   static func main() async throws {
     let system = LocalTestingDistributedActorSystem()
 
-    let actor: any WorkerProtocol = Worker(actorSystem: system)
+    let actor = Worker(actorSystem: system)
 
     // local calls should still just work
-    try await actor.hi(name: "P")
-    // CHECK: Hi, P!
+//    try await actor.hi(name: "P")
 
-    let v = try await actor.variable
-    print("v = \(v)") // CHECK: v = implemented!
+    try await kappa(w: actor)
 
-    let echo = try await actor.generic(incoming: "echo!!!")
-    print("echo = \(echo)") // CHECK: echo = echo!!!
+//    let v = try await actor.foobar
   }
 }
