@@ -3202,9 +3202,10 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   }
 
   if (!lowering.isTrivial() && conformance) {
-    // A non-trivial type can have a conformance in one case:
+    // A non-trivial type can have a conformance in a few cases:
     // (1) contains a conforming archetype
     // (2) is resilient with minimal expansion
+    // (3) containing or being ~Escapable
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
@@ -3215,6 +3216,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (nominal && nominal->isResilient() &&
               forExpansion.getResilienceExpansion() ==
                   ResilienceExpansion::Minimal) {
+            return true;
+          }
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
             return true;
           }
           // Walk into every aggregate.
@@ -3233,6 +3240,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (nominal && nominal->isResilient() &&
               forExpansion.getResilienceExpansion() ==
                   ResilienceExpansion::Minimal) {
+            return false;
+          }
+
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
             return false;
           }
 
