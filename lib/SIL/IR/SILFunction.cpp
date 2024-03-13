@@ -898,8 +898,8 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
       isAvailableExternally())
     return false;
 
-  // Otherwise, only public functions can be referenced.
-  return hasPublicVisibility(getLinkage());
+  // Otherwise, only public or package functions can be referenced.
+  return hasPublicOrPackageVisibility(getLinkage(), getModule().getOptions().EnableSerializePackage);
 }
 
 bool

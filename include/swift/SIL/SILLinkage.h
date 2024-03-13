@@ -289,6 +289,26 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
   llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
+inline bool hasPublicOrPackageVisibility(SILLinkage linkage, bool includePackage) {
+    switch (linkage) {
+    case SILLinkage::Public:
+    case SILLinkage::PublicExternal:
+    case SILLinkage::PublicNonABI:
+        return true;
+    case SILLinkage::Package:
+    case SILLinkage::PackageExternal:
+    case SILLinkage::PackageNonABI:
+        return includePackage;
+    case SILLinkage::Hidden:
+    case SILLinkage::Shared:
+    case SILLinkage::Private:
+    case SILLinkage::HiddenExternal:
+        return false;
+    }
+
+    llvm_unreachable("Unhandled SILLinkage in switch.");
+}
+
 inline bool hasSharedVisibility(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Shared:

@@ -2419,7 +2419,7 @@ public:
     }
     if (F.isSerialized()) {
       require(RefG->isSerialized()
-                || hasPublicVisibility(RefG->getLinkage()),
+                || hasPublicOrPackageVisibility(RefG->getLinkage(), F.getModule().getOptions().EnableSerializePackage),
               "alloc_global inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -2438,7 +2438,7 @@ public:
     }
     if (F.isSerialized()) {
       require(RefG->isSerialized()
-              || hasPublicVisibility(RefG->getLinkage()),
+              || hasPublicOrPackageVisibility(RefG->getLinkage(), F.getModule().getOptions().EnableSerializePackage),
               "global_addr/value inside fragile function cannot "
               "reference a private or hidden symbol");
     }

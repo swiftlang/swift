@@ -2472,9 +2472,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   ensureRequirementsAreSatisfied(Context, conformance);
 
   // Check non-type requirements.
-  evaluateOrDefault(Context.evaluator,
-                    ResolveValueWitnessesRequest{conformance},
-                    evaluator::SideEffect());
+  conformance->resolveValueWitnesses();
 }
 
 /// Add the next associated type deduction to the string representation
