@@ -2341,6 +2341,18 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   } else if (Args.hasArg(OPT_EnbaleCMOEverything)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
+
+  if (Args.hasArg(OPT_ExperimentalPackageCMO)) {
+    if (!FEOpts.AllowNonResilientAccess) {
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-package-cmo",
+                     "-experimental-allow-non-resilient-access");
+    } else {
+      Opts.EnableSerializePackage = true;
+      Opts.CMOMode = CrossModuleOptimizationMode::Default;
+    }
+  }
+
   Opts.EnableStackProtection =
       Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
                    Opts.EnableStackProtection);

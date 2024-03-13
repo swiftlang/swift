@@ -77,6 +77,7 @@ static std::optional<SILLinkage> fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_SHARED: return SILLinkage::Shared;
   case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
+  case SIL_LINKAGE_PACKAGE_EXTERNAL: return SILLinkage::PackageExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
   }
 

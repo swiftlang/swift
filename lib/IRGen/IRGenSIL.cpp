@@ -2446,8 +2446,10 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
       f->getLoweredFunctionType()->isPolymorphic())
     return;
 
-  // Do not emit bodies of public_external functions.
-  if (hasPublicVisibility(f->getLinkage()) && f->isAvailableExternally())
+  // Do not emit bodies of public_external or package_external functions.
+  if (hasPublicOrPackageVisibility(f->getLinkage(),
+                                   f->getASTContext().SILOpts.EnableSerializePackage) &&
+      f->isAvailableExternally())
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
