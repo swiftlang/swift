@@ -3196,7 +3196,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
                    << substType << "\n"
-                   << "of " << origType << "\n";
+                   << "of " << origType << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
@@ -3260,7 +3262,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
       llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
-      llvm::errs() << "\n";
+      llvm::errs() << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
