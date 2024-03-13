@@ -1511,7 +1511,7 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   auto closureExtInfo = objcFnTy->getExtInfo().intoBuilder()
     .withRepresentation(SILFunctionTypeRepresentation::Thin)
     .withAsync()
-    .withConcurrent()
+    .withSendable()
     .build();
   auto closureTy = objcFnTy->getWithExtInfo(closureExtInfo);
   

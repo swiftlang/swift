@@ -6795,7 +6795,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, concurrent, async, throws, hasTransferringResult;
+  bool noescape = false, sendable, async, throws, hasTransferringResult;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -6803,13 +6803,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
 
   if (!isGeneric) {
     decls_block::FunctionTypeLayout::readRecord(
-        scratch, resultID, rawRepresentation, clangTypeID, noescape, concurrent,
+        scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
         hasTransferringResult);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
-        scratch, resultID, rawRepresentation, concurrent, async, throws,
+        scratch, resultID, rawRepresentation, sendable, async, throws,
         thrownErrorID, rawDiffKind, rawIsolation, hasTransferringResult,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
@@ -6862,7 +6862,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation, LifetimeDependenceInfo(),
                   hasTransferringResult)
-                  .withConcurrent(concurrent)
+                  .withSendable(sendable)
                   .withAsync(async)
                   .build();
 
@@ -7357,7 +7357,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   uint8_t rawDiffKind;
   bool pseudogeneric = false;
   bool unimplementable;
-  bool concurrent;
+  bool sendable;
   bool noescape;
   bool erasedIsolation;
   bool hasErrorResult;
@@ -7371,7 +7371,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   ClangTypeID clangFunctionTypeID;
 
   decls_block::SILFunctionTypeLayout::readRecord(
-      scratch, concurrent, async, rawCoroutineKind, rawCalleeConvention,
+      scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
       erasedIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
@@ -7401,7 +7401,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
 
   auto extInfo =
       SILFunctionType::ExtInfoBuilder(
-          *representation, pseudogeneric, noescape, concurrent, async,
+          *representation, pseudogeneric, noescape, sendable, async,
           unimplementable, isolation, *diffKind, clangFunctionType,
           LifetimeDependenceInfo())
           .build();

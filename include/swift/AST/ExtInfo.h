@@ -620,7 +620,7 @@ public:
         clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
   [[nodiscard]]
-  ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
+  ASTExtInfoBuilder withSendable(bool concurrent = true) const {
     return ASTExtInfoBuilder(
         concurrent ? (bits | SendableMask) : (bits & ~SendableMask),
         clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
@@ -808,10 +808,10 @@ public:
 
   /// Helper method for changing only the concurrent field.
   ///
-  /// Prefer using \c ASTExtInfoBuilder::withConcurrent for chaining.
+  /// Prefer using \c ASTExtInfoBuilder::withSendable for chaining.
   [[nodiscard]]
-  ASTExtInfo withConcurrent(bool concurrent = true) const {
-    return builder.withConcurrent(concurrent).build();
+  ASTExtInfo withSendable(bool isSendable = true) const {
+    return builder.withSendable(isSendable).build();
   }
 
   /// Helper method for changing only the throws field.
@@ -1122,7 +1122,7 @@ public:
                              clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
-  SILExtInfoBuilder withConcurrent(bool isSendable = true) const {
+  SILExtInfoBuilder withSendable(bool isSendable = true) const {
     return SILExtInfoBuilder(isSendable ? (bits | SendableMask)
                                         : (bits & ~SendableMask),
                              clangTypeInfo, lifetimeDependenceInfo);
@@ -1294,8 +1294,8 @@ public:
     return builder.withNoEscape(noEscape).build();
   }
   
-  SILExtInfo withConcurrent(bool isSendable = true) const {
-    return builder.withConcurrent(isSendable).build();
+  SILExtInfo withSendable(bool isSendable = true) const {
+    return builder.withSendable(isSendable).build();
   }
 
   SILExtInfo withAsync(bool isAsync = true) const {

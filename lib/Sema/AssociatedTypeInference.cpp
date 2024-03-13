@@ -2122,7 +2122,7 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
     if (adjustment == TypeAdjustment::NoescapeToEscaping)
       return info.withNoEscape(false);
     else
-      return info.withConcurrent(true);
+      return info.withSendable(true);
   };
 
   // If we have a noescape function type, make it escaping.

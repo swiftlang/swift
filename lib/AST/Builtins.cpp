@@ -1565,7 +1565,7 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
     builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows()
-                                    .withConcurrent(true).build();
+                                    .withSendable(true).build();
   Type operationResultType;
   if (isDiscarding) {
     operationResultType = TupleType::getEmpty(ctx); // ()

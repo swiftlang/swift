@@ -1162,7 +1162,7 @@ public:
       break;
     }
 
-    funcFlags = funcFlags.withConcurrent(flags.isSendable());
+    funcFlags = funcFlags.withSendable(flags.isSendable());
     funcFlags = funcFlags.withAsync(flags.isAsync());
     funcFlags = funcFlags.withDifferentiable(flags.isDifferentiable());
     extFuncFlags =

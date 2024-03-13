@@ -671,7 +671,7 @@ bool BindingSet::finalize(
           bool isKeyPathSendable = capability && capability->second;
           if (!isKeyPathSendable && extInfo.isSendable()) {
             fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
-                                       extInfo.withConcurrent(false));
+                                       extInfo.withSendable(false));
           }
 
           updatedBindings.insert(binding.withType(fnType));

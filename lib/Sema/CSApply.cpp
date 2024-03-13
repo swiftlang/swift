@@ -7349,7 +7349,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
     if (toEI.isSendable() && !fromEI.isSendable()) {
-      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withSendable());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
@@ -8949,7 +8949,7 @@ static Expr *wrapAsyncLetInitializer(
                   .has_value();
   auto extInfo = ASTExtInfoBuilder()
     .withAsync()
-    .withConcurrent()
+    .withSendable()
     .withThrows(throws, /*FIXME:*/Type())
     .build();
 

@@ -6009,7 +6009,7 @@ static Type applyUnsafeConcurrencyToParameterType(
                   type->getASTContext().getMainActorType());
 
   return fnType->withExtInfo(fnType->getExtInfo()
-                               .withConcurrent(sendable)
+                               .withSendable(sendable)
                                .withIsolation(isolation));
 }
 

@@ -2005,7 +2005,7 @@ private:
 
   Result visitAnyFunctionType(AnyFunctionType *ty) {
     auto newFn = applyToFunctionType(ty, [](ASTExtInfo extInfo) {
-      return extInfo.withConcurrent();
+      return extInfo.withSendable();
     });
     return { newFn, true };
   }
