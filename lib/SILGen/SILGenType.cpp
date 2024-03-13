@@ -400,6 +400,14 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
+    // TODO: here the requirement is thunk_decl of the protocol; it is a FUNC
+    // detect here that it is a func dec + thunk.
+    // walk up to DC, and find storage.
+    // e  requirementRef->getDecl()->dump()
+    //(func_decl implicit "distributedVariable()" interface type="<Self where Self : WorkerProtocol> (Self) -> () async throws -> String" access=internal nonisolated distributed_thunk
+    //  (parameter "self")
+    //  (parameter_list))
+
     auto reqDecl = requirementRef.getDecl();
 
     // Static functions can be witnessed by enum cases with payload
@@ -416,9 +424,18 @@ public:
 
     auto reqAccessor = dyn_cast<AccessorDecl>(reqDecl);
 
+    auto storage = // NIL
+
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (auto witness = asDerived().getWitness(reqDecl)) {
+
+      // TODO: we enter here, because we are a FUNC
+      // if (is distributed THUNK)
+      // get DC and get the variable decl = that is our a
+      //  set the storage...
+      //  FALL THROUGH
+      // else
+    if (auto witness = asDerived().getWitness(reqDecl)) {
         auto newDecl = requirementRef.withDecl(witness.getDecl());
         // Only import C++ methods as foreign. If the following
         // Objective-C function is imported as foreign:
@@ -434,15 +451,22 @@ public:
             requirementRef, getWitnessRef(newDecl, witness),
             witness);
       }
-
       return asDerived().addMissingMethod(requirementRef);
+    } else {
+
+      // TODO: make this happen, the reqAccessor find it
+      // Otherwise, we need to map the storage declaration and then get
+      // the appropriate accessor for it.
+      storage = reqAccessor->getStorage();
+
     }
 
-    // Otherwise, we need to map the storage declaration and then get
-    // the appropriate accessor for it.
-    auto witness = asDerived().getWitness(reqAccessor->getStorage());
+
+
+    auto witness = asDerived().getWitness(storage);
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
+
 
     // Static properties can be witnessed by enum cases without payload
     if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
@@ -452,8 +476,16 @@ public:
     }
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
-    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
+    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation()) {
       return asDerived().addMissingMethod(requirementRef);
+    }
+    // Here we notice a `distributed var` thunk requirement,
+    // and witness it with the distributed thunk -- the "getter thunk".
+    if (requirementRef.isDistributedThunk()) {
+      return addMethodImplementation(
+          requirementRef, getWitnessRef(requirementRef, witnessStorage->getDistributedThunk()),
+          witness);
+    }
 
     auto witnessAccessor =
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
@@ -704,6 +736,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
+  // SIMILAR TO THIS?
   auto shouldUseDistributedThunkWitness =
       // always use a distributed thunk for distributed requirements:
       requirement.isDistributedThunk() ||

@@ -5674,6 +5674,8 @@ RValue SILGenFunction::emitApply(
   SILValue rawDirectResult;
   {
     SmallVector<SILValue, 1> rawDirectResults;
+    fprintf(stderr, "[%s:%d](%s) emit raw apply: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    fn.dump();
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
                  indirectResultAddrs, indirectErrorAddr,
                  rawDirectResults, breadcrumb);

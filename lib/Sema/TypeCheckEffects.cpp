@@ -3578,7 +3578,9 @@ private:
         .highlight(E->getAwaitLoc());
       return;
     }
+    E->dump();
     Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+    assert(false);
   }
 
   void diagnoseUncoveredAsyncSite(const Expr *anchor) const {

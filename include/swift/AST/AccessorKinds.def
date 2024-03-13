@@ -120,6 +120,7 @@
 /// always be synthesized.  However, this will not be true when
 /// move-only types are introduced.
 OBJC_ACCESSOR(Get, get)
+OBJC_ACCESSOR(DistributedGet, _distributed_get)
 
 /// This is a setter: a function that is called when a value is assigned
 /// to the storage.  It takes a value of the storage type as its

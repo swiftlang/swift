@@ -2858,6 +2858,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberAccessor() {
   auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return runForSemanticMemberGetter();
   case AccessorKind::Set:
     return runForSemanticMemberSetter();

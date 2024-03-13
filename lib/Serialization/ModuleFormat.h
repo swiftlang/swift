@@ -335,6 +335,7 @@ enum AccessorKind : uint8_t {
   Read,
   Modify,
   Init,
+  DistributedGet,
 };
 using AccessorKindField = BCFixed<4>;
 
