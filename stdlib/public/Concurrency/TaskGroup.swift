@@ -1211,7 +1211,7 @@ func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")
 func _taskHasTaskGroupStatusRecord() -> Bool
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_hasTaskExecutorStatusRecord")
 func _taskHasTaskExecutorStatusRecord() -> Bool
 

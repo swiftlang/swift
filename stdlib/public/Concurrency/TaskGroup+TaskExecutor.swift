@@ -17,7 +17,7 @@ import Swift
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension TaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
@@ -107,7 +107,7 @@ extension TaskGroup {
 // ==== ThrowingTaskGroup ------------------------------------------------------------------------------------------------------
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension ThrowingTaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
@@ -194,7 +194,7 @@ extension ThrowingTaskGroup {
 // ==== DiscardingTaskGroup ------------------------------------------------------------------------------------------------------
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscardingTaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
@@ -286,7 +286,7 @@ extension DiscardingTaskGroup {
 // ==== ThrowingDiscardingTaskGroup ------------------------------------------------------------------------------------------------------
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension ThrowingDiscardingTaskGroup {
   /// Adds a child task to the group and set it up with the passed in task executor preference.
   ///
