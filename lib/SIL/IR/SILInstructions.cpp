@@ -825,7 +825,7 @@ ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
     SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions) {
   if (DerivativeFunctions.empty())
     return OriginalFunction->getOwnershipKind();
-  return mergeSILValueOwnership(
+  return getSILValueOwnership(
       {OriginalFunction, DerivativeFunctions[0], DerivativeFunctions[1]});
 }
 

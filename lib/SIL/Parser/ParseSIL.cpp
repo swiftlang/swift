@@ -4980,7 +4980,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         auto Ty2 = SILType::getPrimitiveObjectType(Ty->getCanonicalType());
 
         ValueOwnershipKind forwardingOwnership =
-            F && F->hasOwnership() ? mergeSILValueOwnership(OpList)
+            F && F->hasOwnership() ? getSILValueOwnership(OpList)
                                    : ValueOwnershipKind(OwnershipKind::None);
 
         if (parseForwardingOwnershipKind(forwardingOwnership)
@@ -5540,7 +5540,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       if (Opcode == SILInstructionKind::StructInst) {
         ValueOwnershipKind forwardingOwnership =
-            F && F->hasOwnership() ? mergeSILValueOwnership(OpList)
+            F && F->hasOwnership() ? getSILValueOwnership(OpList, Ty)
                                    : ValueOwnershipKind(OwnershipKind::None);
         if (parseForwardingOwnershipKind(forwardingOwnership)
              || parseSILDebugLocation(InstLoc, B)) {
