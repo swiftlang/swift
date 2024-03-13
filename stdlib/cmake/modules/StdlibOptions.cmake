@@ -270,6 +270,10 @@ option(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
        "Use relative protocol witness tables"
        FALSE)
 
+option(SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES
+       "Use fragile protocol witness tables for resilient protocols"
+       FALSE)
+
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default TRUE)
 else()

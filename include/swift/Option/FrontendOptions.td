@@ -1259,6 +1259,12 @@ def enable_relative_protocol_witness_tables :
 def disable_relative_protocol_witness_tables :
   Flag<["-"], "disable-relative-protocol-witness-tables">,
   HelpText<"Disable relative protocol witness tables">;
+def enable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "enable-fragile-relative-protocol-tables">,
+  HelpText<"Enable relative protocol witness tables">;
+def disable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "disable-fragile-relative-protocol-tables">,
+  HelpText<"Disable relative protocol witness tables">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,

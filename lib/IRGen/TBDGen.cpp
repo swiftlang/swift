@@ -511,6 +511,7 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   opts.PublicOrPackageSymbolsOnly = Opts.PublicOrPackageSymbolsOnly;
   opts.WitnessMethodElimination = Opts.WitnessMethodElimination;
   opts.VirtualFunctionElimination = Opts.VirtualFunctionElimination;
+  opts.FragileResilientProtocols = Opts.FragileResilientProtocols;
 
   auto silVisitorCtx = SILSymbolVisitorContext(SwiftModule, opts);
   auto visitorCtx = IRSymbolVisitorContext{UniversalLinkInfo, silVisitorCtx};

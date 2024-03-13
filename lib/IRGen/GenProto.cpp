@@ -953,7 +953,10 @@ bool IRGenModule::isResilientConformance(
     const NormalProtocolConformance *conformance) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
-  if (!conformance->getProtocol()->isResilient())
+  bool shouldTreatProtocolNonResilient =
+    IRGen.Opts.UseFragileResilientProtocolWitnesses;
+  if (!conformance->getProtocol()->isResilient() ||
+      shouldTreatProtocolNonResilient)
     return false;
 
   auto *conformanceModule = conformance->getDeclContext()->getParentModule();
@@ -2167,6 +2170,7 @@ namespace {
     void addResilientWitnesses() {
       if (Description.resilientWitnesses.empty())
         return;
+      assert(!IGM.IRGen.Opts.UseFragileResilientProtocolWitnesses);
 
       Flags = Flags.withHasResilientWitnesses(true);
 
@@ -2540,6 +2544,17 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   bool isResilient = isResilientConformance(conf);
   bool useRelativeProtocolWitnessTable =
     IRGen.Opts.UseRelativeProtocolWitnessTables;
+  if (useRelativeProtocolWitnessTable &&
+      !conf->getConditionalRequirements().empty()) {
+    auto sig = conf->getGenericSignature();
+    sig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
+                      if (param->isParameterPack()) {
+#ifndef NDEBUG
+                        wt->dump();
+#endif
+                        llvm::report_fatal_error("use of relative protcol witness tables not supported");
+                      }});
+  }
   if (!isResilient) {
     // Build the witness table.
     ConstantInitBuilder builder(*this);
