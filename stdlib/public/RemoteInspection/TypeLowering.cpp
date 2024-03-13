@@ -450,9 +450,13 @@ public:
   }
 };
 
-// Old bit hack for setting all the bits lower than
-// the highest set bit.
+// Given a count, return a mask that is just
+// big enough to preserve values less than that count.
+// E.g., given a count of 6, max value is 5 (binary 0101),
+// so we want to return binary 0111.
 static uint32_t maskForCount(uint32_t t) {
+  t -= 1; // Convert count => max value
+  // Set all bits below highest bit...
   t |= t >> 16;
   t |= t >> 8;
   t |= t >> 4;
