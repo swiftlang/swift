@@ -6015,6 +6015,11 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
                               ClassDecl *asViewedFromRootClass) {
   assert(!asViewedFromRootClass || isa<ClassDecl>(D));
 
+  // Ignore resilient protocols if requested.
+  if (isa<ProtocolDecl>(D) && IRGen.Opts.UseFragileResilientProtocolWitnesses) {
+    return false;
+  }
+
   if (D->getModuleContext()->getBypassResilience())
     return false;
   if (expansion == ResilienceExpansion::Maximal &&

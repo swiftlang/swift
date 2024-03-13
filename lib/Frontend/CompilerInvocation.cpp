@@ -2525,6 +2525,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
 
   Opts.VirtualFunctionElimination = Args.hasArg(OPT_enable_llvm_vfe);
   Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
+  Opts.FragileResilientProtocols =
+    Args.hasArg(OPT_enable_fragile_resilient_protocol_witnesses);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
@@ -3046,6 +3048,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
                  OPT_disable_relative_protocol_witness_tables,
                  Opts.UseRelativeProtocolWitnessTables);
+  Opts.UseFragileResilientProtocolWitnesses =
+    Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
+                 OPT_disable_fragile_resilient_protocol_witnesses,
+                 Opts.UseFragileResilientProtocolWitnesses);
   Opts.EnableLargeLoadableTypesReg2Mem =
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,

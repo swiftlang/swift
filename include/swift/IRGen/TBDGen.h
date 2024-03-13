@@ -47,6 +47,9 @@ struct TBDGenOptions {
   /// Whether LLVM IR Witness Method Elimination is enabled.
   bool WitnessMethodElimination = false;
 
+  /// Whether resilient protocols should be emitted fragile.
+  bool FragileResilientProtocols = false;
+
   /// The install_name to use in the TBD file.
   std::string InstallName;
 
@@ -78,6 +81,7 @@ struct TBDGenOptions {
            lhs.PublicOrPackageSymbolsOnly == rhs.PublicOrPackageSymbolsOnly &&
            lhs.VirtualFunctionElimination == rhs.VirtualFunctionElimination &&
            lhs.WitnessMethodElimination == rhs.WitnessMethodElimination &&
+           lhs.FragileResilientProtocols == rhs.FragileResilientProtocols &&
            lhs.InstallName == rhs.InstallName &&
            lhs.ModuleLinkName == rhs.ModuleLinkName &&
            lhs.CurrentVersion == rhs.CurrentVersion &&
@@ -95,7 +99,7 @@ struct TBDGenOptions {
     return hash_combine(
         opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
         opts.PublicOrPackageSymbolsOnly, opts.VirtualFunctionElimination,
-        opts.WitnessMethodElimination,
+        opts.WitnessMethodElimination, opts.FragileResilientProtocols,
         opts.InstallName, opts.ModuleLinkName,
         opts.CurrentVersion, opts.CompatibilityVersion,
         opts.ModuleInstallNameMapPath,

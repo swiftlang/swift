@@ -162,6 +162,7 @@ if "@SWIFT_ENABLE_SYNCHRONIZATION@" == "TRUE":
 
 config.swift_freestanding_is_darwin = "@SWIFT_FREESTANDING_IS_DARWIN@" == "TRUE"
 config.swift_stdlib_use_relative_protocol_witness_tables = "@SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES@" == "TRUE"
+config.swift_stdlib_use_use_fragile_resilient_protocol_witness_tables = "@SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES@" == "TRUE"
 config.swift_enable_dispatch = "@SWIFT_ENABLE_DISPATCH@" == "TRUE"
 config.swift_stdlib_enable_objc_interop = "@SWIFT_STDLIB_ENABLE_OBJC_INTEROP@" == "TRUE"
 # Configured in DarwinSDKs.cmake
