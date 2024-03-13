@@ -5,9 +5,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// rdar://124277662
-// XFAIL: freestanding
-
 struct Boom: Error {}
 
 func boom() async throws -> Int {
