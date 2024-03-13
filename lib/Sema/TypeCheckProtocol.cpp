@@ -2208,7 +2208,8 @@ static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
 /// runtime for an arbitrary type.
 static bool hasRuntimeConformanceInfo(ProtocolDecl *proto) {
   return !proto->isMarkerProtocol()
-      || proto->isSpecificProtocol(KnownProtocolKind::Copyable);
+      || proto->isSpecificProtocol(KnownProtocolKind::Copyable)
+      || proto->isSpecificProtocol(KnownProtocolKind::Escapable);
 }
 
 static void ensureRequirementsAreSatisfied(ASTContext &ctx,
