@@ -96,6 +96,10 @@ llvm::cl::opt<std::string> SILBreakOnPass(
     "sil-break-on-pass", llvm::cl::init(""),
     llvm::cl::desc("Break before running a particular function pass"));
 
+llvm::cl::opt<std::string>
+    SILBreakBeforePassCount("sil-break-before-pass-count", llvm::cl::init(""),
+                            llvm::cl::desc("Break before running pass number"));
+
 llvm::cl::list<std::string>
     SILPrintFunction("sil-print-function", llvm::cl::CommaSeparated,
                     llvm::cl::desc("Only print out the sil for this function"));
@@ -403,7 +407,7 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
   if (!SILNumOptPassesToRun.empty()) {
-    parsePassCount(SILNumOptPassesToRun);
+    parsePassesToRunCount(SILNumOptPassesToRun);
   } else if (!SILPassCountConfigFile.empty()) {
     StringRef moduleName = M->getSwiftModule()->getName().str();
     std::fstream fs(SILPassCountConfigFile);
@@ -417,11 +421,15 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
       StringRef modName = pair.first;
       StringRef countsStr = pair.second;
       if (modName == moduleName) {
-        parsePassCount(countsStr);
+        parsePassesToRunCount(countsStr);
         break;
       }
     }
     fs.close();
+  }
+
+  if (!SILBreakBeforePassCount.empty()) {
+    parseBreakBeforePassCount(SILBreakBeforePassCount);
   }
 
   for (SILAnalysis *A : Analyses) {
@@ -434,7 +442,7 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
   M->registerDeserializationNotificationHandler(std::move(handler));
 }
 
-void SILPassManager::parsePassCount(StringRef countsStr) {
+void SILPassManager::parsePassesToRunCount(StringRef countsStr) {
   bool validFormat = true;
   if (countsStr.consumeInteger(10, maxNumPassesToRun))
     validFormat = false;
@@ -445,6 +453,17 @@ void SILPassManager::parsePassCount(StringRef countsStr) {
   }
   if (!validFormat || !countsStr.empty()) {
     llvm::errs() << "error: wrong format of -sil-opt-pass-count option\n";
+    exit(1);
+  }
+}
+
+void SILPassManager::parseBreakBeforePassCount(StringRef countsStr) {
+  bool validFormat = true;
+  if (countsStr.consumeInteger(10, breakBeforePassCount))
+    validFormat = false;
+  if (!validFormat || !countsStr.empty()) {
+    llvm::errs()
+        << "error: wrong format of -sil-break-before-pass-count option\n";
     exit(1);
   }
 }
@@ -486,19 +505,24 @@ bool SILPassManager::analysesUnlocked() {
 // Test the function and pass names we're given against the debug
 // options that force us to break prior to a given pass and/or on a
 // given function.
-static bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT) {
-  if (SILBreakOnFun.empty() && SILBreakOnPass.empty())
+bool SILPassManager::breakBeforeRunning(StringRef fnName,
+                                        SILFunctionTransform *SFT) {
+  if (SILBreakOnFun.empty() && SILBreakOnPass.empty() &&
+      SILBreakBeforePassCount.empty())
     return false;
 
-  if (SILBreakOnFun.empty()
-      && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
+  if (!SILBreakOnPass.empty() &&
+      (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
     return true;
 
-  if (SILBreakOnPass.empty() && fnName == SILBreakOnFun)
+  if (!SILBreakOnFun.empty() && fnName == SILBreakOnFun)
     return true;
 
-  return fnName == SILBreakOnFun
-    && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass);
+  if (!SILBreakBeforePassCount.empty() &&
+      breakBeforePassCount == NumPassesRun) {
+    return true;
+  }
+  return false;
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
