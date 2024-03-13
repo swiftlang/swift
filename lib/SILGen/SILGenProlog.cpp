@@ -1470,14 +1470,9 @@ uint16_t SILGenFunction::emitBasicProlog(
 
   std::optional<AbstractionPattern> origErrorType;
   if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
-    CanType substClosureType = origClosureType->getType()
-        .subst(origClosureType->getGenericSubstitutions())->getCanonicalType();
-    CanAnyFunctionType substClosureFnType =
-        cast<AnyFunctionType>(substClosureType);
-    if (auto optPair = origClosureType->getFunctionThrownErrorType(substClosureFnType)) {
-      origErrorType = optPair->first;
-      errorType = optPair->second;
-    }
+    origErrorType = origClosureType->getFunctionThrownErrorType();
+    if (origErrorType && !errorType)
+      errorType = origErrorType->getEffectiveThrownErrorType();
   } else if (errorType) {
     origErrorType = AbstractionPattern(genericSig.getCanonicalSignature(),
                                        (*errorType)->getCanonicalType());
