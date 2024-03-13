@@ -2744,6 +2744,16 @@ bool ConvertFunctionInst::onlyConvertsSubstitutions() const {
   return fromType->getUnsubstitutedType(M) == toType->getUnsubstitutedType(M);
 }
 
+static SILFunctionType *getNonSendableFuncType(SILType ty) {
+  auto fnTy = ty.castTo<SILFunctionType>();
+  return fnTy->getWithExtInfo(fnTy->getExtInfo().withSendable(false));
+}
+
+bool ConvertFunctionInst::onlyConvertsSendable() const {
+  return getNonSendableFuncType(getOperand()->getType()) ==
+         getNonSendableFuncType(getType());
+}
+
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
     bool isLifetimeGuaranteed) {

@@ -490,7 +490,7 @@ ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
 template <class S>
 ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
                              const SendableModSynthesizer<S> &s) {
-  return synthesizeExtInfo(SC, s.sub).withConcurrent();
+  return synthesizeExtInfo(SC, s.sub).withSendable();
 }
 
 /// Synthesize a function type.

@@ -3783,7 +3783,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
                                       funcType->isThrowing(),
                                       funcType->getThrownError())
-          .withConcurrent(funcType->isSendable())
+          .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())

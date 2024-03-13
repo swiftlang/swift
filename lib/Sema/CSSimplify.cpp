@@ -11879,7 +11879,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (contextualFnType->isSendable())
-      closureExtInfo = closureExtInfo.withConcurrent();
+      closureExtInfo = closureExtInfo.withSendable();
   }
 
   // Isolated parameters override any other kind of isolation we might infer.

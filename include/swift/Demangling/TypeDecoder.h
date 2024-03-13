@@ -311,7 +311,7 @@ public:
   }
 
   ImplFunctionTypeFlags
-  withConcurrent() const {
+  withSendable() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true, Async,
         ErasedIsolation,
@@ -967,7 +967,7 @@ protected:
         ++firstChildIdx;
       }
 
-      flags = flags.withConcurrent(isSendable)
+      flags = flags.withSendable(isSendable)
           .withAsync(isAsync).withThrows(isThrow)
           .withDifferentiable(diffKind.isDifferentiable());
 
@@ -1046,7 +1046,7 @@ protected:
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
           if (child->getText() == "@Sendable") {
-            flags = flags.withConcurrent();
+            flags = flags.withSendable();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
           }

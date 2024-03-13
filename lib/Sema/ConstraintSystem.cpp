@@ -1803,7 +1803,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       // All global functions should be @Sendable
       if (funcDecl->getDeclContext()->isModuleScopeContext()) {
         funcType =
-            funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
+            funcType->withExtInfo(funcType->getExtInfo().withSendable());
       }
     }
 
@@ -2812,11 +2812,11 @@ ConstraintSystem::getTypeOfMemberReference(
         // Add @Sendable to functions without conditional conformances
         functionType =
             functionType
-                ->withExtInfo(functionType->getExtInfo().withConcurrent())
+                ->withExtInfo(functionType->getExtInfo().withSendable())
                 ->getAs<FunctionType>();
       }
       // Unapplied values should always be Sendable
-      info = info.withConcurrent();
+      info = info.withSendable();
     }
 
     // We'll do other adjustment later, but we need to handle parameter
@@ -3418,26 +3418,26 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
-  bool concurrent = expr->getAttrs().hasAttribute<SendableAttr>();
+  bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
-      .withConcurrent(concurrent)
+      .withSendable(sendable)
       .build();
   }
 
   // Scan the body to determine the effects.
   auto body = expr->getBody();
   if (!body)
-    return ASTExtInfoBuilder().withConcurrent(concurrent).build();
+    return ASTExtInfoBuilder().withSendable(sendable).build();
 
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
       .withAsync(bool(findAsyncNode(expr)))
-      .withConcurrent(concurrent)
+      .withSendable(sendable)
       .build();
 }
 
