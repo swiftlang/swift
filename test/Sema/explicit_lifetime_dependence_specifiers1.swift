@@ -11,16 +11,26 @@ struct BufferView : ~Escapable {
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
-  init(_ c: borrowing Container) -> _borrow(c) Self { // expected-error{{invalid lifetime dependence on bitwise copyable type}}
-    self.ptr = c.ptr
-    return self
-  }
   init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Int>) -> _borrow(arr) Self {
     self.ptr = ptr
     return self
   }
   init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Double>) -> _borrow(arr) Self {
     self.ptr = ptr
+  }
+  // TODO: Once Optional is ~Escapable, the error will go away
+  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Float>) -> _borrow(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+    if (Int.random(in: 1..<100) == 0) {
+      return nil
+    }
+    self.ptr = ptr
+  }
+  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<String>) -> _borrow(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+    if (Int.random(in: 1..<100) == 0) {
+      return nil
+    }
+    self.ptr = ptr
+    return self
   }
 }
 
