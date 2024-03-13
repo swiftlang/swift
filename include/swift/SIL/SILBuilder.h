@@ -1404,6 +1404,9 @@ public:
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitCopyValueOperation");
+    assert((getModule().getStage() == SILStage::Raw
+            || !operand->getType().isMoveOnly())
+           && "should not be copying move-only values in canonical SIL");
     return insert(new (getModule())
                       CopyValueInst(getSILDebugLocation(Loc), operand));
   }
