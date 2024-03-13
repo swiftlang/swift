@@ -37,6 +37,12 @@ public struct TestWrapper {
   }
 }
 
+// https://github.com/apple/swift/issues/71546
+actor TestActor {
+  nonisolated(unsafe) let immutableActorIsolated = TestSendable()
+  // expected-warning@-1 {{'nonisolated(unsafe)' is unnecessary for a constant actor-isolated property with 'Sendable' type 'TestSendable', consider removing it}} {{3-23=}}
+}
+
 struct TestStatics {
   static let immutableExplicitSendable = TestSendable()
   static let immutableNonsendable = TestNonsendable() // expected-error{{static property 'immutableNonsendable' is not concurrency-safe because non-'Sendable' type 'TestNonsendable' may have shared mutable state}}
