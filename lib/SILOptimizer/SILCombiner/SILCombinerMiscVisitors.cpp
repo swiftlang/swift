@@ -953,16 +953,6 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // can't handle the payload case here due to the flow problems caused by the
   // dependency in between the enum and its data.
 
-  // Disable this for empty typle type because empty tuple stack locations maybe
-  // uninitialized. And converting to value form loses tag information.
-  if (IEAI->getElement()->hasAssociatedValues()) {
-    SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
-        IEAI->getElement(), IEAI->getFunction());
-    if (elemType.isEmpty(*IEAI->getFunction())) {
-      return nullptr;
-    }
-  }
-
   assert(IEAI->getOperand()->getType().isAddress() && "Must be an address");
   Builder.setCurrentDebugScope(IEAI->getDebugScope());
 
@@ -1231,6 +1221,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   auto *AI = dyn_cast_or_null<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
   if (!AI)
     return nullptr;
+
   unsigned ArgIdx = 0;
   Operand *EnumInitOperand = nullptr;
   for (auto &Opd : AI->getArgumentOperands()) {
@@ -1255,10 +1246,22 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                                               EnumInitOperand->get()->getType());
   EnumInitOperand->set(AllocStack);
   Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
-  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack,
-                                   LoadOwnershipQualifier::Unqualified));
+  SILValue enumValue;
+
+  // If it is an empty type, apply may not initialize it.
+  // Create an empty value of the empty type and store it to a new local.
+  SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
+      IEAI->getElement(), IEAI->getFunction());
+  if (elemType.isEmpty(*IEAI->getFunction())) {
+    enumValue = createEmptyAndUndefValue(
+        elemType.getObjectType(), &*Builder.getInsertionPoint(),
+        Builder.getBuilderContext(), /*noUndef*/ true);
+  } else {
+    enumValue = Builder.createLoad(DataAddrInst->getLoc(), AllocStack,
+                                   LoadOwnershipQualifier::Unqualified);
+  }
   EnumInst *E = Builder.createEnum(
-      DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
+      DataAddrInst->getLoc(), enumValue, DataAddrInst->getElement(),
       DataAddrInst->getOperand()->getType().getObjectType());
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
                       StoreOwnershipQualifier::Unqualified);

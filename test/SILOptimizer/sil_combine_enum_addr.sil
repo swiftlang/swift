@@ -1,9 +1,16 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution \
+// RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
+// RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
+
+import resilient_struct
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
 // CHECK-NOT: init_existential_addr
@@ -254,8 +261,7 @@ bb22:
 sil @no_init : $@convention(thin) () -> (@out ())
 
 // CHECK-LABEL: sil @test_empty_tuple_uninintialized : $@convention(thin) () -> () {
-// CHECK: init_enum_data_addr
-// CHECK: inject_enum_addr
+// CHECK-NOT: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_tuple_uninintialized'
 sil @test_empty_tuple_uninintialized : $@convention(thin) () -> () {
 bb0:
@@ -279,3 +285,55 @@ bb3:
   return %8 : $()
 }
 
+sil @no_init_nested_tuple : $@convention(thin) () -> (@out ((), ()))
+
+// CHECK-LABEL: sil @test_empty_nested_tuple_uninintialized : $@convention(thin) () -> () {
+// CHECK-NOT: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_nested_tuple_uninintialized'
+sil @test_empty_nested_tuple_uninintialized : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<((), ())>
+  %1 = init_enum_data_addr %0 : $*Optional<((), ())>, #Optional.some!enumelt
+  %f = function_ref @no_init_nested_tuple : $@convention(thin) () -> (@out ((), ()))
+  apply %f(%1) : $@convention(thin) () -> (@out ((), ()))
+  inject_enum_addr %0 : $*Optional<((), ())>, #Optional.some!enumelt
+  %2 = load %0 : $*Optional<((), ())>
+  switch_enum %2 : $Optional<((), ())>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : $((), ())):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<((), ())>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @no_init_struct : $@convention(thin) () -> (@out ResilientEmptyStruct)
+
+// CHECK-LABEL: sil @test_empty_struct_uninintialized : $@convention(thin) () -> () {
+// CHECK-NOT: switch_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_struct_uninintialized'
+sil @test_empty_struct_uninintialized : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<ResilientEmptyStruct>
+  %1 = init_enum_data_addr %0 : $*Optional<ResilientEmptyStruct>, #Optional.some!enumelt
+  %f = function_ref @no_init_struct : $@convention(thin) () -> (@out ResilientEmptyStruct)
+  apply %f(%1) : $@convention(thin) () -> (@out ResilientEmptyStruct)
+  inject_enum_addr %0 : $*Optional<ResilientEmptyStruct>, #Optional.some!enumelt
+  switch_enum_addr %0 : $*Optional<ResilientEmptyStruct>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<ResilientEmptyStruct>
+  %8 = tuple ()
+  return %8 : $()
+}
