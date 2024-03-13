@@ -538,6 +538,13 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   SmallVector<InverseRequirement, 2> inverseReqs;
 
   if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+
+    // We have baked-in support for Sendable not needing to state inverses
+    // in its inheritance clause within interface files. So, it technically is
+    // not using the feature with respect to the concerns of an interface file.
+    if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+      return false;
+
     proto->getRequirementSignature().getRequirementsWithInverses(
         proto, reqs, inverseReqs);
   } else if (auto *genCtx = decl->getAsGenericContext()) {
