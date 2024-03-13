@@ -5450,6 +5450,11 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       auto isKeyPathLiteral = [&](Expr *argExpr) -> KeyPathExpr * {
         if (auto *DTBE = getAsExpr<DerivedToBaseExpr>(argExpr))
           argExpr = DTBE->getSubExpr();
+        // Sendable key path literals are represented as an existential
+        // protocol composition with `Sendable` protocol which has to be
+        // opened in certain scenarios i.e. to pass it to non-Sendable version.
+        if (auto *OEE = getAsExpr<OpenExistentialExpr>(argExpr))
+          argExpr = OEE->getExistentialValue();
         return getAsExpr<KeyPathExpr>(argExpr);
       };
 
