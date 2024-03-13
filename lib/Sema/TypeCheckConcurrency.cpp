@@ -4250,9 +4250,9 @@ static bool hasExplicitIsolationAttribute(const Decl *decl) {
 /// \returns the actor isolation determined from attributes alone (with no
 /// inference rules). Returns \c None if there were no attributes on this
 /// declaration.
-static std::optional<ActorIsolation>
-getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
-                           bool onlyExplicit = false) {
+std::optional<ActorIsolation>
+swift::getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose,
+                           bool onlyExplicit) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
@@ -4271,7 +4271,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   if (numIsolationAttrs == 0)
     return std::nullopt;
 
-  // Only one such attribute is valid, but we only actually care of one of
+  // Only one such attribute is valid, but we only actually care if one of
   // them is a global actor.
   if (numIsolationAttrs > 1 && globalActorAttr && shouldDiagnose) {
     decl->diagnose(diag::actor_isolation_multiple_attr, decl,
@@ -4303,7 +4303,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     // Handle @<global attribute type>(unsafe).
     auto *attr = globalActorAttr->first;
     bool isUnsafe = attr->isArgUnsafe();
-    if (attr->hasArgs()) {
+    if (attr->hasArgs() && shouldDiagnose) {
       if (isUnsafe) {
         SourceFile *file = decl->getDeclContext()->getParentSourceFile();
         bool inSwiftinterface =
@@ -4637,8 +4637,8 @@ static ActorIsolation getActorIsolationFromWrappedProperty(VarDecl *var) {
   return ActorIsolation::forUnspecified();
 }
 
-static std::optional<ActorIsolation>
-getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
+std::optional<ActorIsolation>
+swift::getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
   // Ensure that the base type that this function is declared in has @main
   // attribute
   NominalTypeDecl *declContext =
@@ -4935,6 +4935,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return isolation;
   };
 
+  // Look for explicit annotions to determine isolation
   auto isolationFromAttr = getIsolationFromAttributes(value);
   if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
@@ -4948,16 +4949,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // Any other isolation is an error.
     std::optional<ActorIsolation> mainIsolation =
         getActorIsolationForMainFuncDecl(fd);
-    if (mainIsolation) {
-      if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
-        if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
-                           mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
-        }
-      }
+
+    if (mainIsolation)
       return *mainIsolation;
-    }
   }
   // If this declaration has one of the actor isolation attributes, report
   // that.
@@ -4971,8 +4965,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return checkGlobalIsolation(*isolationFromAttr);
   }
 
-  // Determine the default isolation for this declaration, which may still be
-  // overridden by other inference rules.
+  // If no explicit annotation is provided, determine the default isolation
+  // for this declaration, which may still be overridden by other inference
+  // rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {

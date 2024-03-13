@@ -355,6 +355,8 @@ enum class SendableCheck {
   ImplicitForExternallyVisible,
 };
 
+std::optional<ActorIsolation> getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
+                           bool onlyExplicit = false);
 /// Whether this sendable check is implicit.
 static inline bool isImplicitSendableCheck(SendableCheck check) {
   switch (check) {
@@ -498,6 +500,8 @@ void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
                            ArrayRef<CustomAttr *> attrs);
+std::optional<ActorIsolation>
+getActorIsolationForMainFuncDecl(FuncDecl *fnDecl);
 
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
