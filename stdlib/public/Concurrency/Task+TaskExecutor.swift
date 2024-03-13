@@ -128,12 +128,12 @@ import Swift
 /// - Throws: if the operation closure throws
 /// - SeeAlso: ``TaskExecutor``
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
-@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
-public func withTaskExecutorPreference<T: Sendable>(
+@available(SwiftStdlib 6.0, *)
+public func withTaskExecutorPreference<T, Failure>(
   _ taskExecutor: (any TaskExecutor)?,
-  operation: @Sendable () async throws -> T
-  ) async rethrows -> T {
+  isolation: isolated (any Actor)? = #isolation,
+  operation: () async throws(Failure) -> T
+) async throws(Failure) -> T {
   guard let taskExecutor else {
     // User explicitly passed a "nil" preference, so we invoke the operation
     // as is, which will hop to it's expected executor without any change in
@@ -159,9 +159,32 @@ public func withTaskExecutorPreference<T: Sendable>(
   return try await operation()
 }
 
+@_unavailableInEmbedded
+@available(SwiftStdlib 6.0, *)
+@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+@_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
+public func __abi__withTaskExecutorPreference<T: Sendable>(
+  _ taskExecutor: (any TaskExecutor)?,
+  operation: @Sendable () async throws -> T
+) async rethrows -> T {
+  guard let taskExecutor else {
+    return try await operation()
+  }
+
+  let taskExecutorBuiltin: Builtin.Executor =
+    taskExecutor.asUnownedTaskExecutor().executor
+
+  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  defer {
+    _popTaskExecutorPreference(record: record)
+  }
+
+  return try await operation()
+}
+
 /// Task with specified executor -----------------------------------------------
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -227,7 +250,7 @@ extension Task where Failure == Never {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -289,7 +312,7 @@ extension Task where Failure == Error {
 
 // ==== Detached tasks ---------------------------------------------------------
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
@@ -346,7 +369,7 @@ extension Task where Failure == Never {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
@@ -407,7 +430,7 @@ extension Task where Failure == Error {
 
 // ==== Unsafe Current Task ----------------------------------------------------
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension UnsafeCurrentTask {
 
   /// The current ``TaskExecutor`` preference, if this task has one configured.
@@ -417,7 +440,7 @@ extension UnsafeCurrentTask {
   /// The lifetime of an executor is not guaranteed by an ``UnownedTaskExecutor``,
   /// so accessing it must be handled with great case -- and the program must use other
   /// means to guarantee the executor remains alive while it is in use.
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   public var unownedTaskExecutor: UnownedTaskExecutor? {
     let ref = _getPreferredTaskExecutor()
     return UnownedTaskExecutor(ref)
@@ -426,18 +449,18 @@ extension UnsafeCurrentTask {
 
 // ==== Runtime ---------------------------------------------------------------
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
 internal func _getPreferredTaskExecutor() -> Builtin.Executor
 
 typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_pushTaskExecutorPreference")
 internal func _pushTaskExecutorPreference(_ executor: Builtin.Executor)
   -> TaskExecutorPreferenceStatusRecord
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_popTaskExecutorPreference")
 internal func _popTaskExecutorPreference(
   record: TaskExecutorPreferenceStatusRecord
@@ -447,7 +470,7 @@ internal func _popTaskExecutorPreference(
 ///
 /// It can be used to compare against, and is semantically equivalent to
 /// "no preference".
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @usableFromInline
 internal func _getUndefinedTaskExecutor() -> Builtin.Executor {
   // Similar to the `_getGenericSerialExecutor` this method relies
