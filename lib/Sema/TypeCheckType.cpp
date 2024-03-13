@@ -4094,7 +4094,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         getASTContext().getClangFunctionType(params, outputTy, representation);
 
   auto extInfo = extInfoBuilder.withRepresentation(representation)
-                     .withConcurrent(sendable)
+                     .withSendable(sendable)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
                      .build();

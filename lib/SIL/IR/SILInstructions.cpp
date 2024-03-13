@@ -2746,7 +2746,7 @@ bool ConvertFunctionInst::onlyConvertsSubstitutions() const {
 
 static SILFunctionType *getNonSendableFuncType(SILType ty) {
   auto fnTy = ty.castTo<SILFunctionType>();
-  return fnTy->getWithExtInfo(fnTy->getExtInfo().withConcurrent(false));
+  return fnTy->getWithExtInfo(fnTy->getExtInfo().withSendable(false));
 }
 
 bool ConvertFunctionInst::onlyConvertsSendable() const {

@@ -1119,7 +1119,7 @@ public:
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
-  withConcurrent(bool isSendable) const {
+  withSendable(bool isSendable) const {
     return TargetFunctionTypeFlags<int_type>(
         (Data & ~SendableMask) |
         (isSendable ? SendableMask : 0));

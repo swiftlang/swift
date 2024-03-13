@@ -2305,7 +2305,7 @@ public:
       auto fnType = requireObjectType(SILFunctionType, arguments[4],
                                       "result of createAsyncTask");
       auto expectedExtInfo =
-        SILExtInfoBuilder().withAsync(true).withConcurrent(true).build();
+        SILExtInfoBuilder().withAsync(true).withSendable(true).build();
       require(fnType->getExtInfo().isEqualTo(expectedExtInfo, /*clang types*/true),
               "function argument to createAsyncTask has incorrect ext info");
       // FIXME: it'd be better if we took a consuming closure here

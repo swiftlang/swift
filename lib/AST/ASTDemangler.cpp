@@ -475,7 +475,7 @@ Type ASTBuilder::createFunctionType(
                    resultDiffKind, clangFunctionType, isolation,
                    LifetimeDependenceInfo(), extFlags.hasTransferringResult())
                    .withAsync(flags.isAsync())
-                   .withConcurrent(flags.isSendable())
+                   .withSendable(flags.isSendable())
                    .build();
 
   return FunctionType::get(funcParams, output, einfo);

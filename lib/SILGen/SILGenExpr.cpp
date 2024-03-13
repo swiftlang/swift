@@ -2904,12 +2904,12 @@ static bool canEmitClosureFunctionUnderConversion(
   // interferes with the implementation of `reasync`.
   auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
-    .withConcurrent(false)
+    .withSendable(false)
     .withThrows(false, Type());
 
   auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
-    .withConcurrent(false)
+    .withSendable(false)
     .withThrows(false, Type());
 
   // If the converted type has erased isolation, remove the isolation from

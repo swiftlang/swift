@@ -1428,7 +1428,7 @@ getFunctionTypeFlags(CanFunctionType type) {
   auto flags = FunctionTypeFlags()
       .withConvention(metadataConvention)
       .withAsync(type->isAsync())
-      .withConcurrent(type->isSendable())
+      .withSendable(type->isSendable())
       .withThrows(type->isThrowing())
       .withParameterFlags(hasParameterFlags)
       .withEscaping(isEscaping)

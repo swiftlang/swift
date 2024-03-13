@@ -2407,7 +2407,7 @@ static CanSILFunctionType getSILFunctionType(
   }
   auto silExtInfo = extInfoBuilder.withClangFunctionType(clangType)
                         .withIsPseudogeneric(pseudogeneric)
-                        .withConcurrent(isSendable)
+                        .withSendable(isSendable)
                         .withAsync(isAsync)
                         .withUnimplementable(unimplementable)
                         .withLifetimeDependenceInfo(
@@ -2493,7 +2493,7 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   auto silExtInfo =
       SILExtInfoBuilder()
           .withRepresentation(SILFunctionTypeRepresentation::Thin)
-          .withConcurrent(substAccessorType->getExtInfo().isSendable())
+          .withSendable(substAccessorType->getExtInfo().isSendable())
           .build();
 
   return SILFunctionType::get(

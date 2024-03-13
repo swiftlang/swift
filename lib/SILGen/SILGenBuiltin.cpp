@@ -1620,7 +1620,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
         ASTExtInfoBuilder()
             .withAsync()
             .withThrows()
-            .withConcurrent(true)
+            .withSendable(true)
             .withRepresentation(GenericFunctionType::Representation::Swift)
             .build();
 
@@ -1733,7 +1733,7 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
   CanType flagsType = ctx.getIntType()->getCanonicalType();
   CanType functionType =
     FunctionType::get({}, ctx.TheEmptyTupleType,
-                      ASTExtInfo().withAsync().withThrows().withConcurrent(true))
+                      ASTExtInfo().withAsync().withThrows().withSendable(true))
       ->getCanonicalType();
 
   using Param = FunctionType::Param;
