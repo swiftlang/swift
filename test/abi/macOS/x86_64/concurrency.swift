@@ -269,3 +269,9 @@ Added: _swift_job_run_on_task_executor
 Added: _swift_task_getPreferredTaskExecutor
 Added: _swift_task_popTaskExecutorPreference
 Added: _swift_task_pushTaskExecutorPreference
+
+// Updated signature for withTaskExecutorPreference to used typed throws and #isolation
+// Swift.withTaskExecutorPreference<A, B where B: Swift.Error>(_: Swift.TaskExecutor?, isolation: isolated Swift.Actor?, operation: () async throws(B) -> A) async throws(B) -> A
+Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEtYaq_YKs5ErrorR_r0_lF
+// async function pointer to Swift.withTaskExecutorPreference<A, B where B: Swift.Error>(_: Swift.TaskExecutor?, isolation: isolated Swift.Actor?, operation: () async throws(B) -> A) async throws(B) -> A
+Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEtYaq_YKs5ErrorR_r0_lFTu
