@@ -6990,6 +6990,12 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
             diagnose(unsafeStart, diag::unsafe_sendable_actor_constant, type)
                 .fixItRemoveChars(unsafeStart,
                                   attr->getRange().End.getAdvancedLoc(1));
+          } else {
+            // This actor is not public, so suggest to remove
+            // 'nonisolated(unsafe)'.
+            diagnose(attr->getLocation(),
+                     diag::nonisolated_unsafe_sendable_actor_constant, type)
+                .fixItRemove(attr->getRange());
           }
 
         } else {
