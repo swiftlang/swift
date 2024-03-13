@@ -230,3 +230,11 @@ do {
   func forward<T>(_ v: T) -> T { v }
   let _: KeyPath<String, Int> = forward(kp()) // Ok
 }
+
+do {
+  final class C<T> {
+    let immutable: String = ""
+  }
+
+  _ = \C<Int>.immutable as? ReferenceWritableKeyPath // Ok
+}
