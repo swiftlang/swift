@@ -97,10 +97,10 @@ bb0(%taskGroup : $Builtin.RawPointer, %taskFunction : $@Sendable @async @callee_
 sil hidden [ossa] @launch_future_opt_task_group : $@convention(method) <T> (Int, Optional<Builtin.RawPointer>, @owned @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
 bb0(%flags : $Int, %optTaskGroup : $Optional<Builtin.RawPointer>, %taskFunction: @owned $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
   // CHECK: [[OPTIONS:%.*]] = alloca %swift.task_group_task_option
-  // CHECK: [[GROUP_IS_NULL:%.*]] = icmp eq i64 %1, 0
+  // CHECK: [[GROUP_IS_NULL:%.*]] = icmp eq [[INT]] %1, 0
   // CHECK: br i1 [[GROUP_IS_NULL]], label %task_group.cont, label %task_group.some
   // CHECK: task_group.some:
-  // CHECK: [[GROUP:%.*]] = inttoptr i64 %1 to ptr
+  // CHECK: [[GROUP:%.*]] = inttoptr [[INT]] %1 to ptr
   // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
   // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 1, ptr [[FLAGS_GEP]], align
@@ -111,7 +111,7 @@ bb0(%flags : $Int, %optTaskGroup : $Optional<Builtin.RawPointer>, %taskFunction:
   // CHECK: [[OPTIONS_PTR:%.*]] = ptrtoint ptr [[OPTIONS]] to [[INT]]
   // CHECK: br label %task_group.cont
   // CHECK: task_group.cont:
-  // CHECK: phi i64 [ 0, %entry ], [ [[OPTIONS_PTR]], %task_group.some ]
+  // CHECK: phi [[INT]] [ 0, %entry ], [ [[OPTIONS_PTR]], %task_group.some ]
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create(
   
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.none
