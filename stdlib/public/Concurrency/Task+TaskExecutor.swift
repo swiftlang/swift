@@ -162,8 +162,8 @@ public func withTaskExecutorPreference<T, Failure>(
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
-@_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaKXEtYaKs8SendableRzlF")
-public func __abi_withTaskExecutorPreference<T: Sendable>(
+@_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
+public func __abi__withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
 ) async rethrows -> T {
@@ -172,7 +172,7 @@ public func __abi_withTaskExecutorPreference<T: Sendable>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
+    taskExecutor.asUnownedTaskExecutor().executor
 
   let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
