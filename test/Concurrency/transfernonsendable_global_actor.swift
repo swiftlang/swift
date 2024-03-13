@@ -147,3 +147,23 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 
   useValue(x)
 }
+
+struct Clock {
+  public func measure<T>(
+    _ work: () async throws -> T
+  ) async rethrows -> T {
+    try await work()
+  }
+
+  public func sleep<T>() async throws -> T { fatalError() }
+}
+
+// We used to crash when inferring the type for the diagnostic below.
+@MainActor func testIndirectParametersHandledCorrectly() async {
+  let c = Clock()
+  let _: Int = await c.measure { // expected-tns-warning {{main actor-isolated value of type '() async -> Int' transferred to nonisolated context}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() async -> Int' outside of main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    try! await c.sleep()
+  }
+}
