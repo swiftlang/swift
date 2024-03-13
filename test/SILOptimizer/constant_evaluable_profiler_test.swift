@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -profile-generate -emit-silgen -primary-file %S/Inputs/constant_evaluable.swift -o %t/constant_evaluable_profiler_test_silgen.sil
+// RUN: %target-swift-frontend -profile-generate -enable-upcoming-feature InferSendableFromCaptures -emit-silgen -primary-file %S/Inputs/constant_evaluable.swift -o %t/constant_evaluable_profiler_test_silgen.sil
 //
 // Run the (mandatory) passes on which constant evaluator depends, and test the
 // constant evaluator on the SIL produced after the dependent passes are run.
