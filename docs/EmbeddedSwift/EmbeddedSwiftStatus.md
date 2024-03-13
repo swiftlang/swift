@@ -48,6 +48,7 @@ This status table describes which of the following Swift features can be used in
 
 | **Swift Feature**                                          | **Currently Supported In Embedded Swift?**          |
 |------------------------------------------------------------|-----------------------------------------------------|
+| Synchronization module                                     | Yes    |
 | Swift Concurrency                                          | Partial, experimental (basics of actors and tasks work in single-threaded concurrency mode) |
 | C interop                                                  | Yes    | 
 | C++ interop                                                | Yes    |

@@ -206,8 +206,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
       # Without specifying the `windows` component LLVM refuses to
       # generate valid COFF object files.
-      "i686    i686-unknown-windows-coff   i686-unknown-windows-coff"
-      "x86_64  x86_64-unknown-windows-coff x86_64-unknown-windows-coff"
+      "i686    i686-unknown-windows-msvc   i686-unknown-windows-msvc"
+      "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
     )
   endif()
 
