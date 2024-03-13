@@ -957,10 +957,18 @@ void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
     unsigned argNum = [&]() -> unsigned {
       if (fai.isCalleeOperand(*op))
         return op->getOperandNumber();
-      return fai.getAppliedArgIndex(*op);
+      return fai.getAppliedArgIndexWithoutIndirectResult(*op);
     }();
-    assert(argNum < sourceApply->getArgs()->size());
-    foundExpr = getFoundExprForParam(sourceApply, argNum);
+
+    // If something funny happened and we get an arg num that is larger than our
+    // num args... just return nullptr so we emit an error using our initial
+    // foundExpr.
+    //
+    // TODO: We should emit a "I don't understand error" so this gets reported
+    // to us.
+    if (argNum < sourceApply->getArgs()->size()) {
+      foundExpr = getFoundExprForParam(sourceApply, argNum);
+    }
   }
 
   auto inferredArgType =

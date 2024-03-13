@@ -811,6 +811,15 @@ public:
     }
   }
 
+  /// Return the applied argument without indirect results.
+  unsigned getAppliedArgIndexWithoutIndirectResult(const Operand &oper) const {
+    assert(oper.getUser() == **this);
+    assert(isArgumentOperand(oper));
+
+    return oper.getOperandNumber() - getOperandIndexOfFirstArgument() -
+           getNumIndirectSILResults() - getNumIndirectSILErrorResults();
+  }
+
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
 
   static bool classof(const SILInstruction *inst) {
