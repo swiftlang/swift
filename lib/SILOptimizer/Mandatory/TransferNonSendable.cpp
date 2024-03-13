@@ -985,15 +985,14 @@ public:
   void emitNamedIsolation(SILLocation loc, Identifier name,
                           ApplyIsolationCrossing isolationCrossing) {
     emitNamedOnlyError(loc, name);
-    diagnoseNote(
-        loc, diag::regionbasedisolation_transfer_non_transferrable_named_note,
-        name, isolationCrossing.getCallerIsolation(),
-        isolationCrossing.getCalleeIsolation());
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_transfer_non_transferrable,
+                 name, isolationCrossing.getCallerIsolation(),
+                 isolationCrossing.getCalleeIsolation());
   }
 
-  void emitNamedFunctionArgumentApplyStronglyTransferred(
-      SILLocation loc, Identifier varName,
-      ValueIsolationRegionInfo isolationRegionInfo) {
+  void emitNamedFunctionArgumentApplyStronglyTransferred(SILLocation loc,
+                                                         Identifier varName) {
     emitNamedOnlyError(loc, varName);
     SmallString<64> descriptiveKindStr;
     {
@@ -1002,6 +1001,18 @@ public:
     }
     auto diag =
         diag::regionbasedisolation_named_transfer_into_transferring_param;
+    diagnoseNote(loc, diag, descriptiveKindStr, varName);
+  }
+
+  void emitNamedTransferringReturn(SILLocation loc, Identifier varName) {
+    emitNamedOnlyError(loc, varName);
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+    auto diag =
+        diag::regionbasedisolation_named_notransfer_transfer_into_result;
     diagnoseNote(loc, diag, descriptiveKindStr, varName);
   }
 
@@ -1106,7 +1117,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
         SmallString<64> resultingName;
         if (auto varName = inferNameFromValue(op->get())) {
           diagnosticEmitter.emitNamedFunctionArgumentApplyStronglyTransferred(
-              loc, *varName, diagnosticEmitter.getIsolationRegionInfo());
+              loc, *varName);
           return true;
         }
 
@@ -1168,6 +1179,33 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       diagnosticEmitter.emitFunctionArgumentApply(
           loc, op->get()->getType().getASTType(), *isolation);
       return true;
+    }
+  }
+
+  if (auto *ri = dyn_cast<ReturnInst>(op->getUser())) {
+    auto fType = ri->getFunction()->getLoweredFunctionType();
+    if (fType->getNumResults() &&
+        fType->getResults()[0].hasOption(SILResultInfo::IsTransferring)) {
+      assert(llvm::all_of(fType->getResults(),
+                          [](SILResultInfo resultInfo) {
+                            return resultInfo.hasOption(
+                                SILResultInfo::IsTransferring);
+                          }) &&
+             "All result info must be the same... if that changes... update "
+             "this code!");
+      SmallString<64> resultingName;
+      if (auto name = inferNameFromValue(op->get())) {
+        diagnosticEmitter.emitNamedTransferringReturn(loc, *name);
+        return true;
+      }
+    } else {
+      assert(llvm::none_of(fType->getResults(),
+                           [](SILResultInfo resultInfo) {
+                             return resultInfo.hasOption(
+                                 SILResultInfo::IsTransferring);
+                           }) &&
+             "All result info must be the same... if that changes... update "
+             "this code!");
     }
   }
 
