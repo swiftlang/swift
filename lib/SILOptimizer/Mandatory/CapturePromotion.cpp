@@ -405,7 +405,8 @@ computeNewArgInterfaceTypes(SILFunction *f, IndicesSet &promotableIndices,
       convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
                                         : ParameterConvention::Direct_Owned;
     }
-    outTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(), convention));
+    outTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(), convention,
+                                      param.getOptions()));
   }
 }
 

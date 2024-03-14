@@ -884,7 +884,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
 /// startAsyncLet()<T>: (
-///     __owned @Sendable @escaping () async throws -> T
+///     __owned @escaping () async throws -> transferring T
 /// ) -> Builtin.RawPointer
 ///
 /// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
@@ -894,7 +894,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Speci
 BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 
 /// startAsyncLetWithLocalBuffer()<T>: (
-///     __owned @Sendable @escaping () async throws -> T,
+///     __owned @escaping () async throws -> transferring T,
 ///     _ resultBuf: Builtin.RawPointer
 /// ) -> Builtin.RawPointer
 ///
