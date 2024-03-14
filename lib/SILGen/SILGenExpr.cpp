@@ -2109,9 +2109,12 @@ RValue RValueEmitter::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *
                                                    nonIsolatedType));
 }
 
-RValue RValueEmitter::visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
-                                                        SGFContext C) {
-  llvm_unreachable("not yet implemented for ExtractFunctionIsolationExpr");
+RValue RValueEmitter::visitExtractFunctionIsolationExpr(
+    ExtractFunctionIsolationExpr *E, SGFContext C) {
+  auto arg = SGF.emitRValue(E->getFunctionExpr());
+  auto result = SGF.emitExtractFunctionIsolation(
+      E, ArgumentSource(E, std::move(arg)), C);
+  return RValue(SGF, E, result);
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
