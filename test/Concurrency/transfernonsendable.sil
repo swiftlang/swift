@@ -317,3 +317,39 @@ bb0(%0 : @guaranteed $MyActor):
   %19 = tuple ()
   return %19 : $()
 }
+
+sil @sendableAsyncLetClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed NonSendableKlass) -> (@out τ_0_0, @error any Error) for <Int>
+
+sil [ossa] @sendableAsyncLetClosureTest : $@convention(thin) @async () -> () {
+bb0:
+  %3 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %4 = apply %3() : $@convention(thin) () -> @owned NonSendableKlass
+  %5 = move_value [lexical] [var_decl] %4 : $NonSendableKlass
+  debug_value %5 : $NonSendableKlass, let, name "x"
+  %7 = alloc_stack $Int
+  %8 = address_to_pointer %7 : $*Int to $Builtin.RawPointer
+  %9 = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %10 = function_ref @sendableAsyncLetClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed NonSendableKlass) -> (@out τ_0_0, @error any Error) for <Int>
+  %11 = copy_value %5 : $NonSendableKlass
+  %12 = partial_apply [callee_guaranteed] %10(%11) : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed NonSendableKlass) -> (@out τ_0_0, @error any Error) for <Int>
+  %13 = convert_function %12 : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int> to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  %14 = convert_escape_to_noescape [not_guaranteed] %13 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  %15 = builtin "startAsyncLetWithLocalBuffer"<Int>(%9 : $Optional<Builtin.RawPointer>, %14 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>, %8 : $Builtin.RawPointer) : $Builtin.RawPointer
+
+  %useValue = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  apply %useValue(%5) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+
+  %26 = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %27 = apply %26(%15, %8) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %29 = load [trivial] %7 : $*Int
+  %30 = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %31 = apply %30(%15, %8) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %33 = builtin "endAsyncLetLifetime"(%15 : $Builtin.RawPointer) : $()
+  destroy_value %14 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  destroy_value %13 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  dealloc_stack %7 : $*Int
+  destroy_value %5 : $NonSendableKlass
+  %38 = tuple ()
+  return %38 : $()
+}
+

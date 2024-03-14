@@ -811,13 +811,18 @@ public:
     }
   }
 
-  /// Return the applied argument without indirect results.
-  unsigned getAppliedArgIndexWithoutIndirectResult(const Operand &oper) const {
+  /// Return the applied argument index for the given operand ignoring indirect
+  /// results.
+  ///
+  /// So for instance:
+  ///
+  /// apply %f(%result, %0, %1, %2, ...).
+  unsigned getAppliedArgIndexWithoutIndirectResults(const Operand &oper) const {
     assert(oper.getUser() == **this);
     assert(isArgumentOperand(oper));
 
-    return oper.getOperandNumber() - getOperandIndexOfFirstArgument() -
-           getNumIndirectSILResults() - getNumIndirectSILErrorResults();
+    return getAppliedArgIndex(oper) - getNumIndirectSILResults() -
+           getNumIndirectSILErrorResults();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

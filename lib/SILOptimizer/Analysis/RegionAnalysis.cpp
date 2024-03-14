@@ -464,10 +464,9 @@ using AsyncLetSourceValue =
 } // namespace
 
 static std::optional<AsyncLetSourceValue>
-findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
+findAsyncLetPartialApplyFromStart(SILValue value) {
   // If our operand is Sendable then we want to return nullptr. We only want to
   // return a value if we are not
-  SILValue value = bi->getOperand(1);
   auto fType = value->getType().castTo<SILFunctionType>();
   if (fType->isSendable())
     return {};
@@ -485,11 +484,30 @@ findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
 
   // We can also get a thin_to_thick_function here if we do not capture
   // anything. In such a case, we just do not process the partial apply get
-  if (auto *pai = dyn_cast<PartialApplyInst>(value))
-    return {{pai}};
-  return {{cast<ThinToThickFunctionInst>(value)}};
+  if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(value))
+    return {{ttfi}};
+
+  // Ok, we could still have a reabstraction thunk. In such a case, we want the
+  // partial_apply that we process to be the original partial_apply (or
+  // thin_to_thick)... so in that case process recursively.
+  auto *pai = cast<PartialApplyInst>(value);
+  if (auto *calleeFunction = pai->getCalleeFunction()) {
+    if (calleeFunction->isThunk() == IsReabstractionThunk) {
+      return findAsyncLetPartialApplyFromStart(pai->getArgument(0));
+    }
+  }
+
+  // Otherwise, this is the right partial_apply... apply it!
+  return {{pai}};
 }
 
+/// This recurses through reabstraction thunks.
+static std::optional<AsyncLetSourceValue>
+findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
+  return findAsyncLetPartialApplyFromStart(bi->getOperand(1));
+}
+
+/// This recurses through reabstraction thunks.
 static std::optional<AsyncLetSourceValue>
 findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
   auto *bi = cast<BuiltinInst>(FullApplySite(ai).getArgument(0));
@@ -499,15 +517,37 @@ findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
 }
 
 static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
-  auto *cfi = pai->getSingleUserOfType<ConvertFunctionInst>();
-  if (!cfi)
-    return false;
+  if (auto *fas = pai->getCalleeFunction())
+    if (fas->isThunk())
+      return false;
 
-  auto *cvt = cfi->getSingleUserOfType<ConvertEscapeToNoEscapeInst>();
-  if (!cvt)
-    return false;
+  // Look through reabstraction thunks.
+  SILValue result = pai;
+  while (true) {
+    SILValue iter = result;
 
-  auto *bi = cvt->getSingleUserOfType<BuiltinInst>();
+    if (auto *use = iter->getSingleUse()) {
+      if (auto *maybeThunk = dyn_cast<PartialApplyInst>(use->getUser())) {
+        if (auto *fas = maybeThunk->getCalleeFunction()) {
+          if (fas->isThunk()) {
+            iter = maybeThunk;
+          }
+        }
+      }
+    }
+
+    if (auto *cfi = iter->getSingleUserOfType<ConvertFunctionInst>())
+      iter = cfi;
+    if (auto *cvt = iter->getSingleUserOfType<ConvertEscapeToNoEscapeInst>())
+      iter = cvt;
+
+    if (iter == result)
+      break;
+
+    result = iter;
+  }
+
+  auto *bi = result->getSingleUserOfType<BuiltinInst>();
   if (!bi)
     return false;
 
@@ -957,7 +997,7 @@ void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
     unsigned argNum = [&]() -> unsigned {
       if (fai.isCalleeOperand(*op))
         return op->getOperandNumber();
-      return fai.getAppliedArgIndexWithoutIndirectResult(*op);
+      return fai.getAppliedArgIndexWithoutIndirectResults(*op);
     }();
 
     // If something funny happened and we get an arg num that is larger than our
@@ -1612,6 +1652,17 @@ public:
     }
   }
 
+  /// Transfer the parameters of our partial_apply.
+  ///
+  /// Handling async let has three-four parts:
+  ///
+  /// %partial_apply = partial_apply()
+  /// %reabstraction = maybe reabstraction thunk of partial_apply
+  /// builtin "async let start"(%reabstraction | %partial_apply)
+  /// call %asyncLetGet()
+  ///
+  /// We transfer the captured parameters of %partial_apply at the async let
+  /// start and then untransfer them at async let get.
   void translateAsyncLetStart(BuiltinInst *bi) {
     // Just track the result of the builtin inst as an assign fresh. We do this
     // so we properly track the partial_apply get. We already transferred the
@@ -1619,7 +1670,10 @@ public:
     builder.addAssignFresh(bi);
   }
 
+  /// For discussion on how we handle async let, please see the comment on
+  /// translateAsyncLetStart.
   void translateAsyncLetGet(ApplyInst *ai) {
+    // This looks through reabstraction thunks.
     auto source = findAsyncLetPartialApplyFromGet(ai);
     assert(source.has_value());
 
@@ -1628,14 +1682,16 @@ public:
     if (source->is<ThinToThickFunctionInst *>())
       return;
 
-    // We should always be able to derive a partial_apply since we pattern
-    // matched against the actual function call to swift_asyncLet_get in our
-    // caller.
+    // If our partial_apply was Sendable, then Sema should have checked that
+    // none of our captures were non-Sendable and we should have emitted an
+    // error earlier.
+    assert(bool(source.value()) &&
+           "AsyncLet Get should always have a derivable partial_apply");
     auto *pai = source->get<PartialApplyInst *>();
-    assert(pai && "AsyncLet Get should always have a derivable partial_apply");
+    if (pai->getFunctionType()->isSendable())
+      return;
 
     ApplySite applySite(pai);
-
     // For each of our partial apply operands...
     for (auto pair : llvm::enumerate(applySite.getArgumentOperands())) {
       Operand &op = pair.value();
@@ -1669,6 +1725,7 @@ public:
   }
 
   void translateSILPartialApplyAsyncLetBegin(PartialApplyInst *pai) {
+    LLVM_DEBUG(llvm::dbgs() << "Translating Async Let Begin Partial Apply!\n");
     // Grab our partial apply and transfer all of its non-sendable
     // parameters. We do not merge the parameters since each individual capture
     // of the async let at the program level is viewed as still being in
@@ -1686,6 +1743,9 @@ public:
                             &op);
       }
     }
+
+    // Then mark our partial_apply result as being returned fresh.
+    builder.addAssignFresh(pai);
   }
 
   /// Handles the semantics for SIL applies that cross isolation.
@@ -1694,6 +1754,7 @@ public:
   void translateIsolatedPartialApply(PartialApplyInst *pai,
                                      ValueIsolationRegionInfo actorIsolation) {
     ApplySite applySite(pai);
+    LLVM_DEBUG(llvm::dbgs() << "Translating Isolated Partial Apply!\n");
 
     // For each argument operand.
     for (auto &op : applySite.getArgumentOperands()) {
@@ -1718,18 +1779,8 @@ public:
   void translateSILPartialApply(PartialApplyInst *pai) {
     assert(!isIsolationBoundaryCrossingApply(pai));
 
-    // First check if our partial_apply is fed into an async let begin. If so,
-    // handle it especially.
-    //
-    // NOTE: If it is an async_let, then the closure itself will be Sendable. We
-    // treat passing in a value into the async Sendable closure as transferring
-    // it into the closure.
-    if (isAsyncLetBeginPartialApply(pai)) {
-      return translateSILPartialApplyAsyncLetBegin(pai);
-    }
-
-    // Then check if our partial apply is Sendable. In such a case, we will have
-    // emitted an earlier warning in Sema.
+    // First check if our partial apply is Sendable. In such a case, we will
+    // have emitted an earlier warning in Sema.
     //
     // DISCUSSION: The reason why we can treat values passed into an async let
     // as transferring safely but it is unsafe to do this for arbitrary Sendable
@@ -1743,6 +1794,23 @@ public:
     // Sema warning and just bail here.
     if (pai->getFunctionType()->isSendableType())
       return;
+
+    // Then check if our partial_apply is fed into an async let begin. If so,
+    // handle it especially.
+    //
+    // NOTE: If it is an async_let, then the closure itself will be Sendable. We
+    // treat passing in a value into the async Sendable closure as transferring
+    // it into the closure.
+    if (isAsyncLetBeginPartialApply(pai)) {
+      return translateSILPartialApplyAsyncLetBegin(pai);
+    }
+
+    // See if we have a reabstraction thunk. In such a case, just do an assign.
+    if (auto *calleeFn = pai->getCalleeFunction()) {
+      if (calleeFn->isThunk() == IsReabstractionThunk) {
+        return translateSILAssign(pai);
+      }
+    }
 
     if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
       auto actorIsolation = ace->getActorIsolation();
@@ -1846,6 +1914,7 @@ public:
   }
 
   void translateSILApply(SILInstruction *inst) {
+    // Handles normal builtins and async let start.
     if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
       return translateSILBuiltin(bi);
     }
@@ -1853,8 +1922,8 @@ public:
     auto fas = FullApplySite::isa(inst);
     assert(bool(fas) && "Builtins should be handled above");
 
+    // Handle async let get.
     if (auto *f = fas.getCalleeFunction()) {
-      // Check against the actual SILFunction.
       if (f->getName() == "swift_asyncLet_get") {
         return translateAsyncLetGet(cast<ApplyInst>(*fas));
       }

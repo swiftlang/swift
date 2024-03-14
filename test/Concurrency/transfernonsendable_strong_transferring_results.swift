@@ -7,12 +7,16 @@
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass {}
+class NonSendableKlass {} // expected-note {{}}
 
 struct NonSendableStruct {
   var first = NonSendableKlass()
   var second = NonSendableKlass()
 }
+
+func getValue<T>() -> T { fatalError() }
+func getValueAsync<T>() async -> T { fatalError() }
+func getValueAsyncTransferring<T>() async -> transferring T { fatalError() }
 
 func useValue<T>(_ t: T) {}
 func getAny() -> Any { fatalError() }
@@ -181,3 +185,38 @@ extension MainActorIsolatedEnum {
   }
 
 }
+
+///////////////////////////
+// MARK: Async Let Tests //
+///////////////////////////
+//
+// Move these tests to async let once strict-concurrency=complete requires
+// transfer non sendable.
+
+// Make sure that we can properly construct a reabstraction thunk since
+// constructNonSendableKlassAsync doesn't return the value transferring but
+// async let wants it to be transferring.
+//
+// Importantly, we should only emit the sema error here saying that one cannot
+// return a non-Sendable value here.
+func asyncLetReabstractionThunkTest() async {
+  // With thunk.
+  async let newValue: NonSendableKlass = await getValueAsync()
+  let _ = await newValue
+
+  // Without thunk.
+  async let newValue2: NonSendableKlass = await getValueAsyncTransferring()
+  let _ = await newValue2
+}
+
+@MainActor func asyncLetReabstractionThunkTestGlobalActor() async {
+  // With thunk. We emit the sema error here.
+  async let newValue: NonSendableKlass = await getValueAsync() // expected-warning {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
+  let _ = await newValue
+
+  // Without thunk.
+  async let newValue2: NonSendableKlass = await getValueAsyncTransferring()
+  let _ = await newValue2
+}
+
+
