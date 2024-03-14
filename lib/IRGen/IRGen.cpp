@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "../Serialization/ModuleFormat.h"
+#include "GenValueWitness.h"
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
@@ -56,15 +57,14 @@
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -79,6 +79,7 @@
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
@@ -1162,6 +1163,8 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
 
+  (void)layoutStringsEnabled(IGM, /*diagnose*/ true);
+
   {
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
@@ -1403,6 +1406,12 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       // around.
       runIRGenPreparePasses(*SILMod, *IGM);
       DidRunSILCodeGenPreparePasses = true;
+    }
+
+    if (!layoutStringsEnabled(*IGM)) {
+      auto moduleName = IGM->getSwiftModule()->getRealName().str();
+      IGM->Context.Diags.diagnose(SourceLoc(), diag::layout_strings_blocked,
+                                  moduleName);
     }
   }
   

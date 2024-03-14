@@ -2606,8 +2606,7 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   auto &ti = IGM.getTypeInfo(lowered);
   auto *typeLayoutEntry =
       ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-      IGM.getOptions().EnableLayoutStringValueWitnesses) {
+  if (layoutStringsEnabled(IGM)) {
 
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
@@ -3134,11 +3133,11 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   auto loweredTy = IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
-  bool useLayoutStrings = IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.Context.LangOpts.hasFeature(
-            Feature::LayoutStringValueWitnessesInstantiation) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses &&
-        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
+  bool useLayoutStrings =
+      layoutStringsEnabled(IGM) &&
+      IGM.Context.LangOpts.hasFeature(
+          Feature::LayoutStringValueWitnessesInstantiation) &&
+      IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
 
   if (auto sd = dyn_cast<StructDecl>(nominalDecl)) {
     auto &fixedTI = IGM.getTypeInfo(loweredTy);
@@ -3289,8 +3288,7 @@ namespace {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -3371,9 +3369,7 @@ namespace {
         if (HasDependentMetadata)
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
 
-        if (IGM.Context.LangOpts.hasFeature(
-                Feature::LayoutStringValueWitnesses) &&
-            IGM.getOptions().EnableLayoutStringValueWitnesses) {
+        if (layoutStringsEnabled(IGM)) {
           if (auto *layoutString = getLayoutString()) {
             auto layoutStringCast = IGF.Builder.CreateBitCast(layoutString,
                                                               IGM.Int8PtrTy);
@@ -3968,8 +3964,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -4706,7 +4701,7 @@ namespace {
     SILType getLoweredType() { return SILType::getPrimitiveObjectType(type); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredType();
       auto &ti = IGM.getTypeInfo(lowered);
@@ -4733,7 +4728,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5316,8 +5311,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5361,8 +5355,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -5509,9 +5502,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
       return !!getLayoutString() ||
@@ -5793,9 +5784,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5803,8 +5792,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -6030,9 +6018,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
