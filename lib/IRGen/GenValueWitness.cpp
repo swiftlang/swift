@@ -23,8 +23,10 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -885,9 +887,26 @@ void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
 }
 } // end anonymous namespace
 
+bool irgen::layoutStringsEnabled(IRGenModule &IGM, bool diagnose) {
+  auto moduleName = IGM.getSwiftModule()->getRealName().str();
+  if (IGM.Context.blockListConfig.hasBlockListAction(
+          moduleName, BlockListKeyKind::ModuleName,
+          BlockListAction::ShouldUseLayoutStringValueWitnesses)) {
+    if (diagnose) {
+      IGM.Context.Diags.diagnose(SourceLoc(), diag::layout_strings_blocked,
+                                 moduleName);
+    }
+    return false;
+  }
+
+  return IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+         IGM.getOptions().EnableLayoutStringValueWitnesses;
+}
+
 static bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
                                        const TypeLayoutEntry *typeLayoutEntry) {
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+
+  if (layoutStringsEnabled(IGM) &&
       IGM.Context.LangOpts.hasFeature(
           Feature::LayoutStringValueWitnessesInstantiation) &&
       IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
@@ -1028,8 +1047,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getDestroyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1053,8 +1071,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       }
     }
 
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1077,8 +1094,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::InitializeWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1098,8 +1114,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithCopyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1119,8 +1134,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithTakeStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1140,8 +1154,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getInitWithCopyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
