@@ -11,15 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleFile.h"
-#include "ModuleFileCoreTableInfo.h"
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "ModuleFileCoreTableInfo.h"
 #include "ModuleFormat.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/Subsystems.h"
-#include "swift/AST/DiagnosticsSema.h"
+#include "SerializationFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -27,7 +26,9 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -1120,7 +1121,7 @@ void ModuleFile::collectBasicSourceFileInfo(
   auto *End = Core->SourceFileListData.bytes_end();
   while (Cursor < End) {
     // FilePath (byte offset in 'SourceLocsTextData').
-    auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
+    auto fileID = readNext<uint32_t>(Cursor);
 
     // InterfaceHashIncludingTypeMembers (fixed length string).
     auto fpStrIncludingTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
@@ -1133,9 +1134,9 @@ void ModuleFile::collectBasicSourceFileInfo(
     Cursor += Fingerprint::DIGEST_LENGTH;
 
     // LastModified (nanoseconds since epoch).
-    auto timestamp = endian::readNext<uint64_t, little, unaligned>(Cursor);
+    auto timestamp = readNext<uint64_t>(Cursor);
     // FileSize (num of bytes).
-    auto fileSize = endian::readNext<uint64_t, little, unaligned>(Cursor);
+    auto fileSize = readNext<uint64_t>(Cursor);
 
     assert(fileID < Core->SourceLocsTextData.size());
     auto filePath = Core->SourceLocsTextData.substr(fileID);
@@ -1165,8 +1166,7 @@ void ModuleFile::collectBasicSourceFileInfo(
 }
 
 static StringRef readLocString(const char *&Data, StringRef StringData) {
-  auto Str =
-      StringData.substr(endian::readNext<uint32_t, little, unaligned>(Data));
+  auto Str = StringData.substr(readNext<uint32_t>(Data));
   size_t TerminatorOffset = Str.find('\0');
   assert(TerminatorOffset != StringRef::npos && "unterminated string data");
   return Str.slice(0, TerminatorOffset);
@@ -1174,13 +1174,13 @@ static StringRef readLocString(const char *&Data, StringRef StringData) {
 
 static void readRawLoc(ExternalSourceLocs::RawLoc &Loc, const char *&Data,
                        StringRef StringData) {
-  Loc.Offset = endian::readNext<uint32_t, little, unaligned>(Data);
-  Loc.Line = endian::readNext<uint32_t, little, unaligned>(Data);
-  Loc.Column = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Offset = readNext<uint32_t>(Data);
+  Loc.Line = readNext<uint32_t>(Data);
+  Loc.Column = readNext<uint32_t>(Data);
 
-  Loc.Directive.Offset = endian::readNext<uint32_t, little, unaligned>(Data);
-  Loc.Directive.LineOffset = endian::readNext<int32_t, little, unaligned>(Data);
-  Loc.Directive.Length = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Directive.Offset = readNext<uint32_t>(Data);
+  Loc.Directive.LineOffset = readNext<int32_t>(Data);
+  Loc.Directive.Length = readNext<uint32_t>(Data);
   Loc.Directive.Name = readLocString(Data, StringData);
 }
 
@@ -1225,19 +1225,18 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
   ExternalSourceLocs::RawLocs Result;
   Result.SourceFilePath = readLocString(Record, Core->SourceLocsTextData);
 
-  const auto DocRangesOffset =
-      endian::readNext<uint32_t, little, unaligned>(Record);
+  const auto DocRangesOffset = readNext<uint32_t>(Record);
   if (DocRangesOffset) {
     assert(!Core->DocRangesData.empty());
     const auto *Data = Core->DocRangesData.data() + DocRangesOffset;
-    const auto NumLocs = endian::readNext<uint32_t, little, unaligned>(Data);
+    const auto NumLocs = readNext<uint32_t>(Data);
     assert(NumLocs);
 
     for (uint32_t I = 0; I < NumLocs; ++I) {
       auto &Range =
           Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(), 0);
       readRawLoc(Range.first, Data, Core->SourceLocsTextData);
-      Range.second = endian::readNext<uint32_t, little, unaligned>(Data);
+      Range.second = readNext<uint32_t>(Data);
     }
   }
 

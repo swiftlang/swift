@@ -94,7 +94,8 @@ swift::createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
 
   // CacheKey is the index of the producting input + the base key.
   // Encode the unsigned value as little endian in the field.
-  llvm::support::endian::write<uint32_t>(OS, InputIndex, llvm::support::little);
+  llvm::support::endian::write<uint32_t>(OS, InputIndex,
+                                         llvm::endianness::little);
 
   return CAS.storeFromString({BaseKey}, OS.str());
 }

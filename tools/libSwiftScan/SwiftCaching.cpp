@@ -405,7 +405,7 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
   auto Input = KeyProxy->getData();
 
   unsigned Index =
-      llvm::support::endian::read<uint32_t, llvm::support::little,
+      llvm::support::endian::read<uint32_t, llvm::endianness::little,
                                   llvm::support::unaligned>(Input.data());
   {
     swift::cas::CompileJobResultSchema Schema(CAS.getCAS());

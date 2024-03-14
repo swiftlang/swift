@@ -51,6 +51,12 @@ static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
   return false;
 }
 
+template <typename value_type, typename CharT>
+[[nodiscard]] static inline value_type readNext(const CharT *&memory) {
+  return llvm::support::endian::readNext<value_type, llvm::endianness::little,
+                                         llvm::support::unaligned>(memory);
+}
+
 namespace {
   class BaseNameToEntitiesTableReaderInfo;
   class GlobalsAsMembersTableReaderInfo;
@@ -1146,14 +1152,14 @@ namespace {
         dataLength += (sizeof(uint64_t) * entry.DeclsOrMacros.size());
       }
 
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint8_t>((uint8_t)key.Kind);
       if (key.Kind == swift::DeclBaseName::Kind::Normal)
         writer.OS << key.Name;
@@ -1161,7 +1167,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
 
       // # of entries
       writer.write<uint16_t>(data.size());
@@ -1240,14 +1246,14 @@ namespace {
         sizeof(uint16_t) + sizeof(uint64_t) * data.size();
       assert(dataLength == static_cast<uint32_t>(dataLength));
 
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint8_t>(static_cast<unsigned>(key.first) - 2);
       if (SwiftLookupTable::contextRequiresName(key.first))
         out << key.second;
@@ -1255,7 +1261,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
 
       // # of entries
       writer.write<uint16_t>(data.size());
@@ -1314,7 +1320,7 @@ void SwiftLookupTableWriter::writeExtensionContents(
 
       llvm::raw_svector_ostream blobStream(hashTableBlob);
       // Make sure that no bucket is at offset 0
-      endian::write<uint32_t>(blobStream, 0, little);
+      endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
       tableOffset = generator.Emit(blobStream, info);
     }
 
@@ -1356,7 +1362,7 @@ void SwiftLookupTableWriter::writeExtensionContents(
 
         llvm::raw_svector_ostream blobStream(hashTableBlob);
         // Make sure that no bucket is at offset 0
-        endian::write<uint32_t>(blobStream, 0, little);
+        endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
         tableOffset = generator.Emit(blobStream, info);
       }
 
@@ -1386,7 +1392,7 @@ void SwiftLookupTableWriter::writeExtensionContents(
 
       llvm::raw_svector_ostream blobStream(hashTableBlob);
       // Make sure that no bucket is at offset 0
-      endian::write<uint32_t>(blobStream, 0, little);
+      endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
       tableOffset = generator.Emit(blobStream, info);
     }
 
@@ -1423,13 +1429,13 @@ namespace {
 
     static std::pair<unsigned, unsigned>
     ReadKeyDataLength(const uint8_t *&data) {
-      unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-      unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
+      unsigned keyLength = readNext<uint16_t>(data);
+      unsigned dataLength = readNext<uint32_t>(data);
       return { keyLength, dataLength };
     }
 
     static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-      uint8_t kind = endian::readNext<uint8_t, little, unaligned>(data);
+      uint8_t kind = readNext<uint8_t>(data);
       switch (kind) {
       case (uint8_t)DeclBaseName::Kind::Normal: {
         StringRef str(reinterpret_cast<const char *>(data),
@@ -1452,7 +1458,7 @@ namespace {
       data_type result;
 
       // # of entries.
-      unsigned numEntries = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned numEntries = readNext<uint16_t>(data);
       result.reserve(numEntries);
 
       // Read all of the entries.
@@ -1461,19 +1467,17 @@ namespace {
 
         // Read the context.
         entry.Context.first =
-          static_cast<SwiftLookupTable::ContextKind>(
-            endian::readNext<uint8_t, little, unaligned>(data));
+            static_cast<SwiftLookupTable::ContextKind>(readNext<uint8_t>(data));
         if (SwiftLookupTable::contextRequiresName(entry.Context.first)) {
-          uint16_t length = endian::readNext<uint16_t, little, unaligned>(data);
+          uint16_t length = readNext<uint16_t>(data);
           entry.Context.second = StringRef((const char *)data, length);
           data += length;
         }
 
         // Read the declarations and macros.
-        unsigned numDeclsOrMacros =
-          endian::readNext<uint16_t, little, unaligned>(data);
+        unsigned numDeclsOrMacros = readNext<uint16_t>(data);
         while (numDeclsOrMacros--) {
-          auto id = endian::readNext<uint64_t, little, unaligned>(data);
+          auto id = readNext<uint64_t>(data);
           entry.DeclsOrMacros.push_back(id);
         }
 
@@ -1511,8 +1515,8 @@ namespace {
 
     static std::pair<unsigned, unsigned>
     ReadKeyDataLength(const uint8_t *&data) {
-      unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-      unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
+      unsigned keyLength = readNext<uint16_t>(data);
+      unsigned dataLength = readNext<uint32_t>(data);
       return { keyLength, dataLength };
     }
 
@@ -1527,12 +1531,12 @@ namespace {
       data_type result;
 
       // # of entries.
-      unsigned numEntries = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned numEntries = readNext<uint16_t>(data);
       result.reserve(numEntries);
 
       // Read all of the entries.
       while (numEntries--) {
-        auto id = endian::readNext<uint64_t, little, unaligned>(data);
+        auto id = readNext<uint64_t>(data);
         result.push_back(id);
       }
 
