@@ -16,6 +16,11 @@
 // RUN:   -module-name Client -emit-module-path %t/Client.swiftmodule \
 // RUN:   -experimental-spi-only-imports
 
+/// Attribute is accepted without the flag in Swift 6.
+// RUN: %target-swift-frontend -emit-module %t/Client.swift -I %t \
+// RUN:   -module-name Client -emit-module-path %t/Client.swiftmodule \
+// RUN:   -swift-version 6
+
 /// Attribute is accepted without the flag when in a swiftinterface.
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) \
 // RUN:   -I %t -module-name Client
