@@ -3935,6 +3935,10 @@ namespace {
       return OptionalType::get(actorProto->getDeclaredExistentialType());
     }
 
+    Type visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E) {
+      llvm_unreachable("found ExtractFunctionIsolationExpr in CSGen");
+    }
+
     Type visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }

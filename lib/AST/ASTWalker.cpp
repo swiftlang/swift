@@ -1326,6 +1326,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E) {
+    if (auto fn = E->getFunctionExpr()) {
+      if (auto newFn = doIt(fn))
+        E->setFunctionExpr(newFn);
+      else
+        return nullptr;
+    }
+
+    return E;
+  }
+
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {

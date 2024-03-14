@@ -205,6 +205,7 @@ static bool areConservativelyCompatibleArgumentLabels(
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     return true;
   }
 
@@ -9762,6 +9763,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   if (auto *selfTy = instanceTy->getAs<DynamicSelfType>())
     instanceTy = selfTy->getSelfType();
+
+  // Dynamically isolated function types have a magic '.isolation'
+  // member that extracts the isolation value.
+  if (auto *fn = dyn_cast<FunctionType>(instanceTy)) {
+    if (fn->getIsolation().isErased() &&
+        memberName.getBaseIdentifier().str() == "isolation") {
+      result.ViableCandidates.push_back(
+        OverloadChoice(baseTy, OverloadChoiceKind::ExtractFunctionIsolation));
+    }
+  }
 
   if (!instanceTy->mayHaveMembers())
     return result;
