@@ -19,33 +19,54 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   //
   // TODO(String performance): SIMD-ize
   //
-  let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
+  let count = input.count
+  var ptr = UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
   var i = 0
 
-  let count = input.count
-  let stride = MemoryLayout<UInt>.stride
-  let address = Int(bitPattern: ptr)
+  let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
+  let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
+  let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
+  let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
+  
+  let end128 = ptr + count & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
+  let end64 = ptr + count & ~(MemoryLayout<UInt64>.stride &- 1)
+  let end32 = ptr + count & ~(MemoryLayout<UInt32>.stride &- 1)
+  let end16 = ptr + count & ~(MemoryLayout<UInt16>.stride &- 1)
+  let end = ptr + count
 
-  let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
-  let byteASCIIMask = UInt8(truncatingIfNeeded: wordASCIIMask)
-
-  while (address &+ i) % stride != 0 && i < count {
-    guard ptr[i] & byteASCIIMask == 0 else { return false }
-    i &+= 1
+  
+  while ptr < end128 {
+    let pair = ptr.loadUnaligned(as: (UInt64, UInt64).self)
+    let result = (pair.0 | pair.1) & asciiMask64
+    guard result == 0 else { return false }
+    ptr = ptr + MemoryLayout<(UInt64, UInt64)>.stride
+  }
+  
+  // If we had enough bytes for two iterations of this, we would have hit
+  // the loop above, so we only need to do this once
+  if ptr < end64 {
+    let value = ptr.loadUnaligned(as: UInt64.self)
+    guard value & asciiMask64 == 0 else { return false }
+    ptr = ptr + MemoryLayout<UInt64>.stride
+  }
+  
+  if ptr < end32 {
+    let value = ptr.loadUnaligned(as: UInt32.self)
+    guard value & asciiMask32 == 0 else { return false }
+    ptr = ptr + MemoryLayout<UInt32>.stride
+  }
+  
+  if ptr < end16 {
+    let value = ptr.loadUnaligned(as: UInt16.self)
+    guard value & asciiMask16 == 0 else { return false }
+    ptr = ptr + MemoryLayout<UInt16>.stride
   }
 
-  while (i &+ stride) <= count {
-    let word: UInt = UnsafePointer(
-      bitPattern: address &+ i
-    )._unsafelyUnwrappedUnchecked.pointee
-    guard word & wordASCIIMask == 0 else { return false }
-    i &+= stride
+  if ptr < end {
+    let value = ptr.loadUnaligned(fromByteOffset: i, as: UInt8.self)
+    guard value & asciiMask8 == 0 else { return false }
   }
-
-  while i < count {
-    guard ptr[i] & byteASCIIMask == 0 else { return false }
-    i &+= 1
-  }
+  _internalInvariant(ptr == end || ptr + 1 == end)
   return true
 }
 
