@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature MoveOnlyClasses
 
-// XFAIL: noncopyable_generics
-
 // REQUIRES: concurrency
 
 class CopyableKlass {}
@@ -19,37 +17,37 @@ struct MoveOnlyStruct { // expected-note {{struct 'MoveOnlyStruct' has '~Copyabl
 
 class C {
     var copyable: CopyableKlass? = nil
-    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
-    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'Optional<Wrapped>' yet}}
+    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
 }
 
 @_moveOnly
 class CMoveOnly {
     var copyable: CopyableKlass? = nil
-    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
-    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'Optional<Wrapped>' yet}}
+    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
 }
 
-struct OptionalGrandField<T> {
+struct OptionalGrandField<T> { // expected-note {{consider adding '~Copyable' to generic struct 'OptionalGrandField'}}
     var moveOnly3: T?
     var moveOnly2: MoveOnlyKlass // expected-error {{stored property 'moveOnly2' of 'Copyable'-conforming generic struct 'OptionalGrandField' has non-Copyable type 'MoveOnlyKlass'}}
 }
 
 struct S0 {
-    var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'OptionalGrandField<T>' yet}}
-    var moveOnly4: OptionalGrandField<MoveOnlyStruct> // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'OptionalGrandField<T>' yet}}
+    var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+    var moveOnly4: OptionalGrandField<MoveOnlyStruct> // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
 }
 
 struct SCopyable {
     var copyable: CopyableKlass
 }
 
-struct S {
+struct S { // expected-note {{consider adding '~Copyable' to struct 'S'}}
     var copyable: CopyableKlass
-    var moveOnly2: MoveOnlyStruct? // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'Optional<Wrapped>' yet}}
+    var moveOnly2: MoveOnlyStruct? // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
     var moveOnly: MoveOnlyStruct // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S' has non-Copyable type 'MoveOnlyStruct'}}
-    var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'OptionalGrandField<T>' yet}}
-    var moveOnly3: OptionalGrandField<MoveOnlyStruct> // expected-error {{noncopyable type 'MoveOnlyStruct' cannot be used with generic type 'OptionalGrandField<T>' yet}}
+    var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+    var moveOnly3: OptionalGrandField<MoveOnlyStruct> // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
 }
 
 @_moveOnly
@@ -58,10 +56,10 @@ struct SMoveOnly {
     var moveOnly: MoveOnlyKlass
 }
 
-enum E {
+enum E { // expected-note {{consider adding '~Copyable' to enum 'E'}}
     case lhs(CopyableKlass)
     case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E' has non-Copyable type 'MoveOnlyKlass'}}
-    case rhs2(OptionalGrandField<MoveOnlyKlass>) // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'OptionalGrandField<T>' yet}}
+    case rhs2(OptionalGrandField<MoveOnlyKlass>) // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
 }
 
 @_moveOnly
@@ -87,16 +85,16 @@ extension MoveOnlyStruct {
 func foo() {
     class C2 {
         var copyable: CopyableKlass? = nil
-        var moveOnly: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
+        var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
     }
 
     @_moveOnly
     class C2MoveOnly {
         var copyable: CopyableKlass? = nil
-        var moveOnly: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
+        var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
     }
 
-    struct S2 {
+    struct S2 { // expected-note {{consider adding '~Copyable' to struct 'S2'}}
         var copyable: CopyableKlass
         var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-Copyable type 'MoveOnlyKlass'}}
     }
@@ -107,7 +105,7 @@ func foo() {
         var moveOnly: MoveOnlyKlass
     }
 
-    enum E2 {
+    enum E2 { // expected-note {{consider adding '~Copyable' to enum 'E2'}}
         case lhs(CopyableKlass)
         case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E2' has non-Copyable type 'MoveOnlyKlass'}}
     }
@@ -120,16 +118,16 @@ func foo() {
     {
         class C3 {
             var copyable: CopyableKlass? = nil
-            var moveOnly: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
+            var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
         }
 
         @_moveOnly
         class C3MoveOnly {
             var copyable: CopyableKlass? = nil
-            var moveOnly: MoveOnlyKlass? = nil // expected-error {{noncopyable type 'MoveOnlyKlass' cannot be used with generic type 'Optional<Wrapped>' yet}}
+            var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
         }
 
-        struct S3 {
+        struct S3 { // expected-note {{consider adding '~Copyable' to struct 'S3'}}
             var copyable: CopyableKlass
             var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S3' has non-Copyable type 'MoveOnlyKlass'}}
         }
@@ -140,7 +138,7 @@ func foo() {
             var moveOnly: MoveOnlyKlass
         }
 
-        enum E3 {
+        enum E3 { // expected-note {{consider adding '~Copyable' to enum 'E3'}}
             case lhs(CopyableKlass)
             case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E3' has non-Copyable type 'MoveOnlyKlass'}}
         }
@@ -165,33 +163,29 @@ struct UnsafePointerWithOwner<T> {
 
 // Make sure we error whenever we attempt to conform a move only type to a
 // protocol.
-protocol P {}
-protocol Q {}
+protocol P {} // expected-note 6{{type}}
+protocol Q {} // expected-note 2{{type}}
 @_moveOnly class ProtocolCheckMoveOnlyKlass {}
 @_moveOnly struct ProtocolCheckMoveOnlyStruct {
     var k: MoveOnlyKlass
 }
 @_moveOnly enum ProtocolCheckMoveOnlyEnum {}
 
-extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{noncopyable class 'ProtocolCheckMoveOnlyKlass' cannot conform to 'P'}}
+extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{type 'ProtocolCheckMoveOnlyKlass' does not conform to protocol 'Copyable'}}
 extension ProtocolCheckMoveOnlyStruct : P, Q {}
-// expected-error@-1 {{noncopyable struct 'ProtocolCheckMoveOnlyStruct' cannot conform to 'P'}}
-// expected-error@-2 {{noncopyable struct 'ProtocolCheckMoveOnlyStruct' cannot conform to 'Q'}}
-// expected-note@-3 {{'ProtocolCheckMoveOnlyStruct' declares conformance to protocol 'P' here}}
+// expected-error@-1 2{{type 'ProtocolCheckMoveOnlyStruct' does not conform to protocol 'Copyable'}}
+// expected-note@-2 {{'ProtocolCheckMoveOnlyStruct' declares conformance to protocol 'P' here}}
 
 extension ProtocolCheckMoveOnlyStruct: P {}
 // expected-error@-1 {{redundant conformance of 'ProtocolCheckMoveOnlyStruct' to protocol 'P'}}
-// expected-error@-2 {{noncopyable struct 'ProtocolCheckMoveOnlyStruct' cannot conform to 'P'}}
 
-extension ProtocolCheckMoveOnlyEnum : P & Q, Sendable {}
-// expected-error@-1 {{noncopyable enum 'ProtocolCheckMoveOnlyEnum' cannot conform to 'P & Q'}}
+extension ProtocolCheckMoveOnlyEnum : P & Q {}
+// expected-error@-1 2{{type 'ProtocolCheckMoveOnlyEnum' does not conform to protocol 'Copyable'}}
 
 extension ProtocolCheckMoveOnlyEnum : Any {}
-// expected-error@-1 {{noncopyable enum 'ProtocolCheckMoveOnlyEnum' cannot conform to 'Any'}}
 
 extension ProtocolCheckMoveOnlyEnum : AnyHashable {}
-// expected-error@-1 {{noncopyable enum 'ProtocolCheckMoveOnlyEnum' cannot conform to 'AnyHashable'}}
-// expected-error@-2 {{inheritance from non-protocol type 'AnyHashable'}}
+// expected-error@-1 {{inheritance from non-protocol type 'AnyHashable'}}
 
 // But a normal extension is ok.
 extension ProtocolCheckMoveOnlyKlass {}
@@ -200,13 +194,13 @@ extension ProtocolCheckMoveOnlyEnum {}
 
 // Check if we define a move only type and make it conform on the base type
 @_moveOnly
-class MoveOnlyKlassP : P {} // expected-error {{noncopyable class 'MoveOnlyKlassP' cannot conform to 'P'}}
+class MoveOnlyKlassP : P {} // expected-error {{type 'MoveOnlyKlassP' does not conform to protocol 'Copyable'}}
 @_moveOnly
-struct MoveOnlyStructP : P { // expected-error {{noncopyable struct 'MoveOnlyStructP' cannot conform to 'P'}}
+struct MoveOnlyStructP : P { // expected-error {{type 'MoveOnlyStructP' does not conform to protocol 'Copyable'}}
     var mv: MoveOnlyKlass
 }
 @_moveOnly
-enum MoveOnlyEnumP : P {} // expected-error {{noncopyable enum 'MoveOnlyEnumP' cannot conform to 'P'}}
+enum MoveOnlyEnumP : P {} // expected-error {{type 'MoveOnlyEnumP' does not conform to protocol 'Copyable'}}
 
 // ensure there is no auto-synthesis of Equatable, Hashable, etc, for this move-only enum,
 // because it normally would be synthesized since it only has cases without associated values.
@@ -249,12 +243,12 @@ struct StructHolder {
     }
 }
 
-struct BarStruct {
+struct BarStruct { // expected-note {{consider adding '~Copyable' to struct 'BarStruct'}}
   init() {}
   deinit {} // expected-error {{deinitializer cannot be declared in struct 'BarStruct' that conforms to 'Copyable'}}
 }
 
-enum BarUnion {
+enum BarUnion { // expected-note {{consider adding '~Copyable' to enum 'BarUnion'}}
   init() {}
   deinit {} // expected-error {{deinitializer cannot be declared in enum 'BarUnion' that conforms to 'Copyable'}}
 }
