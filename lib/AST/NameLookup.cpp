@@ -2434,7 +2434,7 @@ static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
   if (!member.isSimpleName() || baseName.isSpecial())
     return;
 
-  if ((!baseName.getIdentifier().str().startswith("$") &&
+  if ((!baseName.getIdentifier().str().starts_with("$") &&
        !baseName.getIdentifier().hasUnderscoredNaming()) ||
       baseName.getIdentifier().str().size() <= 1) {
     return;

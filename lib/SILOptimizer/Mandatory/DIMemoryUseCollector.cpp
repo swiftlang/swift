@@ -1509,7 +1509,7 @@ static bool isSelfInitUse(SILInstruction *I) {
   if (I->getLoc().isSILFile()) {
     if (auto *AI = dyn_cast<ApplyInst>(I))
       if (auto *Fn = AI->getReferencedFunctionOrNull())
-        if (Fn->getName().startswith("selfinit"))
+        if (Fn->getName().starts_with("selfinit"))
           return true;
 
     return false;

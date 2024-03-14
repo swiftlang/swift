@@ -2961,7 +2961,7 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   // ObjC metadata.
   StringRef typeStr(typeName);
   const Metadata *metadata = nullptr;
-  if (typeStr.startswith("_Tt")) {
+  if (typeStr.starts_with("_Tt")) {
     Demangler demangler;
     auto node = demangler.demangleSymbol(typeName);
     if (!node)

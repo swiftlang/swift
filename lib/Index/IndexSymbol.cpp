@@ -75,7 +75,7 @@ static bool isUnitTest(const ValueDecl *D) {
     return false;
 
   // 6. ...and starts with "test".
-  if (FD->getBaseIdentifier().str().startswith("test"))
+  if (FD->getBaseIdentifier().str().starts_with("test"))
     return true;
 
   return false;

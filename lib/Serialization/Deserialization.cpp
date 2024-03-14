@@ -331,8 +331,8 @@ ModularizationError::diagnose(const ModuleFile *MF,
     StringRef foundModuleName = foundModule->getName().str();
     StringRef expectedModuleName = expectedModule->getName().str();
     if (foundModuleName != expectedModuleName &&
-        (foundModuleName.startswith(expectedModuleName) ||
-         expectedModuleName.startswith(foundModuleName)) &&
+        (foundModuleName.starts_with(expectedModuleName) ||
+         expectedModuleName.starts_with(foundModuleName)) &&
         (expectedUnderlying ||
          expectedModule->findUnderlyingClangModule())) {
       ctx.Diags.diagnose(SourceLoc(),

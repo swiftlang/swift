@@ -446,7 +446,7 @@ void SILPassManager::parsePassesToRunCount(StringRef countsStr) {
   bool validFormat = true;
   if (countsStr.consumeInteger(10, maxNumPassesToRun))
     validFormat = false;
-  if (countsStr.startswith(".")) {
+  if (countsStr.starts_with(".")) {
     countsStr = countsStr.drop_front(1);
     if (countsStr.consumeInteger(10, maxNumSubpassesToRun))
       validFormat = false;
@@ -574,7 +574,7 @@ bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
   StringRef prefix("simplify-");
   for (const std::string &namePattern : SILDisablePass) {
     StringRef pattern(namePattern);
-    if (pattern.startswith(prefix) && pattern.endswith(instName) &&
+    if (pattern.starts_with(prefix) && pattern.endswith(instName) &&
         pattern.size() == prefix.size() + instName.size()) {
       return true;
     }

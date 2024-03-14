@@ -89,7 +89,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
-    if (FirstArg.startswith(OptName))
+    if (FirstArg.starts_with(OptName))
       DriverName = FirstArg.drop_front(OptName.size());
   }
 
@@ -129,7 +129,7 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
 
   StringRef OptName =
     getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
-  if (StringRef(Args[0]).startswith(OptName))
+  if (StringRef(Args[0]).starts_with(OptName))
     Args = Args.slice(1);
   return Args;
 }
@@ -260,7 +260,7 @@ static void validateCompilationConditionArgs(DiagnosticEngine &diags,
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
                      name);
-    } else if (name.startswith("-D")) {
+    } else if (name.starts_with("-D")) {
       diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
     } else if (!Lexer::isIdentifier(name)) {
@@ -1336,7 +1336,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     if ((OI.LinkAction == LinkKind::DynamicLibrary ||
          OI.LinkAction == LinkKind::StaticLibrary) &&
         !llvm::sys::path::extension(A->getValue()).empty() &&
-        StringRef(OI.ModuleName).startswith("lib")) {
+        StringRef(OI.ModuleName).starts_with("lib")) {
       // Chop off a "lib" prefix if we're building a library.
       OI.ModuleName.erase(0, strlen("lib"));
     }

@@ -558,7 +558,7 @@ public:
     if (Name.empty())
       return false;
 
-    if (Name.startswith("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
+    if (Name.starts_with("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;
 
     return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);

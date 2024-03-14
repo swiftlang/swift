@@ -261,14 +261,14 @@ namespace llvm {
 
     /// Check if this string starts with the given \p Prefix.
     [[nodiscard]]
-    bool startswith(StringRef Prefix) const {
+    bool starts_with(StringRef Prefix) const {
       return Length >= Prefix.Length &&
              compareMemory(Data, Prefix.Data, Prefix.Length) == 0;
     }
 
     /// Check if this string starts with the given \p Prefix, ignoring case.
     [[nodiscard]]
-    bool startswith_insensitive(StringRef Prefix) const;
+    bool starts_with_insensitive(StringRef Prefix) const;
 
     /// Check if this string ends with the given \p Suffix.
     [[nodiscard]]
@@ -637,7 +637,7 @@ namespace llvm {
     /// Returns true if this StringRef has the given prefix and removes that
     /// prefix.
     bool consume_front(StringRef Prefix) {
-      if (!startswith(Prefix))
+      if (!starts_with(Prefix))
         return false;
 
       *this = drop_front(Prefix.size());
@@ -647,7 +647,7 @@ namespace llvm {
     /// Returns true if this StringRef has the given prefix, ignoring case,
     /// and removes that prefix.
     bool consume_front_insensitive(StringRef Prefix) {
-      if (!startswith_insensitive(Prefix))
+      if (!starts_with_insensitive(Prefix))
         return false;
 
       *this = drop_front(Prefix.size());

@@ -447,7 +447,7 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 static void tryStdlibFixit(ASTContext &ctx,
                            StringRef moduleName,
                            SourceLoc loc) {
-  if (moduleName.startswith("std")) {
+  if (moduleName.starts_with("std")) {
     ctx.Diags.diagnose(loc, diag::did_you_mean_cxxstdlib)
       .fixItReplaceChars(loc, loc.getAdvancedLoc(3), "CxxStdlib");
   }

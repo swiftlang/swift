@@ -65,7 +65,7 @@ TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
 TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
                                              StringRef usr,
                                              GenericSignature genericSig) {
-  if (!usr.startswith("s:"))
+  if (!usr.starts_with("s:"))
     return nullptr;
 
   std::string mangling(usr);
@@ -104,7 +104,7 @@ TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
 Type
 ASTBuilder::createBuiltinType(StringRef builtinName,
                               StringRef mangledName) {
-  if (builtinName.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
+  if (builtinName.starts_with(BUILTIN_TYPE_NAME_PREFIX)) {
     SmallVector<ValueDecl *, 1> decls;
 
     StringRef strippedName =

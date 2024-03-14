@@ -976,7 +976,7 @@ public:
   /// TODO: This needs a better name.
   bool hasSemanticsAttrThatStartsWith(StringRef S) {
     return count_if(getSemanticsAttrs(), [&S](const std::string &Attr) -> bool {
-      return StringRef(Attr).startswith(S);
+      return StringRef(Attr).starts_with(S);
     });
   }
 

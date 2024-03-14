@@ -3261,7 +3261,7 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   // name. The old and new Swift libraries must be able to coexist in
   // the same process, and this avoids warnings due to the ObjC names
   // colliding.
-  bool addSuffix = string.startswith("_TtGCs");
+  bool addSuffix = string.starts_with("_TtGCs");
 
   size_t allocationSize = string.size() + 1;
   if (addSuffix)

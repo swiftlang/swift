@@ -315,23 +315,23 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 
   // Several operation names have suffixes and don't match the name from
   // Builtins.def, so handle those first.
-  if (OperationName.startswith("fence_"))
+  if (OperationName.starts_with("fence_"))
     Info.ID = BuiltinValueKind::Fence;
-  else if (OperationName.startswith("ifdef_"))
+  else if (OperationName.starts_with("ifdef_"))
     Info.ID = BuiltinValueKind::Ifdef;
-  else if (OperationName.startswith("cmpxchg_"))
+  else if (OperationName.starts_with("cmpxchg_"))
     Info.ID = BuiltinValueKind::CmpXChg;
-  else if (OperationName.startswith("atomicrmw_"))
+  else if (OperationName.starts_with("atomicrmw_"))
     Info.ID = BuiltinValueKind::AtomicRMW;
-  else if (OperationName.startswith("atomicload_"))
+  else if (OperationName.starts_with("atomicload_"))
     Info.ID = BuiltinValueKind::AtomicLoad;
-  else if (OperationName.startswith("atomicstore_"))
+  else if (OperationName.starts_with("atomicstore_"))
     Info.ID = BuiltinValueKind::AtomicStore;
-  else if (OperationName.startswith("allocWithTailElems_"))
+  else if (OperationName.starts_with("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
-  else if (OperationName.startswith("applyDerivative_"))
+  else if (OperationName.starts_with("applyDerivative_"))
     Info.ID = BuiltinValueKind::ApplyDerivative;
-  else if (OperationName.startswith("applyTranspose_"))
+  else if (OperationName.starts_with("applyTranspose_"))
     Info.ID = BuiltinValueKind::ApplyTranspose;
   else
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)

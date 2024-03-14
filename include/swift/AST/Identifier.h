@@ -174,11 +174,11 @@ public:
   }
 
   bool hasDollarPrefix() const {
-    return str().startswith("$") && !(getLength() == 1);
+    return str().starts_with("$") && !(getLength() == 1);
   }
   
   bool hasUnderscoredNaming() const {
-    return str().startswith("_");
+    return str().starts_with("_");
   }
   
   const void *getAsOpaquePointer() const {

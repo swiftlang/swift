@@ -1185,7 +1185,7 @@ bool PolymorphicBuiltinSpecializedOverloadInfo::init(
   // we have an overload for its current operand type.
   StringRef name = getBuiltinName(builtinKind);
   StringRef prefix = "generic_";
-  assert(name.startswith(prefix) &&
+  assert(name.starts_with(prefix) &&
          "Invalid polymorphic builtin name! Prefix should be Generic$OP?!");
   SmallString<32> staticOverloadName;
   staticOverloadName.append(name.drop_front(prefix.size()));

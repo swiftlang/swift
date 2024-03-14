@@ -766,7 +766,7 @@ public:
 
   /// Check whether the current token starts with a multi-line string delimiter.
   bool startsWithMultilineStringDelimiter(Token Tok) {
-    return Tok.getText().ltrim('#').startswith("\"\"\"");
+    return Tok.getText().ltrim('#').starts_with("\"\"\"");
   }
 
   /// Returns true if token is an identifier with the given value.
