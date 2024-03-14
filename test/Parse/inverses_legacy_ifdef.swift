@@ -25,28 +25,28 @@ struct Blah: ~Copyable, ~Copyable {}
 // expected-error@-1 {{duplicate suppression of 'Copyable'}}
 
 protocol Compare where Self: ~Copyable { // expected-error {{cannot suppress conformances here}}
+                                         // expected-note@-1 {{type 'NC' does not conform to inherited protocol 'Copyable'}}
   func lessThan(_ other: borrowing Self) -> Bool
 }
 
 protocol Sortable<Element>: ~Copyable { // expected-error {{cannot suppress conformances here}}
-  associatedtype Element: ~Copyable, Compare // expected-error {{cannot suppress conformances here}} // expected-note {{protocol requires nested type 'Element'; add nested type 'Element' for conformance}}
+                                        // expected-note@-1 {{type 'NC' does not conform to inherited protocol 'Copyable'}}
+  associatedtype Element: ~Copyable, Compare // expected-error {{cannot suppress conformances here}}
 
   mutating func sort()
 }
 
-extension NC: Compare { // expected-error {{noncopyable struct 'NC' cannot conform to 'Compare'}}
+extension NC: Compare { // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
   func lessThan(_ other: borrowing Self) -> Bool { false }
 }
 
-extension NC: Sortable { // expected-error {{noncopyable struct 'NC' cannot conform to 'Sortable'}}
-                         // expected-error@-1 {{type 'NC' does not conform to protocol 'Sortable'}}
-                         // expected-error@-2 {{struct 'NC' required to be 'Copyable' but is marked with '~Copyable'}}
-  typealias Element = NC // expected-note {{possibly intended match 'NC.Element' (aka 'NC') does not conform to 'Copyable'}}
+extension NC: Sortable { // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  typealias Element = NC
 
   mutating func sort() { }
 }
 
-func f<T>(_ t: inout T) // expected-note {{where 'T.Element' = 'NC.Element'}}
+func f<T>(_ t: inout T) // expected-error {{no type for 'T.Element' can satisfy both 'T.Element == NC' and 'T.Element : Copyable'}}
   where T: ~Copyable,  // expected-error {{cannot suppress conformances here}}
         T: Sortable,
         T.Element == NC {
@@ -55,7 +55,7 @@ func f<T>(_ t: inout T) // expected-note {{where 'T.Element' = 'NC.Element'}}
 
 do {
   var x = NC()
-  f(&x) // expected-error {{global function 'f' requires the types 'NC.Element' and 'NC' be equivalent}}
+  f(&x)
 }
 
 #endif
