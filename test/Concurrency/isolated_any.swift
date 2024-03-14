@@ -83,3 +83,16 @@ func extractFunctionIsolation(_ fn: @isolated(any) @escaping () async -> Void) {
   let _: (any Actor)? = extractIsolation(myActor.asyncThrowsActorFunction)
   let _: (any Actor)? = extractIsolation(myActor.actorFunctionWithArgs(value:))
 }
+
+func extractFunctionIsolationExpr(
+  _ fn1: @isolated(any) @escaping () async -> Void,
+  _ fn2: @isolated(any) @escaping (Int, String) -> Bool
+) {
+  let _: (any Actor)? = fn1.isolation
+  let _: (any Actor)? = fn2.isolation
+
+  // Only `@isolated(any)` functions have `.isolation`
+  let myActor = A()
+  let _: (any Actor)? = myActor.asyncActorFunction.isolation // expected-error {{value of type '@Sendable () async -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = globalNonisolatedFunction.isolation // expected-error {{value of type '@Sendable () -> ()' has no member 'isolation'}}
+}

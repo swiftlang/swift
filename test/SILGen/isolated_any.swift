@@ -452,3 +452,17 @@ extension MyActor {
 func testEraseAsyncActorIsolatedPartialApplication(a: MyActor) {
   takeAsyncIsolatedAny(fn: a.asyncAction)
 }
+
+/*-- Isolation extraction --*/
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test16extractIsolation2fnScA_pSgyyYAc_tF
+// CHECK: [[FN:%.*]] = copy_value %0 : $@isolated(any) @callee_guaranteed () -> ()
+// CHECK-NEXT: [[FN_BORROW:%.*]] = begin_borrow [[FN]] : $@isolated(any) @callee_guaranteed () -> ()
+// CHECK-NEXT: [[ISOLATION:%.*]] = function_extract_isolation [[FN_BORROW]] : $@isolated(any) @callee_guaranteed () -> ()
+// CHECK-NEXT: [[RESULT:%.*]] = copy_value [[ISOLATION]] : $Optional<any Actor>
+// CHECK-NEXT: end_borrow [[FN_BORROW]] : $@isolated(any) @callee_guaranteed () -> ()
+// CHECK-NEXT: destroy_value [[FN]] : $@isolated(any) @callee_guaranteed () -> ()
+// CHECK-NEXT: return [[RESULT]] : $Optional<any Actor>
+func extractIsolation(fn: @escaping @isolated(any) () -> Void) -> (any Actor)? {
+  fn.isolation
+}
