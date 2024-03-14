@@ -8,9 +8,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// rdar://124277662
-// XFAIL: freestanding
-
 @_spi(_TaskToThreadModel) import _Concurrency
 import StdlibUnittest
 import Darwin
