@@ -1340,7 +1340,6 @@ AbstractionPattern::getFunctionThrownErrorType(
   if (!optOrigErrorType)
     return std::nullopt;
 
-  auto &ctx = substFnInterfaceType->getASTContext();
   auto substErrorType = substFnInterfaceType->getEffectiveThrownErrorType();
 
   if (isTypeParameterOrOpaqueArchetype()) {
@@ -1352,14 +1351,19 @@ AbstractionPattern::getFunctionThrownErrorType(
   }
 
   if (!substErrorType) {
-    if (optOrigErrorType->getType()->hasTypeParameter())
-      substErrorType = ctx.getNeverType();
-    else
-      substErrorType = optOrigErrorType->getType();
+    substErrorType = optOrigErrorType->getEffectiveThrownErrorType();
   }
 
   return std::make_pair(*optOrigErrorType,
                         (*substErrorType)->getCanonicalType());
+}
+
+CanType AbstractionPattern::getEffectiveThrownErrorType() const {
+  CanType type = getType();
+  if (type->hasTypeParameter())
+    return type->getASTContext().getNeverType()->getCanonicalType();
+
+  return type;
 }
 
 AbstractionPattern
