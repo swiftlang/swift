@@ -1723,6 +1723,10 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
         bool isSelf = false;
         if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
           isSelf = UDRE->getName().isSimpleName(ctx.Id_self);
+          // Result the result expression so that rest of the compilation
+          // pipeline handles initializers with lifetime dependence specifiers
+          // in the same way as other initializers.
+          RS->setResult(nullptr);
         }
         if (!isSelf) {
           ctx.Diags.diagnose(

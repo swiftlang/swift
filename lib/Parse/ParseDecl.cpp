@@ -9916,8 +9916,19 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   if (auto *lifetimeTyR =
           dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(FuncRetTy)) {
-    if (!lifetimeTyR->getBase()->isSimpleUnqualifiedIdentifier(
-            Context.Id_Self)) {
+    auto *base = lifetimeTyR->getBase();
+
+    auto isOptionalSimpleUnqualifiedIdentifier = [](TypeRepr *typeRepr,
+                                                    Identifier str) {
+      if (auto *optionalTR = dyn_cast<OptionalTypeRepr>(typeRepr)) {
+        return optionalTR->getBase()->isSimpleUnqualifiedIdentifier(str);
+      }
+      return false;
+    };
+
+    // Diagnose if return type is not Self or Self?
+    if (!base->isSimpleUnqualifiedIdentifier(Context.Id_Self) &&
+        !isOptionalSimpleUnqualifiedIdentifier(base, Context.Id_Self)) {
       diagnose(FuncRetTy->getStartLoc(),
                diag::lifetime_dependence_invalid_init_return);
       return nullptr;
