@@ -96,7 +96,7 @@ static bool looksLikeInitMethod(ObjCSelector selector) {
   ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
   assert(!selectorPieces.empty());
   auto firstPiece = selectorPieces.front().str();
-  if (!firstPiece.startswith("init")) return false;
+  if (!firstPiece.starts_with("init")) return false;
   return !(firstPiece.size() > 4 && clang::isLowercase(firstPiece[4]));
 }
 

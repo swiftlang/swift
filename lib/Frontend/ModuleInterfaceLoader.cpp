@@ -1294,9 +1294,9 @@ class ModuleInterfaceLoaderImpl {
 } // end anonymous namespace
 
 bool ModuleInterfaceCheckerImpl::isCached(StringRef DepPath) {
-  if (!CacheDir.empty() && DepPath.startswith(CacheDir))
+  if (!CacheDir.empty() && DepPath.starts_with(CacheDir))
     return true;
-  return !PrebuiltCacheDir.empty() && DepPath.startswith(PrebuiltCacheDir);
+  return !PrebuiltCacheDir.empty() && DepPath.starts_with(PrebuiltCacheDir);
 }
 
 bool ModuleInterfaceLoader::isCached(StringRef DepPath) {

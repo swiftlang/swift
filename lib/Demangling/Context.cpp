@@ -145,13 +145,13 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
     return false;
   }
 
-  if (MangledName.startswith("_T")) {
+  if (MangledName.starts_with("_T")) {
     // Old mangling.
     StringRef Remaining = MangledName.substr(2);
-    if (Remaining.startswith("To") ||   // swift-as-ObjC thunk
-        Remaining.startswith("TO") ||   // ObjC-as-swift thunk
-        Remaining.startswith("PA_") ||  // partial application forwarder
-        Remaining.startswith("PAo_")) { // ObjC partial application forwarder
+    if (Remaining.starts_with("To") ||   // swift-as-ObjC thunk
+        Remaining.starts_with("TO") ||   // ObjC-as-swift thunk
+        Remaining.starts_with("PA_") ||  // partial application forwarder
+        Remaining.starts_with("PAo_")) { // ObjC partial application forwarder
       return true;
     }
   }
@@ -185,13 +185,13 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
     return MangledName.substr(0, MangledName.size() - 2).str();
   }
   // Old mangling.
-  assert(MangledName.startswith("_T"));
+  assert(MangledName.starts_with("_T"));
   StringRef Remaining = MangledName.substr(2);
-  if (Remaining.startswith("PA_"))
+  if (Remaining.starts_with("PA_"))
     return Remaining.substr(3).str();
-  if (Remaining.startswith("PAo_"))
+  if (Remaining.starts_with("PAo_"))
     return Remaining.substr(4).str();
-  assert(Remaining.startswith("To") || Remaining.startswith("TO"));
+  assert(Remaining.starts_with("To") || Remaining.starts_with("TO"));
   return std::string("_T") + Remaining.substr(2).str();
 }
 

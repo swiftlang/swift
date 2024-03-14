@@ -2713,7 +2713,7 @@ ClangImporter::Implementation::importIdentifier(
   StringRef name = identifier->getName();
   // Remove the prefix, if any.
   if (!removePrefix.empty()) {
-    if (name.startswith(removePrefix)) {
+    if (name.starts_with(removePrefix)) {
       name = name.slice(removePrefix.size(), name.size());
     }
   }
@@ -2789,7 +2789,7 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
     return false;
 
   clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
-  if (!setterID || !setterID->getName().startswith("set"))
+  if (!setterID || !setterID->getName().starts_with("set"))
     return false;
 
   for (auto *prop : proto->properties()) {
@@ -7016,7 +7016,7 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
   if (!func->hasName())
     return false;
   auto id = func->getBaseName().userFacingName();
-  return id.startswith("__") && id.endswith("Unsafe");
+  return id.starts_with("__") && id.endswith("Unsafe");
 }
 
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
@@ -7636,7 +7636,7 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   auto retainFnAttr =
       llvm::find_if(decl->getAttrs(), [&operationStr](auto *attr) {
         if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-          return swiftAttr->getAttribute().startswith(operationStr);
+          return swiftAttr->getAttribute().starts_with(operationStr);
         return false;
       });
   if (retainFnAttr == decl->getAttrs().end()) {

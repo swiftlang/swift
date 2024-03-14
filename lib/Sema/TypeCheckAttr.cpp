@@ -2161,7 +2161,7 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     // Verify that the name mentioned in the expose
     // attribute matches the supported name pattern.
     if (!attr->Name.empty()) {
-      if (isa<ConstructorDecl>(VD) && !attr->Name.startswith("init"))
+      if (isa<ConstructorDecl>(VD) && !attr->Name.starts_with("init"))
         diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
                  attr->Name);
     }

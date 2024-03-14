@@ -207,7 +207,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         Kind = SyntaxNodeKind::Keyword;
         break;
       case tok::identifier:
-        if (Tok.getText().startswith("<#"))
+        if (Tok.getText().starts_with("<#"))
           Kind = SyntaxNodeKind::EditorPlaceholder;
         else
           Kind = SyntaxNodeKind::Identifier;
@@ -247,13 +247,13 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         break;
 
       case tok::comment:
-        if (Tok.getText().startswith("///") ||
-            (IsPlayground && Tok.getText().startswith("//:")))
+        if (Tok.getText().starts_with("///") ||
+            (IsPlayground && Tok.getText().starts_with("//:")))
           Kind = SyntaxNodeKind::DocCommentLine;
-        else if (Tok.getText().startswith("/**") ||
-                 (IsPlayground && Tok.getText().startswith("/*:")))
+        else if (Tok.getText().starts_with("/**") ||
+                 (IsPlayground && Tok.getText().starts_with("/*:")))
           Kind = SyntaxNodeKind::DocCommentBlock;
-        else if (Tok.getText().startswith("//"))
+        else if (Tok.getText().starts_with("//"))
           Kind = SyntaxNodeKind::CommentLine;
         else
           Kind = SyntaxNodeKind::CommentBlock;
@@ -270,7 +270,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
 
       case tok::unknown: {
-        if (Tok.getRawText().ltrim('#').startswith("\"")) {
+        if (Tok.getRawText().ltrim('#').starts_with("\"")) {
           // This is likely an invalid single-line ("), multi-line ("""),
           // or raw (#", ##", #""", etc.) string literal.
           Kind = SyntaxNodeKind::String;
@@ -1458,8 +1458,8 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
 
     Text = Text.substr(Pos);
     Loc = Loc.getAdvancedLoc(Pos);
-    if (Text.startswith("FIXME:") || Text.startswith("TODO:") ||
-        Text.startswith("MARK:"))
+    if (Text.starts_with("FIXME:") || Text.starts_with("TODO:") ||
+        Text.starts_with("MARK:"))
       break;
     Text = Text.substr(1);
     Loc = Loc.getAdvancedLoc(1);
@@ -1503,7 +1503,7 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
       Text.substr(Index - Name.size(), Name.size()) == Name;
   };
 
-  auto HasSlash = Text.substr(Index).startswith("://");
+  auto HasSlash = Text.substr(Index).starts_with("://");
 
   if (HasSlash) {
     for (auto It = URLProtocols.begin(); It < URLProtocols.end(); ++ It) {
@@ -1681,8 +1681,8 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
   auto OrigText = SM.extractText(Node.Range, BufferID);
   auto OrigLoc = Node.Range.getStart();
 
-  if (!OrigText.startswith("/**") &&
-      !(LangOpts.Playground && OrigText.startswith("/*:")))
+  if (!OrigText.starts_with("/**") &&
+      !(LangOpts.Playground && OrigText.starts_with("/*:")))
     return true;
 
   auto Text = OrigText.drop_front(3); // Drop "^/**" or "/*:"

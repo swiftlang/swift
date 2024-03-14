@@ -119,9 +119,9 @@ public:
   /// @name String Predicates
   /// @{
 
-  /// startswith - Check if this string starts with the given \p Prefix.
-  bool startswith(StringRef Prefix) const {
-    return str().startswith(Prefix);
+  /// starts_with - Check if this string starts with the given \p Prefix.
+  bool starts_with(StringRef Prefix) const {
+    return str().starts_with(Prefix);
   }
 
   /// endswith - Check if this string ends with the given \p Suffix.

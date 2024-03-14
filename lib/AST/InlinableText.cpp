@@ -56,7 +56,7 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-      if (unresolved->getName().getBaseName().userFacingName().startswith("$"))
+      if (unresolved->getName().getBaseName().userFacingName().starts_with("$"))
         foundFeature = true;
     }
 

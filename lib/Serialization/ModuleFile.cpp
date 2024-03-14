@@ -289,7 +289,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   // In Swift 6 mode, we do not inherit search paths from loaded non-SDK modules.
   if (!ctx.LangOpts.isSwiftVersionAtLeast(6) &&
       (SDKPath.empty() ||
-       !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath))) {
+       !Core->ModuleInputBuffer->getBufferIdentifier().starts_with(SDKPath))) {
     for (const auto &searchPath : Core->SearchPaths) {
       ctx.addSearchPath(
         ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),

@@ -192,11 +192,11 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       if (A->getKind() == SDKNodeKind::DeclVar) {
         if (A->getName().compare_insensitive(R->getName()) == 0) {
           R->annotate(NodeAnnotation::GetterToProperty);
-        } else if (R->getName().startswith("get") &&
+        } else if (R->getName().starts_with("get") &&
                    R->getName().substr(3).compare_insensitive(A->getName()) ==
                        0) {
           R->annotate(NodeAnnotation::GetterToProperty);
-        } else if (R->getName().startswith("set") &&
+        } else if (R->getName().starts_with("set") &&
                    R->getName().substr(3).compare_insensitive(A->getName()) ==
                        0) {
           R->annotate(NodeAnnotation::SetterToProperty);
@@ -213,12 +213,12 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
 
   static bool isAnonymousEnum(SDKNodeDecl *N) {
     return N->getKind() == SDKNodeKind::DeclVar &&
-      N->getUsr().startswith("c:@Ea@");
+      N->getUsr().starts_with("c:@Ea@");
   }
 
   static bool isNominalEnum(SDKNodeDecl *N) {
     return N->getKind() == SDKNodeKind::DeclType &&
-    N->getUsr().startswith("c:@E@");
+    N->getUsr().starts_with("c:@E@");
   }
 
   static std::optional<StringRef> getLastPartOfUsr(SDKNodeDecl *N) {
@@ -289,10 +289,10 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     auto RR = R.lower();
     if (isNameTooSimple(LL) || isNameTooSimple(RR))
       return false;
-    if (((StringRef)LL).startswith(RR) || ((StringRef)RR).startswith(LL))
+    if (((StringRef)LL).starts_with(RR) || ((StringRef)RR).starts_with(LL))
       return true;
-    if (((StringRef)LL).startswith((llvm::Twine("ns") + RR).str()) ||
-        ((StringRef)RR).startswith((llvm::Twine("ns") + LL).str()))
+    if (((StringRef)LL).starts_with((llvm::Twine("ns") + RR).str()) ||
+        ((StringRef)RR).starts_with((llvm::Twine("ns") + LL).str()))
       return true;
     if (((StringRef)LL).endswith(RR) || ((StringRef)RR).endswith(LL))
       return true;
@@ -1877,7 +1877,7 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
     Line = Line.trim();
     if (Line.empty())
       continue;
-    if (Line.startswith("// ")) // comment.
+    if (Line.starts_with("// ")) // comment.
       continue;
     Lines.insert(Line);
   }

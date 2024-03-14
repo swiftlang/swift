@@ -3091,7 +3091,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
     scratch = ctx.SearchPathOpts.getSDKPath();
     path::append(scratch, a, b, c, d);
     path::append(scratch, e);
-    return path.startswith(scratch);
+    return path.starts_with(scratch);
   };
 
   /// Is \p modulePath from System/Library/PrivateFrameworks/?

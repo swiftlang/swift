@@ -104,7 +104,7 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
     auto moduleFormatPos = std::find_if(commandLineArgs.begin(),
                                         commandLineArgs.end(),
                                         [](StringRef arg) {
-      return arg.startswith("-fmodule-format=");
+      return arg.starts_with("-fmodule-format=");
     });
     assert(moduleFormatPos != commandLineArgs.end());
     assert(moduleFormatPos != commandLineArgs.begin());

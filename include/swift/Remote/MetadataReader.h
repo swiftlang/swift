@@ -866,7 +866,7 @@ public:
         StringRef NameStr(Name);
 
         // If this is a Swift-defined protocol, demangle it.
-        if (NameStr.startswith("_TtP")) {
+        if (NameStr.starts_with("_TtP")) {
           auto Demangled = dem.demangleSymbol(NameStr);
           if (!Demangled)
             return resolver.failure();

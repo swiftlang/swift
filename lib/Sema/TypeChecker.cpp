@@ -581,7 +581,7 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
 
   StringRef Str = Name.getIdentifier().str();
   for (auto forbiddenPrefix : C.TypeCheckerOpts.DebugForbidTypecheckPrefixes) {
-    if (Str.startswith(forbiddenPrefix)) {
+    if (Str.starts_with(forbiddenPrefix)) {
       llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
     }
   }

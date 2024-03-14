@@ -386,7 +386,7 @@ static void parseAutoDiffBuiltinCommonConfig(
     StringRef &operationName, unsigned &arity, bool &throws) {
   // Parse '_arity'.
   constexpr char arityPrefix[] = "_arity";
-  if (operationName.startswith(arityPrefix)) {
+  if (operationName.starts_with(arityPrefix)) {
     operationName = operationName.drop_front(sizeof(arityPrefix) - 1);
     auto arityStr = operationName.take_while(llvm::isDigit);
     operationName = operationName.drop_front(arityStr.size());
@@ -398,7 +398,7 @@ static void parseAutoDiffBuiltinCommonConfig(
   }
   // Parse '_throws'.
   constexpr char throwsPrefix[] = "_throws";
-  if (operationName.startswith(throwsPrefix)) {
+  if (operationName.starts_with(throwsPrefix)) {
     operationName = operationName.drop_front(sizeof(throwsPrefix) - 1);
     throws = true;
   } else {
@@ -410,15 +410,15 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
     StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
     unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyDerivative";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   // Parse 'jvp' or 'vjp'.
   constexpr char jvpPrefix[] = "_jvp";
   constexpr char vjpPrefix[] = "_vjp";
-  if (operationName.startswith(jvpPrefix))
+  if (operationName.starts_with(jvpPrefix))
     kind = AutoDiffDerivativeFunctionKind::JVP;
-  else if (operationName.startswith(vjpPrefix))
+  else if (operationName.starts_with(vjpPrefix))
     kind = AutoDiffDerivativeFunctionKind::VJP;
   operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -428,7 +428,7 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
 bool autodiff::getBuiltinApplyTransposeConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyTranspose";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -439,9 +439,9 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char differentiablePrefix[] = "differentiableFunction";
   constexpr char linearPrefix[] = "linearFunction";
-  if (operationName.startswith(differentiablePrefix))
+  if (operationName.starts_with(differentiablePrefix))
     operationName = operationName.drop_front(sizeof(differentiablePrefix) - 1);
-  else if (operationName.startswith(linearPrefix))
+  else if (operationName.starts_with(linearPrefix))
     operationName = operationName.drop_front(sizeof(linearPrefix) - 1);
   else
     return false;

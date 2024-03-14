@@ -102,7 +102,7 @@ static const llvm::json::Value substitute(const llvm::json::Value &value,
   }
 
   auto str = value.getAsString();
-  if (!str || !str->startswith("=req")) {
+  if (!str || !str->starts_with("=req")) {
     // Not a substitution.
     return value;
   }
@@ -111,7 +111,7 @@ static const llvm::json::Value substitute(const llvm::json::Value &value,
   const llvm::json::Value *subst = &req;
   while (!path.empty()) {
     // '.' <alphanum> -> object key.
-    if (path.startswith(".")) {
+    if (path.starts_with(".")) {
       if (subst->kind() != llvm::json::Value::Object)
         return "<substition error: not an object>";
       path = path.substr(1);
@@ -123,7 +123,7 @@ static const llvm::json::Value substitute(const llvm::json::Value &value,
       continue;
     }
     // '[' <digit>+ ']' -> array index.
-    if (path.startswith("[")) {
+    if (path.starts_with("[")) {
       if (subst->kind() != llvm::json::Value::Array)
         return "<substition error: not an array>";
       path = path.substr(1);
@@ -132,7 +132,7 @@ static const llvm::json::Value substitute(const llvm::json::Value &value,
       (void)path.slice(0, idxlength).getAsInteger(10, idx);
       subst = &(*subst->getAsArray())[idx];
       path = path.substr(idxlength);
-      if (!path.startswith("]"))
+      if (!path.starts_with("]"))
         return "<substition error: missing ']' after digits>";
       path = path.substr(1);
       continue;
