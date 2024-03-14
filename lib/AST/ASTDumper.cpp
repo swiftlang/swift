@@ -2699,6 +2699,13 @@ public:
     printFoot();
   }
 
+  void visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                         StringRef label) {
+    printCommon(E, "extract_function_isolation", label);
+    printRec(E->getFunctionExpr());
+    printFoot();
+  }
+
   void visitInOutExpr(InOutExpr *E, StringRef label) {
     printCommon(E, "inout_expr", label);
     printRec(E->getSubExpr());

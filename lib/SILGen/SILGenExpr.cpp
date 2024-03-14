@@ -486,6 +486,8 @@ namespace {
                                        SGFContext C);
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
+    RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                             SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
              CovariantFunctionConversionExpr *E,
              SGFContext C);
@@ -2105,6 +2107,11 @@ RValue RValueEmitter::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *
   return RValue(SGF, E,
                 SGF.emitActorIsolationErasureThunk(loc, funcRef, isolatedType,
                                                    nonIsolatedType));
+}
+
+RValue RValueEmitter::visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                                        SGFContext C) {
+  llvm_unreachable("not yet implemented for ExtractFunctionIsolationExpr");
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {

@@ -5372,6 +5372,10 @@ namespace {
       return E;
     }
 
+    Expr *visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E) {
+      llvm_unreachable("found ExtractFunctionIsolationExpr in CSApply");
+    }
+
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
