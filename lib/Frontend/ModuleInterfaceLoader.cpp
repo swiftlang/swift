@@ -1879,6 +1879,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
     explicitSwiftModuleMap.str();
 
+  // Pass down VFSOverlay flags (do not need to inherit the options because
+  // FileSystem is shared).
+  for (auto &Overlay : searchPathOpts.VFSOverlayFiles) {
+    GenericArgs.push_back("-vfsoverlay");
+    GenericArgs.push_back(Overlay);
+  }
+
   // Load plugin libraries for macro expression as default arguments
   genericSubInvocation.getSearchPathOptions().PluginSearchOpts =
       searchPathOpts.PluginSearchOpts;
