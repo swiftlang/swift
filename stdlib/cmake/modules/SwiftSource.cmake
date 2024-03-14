@@ -99,8 +99,17 @@ function(handle_swift_sources
   endforeach()
 
   set(swift_compile_flags ${SWIFTSOURCES_COMPILE_FLAGS})
+
+  set(module_link_name "${name}")
+
+  # The stdlib swift sources are compiled in the swiftStdlib target, but the
+  # dylib you link against is the swiftCore target.
+  if(SWIFTSOURCES_IS_STDLIB_CORE)
+    set(module_link_name "swiftCore")
+  endif()
+
   if (NOT SWIFTSOURCES_IS_MAIN AND NOT SWIFTSOURCES_NO_LINK_NAME)
-    list(APPEND swift_compile_flags "-module-link-name" "${name}")
+    list(APPEND swift_compile_flags "-module-link-name" "${module_link_name}")
   endif()
 
   if(swift_sources)
