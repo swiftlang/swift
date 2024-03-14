@@ -2610,12 +2610,13 @@ void ASTMangler::appendSymbolicReference(SymbolicReferent referent) {
 static void reconcileInverses(
            SmallVector<InverseRequirement, 2> &inverses,
            GenericSignature sig,
-           std::optional<unsigned> inversesAlreadyMangledDepth) {
+           std::optional<unsigned> inversesAlreadyMangledDepth,
+           std::optional<unsigned> suppressedInnermostDepth) {
   CanGenericSignature baseSig;
   if (sig)
     baseSig = sig.getCanonicalSignature();
 
-  if (baseSig || inversesAlreadyMangledDepth)
+  if (baseSig || inversesAlreadyMangledDepth || suppressedInnermostDepth)
     llvm::erase_if(inverses, [&](InverseRequirement const& inv) -> bool {
       // Drop inverses that aren't applicable in the nested / child signature,
       // because of an added requirement.
@@ -2629,6 +2630,10 @@ static void reconcileInverses(
       if (auto limit = inversesAlreadyMangledDepth)
         if (gp->getDepth() <= limit)
           return true;
+
+      if (suppressedInnermostDepth &&
+          gp->getDepth() == *suppressedInnermostDepth)
+        return true;
 
       return false;
     });
@@ -3353,7 +3358,8 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
   // Process inverses relative to the base entity's signature.
   if (AllowInverses) {
     // Simplify and canonicalize inverses.
-    reconcileInverses(inverseReqs, base.getSignature(), base.getDepth());
+    reconcileInverses(inverseReqs, base.getSignature(), base.getDepth(),
+                      base.getSuppressedInnermostInversesDepth());
   } else {
     inverseReqs.clear();
   }
@@ -4654,6 +4660,31 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
   return appendOperator("XP");
 }
 
+/// Determine whether this declaration can only occur within the primary
+/// type definition.
+static bool canOnlyOccurInPrimaryTypeDefinition(const Decl *decl) {
+  // Enum elements always occur within the primary definition.
+  if (isa<EnumElementDecl>(decl))
+    return true;
+
+  return false;
+}
+
+/// When the immediate enclosing context of this declaration is
+/// a generic type (with its own generic parameters), return the depth of
+/// the innermost generic parameters.
+static std::optional<unsigned> getEnclosingTypeGenericDepth(const Decl *decl) {
+  auto typeDecl = dyn_cast<GenericTypeDecl>(decl->getDeclContext());
+  if (!typeDecl)
+    return std::nullopt;
+
+  auto genericParams = typeDecl->getGenericParams();
+  if (!genericParams)
+    return std::nullopt;
+
+  return genericParams->getParams().back()->getDepth();
+}
+
 ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     : sig(nullptr), innermostTypeDecl(true), extension(false),
       mangledDepth(std::nullopt) {
@@ -4668,11 +4699,21 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::Enum:
     case DeclKind::Struct:
     case DeclKind::Class:
+    case DeclKind::EnumElement:
       sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
       // Protocol members never mangle inverse constraints on `Self`.
       if (isa<ProtocolDecl>(decl->getDeclContext()))
         setDepth(0);
+
+      // Declarations that can only occur in the primary type definition should
+      // not mangle inverses for the generic parameters of that type definition.
+      // This allows types to introduce conditional conformances to invertible
+      // protocols without breaking ABI.
+      if (canOnlyOccurInPrimaryTypeDefinition(decl)) {
+        if (auto depth = getEnclosingTypeGenericDepth(decl))
+          suppressedInnermostDepth = depth;
+      }
 
       break;
 
@@ -4686,7 +4727,6 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::Module:
     case DeclKind::Param:
     case DeclKind::Macro:
-    case DeclKind::EnumElement:
     case DeclKind::Extension:
     case DeclKind::TopLevelCode:
     case DeclKind::Import:
