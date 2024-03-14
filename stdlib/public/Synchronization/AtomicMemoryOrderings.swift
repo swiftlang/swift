@@ -96,6 +96,7 @@ extension AtomicLoadOrdering: Hashable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension AtomicLoadOrdering: CustomStringConvertible {
   @available(SwiftStdlib 6.0, *)
   public var description: String {
@@ -191,6 +192,7 @@ extension AtomicStoreOrdering: Hashable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension AtomicStoreOrdering: CustomStringConvertible {
   @available(SwiftStdlib 6.0, *)
   public var description: String {
@@ -315,6 +317,7 @@ extension AtomicUpdateOrdering: Hashable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension AtomicUpdateOrdering: CustomStringConvertible {
   @available(SwiftStdlib 6.0, *)
   public var description: String {
