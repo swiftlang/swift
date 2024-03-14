@@ -3530,7 +3530,7 @@ class ExtractFunctionIsolationExpr : public Expr {
 
 public:
   ExtractFunctionIsolationExpr(Expr *fnExpr, SourceLoc isolationLoc,
-                               Type type, bool implicit)
+                               Type type, bool implicit = false)
       : Expr(ExprKind::ExtractFunctionIsolation, implicit, type),
         fnExpr(fnExpr), isolationLoc(isolationLoc) {}
 

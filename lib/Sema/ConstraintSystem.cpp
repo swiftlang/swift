@@ -2890,6 +2890,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     return Type();
   }
 
@@ -3569,6 +3570,7 @@ void ConstraintSystem::bindOverloadType(
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
   case OverloadChoiceKind::KeyPathApplication:
     bindTypeOrIUO(openedType);
     return;
@@ -3825,6 +3827,15 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // base type just like TupleIndex does.
     adjustedRefType =
         getPatternTypeOfSingleUnlabeledPackExpansionTuple(choice.getBaseType());
+    refType = adjustedRefType;
+    break;
+  }
+
+  case OverloadChoiceKind::ExtractFunctionIsolation: {
+    // The type of `.isolation` is `(any Actor)?`
+    auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
+    adjustedRefType =
+        OptionalType::get(actor->getDeclaredExistentialType());
     refType = adjustedRefType;
     break;
   }
@@ -4466,6 +4477,7 @@ DeclName OverloadChoice::getName() const {
 
     case OverloadChoiceKind::MaterializePack:
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
       llvm_unreachable("no name!");
   }
 
@@ -5830,6 +5842,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
 
       case OverloadChoiceKind::TupleIndex:
       case OverloadChoiceKind::MaterializePack:
+      case OverloadChoiceKind::ExtractFunctionIsolation:
         // FIXME: Actually diagnose something here.
         break;
       }
