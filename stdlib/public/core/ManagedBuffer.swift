@@ -120,8 +120,10 @@ extension ManagedBuffer {
   /// Call `body` with an `UnsafeMutablePointer` to the stored
   /// `Header`.
   ///
-  /// - Note: This pointer is valid only for the duration of the
-  ///   call to `body`.
+  /// - Note: This pointer is fixed when the buffer is created, but it is only valid
+  ///   for the lifetime of the buffer. The buffer is guaranteed to live for the
+  ///   duration of the call to `body`, but may be deallocated immediately thereafter
+  ///   if its lifetime is not otherwise extended.
   @inlinable
   public final func withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
@@ -132,8 +134,10 @@ extension ManagedBuffer {
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
   /// storage.
   ///
-  /// - Note: This pointer is valid only for the duration of the
-  ///   call to `body`.
+  /// - Note: This pointer is fixed when the buffer is created, but it is only valid
+  ///   for the lifetime of the buffer. The buffer is guaranteed to live for the
+  ///   duration of the call to `body`, but may be deallocated immediately thereafter
+  ///   if its lifetime is not otherwise extended.
   @inlinable
   public final func withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
@@ -144,8 +148,10 @@ extension ManagedBuffer {
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`
   /// and raw `Element` storage.
   ///
-  /// - Note: These pointers are valid only for the duration of the
-  ///   call to `body`.
+  /// - Note: These pointers are fixed when the buffer is created, but it is only valid
+  ///   for the lifetime of the buffer. The buffer is guaranteed to live for the
+  ///   duration of the call to `body`, but may be deallocated immediately thereafter
+  ///   if its lifetime is not otherwise extended.
   @inlinable
   public final func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
