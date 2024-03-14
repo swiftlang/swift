@@ -44,6 +44,11 @@ ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi', 'ipi', or 'other'", (StringRef))
 
+ERROR(error_old_spi_only_import_unsupported, none,
+      "'-experimental-spi-imports' is unsupported in Swift 6, "
+      "use '@_spiOnly' instead",
+      ())
+
 ERROR(error_unknown_require_explicit_availability, none,
       "unknown argument '%0', passed to -require-explicit-availability, "
       "expected 'error', 'warn' or 'ignore'",
