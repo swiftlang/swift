@@ -432,23 +432,6 @@ extension UInt8? {
   }
 }
 
-/// Extends `Array` where Element is a FixedWidthInteger, providing initialization from a string of Unicode scalars.
-@_unavailableInEmbedded
-extension Array where Element: FixedWidthInteger {
-  /// Initializes an array of Integers with Unicode scalars represented by the provided string.
-  ///
-  /// - Parameter scalars: A string containing Unicode scalars.
-  @inlinable @_alwaysEmitIntoClient @_unavailableInEmbedded
-  public init(scalars: String) {
-    #if os(Linux) || os(iOS) || os(tvOS)
-    // How to avoid the function body being type checked for embedded?
-    self.init(scalars.unicodeScalars.map { Element(unicode: $0) })
-    #else
-    self.init(scalars.utf16.map { Element($0) })
-    #endif
-  }
-}
-
 /// Extends `FixedWidthInteger` providing initialization from a Unicode scalar.
 extension FixedWidthInteger {
   /// Initializes a FixedWidthInteger with the value of the provided Unicode scalar.
@@ -456,9 +439,8 @@ extension FixedWidthInteger {
   /// - Parameter unicode: The Unicode scalar to initialize from.
   /// - Note: Construct with value `v.value`.
   @inlinable @_alwaysEmitIntoClient
-  public init(unicode v: Unicode.Scalar) {
-    _precondition(v.value <= Self.max,
-                  "Code point value does not fit into type")
+  public init?(unicode v: Unicode.Scalar) {
+    guard v.value <= Self.max else { return nil }
     self = Self(v.value)
   }
 }
