@@ -94,6 +94,7 @@ template <> struct compute_node_options<::swift::SILInstruction> {
 
     static const bool enable_sentinel_tracking = false;
     static const bool is_sentinel_tracking_explicit = false;
+    static const bool has_iterator_bits = false;
     typedef void tag;
     typedef ilist_node_base<enable_sentinel_tracking> node_base_type;
     typedef SILInstructionListBase list_base_type;
