@@ -286,6 +286,30 @@ static void printImports(raw_ostream &out,
     allImportFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
   }
 
+  // Collect the public imports as a subset so that we can mark them with
+  // '@_exported'.
+  SmallVector<ImportedModule, 8> exportedImports;
+  M->getImportedModules(exportedImports, ModuleDecl::ImportFilterKind::Exported);
+  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> exportedImportSet;
+  exportedImportSet.insert(exportedImports.begin(), exportedImports.end());
+
+  // All of the above are considered `public` including `@_spiOnly public import`
+  // and `@_spi(name) public import`, and should override `package import`.
+  // Track the `public` imports here to determine whether to override.
+  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> publicImportSet;
+  SmallVector<ImportedModule, 8> publicImports;
+  M->getImportedModules(publicImports, allImportFilter);
+  publicImportSet.insert(publicImports.begin(), publicImports.end());
+
+  // Used to determine whether `package import` should be overriden below.
+  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> packageOnlyImportSet;
+  if (Opts.printPackageInterface()) {
+    SmallVector<ImportedModule, 8> packageOnlyImports;
+    M->getImportedModules(packageOnlyImports, ModuleDecl::ImportFilterKind::PackageOnly);
+    packageOnlyImportSet.insert(packageOnlyImports.begin(), packageOnlyImports.end());
+    allImportFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
+  }
+
   SmallVector<ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
 
@@ -294,13 +318,6 @@ static void printImports(raw_ostream &out,
 
   ImportedModule::removeDuplicates(allImports);
   diagnoseScopedImports(ctx.Diags, allImports);
-
-  // Collect the public imports as a subset so that we can mark them with
-  // '@_exported'.
-  SmallVector<ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Exported);
-  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> publicImportSet;
-  publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
@@ -332,7 +349,7 @@ static void printImports(raw_ostream &out,
       out << "@_implementationOnly ";
     }
 
-    if (publicImportSet.count(import))
+    if (exportedImportSet.count(import))
       out << "@_exported ";
 
     if (!Opts.printPublicInterface()) {
@@ -351,7 +368,11 @@ static void printImports(raw_ostream &out,
         out << "@_spi(" << spiName << ") ";
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
+    if (Opts.printPackageInterface() &&
+        !publicImportSet.count(import) &&
+        packageOnlyImportSet.count(import))
+      out << "package ";
+    else if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
       out << "public ";
     }
 
