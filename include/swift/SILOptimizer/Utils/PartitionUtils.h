@@ -205,9 +205,225 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 };
 
-} // namespace swift
+class Partition;
 
-namespace swift {
+/// A persistent data structure that is used to "rewind" partition history so
+/// that we can discover when values become part of the same region.
+///
+/// NOTE: This does not track whether or not values are transferred. This is
+/// because from the perspective of determining when two values become part of
+/// the same region, that information is not important. To unroll history, a
+/// Partition must have no transfers to use this. NOTE: There is a method that
+/// takes a Partition and produces a new Partition that does not have any
+/// transfers.
+class IsolationHistory {
+public:
+  class Factory;
+
+private:
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
+  class Node;
+
+  // TODO: This shouldn't need to be a friend.
+  friend class Partition;
+
+  /// First node in the immutable linked list.
+  Node *head = nullptr;
+  Factory *factory = nullptr;
+
+  IsolationHistory(Factory *factory) : head(nullptr), factory(factory) {}
+
+public:
+  IsolationHistory(const IsolationHistory &otherIsolation)
+      : head(otherIsolation.head), factory(otherIsolation.factory) {}
+
+  IsolationHistory &operator=(const IsolationHistory &otherIsolation) {
+    assert(factory == otherIsolation.factory);
+    head = otherIsolation.head;
+    return *this;
+  }
+
+  Node *getHead() const { return head; }
+
+  /// Push a node that signals the end of a new sequence of history nodes that
+  /// should execute together. Must be explicitly ended by a push sequence
+  /// end. Is non-rentrant, so one cannot have multiple sequence starts.
+  Node *pushHistorySequenceBoundary();
+
+  /// Push onto the history list that \p value should be added into its own
+  /// independent region.
+  Node *pushNewElementRegion(Element element);
+
+  /// Push onto the history that \p value should be removed from a region and
+  /// that element is the last element in that region (so the region is empty
+  /// afterwards).
+  void pushRemoveLastElementFromRegion(Element element);
+
+  /// Push onto the history that \p element should be removed from a region that
+  /// contains \p otherElementInOldRegion.
+  void pushRemoveElementFromRegion(Element otherElementInOldRegion,
+                                   Element element);
+
+  /// \p elementToMergeInto is the element whose region we merge \p otherRegions
+  /// into.
+  void pushMergeElementRegions(Element elementToMergeInto,
+                               ArrayRef<Element> otherRegions);
+
+  /// Assign \p elementToMerge's region to \p elementToMergeInto's region.
+  void pushAssignElementRegions(Element elementToMergeInto,
+                                Element elementToMerge);
+
+  /// Push that \p other should be merged into this region.
+  void pushCFGHistoryJoin(Node *otherNode);
+
+  Node *pop();
+};
+
+class IsolationHistory::Node final
+    : private llvm::TrailingObjects<IsolationHistory::Node, Element> {
+  friend IsolationHistory;
+  friend TrailingObjects;
+
+public:
+  enum Kind {
+    /// Add a new element to its own region. The region will only consist of
+    /// element.
+    AddNewRegionForElement,
+
+    /// Remove an element from a region which it is the only element of.
+    RemoveLastElementFromRegion,
+
+    /// Remove an element from a region which still has elements remaining.
+    ///
+    /// This is different from RemoveLastElementFromRegion since we store the
+    /// other element.
+    RemoveElementFromRegion,
+
+    /// Given two elements, data and otherData, merge otherData into data's
+    /// region.
+    MergeElementRegions,
+
+    /// At a CFG merge point, we merged two histories. We need to visit it
+    /// recursively.
+    CFGHistoryJoin,
+
+    /// Signals that a sequence boundary has been found in the history and if we
+    /// are processing a sequence, should stop processing.
+    ///
+    /// Clients may want to ensure that a set of history elements are pushed or
+    /// popped together since the effects happen at the same time.
+    /// HistorySequenceStart
+    /// signifies that.
+    SequenceBoundary,
+  };
+
+private:
+  Kind kind;
+  Node *parent;
+
+  /// Child node. Never set on construction.
+  Node *child = nullptr;
+
+  // Either the element that we are adding/removing/modifying or the Node that
+  // we are merging into.
+  std::variant<Element, Node *> subject;
+
+  /// Number of additional element arguments stored in the tail allocated array.
+  unsigned numAdditionalElements;
+
+  /// Access the tail allocated buffer of additional element arguments.
+  MutableArrayRef<Element> getAdditionalElementArgs() {
+    return {getTrailingObjects<Element>(), numAdditionalElements};
+  }
+
+  Node(Kind kind, Node *parent)
+      : kind(kind), parent(parent), subject(nullptr) {}
+  Node(Kind kind, Node *parent, Element value)
+      : kind(kind), parent(parent), subject(value), numAdditionalElements(0) {}
+  Node(Kind kind, Node *parent, Element primaryElement,
+       std::initializer_list<Element> restOfTheElements)
+      : kind(kind), parent(parent), subject(primaryElement),
+        numAdditionalElements(restOfTheElements.size()) {
+    unsigned writeIndex = 0;
+    for (Element restElt : restOfTheElements) {
+      if (primaryElement == restElt) {
+        continue;
+      }
+
+      getAdditionalElementArgs()[writeIndex] = restElt;
+      ++writeIndex;
+    }
+
+    // Set writeIndex to n - 1.
+    numAdditionalElements = writeIndex;
+  }
+
+  Node(Kind kind, Node *parent, Element lhsValue, ArrayRef<Element> rhsValue)
+      : kind(kind), parent(parent), subject(lhsValue),
+        numAdditionalElements(rhsValue.size()) {
+    std::uninitialized_copy(rhsValue.begin(), rhsValue.end(),
+                            getAdditionalElementArgs().data());
+  }
+
+  Node(Kind kind, Node *parent, Node *node)
+      : kind(kind), parent(parent), subject(node), numAdditionalElements(0) {}
+
+public:
+  Kind getKind() const { return kind; }
+
+  Node *getParent() const { return parent; }
+
+  Node *getChild() const { return child; }
+  void setChild(Node *newChild) { child = newChild; }
+
+  Element getFirstArgAsElement() const {
+    assert(kind != CFGHistoryJoin);
+    assert(std::holds_alternative<Element>(subject));
+    return std::get<Element>(subject);
+  }
+
+  Node *getFirstArgAsNode() const {
+    assert(kind == CFGHistoryJoin);
+    assert(std::holds_alternative<Node *>(subject));
+    return std::get<Node *>(subject);
+  }
+
+  ArrayRef<Element> getAdditionalElementArgs() const {
+    assert(kind == MergeElementRegions || kind == RemoveElementFromRegion);
+    return const_cast<Node *>(this)->getAdditionalElementArgs();
+  }
+
+  bool isHistorySequenceBoundary() const {
+    return getKind() == SequenceBoundary;
+  }
+
+  /// If this node is a history sequence join, return its node. Otherwise,
+  /// return nullptr.
+  Node *getHistorySequenceJoin() const {
+    if (kind != CFGHistoryJoin)
+      return nullptr;
+    return getFirstArgAsNode();
+  }
+};
+
+class IsolationHistory::Factory {
+  friend IsolationHistory;
+  using Node = IsolationHistory::Node;
+
+  llvm::BumpPtrAllocator &allocator;
+
+public:
+  Factory(llvm::BumpPtrAllocator &allocator) : allocator(allocator) {}
+
+  Factory(IsolationHistory::Factory &&other) = delete;
+  Factory &operator=(IsolationHistory::Factory &&other) = delete;
+  Factory(const IsolationHistory::Factory &other) = delete;
+  Factory &operator=(const IsolationHistory::Factory &other) = delete;
+
+  /// Returns a new isolation history without any history.
+  IsolationHistory get() { return IsolationHistory(this); }
+};
 
 class TransferringOperand {
   using ValueType = llvm::PointerIntPair<Operand *, 1>;
@@ -402,8 +618,6 @@ public:
 };
 
 /// A map from Element -> Region that represents the current partition set.
-///
-///
 class Partition {
 public:
   /// A class defined in PartitionUtils unittest used to grab state from
@@ -415,6 +629,7 @@ public:
   using TransferringOperandSet = ImmutablePointerSet<TransferringOperand *>;
   using TransferringOperandSetFactory =
       ImmutablePointerSetFactory<TransferringOperand *>;
+  using IsolationHistoryNode = IsolationHistory::Node;
 
 private:
   /// A map from a region number to a instruction that consumes it.
@@ -436,6 +651,9 @@ private:
   /// and therefore safe for use as a fresh label.
   Region fresh_label = Region(0);
 
+  /// An immutable data structure that we use to push/pop isolation history.
+  IsolationHistory history;
+
   /// In a canonical partition, all regions are labelled with the smallest index
   /// of any member. Certain operations like join and equals rely on
   /// canonicality so when it's invalidated this boolean tracks that, and it
@@ -443,19 +661,23 @@ private:
   bool canonical;
 
 public:
-  Partition() : elementToRegionMap({}), canonical(true) {}
+  Partition(IsolationHistory history)
+      : elementToRegionMap({}), history(history), canonical(true) {}
 
   /// 1-arg constructor used when canonicality will be immediately invalidated,
   /// so set to false to begin with
-  Partition(bool canonical) : elementToRegionMap({}), canonical(canonical) {}
+  Partition(IsolationHistory history, bool canonical)
+      : elementToRegionMap({}), history(history), canonical(canonical) {}
 
   /// Return a new Partition that has a single region containing the elements of
   /// \p indices.
-  static Partition singleRegion(ArrayRef<Element> indices);
+  static Partition singleRegion(ArrayRef<Element> indices,
+                                IsolationHistory inputHistory);
 
   /// Return a new Partition that has each element of \p indices in their own
   /// region.
-  static Partition separateRegions(ArrayRef<Element> indices);
+  static Partition separateRegions(ArrayRef<Element> indices,
+                                   IsolationHistory inputHistory);
 
   /// Test two partititons for equality by first putting them in canonical form
   /// then comparing for exact equality.
@@ -482,10 +704,13 @@ public:
 
   /// If \p newElt is not being tracked, create a new region for \p newElt. If
   /// \p newElt is already being tracked, remove it from its old region as well.
-  void trackNewElement(Element newElt);
+  ///
+  /// \arg updateHistory internal parameter used to determine if we should
+  /// update the history. External users shouldn't use this
+  void trackNewElement(Element newElt, bool updateHistory = true);
 
   /// Assigns \p oldElt to the region associated with \p newElt.
-  void assignElement(Element oldElt, Element newElt);
+  void assignElement(Element oldElt, Element newElt, bool updateHistory = true);
 
   bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
     return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
@@ -498,11 +723,62 @@ public:
   iterator end() { return elementToRegionMap.end(); }
   llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
+  void clearTransferState() { regionToTransferredOpMap.clear(); }
+
+  Partition removingTransferState() const {
+    Partition p = *this;
+    p.clearTransferState();
+    return p;
+  }
+
+  /// Rewind one PartitionOp worth of history from the partition.
+  ///
+  /// If we rewind through a join, the joined isolation history before merging
+  /// is inserted into \p foundJoinedHistories which should be processed
+  /// afterwards if the current linear history does not find what one is looking
+  /// for.
+  ///
+  /// NOTE: This can only be used if one has cleared transfer state using
+  /// Partition::clearTransferState or constructed a new Partiton using
+  /// Partition::withoutTransferState(). This is because history rewinding
+  /// doesn't use transfer information so just to be careful around potential
+  /// invariants being broken, we just require the elimination of the transfer
+  /// information.
+  ///
+  /// \returns true if there is more history that can be popped.
+  bool popHistory(SmallVectorImpl<IsolationHistory> &foundJoinedHistories);
+
+  /// Returns true if this value has any isolation history stored.
+  bool hasHistory() const { return bool(history.getHead()); }
+
+  /// Returns the number of nodes of stored history.
+  ///
+  /// NOTE: Do not use this in real code... only intended to be used in testing
+  /// code.
+  unsigned historySize() const {
+    unsigned count = 0;
+    auto *head = history.getHead();
+    if (!head)
+      return count;
+    ++count;
+
+    while ((head = head->getParent()))
+      ++count;
+
+    return count;
+  }
+
+  /// Return a copy of our isolation history.
+  IsolationHistory getIsolationHistory() const { return history; }
+
   /// Construct the partition corresponding to the union of the two passed
   /// partitions.
   ///
+  /// NOTE: snd is passed in as mutable since we may canonicalize snd. We will
+  /// not perform any further mutations to snd.
+  ///
   /// Runs in quadratic time.
-  static Partition join(const Partition &fst, const Partition &snd);
+  static Partition join(const Partition &fst, Partition &snd);
 
   /// Return a vector of the transferred values in this partition.
   std::vector<Element> getTransferredVals() const {
@@ -549,6 +825,14 @@ public:
 
   void printVerbose(llvm::raw_ostream &os) const;
 
+  SWIFT_DEBUG_DUMPER(dumpHistory()) { printHistory(llvm::dbgs()); }
+  void printHistory(llvm::raw_ostream &os) const;
+
+  /// See docs on \p history.pushHistorySequenceBoundary().
+  IsolationHistoryNode *pushHistorySequenceBoundary() {
+    return history.pushHistorySequenceBoundary();
+  }
+
   bool isTransferred(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
@@ -594,24 +878,70 @@ public:
   /// the final region used.
   ///
   /// This runs in linear time.
-  Region merge(Element fst, Element snd);
+  Region merge(Element fst, Element snd, bool updateHistory = true);
 
 private:
-  /// For each region label that occurs, find the first index at which it occurs
-  /// and relabel all instances of it to that index.  This excludes the -1 label
-  /// for transferred regions.
+  /// Pop one history node. Multiple history nodes can make up one PartitionOp
+  /// worth of history, so this is called by popHistory.
+  ///
+  /// Returns true if we succesfully popped a single history node.
+  bool popHistoryOnce(SmallVectorImpl<IsolationHistory> &foundJoinHistoryNodes);
+
+  /// A canonical region is defined to have its region number as equal to the
+  /// minimum element number of all of its assigned element numbers. This
+  /// routine goes through the element -> region map and transforms the
+  /// partition state to restore this property.
   ///
   /// This runs in linear time.
   void canonicalize();
 
-  /// For the passed `map`, ensure that `key` maps to `val`. If `key` already
-  /// mapped to a different value, ensure that all other keys mapped to that
-  /// value also now map to `val`. This is a relatively expensive (linear time)
-  /// operation that's unfortunately used pervasively throughout PartitionOp
-  /// application. If this is a performance bottleneck, let's consider
-  /// optimizing it to a true union-find or other tree-based data structure.
-  static void horizontalUpdate(std::map<Element, Region> &map, Element key,
-                               Region val);
+  /// Walk the elementToRegionMap updating all elements in the region of \p
+  /// targetElement will be changed to now point at \p newRegion.
+  void horizontalUpdate(Element targetElement, Region newRegion,
+                        SmallVectorImpl<Element> &mergedElements);
+
+  /// Push onto the history list that \p element should be added into its own
+  /// independent region.
+  IsolationHistoryNode *pushNewElementRegion(Element element) {
+    return history.pushNewElementRegion(element);
+  }
+
+  /// Push onto the history that \p element should be removed from the region it
+  /// belongs to and that \p element is the last element in that region.
+  void pushRemoveLastElementFromRegion(Element element) {
+    history.pushRemoveLastElementFromRegion(element);
+  }
+
+  /// Push onto the history that \p elementToRemove should be removed from the
+  /// region which \p elementFromOldRegion belongs to.
+  void pushRemoveElementFromRegion(Element elementFromOldRegion,
+                                   Element elementToRemove) {
+    history.pushRemoveElementFromRegion(elementFromOldRegion, elementToRemove);
+  }
+
+  /// Push that \p other should be merged into this region.
+  void pushCFGHistoryJoin(IsolationHistory otherHistory) {
+    if (auto *head = otherHistory.head)
+      history.pushCFGHistoryJoin(head);
+  }
+
+  /// NOTE: Assumes that \p elementToMergeInto and \p otherRegions are disjoint.
+  void pushMergeElementRegions(Element elementToMergeInto,
+                               ArrayRef<Element> otherRegions) {
+    history.pushMergeElementRegions(elementToMergeInto, otherRegions);
+  }
+
+  /// Remove a single element without touching the region to transferring inst
+  /// multimap. Assumes that the element is never the last element in a region.
+  ///
+  /// Just a helper routine.
+  void removeElement(Element e) {
+    // We added an element to its own region... so we should remove it and it
+    // should be the last element in the region.
+    bool result = elementToRegionMap.erase(e);
+    canonical = false;
+    assert(result && "Failed to erase?!");
+  }
 };
 
 /// A data structure that applies a series of PartitionOps to a single Partition
@@ -728,6 +1058,10 @@ public:
       }
       assert(p.is_canonical_correct());
     };
+
+    // Set the boundary so that as we push, this shows when to stop processing
+    // for this PartitionOp.
+    p.pushHistorySequenceBoundary();
 
     switch (op.getKind()) {
     case PartitionOpKind::Assign:

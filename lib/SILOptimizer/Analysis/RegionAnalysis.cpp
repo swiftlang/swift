@@ -1449,7 +1449,8 @@ class PartitionOpTranslator {
 
 public:
   PartitionOpTranslator(SILFunction *function, PostOrderFunctionInfo *pofi,
-                        RegionAnalysisValueMap &valueMap)
+                        RegionAnalysisValueMap &valueMap,
+                        IsolationHistory::Factory &historyFactory)
       : function(function), functionArgPartition(), builder(),
         partialApplyReachabilityDataflow(function, pofi), valueMap(valueMap) {
     builder.translator = this;
@@ -1459,7 +1460,7 @@ public:
     auto functionArguments = function->getArguments();
     if (functionArguments.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "    None.\n");
-      functionArgPartition = Partition::singleRegion({});
+      functionArgPartition = Partition::singleRegion({}, historyFactory.get());
       return;
     }
 
@@ -1488,7 +1489,8 @@ public:
       }
     }
 
-    functionArgPartition = Partition::singleRegion(nonSendableJoinedIndices);
+    functionArgPartition =
+        Partition::singleRegion(nonSendableJoinedIndices, historyFactory.get());
     for (Element elt : nonSendableSeparateIndices) {
       functionArgPartition->trackNewElement(elt);
     }
@@ -2950,8 +2952,11 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
 
 BlockPartitionState::BlockPartitionState(
     SILBasicBlock *basicBlock, PartitionOpTranslator &translator,
-    TransferringOperandSetFactory &ptrSetFactory)
-    : basicBlock(basicBlock), ptrSetFactory(ptrSetFactory) {
+    TransferringOperandSetFactory &ptrSetFactory,
+    IsolationHistory::Factory &isolationHistoryFactory)
+    : entryPartition(isolationHistoryFactory.get()),
+      exitPartition(isolationHistoryFactory.get()), basicBlock(basicBlock),
+      ptrSetFactory(ptrSetFactory) {
   translator.translateSILBasicBlock(basicBlock, blockPartitionOps);
 }
 
@@ -3065,9 +3070,9 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
 
 RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     SILFunction *fn, PostOrderFunctionInfo *pofi)
-    : allocator(), fn(fn), valueMap(fn), translator(),
-      ptrSetFactory(allocator), blockStates(), pofi(pofi), solved(false),
-      supportedFunction(true) {
+    : allocator(), fn(fn), valueMap(fn), translator(), ptrSetFactory(allocator),
+      isolationHistoryFactory(allocator), blockStates(), pofi(pofi),
+      solved(false), supportedFunction(true) {
   // Before we do anything, make sure that we support processing this function.
   //
   // NOTE: See documentation on supportedFunction for criteria.
@@ -3076,9 +3081,11 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     return;
   }
 
-  translator = new (allocator) PartitionOpTranslator(fn, pofi, valueMap);
+  translator = new (allocator)
+      PartitionOpTranslator(fn, pofi, valueMap, isolationHistoryFactory);
   blockStates.emplace(fn, [this](SILBasicBlock *block) -> BlockPartitionState {
-    return BlockPartitionState(block, *translator, ptrSetFactory);
+    return BlockPartitionState(block, *translator, ptrSetFactory,
+                               isolationHistoryFactory);
   });
   // Mark all blocks as needing to be updated.
   for (auto &block : *fn) {

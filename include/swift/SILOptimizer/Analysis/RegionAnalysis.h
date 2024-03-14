@@ -90,7 +90,8 @@ class BlockPartitionState {
 
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator,
-                      TransferringOperandSetFactory &ptrSetFactory);
+                      TransferringOperandSetFactory &ptrSetFactory,
+                      IsolationHistory::Factory &isolationHistoryFactory);
 
 public:
   bool getLiveness() const { return isLive; }
@@ -393,6 +394,8 @@ class RegionAnalysisFunctionInfo {
   PartitionOpTranslator *translator;
 
   TransferringOperandSetFactory ptrSetFactory;
+
+  IsolationHistory::Factory isolationHistoryFactory;
 
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different
