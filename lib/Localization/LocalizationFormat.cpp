@@ -64,11 +64,11 @@ bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
 
   offset_type offset;
   {
-    llvm::support::endian::write<offset_type>(OS, 0, llvm::support::little);
+    llvm::support::endian::write<offset_type>(OS, 0, llvm::endianness::little);
     offset = generator.Emit(OS);
   }
   OS.seek(0);
-  llvm::support::endian::write(OS, offset, llvm::support::little);
+  llvm::support::endian::write(OS, offset, llvm::endianness::little);
   OS.close();
 
   return OS.has_error();
@@ -116,7 +116,8 @@ SerializedLocalizationProducer::SerializedLocalizationProducer(
 bool SerializedLocalizationProducer::initializeImpl() {
   auto base =
       reinterpret_cast<const unsigned char *>(Buffer.get()->getBufferStart());
-  auto tableOffset = endian::read<offset_type>(base, little);
+  auto tableOffset =
+      llvm::support::endian::read<offset_type>(base, llvm::endianness::little);
   SerializedTable.reset(SerializedLocalizationTable::Create(
       base + tableOffset, base + sizeof(offset_type), base));
   return true;

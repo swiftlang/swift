@@ -13,12 +13,12 @@
 #define DEBUG_TYPE "deserialize"
 
 #include "DeserializeSIL.h"
-
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "ModuleFile.h"
 #include "SILFormat.h"
 #include "SILSerializationFunctionBuilder.h"
+#include "SerializationFormat.h"
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignature.h"
@@ -143,14 +143,14 @@ public:
 
   internal_key_type ReadKey(const uint8_t *data, unsigned length) {
     assert(length == sizeof(uint32_t) && "Expect a single IdentifierID.");
-    IdentifierID keyID = endian::readNext<uint32_t, little, unaligned>(data);
+    IdentifierID keyID = readNext<uint32_t>(data);
     return MF.getIdentifierText(keyID);
   }
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
     assert(length == sizeof(uint32_t) && "Expect a single DeclID.");
-    data_type result = endian::readNext<uint32_t, little, unaligned>(data);
+    data_type result = readNext<uint32_t>(data);
     return result;
   }
 };
