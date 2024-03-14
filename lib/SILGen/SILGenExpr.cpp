@@ -486,6 +486,8 @@ namespace {
                                        SGFContext C);
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
+    RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                             SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
              CovariantFunctionConversionExpr *E,
              SGFContext C);
@@ -2105,6 +2107,14 @@ RValue RValueEmitter::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *
   return RValue(SGF, E,
                 SGF.emitActorIsolationErasureThunk(loc, funcRef, isolatedType,
                                                    nonIsolatedType));
+}
+
+RValue RValueEmitter::visitExtractFunctionIsolationExpr(
+    ExtractFunctionIsolationExpr *E, SGFContext C) {
+  auto arg = SGF.emitRValue(E->getFunctionExpr());
+  auto result = SGF.emitExtractFunctionIsolation(
+      E, ArgumentSource(E, std::move(arg)), C);
+  return RValue(SGF, E, result);
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {

@@ -3518,6 +3518,43 @@ public:
   }
 };
 
+/// Extracts the isolation of a dynamically isolated function value.
+class ExtractFunctionIsolationExpr : public Expr {
+  /// The function value expression from which to extract the
+  /// isolation. The type of `fnExpr` must be an ``@isolated(any)`
+  /// funciton.
+  Expr *fnExpr;
+
+  /// The source location of `.isolation`
+  SourceLoc isolationLoc;
+
+public:
+  ExtractFunctionIsolationExpr(Expr *fnExpr, SourceLoc isolationLoc,
+                               Type type, bool implicit = false)
+      : Expr(ExprKind::ExtractFunctionIsolation, implicit, type),
+        fnExpr(fnExpr), isolationLoc(isolationLoc) {}
+
+  Expr *getFunctionExpr() const {
+    return fnExpr;
+  }
+
+  void setFunctionExpr(Expr *fnExpr) {
+    this->fnExpr = fnExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return fnExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return isolationLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ExtractFunctionIsolation;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
