@@ -602,6 +602,15 @@ public:
     initClangType(subs, signature, origType, clangType);
   }
 
+  /// Builds an Abstraction pattern from a type without a substitution map, if
+  /// possible.
+  static std::optional<AbstractionPattern>
+  buildAbstractionPatternIfPossible(Type origType) {
+    if (origType->hasTypeParameter())
+      return {};
+    return AbstractionPattern(origType);
+  }
+
   static AbstractionPattern getOpaque() {
     return AbstractionPattern(Kind::Opaque);
   }
