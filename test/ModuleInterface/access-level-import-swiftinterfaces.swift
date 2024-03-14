@@ -108,7 +108,7 @@
 /// Build a client with multiple files.
 // RUN: %target-swift-frontend -typecheck %t/MultiFiles?.swift -I %t \
 // RUN:   -package-name TestPackage -module-name MultiFiles_Swift6 \
-// RUN:   -experimental-spi-only-imports -experimental-spi-imports \
+// RUN:   -experimental-spi-only-imports \
 // RUN:   -enable-library-evolution -swift-version 6 \
 // RUN:   -emit-module-interface-path %t/MultiFiles_Swift6.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/MultiFiles_Swift6.private.swiftinterface \
