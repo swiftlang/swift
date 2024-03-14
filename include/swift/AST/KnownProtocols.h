@@ -15,6 +15,7 @@
 
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/FixedBitSet.h"
+#include "swift/AST/InvertibleProtocolKind.h"
 #include "swift/Config.h"
 
 namespace llvm {
@@ -54,11 +55,6 @@ enum : uint8_t {
 #define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) +1
   /// The number of invertible protocols.
   NumInvertibleProtocols =
-#include "swift/AST/KnownProtocols.def"
-};
-
-enum class InvertibleProtocolKind : uint8_t {
-#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) Id,
 #include "swift/AST/KnownProtocols.def"
 };
 
