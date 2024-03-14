@@ -1070,6 +1070,9 @@ bool SILType::isEscapable(const SILFunction &function) const {
                                      function.getModule().Types, 0);
   }
 
+  if (auto *moveOnlyTy = ty->getAs<SILMoveOnlyWrappedType>())
+    ty = moveOnlyTy->getInnerType();
+
   // TODO: Support ~Escapable in parameter packs.
   //
   // Treat all other SIL-specific types as Escapable.

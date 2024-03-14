@@ -2,7 +2,8 @@
 // RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -enable-experimental-lifetime-dependence-inference
+// RUN:   -enable-experimental-lifetime-dependence-inference \
+// RUN:   -disable-lifetime-dependence-diagnostics
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
