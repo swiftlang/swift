@@ -1,4 +1,4 @@
-#===--- CMakeLists.txt - Build the core standard library -----------------===#
+#===--- CMakeLists.txt - Build the standard library ---------------------===#
 #
 # This source file is part of the Swift.org open source project
 #
@@ -272,25 +272,7 @@ list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   )
 
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
-set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
-set(swift_core_framework_depends)
-set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
-
-if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "CYGWIN")
-  # TODO(compnerd) cache this variable to permit re-configuration
-  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}" OUTPUT_VARIABLE ENV_SYSTEMROOT)
-  list(APPEND swift_core_private_link_libraries "${ENV_SYSTEMROOT}/system32/psapi.dll")
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "FREEBSD")
-  find_library(EXECINFO_LIBRARY execinfo)
-  list(APPEND swift_core_private_link_libraries ${EXECINFO_LIBRARY})
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "LINUX")
-  if(SWIFT_BUILD_STATIC_STDLIB)
-    list(APPEND swift_core_private_link_libraries)
-  endif()
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WINDOWS")
-  list(APPEND swift_core_private_link_libraries shell32;DbgHelp;Synchronization)
-endif()
 
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
@@ -327,32 +309,6 @@ list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
   "${swift_lib_dir}/swift/host/plugins#${swift_bin_dir}/swift-plugin-server")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
 
-set(swift_core_incorporate_object_libraries)
-list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
-list(APPEND swift_core_incorporate_object_libraries swiftLLVMSupport)
-list(APPEND swift_core_incorporate_object_libraries swiftDemangling)
-list(APPEND swift_core_incorporate_object_libraries swiftStdlibStubs)
-list(APPEND swift_core_incorporate_object_libraries swiftThreading)
-if(SWIFT_STDLIB_HAS_COMMANDLINE)
-  list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
-endif()
-
-set(swiftCore_common_options
-                  IS_STDLIB IS_STDLIB_CORE
-                    ${SWIFTLIB_SOURCES}
-                  GYB_SOURCES
-                    ${SWIFTLIB_GYB_SOURCES}
-                  LINK_FLAGS
-                    ${swift_core_link_flags}
-                  PRIVATE_LINK_LIBRARIES
-                    ${swift_core_private_link_libraries}
-                  INCORPORATE_OBJECT_LIBRARIES
-                    ${swift_core_incorporate_object_libraries}
-                  FRAMEWORK_DEPENDS
-                    ${swift_core_framework_depends}
-                  SWIFT_COMPILE_FLAGS
-                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS})
-
 # The copy_shim_headers target dependency is required to let the
 # build system know that there's a rule to produce the shims
 # directory, but is not sufficient to cause the object file to be rebuilt
@@ -361,51 +317,18 @@ set(swiftCore_common_options
 set(swiftCore_common_dependencies
     copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE})
 
-if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
-
-  set(b0_deps symlink-headers-bootstrapping0)
-  set(b1_deps symlink-headers-bootstrapping1)
-
-  list(FIND SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED" index_of_shared)
-  if(index_of_shared EQUAL -1)
-    message(FATAL_ERROR "bootstrapping requires SHARED stdlib build type")
-  endif()
-
-  set(swiftCore_common_bootstrapping_options
-                    SHARED
-                    ${swiftCore_common_options}
-                    SDK ${SWIFT_HOST_VARIANT_SDK}
-                    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-                    INSTALL_IN_COMPONENT
-                      "never_install")
-
-  # Bootstrapping - stage 0
-
-  add_swift_target_library_single(swiftCore-bootstrapping0 swiftCore
-                    ${swiftCore_common_bootstrapping_options}
-                    FILE_DEPENDS
-                      ${b0_deps} ${swiftCore_common_dependencies}
-                    BOOTSTRAPPING 0)
-
-  # Bootstrapping - stage 1
-
-  add_swift_target_library_single(swiftCore-bootstrapping1 swiftCore
-                    ${swiftCore_common_bootstrapping_options}
-                    FILE_DEPENDS
-                      ${b1_deps} ${swiftCore_common_dependencies}
-                    BOOTSTRAPPING 1)
-endif()
-
-add_swift_target_library(swiftCore
-                  ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
+add_swift_target_library(swiftStdlib IS_STDLIB IS_STDLIB_CORE OBJECT_LIBRARY
+                  ${SWIFTLIB_SOURCES}
+                  GYB_SOURCES
+                    ${SWIFTLIB_GYB_SOURCES}
+                  SWIFT_COMPILE_FLAGS
+                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   ${swiftCore_common_options}
                   ${compile_flags_for_final_build}
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
                   INSTALL_IN_COMPONENT
                     stdlib
-                  MACCATALYST_BUILD_FLAVOR
-                    zippered
                  )
 
 # Embedded standard library - embedded libraries are built as .swiftmodule only,

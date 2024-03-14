@@ -996,6 +996,7 @@ function(add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${SWIFTLIB_SINGLE_IS_FRAGILE_keyword}
       ${SWIFTLIB_SINGLE_ONLY_SWIFTMODULE_keyword}
+      ${SWIFTLIB_SINGLE_OBJECT_LIBRARY_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
       ${SWIFTLIB_SINGLE_NO_LINK_NAME_keyword}
@@ -1074,8 +1075,11 @@ function(add_swift_target_library_single target name)
         ${SWIFT_SOURCE_DIR}/cmake/dummy.cpp)
   endif()
 
+  set(INCORPORATED_OBJECT_LIBRARIES ${SWIFTLIB_SINGLE_INCORPORATE_OBJECT_LIBRARIES})
   set(INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
   if(libkind STREQUAL "SHARED")
+    list(APPEND INCORPORATED_OBJECT_LIBRARIES
+         ${SWIFTLIB_SINGLE_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY})
     list(APPEND INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
          ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS_SHARED_ONLY})
   endif()
@@ -1331,6 +1335,31 @@ function(add_swift_target_library_single target name)
     target_link_libraries("${target}" INTERFACE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   endif()
 
+  # For every object library, target link against the potential single Swift
+  # object file generated for it. An object library may define Swift sources,
+  # and if so a single .o is produced for all of those sources. We need to
+  # explicitly bring that in.
+  foreach(object_library ${INCORPORATED_OBJECT_LIBRARIES})
+    string(REPLACE swift "" object_library_module_name "${object_library}")
+
+    # The stdlib's target is Stdlib, but the module name is Swift.
+    if(object_library_module_name STREQUAL "Stdlib")
+      set(object_library_module_name "Swift")
+    endif()
+
+    set(swift_objsubdir "/${SWIFTLIB_SINGLE_SDK}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    get_bootstrapping_path(swift_obj_dir
+      "$<TARGET_PROPERTY:${object_library}${VARIANT_SUFFIX},BINARY_DIR>/${swift_objsubdir}" "${BOOTSTRAPPING}")
+    set(swift_obj_name "${object_library_module_name}${CMAKE_C_OUTPUT_EXTENSION}")
+    set(swift_obj "${swift_obj_dir}/${swift_obj_name}")
+
+    # If the object file dependency target wasn't created for this object
+    # library, then it had no Swift sources.
+    if(TARGET "stdlib${VARIANT_SUFFIX}-${swift_obj_name}")
+      target_link_libraries("${target}" PRIVATE ${swift_obj})
+    endif()
+  endforeach()
+
   if(target_static)
     _list_add_string_suffix(
         "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
@@ -1356,8 +1385,14 @@ function(add_swift_target_library_single target name)
 
   # Collect compile and link flags for the static and non-static targets.
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
+  set(swift_target_library_name "${name}")
+
+  if(SWIFTLIB_SINGLE_IS_STDLIB_CORE)
+    set(swift_target_library_name "swiftCore")
+  endif()
+
   set(c_compile_flags
-      ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}  "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
+      ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}  "-DSWIFT_TARGET_LIBRARY_NAME=${swift_target_library_name}")
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
 
   set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
@@ -1884,7 +1919,7 @@ function(add_swift_target_library name)
   # All Swift code depends on the standard library, except for the standard
   # library itself.
   if(SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
-    list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
+    list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Stdlib)
 
     # swiftSwiftOnoneSupport does not depend on itself, obviously.
     if(NOT name STREQUAL "swiftSwiftOnoneSupport")
@@ -1899,7 +1934,7 @@ function(add_swift_target_library name)
 
   if((NOT "${SWIFT_BUILD_STDLIB}") AND
      (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS Core SwiftOnoneSupport)
+    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS Stdlib SwiftOnoneSupport)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
@@ -2146,49 +2181,58 @@ function(add_swift_target_library name)
 
       if(NOT BUILD_STANDALONE)
         foreach(mod ${swiftlib_module_depends_flattened})
+          set(module_swiftmodule_name "${mod}")
+          set(module_link_name "${mod}")
+
+          # The stdlib swiftmodule is based on the Stdlib target, but the actual
+          # dylib is produced by the Core target.
+          if(module_link_name STREQUAL "Stdlib")
+            set(module_link_name "Core")
+          endif()
+
           if(DEFINED maccatalyst_build_flavor)
             if(maccatalyst_build_flavor STREQUAL "zippered")
               # Zippered libraries are dependent on both the macCatalyst and normal macOS
               # modules of their dependencies (which themselves must be zippered).
               list(APPEND swiftlib_module_dependency_targets
-                   "swift${mod}${maccatalyst_module_variant_suffix}")
+                   "swift${module_swiftmodule_name}${maccatalyst_module_variant_suffix}")
               list(APPEND swiftlib_module_dependency_targets
-                   "swift${mod}${MODULE_VARIANT_SUFFIX}")
+                   "swift${module_swiftmodule_name}${MODULE_VARIANT_SUFFIX}")
 
               # Zippered libraries link against their zippered library targets, which
               # live (and are built in) the same location as normal macOS libraries.
               list(APPEND swiftlib_private_link_libraries_targets
-                "swift${mod}${VARIANT_SUFFIX}")
+                "swift${module_link_name}${VARIANT_SUFFIX}")
             elseif(maccatalyst_build_flavor STREQUAL "ios-like")
               # iOS-like libraries depend on the macCatalyst modules of their dependencies
               # regardless of whether the target is zippered or macCatalyst only.
               list(APPEND swiftlib_module_dependency_targets
-                   "swift${mod}${maccatalyst_module_variant_suffix}")
+                   "swift${module_swiftmodule_name}${maccatalyst_module_variant_suffix}")
 
               # iOS-like libraries can link against either iOS-like library targets
               # or zippered targets.
               if(mod IN_LIST SWIFTLIB_SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED)
                 list(APPEND swiftlib_private_link_libraries_targets
-                    "swift${mod}${maccatalyst_variant_suffix}")
+                    "swift${module_link_name}${maccatalyst_variant_suffix}")
               else()
                 list(APPEND swiftlib_private_link_libraries_targets
-                    "swift${mod}${VARIANT_SUFFIX}")
+                    "swift${module_link_name}${VARIANT_SUFFIX}")
               endif()
             else()
               list(APPEND swiftlib_module_dependency_targets
-                   "swift${mod}${MODULE_VARIANT_SUFFIX}")
+                   "swift${module_swiftmodule_name}${MODULE_VARIANT_SUFFIX}")
 
               list(APPEND swiftlib_private_link_libraries_targets
-                 "swift${mod}${VARIANT_SUFFIX}")
+                 "swift${module_link_name}${VARIANT_SUFFIX}")
             endif()
             continue()
           endif()
 
           list(APPEND swiftlib_module_dependency_targets
-              "swift${mod}${MODULE_VARIANT_SUFFIX}")
+              "swift${module_swiftmodule_name}${MODULE_VARIANT_SUFFIX}")
 
           list(APPEND swiftlib_private_link_libraries_targets
-              "swift${mod}${VARIANT_SUFFIX}")
+              "swift${module_link_name}${VARIANT_SUFFIX}")
         endforeach()
       endif()
 
@@ -2867,7 +2911,7 @@ function(add_swift_target_executable name)
 
   if(SWIFT_BUILD_STDLIB)
     # All Swift executables depend on the standard library.
-    list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS Core)
+    list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS Stdlib)
     # All Swift executables depend on the swiftSwiftOnoneSupport library.
     list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
   endif()
@@ -2953,48 +2997,57 @@ function(add_swift_target_executable name)
       set(swiftexe_module_dependency_targets)
       set(swiftexe_link_libraries_targets)
       foreach(mod ${swiftexe_module_depends_flattened})
+        set(module_swiftmodule_name "${mod}")
+        set(module_link_name "${mod}")
+
+        # The stdlib swiftmodule is based on the Stdlib target, but the actual
+        # dylib is produced by the Core target.
+        if(module_link_name STREQUAL "Stdlib")
+          set(module_link_name "Core")
+        endif()
+
         if(DEFINED maccatalyst_build_flavor)
           if(maccatalyst_build_flavor STREQUAL "zippered")
             # Zippered libraries are dependent on both the macCatalyst and normal macOS
             # modules of their dependencies (which themselves must be zippered).
             list(APPEND swiftexe_module_dependency_targets
-              "swift${mod}${maccatalyst_module_variant_suffix}")
+              "swift${module_swiftmodule_name}${maccatalyst_module_variant_suffix}")
             list(APPEND swiftexe_module_dependency_targets
-              "swift${mod}${MODULE_VARIANT_SUFFIX}")
+              "swift${module_swiftmodule_name}${MODULE_VARIANT_SUFFIX}")
 
             # Zippered libraries link against their zippered library targets, which
             # live (and are built in) the same location as normal macOS libraries.
             list(APPEND swiftexe_link_libraries_targets
-              "swift${mod}${VARIANT_SUFFIX}")
+              "swift${module_link_name}${VARIANT_SUFFIX}")
           elseif(maccatalyst_build_flavor STREQUAL "ios-like")
             # iOS-like libraries depend on the macCatalyst modules of their dependencies
             # regardless of whether the target is zippered or macCatalyst only.
             list(APPEND swiftexe_module_dependency_targets
-              "swift${mod}${maccatalyst_module_variant_suffix}")
+              "swift${module_swiftmodule_name}${maccatalyst_module_variant_suffix}")
 
             # iOS-like libraries can link against either iOS-like library targets
             # or zippered targets.
             if(mod IN_LIST SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED)
               list(APPEND swiftexe_link_libraries_targets
-                "swift${mod}${maccatalyst_variant_suffix}")
+                "swift${module_link_name}${maccatalyst_variant_suffix}")
             else()
               list(APPEND swiftexe_link_libraries_targets
-                "swift${mod}${VARIANT_SUFFIX}")
+                "swift${module_link_name}${VARIANT_SUFFIX}")
             endif()
           else()
             list(APPEND swiftexe_module_dependency_targets
-              "swift${mod}${MODULE_VARIANT_SUFFIX}")
+              "swift${module_swiftmodule_name}${MODULE_VARIANT_SUFFIX}")
 
             list(APPEND swiftexe_link_libraries_targets
-              "swift${mod}${VARIANT_SUFFIX}")
+              "swift${module_link_name}${VARIANT_SUFFIX}")
           endif()
           continue()
         endif()
 
         list(APPEND swiftexe_module_dependency_targets
-          "swift${mod}${MODULE_VARIANT_SUFFIX}")
+          "swift${module_swiftmodule_name}${MODULE_VARIANT_SUFFIX}")
 
-        set(library_target "swift${mod}${VARIANT_SUFFIX}")
+        set(library_target "swift${module_link_name}${VARIANT_SUFFIX}")
         if(SWIFTEXE_TARGET_PREFER_STATIC AND TARGET "${library_target}-static")
           set(library_target "${library_target}-static")
         endif()

@@ -75,16 +75,6 @@ endif()
 
 add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
-if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
-  add_subdirectory(Cxx)
-else()
-  # SwiftCompilerSources rely on C++ interop, specifically on being able to
-  # import the C++ standard library into Swift. On Linux, this is only possible
-  # when using the modulemap that Swift provides for libstdc++. Make sure we
-  # include the libstdc++ modulemap into the build even when not building
-  # C++ interop modules.
-  add_subdirectory(Cxx/libstdcxx)
-endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection
@@ -237,9 +227,10 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
+  add_subdirectory(core)
   add_subdirectory(runtime)
   add_subdirectory(stubs)
-  add_subdirectory(core)
+  add_subdirectory(stdlib)
   add_subdirectory(SwiftOnoneSupport)
 endif()
 
@@ -280,6 +271,17 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
   if(SWIFT_ENABLE_SYNCHRONIZATION)
     add_subdirectory(Synchronization)
   endif()
+endif()
+
+if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
+  add_subdirectory(Cxx)
+else()
+  # SwiftCompilerSources rely on C++ interop, specifically on being able to
+  # import the C++ standard library into Swift. On Linux, this is only possible
+  # when using the modulemap that Swift provides for libstdc++. Make sure we
+  # include the libstdc++ modulemap into the build even when not building
+  # C++ interop modules.
+  add_subdirectory(Cxx/libstdcxx)
 endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)

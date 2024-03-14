@@ -49,7 +49,7 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE;OBJECT_LIBRARY"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
@@ -66,6 +66,7 @@ function(handle_swift_sources
   translate_flag(${SWIFTSOURCES_NO_LINK_NAME} "NO_LINK_NAME" NO_LINK_NAME_arg)
   translate_flag(${SWIFTSOURCES_IS_FRAGILE} "IS_FRAGILE" IS_FRAGILE_arg)
   translate_flag(${SWIFTSOURCES_ONLY_SWIFTMODULE} "ONLY_SWIFTMODULE" ONLY_SWIFTMODULE_arg)
+  translate_flag(${SWIFTSOURCES_OBJECT_LIBRARY} "OBJECT_LIBRARY" OBJECT_LIBRARY_arg)
   if(DEFINED SWIFTSOURCES_BOOTSTRAPPING)
     set(BOOTSTRAPPING_arg "BOOTSTRAPPING" ${SWIFTSOURCES_BOOTSTRAPPING})
   endif()
@@ -157,6 +158,7 @@ function(handle_swift_sources
         ${BOOTSTRAPPING_arg}
         ${IS_FRAGILE_arg}
         ${ONLY_SWIFTMODULE_arg}
+        ${OBJECT_LIBRARY_arg}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}"
         DEPLOYMENT_VERSION_OSX ${SWIFTSOURCES_DEPLOYMENT_VERSION_OSX}
         DEPLOYMENT_VERSION_IOS ${SWIFTSOURCES_DEPLOYMENT_VERSION_IOS}
@@ -404,13 +406,15 @@ endfunction()
 #     [EMBED_BITCODE]                   # Embed LLVM bitcode into the .o files
 #     [STATIC]                          # Also write .swiftmodule etc. to static
 #                                       # resource folder
+#     [OBJECT_LIBRARY]                  # This is just an ordinary object file,
+#                                       # not a library.
 #     )
 function(_compile_swift_files
     dependency_target_out_var_name dependency_module_target_out_var_name
     dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;ONLY_SWIFTMODULE"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;ONLY_SWIFTMODULE;OBJECT_LIBRARY"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -583,6 +587,11 @@ function(_compile_swift_files
     list(APPEND swift_flags "-swift-version" "5")
   endif()
 
+  # Force plain object files to use version 6.
+  if (SWIFTFILE_OBJECT_LIBRARY AND NOT SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-swift-version" "6")
+  endif()
+
   # Avoiding emiting ABI descriptor files while building stdlib.
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-empty-abi-descriptor")
@@ -594,7 +603,7 @@ function(_compile_swift_files
 
   # Don't need to link runtime compatibility libraries for older runtimes 
   # into the new runtime.
-  if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
+  if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY OR SWIFTFILE_OBJECT_LIBRARY)
     list(APPEND swift_flags "-runtime-compatibility-version" "none")
     list(APPEND swift_flags "-disable-autolinking-runtime-compatibility-dynamic-replacements")
     list(APPEND swift_flags "-Xfrontend" "-disable-autolinking-runtime-compatibility-concurrency")
@@ -658,7 +667,17 @@ function(_compile_swift_files
 
   get_bootstrapping_path(lib_dir ${SWIFTLIB_DIR} "${SWIFTFILE_BOOTSTRAPPING}")
 
+  if(NOT SWIFTFILE_IS_MAIN AND NOT (SWIFTFILE_OBJECT_LIBRARY AND NOT SWIFTFILE_IS_STDLIB))
+    set(should_emit_module TRUE)
+  else()
+    set(should_emit_module FALSE)
+  endif()
+
   if(NOT SWIFTFILE_IS_MAIN)
+    list(APPEND swift_flags "-parse-as-library")
+  endif()
+
+  if(should_emit_module)
     # Determine the directory where the module file should be placed.
     if(SWIFTFILE_MODULE_DIR)
       set(module_dir "${SWIFTFILE_MODULE_DIR}")
@@ -667,8 +686,6 @@ function(_compile_swift_files
     else()
       message(FATAL_ERROR "Don't know where to put the module files")
     endif()
-
-    list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
 
@@ -726,9 +743,12 @@ function(_compile_swift_files
       set(optional_arg "OPTIONAL")
     endif()
 
-    swift_install_in_component(DIRECTORY "${specific_module_dir}"
-                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+    if(NOT SWIFTFILE_OBJECT_LIBRARY)
+      swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+    endif()
+
     if(SWIFTFILE_STATIC)
       swift_install_in_component(DIRECTORY "${specific_module_dir_static}"
                                  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${library_subdir}"
@@ -800,13 +820,15 @@ function(_compile_swift_files
       list(APPEND module_outputs "${api_descriptor_file}")
   endif()
 
-  swift_install_in_component(DIRECTORY "${specific_module_dir}"
-                             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                             COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
-                             OPTIONAL
-                             PATTERN "Project" EXCLUDE)
+  if(should_emit_module)
+    swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+                               OPTIONAL
+                               PATTERN "Project" EXCLUDE)
+  endif()
 
-  if(SWIFTFILE_STATIC)
+  if(should_emit_module AND SWIFTFILE_STATIC)
     swift_install_in_component(DIRECTORY "${specific_module_dir_static}"
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${library_subdir}"
                                COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
@@ -1013,6 +1035,8 @@ function(_compile_swift_files
     set(copy_legacy_layouts_dep)
   endif()
 
+  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR}-${SWIFTFILE_ARCHITECTURE}")
+
   if(NOT SWIFTFILE_ONLY_SWIFTMODULE)
   add_custom_command_target(
       dependency_target
@@ -1031,7 +1055,8 @@ function(_compile_swift_files
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${copy_legacy_layouts_dep}
-      COMMENT "Compiling ${first_output}")
+      COMMENT "Compiling ${first_output}"
+      CUSTOM_TARGET_NAME "stdlib${VARIANT_SUFFIX}-${SWIFTFILE_MODULE_NAME}.o")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
   endif()
 
@@ -1050,7 +1075,7 @@ function(_compile_swift_files
   #
   # We only build these when we are not producing a main file. We could do this
   # with sib/sibgen, but it is useful for looking at the stdlib.
-  if (NOT SWIFTFILE_IS_MAIN)
+  if (should_emit_module)
     add_custom_command_target(
         module_dependency_target
         COMMAND
@@ -1220,7 +1245,6 @@ function(_compile_swift_files
     set("${dependency_sibgen_target_out_var_name}" "${sibgen_dependency_target}" PARENT_SCOPE)
   endif()
 
-
   # Make sure the build system knows the file is a generated object file.
   set_source_files_properties(${SWIFTFILE_OUTPUT}
       PROPERTIES
@@ -1228,4 +1252,10 @@ function(_compile_swift_files
       EXTERNAL_OBJECT true
       LANGUAGE C
       OBJECT_DEPENDS "${source_files}")
+
+  # Swift code found in object libraries (other than the Stdlib itself) depend
+  # on changes that occur in Stdlib.
+  if(SWIFTFILE_OBJECT_LIBRARY AND NOT SWIFTFILE_IS_STDLIB_CORE)
+    add_dependencies("${dependency_target}" "swiftStdlib${VARIANT_SUFFIX}")
+  endif()
 endfunction()
