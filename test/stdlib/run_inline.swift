@@ -5,9 +5,6 @@
 // REQUIRES: freestanding
 // REQUIRES: concurrency_runtime
 
-// rdar://124277662
-// XFAIL: freestanding
-
 @_spi(_TaskToThreadModel) import _Concurrency
 
 // =============================================================================
