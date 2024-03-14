@@ -1,35 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=SWIFT_COMPLETIONS | %FileCheck %s -check-prefix=SWIFT_COMPLETIONS
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FW_UNQUAL_1 > %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_FOO_HELPER < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_FOO_HELPER_SUB < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_BOTH_FOO_BAR < %t.compl.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_FOO_1 > %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_QUAL_FOO_NEGATIVE < %t.compl.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_BAR_1 > %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_1 < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_NEGATIVE < %t.compl.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_FOO_2 | %FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FUNCTION_CALL_1 | %FileCheck %s -check-prefix=FUNCTION_CALL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FUNCTION_CALL_2 | %FileCheck %s -check-prefix=FUNCTION_CALL_2
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_STRUCT_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_STRUCT_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_CLASS_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_CLASS_MEMBERS_2 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=TYPE_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=EXPR_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
+// RUN: %batch-code-completion -F %S/Inputs/mock-sdk -enable-objc-interop
 
 import Foo
 // Don't import FooHelper directly in this test!
@@ -123,11 +92,11 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_QUAL_BAR_NEGATIVE-NOT: FOO
 
 func testClangModule() {
-  #^FW_UNQUAL_1^#
+  #^FW_UNQUAL_1?check=CLANG_FOO;check=CLANG_FOO_SUB;check=CLANG_FOO_HELPER;check=CLANG_FOO_HELPER_SUB;check=CLANG_BAR;check=CLANG_BOTH_FOO_BAR^#
 }
 
 func testCompleteModuleQualifiedFoo1() {
-  Foo.#^CLANG_QUAL_FOO_1^#
+  Foo.#^CLANG_QUAL_FOO_1?check=CLANG_FOO;check=CLANG_FOO_SUB;check=CLANG_QUAL_FOO_NEGATIVE^#
 }
 
 func testCompleteModuleQualifiedFoo2() {
@@ -206,7 +175,7 @@ func testCompleteModuleQualifiedFoo2() {
 }
 
 func testCompleteModuleQualifiedBar1() {
-  Bar.#^CLANG_QUAL_BAR_1^#
+  Bar.#^CLANG_QUAL_BAR_1?check=CLANG_QUAL_BAR_1;check=CLANG_BAR;check=CLANG_QUAL_BAR_NEGATIVE^#
 // If the number of results below changes, this is an indication that you need
 // to add a result to the appropriate list.  Do not just bump the number!
 // CLANG_QUAL_BAR_1: Begin completions, 8 items
@@ -312,8 +281,8 @@ func testCompleteInstanceMembers1(fooObject: FooClassDerived) {
 }
 
 // Check the FooHelper module is suggested even though it's not imported directly
-func testExportedModuleCompletion() -> #^TYPE_MODULE_QUALIFIER^# {
-  let x = #^EXPR_MODULE_QUALIFIER^#
+func testExportedModuleCompletion() -> #^TYPE_MODULE_QUALIFIER?check=MODULE_QUALIFIER^# {
+  let x = #^EXPR_MODULE_QUALIFIER?check=MODULE_QUALIFIER^#
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: swift_ide_test[#Module#]; name=swift_ide_test
 // MODULE_QUALIFIER-DAG: Decl[Module]/None/IsSystem: Swift[#Module#]; name=Swift
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: Foo[#Module#]; name=Foo
