@@ -3337,6 +3337,17 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
+  // With Swift 6, enable @_spiOnly by default and forbid the old version.
+  // This also enables proper error reporting of ioi references from spi decls.
+  if (LangOpts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
+    LangOpts.EnableSPIOnlyImports = true;
+
+    if (ParsedArgs.hasArg(OPT_experimental_spi_imports)) {
+      Diags.diagnose(SourceLoc(), diag::error_old_spi_only_import_unsupported);
+      return true;
+    }
+  }
+
   return false;
 }
 
