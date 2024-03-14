@@ -1133,6 +1133,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
+    #if $TypedThrows
     try withMemoryRebound(to: Element.self) { b in
       var buffer = b
       defer {
@@ -1143,6 +1144,9 @@ extension Unsafe${Mutable}RawBufferPointer {
       }
       return try body(&buffer)
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
   }
 
 %  end
@@ -1151,9 +1155,13 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
+    #if $TypedThrows
     try withMemoryRebound(to: Element.self) {
       try body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
   }
 }
 
