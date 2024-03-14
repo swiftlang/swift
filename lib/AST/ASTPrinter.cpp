@@ -7424,6 +7424,13 @@ void Requirement::print(ASTPrinter &printer, const PrintOptions &opts) const {
   PrintAST(printer, opts).printRequirement(*this);
 }
 
+void InverseRequirement::print(raw_ostream &os,
+                          const PrintOptions &opts,
+                          bool forInherited) const {
+  StreamPrinter printer(os);
+  PrintAST(printer, opts).printRequirement(*this, forInherited);
+}
+
 std::string GenericSignatureImpl::getAsString() const {
   return GenericSignature(const_cast<GenericSignatureImpl *>(this))
       .getAsString();
