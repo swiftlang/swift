@@ -19,7 +19,11 @@ import _Concurrency
 // MARK: Declarations //
 ////////////////////////
 
+class Klass {}
+
 class NonSendableKlass {
+  var klass: Klass
+
   func asyncCall() async
 }
 
@@ -351,5 +355,23 @@ bb0:
   destroy_value %5 : $NonSendableKlass
   %38 = tuple ()
   return %38 : $()
+}
+
+// Make sure that when we process the following sil we do not crash.
+//
+// We previously crashed since we used the base of the storage instead of the
+// operand of the root (the ref_element_addr)
+sil [ossa] @test_ref_element_addr_with_different_storage_no_crash : $@convention(method) <Self where Self : NonSendableKlass> (@guaranteed Self) -> () {
+bb0(%0 : @guaranteed $Self):
+  %1 = copy_value %0 : $Self
+  %2 = upcast %1 : $Self to $NonSendableKlass
+  %3 = begin_borrow %2 : $NonSendableKlass
+  %4 = ref_element_addr [immutable] %3 : $NonSendableKlass, #NonSendableKlass.klass
+  %5 = load [copy] %4 : $*Klass
+  destroy_value %5 : $Klass
+  end_borrow %3 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
 }
 
