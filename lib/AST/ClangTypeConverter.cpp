@@ -269,7 +269,7 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
 
   // Map vector types to the corresponding C vectors.
 #define MAP_SIMD_TYPE(TYPE_NAME, _, BUILTIN_KIND)                      \
-  if (name.startswith(#TYPE_NAME)) {                                   \
+  if (name.starts_with(#TYPE_NAME)) {                                   \
     return getClangVectorType(ctx, clang::BuiltinType::BUILTIN_KIND,   \
                               clang::VectorType::GenericVector,        \
                               name.drop_front(sizeof(#TYPE_NAME)-1));  \

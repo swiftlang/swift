@@ -578,7 +578,7 @@ private:
     } else {
       File = NormalizedFile;
       // Leave <compiler-generated> & friends as is, without directory.
-      if (!(File.startswith("<") && File.endswith(">")))
+      if (!(File.starts_with("<") && File.endswith(">")))
         Dir = CurDir;
       else
         Dir = llvm::sys::path::root_directory(CurDir);
@@ -1069,8 +1069,8 @@ private:
       assert(!Name.empty() &&
              "no mangled name and no human readable name given");
     else
-      assert((UniqueID.startswith("_T") ||
-              UniqueID.startswith(MANGLING_PREFIX_STR)) &&
+      assert((UniqueID.starts_with("_T") ||
+              UniqueID.starts_with(MANGLING_PREFIX_STR)) &&
              "UID is not a mangled name");
 #endif
 

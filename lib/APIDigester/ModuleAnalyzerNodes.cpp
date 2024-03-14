@@ -648,8 +648,8 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
   static auto getAsBool = [&](llvm::yaml::Node *N) -> bool {
     auto txt = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
-    assert(txt.startswith("false") || txt.startswith("true"));
-    return txt.startswith("true");
+    assert(txt.starts_with("false") || txt.starts_with("true"));
+    return txt.starts_with("true");
   };
   SDKNodeKind Kind;
   SDKNodeInitInfo Info(Ctx);

@@ -373,7 +373,7 @@ static ValidationInfo validateControlBlock(
       // recommended configuration and may lead to unreadable swiftmodules.
       StringRef moduleSDK = blobData;
       if (!moduleSDK.empty() && !requiredSDK.empty() &&
-          !requiredSDK.startswith(moduleSDK)) {
+          !requiredSDK.starts_with(moduleSDK)) {
         result.status = Status::SDKMismatch;
         return result;
       }
@@ -571,7 +571,7 @@ std::string serialization::StatusToString(Status S) {
 bool serialization::isSerializedAST(StringRef data) {
   StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
                          std::size(SWIFTMODULE_SIGNATURE));
-  return data.startswith(signatureStr);
+  return data.starts_with(signatureStr);
 }
 
 ValidationInfo serialization::validateSerializedAST(

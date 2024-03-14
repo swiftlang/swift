@@ -903,7 +903,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
           auto *decl = DRE->getDecl();
           if (decl && decl->hasName()) {
             auto baseName = DRE->getDecl()->getBaseIdentifier();
-            if (baseName.str().startswith("$__builder")) {
+            if (baseName.str().starts_with("$__builder")) {
               diagnostic =
                   diag::cannot_convert_result_builder_result_to_return_type;
               break;

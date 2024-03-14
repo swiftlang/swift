@@ -1650,7 +1650,7 @@ Identifier AsyncConverter::assignUniqueName(const Decl *D,
       return Ident;
   }
 
-  if (BoundName.startswith("$")) {
+  if (BoundName.starts_with("$")) {
     llvm::SmallString<8> NewName;
     NewName.append("val");
     NewName.append(BoundName.drop_front());

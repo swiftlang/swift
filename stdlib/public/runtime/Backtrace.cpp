@@ -922,7 +922,7 @@ _swift_backtrace_demangle(const char *mangledName,
 
     return outputBuffer;
 #ifndef _WIN32
-  } else if (name.startswith("_Z")) {
+  } else if (name.starts_with("_Z")) {
     // Try C++; note that we don't want to force callers to use malloc() to
     // allocate their buffer, which is a requirement for __cxa_demangle
     // because it may call realloc() on the incoming pointer.  As a result,

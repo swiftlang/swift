@@ -373,7 +373,7 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
     llvm::sys::fs::make_absolute(TempPath);
     llvm::sys::path::native(TempPath);
 
-    if (StringRef(ArgPath).startswith(TempPath)) {
+    if (StringRef(ArgPath).starts_with(TempPath)) {
       // Don't write temporary file names in the debug info. This would prevent
       // incremental llvm compilation because we would generate different IR on
       // every compiler invocation.
@@ -856,7 +856,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // Allow StrictConcurrency to have a value that corresponds to the
     // -strict-concurrency=<blah> settings.
     StringRef value = A->getValue();
-    if (value.startswith("StrictConcurrency")) {
+    if (value.starts_with("StrictConcurrency")) {
       auto decomposed = value.split("=");
       if (decomposed.first == "StrictConcurrency") {
         if (decomposed.second == "") {
@@ -890,7 +890,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // this form of feature, so specially handle it here until features can
     // maybe have extra arguments in the future.
     auto strRef = StringRef(A->getValue());
-    if (strRef.startswith("AvailabilityMacro=")) {
+    if (strRef.starts_with("AvailabilityMacro=")) {
       auto availability = strRef.split("=").second;
 
       Opts.AvailabilityMacros.push_back(availability.str());
@@ -2007,7 +2007,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
     StringRef contents = arg->getValue();
-    bool negated = contents.startswith("no-");
+    bool negated = contents.starts_with("no-");
     if (negated)
       contents = contents.drop_front(3);
     if (contents == "diagnostics")
@@ -2674,7 +2674,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef Opt = A->getValue();
-    if (Opt.startswith("-D") || Opt.startswith("-U"))
+    if (Opt.starts_with("-D") || Opt.starts_with("-U"))
       Opts.ClangDefines.push_back(Opt.str());
   }
 

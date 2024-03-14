@@ -1141,7 +1141,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 
 /// FIXME: This is an egregious hack.
 static bool isMacroSignatureFile(SourceFile &sf) {
-  return sf.getFilename().startswith("Macro signature of");
+  return sf.getFilename().starts_with("Macro signature of");
 }
 
 /// parseTypeTupleBody
@@ -1414,7 +1414,7 @@ bool Parser::isOptionalToken(const Token &T) const {
   if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
     // We'll munch off the '?', so long as it is left-bound with
     // the type (i.e., parsed as a postfix or unspaced binary operator).
-    return T.getText().startswith("?");
+    return T.getText().starts_with("?");
   }
 
   return false;
@@ -1430,7 +1430,7 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
   if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
     // We'll munch off the '!', so long as it is left-bound with
     // the type (i.e., parsed as a postfix or unspaced binary operator).
-    return T.getText().startswith("!");
+    return T.getText().starts_with("!");
   }
 
   return false;

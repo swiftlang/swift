@@ -256,7 +256,7 @@ private:
         return Options.DisplayObjCModule;
       if (Context->getText() == Options.HidingCurrentModule)
         return false;
-      if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
+      if (Context->getText().starts_with(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
         return Options.DisplayDebuggerGeneratedModule;
     }
     return true;

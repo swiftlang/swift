@@ -78,7 +78,7 @@ private:
 static StringRef getTagForDecl(const Decl *D, bool isRef) {
   auto UID = SwiftLangSupport::getUIDForDecl(D, isRef);
   static const char *prefix = "source.lang.swift.";
-  assert(UID.getName().startswith(prefix));
+  assert(UID.getName().starts_with(prefix));
   return UID.getName().drop_front(strlen(prefix));
 }
 
@@ -2344,7 +2344,7 @@ static void resolveCursorFromUSR(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      if (USR.startswith("c:")) {
+      if (USR.starts_with("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
         CursorInfoData Info;
         Info.InternalDiagnostic = "Lookup for C/C++/ObjC USRs not implemented.";

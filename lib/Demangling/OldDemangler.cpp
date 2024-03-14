@@ -125,7 +125,7 @@ public:
 
   /// Claim the next few characters if they exactly match the given string.
   bool nextIf(StringRef str) {
-    if (!Text.startswith(str)) return false;
+    if (!Text.starts_with(str)) return false;
     advanceOffset(str.size());
     return true;
   }
