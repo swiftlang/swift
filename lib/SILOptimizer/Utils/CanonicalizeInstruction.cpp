@@ -139,8 +139,6 @@ static void replaceUsesOfExtract(SingleValueInstruction *extract,
 // (struct_extract (load %base))
 //   ->
 // (load (struct_element_addr %base, #field)
-//
-// TODO: Consider handling LoadBorrowInst.
 static SILBasicBlock::iterator
 splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   // Keep track of the next iterator after any newly added or to-be-deleted
