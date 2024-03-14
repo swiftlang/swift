@@ -1836,11 +1836,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     static const AbstractClosureExpr *
     parentClosureDisallowingImplicitSelf(const ValueDecl *selfDecl,
                                          const AbstractClosureExpr *inClosure) {
-      ASTContext &ctx = inClosure->getASTContext();
-      if (!selfDecl) {
-        return nullptr;
-      }
-
       // Find the outer decl that determines what self refers to in this
       // closure.
       //  - If this is an escaping closure that captured self, then `selfDecl`
@@ -1851,10 +1846,13 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       const ValueDecl *outerSelfDecl = selfDecl;
       if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
         if (auto capturedSelfDecl = closureExpr->getCapturedSelfDecl()) {
-          outerSelfDecl = ASTScope::lookupSingleLocalDecl(
-              inClosure->getParentSourceFile(), DeclName(ctx.Id_self),
-              capturedSelfDecl->getLoc());
+          // Retrieve the outer decl that the self capture refers to.
+          outerSelfDecl = getParentInitializerDecl(capturedSelfDecl);
         }
+      }
+
+      if (!outerSelfDecl) {
+        return nullptr;
       }
 
       // Find the closest parent closure that contains the outer self decl,
@@ -2008,6 +2006,43 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       }
 
       return false;
+    }
+
+    // Given a `self` decl that is a closure's `self` capture,
+    // retrieves and returns the decl that the capture refers to.
+    static ValueDecl *getParentInitializerDecl(const VarDecl *selfDecl) {
+      if (!selfDecl) {
+        return nullptr;
+      }
+
+      auto captureList = selfDecl->getParentCaptureList();
+      if (!captureList) {
+        return nullptr;
+      }
+
+      for (auto capture : captureList->getCaptureList()) {
+        if (capture.getVar() == selfDecl && capture.PBD) {
+          // We've found the `CaptureListEntry` that contains the `self`
+          // capture, now we can retrieve and inspect its parent initializer.
+          auto index = capture.PBD->getPatternEntryIndexForVarDecl(selfDecl);
+          auto parentInitializer = capture.PBD->getInit(index);
+
+          // Look through implicit conversions like `InjectIntoOptionalExpr`
+          if (auto implicitConversion =
+                  dyn_cast_or_null<ImplicitConversionExpr>(parentInitializer)) {
+            parentInitializer = implicitConversion->getSubExpr();
+          }
+
+          auto DRE = dyn_cast_or_null<DeclRefExpr>(parentInitializer);
+          if (!DRE) {
+            return nullptr;
+          }
+
+          return DRE->getDecl();
+        }
+      }
+
+      return nullptr;
     }
 
     /// Return true if this is a closure expression that will require explicit
