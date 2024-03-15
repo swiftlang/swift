@@ -63,8 +63,9 @@ extension Result {
 }
 
 extension Result where Success: ~Copyable {
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public consuming func consumingMap<NewSuccess: ~Copyable>(
+  public consuming func _consumingMap<NewSuccess: ~Copyable>(
     _ transform: (consuming Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch consume self {
@@ -76,8 +77,9 @@ extension Result where Success: ~Copyable {
   }
 
 #if $BorrowingSwitch
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public borrowing func borrowingMap<NewSuccess: ~Copyable>(
+  public borrowing func _borrowingMap<NewSuccess: ~Copyable>(
     _ transform: (borrowing Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -187,8 +189,9 @@ extension Result {
 }
 
 extension Result where Success: ~Copyable {
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public consuming func consumingFlatMap<NewSuccess: ~Copyable>(
+  public consuming func _consumingFlatMap<NewSuccess: ~Copyable>(
     _ transform: (consuming Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch consume self {
@@ -200,8 +203,9 @@ extension Result where Success: ~Copyable {
   }
 
 #if $BorrowingSwitch
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public borrowing func borrowingFlatMap<NewSuccess: ~Copyable>(
+  public borrowing func _borrowingFlatMap<NewSuccess: ~Copyable>(
     _ transform: (borrowing Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {

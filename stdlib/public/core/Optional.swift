@@ -200,8 +200,9 @@ extension Optional {
 }
 
 extension Optional where Wrapped: ~Copyable {
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public consuming func consumingMap<U: ~Copyable, E: Error>(
+  public consuming func _consumingMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch consume self {
@@ -213,8 +214,9 @@ extension Optional where Wrapped: ~Copyable {
   }
 
 #if hasFeature(BorrowingSwitch)
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public borrowing func borrowingMap<U: ~Copyable, E: Error>(
+  public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch self {
@@ -262,8 +264,9 @@ extension Optional {
 }
 
 extension Optional where Wrapped: ~Copyable {
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public consuming func consumingFlatMap<U: ~Copyable, E: Error>(
+  public consuming func _consumingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch consume self {
@@ -275,8 +278,9 @@ extension Optional where Wrapped: ~Copyable {
   }
 
 #if hasFeature(BorrowingSwitch)
+  // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
-  public func borrowingFlatMap<U: ~Copyable, E: Error>(
+  public func _borrowingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
@@ -326,9 +330,9 @@ extension Optional {
 }
 
 extension Optional where Wrapped: ~Copyable {
-  // FIXME(NCG): Do we want this? It seems like we do.
+  // FIXME(NCG): Do we want this? It seems like we do. Make this public.
   @_alwaysEmitIntoClient
-  public consuming func consumingUnsafelyUnwrap() -> Wrapped {
+  public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
     switch consume self {
     case .some(let x):
       return x
@@ -386,8 +390,8 @@ extension Optional where Wrapped: ~Copyable {
   ///
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
-  @_alwaysEmitIntoClient // FIXME(NCG): This is new in Swift 6
-  public mutating func take() -> Self {
+  @_alwaysEmitIntoClient // FIXME(NCG): Make this public.
+  public mutating func _take() -> Self {
     let result = consume self
     self = nil
     return result
