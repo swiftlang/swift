@@ -22,6 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/InvertibleProtocolKind.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementKind.h"
 #include "swift/Basic/OptionSet.h"
@@ -422,10 +423,13 @@ getObjCClassOrProtocolName(NodePointer node) {
 #endif
 
 template <typename BuiltType, typename BuiltRequirement,
+          typename BuiltInverseRequirement,
           typename BuiltLayoutConstraint, typename BuilderType>
-void decodeRequirement(NodePointer node,
-                       llvm::SmallVectorImpl<BuiltRequirement> &requirements,
-                       BuilderType &Builder) {
+void decodeRequirement(
+    NodePointer node,
+    llvm::SmallVectorImpl<BuiltRequirement> &requirements,
+    llvm::SmallVectorImpl<BuiltInverseRequirement> &inverseRequirements,
+    BuilderType &Builder) {
   for (auto &child : *node) {
     if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount ||
         child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker)
@@ -451,9 +455,40 @@ void decodeRequirement(NodePointer node,
         return;
     } else if (child->getKind() ==
           Demangle::Node::Kind::DependentGenericInverseConformanceRequirement) {
-      // FIXME(kavon): this is unimplemented! We should build a PCT here with
-      //               the inverse in it.
-      return;
+      // Type child
+      auto constraintNode = child->getChild(1);
+      if (constraintNode->getKind() != Demangle::Node::Kind::Type ||
+          constraintNode->getNumChildren() != 1)
+        return;
+
+      // Protocol child
+      auto protocolNode = constraintNode->getChild(0);
+      if (protocolNode->getKind() != Demangle::Node::Kind::Protocol ||
+          protocolNode->getNumChildren() != 2)
+        return;
+
+      auto moduleNode = protocolNode->getChild(0);
+      if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+          moduleNode->getText() != "Swift")
+        return;
+
+      auto protocolNameNode = protocolNode->getChild(1);
+      if (protocolNameNode->getKind() != Demangle::Node::Kind::Identifier)
+        return;
+
+      auto protocolName = protocolNameNode->getText();
+      using OptInvertibleKind = std::optional<InvertibleProtocolKind>;
+      auto protocolKind = llvm::StringSwitch<OptInvertibleKind>(protocolName)
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+          .Case(Name, InvertibleProtocolKind::Id)
+#include "swift/AST/KnownProtocols.def"
+          .Default(std::nullopt);
+      if (!protocolKind)
+        return;
+
+      inverseRequirements.push_back(
+          Builder.createInverseRequirement(subjectType, *protocolKind));
+      continue;
     }
 
 
@@ -538,6 +573,7 @@ class TypeDecoder {
   using Field = typename BuilderType::BuiltSILBoxField;
   using BuiltSubstitution = typename BuilderType::BuiltSubstitution;
   using BuiltRequirement = typename BuilderType::BuiltRequirement;
+  using BuiltInverseRequirement = typename BuilderType::BuiltInverseRequirement;
   using BuiltLayoutConstraint = typename BuilderType::BuiltLayoutConstraint;
   using BuiltGenericSignature = typename BuilderType::BuiltGenericSignature;
   using BuiltSubstitutionMap = typename BuilderType::BuiltSubstitutionMap;
@@ -800,16 +836,19 @@ protected:
         return protocolType;
 
       llvm::SmallVector<BuiltRequirement, 8> requirements;
+      llvm::SmallVector<BuiltInverseRequirement, 8> inverseRequirements;
 
       auto *reqts = Node->getChild(1);
       if (reqts->getKind() != NodeKind::ConstrainedExistentialRequirementList)
         return MAKE_NODE_TYPE_ERROR0(reqts, "is not requirement list");
 
-      decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
-                        BuilderType>(reqts, requirements, Builder);
+      decodeRequirement<BuiltType, BuiltRequirement, BuiltInverseRequirement,
+                        BuiltLayoutConstraint, BuilderType>(
+          reqts, requirements, inverseRequirements, Builder);
 
       return Builder.createConstrainedExistentialType(protocolType.getType(),
-                                                      requirements);
+                                                      requirements,
+                                                      inverseRequirements);
     }
     case NodeKind::ConstrainedExistentialSelf:
       return Builder.createGenericTypeParameterType(/*depth*/ 0, /*index*/ 0);
@@ -1280,6 +1319,7 @@ protected:
       llvm::SmallVector<Field, 4> fields;
       llvm::SmallVector<BuiltSubstitution, 4> substitutions;
       llvm::SmallVector<BuiltRequirement, 4> requirements;
+      llvm::SmallVector<BuiltInverseRequirement, 8> inverseRequirements;
       llvm::SmallVector<BuiltType, 4> genericParams;
 
       if (Node->getNumChildren() < 1)
@@ -1332,10 +1372,10 @@ protected:
         }
 
         // Decode requirements.
-        decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
-                          BuilderType>(dependentGenericSignatureNode,
-                                       requirements,
-                                       Builder);
+        decodeRequirement<BuiltType, BuiltRequirement, BuiltInverseRequirement,
+                          BuiltLayoutConstraint, BuilderType>(
+            dependentGenericSignatureNode, requirements, inverseRequirements,
+            Builder);
 
         // Decode substitutions.
         for (unsigned i = 0, e = substNode->getNumChildren(); i < e; ++i) {
@@ -1373,7 +1413,8 @@ protected:
       }
 
       return Builder.createSILBoxTypeWithLayout(fields, substitutions,
-                                                requirements);
+                                                requirements,
+                                                inverseRequirements);
     }
     case NodeKind::SugaredOptional: {
       if (Node->getNumChildren() < 1)
