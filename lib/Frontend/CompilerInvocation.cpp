@@ -681,8 +681,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
-  Opts.EnableBypassResilienceInPackage = Args.hasArg(OPT_experimental_package_bypass_resilience) ||
-                                         Opts.hasFeature(Feature::ClientBypassResilientAccessInPackage);
+  Opts.EnableBypassResilienceInPackage =
+      Args.hasArg(OPT_experimental_package_bypass_resilience) ||
+      Opts.hasFeature(Feature::ClientBypassResilientAccessInPackage);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
@@ -1115,11 +1116,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_library_evolution)) {
     Opts.SkipNonExportableDecls |=
-    Args.hasArg(OPT_experimental_skip_non_exportable_decls);
+        Args.hasArg(OPT_experimental_skip_non_exportable_decls);
 
     Opts.SkipNonExportableDecls |=
-    Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-    Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+        Args.hasArg(
+            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
   } else {
     if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
@@ -1127,8 +1129,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      "-enable-library-evolution");
   }
 
-  Opts.AllowNonResilientAccess = Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
-                                 Opts.hasFeature(Feature::AllowNonResilientAccessInPackage);
+  Opts.AllowNonResilientAccess =
+      Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
+      Opts.hasFeature(Feature::AllowNonResilientAccessInPackage);
   if (Opts.AllowNonResilientAccess) {
     // Override the option to skip non-exportable decls.
     if (Opts.SkipNonExportableDecls) {
@@ -1139,11 +1142,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
     // If built from interface, non-resilient access should not be allowed.
     if (Opts.AllowNonResilientAccess &&
-        (FrontendOpts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
-         FrontendOpts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
-                     "-experimental-allow-non-resilient-access",
-                     "-compile-module-from-interface or -typecheck-module-from-interface");
+        (FrontendOpts.RequestedAction ==
+             FrontendOptions::ActionType::CompileModuleFromInterface ||
+         FrontendOpts.RequestedAction ==
+             FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
+      Diags.diagnose(
+          SourceLoc(), diag::warn_ignore_option_overriden_by,
+          "-experimental-allow-non-resilient-access",
+          "-compile-module-from-interface or -typecheck-module-from-interface");
       Opts.AllowNonResilientAccess = false;
     }
   }
@@ -2140,11 +2146,9 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
-                         IRGenOptions &IRGenOpts,
-                         const FrontendOptions &FEOpts,
+                         IRGenOptions &IRGenOpts, const FrontendOptions &FEOpts,
                          const TypeCheckerOptions &TCOpts,
-                         DiagnosticEngine &Diags,
-                         LangOptions &LangOpts,
+                         DiagnosticEngine &Diags, LangOptions &LangOpts,
                          ClangImporterOptions &ClangOpts) {
   using namespace options;
 
@@ -2484,7 +2488,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
     Opts.Sanitizers = parseSanitizerArgValues(
         Args, A, LangOpts.Target, Diags,
-        /* sanitizerRuntimeLibExists= */[](StringRef libName, bool shared) {
+        /* sanitizerRuntimeLibExists= */ [](StringRef libName, bool shared) {
 
           // The driver has checked the existence of the library
           // already.
@@ -3332,8 +3336,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
-                   TypeCheckerOpts, Diags,
-                   LangOpts, ClangImporterOpts)) {
+                   TypeCheckerOpts, Diags, LangOpts, ClangImporterOpts)) {
     return true;
   }
 

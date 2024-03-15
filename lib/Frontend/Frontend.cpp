@@ -249,7 +249,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 
-  serializationOpts.SkipNonExportableDecls = opts.SkipNonExportableDecls;
+  serializationOpts.SkipNonExportableDecls =
+      getLangOptions().SkipNonExportableDecls;
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
