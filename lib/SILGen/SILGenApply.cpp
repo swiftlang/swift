@@ -5674,8 +5674,6 @@ RValue SILGenFunction::emitApply(
   SILValue rawDirectResult;
   {
     SmallVector<SILValue, 1> rawDirectResults;
-    fprintf(stderr, "[%s:%d](%s) emit raw apply: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    fn.dump();
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
                  indirectResultAddrs, indirectErrorAddr,
                  rawDirectResults, breadcrumb);
@@ -6663,10 +6661,27 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
-
-  if (constant.isDistributedThunk()) {
-      decl = constant.getFuncDecl()->getDistributedThunk();
-  }
+//  if (constant.isDistributedThunk()) {
+//    auto distributedThunk = constant.getFuncDecl();
+//    auto targetAttr = distributedThunk->getAttrs().getAttribute<DistributedThunkTargetAttr>();
+//
+//    if (targetAttr) {
+//      fprintf(stderr, "[%s:%d](%s) constant:\n", __FILE_NAME__, __LINE__,
+//              __FUNCTION__);
+//      constant.dump();
+//      fprintf(stderr, "[%s:%d](%s) THE TARGET:\n", __FILE_NAME__, __LINE__,
+//              __FUNCTION__);
+//      targetAttr->getTarget()->dumpRef();
+//
+//      if (auto afd = dyn_cast<AbstractFunctionDecl>(targetAttr->getTarget())) {
+//        decl = afd->getDistributedThunk();
+//      }
+//      // decl = distributedThunk->getDistributedThunk(); // FIXME: this yielded null
+//      assert(decl && "constant thunk decl was null!");
+//    } else {
+//      fprintf(stderr, "[%s:%d](%s) NO ATTR!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    }
+//  }
 
   bool isObjCReplacementSelfCall = false;
   if (isOnSelfParameter &&

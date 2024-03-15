@@ -117,40 +117,79 @@ void SILGenModule::emitDistributedThunkForDecl(
 
   if (varOrAFD.is<AbstractFunctionDecl *>()) {
     auto afd = varOrAFD.get<AbstractFunctionDecl *>();
-    if (isa<AccessorDecl>(afd)) {
-      thunkDecl = afd->getDistributedThunk();
+//    if (auto acc = dyn_cast<AccessorDecl>(afd)) {
+//      fprintf(stderr, "[%s:%d](%s) AVOID ACCESSOR, we'll do the var!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      afd->dumpRef();
+//      fprintf(stderr, "[%s:%d](%s) acc storage:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      acc->getStorage()->dumpRef();
+//      return;
+//    }
+    thunkDecl = afd->getDistributedThunk();
+    if (thunkDecl) {
+      fprintf(stderr, "[%s:%d](%s) EMIT THUNK FOR: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      thunkDecl->dumpRef();
+      fprintf(stderr, "[%s:%d](%s) AFD:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      afd->dumpRef();
     }
-//    fprintf(stderr, "[%s:%d](%s) BAIL OUT: accrssor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    afd->dump();
-//    return;
   } else {
     auto var = varOrAFD.get<VarDecl *>();
     thunkDecl = var->getDistributedThunk();
+    if (thunkDecl) {
+      fprintf(stderr, "[%s:%d](%s) EMIT THUNK FOR: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      thunkDecl->dumpRef();
+      fprintf(stderr, "[%s:%d](%s) VAR:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      var->dumpRef();
+    }
   }
-
   if (!thunkDecl)
     return;
 
   if (!thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;
 
-//  fprintf(stderr, "[%s:%d](%s) IS FUNC = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//          varOrAFD.is<AbstractFunctionDecl *>());
-//  if (varOrAFD.is<AbstractFunctionDecl *>()) {
-//    auto afd = varOrAFD.get<AbstractFunctionDecl *>();
-//    afd->dump();
-//  } else {
-//    auto var = varOrAFD.get<VarDecl *>();
-//    var->dump();
-//  }
+  if (isa<ExtensionDecl>(thunkDecl->getDeclContext()))
+    return;
 
   auto thunk = SILDeclRef(thunkDecl).asDistributed();
-
-//  fprintf(stderr, "[%s:%d](%s) EMIT:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//  thunk.dump();
-
   emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
                          getFunction(thunk, ForDefinition));
+//
+//  if (varOrAFD.is<AbstractFunctionDecl *>()) {
+//    auto afd = varOrAFD.get<AbstractFunctionDecl *>();
+//    if (isa<AccessorDecl>(afd)) {
+//      thunkDecl = afd->getDistributedThunk();
+//    }
+////    fprintf(stderr, "[%s:%d](%s) BAIL OUT: accrssor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+////    afd->dump();
+////    return;
+//  } else {
+//    auto var = varOrAFD.get<VarDecl *>();
+//    thunkDecl = var->getDistributedThunk();
+//  }
+//
+//  if (!thunkDecl)
+//    return;
+//
+//  if (!thunkDecl->hasBody() || thunkDecl->isBodySkipped())
+//    return;
+//
+////  fprintf(stderr, "[%s:%d](%s) IS FUNC = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+////          varOrAFD.is<AbstractFunctionDecl *>());
+////  if (varOrAFD.is<AbstractFunctionDecl *>()) {
+////    auto afd = varOrAFD.get<AbstractFunctionDecl *>();
+////    afd->dump();
+////  } else {
+////    auto var = varOrAFD.get<VarDecl *>();
+////    var->dump();
+////  }
+//
+//  auto thunk = SILDeclRef(thunkDecl).asDistributed();
+//
+////  fprintf(stderr, "[%s:%d](%s) EMIT:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+////  thunk.dump();
+//
+//  emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
+//                         getFunction(thunk, ForDefinition));
 }
 
 void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {

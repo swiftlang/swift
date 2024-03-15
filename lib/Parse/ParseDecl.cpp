@@ -3704,6 +3704,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::DistributedThunkTarget: {
+    assert(false && "Not implemented");
+    break;
+  }
+
   case DeclAttrKind::TypeEraser: {
     // Parse leading '('
     if (Tok.isNot(tok::l_paren)) {

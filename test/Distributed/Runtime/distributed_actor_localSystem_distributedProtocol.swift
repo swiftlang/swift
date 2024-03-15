@@ -51,8 +51,8 @@ distributed actor Worker: WorkerProtocol {
 
     // local calls should still just work
 
-//    let v = try await actor.distributedVariable
-//    print("v = \(v)") // CHECK: v = implemented!
+    let v = try await actor.distributedVariable
+    print("v = \(v)") // CHECK: v = implemented!
 
   }
 }

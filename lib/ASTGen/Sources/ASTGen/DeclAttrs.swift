@@ -256,7 +256,8 @@ extension ASTGenVisitor {
         .usableFromInline,
         .used,
         .warnUnqualifiedAccess,
-        .weakLinked:
+        .weakLinked,
+        .distributedThunkTarget:
 
         return self.generateSimpleDeclAttr(attribute: node, kind: attrKind)
 
