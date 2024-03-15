@@ -147,7 +147,7 @@ public:
 
   /// Remove "on reconnect" callback.
   void removeOnReconnect(std::function<void(void)> *fn) {
-    llvm::erase_value(onReconnect, fn);
+    llvm::erase(onReconnect, fn);
   }
 
   llvm::sys::procid_t getPid() { return Process->process.Pid; }
