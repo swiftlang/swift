@@ -249,7 +249,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
-  inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
+  inputArgs.addAllArgs(arguments, {options::OPT_F, options::OPT_Fsystem});
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
@@ -304,8 +304,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
-  inputArgs.AddAllArgs(arguments, options::OPT_warnings_as_errors,
-                       options::OPT_no_warnings_as_errors);
+  inputArgs.addAllArgs(arguments, {options::OPT_warnings_as_errors,
+                                   options::OPT_no_warnings_as_errors});
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments,
@@ -347,9 +347,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
   // Pass on file paths that should be remapped in debug info.
-  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map,
-                                  options::OPT_coverage_prefix_map,
-                                  options::OPT_file_prefix_map);
+  inputArgs.addAllArgs(arguments, {options::OPT_debug_prefix_map,
+                                   options::OPT_coverage_prefix_map,
+                                   options::OPT_file_prefix_map});
 
   std::string globalRemapping = getGlobalDebugPathRemapping();
   if (!globalRemapping.empty()) {
@@ -1310,7 +1310,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
-  context.Args.AddAllArgs(FrontendArgs, options::OPT_framework, options::OPT_L);
+  context.Args.addAllArgs(FrontendArgs,
+                          {options::OPT_framework, options::OPT_L});
   ToolChain::addLinkedLibArgs(context.Args, FrontendArgs);
 
   if (!useLLDB) {
