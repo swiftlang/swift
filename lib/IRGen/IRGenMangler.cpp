@@ -521,8 +521,8 @@ std::string
 IRGenMangler::mangleConformanceSymbol(Type type,
                                       const ProtocolConformance *Conformance,
                                       const char *Op) {
-llvm::SaveAndRestore X(AllowInverses,
-                       inversesAllowedIn(Conformance->getDeclContext()));
+  llvm::SaveAndRestore X(AllowInverses,
+                         inversesAllowedIn(Conformance->getDeclContext()));
 
   beginMangling();
   if (type)
