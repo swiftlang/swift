@@ -219,6 +219,19 @@ EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
+/// Enables a module to allow non resilient access from other
+/// modules within a package if built from source.
+EXPERIMENTAL_FEATURE(AllowNonResilientAccessInPackage, false)
+
+/// Enables a client module within a package to bypass resilient
+/// access (at use site) to decls defined in another module within
+/// the same package.
+EXPERIMENTAL_FEATURE(ClientBypassResilientAccessInPackage, false)
+
+/// Enables serialization of package decls and bodies and performs
+/// CMO within a package.
+EXPERIMENTAL_FEATURE(PackageCMO, false)
+
 /// Whether to enable experimental layout string value witnesses
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnesses, true)
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnessesInstantiation, true)

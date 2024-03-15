@@ -468,6 +468,8 @@ static bool usesFeatureLayoutPrespecialization(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(AccessLevelOnImport)
+UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
+UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
 UNINTERESTING_FEATURE(LayoutStringValueWitnesses)
 UNINTERESTING_FEATURE(LayoutStringValueWitnessesInstantiation)
 UNINTERESTING_FEATURE(DifferentiableProgramming)
@@ -475,6 +477,7 @@ UNINTERESTING_FEATURE(ForwardModeDifferentiation)
 UNINTERESTING_FEATURE(AdditiveArithmeticDerivedConformances)
 UNINTERESTING_FEATURE(SendableCompletionHandlers)
 UNINTERESTING_FEATURE(OpaqueTypeErasure)
+UNINTERESTING_FEATURE(PackageCMO)
 UNINTERESTING_FEATURE(ParserRoundTrip)
 UNINTERESTING_FEATURE(ParserValidation)
 UNINTERESTING_FEATURE(ParserDiagnostics)

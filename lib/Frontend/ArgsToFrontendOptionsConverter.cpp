@@ -301,48 +301,6 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
-  if (Args.hasArg(OPT_enable_library_evolution)) {
-    Opts.SkipNonExportableDecls |=
-        Args.hasArg(OPT_experimental_skip_non_exportable_decls);
-
-    Opts.SkipNonExportableDecls |=
-        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-        Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
-  } else {
-    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
-      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-skip-non-exportable-decls",
-                     "-enable-library-evolution");
-  }
-
-  Opts.AllowNonResilientAccess = Args.hasArg(OPT_experimental_allow_non_resilient_access);
-  if (Opts.AllowNonResilientAccess) {
-    // Override the option to skip non-exportable decls.
-    if (Opts.SkipNonExportableDecls) {
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
-                     "-experimental-skip-non-exportable-decls",
-                     "-experimental-allow-non-resilient-access");
-      Opts.SkipNonExportableDecls = false;
-    }
-    // If built from interface, non-resilient access should not be allowed.
-    if (Opts.AllowNonResilientAccess &&
-        (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
-         Opts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
-                     "-experimental-allow-non-resilient-access",
-                     "-compile-module-from-interface or -typecheck-module-from-interface");
-      Opts.AllowNonResilientAccess = false;
-    }
-  }
-
-  // HACK: The driver currently erroneously passes all flags to module interface
-  // verification jobs. -experimental-skip-non-exportable-decls is not
-  // appropriate for verification tasks and should be ignored, though.
-  if (Opts.RequestedAction ==
-      FrontendOptions::ActionType::TypecheckModuleFromInterface)
-    Opts.SkipNonExportableDecls = false;
-
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
