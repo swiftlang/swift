@@ -1302,8 +1302,13 @@ public:
     if (!fnType) return Classification::forInvalidCode();
 
     auto fnRef = AbstractFunction::getAppliedFn(E);
-    auto conformances = fnRef.getSubstitutions().getConformances();
-    const auto hasAnyConformances = !conformances.empty();
+    auto substitutions = fnRef.getSubstitutions();
+    const bool hasAnyConformances =
+        llvm::any_of(substitutions.getConformances(),
+                     [](const ProtocolConformanceRef conformance) {
+                       auto *requirement = conformance.getRequirement();
+                       return !requirement->getInvertibleProtocolKind();
+                     });
 
     // If the function doesn't have any effects or conformances, we're done
     // here.
@@ -1347,21 +1352,21 @@ public:
       switch (auto polyKind = fnRef.getPolymorphicEffectKind(kind)) {
       case PolymorphicEffectKind::AsyncSequenceRethrows:
       case PolymorphicEffectKind::ByConformance: {
-        auto substitutions = fnRef.getSubstitutions();
-        auto requirements =
-            substitutions.getGenericSignature().getRequirements();
-        auto conformances = substitutions.getConformances();
+        auto requirements = substitutions.getGenericSignature()
+                                .withoutMarkerProtocols()
+                                .getRequirements();
         for (const auto &req : requirements) {
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 
-          auto conformanceRef = conformances.front();
-          conformances = conformances.drop_front();
-
           Type type = req.getFirstType().subst(substitutions);
+
+          auto conformanceRef = substitutions.lookupConformance(
+              req.getFirstType()->getCanonicalType(), req.getProtocolDecl());
+          assert(conformanceRef);
+
           result.merge(classifyConformance(type, conformanceRef, kind));
         }
-        assert(conformances.empty());
 
         // 'ByConformance' is a superset of 'ByClosure', so check for
         // closure arguments too.
