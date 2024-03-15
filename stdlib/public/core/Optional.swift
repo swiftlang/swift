@@ -769,6 +769,7 @@ extension Optional where Wrapped: ~Copyable {
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
 @_alwaysEmitIntoClient
+// FIXME: This needs to support typed throws.
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
   defaultValue: @autoclosure () throws -> T
@@ -839,6 +840,7 @@ internal func ?? <T>(
 ///     `optional` have the same type.
 @_transparent
 @_alwaysEmitIntoClient
+// FIXME: This needs to support typed throws.
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
   defaultValue: @autoclosure () throws -> T?

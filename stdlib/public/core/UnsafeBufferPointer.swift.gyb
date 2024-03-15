@@ -110,7 +110,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
 }
 
 @available(*, unavailable)
-extension Unsafe${Mutable}BufferPointer: Sendable {}
+extension Unsafe${Mutable}BufferPointer: Sendable where Element: ~Copyable {}
 
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// A pointer to the first element of the buffer.
@@ -521,7 +521,6 @@ extension Unsafe${Mutable}BufferPointer {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal subscript(_unchecked i: Int) -> Element {
-    @_transparent
     get {
       _internalInvariant(i >= 0)
       _internalInvariant(i < endIndex)
@@ -1262,8 +1261,6 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  // FIXME(NCG): Get rid of this once the new mangling rules are working.
-  @_silgen_name("_swift_stdlib_tempSymbol_Unsafe${Mutable}BufferPointer_withMemoryRebound")
   public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
     to type: T.Type,
     _ body: (_ buffer: ${Self}<T>) throws -> Result

@@ -229,6 +229,7 @@ extension UnsafePointer: _Pointer where Pointee: ~Copyable {
 
 @_preInverseGenerics
 extension UnsafePointer: Equatable where Pointee: ~Copyable {}
+
 @_preInverseGenerics
 extension UnsafePointer: Hashable where Pointee: ~Copyable {
   // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
@@ -240,13 +241,16 @@ extension UnsafePointer: Hashable where Pointee: ~Copyable {
 }
 @_preInverseGenerics
 extension UnsafePointer: Comparable where Pointee: ~Copyable {}
+
 @_preInverseGenerics
 extension UnsafePointer: Strideable where Pointee: ~Copyable {}
+
 #if !$Embedded
 @_preInverseGenerics
 extension UnsafePointer: CustomDebugStringConvertible
 where Pointee: ~Copyable {}
 #endif
+
 #if SWIFT_ENABLE_REFLECTION
 @_preInverseGenerics
 extension UnsafePointer: CustomReflectable where Pointee: ~Copyable {}
@@ -674,6 +678,7 @@ extension UnsafeMutablePointer: _Pointer where Pointee: ~Copyable {
 
 @_preInverseGenerics
 extension UnsafeMutablePointer: Equatable where Pointee: ~Copyable {}
+
 @_preInverseGenerics
 extension UnsafeMutablePointer: Hashable where Pointee: ~Copyable {
   // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
@@ -683,15 +688,19 @@ extension UnsafeMutablePointer: Hashable where Pointee: ~Copyable {
     _hashValue(for: self)
   }
 }
+
 @_preInverseGenerics
 extension UnsafeMutablePointer: Comparable where Pointee: ~Copyable {}
+
 @_preInverseGenerics
 extension UnsafeMutablePointer: Strideable where Pointee: ~Copyable {}
+
 #if !$Embedded
 @_preInverseGenerics
 extension UnsafeMutablePointer: CustomDebugStringConvertible
 where Pointee: ~Copyable {}
 #endif
+
 #if SWIFT_ENABLE_REFLECTION
 @_preInverseGenerics
 extension UnsafeMutablePointer: CustomReflectable where Pointee: ~Copyable {}
