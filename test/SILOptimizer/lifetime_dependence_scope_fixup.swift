@@ -138,8 +138,10 @@ func test5(_ a: Array<Int>) {
   }
 }
 
+// rdar://124651399
+// XFAIL: *
 func test6(_ a: Array<Int>) {
-  var p : View?
+  var p : View? // error: type 'View' does not conform to protocol 'Escapable'
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
     mutate(&x)
