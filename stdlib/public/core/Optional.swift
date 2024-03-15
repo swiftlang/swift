@@ -132,11 +132,11 @@ public enum Optional<Wrapped: ~Copyable>: ~Copyable {
   case some(Wrapped)
 }
 
+extension Optional: Copyable /* where Wrapped: Copyable */ {}
+
 extension Optional: Sendable where Wrapped: ~Copyable & Sendable { }
 
 extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }
-
-extension Optional: Copyable /* where Wrapped: Copyable */ {}
 
 @_preInverseGenerics
 extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
