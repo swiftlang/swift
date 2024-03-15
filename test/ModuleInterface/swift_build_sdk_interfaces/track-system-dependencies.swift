@@ -30,6 +30,9 @@
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP
 // RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Swifty-*.swiftmodule
 
+// FIXME(NCG): This test requires NoncopyableGenerics to be a "suppressible" compiler feature.
+// XFAIL: !noncopyable_generics
+
 import Swifty
 
 usesCStruct(nil)
