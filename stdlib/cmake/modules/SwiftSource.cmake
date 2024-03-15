@@ -848,8 +848,9 @@ function(_compile_swift_files
   endif()
 
   set(swift_compiler_tool_dep)
-  if(SWIFT_INCLUDE_TOOLS)
-    # Depend on the binary itself, in addition to the symlink.
+  if(SWIFT_INCLUDE_TOOLS AND NOT BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+    # Depend on the binary itself, in addition to the symlink, unless
+    # cross-compiling the compiler.
     set(swift_compiler_tool_dep "swift-frontend${target_suffix}")
   endif()
 
