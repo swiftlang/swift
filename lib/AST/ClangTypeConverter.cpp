@@ -227,7 +227,7 @@ clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,
 // we could recover in some other way.
 static clang::QualType getClangVectorType(const clang::ASTContext &ctx,
                                           clang::BuiltinType::Kind eltKind,
-                                          clang::VectorType::VectorKind vecKind,
+                                          clang::VectorKind vecKind,
                                           StringRef numEltsString) {
   unsigned numElts;
   bool failedParse = numEltsString.getAsInteger<unsigned>(10, numElts);
@@ -268,11 +268,11 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
 #undef CHECK_NAMED_TYPE
 
   // Map vector types to the corresponding C vectors.
-#define MAP_SIMD_TYPE(TYPE_NAME, _, BUILTIN_KIND)                      \
-  if (name.starts_with(#TYPE_NAME)) {                                   \
-    return getClangVectorType(ctx, clang::BuiltinType::BUILTIN_KIND,   \
-                              clang::VectorType::GenericVector,        \
-                              name.drop_front(sizeof(#TYPE_NAME)-1));  \
+#define MAP_SIMD_TYPE(TYPE_NAME, _, BUILTIN_KIND)                              \
+  if (name.starts_with(#TYPE_NAME)) {                                          \
+    return getClangVectorType(ctx, clang::BuiltinType::BUILTIN_KIND,           \
+                              clang::VectorKind::Generic,                      \
+                              name.drop_front(sizeof(#TYPE_NAME) - 1));        \
   }
 #include "swift/ClangImporter/SIMDMappedTypes.def"
 
@@ -427,8 +427,8 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
     return clang::QualType();
 
   APInt size(32, tupleNumElements);
-  return ClangASTContext.getConstantArrayType(clangEltTy, size, nullptr,
-           clang::ArrayType::Normal, 0);
+  return ClangASTContext.getConstantArrayType(
+      clangEltTy, size, nullptr, clang::ArraySizeModifier::Normal, 0);
 }
 
 clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
@@ -617,7 +617,7 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
       return clang::QualType();
     (void) failedParse;
     auto vectorTy = ClangASTContext.getVectorType(scalarTy, numElts,
-      clang::VectorType::VectorKind::GenericVector);
+                                                  clang::VectorKind::Generic);
     return vectorTy;
   }
   }

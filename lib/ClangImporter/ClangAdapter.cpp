@@ -776,7 +776,7 @@ OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
   // Check for the 'static' annotation on C arrays.
   if (const auto *DT = dyn_cast<clang::DecayedType>(paramTy))
     if (const auto *AT = DT->getOriginalType()->getAsArrayTypeUnsafe())
-      if (AT->getSizeModifier() == clang::ArrayType::Static)
+      if (AT->getSizeModifier() == clang::ArraySizeModifier::Static)
         return OTK_None;
 
   // Default to implicitly unwrapped optionals.
