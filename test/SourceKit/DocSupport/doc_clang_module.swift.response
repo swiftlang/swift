@@ -5652,8 +5652,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
-        key.name: "_Pointer",
-        key.usr: "s:s8_PointerP"
+        key.name: "Copyable",
+        key.usr: "s:s8CopyableP"
       }
     ]
   },
