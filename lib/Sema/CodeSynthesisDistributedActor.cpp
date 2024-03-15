@@ -712,15 +712,27 @@ createSameSignatureFunctionDecl(DeclContext *DC, FuncDecl *func,
     // TODO: try a Func, but make DC the Storage;
     // Isolation of var has to match the type
     // TODO: inside addMethod get the DC and
-    auto accessorCopy = AccessorDecl::createImplicit(
-        C, AccessorKind::DistributedGet, accessor->getStorage(),
+
+    auto storage = accessor->getStorage();
+    copy = FuncDecl::createImplicit(
+        C, swift::StaticSpellingKind::None,
+        funcName, SourceLoc(),
         /*async=*/forceAsync || func->hasAsync(),
         /*throws=*/forceThrows || func->hasThrows(),
-        /*thrownType=*/TypeLoc::withoutLoc(Type()), // TODO(distributed): support typed throws
-        func->getResultInterfaceType(), DC); // TODO: wrong context
-    accessorCopy->setParameters(params);
-    // accessorCopy->setName(funcName);
-    copy = accessorCopy;
+        /*thrownType=*/Type(), // TODO(distributed): support typed throws
+        genericParamList,
+        params, func->getResultInterfaceType(),
+        /*DC=*/DC); // Note: we act like the storage is the DC so we can pull it out in SILGenType
+
+//    auto accessorCopy = AccessorDecl::createImplicit(
+//        C, AccessorKind::DistributedGet, accessor->getStorage(),
+//        /*async=*/forceAsync || func->hasAsync(),
+//        /*throws=*/forceThrows || func->hasThrows(),
+//        /*thrownType=*/TypeLoc::withoutLoc(Type()), // TODO(distributed): support typed throws
+//        func->getResultInterfaceType(), DC); // TODO: wrong context
+//    accessorCopy->setParameters(params);
+//    // accessorCopy->setName(funcName); // we're not doing this anymore
+//    copy = accessorCopy;
   } else {
     copy = FuncDecl::createImplicit(
         C, swift::StaticSpellingKind::None,
@@ -731,7 +743,6 @@ createSameSignatureFunctionDecl(DeclContext *DC, FuncDecl *func,
         genericParamList,
         params, func->getResultInterfaceType(), DC);
   }
-
   copy->setSynthesized(true);
 
   if (isa<ClassDecl>(DC))
@@ -766,15 +777,27 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
                                                     /*forceThrows=*/true);
   fprintf(stderr, "[%s:%d](%s) FUNC IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(func));
   fprintf(stderr, "[%s:%d](%s) THUNK IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(thunk));
-  assert((!isa<AccessorDecl>(func) || (isa<AccessorDecl>(func) && isa<AccessorDecl>(thunk))) &&
-         "If emitting a thunk for a distributed property accessor, it also "
-         "must be an accessor");
+//  assert((!isa<AccessorDecl>(func) || (isa<AccessorDecl>(func) && isa<AccessorDecl>(thunk))) &&
+//         "If emitting a thunk for a distributed property accessor, it also "
+//         "must be an accessor");
   assert(thunk && "couldn't create a distributed thunk");
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
   thunk->getAttrs().add(
       new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+
+  /// Record which function this is a thunk for, we'll need this to link back
+  /// calls in case this is a distributed requirement witness.
+  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+    fprintf(stderr, "[%s:%d](%s) THE STORAGE CONTEXT:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    accessor->getStorage()->getDeclContext()->dumpContext();
+    fprintf(stderr, "[%s:%d](%s) STORE THE STORAGE:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    accessor->getStorage()->dump();
+    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(accessor->getStorage()));
+  } else {
+    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));
+  }
 
   // Protocol requirements don't have bodies.
   if (func->hasBody())

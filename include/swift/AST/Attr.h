@@ -2620,6 +2620,31 @@ template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
   }
 };
 
+/// The @_distributedThunkTarget(for:) attribute.
+class DistributedThunkTargetAttr final
+    : public DeclAttribute {
+
+  ValueDecl *TargetFunction;
+
+public:
+  DistributedThunkTargetAttr(ValueDecl *target)
+      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(),
+                      SourceRange(),
+                      /*Implicit=*/false),
+        TargetFunction(target) {}
+
+  /// This will be either an `AbstractStorageDecl` if the target is a
+  /// `distributed var`, or the `FuncDecl` of the `distributed func` this is a
+  /// `distributed_thunk` for.
+  ValueDecl *getTarget() const {
+    return TargetFunction;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::DistributedThunkTarget;
+  }
+};
+
 /// The @_allowFeatureSuppression(Foo, Bar) attribute.  The feature
 /// names are intentionally not validated, and the attribute itself is
 /// not printed when rendering a module interface.

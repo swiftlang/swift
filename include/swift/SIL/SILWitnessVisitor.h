@@ -132,8 +132,8 @@ public:
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
-        addDistributedWitnessMethodsIfRequired(accessor,
-                                               SILDeclRef::Kind::Func);
+//        addDistributedWitnessMethodsIfRequired(accessor,
+//                                               SILDeclRef::Kind::Func);
       }
     });
   }
