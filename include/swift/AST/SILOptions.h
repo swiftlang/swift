@@ -132,7 +132,7 @@ public:
   /// to be built in the same project. To enable this optimization, the
   /// module also needs to opt in to allow non-resilient access with
   /// -experimental-allow-non-resilient-access.
-  bool EnableSerializePackage = true;
+  bool EnableSerializePackage = false;
 
   /// Enables the emission of stack protectors in functions.
   bool EnableStackProtection = true;
