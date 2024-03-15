@@ -17,15 +17,21 @@ struct MoveOnlyStruct { // expected-note {{struct 'MoveOnlyStruct' has '~Copyabl
 
 class C {
     var copyable: CopyableKlass? = nil
-    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
-    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
+    var moveOnlyC: MoveOnlyKlass? = nil
+    var moveOnlyS: MoveOnlyStruct? = nil
+    var copyableCs: [CopyableKlass] = []
+    var moveOnlyCs: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+    var moveOnlySs: [MoveOnlyStruct] = [] // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
 }
 
 @_moveOnly
 class CMoveOnly {
     var copyable: CopyableKlass? = nil
-    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
-    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
+    var moveOnlyC: MoveOnlyKlass? = nil
+    var moveOnlyS: MoveOnlyStruct? = nil
+    var copyableCs: [CopyableKlass] = []
+    var moveOnlyCs: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+    var moveOnlySs: [MoveOnlyStruct] = [] // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
 }
 
 struct OptionalGrandField<T> { // expected-note {{consider adding '~Copyable' to generic struct 'OptionalGrandField'}}
@@ -44,10 +50,15 @@ struct SCopyable {
 
 struct S { // expected-note {{consider adding '~Copyable' to struct 'S'}}
     var copyable: CopyableKlass
-    var moveOnly2: MoveOnlyStruct? // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
-    var moveOnly: MoveOnlyStruct // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S' has non-Copyable type 'MoveOnlyStruct'}}
+    var moveOnly2: MoveOnlyStruct? // expected-error {{stored property 'moveOnly2' of 'Copyable'-conforming struct 'S' has non-Copyable type 'MoveOnlyStruct?'}}
+    // FIXME(NCG): Shouldn't this be also an error?
+    var moveOnly: MoveOnlyStruct
     var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
     var moveOnly3: OptionalGrandField<MoveOnlyStruct> // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
+}
+
+struct S2 { // expected-note {{consider adding '~Copyable' to struct 'S2'}}
+    var moveOnly: MoveOnlyStruct // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-Copyable type 'MoveOnlyStruct'}}
 }
 
 @_moveOnly
@@ -85,13 +96,17 @@ extension MoveOnlyStruct {
 func foo() {
     class C2 {
         var copyable: CopyableKlass? = nil
-        var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+        var moveOnly: MoveOnlyKlass? = nil
+        var copyables: [CopyableKlass] = []
+        var moveOnlies: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
     }
 
     @_moveOnly
     class C2MoveOnly {
         var copyable: CopyableKlass? = nil
-        var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+        var moveOnly: MoveOnlyKlass? = nil
+        var copyables: [CopyableKlass] = []
+        var moveOnlies: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
     }
 
     struct S2 { // expected-note {{consider adding '~Copyable' to struct 'S2'}}
@@ -118,13 +133,17 @@ func foo() {
     {
         class C3 {
             var copyable: CopyableKlass? = nil
-            var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+            var moveOnly: MoveOnlyKlass? = nil
+            var copyables: [CopyableKlass] = []
+            var moveOnlies: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
         }
 
         @_moveOnly
         class C3MoveOnly {
             var copyable: CopyableKlass? = nil
-            var moveOnly: MoveOnlyKlass? = nil // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
+            var moveOnly: MoveOnlyKlass? = nil
+            var copyables: [CopyableKlass] = []
+            var moveOnlies: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
         }
 
         struct S3 { // expected-note {{consider adding '~Copyable' to struct 'S3'}}
