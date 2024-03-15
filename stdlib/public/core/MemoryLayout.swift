@@ -239,9 +239,6 @@ extension MemoryLayout {
   @_transparent
   @_unavailableInEmbedded
   public static func offset(of key: PartialKeyPath<T>) -> Int? {
-    // FIXME(noncopyableGenerics): The new (implicit) `where T: Copyable`
-    // extension constraint currently changes the mangling of this from a
-    // standalone function to an extension method.
     return key._storedInlineOffset
   }
 }
