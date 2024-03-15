@@ -1,41 +1,42 @@
 // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
-// rdar://124466060
-// UNSUPPORTED: CPU=armv7k
-
 sil_stage raw
 
 import Builtin
 import Swift
 import SwiftShims
 
+struct FakeInt {
+  var i: Builtin.Int32
+}
+
 @_moveOnly struct MO_DEINIT {
-  @_hasStorage var value: Int { get set }
+  @_hasStorage var value: FakeInt { get set }
   deinit
-  init(value: Int)
+  init(value: FakeInt)
 }
 
 struct NC_DEINIT : ~Copyable {
-  @_hasStorage var value: Int { get set }
+  @_hasStorage var value: FakeInt { get set }
   deinit
-  init(value: Int)
+  init(value: FakeInt)
 }
 
 @_moveOnly struct MO {
-  @_hasStorage var value: Int { get set }
+  @_hasStorage var value: FakeInt { get set }
 }
 
 struct NC : ~Copyable {
-  @_hasStorage var value: Int { get set }
+  @_hasStorage var value: FakeInt { get set }
 }
 
 // CHECK: begin running test 1 of 4 on motest1: is-sil-trivial with: @instruction[2]
-// CHECK:   %2 = struct $MO_DEINIT (%1 : $Int)
+// CHECK:   %2 = struct $MO_DEINIT (%1 : $FakeInt)
 // CHECK:  is not trivial
 // CHECK: end running test 1 of 4 on motest1: is-sil-trivial with: @instruction[2]
 // CHECK: begin running test 2 of 4 on motest1: get-ownership-kind with: @instruction[2]
-// CHECK:   %2 = struct $MO_DEINIT (%1 : $Int)
-// CHECK: OwnershipKind: none
+// CHECK:   %2 = struct $MO_DEINIT (%1 : $FakeInt)
+// CHECK: OwnershipKind: owned
 // CHECK: end running test 2 of 4 on motest1: get-ownership-kind with: @instruction[2]
 // CHECK: begin running test 3 of 4 on motest1: is-sil-trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $MO_DEINIT
@@ -52,9 +53,9 @@ bb0:
   specify_test "get-ownership-kind @instruction[2]"
   specify_test "is-sil-trivial @instruction[4]"
   specify_test "get-ownership-kind @instruction[4]"
-  %0 = integer_literal $Builtin.Int64, 38
-  %1 = struct $Int (%0 : $Builtin.Int64)
-  %2 = struct $MO_DEINIT (%1 : $Int)
+  %0 = integer_literal $Builtin.Int32, 38
+  %1 = struct $FakeInt (%0 : $Builtin.Int32)
+  %2 = struct $MO_DEINIT (%1 : $FakeInt)
   debug_value %2 : $MO_DEINIT, let, name "b"
   %4 = move_value [lexical] %2 : $MO_DEINIT
   destroy_value %4 : $MO_DEINIT
@@ -63,12 +64,12 @@ bb0:
 }
 
 // CHECK: begin running test 1 of 4 on motest2: is-sil-trivial with: @instruction[2]
-// CHECK:   %2 = struct $MO (%1 : $Int)
+// CHECK:   %2 = struct $MO (%1 : $FakeInt)
 // CHECK:  is not trivial
 // CHECK: end running test 1 of 4 on motest2: is-sil-trivial with: @instruction[2]
 // CHECK: begin running test 2 of 4 on motest2: get-ownership-kind with: @instruction[2]
-// CHECK:   %2 = struct $MO (%1 : $Int)
-// CHECK: OwnershipKind: none
+// CHECK:   %2 = struct $MO (%1 : $FakeInt)
+// CHECK: OwnershipKind: owned
 // CHECK: end running test 2 of 4 on motest2: get-ownership-kind with: @instruction[2]
 // CHECK: begin running test 3 of 4 on motest2: is-sil-trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $MO
@@ -85,9 +86,9 @@ bb0:
   specify_test "get-ownership-kind @instruction[2]"
   specify_test "is-sil-trivial @instruction[4]"
   specify_test "get-ownership-kind @instruction[4]"
-  %0 = integer_literal $Builtin.Int64, 38
-  %1 = struct $Int (%0 : $Builtin.Int64)
-  %2 = struct $MO (%1 : $Int)
+  %0 = integer_literal $Builtin.Int32, 38
+  %1 = struct $FakeInt (%0 : $Builtin.Int32)
+  %2 = struct $MO (%1 : $FakeInt)
   debug_value %2 : $MO, let, name "b"
   %4 = move_value [lexical] %2 : $MO
   destroy_value %4 : $MO
@@ -96,12 +97,12 @@ bb0:
 }
 
 // CHECK: begin running test 1 of 4 on nctest1: is-sil-trivial with: @instruction[2]
-// CHECK:   %2 = struct $NC_DEINIT (%1 : $Int)
+// CHECK:   %2 = struct $NC_DEINIT (%1 : $FakeInt)
 // CHECK:  is not trivial
 // CHECK: end running test 1 of 4 on nctest1: is-sil-trivial with: @instruction[2]
 // CHECK: begin running test 2 of 4 on nctest1: get-ownership-kind with: @instruction[2]
-// CHECK:   %2 = struct $NC_DEINIT (%1 : $Int)
-// CHECK: OwnershipKind: none
+// CHECK:   %2 = struct $NC_DEINIT (%1 : $FakeInt)
+// CHECK: OwnershipKind: owned
 // CHECK: end running test 2 of 4 on nctest1: get-ownership-kind with: @instruction[2]
 // CHECK: begin running test 3 of 4 on nctest1: is-sil-trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $NC_DEINIT
@@ -119,9 +120,9 @@ bb0:
   specify_test "get-ownership-kind @instruction[2]"
   specify_test "is-sil-trivial @instruction[4]"
   specify_test "get-ownership-kind @instruction[4]"
-  %0 = integer_literal $Builtin.Int64, 38
-  %1 = struct $Int (%0 : $Builtin.Int64)
-  %2 = struct $NC_DEINIT (%1 : $Int)
+  %0 = integer_literal $Builtin.Int32, 38
+  %1 = struct $FakeInt (%0 : $Builtin.Int32)
+  %2 = struct $NC_DEINIT (%1 : $FakeInt)
   debug_value %2 : $NC_DEINIT, let, name "b"
   %4 = move_value [lexical] %2 : $NC_DEINIT
   destroy_value %4 : $NC_DEINIT
@@ -130,12 +131,12 @@ bb0:
 }
 
 // CHECK: begin running test 1 of 4 on nctest2: is-sil-trivial with: @instruction[2]
-// CHECK:   %2 = struct $NC (%1 : $Int)
+// CHECK:   %2 = struct $NC (%1 : $FakeInt)
 // CHECK:  is not trivial
 // CHECK: end running test 1 of 4 on nctest2: is-sil-trivial with: @instruction[2]
 // CHECK: begin running test 2 of 4 on nctest2: get-ownership-kind with: @instruction[2]
-// CHECK:   %2 = struct $NC (%1 : $Int)
-// CHECK: OwnershipKind: none
+// CHECK:   %2 = struct $NC (%1 : $FakeInt)
+// CHECK: OwnershipKind: owned
 // CHECK: end running test 2 of 4 on nctest2: get-ownership-kind with: @instruction[2]
 // CHECK: begin running test 3 of 4 on nctest2: is-sil-trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $NC
@@ -152,9 +153,9 @@ bb0:
   specify_test "get-ownership-kind @instruction[2]"
   specify_test "is-sil-trivial @instruction[4]"
   specify_test "get-ownership-kind @instruction[4]"
-  %0 = integer_literal $Builtin.Int64, 38
-  %1 = struct $Int (%0 : $Builtin.Int64)
-  %2 = struct $NC (%1 : $Int)
+  %0 = integer_literal $Builtin.Int32, 38
+  %1 = struct $FakeInt (%0 : $Builtin.Int32)
+  %2 = struct $NC (%1 : $FakeInt)
   debug_value %2 : $NC, let, name "b"
   %4 = move_value [lexical] %2 : $NC
   destroy_value %4 : $NC
