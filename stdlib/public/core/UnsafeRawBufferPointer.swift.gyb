@@ -192,7 +192,6 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   ///
   /// - Returns: an iterator over any remaining elements of `self` and the
   ///   number of elements copied.
-  @inlinable // unsafe-performance
   @_alwaysEmitIntoClient
   public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<UInt8>
@@ -406,7 +405,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
-  // FIXME(NCG): Add a consuming analogue of `load`, like `move(fromByteOffset:as:_:)`
+  // FIXME(NCG): Add a consuming analogue of `load`, like `move(fromByteOffset:as:_:)` (in the mutable variant)
   // FIXME(NCG): Add a borrow analogue of `load`, like `withBorrow(fromByteOffset:as:_:)`
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -498,7 +497,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
-  @inlinable
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawBufferPointer_storeBytes")
@@ -853,7 +851,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`
-  @inlinable
   @_alwaysEmitIntoClient
   public func initializeMemory<C: Collection>(
     as type: C.Element.Type,
@@ -942,7 +939,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.
   @discardableResult
-  @inlinable
   @_alwaysEmitIntoClient
   public func moveInitializeMemory<T: ~Copyable>(
     as type: T.Type,
@@ -1085,9 +1081,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   ///   - buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable, E: Error>(
+  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -1123,7 +1118,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  @inlinable
   @_alwaysEmitIntoClient
   public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
@@ -1139,9 +1133,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
 %  if Mutable:
-  @inlinable
   @_alwaysEmitIntoClient
-  public func withContiguousMutableStorageIfAvailable<R: ~Copyable>(
+  public func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     #if $TypedThrows
@@ -1161,9 +1154,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
 %  end
-  @inlinable
   @_alwaysEmitIntoClient
-  public func withContiguousStorageIfAvailable<R: ~Copyable>(
+  public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     #if $TypedThrows
