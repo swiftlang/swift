@@ -535,15 +535,19 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD|WINDOWS")
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASRLF_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
-      # At build time and run time, link against the swift libraries in the
-      # installed host toolchain.
-      if(SWIFT_PATH_TO_SWIFT_SDK)
-        set(swift_dir "${SWIFT_PATH_TO_SWIFT_SDK}/usr")
+      if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+        # At build time and run time, link against the swift libraries in the
+        # installed host toolchain.
+        if(SWIFT_PATH_TO_SWIFT_SDK)
+          set(swift_dir "${SWIFT_PATH_TO_SWIFT_SDK}/usr")
+        else()
+          get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+          get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+        endif()
+        set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       else()
-        get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-        get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+        set(host_lib_dir "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       endif()
-      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       set(host_lib_arch_dir "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}")
 
       set(swiftrt "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
