@@ -966,6 +966,22 @@ public:
     IncludeOuterInverses = 64,
   };
 
+  /// The default generic signature flags for printing requirements.
+  unsigned defaultGenericRequirementFlags() const {
+    return defaultGenericRequirementFlags(Options);
+  }
+
+  /// The default generic signature flags for printing requirements.
+  static unsigned 
+  defaultGenericRequirementFlags(const PrintOptions &options) {
+    unsigned flags = PrintRequirements;
+
+    if (!options.SuppressNoncopyableGenerics)
+      flags |= PrintInverseRequirements;
+
+    return flags;
+  }
+
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
                                               TypeDecl *attachingTo);
   void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
@@ -1617,7 +1633,8 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
   // inheritance clause, because they do not gain any default requirements.
   // HACK: also exclude Sendable from getting inverses printed.
   if (!proto->getInvertibleProtocolKind()
-      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+      !Options.SuppressNoncopyableGenerics)
     flags |= PrintInverseRequirements;
 
   printRequirementSignature(
@@ -1628,7 +1645,7 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
 
 void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                         TypeDecl *attachingTo) {
-  unsigned flags = PrintRequirements | PrintInverseRequirements;
+  unsigned flags = defaultGenericRequirementFlags();
   if (isa<AssociatedTypeDecl>(attachingTo))
     flags |= SwapSelfAndDependentMemberType;
   printRequirementSignature(proto, proto->getRequirementSignature(), flags,
@@ -1670,6 +1687,21 @@ void PrintAST::printGenericSignature(GenericSignature genericSig,
                         [&](const Requirement &) { return true; });
 }
 
+// Erase any requirements involving invertible protocols.
+static void eraseInvertibleProtocolConformances(
+    SmallVectorImpl<Requirement> &requirements) {
+  llvm::erase_if(requirements, [&](Requirement req) {
+      if (req.getKind() == RequirementKind::Conformance) {
+        if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
+          auto proto = protoType->getDecl();
+          return proto->getInvertibleProtocolKind().has_value();
+        }
+      }
+
+      return false;
+    });
+}
+
 void PrintAST::printGenericSignature(
     GenericSignature genericSig,
     unsigned flags,
@@ -1683,6 +1715,9 @@ void PrintAST::printGenericSignature(
   } else {
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
+
+    if (Options.SuppressNoncopyableGenerics)
+      eraseInvertibleProtocolConformances(requirements);
   }
 
   // Unless `IncludeOuterInverses` is enabled, limit inverses to the
@@ -1976,6 +2011,9 @@ void PrintAST::printRequirementSignature(ProtocolDecl *owner,
   } else {
     requirements.append(sig.getRequirements().begin(),
                         sig.getRequirements().end());
+
+    if (Options.SuppressNoncopyableGenerics)
+      eraseInvertibleProtocolConformances(requirements);
   }
 
   if (attachingTo) {
@@ -2724,7 +2762,7 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
   if (parentSig && parentSig->isEqual(genericSig))
     return;
 
-  unsigned flags = PrintRequirements | PrintInverseRequirements;
+  unsigned flags = defaultGenericRequirementFlags();
 
   // In many cases, inverses should not be printed for outer generic parameters.
   // Exceptions to that include extensions, as it's valid to write an inverse
@@ -2892,14 +2930,15 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     SmallVector<InverseRequirement, 2> inverses;
     auto Sig = ED->getGenericSignature();
     Sig->getRequirementsWithInverses(requirements, inverses);
-    printSingleDepthOfGenericSignature(Sig.getGenericParams(),
-                                       requirements,
-                                       inverses,
-                                       IsFirst,
-                                       PrintRequirements | PrintInverseRequirements,
-                                       [](const Requirement &Req){
-      return true;
-    });
+    printSingleDepthOfGenericSignature(
+        Sig.getGenericParams(),
+        requirements,
+        inverses,
+        IsFirst,
+        PrintAST::defaultGenericRequirementFlags(Options),
+        [](const Requirement &Req){
+          return true;
+        });
   };
 
   auto printCombinedRequirementsIfNeeded = [&]() -> bool {
@@ -2995,8 +3034,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
       printGenericSignature(genericSig,
-                            PrintRequirements
-                              | PrintInverseRequirements
+                            defaultGenericRequirementFlags()
                               | IncludeOuterInverses,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
@@ -3097,6 +3135,14 @@ static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
   options.ExcludeAttrList.push_back(DeclAttrKind::Implements);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void suppressingFeatureNoncopyableGenerics(
+    PrintOptions &options,
+    llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(
+      options.SuppressNoncopyableGenerics, true);
+  action();
 }
 
 /// Suppress the printing of a particular feature.
@@ -6609,8 +6655,7 @@ public:
     printFunctionExtInfo(T);
     printGenericSignature(T->getGenericSignature(),
                           PrintAST::PrintParams |
-                          PrintAST::PrintRequirements |
-                          PrintAST::PrintInverseRequirements);
+                          PrintAST::defaultGenericRequirementFlags(Options));
     Printer << " ";
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
@@ -6696,8 +6741,7 @@ public:
     if (GenericSignature sig = T->getInvocationGenericSignature()) {
       printGenericSignature(sig,
                             PrintAST::PrintParams |
-                            PrintAST::PrintRequirements |
-                            PrintAST::PrintInverseRequirements);
+                            PrintAST::defaultGenericRequirementFlags(Options));
       Printer << " ";
     }
 
@@ -6833,12 +6877,11 @@ public:
 
       // Capture list used here to ensure we don't print anything using `this`
       // printer, but only the sub-Printer.
-      [&sub, T]{
+      [&sub, T, options=Options]{
         if (auto sig = T->getLayout()->getGenericSignature()) {
           sub.printGenericSignature(sig,
                           PrintAST::PrintParams |
-                          PrintAST::PrintRequirements |
-                          PrintAST::PrintInverseRequirements);
+                          PrintAST::defaultGenericRequirementFlags(options));
           sub.Printer << " ";
         }
         sub.Printer << "{";
@@ -7394,8 +7437,8 @@ void GenericSignature::print(ASTPrinter &Printer,
   }
 
   auto flags = PrintAST::PrintParams | PrintAST::PrintRequirements;
-  if (Opts.PrintInverseRequirements)
-    flags |=  PrintAST::PrintInverseRequirements;
+  if (Opts.PrintInverseRequirements && !Opts.SuppressNoncopyableGenerics)
+    flags |= PrintAST::PrintInverseRequirements;
   PrintAST(Printer, Opts).printGenericSignature(*this, flags);
 }
 
@@ -7410,8 +7453,8 @@ void RequirementSignature::print(ProtocolDecl *owner,
                                  ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   auto flags = PrintAST::PrintParams | PrintAST::PrintRequirements;
-  if (Opts.PrintInverseRequirements)
-    flags |=  PrintAST::PrintInverseRequirements;
+  if (Opts.PrintInverseRequirements && !Opts.SuppressNoncopyableGenerics)
+    flags |= PrintAST::PrintInverseRequirements;
   PrintAST(Printer, Opts).printRequirementSignature(owner, *this, flags, nullptr);
 }
 
@@ -7615,10 +7658,10 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
       StreamPrinter sPrinter(os);
       TypePrinter typePrinter(sPrinter, PO);
       typePrinter
-          .printGenericSignature(genericSig,
-                                 PrintAST::PrintParams |
-                                 PrintAST::PrintRequirements |
-                                 PrintAST::PrintInverseRequirements);
+          .printGenericSignature(
+            genericSig,
+            PrintAST::PrintParams |
+            PrintAST::defaultGenericRequirementFlags(PO));
       os << ' ';
     }
   }
@@ -7787,6 +7830,26 @@ swift::getInheritedForPrinting(
       });
       if (foundUnprintable)
         continue;
+
+      // Suppress Copyable and ~Copyable.
+      if (options.SuppressNoncopyableGenerics) {
+        if (auto pct = ty->getAs<ProtocolCompositionType>()) {
+          auto inverses = pct->getInverses();
+          if (inverses.contains(InvertibleProtocolKind::Copyable)) {
+            inverses.remove(InvertibleProtocolKind::Copyable);
+            ty = ProtocolCompositionType::get(decl->getASTContext(),
+                                              pct->getMembers(),
+                                              inverses,
+                                              pct->hasExplicitAnyObject());
+            if (ty->isAny())
+              continue;
+          }
+        }
+
+        if (auto protoTy = ty->getAs<ProtocolType>())
+          if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Copyable))
+            continue;
+      }
     }
 
     Results.push_back(inherited.getEntry(i));
