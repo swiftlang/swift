@@ -29,6 +29,9 @@ extension CallMe {
   }
 }
 
+// CHECK: @"$s4test13ManagedBufferC12_doNotCallMeACyxq_Gyt_tcfCTq"
+
+
 public protocol Hello<Person>: ~Copyable {
   // CHECK: @"$s4test5HelloP6PersonAC_AA1PTn"
   // CHECK: @"$s6Person4test5HelloPTl" =
@@ -57,4 +60,19 @@ struct XQ<T: ~Copyable>: ~Copyable {
 
 extension XQ: Q where T: ~Copyable {
   struct A { }
+}
+
+// Class metadata
+
+@_fixed_layout
+open class ManagedBuffer<Header, Element: ~Copyable> {
+   @_preInverseGenerics
+  public final var header: Header
+
+  // CHECK: @"$s4test13ManagedBufferC12_doNotCallMeACyxq_Gyt_tcfCTj"
+  @_preInverseGenerics
+  @usableFromInline
+  internal init(_doNotCallMe: ()) {
+    fatalError("boom")
+  }
 }
