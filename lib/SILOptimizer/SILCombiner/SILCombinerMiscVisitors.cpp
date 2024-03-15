@@ -1240,6 +1240,16 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     return nullptr;
   }
 
+  SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
+      IEAI->getElement(), IEAI->getFunction());
+  auto *structDecl = elemType.getStructOrBoundGenericStruct();
+
+  // We cannot create a struct when it has unreferenceable storage.
+  if (elemType.isEmpty(*IEAI->getFunction()) && structDecl &&
+      structDecl->hasUnreferenceableStorage()) {
+    return nullptr;
+  }
+
   // Localize the address access.
   Builder.setInsertionPoint(AI);
   auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
@@ -1250,8 +1260,6 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // If it is an empty type, apply may not initialize it.
   // Create an empty value of the empty type and store it to a new local.
-  SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
-      IEAI->getElement(), IEAI->getFunction());
   if (elemType.isEmpty(*IEAI->getFunction())) {
     enumValue = createEmptyAndUndefValue(
         elemType.getObjectType(), &*Builder.getInsertionPoint(),
