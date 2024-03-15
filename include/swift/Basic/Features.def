@@ -334,6 +334,9 @@ EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
 
+// Enable explicit isolation of closures.
+EXPERIMENTAL_FEATURE(ClosureIsolation, true)
+
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
 
