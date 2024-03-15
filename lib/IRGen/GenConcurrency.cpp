@@ -705,7 +705,7 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
                       Explosion &taskFunction,
                       SubstitutionMap subs) {
   llvm::Value *taskOptions =
-    llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+    llvm::ConstantPointerNull::get(IGF.IGM.SwiftTaskOptionRecordPtrTy);
 
   CanType resultType;
   if (subs) {
