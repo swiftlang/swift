@@ -502,7 +502,7 @@ extension AddressOwnershipLiveRange {
   ///
   /// For address values, use AccessBase.computeOwnershipRange.
   ///
-  /// FIXME: This should use computeLinearLiveness rather than computeInteriorLiveness as soon as lifetime completion
+  /// FIXME: This should use computeLinearLiveness rather than computeKnownLiveness as soon as lifetime completion
   /// runs immediately after SILGen.
   private static func computeValueLiveRange(of value: Value, _ context: FunctionPassContext)
     -> AddressOwnershipLiveRange? {
@@ -511,7 +511,7 @@ extension AddressOwnershipLiveRange {
       // This is unexpected for a value with derived addresses.
       return nil
     case .owned:
-      return .owned(value, computeInteriorLiveness(for: value, context))
+      return .owned(value, computeKnownLiveness(for: value, context))
     case .guaranteed:
       return .borrow(computeBorrowLiveRange(for: value, context))
     }
