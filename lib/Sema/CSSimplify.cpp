@@ -9762,7 +9762,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // member that extracts the isolation value.
   if (auto *fn = instanceTy->getAs<FunctionType>()) {
     if (fn->getIsolation().isErased() &&
-        memberName.getBaseIdentifier().str() == "isolation") {
+        memberName.isSimpleName(Context.Id_isolation)) {
       result.ViableCandidates.push_back(
         OverloadChoice(baseTy, OverloadChoiceKind::ExtractFunctionIsolation));
     }
