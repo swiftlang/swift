@@ -87,7 +87,7 @@ public func withUnsafeMutablePointer<
   try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss24withUnsafeMutablePointer2to_q_xz_q_SpyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
@@ -147,7 +147,7 @@ public func withUnsafePointer<T: ~Copyable, E, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
 /// which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_x_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withUnsafePointer<T, Result>(
@@ -192,7 +192,7 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_xz_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafePointer<T, Result>(

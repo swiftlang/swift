@@ -518,7 +518,7 @@ extension Unsafe${Mutable}BufferPointer {
 %end
   }
 
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal subscript(_unchecked i: Int) -> Element {
     @_transparent
@@ -732,17 +732,9 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// initialized or `Pointee` must be a trivial type. This buffer pointer's
   /// `count` must be equal to the originally allocated size of the memory
   /// block.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public func deallocate() {
-    _position?.deallocate()
-  }
-}
-
-extension Unsafe${Mutable}BufferPointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal func deallocate() {
     _position?.deallocate()
   }
 }
@@ -770,20 +762,9 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   ///
   /// - Parameter count: The amount of memory to allocate, counted in instances
   ///   of `Element`.
-  @_alwaysEmitIntoClient
+  @inlinable
+  @_preInverseGenerics
   public static func allocate(
-    capacity count: Int
-  ) -> UnsafeMutableBufferPointer<Element> {
-    let base  = UnsafeMutablePointer<Element>.allocate(capacity: count)
-    return UnsafeMutableBufferPointer(start: base, count: count)
-  }
-}
-
-extension UnsafeMutableBufferPointer {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
-  @usableFromInline
-  internal static func allocate(
     capacity count: Int
   ) -> UnsafeMutableBufferPointer<Element> {
     let base  = UnsafeMutablePointer<Element>.allocate(capacity: count)
@@ -1319,7 +1300,7 @@ extension Unsafe${Mutable}BufferPointer {
   // of `withMemoryRebound<T, Result>(to:_:)`, and provides
   // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 % if Mutable:
   @_silgen_name("$sSr17withMemoryRebound2to_qd_0_qd__m_qd_0_Sryqd__GKXEtKr0_lF")
 % else:
