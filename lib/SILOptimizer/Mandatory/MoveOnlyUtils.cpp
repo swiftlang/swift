@@ -547,7 +547,7 @@ struct SimpleTemporaryAllocStackElimVisitor
     state.setFinalUser(op);
 
     // We found an instruction that we did not understand.
-    return true;
+    return false;
   }
 };
 
