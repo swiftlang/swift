@@ -192,6 +192,25 @@ public:
   }
 };
 
+class TypeRefInverseRequirement {
+  llvm::PointerIntPair<const TypeRef *, 3, InvertibleProtocolKind> Storage;
+
+public:
+  TypeRefInverseRequirement(const TypeRef *first, InvertibleProtocolKind proto)
+      : Storage(first, proto) {
+    assert(first);
+  }
+
+  /// Retrieve the first type.
+  const TypeRef *getFirstType() const {
+    return Storage.getPointer();
+  }
+
+  /// Determine the kind of requirement.
+  InvertibleProtocolKind getKind() const { return Storage.getInt(); }
+};
+
+
 // On 32-bit systems this needs more than just pointer alignment to fit the
 // extra bits needed by TypeRefRequirement.
 class alignas(8) TypeRef {

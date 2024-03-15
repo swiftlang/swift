@@ -4,6 +4,7 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   -enable-library-evolution \
+// RUN:   -g \
 // RUN:   > %t/test.irgen
 
 // RUN: %FileCheck %s < %t/test.irgen
@@ -44,4 +45,16 @@ public protocol Hello<Person>: ~Copyable {
 
   // CHECK: @"$s4test5HelloP10overloadedyyqd__Ricd__lFTj"
   func overloaded<T: ~Copyable>(_: borrowing T)
+}
+
+// CHECK: $s4test2XQVAARiczrlE1AVMi
+protocol Q: ~Copyable {
+  associatedtype A: ~Copyable
+}
+
+struct XQ<T: ~Copyable>: ~Copyable {
+}
+
+extension XQ: Q where T: ~Copyable {
+  struct A { }
 }
