@@ -792,6 +792,8 @@ extension LifetimeDependenceUseDefWalker {
 ///   yieldedDependence(result: Operand) -> WalkResult
 /// Start walking:
 ///   walkDown(root: Value)
+///
+/// Note: this may visit values that are not dominated by `root` because of dependent phi operands.
 protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
                                           OwnershipUseVisitor,
                                           AddressUseVisitor {
