@@ -48,6 +48,7 @@ open class ManagedBuffer<Header, Element: ~Copyable> {
   #if $Embedded
   // In embedded mode this initializer has to be public, otherwise derived
   // classes cannot be specialized.
+  @_preInverseGenerics
   public init(_doNotCallMe: ()) {
     _internalInvariantFailure("Only initialize these by calling create")
   }
