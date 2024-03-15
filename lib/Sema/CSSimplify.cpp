@@ -9760,7 +9760,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Dynamically isolated function types have a magic '.isolation'
   // member that extracts the isolation value.
-  if (auto *fn = dyn_cast<FunctionType>(instanceTy)) {
+  if (auto *fn = instanceTy->getAs<FunctionType>()) {
     if (fn->getIsolation().isErased() &&
         memberName.getBaseIdentifier().str() == "isolation") {
       result.ViableCandidates.push_back(
