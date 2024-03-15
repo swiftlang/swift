@@ -10733,8 +10733,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // reason to perform a lookup because it wouldn't return any results.
   if (shouldAttemptFixes()) {
     auto markMemberTypeAsPotentialHole = [&](Type memberTy) {
-      if (auto *typeVar = memberTy->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
+      recordAnyTypeVarAsPotentialHole(simplifyType(memberTy));
     };
 
     // If this is an unresolved member ref e.g. `.foo` and its contextual base
