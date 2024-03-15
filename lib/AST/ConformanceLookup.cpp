@@ -848,6 +848,11 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
 
   assert(!type->is<PackExpansionType>());
 
+  // FIXME: lldb misbehaves by getting here with a SILPackType.
+  //  just pretend it it conforms.
+  if (type->is<SILPackType>())
+    return true;
+
   // The SIL types in the AST do not have real conformances, and should have
   // been handled in SILType instead.
   assert(!(type->is<SILBoxType,
