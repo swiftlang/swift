@@ -13,6 +13,9 @@
 
 // REQUIRES: executable_test
 
+// FIXME(NCG): This test requires NoncopyableGenerics to be a "suppressible" compiler feature.
+// XFAIL: !noncopyable_generics
+
 //--- header.h
 
 #include <stdio.h>
