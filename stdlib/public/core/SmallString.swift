@@ -223,6 +223,7 @@ extension _SmallString {
   ) rethrows -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
+#if hasFeature(TypedThrows)
     return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
       let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
@@ -234,6 +235,19 @@ extension _SmallString {
       }
       return try f(UnsafeBufferPointer(_uncheckedStart: ptr, count: count))
     }
+#else
+    return try Swift.__abi_se0413_withUnsafeBytes(of: &raw) {
+      let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
+      // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
+      // duration of the closure. Accessing self after this rebind is undefined.
+      let ptr = rawPtr.bindMemory(to: UInt8.self, capacity: count)
+      defer {
+        // Restore the memory type of self._storage
+        _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
+      }
+      return try f(UnsafeBufferPointer(_uncheckedStart: ptr, count: count))
+    }
+#endif
   }
 
   // Overwrite stored code units, including uninitialized. `f` should return the
