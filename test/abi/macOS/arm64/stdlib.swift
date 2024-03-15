@@ -245,16 +245,6 @@ Added: _$sSR7isEmptySbvpMV
 // property descriptor for Swift.UnsafeMutableBufferPointer.isEmpty : Swift.Bool
 Added: _$sSr7isEmptySbvpMV
 
-// Mangling issue with the generalized `ManagedBuffer`'s dummy initializer. (rdar://124644596)
-// dispatch thunk of Swift.ManagedBuffer.__allocating_init(_doNotCallMe: ()) -> Swift.ManagedBuffer<A, B>
-Removed: _$ss13ManagedBufferC12_doNotCallMeAByxq_Gyt_tcfCTj
-// method descriptor for Swift.ManagedBuffer.__allocating_init(_doNotCallMe: ()) -> Swift.ManagedBuffer<A, B>
-Removed: _$ss13ManagedBufferC12_doNotCallMeAByxq_Gyt_tcfCTq
-// dispatch thunk of (extension in Swift):Swift.ManagedBuffer< where B: ~Swift.Copyable>.init(_doNotCallMe: ()) -> Swift.ManagedBuffer<A, B>
-Added: _$ss13ManagedBufferCsRic_rlE12_doNotCallMeAByxq_Gyt_tcfCTj
-// method descriptor for (extension in Swift):Swift.ManagedBuffer< where B: ~Swift.Copyable>.init(_doNotCallMe: ()) -> Swift.ManagedBuffer<A, B>
-Added: _$ss13ManagedBufferCsRic_rlE12_doNotCallMeAByxq_Gyt_tcfCTq
-
 // Runtime Symbols
 Added: __swift_pod_copy
 Added: __swift_pod_destroy
