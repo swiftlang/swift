@@ -462,6 +462,11 @@ bool Implementation::gatherUses(SILValue value) {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
         }
+        if (PhiOperand(end)) {
+          assert(end->getOperandOwnership() ==
+                 OperandOwnership::ForwardingConsume);
+          return false;
+        }
         LLVM_DEBUG(llvm::dbgs() << "        ++ Scope-ending use: ";
                    end->getUser()->print(llvm::dbgs()));
         liveness.updateForUse(end->getUser(), *leafRange,

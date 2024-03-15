@@ -238,6 +238,11 @@ PrunedLiveRange<LivenessWithDefs>::updateForBorrowingOperand(Operand *operand) {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
         }
+        if (PhiOperand(end)) {
+          assert(end->getOperandOwnership() ==
+                 OperandOwnership::ForwardingConsume);
+          return false;
+        }
         updateForUse(end->getUser(), /*lifetimeEnding*/ false);
         return true;
       })) {

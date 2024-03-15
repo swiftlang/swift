@@ -1792,11 +1792,10 @@ bool SILInstruction::maySuspend() const {
   return false;
 }
 
-static bool visitRecursivelyLifetimeEndingUses(
-  SILValue i,
-  bool &noUsers,
-  llvm::function_ref<bool(Operand *)> func)
-{
+static bool
+visitRecursivelyLifetimeEndingUses(SILValue i, bool &noUsers,
+                                   llvm::function_ref<bool(Operand *)> func,
+                                   bool allowPhis) {
   for (Operand *use : i->getConsumingUses()) {
     noUsers = false;
     if (isa<DestroyValueInst>(use->getUser())) {
@@ -1812,6 +1811,14 @@ static bool visitRecursivelyLifetimeEndingUses(
         return false;
       }
       continue;
+    }
+    if (allowPhis) {
+      if (PhiOperand(use)) {
+        if (!func(use)) {
+          return false;
+        }
+        continue;
+      }
     }
     // FIXME: Handle store to indirect result
     
@@ -1835,7 +1842,8 @@ static bool visitRecursivelyLifetimeEndingUses(
                                "forwarded to a destroy_value");
     }
     for (auto res : use->getUser()->getResults()) {
-      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, func)) {
+      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, func,
+                                              allowPhis)) {
         return false;
       }
     }
@@ -1851,7 +1859,8 @@ PartialApplyInst::visitOnStackLifetimeEnds(
          && "only meaningful for OSSA stack closures");
   bool noUsers = true;
 
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
+                                          /*allowPhis*/ false)) {
     return false;
   }
   return !noUsers;
@@ -1863,7 +1872,8 @@ visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand *)> func) const {
          && "only meaningful for nonescaping dependencies");
   bool noUsers = true;
 
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
+                                          /*allowPhis*/ true)) {
     return false;
   }
   return !noUsers;
