@@ -157,7 +157,7 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
                   .setOptions(std::move(TargetOpt))
                   .setCPU(std::move(CPU))
                   .addFeatures(Features)
-                  .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
+                  .setCodeGenOptLevel(llvm::CodeGenOptLevel::Default);
   auto J = llvm::orc::LLJITBuilder()
                .setJITTargetMachineBuilder(std::move(JTMB))
                .create();

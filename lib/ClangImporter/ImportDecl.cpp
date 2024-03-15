@@ -4586,7 +4586,8 @@ namespace {
                                                : getOverridableAccessLevel(dc));
 
       // Optional methods in protocols.
-      if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
+      if (decl->getImplementationControl() ==
+              clang::ObjCImplementationControl::Optional &&
           isa<ProtocolDecl>(dc))
         result->getAttrs().add(new (Impl.SwiftContext)
                                       OptionalAttr(/*implicit*/false));
@@ -5495,8 +5496,9 @@ namespace {
       if (decl->hasAttr<clang::IBOutletAttr>())
         result->getAttrs().add(
             new (Impl.SwiftContext) IBOutletAttr(/*IsImplicit=*/false));
-      if (decl->getPropertyImplementation() == clang::ObjCPropertyDecl::Optional
-          && isa<ProtocolDecl>(dc) &&
+      if (decl->getPropertyImplementation() ==
+              clang::ObjCPropertyDecl::Optional &&
+          isa<ProtocolDecl>(dc) &&
           !result->getAttrs().hasAttribute<OptionalAttr>())
         result->getAttrs().add(new (Impl.SwiftContext)
                                       OptionalAttr(/*implicit*/false));
@@ -7026,7 +7028,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   // Find the counterpart.
   bool optionalMethods = (objcMethod->getImplementationControl() ==
-                          clang::ObjCMethodDecl::Optional);
+                          clang::ObjCImplementationControl::Optional);
 
   if (auto *counterpart = findCounterpart(counterpartSelector)) {
     const clang::ObjCMethodDecl *counterpartMethod = nullptr;
@@ -7040,7 +7042,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       counterpartMethod = cast<clang::ObjCMethodDecl>(importedFrom);
       if (optionalMethods)
         optionalMethods = (counterpartMethod->getImplementationControl() ==
-                           clang::ObjCMethodDecl::Optional);
+                           clang::ObjCImplementationControl::Optional);
     }
 
     assert(!counterpart || !counterpart->isStatic());
@@ -8558,12 +8560,12 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     if (auto clangProto
           = dyn_cast<clang::ObjCProtocolDecl>(ClangDecl->getDeclContext())) {
       if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
-        if (method->getImplementationControl()
-              == clang::ObjCMethodDecl::Required)
+        if (method->getImplementationControl() ==
+            clang::ObjCImplementationControl::Required)
           hasMissingRequiredMember = true;
       } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(ClangDecl)) {
-        if (prop->getPropertyImplementation()
-              == clang::ObjCPropertyDecl::Required)
+        if (prop->getPropertyImplementation() ==
+            clang::ObjCPropertyDecl::Required)
           hasMissingRequiredMember = true;
       }
 
