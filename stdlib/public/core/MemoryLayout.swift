@@ -40,10 +40,10 @@
 ///             byteCount: count * MemoryLayout<Point>.stride,
 ///             alignment: MemoryLayout<Point>.alignment)
 @frozen // namespace
-public enum MemoryLayout<T: ~Copyable> {}
+public enum MemoryLayout<T: ~Copyable>: Copyable {}
 
 @available(*, unavailable)
-extension MemoryLayout : _BitwiseCopyable {}
+extension MemoryLayout: _BitwiseCopyable {}
 
 extension MemoryLayout where T: ~Copyable {
   /// The contiguous memory footprint of `T`, in bytes.
