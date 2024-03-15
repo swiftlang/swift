@@ -199,8 +199,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     // Swift frontend option for input file path (Foo.modulemap).
     swiftArgs.push_back(remapPath(clangModuleDep.ClangModuleMapFile));
 
-    // Handle VFSOverlay.
-    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
+    // Handle VFSOverlay. If include tree is used, there is no need for overlay.
+    if (!ctx.ClangImporterOpts.UseClangIncludeTree) {
       for (auto &overlay : ctx.SearchPathOpts.VFSOverlayFiles) {
         swiftArgs.push_back("-vfsoverlay");
         swiftArgs.push_back(remapPath(overlay));

@@ -477,6 +477,10 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
       FS->status(LayoutFile);
     }
   }
+
+  // Add VFSOverlay file.
+  for (auto &Overlay: Opts.VFSOverlayFiles)
+    FS->status(Overlay);
 }
 
 void SwiftDependencyTracker::startTracking() {
