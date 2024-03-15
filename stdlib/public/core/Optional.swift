@@ -212,7 +212,7 @@ extension Optional where Wrapped: ~Copyable {
     }
   }
 
-#if $BorrowingSwitch
+#if hasFeature(BorrowingSwitch)
   @_alwaysEmitIntoClient
   public borrowing func borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
@@ -274,7 +274,7 @@ extension Optional where Wrapped: ~Copyable {
     }
   }
 
-#if $BorrowingSwitch
+#if hasFeature(BorrowingSwitch)
   @_alwaysEmitIntoClient
   public func borrowingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U?
@@ -542,7 +542,7 @@ public struct _OptionalNilComparisonType: ExpressibleByNilLiteral {
   }
 }
 
-#if $BorrowingSwitch
+#if hasFeature(BorrowingSwitch)
 extension Optional where Wrapped: ~Copyable {
   /// Returns a Boolean value indicating whether an argument matches `nil`.
   ///
