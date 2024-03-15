@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  \
 // RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -disable-experimental-parser-round-trip \
 // RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
 // REQUIRES: asserts
 
