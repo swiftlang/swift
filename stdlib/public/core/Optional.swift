@@ -187,6 +187,7 @@ extension Optional {
   ///   returns `nil`.
   @inlinable
   public func map<U>(
+    // FIXME: This needs to support typed throws.
     _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
     switch self {
@@ -200,12 +201,12 @@ extension Optional {
 
 extension Optional where Wrapped: ~Copyable {
   @_alwaysEmitIntoClient
-  public consuming func consumingMap<U: ~Copyable>(
-    _ transform: (consuming Wrapped) throws -> U
-  ) rethrows -> U? {
-    switch /*consume*/ self {
+  public consuming func consumingMap<U: ~Copyable, E: Error>(
+    _ transform: (consuming Wrapped) throws(E) -> U
+  ) throws(E) -> U? {
+    switch consume self {
     case .some(let y):
-      return .some(try transform(consume y))
+      return .some(try transform(y))
     case .none:
       return .none
     }
@@ -213,9 +214,9 @@ extension Optional where Wrapped: ~Copyable {
 
 #if $BorrowingSwitch
   @_alwaysEmitIntoClient
-  public borrowing func borrowingMap<U: ~Copyable>(
-    _ transform: (borrowing Wrapped) throws -> U
-  ) rethrows -> U? {
+  public borrowing func borrowingMap<U: ~Copyable, E: Error>(
+    _ transform: (borrowing Wrapped) throws(E) -> U
+  ) throws(E) -> U? {
     switch self {
     case .some(_borrowing y):
       return .some(try transform(y))
@@ -248,6 +249,7 @@ extension Optional {
   ///   returns `nil`.
   @inlinable
   public func flatMap<U>(
+    // FIXME: This needs to support typed throws.
     _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
     switch self {
@@ -261,10 +263,9 @@ extension Optional {
 
 extension Optional where Wrapped: ~Copyable {
   @_alwaysEmitIntoClient
-  @inlinable
-  public consuming func consumingFlatMap<U: ~Copyable>(
-    _ transform: (consuming Wrapped) throws -> U?
-  ) rethrows -> U? {
+  public consuming func consumingFlatMap<U: ~Copyable, E: Error>(
+    _ transform: (consuming Wrapped) throws(E) -> U?
+  ) throws(E) -> U? {
     switch consume self {
     case .some(let y):
       return try transform(consume y)
@@ -275,10 +276,9 @@ extension Optional where Wrapped: ~Copyable {
 
 #if $BorrowingSwitch
   @_alwaysEmitIntoClient
-  @inlinable
-  public func borrowingFlatMap<U: ~Copyable>(
-    _ transform: (borrowing Wrapped) throws -> U?
-  ) rethrows -> U? {
+  public func borrowingFlatMap<U: ~Copyable, E: Error>(
+    _ transform: (borrowing Wrapped) throws(E) -> U?
+  ) throws(E) -> U? {
     switch self {
     case .some(_borrowing y):
       return try transform(y)
