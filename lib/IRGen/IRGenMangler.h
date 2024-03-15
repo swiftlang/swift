@@ -46,6 +46,7 @@ public:
   IRGenMangler() { }
 
   std::string mangleDispatchThunk(const FuncDecl *func) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginMangling();
     appendEntity(func);
     appendOperator("Tj");
@@ -55,6 +56,7 @@ public:
   std::string mangleDerivativeDispatchThunk(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -71,6 +73,7 @@ public:
 
   std::string mangleConstructorDispatchThunk(const ConstructorDecl *ctor,
                                              bool isAllocating) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(ctor));
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tj");
@@ -78,6 +81,7 @@ public:
   }
 
   std::string mangleMethodDescriptor(const FuncDecl *func) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginMangling();
     appendEntity(func);
     appendOperator("Tq");
@@ -87,6 +91,7 @@ public:
   std::string mangleDerivativeMethodDescriptor(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -103,6 +108,7 @@ public:
 
   std::string mangleConstructorMethodDescriptor(const ConstructorDecl *ctor,
                                                 bool isAllocating) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(ctor));
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tq");
@@ -394,6 +400,7 @@ public:
   }
 
   std::string mangleFieldOffset(const ValueDecl *Decl) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(Decl));
     beginMangling();
     appendEntity(Decl);
     appendOperator("Wvd");
