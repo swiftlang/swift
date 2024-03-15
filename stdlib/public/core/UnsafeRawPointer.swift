@@ -385,7 +385,7 @@ extension UnsafeRawPointer {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable, E: Error>(
+  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
@@ -453,7 +453,6 @@ extension UnsafeRawPointer {
 #endif
   }
 
-  // FIXME(NCG): Add a consuming analogue of `load`, like `move(fromByteOffset:as:_:)`
   // FIXME(NCG): Add a borrow analogue of `load`, like `withBorrow(fromByteOffset:as:_:)`
 
 #if $BitwiseCopyable
@@ -996,7 +995,7 @@ extension UnsafeMutableRawPointer {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable, E: Error>(
+  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result

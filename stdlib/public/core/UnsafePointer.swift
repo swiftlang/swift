@@ -302,7 +302,6 @@ extension UnsafePointer {
 extension UnsafePointer where Pointee: ~Copyable {
   /// Accesses the pointee at the specified offset from this pointer.
   ///
-  ///
   /// For a pointer `p`, the memory at `p + i` must be initialized.
   ///
   /// - Parameter i: The offset from this pointer at which to access an
