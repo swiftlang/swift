@@ -137,7 +137,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
-public func withUnsafePointer<T: ~Copyable, E, Result: ~Copyable>(
+public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: borrowing T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result
