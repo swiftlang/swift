@@ -131,8 +131,7 @@ extension Result where Success: ~Copyable {
 }
 
 extension Result {
-  // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal func mapError<NewFailure>(
     _ transform: (Failure) -> NewFailure
@@ -281,7 +280,7 @@ extension Result where Success: ~Copyable {
 
 extension Result {
   /// ABI: Historical get() throws
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$ss6ResultO3getxyKF")
   @usableFromInline
   func __abi_get() throws -> Success {
@@ -297,7 +296,7 @@ extension Result {
 
 extension Result where Failure == Swift.Error {
   /// ABI: Historical init(catching:)
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$ss6ResultOss5Error_pRs_rlE8catchingAByxsAC_pGxyKXE_tcfC")
   @usableFromInline
   init(__abi_catching body: () throws(Failure) -> Success) {
