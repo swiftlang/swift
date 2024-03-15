@@ -16,7 +16,7 @@ func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolate
 
 // CHECK-LABEL: sil hidden [distributed] [ossa] @$s4test2DAC0A20DistributedIsolationyyF
 // CHECK:         // function_ref closure #1
-// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test2DAC0A20DistributedIsolationyyFyyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed DA) -> ()
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test2DAC0A20DistributedIsolationyyFyyYaYbcfU_ : $@convention(thin) @Sendable @async (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed DA) -> ()
 // CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $DA
 // CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $DA
 //   The conformance here is special, but we don't record that in the printed SIL.
@@ -24,7 +24,7 @@ func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolate
 // CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_OBJECT]] : $any Actor
 // CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]], [[CAPTURE]])
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYbYAc_tF
 // CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
 // CHECK-NEXT:    destroy_value [[CLOSURE]]
 distributed actor DA {

@@ -3,7 +3,7 @@
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
+// RUN: %target-sil-opt -sdk %clang-importer-sdk-path -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
 
 sil_stage canonical
 
@@ -11,6 +11,7 @@ import Builtin
 import Swift
 
 import resilient_struct
+import ctypes
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
 // CHECK-NOT: init_existential_addr
@@ -46,7 +47,6 @@ bb2:
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
-
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
 // CHECK-NOT: init_existential_addr
@@ -121,7 +121,6 @@ bb22:
   inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.none!enumelt
   br bb2
 }
-
 
 class A {
 
@@ -314,10 +313,10 @@ bb3:
 
 sil @no_init_struct : $@convention(thin) () -> (@out ResilientEmptyStruct)
 
-// CHECK-LABEL: sil @test_empty_struct_uninintialized : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @test_empty_struct_uninitialized : $@convention(thin) () -> () {
 // CHECK-NOT: switch_enum_addr
-// CHECK-LABEL: } // end sil function 'test_empty_struct_uninintialized'
-sil @test_empty_struct_uninintialized : $@convention(thin) () -> () {
+// CHECK-LABEL: } // end sil function 'test_empty_struct_uninitialized'
+sil @test_empty_struct_uninitialized : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Optional<ResilientEmptyStruct>
   %1 = init_enum_data_addr %0 : $*Optional<ResilientEmptyStruct>, #Optional.some!enumelt
@@ -334,6 +333,32 @@ bb2:
 
 bb3:
   dealloc_stack %0 : $*Optional<ResilientEmptyStruct>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @no_init_c_union : $@convention(thin) () -> (@out EmptyCUnion)
+
+// CHECK-LABEL: sil @test_empty_c_union : $@convention(thin) () -> () {
+// CHECK: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_c_union'
+sil @test_empty_c_union : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<EmptyCUnion>
+  %1 = init_enum_data_addr %0 : $*Optional<EmptyCUnion>, #Optional.some!enumelt
+  %f = function_ref @no_init_c_union : $@convention(thin) () -> (@out EmptyCUnion)
+  apply %f(%1) : $@convention(thin) () -> (@out EmptyCUnion)
+  inject_enum_addr %0 : $*Optional<EmptyCUnion>, #Optional.some!enumelt
+  switch_enum_addr %0 : $*Optional<EmptyCUnion>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<EmptyCUnion>
   %8 = tuple ()
   return %8 : $()
 }
