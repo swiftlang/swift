@@ -781,7 +781,7 @@ public func ?? <T: ~Copyable>(
   }
 }
 
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @usableFromInline
 internal func ?? <T>(
   optional: T?,
@@ -851,7 +851,7 @@ public func ?? <T: ~Copyable>(
   }
 }
 
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @usableFromInline
 internal func ?? <T>(
   optional: T?,

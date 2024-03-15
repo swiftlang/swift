@@ -286,7 +286,7 @@ extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
   // accessor, if it wasn't @_alwaysEmitIntoClient.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal var pointee: Pointee {
     @_transparent unsafeAddress {
@@ -316,7 +316,7 @@ extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
   // wasn't @_alwaysEmitIntoClient.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal subscript(i: Int) -> Pointee {
     @_transparent
@@ -415,7 +415,7 @@ extension UnsafePointer {
   // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
   // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$sSP17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_SPyqd__GKXEtKr0_lF")
   @usableFromInline
   internal func _legacy_se0333_withMemoryRebound<T, Result>(
@@ -837,7 +837,7 @@ extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
   // accessor, if it wasn't @_alwaysEmitIntoClient.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal var pointee: Pointee {
     @_transparent unsafeAddress {
@@ -893,7 +893,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer {
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal func initialize(to value: Pointee) { // Note: `value` is __shared!
     Builtin.initialize(value, self._rawValue)
@@ -1249,7 +1249,7 @@ extension UnsafeMutablePointer {
   // This obsolete implementation uses the expected mangled name of
   // `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides an entry point
   // for any binary linked against the stdlib binary for Swift 5.6 and older.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")
   @usableFromInline
   internal func _legacy_se0333_withMemoryRebound<T, Result>(
@@ -1294,7 +1294,7 @@ extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
   // wasn't @_alwaysEmitIntoClient.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal subscript(i: Int) -> Pointee {
     @_transparent

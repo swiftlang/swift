@@ -516,7 +516,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   // This unavailable implementation uses the expected mangled name
   // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
   // any binary linked against the stdlib binary for Swift 5.6 and older.
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$sSw10storeBytes2of12toByteOffset2asyx_SixmtlF")
   @usableFromInline func _legacy_se0349_storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
@@ -1238,7 +1238,7 @@ public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafeMutableBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss22withUnsafeMutableBytes2of_q_xz_q_SwKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeMutableBytes<T, Result>(
@@ -1305,7 +1305,7 @@ public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss15withUnsafeBytes2of_q_xz_q_SWKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
@@ -1369,7 +1369,7 @@ public func withUnsafeBytes<
 
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss15withUnsafeBytes2of_q_x_q_SWKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
