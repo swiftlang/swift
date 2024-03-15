@@ -730,30 +730,26 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
   return false;
 }
 
-static SmallVector<NominalTypeDecl *, 2> findSelfBounds(const DeclContext *dc) {
-  auto nominal = dc->getSelfNominalTypeDecl();
+// TODO: in future, migrate this functionality into ASTScopes
+bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
+    const DeclContext *scopeDC) const {
+  auto nominal = scopeDC->getSelfNominalTypeDecl();
   if (!nominal)
-    return {};
+    return false;
 
   SmallVector<NominalTypeDecl *, 2> selfBounds;
   selfBounds.push_back(nominal);
 
   // For a protocol extension, check whether there are additional "Self"
   // constraints that can affect name lookup.
-  if (dc->getExtendedProtocolDecl()) {
-    auto ext = cast<ExtensionDecl>(dc);
-    auto bounds = getSelfBoundsFromWhereClause(ext);
-    for (auto bound : bounds.decls)
-      selfBounds.push_back(bound);
+  if (!factory.options.contains(UnqualifiedLookupFlags::DisregardSelfBounds)) {
+    if (scopeDC->getExtendedProtocolDecl()) {
+      auto ext = cast<ExtensionDecl>(scopeDC);
+      auto bounds = getSelfBoundsFromWhereClause(ext);
+      for (auto bound : bounds.decls)
+        selfBounds.push_back(bound);
+    }
   }
-
-  return selfBounds;
-}
-
-// TODO: in future, migrate this functionality into ASTScopes
-bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
-    const DeclContext *scopeDC) const {
-  auto selfBounds = findSelfBounds(scopeDC);
 
   // We're looking for members of a type.
   //
