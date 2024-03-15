@@ -774,7 +774,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeBufferPointer: AtomicRepresentable {
+extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -840,7 +840,9 @@ extension UnsafeBufferPointer: AtomicRepresentable {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutableBufferPointer: AtomicRepresentable {
+extension UnsafeMutableBufferPointer: AtomicRepresentable
+where Element: ~Copyable
+{
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
