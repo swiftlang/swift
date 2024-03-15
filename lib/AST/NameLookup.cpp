@@ -3406,29 +3406,6 @@ bool TypeRepr::isProtocolOrProtocolComposition(DeclContext *dc) {
   return declsAreProtocols(references.first);
 }
 
-bool TypeRepr::isInverseOf(InvertibleProtocolKind target, DeclContext *dc) {
-  if (auto inverseTypeRepr = dyn_cast<InverseTypeRepr>(this)) {
-    auto *constraint = inverseTypeRepr->getConstraint();
-
-    auto &ctx = dc->getASTContext();
-    return llvm::any_of(
-        directReferencesForTypeRepr(ctx.evaluator, ctx, constraint, dc).first,
-        [&](const TypeDecl *decl) {
-          if (auto *P = dyn_cast<ProtocolDecl>(decl))
-            return P->getInvertibleProtocolKind() == target;
-          return false;
-        });
-  }
-
-  if (auto *composition = dyn_cast<CompositionTypeRepr>(this)) {
-    return llvm::any_of(composition->getTypes(), [&](TypeRepr *member) {
-      return member->isInverseOf(target, dc);
-    });
-  }
-
-  return false;
-}
-
 static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
                              ExtensionDecl *ext,
