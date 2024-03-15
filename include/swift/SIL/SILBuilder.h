@@ -1643,7 +1643,7 @@ public:
                            ArrayRef<SILValue> Elements) {
     return createStruct(Loc, Ty, Elements,
                         hasOwnership()
-                            ? mergeSILValueOwnership(Elements)
+                            ? getSILValueOwnership(Elements, Ty)
                             : ValueOwnershipKind(OwnershipKind::None));
   }
 
@@ -1659,7 +1659,7 @@ public:
                          ArrayRef<SILValue> Elements) {
     return createTuple(Loc, Ty, Elements,
                        hasOwnership()
-                           ? mergeSILValueOwnership(Elements)
+                           ? getSILValueOwnership(Elements)
                            : ValueOwnershipKind(OwnershipKind::None));
   }
 
@@ -2941,9 +2941,9 @@ public:
       std::optional<SILValue> TransposeFunction = std::nullopt) {
     auto ownershipKind =
         hasOwnership()
-            ? (TransposeFunction ? mergeSILValueOwnership(
+            ? (TransposeFunction ? getSILValueOwnership(
                                        {OriginalFunction, *TransposeFunction})
-                                 : mergeSILValueOwnership({OriginalFunction}))
+                                 : getSILValueOwnership({OriginalFunction}))
             : ValueOwnershipKind(OwnershipKind::None);
     return createLinearFunction(Loc, ParameterIndices, OriginalFunction,
                                 ownershipKind, TransposeFunction);
