@@ -3045,34 +3045,46 @@ static void emitDelayedArguments(SILGenFunction &SGF,
 done:
 
   if (defaultArgIsolation) {
-    assert(SGF.F.isAsync());
     assert(!isolatedArgs.empty());
 
-    auto &firstArg = *std::get<0>(isolatedArgs[0]);
-    auto loc = firstArg.getDefaultArgLoc();
+    // Only hop to the default arg isolation if the callee is async.
+    // If we're in a synchronous function, the isolation has to match,
+    // so no hop is required. This is enforced by the actor isolation
+    // checker.
+    //
+    // FIXME: Note that we don't end up in this situation for user-written
+    // synchronous functions, because the default argument is only considered
+    // isolated to the callee if the call crosses an isolation boundary. We
+    // do end up here for default argument generators and stored property
+    // initializers. An alternative (and better) approach is to formally model
+    // those generator functions as isolated.
+    if (SGF.F.isAsync()) {
+      auto &firstArg = *std::get<0>(isolatedArgs[0]);
+      auto loc = firstArg.getDefaultArgLoc();
 
-    SILValue executor;
-    switch (*defaultArgIsolation) {
-    case ActorIsolation::GlobalActor:
-      executor = SGF.emitLoadGlobalActorExecutor(
-          defaultArgIsolation->getGlobalActor());
-      break;
+      SILValue executor;
+      switch (*defaultArgIsolation) {
+      case ActorIsolation::GlobalActor:
+        executor = SGF.emitLoadGlobalActorExecutor(
+            defaultArgIsolation->getGlobalActor());
+        break;
 
-    case ActorIsolation::ActorInstance:
-      llvm_unreachable("default arg cannot be actor instance isolated");
+      case ActorIsolation::ActorInstance:
+        llvm_unreachable("default arg cannot be actor instance isolated");
 
-    case ActorIsolation::Erased:
-      llvm_unreachable("default arg cannot have erased isolation");
+      case ActorIsolation::Erased:
+        llvm_unreachable("default arg cannot have erased isolation");
 
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-      llvm_unreachable("Not isolated");
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+        llvm_unreachable("Not isolated");
+      }
+
+      // Hop to the target isolation domain once to evaluate all
+      // default arguments.
+      SGF.emitHopToTargetExecutor(loc, executor);
     }
-
-    // Hop to the target isolation domain once to evaluate all
-    // default arguments.
-    SGF.emitHopToTargetExecutor(loc, executor);
 
     size_t argsEmitted = 0;
     for (auto &isolatedArg : isolatedArgs) {
