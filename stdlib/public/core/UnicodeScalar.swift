@@ -390,18 +390,21 @@ extension UInt8 {
   /// - Returns: `true` when the `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    guard s.value < 128 else { return false }
     return i == UInt8(ascii: s)
   }
 
   /// Returns a Boolean indicating whether the `UInt8` is not equal to the provided Unicode scalar.
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    guard s.value < 128 else { return true }
     return i != UInt8(ascii: s)
   }
 
   /// Enables pattern matching of Unicode scalars in switch statements.
   @_transparent @_alwaysEmitIntoClient
   public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    guard s.value < 128 else { return false }
     return i == UInt8(ascii: s)
   }
 }
@@ -416,18 +419,21 @@ extension UInt8? {
   /// - Returns: `true` if the optional `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    guard s.value < 128 else { return false }
     return i == UInt8(ascii: s)
   }
 
   /// Returns a Boolean value indicating whether the optional `UInt8` is not equal to the provided Unicode scalar.
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    guard s.value < 128 else { return true }
     return i != UInt8(ascii: s)
   }
 
   /// Allows pattern matching of Unicode scalars in switch statements.
   @_transparent @_alwaysEmitIntoClient
   public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    guard s.value < 128 else { return false }
     return i == UInt8(ascii: s)
   }
 }
