@@ -2794,8 +2794,11 @@ public:
 
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::Nonisolated:
+      printFlag(true, "nonisolated", CapturesColor);
       break;
 
     case ActorIsolation::Erased:
