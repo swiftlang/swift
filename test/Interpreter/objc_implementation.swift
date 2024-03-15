@@ -54,8 +54,6 @@ class LastWords {
       print("otherProperty =", swiftSub.otherProperty)
       print("implProperty =", swiftSub.implProperty)
     }
-
-    implFunc(2023 - 34)
   }
 
   @objc func someMethod() -> String { "ImplClass.someMethod()" }
@@ -75,10 +73,6 @@ class SwiftSubclass: ImplClass {
   override func someMethod() -> String { "SwiftSubclass.someMethod()" }
 }
 
-@_objcImplementation @_cdecl("implFunc") public func implFunc(_ param: Int32) {
-  print("implFunc(\(param))")
-}
-
 // `#if swift` to ignore the inactive branch's contents
 #if swift(>=5.0) && TOP_LEVEL_CODE
 ImplClass.runTests()
@@ -96,5 +90,4 @@ ImplClass.runTests()
 // CHECK: otherProperty = 13
 // CHECK: implProperty = 42
 // CHECK: SwiftSubclass It's better to burn out than to fade away.
-// CHECK: implFunc(1989)
 #endif

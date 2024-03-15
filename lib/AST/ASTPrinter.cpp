@@ -256,9 +256,10 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             return false;
         }
 
-        // Skip member implementations and @objc overrides in @objcImpl
-        // extensions.
-        if (VD->isObjCMemberImplementation()
+        // @implementation: Skip non-extensions marked as implementations,
+        // member implementations, and @objc overrides in @objcImpl extensions.
+        if (VD->isObjCImplementation() ||
+            VD->isObjCMemberImplementation()
             || (isInObjCImpl(VD) && VD->getOverriddenDecl() && VD->isObjC())) {
           return false;
         }
