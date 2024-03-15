@@ -5,6 +5,9 @@
 // RUN: %target-swift-frontend -compile-module-from-interface %t/ResultBuilders.swiftinterface -o %t/ResultBuilders.swiftmodule
 // RUN: %FileCheck %s < %t/ResultBuilders.swiftinterface
 
+// FIXME(NCG): This test requires NoncopyableGenerics to be a "suppressible" compiler feature.
+// XFAIL: !noncopyable_generics
+
 // CHECK: @_functionBuilder public struct TupleBuilder
 @resultBuilder
 public struct TupleBuilder {
