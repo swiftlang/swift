@@ -104,7 +104,7 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
 #if defined(__ANDROID__)
 #if !defined(__ANDROID_API__) || __ANDROID_API__ >= 17
-  extern __swift_size_t malloc_usable_size(const void *ptr);
+  extern __swift_size_t malloc_usable_size(const void * _Nullable ptr);
 #endif
 #else
   extern __swift_size_t malloc_usable_size(void *ptr);
