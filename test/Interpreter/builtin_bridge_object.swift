@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG
-// RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation) | %FileCheck --check-prefixes=CHECK,CHECK-OPT %s
+// RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-abi-5.6-triple) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG
+// RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-abi-5.6-triple) | %FileCheck --check-prefixes=CHECK,CHECK-OPT %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -160,7 +160,7 @@ if true {
   
   var bo3 = nonNativeBridgeObject(unTaggedString)
   print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
-  // CHECK-NEXT: false
+  // CHECK-NEXT: true
   _fixLifetime(bo3)
 }
 
