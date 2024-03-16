@@ -466,8 +466,9 @@ void importer::getNormalInvocationArguments(
     bool ignoreClangTarget) {
   const auto &LangOpts = ctx.LangOpts;
   llvm::Triple triple = LangOpts.Target;
-  if (ctx.LangOpts.ClangTarget.has_value() && !ignoreClangTarget) {
-    triple = ctx.LangOpts.ClangTarget.value();
+  // Use clang specific target triple if given.
+  if (LangOpts.ClangTarget.has_value() && !ignoreClangTarget) {
+    triple = LangOpts.ClangTarget.value();
   }
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
   ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
