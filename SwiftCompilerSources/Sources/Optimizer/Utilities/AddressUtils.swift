@@ -107,10 +107,10 @@ extension AddressUseVisitor {
       // A potentially escaping value depends on this address.
       return escapingAddressUse(of: operand)
 
-    case let pai as PartialApplyInst where pai.isOnStack:
+    case let pai as PartialApplyInst where !pai.mayEscape:
       return dependentAddressUse(of: operand, into: pai)
 
-    case let pai as PartialApplyInst where !pai.isOnStack:
+    case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
 
     case is ReturnInst, is ThrowInst, is YieldInst, is AddressToPointerInst:

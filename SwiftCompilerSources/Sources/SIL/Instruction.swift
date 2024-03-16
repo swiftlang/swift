@@ -1011,7 +1011,21 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
+
+  /// WARNING: isOnStack incorrectly returns false for all closures prior to ClosureLifetimeFixup, even if they need to
+  /// be diagnosed as on-stack closures. Use has mayEscape instead.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
+
+  public var mayEscape: Bool { !isOnStack && !hasNoescapeCapture }
+
+  /// True if this closure captures anything nonescaping.
+  public var hasNoescapeCapture: Bool {
+    if operandConventions.contains(.indirectInoutAliasable) {
+      return true
+    }
+    return arguments.contains { $0.type.containsNoEscapeFunction }
+  }
+
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
 }
 
