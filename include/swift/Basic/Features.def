@@ -299,7 +299,7 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 EXPERIMENTAL_FEATURE(Embedded, true)
 
 /// Enables noncopyable generics
-EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
