@@ -32,7 +32,6 @@
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -96,7 +95,6 @@ namespace swift {
   class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
-  struct InverseMarking;
   class ParameterList;
   class ParameterTypeFlags;
   class Pattern;

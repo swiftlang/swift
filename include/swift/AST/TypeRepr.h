@@ -137,10 +137,6 @@ public:
   /// Is this type representation a protocol?
   bool isProtocolOrProtocolComposition(DeclContext *dc);
 
-  /// Is this `~<target>` representation.
-  bool isInverseOf(InvertibleProtocolKind target,
-                   DeclContext *dc);
-
   /// Is this type representation known to be invalid?
   bool isInvalid() const { return Bits.TypeRepr.Invalid; }
 
