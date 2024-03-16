@@ -1552,8 +1552,11 @@ public:
       auto adjVal = materializeAdjointDirect(getAdjointValue(bb, inst), loc);
       // Allocate a local buffer and store the adjoint value. This buffer will
       // be used for accumulation into the adjoint buffer.
-      auto adjBuf = builder.createAllocStack(
-          loc, adjVal->getType(), SILDebugVariable());
+      auto adjBuf = builder.createAllocStack(loc, adjVal->getType(), {},
+                                             DoesNotHaveDynamicLifetime,
+                                             IsNotLexical, IsNotFromVarDecl,
+                                             DoesNotUseMoveableValueDebugInfo,
+                                             /* skipVarDeclAssert = */ true);
       auto copy = builder.emitCopyValueOperation(loc, adjVal);
       builder.emitStoreValueOperation(loc, copy, adjBuf,
                                       StoreOwnershipQualifier::Init);
