@@ -169,7 +169,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
       self = .storeBorrow(sbi)
     case let bai as BeginApplyInst:
       self = .beginApply(bai)
-    case let pai as PartialApplyInst where pai.isOnStack:
+    case let pai as PartialApplyInst where !pai.mayEscape:
       self = .partialApply(pai)
     case let mdi as MarkDependenceInst:
       self = .markDependence(mdi)

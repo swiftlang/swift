@@ -388,7 +388,7 @@ extension OwnershipUseVisitor {
     -> WalkResult {
     switch operand.instruction {
     case let pai as PartialApplyInst:
-      assert(pai.isOnStack)
+      assert(!pai.mayEscape)
       return dependentUse(of: operand, into: pai)
     case let mdi as MarkDependenceInst:
       assert(operand == mdi.baseOperand && mdi.isNonEscaping)

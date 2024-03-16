@@ -416,7 +416,7 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value) -> WalkResult {
     // Find all uses of partial_apply [on_stack].
-    if let pai = value as? PartialApplyInst, pai.isOnStack {
+    if let pai = value as? PartialApplyInst, !pai.mayEscape {
       var walker = NonEscapingClosureDefUseWalker(context)
       defer { walker.deinitialize() }
       if walker.walkDown(closure: pai) == .abortWalk {
