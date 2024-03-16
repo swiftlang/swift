@@ -37,6 +37,12 @@ public struct TestWrapper {
   }
 }
 
+// https://github.com/apple/swift/issues/71546
+actor TestActor {
+  nonisolated(unsafe) let immutableActorIsolated = TestSendable()
+  // expected-warning@-1 {{'nonisolated(unsafe)' is unnecessary for a constant actor-isolated property with 'Sendable' type 'TestSendable', consider removing it}} {{3-23=}}
+}
+
 struct TestStatics {
   static let immutableExplicitSendable = TestSendable()
   static let immutableNonsendable = TestNonsendable() // expected-error{{static property 'immutableNonsendable' is not concurrency-safe because non-'Sendable' type 'TestNonsendable' may have shared mutable state}}
@@ -45,6 +51,8 @@ struct TestStatics {
   static nonisolated let immutableNonisolated = TestNonsendable() // expected-error{{static property 'immutableNonisolated' is not concurrency-safe because non-'Sendable' type 'TestNonsendable' may have shared mutable state}}
   // expected-note@-1 {{isolate 'immutableNonisolated' to a global actor, or conform 'TestNonsendable' to 'Sendable'}}
   // expected-error@-2 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'TestNonsendable'}}
+  static nonisolated(unsafe) let immutableNonisolatedUnsafeSendable = TestSendable()
+  // expected-warning@-1 {{'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'TestSendable', consider removing it}} {{10-30=}}
   static let immutableInferredSendable = 0
   static var mutable = 0 // expected-error{{static property 'mutable' is not concurrency-safe because it is non-isolated global shared mutable state}}
   // expected-note@-1{{isolate 'mutable' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
@@ -52,6 +60,11 @@ struct TestStatics {
   static var computedProperty: Int { 0 } // computed property that, though static, has no storage so is not a global
   @TestWrapper static var wrapped: Int // expected-error{{static property 'wrapped' is not concurrency-safe because it is non-isolated global shared mutable state}}
   // expected-note@-1{{isolate 'wrapped' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
+}
+
+public actor TestPublicActor {
+  nonisolated(unsafe) let immutableNonisolatedUnsafeSendable = TestSendable()
+  // expected-warning@-1 {{'(unsafe)' is unnecessary for a constant public actor property with 'Sendable' type 'TestSendable', consider removing it}} {{14-22=}}
 }
 
 @TestGlobalActor
@@ -63,6 +76,9 @@ func f() {
 }
 
 func testLocalNonisolatedUnsafe() async {
+  nonisolated(unsafe) let immutable = 1
+  // expected-warning@-1{{'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'Int', consider removing it}} {{3-23=}}
+  // expected-warning@-2{{initialization of immutable value 'immutable' was never used; consider replacing with assignment to '_' or removing it}}
   nonisolated(unsafe) var value = 1
   let task = Task {
     value = 2
