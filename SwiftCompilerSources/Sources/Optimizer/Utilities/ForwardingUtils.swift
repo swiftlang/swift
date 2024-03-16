@@ -385,11 +385,15 @@ extension NonEscapingClosureDefUseWalker: ForwardingDefUseWalker {
 
   mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
     // Nonescaping closures may be moved, copied, or borrowed.
-    if let transition = operand.instruction as? OwnershipTransitionInstruction {
+    switch operand.instruction {
+    case let transition as OwnershipTransitionInstruction:
       return walkDownUses(of: transition.ownershipResult, using: operand)
+    case let convert as ConvertEscapeToNoEscapeInst:
+      return walkDownUses(of: convert, using: operand)
+    default:
+      // Otherwise, assume the use cannot propagate the closure context.
+      return closureContextLeafUse(of: operand)
     }
-    // Otherwise, assume the use cannot propagate the closure context.
-    return closureContextLeafUse(of: operand)
   }
 
   mutating func deadValue(_ value: Value, using operand: Operand?) -> WalkResult {
