@@ -85,6 +85,8 @@ private func extendAccessScopes(dependence: LifetimeDependence,
 
   _ = walker.walkDown(root: dependence.dependentValue)
 
+  log("Scope fixup for dependent uses:\n\(accessRange)")
+
   // Lifetime dependenent uses may not be dominated by the access. The dependent value may be used by a phi or stored
   // into a memory location. The access may be conditional relative to such uses. If any use was not dominated, then
   // `accessRange` will include the function entry.
@@ -219,6 +221,7 @@ private struct LifetimeDependenceScopeFixupWalker : LifetimeDependenceDefUseWalk
   }
 
   mutating func escapingDependence(on operand: Operand) -> WalkResult {
+    log(">>> Escaping dependence: \(operand)")
     _ = visitor(operand)
     // Make a best-effort attempt to extend the access scope regardless of escapes. It is possible that some mandatory
     // pass between scope fixup and diagnostics will make it possible for the LifetimeDependenceDefUseWalker to analyze
