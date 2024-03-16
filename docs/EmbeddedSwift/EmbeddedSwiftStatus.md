@@ -6,6 +6,21 @@
 
 For an introduction and motivation into Embedded Swift, please see "[A Vision for Embedded Swift](https://github.com/apple/swift-evolution/blob/main/visions/embedded-swift.md)", a Swift Evolution document highlighting the main goals and approaches.
 
+## Embedded Swift Language Features
+
+| **Language Feature**                                  | **Currently Supported In Embedded Swift** |
+|-------------------------------------------------------|-------------------------------------------|
+| *Anything not listed below*                           | Yes                                       |
+| Library Evolution (resilience)                        | No, intentionally unsupported long-term   |
+| Objective-C interoperability                          | No, intentionally unsupported long-term   |
+| Non-WMO builds                                        | No, intentionally unsupported long-term (WMO should be used)  |
+| Existentials                                          | No, currently disallowed       |
+| Any, AnyObject                                        | No, currently disallowed       |
+| Metatypes                                             | No, currently only allowed as unused arguments (type hints) |
+| Untyped throwing                                      | No, intentionally unsupported long-term (typed throwing should be used instead) |
+| Weak references, unowned references                   | No                                        |
+| Non-final generic class methods						| No, intentionally unsupported long-term   |
+
 ## Embedded Standard Library Breakdown
 
 This status table describes which of the following standard library features can be used in Embedded Swift:
@@ -27,7 +42,7 @@ This status table describes which of the following standard library features can
 | Integer parsing                                            | No     |
 | KeyPaths                                                   | No     |
 | Lazy collections                                           | No     |
-| Mirror                                                     | No, intentionally unsupported long-term |
+| Mirror (runtime reflection)                                | No, intentionally unsupported long-term |
 | Objective-C bridging                                       | No, intentionally unsupported long-term |
 | Optional                                                   | Yes    |
 | print / debugPrint                                         | Partial (only StaticStrings and integers) |
