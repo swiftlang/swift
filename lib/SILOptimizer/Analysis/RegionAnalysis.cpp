@@ -2018,7 +2018,7 @@ public:
   }
 
   void translateSILLookThrough(SingleValueInstruction *svi) {
-    assert(svi->getNumOperands() == 1);
+    assert(svi->getNumRealOperands() == 1);
     auto srcID = tryToTrackValue(svi->getOperand(0));
     auto destID = tryToTrackValue(svi);
     assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
@@ -2261,7 +2261,7 @@ public:
       return;
 
     case TranslationSemantics::LookThrough:
-      assert(inst->getNumOperands() == 1);
+      assert(inst->getNumRealOperands() == 1);
       assert((isStaticallyLookThroughInst(inst) ||
               isLookThroughIfResultNonSendable(inst) ||
               isLookThroughIfOperandNonSendable(inst) ||
