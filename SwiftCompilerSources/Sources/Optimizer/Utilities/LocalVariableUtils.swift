@@ -441,7 +441,8 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
-    return .abortWalk
+    visit(LocalVariableAccess(.escape, operand))
+    return .continueWalk
   }
 
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
