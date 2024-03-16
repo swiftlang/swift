@@ -1549,6 +1549,8 @@ function Build-Runtime([Platform]$Platform, $Arch) {
     $PlatformDefines += @{
       LLVM_ENABLE_LIBCXX = "YES";
       SWIFT_USE_LINKER = "lld";
+      SWIFT_INCLUDE_TESTS = "NO";
+      SWIFT_INCLUDE_TEST_BINARIES = "NO";
     }
   }
 
