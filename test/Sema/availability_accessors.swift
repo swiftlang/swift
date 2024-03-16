@@ -41,14 +41,14 @@ struct BaseStruct {
   var unavailableSetter: Value {
     get { .defaultValue }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 16 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 12 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: Value {
     @available(*, unavailable)
     get { fatalError() } // expected-note 24 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 16 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 12 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
 }
 
@@ -73,13 +73,13 @@ func testRValueLoads() {
 
   _ = x.unavailableSetter
   _ = x.unavailableSetter.a
-  _ = x.unavailableSetter[0] // expected-error {{setter for 'unavailableSetter' is unavailable}} FIXME: setter should not be diagnosed
-  _ = x.unavailableSetter[0].b // expected-error {{setter for 'unavailableSetter' is unavailable}} FIXME: setter should not be diagnosed
+  _ = x.unavailableSetter[0]
+  _ = x.unavailableSetter[0].b
 
   _ = x.unavailableGetterAndSetter // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = x.unavailableGetterAndSetter.a // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
-  _ = x.unavailableGetterAndSetter[0] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}} FIXME: setter should not be diagnosed
-  _ = x.unavailableGetterAndSetter[0].b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}} FIXME: setter should not be diagnosed
+  _ = x.unavailableGetterAndSetter[0] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = x.unavailableGetterAndSetter[0].b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
 func testLValueAssignments() {
@@ -243,11 +243,11 @@ struct TestPatternBindingInitExprs {
 
   var unavailableSetter = global.unavailableSetter
   var unavailableSetter_a = global.unavailableSetter.a
-  var unavailableSetter_0 = global.unavailableSetter[0] // expected-error {{setter for 'unavailableSetter' is unavailable}} FIXME: setter should not be diagnosed
-  var unavailableSetter_0_b = global.unavailableSetter[0].b // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  var unavailableSetter_0 = global.unavailableSetter[0]
+  var unavailableSetter_0_b = global.unavailableSetter[0].b
 
   var unavailableGetterAndSetter = global.unavailableGetterAndSetter // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   var unavailableGetterAndSetter_a = global.unavailableGetterAndSetter.a // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
-  var unavailableGetterAndSetter_0 = global.unavailableGetterAndSetter[0] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}} FIXME: setter should not be diagnosed
-  var unavailableGetterAndSetter_0_b = global.unavailableGetterAndSetter[0].b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}} FIXME: setter should not be diagnosed
+  var unavailableGetterAndSetter_0 = global.unavailableGetterAndSetter[0] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  var unavailableGetterAndSetter_0_b = global.unavailableGetterAndSetter[0].b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
