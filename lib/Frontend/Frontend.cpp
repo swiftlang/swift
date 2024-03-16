@@ -249,7 +249,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 
-  serializationOpts.SkipNonExportableDecls = opts.SkipNonExportableDecls;
+  serializationOpts.SkipNonExportableDecls =
+      getLangOptions().SkipNonExportableDecls;
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
@@ -1402,7 +1403,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
-    if (Invocation.getFrontendOptions().AllowNonResilientAccess)
+    if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
 
     // Register the main module with the AST context.

@@ -570,6 +570,13 @@ namespace swift {
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = true;
 
+    /// Skips decls that cannot be referenced externally.
+    bool SkipNonExportableDecls = false;
+
+    /// True if -experimental-allow-non-resilient-access is passed and built
+    /// from source.
+    bool AllowNonResilientAccess = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
