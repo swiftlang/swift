@@ -56,7 +56,7 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
         f.set(isPerformanceConstraint: true, context)
       }
 
-      optimize(function: f, context, &worklist)
+      optimize(function: f, context, moduleContext, &worklist)
     }
 
     // Generic specialization takes care of removing metatype arguments of generic functions.
@@ -73,7 +73,7 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
   
   var changed = true
@@ -92,11 +92,11 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
       // Embedded Swift specific transformations
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, &worklist)
+          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, moduleContext, &worklist)
         }
       case let metatype as MetatypeInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, &worklist)
+          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, moduleContext, &worklist)
         }
       case let classMethod as ClassMethodInst:
         if context.options.enableEmbeddedSwift {
@@ -133,13 +133,21 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
   }
 }
 
-private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
-  guard let vtable = context.specializeVTable(for: type, in: function) else {
+private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function,
+                                                     _ context: FunctionPassContext, _ moduleContext: ModulePassContext,
+                                                     _ worklist: inout FunctionWorklist) {
+  let vTablesCountBefore = moduleContext.vTables.count
+
+  guard context.specializeVTable(for: type, in: function) != nil else {
     return
   }
 
-  for entry in vtable.entries {
-    worklist.pushIfNotVisited(entry.function)
+  // More than one new vtable might have been created (superclasses), process them all
+  let vTables = moduleContext.vTables
+  for i in vTablesCountBefore ..< vTables.count {
+    for entry in vTables[i].entries {
+      worklist.pushIfNotVisited(entry.function)
+    }
   }
 }
 
