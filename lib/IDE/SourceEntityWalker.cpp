@@ -178,7 +178,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
         SourceLoc loc = parsedName.second;
         if (auto assocTypeDecl = proto->getAssociatedType(name)) {
           auto Continue = passReference(
-              assocTypeDecl, assocTypeDecl->getDeclaredInterfaceType(),
+              assocTypeDecl, assocTypeDecl->getInterfaceType(),
               DeclNameLoc(loc),
               ReferenceMetaData(SemaReferenceKind::TypeRef, std::nullopt));
           if (!Continue)
