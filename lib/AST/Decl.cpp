@@ -32,7 +32,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
@@ -6613,42 +6612,6 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 
   auto allInherited = getAllInheritedProtocols();
   return (llvm::find(allInherited, super) != allInherited.end());
-}
-
-static void findInheritedType(
-    InheritedTypes inherited,
-    llvm::function_ref<bool(Type, NullablePtr<TypeRepr>)> isMatch) {
-  for (size_t i = 0; i < inherited.size(); i++) {
-    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
-    if (!type)
-      continue;
-
-    if (isMatch(type, inherited.getTypeRepr(i)))
-      break;
-  }
-}
-
-static InverseMarking::Mark
-findInverseInInheritance(InheritedTypes inherited,
-                         InvertibleProtocolKind target) {
-  auto isInverseOfTarget = [&](Type t) {
-    if (auto pct = t->getAs<ProtocolCompositionType>())
-      return pct->getInverses().contains(target);
-    return false;
-  };
-
-  InverseMarking::Mark inverse;
-  findInheritedType(inherited,
-                    [&](Type inheritedTy, NullablePtr<TypeRepr> repr) {
-                      if (!isInverseOfTarget(inheritedTy))
-                        return false;
-
-                      inverse = InverseMarking::Mark(
-                          InverseMarking::Kind::Explicit,
-                          repr.isNull() ? SourceLoc() : repr.get()->getLoc());
-                      return true;
-                    });
-  return inverse;
 }
 
 bool ProtocolDecl::requiresClass() const {
