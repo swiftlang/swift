@@ -514,6 +514,16 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
         return true;
     }
 
+    if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+      auto reqSig = proto->getRequirementSignature();
+
+      SmallVector<Requirement, 2> reqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      reqSig.getRequirementsWithInverses(proto, reqs, inverses);
+      if (!inverses.empty())
+        return true;
+    }
+
     if (isa<AbstractFunctionDecl>(valueDecl) ||
         isa<AbstractStorageDecl>(valueDecl)) {
       if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
