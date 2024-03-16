@@ -3986,23 +3986,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchAmbiguous();
   }
 
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // move-only types (and their metatypes) cannot match with existential types.
-    if (type1->getMetatypeInstanceType()->isNoncopyable()) {
-      // tailor error message
-      if (shouldAttemptFixes()) {
-        auto *fix = MustBeCopyable::create(*this,
-                                           type1,
-                                           NoncopyableMatchFailure::forExistentialCast(
-                                               type2),
-                                           getConstraintLocator(locator));
-        if (!recordFix(fix))
-          return getTypeMatchSuccess();
-      }
-      return getTypeMatchFailure(locator);
-    }
-  }
-
   // FIXME: Feels like a hack.
   if (type1->is<InOutType>())
     return getTypeMatchFailure(locator);
@@ -8496,26 +8479,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                   locator);
 
     return SolutionKind::Solved;
-  }
-
-  // FIXME: This is already handled by tuple conformance lookup path and
-  // should be removed once non-copyable generics are enabled by default.
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // Copyable is checked structurally, so for better performance, split apart
-    // this constraint into individual Copyable constraints on each tuple
-    // element.
-    if (auto *tupleType = type->getAs<TupleType>()) {
-      if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-        for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
-          addConstraint(
-              ConstraintKind::ConformsTo, tupleType->getElementType(i),
-              protocol->getDeclaredInterfaceType(),
-              locator.withPathElement(LocatorPathElt::TupleElement(i)));
-        }
-
-        return SolutionKind::Solved;
-      }
-    }
   }
 
   auto *loc = getConstraintLocator(locator);

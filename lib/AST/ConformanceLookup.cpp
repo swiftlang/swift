@@ -111,14 +111,6 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     return ProtocolConformanceRef::forInvalid();
   }
 
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
-      && !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // Prior to noncopyable generics, all existentials conform to Copyable.
-        return ProtocolConformanceRef(
-            ctx.getBuiltinConformance(type, protocol,
-                                      BuiltinConformanceKind::Synthesized));
-  }
-
   auto layout = type->getExistentialLayout();
 
   // Due to an IRGen limitation, witness tables cannot be passed from an
@@ -398,18 +390,6 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
 
-  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics) &&
-      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    // Only metatypes of Copyable types are Copyable.
-    if (metatypeType->getInstanceType()->isNoncopyable()) {
-      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
-    } else {
-      return ProtocolConformanceRef(
-          ctx.getBuiltinConformance(type, protocol,
-                                    BuiltinConformanceKind::Synthesized));
-    }
-  }
-
   // All metatypes are Sendable, Copyable, Escapable, and BitwiseCopyable.
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
@@ -515,12 +495,6 @@ LookupConformanceInModuleRequest::evaluate(
   // archetype's list of conformances, or if the archetype has a superclass
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
-
-    // Without noncopyable generics, all archetypes are Copyable
-    if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-      if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
-        return ProtocolConformanceRef(protocol);
-
     // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
     // conformance first, since an abstract conformance might not be
@@ -843,26 +817,6 @@ bool TypeBase::isSendableType() {
 /// Copyable and Escapable checking utilities
 ///
 
-/// Returns true if this type is _always_ Copyable using the legacy check
-/// that does not rely on conformances.
-static bool alwaysNoncopyable(Type ty) {
-  if (auto *nominal = ty->getNominalOrBoundGenericNominal())
-    return !nominal->canBeCopyable();
-
-  if (auto *expansion = ty->getAs<PackExpansionType>()) {
-    return alwaysNoncopyable(expansion->getPatternType());
-  }
-
-  // if any components of the tuple are move-only, then the tuple is move-only.
-  if (auto *tupl = ty->getCanonicalType()->getAs<TupleType>()) {
-    for (auto eltTy : tupl->getElementTypes())
-      if (alwaysNoncopyable(eltTy))
-        return true;
-  }
-
-  return false; // otherwise, the conservative assumption is it's copyable.
-}
-
 /// Preprocesses a type before querying whether it conforms to an invertible.
 static CanType preprocessTypeForInvertibleQuery(Type orig) {
   Type type = orig;
@@ -894,6 +848,11 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
 
   assert(!type->is<PackExpansionType>());
 
+  // FIXME: lldb misbehaves by getting here with a SILPackType.
+  //  just pretend it it conforms.
+  if (type->is<SILPackType>())
+    return true;
+
   // The SIL types in the AST do not have real conformances, and should have
   // been handled in SILType instead.
   assert(!(type->is<SILBoxType,
@@ -912,26 +871,10 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
 /// \returns true iff this type lacks conformance to Copyable.
 bool TypeBase::isNoncopyable() {
   auto canType = preprocessTypeForInvertibleQuery(this);
-  auto &ctx = canType->getASTContext();
-
-  // for legacy-mode queries that are not dependent on conformances to Copyable
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return alwaysNoncopyable(canType);
-
   return !conformsToInvertible(canType, InvertibleProtocolKind::Copyable);
 }
 
 bool TypeBase::isEscapable() {
   auto canType = preprocessTypeForInvertibleQuery(this);
-  auto &ctx = canType->getASTContext();
-
-  // for legacy-mode queries that are not dependent on conformances to Escapable
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    if (auto nom = canType.getAnyNominal())
-      return nom->canBeEscapable();
-    else
-      return true;
-  }
-
   return conformsToInvertible(canType, InvertibleProtocolKind::Escapable);
 }

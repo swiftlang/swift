@@ -17,6 +17,7 @@ static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   PrintOptions Opts;
   Opts.SynthesizeSugarOnTypes = true;
   Opts.UseOriginallyDefinedInModuleNames = true;
+  Opts.PrintInverseRequirements = true; // Only inverses are relevant for ABI stability
   if (!CheckerOpts.Migrator) {
     // We should always print fully qualified type names for checking either
     // API or ABI stability.
@@ -1222,8 +1223,15 @@ Requirement getCanonicalRequirement(Requirement &Req) {
   }
 }
 
+// Get an inverse requirement with the subject type canonicalized.
+InverseRequirement getCanonicalInverseRequirement(InverseRequirement &Req) {
+  return {Req.subject->getCanonicalType(), Req.protocol, Req.loc};
+}
+
 static
-StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs,
+StringRef printGenericSignature(SDKContext &Ctx,
+                                ArrayRef<Requirement> AllReqs,
+                                ArrayRef<InverseRequirement> Inverses,
                                 bool Canonical) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
@@ -1243,6 +1251,17 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs,
     else
       Req.print(OS, Opts);
   }
+  for (auto Inv: Inverses) {
+    if (!First) {
+      OS << ", ";
+    } else {
+      First = false;
+    }
+    if (Canonical)
+      getCanonicalInverseRequirement(Inv).print(OS, Opts);
+    else
+      Inv.print(OS, Opts);
+  }
   OS << ">";
   return Ctx.buffer(OS.str());
 }
@@ -1251,8 +1270,10 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
-    return printGenericSignature(Ctx, PD->getRequirementSignature().getRequirements(),
-                                 Canonical);
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    PD->getRequirementSignature().getRequirementsWithInverses(PD, reqs, inverses);
+    return printGenericSignature(Ctx, reqs, inverses, Canonical);
   }
   PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   if (auto *GC = D->getAsGenericContext()) {
@@ -1269,7 +1290,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
 
 static
 StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf, bool Canonical) {
-  return printGenericSignature(Ctx, Conf->getConditionalRequirements(), Canonical);
+  return printGenericSignature(Ctx, Conf->getConditionalRequirements(), {}, Canonical);
 }
 
 static std::optional<uint8_t>

@@ -1074,37 +1074,33 @@ void NominalTypeDecl::prepareConformanceTable() const {
   };
 
   // Synthesize the unconditional conformances to invertible protocols.
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // FIXME: We should be able to only resolve the inheritance clause once,
-    // but we also do it in ConformanceLookupTable::updateLookupTable().
-    InvertibleProtocolSet inverses;
-    bool anyObject = false;
-    (void) getDirectlyInheritedNominalTypeDecls(this, inverses, anyObject);
+  // FIXME: We should be able to only resolve the inheritance clause once,
+  // but we also do it in ConformanceLookupTable::updateLookupTable().
+  InvertibleProtocolSet inverses;
+  bool anyObject = false;
+  (void) getDirectlyInheritedNominalTypeDecls(this, inverses, anyObject);
 
-    // Handle deprecated attributes.
-    if (getAttrs().hasAttribute<MoveOnlyAttr>())
-      inverses.insert(InvertibleProtocolKind::Copyable);
-    if (getAttrs().hasAttribute<NonEscapableAttr>())
-      inverses.insert(InvertibleProtocolKind::Escapable);
+  // Handle deprecated attributes.
+  if (getAttrs().hasAttribute<MoveOnlyAttr>())
+    inverses.insert(InvertibleProtocolKind::Copyable);
+  if (getAttrs().hasAttribute<NonEscapableAttr>())
+    inverses.insert(InvertibleProtocolKind::Escapable);
 
-    bool hasSuppressedConformances = false;
-    for (auto ip : InvertibleProtocolSet::full()) {
-      if (!inverses.contains(ip) ||
-          (isa<ClassDecl>(this) &&
-           !ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
-        addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
-      } else {
-        hasSuppressedConformances = true;
-      }
+  bool hasSuppressedConformances = false;
+  for (auto ip : InvertibleProtocolSet::full()) {
+    if (!inverses.contains(ip) ||
+        (isa<ClassDecl>(this) &&
+         !ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
+      addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+    } else {
+      hasSuppressedConformances = true;
     }
-
-    // Non-copyable and non-escaping types do not implicitly conform to
-    // any other protocols.
-    if (hasSuppressedConformances)
-      return;
-  } else if (!canBeCopyable()) {
-    return; // No synthesized conformances for move-only nominals.
   }
+
+  // Non-copyable and non-escaping types do not implicitly conform to
+  // any other protocols.
+  if (hasSuppressedConformances)
+    return;
 
   // Don't do any more for synthesized FileUnits.
   if (file->getKind() == FileUnitKind::Synthesized)
@@ -1285,11 +1281,8 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
 
     // Triggers synthesis of a possibly conditional conformance.
     // For the unconditional ones, see NominalTypeDecl::prepareConformanceTable
-    if (nominal->getASTContext().LangOpts.hasFeature(
-            Feature::NoncopyableGenerics)) {
-      for (auto ip : InvertibleProtocolSet::full())
-        trySynthesize(getKnownProtocolKind(ip));
-    }
+    for (auto ip : InvertibleProtocolSet::full())
+      trySynthesize(getKnownProtocolKind(ip));
 
     if (nominal->getASTContext().LangOpts.hasFeature(
             Feature::BitwiseCopyable)) {

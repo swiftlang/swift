@@ -33,7 +33,7 @@ struct FooStructDeinitializerB {
   deinit // expected-error {{expected '{' for deinitializer}}
 }
 
-struct FooStructDeinitializerC {
+struct FooStructDeinitializerC { // expected-note {{consider adding '~Copyable' to struct 'FooStructDeinitializerC'}}
   deinit {} // expected-error {{deinitializer cannot be declared in struct 'FooStructDeinitializerC' that conforms to 'Copyable'}}
 }
 
