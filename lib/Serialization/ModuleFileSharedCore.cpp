@@ -214,7 +214,6 @@ static ValidationInfo validateControlBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     std::pair<uint16_t, uint16_t> expectedVersion,
     bool requiresOSSAModules,
-    bool requiresNoncopyableGenerics,
     bool requiresRevisionMatch,
     StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo,
@@ -442,12 +441,6 @@ static ValidationInfo validateControlBlock(
         result.status = Status::NotInOSSA;
       break;
     }
-    case control_block::HAS_NONCOPYABLE_GENERICS: {
-      auto hasNoncopyableGenerics = scratch[0];
-      if (requiresNoncopyableGenerics != hasNoncopyableGenerics)
-        result.status = Status::NoncopyableGenericsMismatch;
-      break;
-    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -552,8 +545,6 @@ std::string serialization::StatusToString(Status S) {
   case Status::RevisionIncompatible: return "RevisionIncompatible";
   case Status::ChannelIncompatible: return "ChannelIncompatible";
   case Status::NotInOSSA: return "NotInOSSA";
-  case Status::NoncopyableGenericsMismatch:
-    return "NoncopyableGenericsMismatch";
   case Status::MissingDependency: return "MissingDependency";
   case Status::MissingUnderlyingModule: return "MissingUnderlyingModule";
   case Status::CircularDependency: return "CircularDependency";
@@ -575,7 +566,7 @@ bool serialization::isSerializedAST(StringRef data) {
 }
 
 ValidationInfo serialization::validateSerializedAST(
-    StringRef data, bool requiresOSSAModules, bool requiresNoncopyableGenerics,
+    StringRef data, bool requiresOSSAModules,
     StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
@@ -621,7 +612,6 @@ ValidationInfo serialization::validateSerializedAST(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           requiresOSSAModules,
-          requiresNoncopyableGenerics,
           /*requiresRevisionMatch=*/true,
           requiredSDK,
           extendedInfo, localObfuscator);
@@ -1157,7 +1147,6 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
       info = validateControlBlock(
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
           RequiresOSSAModules,
-          RequiresNoncopyableGenerics,
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
@@ -1303,7 +1292,6 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
           infoCursor, scratch,
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
           RequiresOSSAModules,
-          RequiresNoncopyableGenerics,
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
@@ -1381,14 +1369,12 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework,
     bool requiresOSSAModules,
-    bool requiresNoncopyableGenerics,
     StringRef requiredSDK,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
-      RequiresOSSAModules(requiresOSSAModules),
-      RequiresNoncopyableGenerics(requiresNoncopyableGenerics) {
+      RequiresOSSAModules(requiresOSSAModules) {
   assert(!hasError());
   Bits.IsFramework = isFramework;
 
@@ -1436,7 +1422,6 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           RequiresOSSAModules,
-          RequiresNoncopyableGenerics,
           /*requiresRevisionMatch=*/true, requiredSDK,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {

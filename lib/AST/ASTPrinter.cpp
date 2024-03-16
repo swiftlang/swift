@@ -7467,6 +7467,13 @@ void Requirement::print(ASTPrinter &printer, const PrintOptions &opts) const {
   PrintAST(printer, opts).printRequirement(*this);
 }
 
+void InverseRequirement::print(raw_ostream &os,
+                          const PrintOptions &opts,
+                          bool forInherited) const {
+  StreamPrinter printer(os);
+  PrintAST(printer, opts).printRequirement(*this, forInherited);
+}
+
 std::string GenericSignatureImpl::getAsString() const {
   return GenericSignature(const_cast<GenericSignatureImpl *>(this))
       .getAsString();
@@ -7770,17 +7777,15 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   InvertibleProtocolSet inverses = InvertibleProtocolSet::full();
 
   for (auto *inherited : proto->getInheritedProtocols()) {
-    if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-      if (auto ip = inherited->getInvertibleProtocolKind()) {
-        inverses.remove(*ip);
-        continue;
-      }
+    if (auto ip = inherited->getInvertibleProtocolKind()) {
+      inverses.remove(*ip);
+      continue;
+    }
 
-      for (auto ip : InvertibleProtocolSet::full()) {
-        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
-        if (inherited->inheritsFrom(proto))
-          inverses.remove(ip);
-      }
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      if (inherited->inheritsFrom(proto))
+        inverses.remove(ip);
     }
 
     Results.emplace_back(TypeLoc::withoutLoc(inherited->getDeclaredInterfaceType()),
@@ -7789,19 +7794,17 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
                          /*isPreconcurrency=*/false);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto ip : inverses) {
-      InvertibleProtocolSet singleton;
-      singleton.insert(ip);
+  for (auto ip : inverses) {
+    InvertibleProtocolSet singleton;
+    singleton.insert(ip);
 
-      auto inverseTy = ProtocolCompositionType::get(
-          ctx, ArrayRef<Type>(), singleton,
-          /*hasExplicitAnyObject=*/false);
-      Results.emplace_back(TypeLoc::withoutLoc(inverseTy),
-                           /*isUnchecked=*/false,
-                           /*isRetroactive=*/false,
-                           /*isPreconcurrency=*/false);
-    }
+    auto inverseTy = ProtocolCompositionType::get(
+        ctx, ArrayRef<Type>(), singleton,
+        /*hasExplicitAnyObject=*/false);
+    Results.emplace_back(TypeLoc::withoutLoc(inverseTy),
+                         /*isUnchecked=*/false,
+                         /*isRetroactive=*/false,
+                         /*isPreconcurrency=*/false);
   }
 }
 

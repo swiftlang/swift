@@ -6419,13 +6419,11 @@ bool NotCopyableFailure::diagnoseAsError() {
   emitDiagnostic(diag::noncopyable_generics, noncopyableTy);
 
 #ifndef NDEBUG
-  if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     getLocator()->dump(&getConstraintSystem());
 #pragma clang diagnostic pop
     llvm_unreachable("NoncopyableGenerics: vague diagnostic for locator");
-  }
 #endif
 
   return true;

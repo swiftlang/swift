@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 protocol P: Copyable {} 
 struct S: P {}
 
@@ -11,8 +9,7 @@ typealias WhatIfIQualify = Swift.Copyable
 class C: Copyable {} 
 
 @_moveOnly struct MOStruct: Copyable {}
-// expected-error@-1 {{noncopyable struct 'MOStruct' cannot conform to 'Copyable'}}
-// expected-error@-2 {{struct 'MOStruct' required to be 'Copyable' but is marked with '~Copyable'}}
+// expected-error@-1 {{struct 'MOStruct' required to be 'Copyable' but is marked with '~Copyable'}}
 
 
 func whatever<T>(_ t: T) where T: Copyable {} 

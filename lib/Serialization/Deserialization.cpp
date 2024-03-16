@@ -893,7 +893,9 @@ ProtocolConformanceDeserializer::readBuiltinProtocolConformance(
   BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
                                                protoID, builtinConformanceKind);
 
-  Type conformingType = MF.getType(conformingTypeID);
+  auto conformingType = MF.getTypeChecked(conformingTypeID);
+  if (!conformingType)
+    return conformingType.takeError();
 
   auto decl = MF.getDeclChecked(protoID);
   if (!decl)
@@ -902,7 +904,7 @@ ProtocolConformanceDeserializer::readBuiltinProtocolConformance(
   auto proto = cast<ProtocolDecl>(decl.get());
 
   auto conformance = ctx.getBuiltinConformance(
-      conformingType, proto,
+      conformingType.get(), proto,
       static_cast<BuiltinConformanceKind>(builtinConformanceKind));
   return conformance;
 }

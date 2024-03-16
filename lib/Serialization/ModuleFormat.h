@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 864; // alloc_stack [var_decl]
+const uint16_t SWIFTMODULE_VERSION_MINOR = 865; // removal of noncopyable generics control block
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -864,7 +864,6 @@ namespace control_block {
     CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
-    HAS_NONCOPYABLE_GENERICS,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -913,11 +912,6 @@ namespace control_block {
   using AllowableClientLayout = BCRecordLayout<
     ALLOWABLE_CLIENT_NAME,
     BCBlob
-  >;
-
-  using HasNoncopyableGenerics = BCRecordLayout<
-      HAS_NONCOPYABLE_GENERICS,
-      BCFixed<1>
   >;
 }
 

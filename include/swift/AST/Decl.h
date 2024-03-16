@@ -4392,10 +4392,6 @@ public:
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
 
-  /// Determine whether this type has ~<target>` stated on
-  /// itself, one of its inherited types or `Self` requirements.
-  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
