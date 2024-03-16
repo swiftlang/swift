@@ -312,13 +312,6 @@ public:
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
 
-  /// Should we skip decls that cannot be referenced externally?
-  bool SkipNonExportableDecls = false;
-
-  /// True if -experimental-allow-non-resilient-access is passed and built
-  /// from source.
-  bool AllowNonResilientAccess = false;
-
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?
   bool RemarkOnRebuildFromModuleInterface = false;

@@ -681,7 +681,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
-  Opts.EnableBypassResilienceInPackage = Args.hasArg(OPT_experimental_package_bypass_resilience);
+  Opts.EnableBypassResilienceInPackage =
+      Args.hasArg(OPT_experimental_package_bypass_resilience) ||
+      Opts.hasFeature(Feature::ClientBypassResilientAccessInPackage);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
@@ -1111,7 +1113,54 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
 
   Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
-  
+
+  if (Args.hasArg(OPT_enable_library_evolution)) {
+    Opts.SkipNonExportableDecls |=
+        Args.hasArg(OPT_experimental_skip_non_exportable_decls);
+
+    Opts.SkipNonExportableDecls |=
+        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+        Args.hasArg(
+            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  } else {
+    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-skip-non-exportable-decls",
+                     "-enable-library-evolution");
+  }
+
+  Opts.AllowNonResilientAccess =
+      Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
+      Opts.hasFeature(Feature::AllowNonResilientAccessInPackage);
+  if (Opts.AllowNonResilientAccess) {
+    // Override the option to skip non-exportable decls.
+    if (Opts.SkipNonExportableDecls) {
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-exportable-decls",
+                     "-experimental-allow-non-resilient-access");
+      Opts.SkipNonExportableDecls = false;
+    }
+    // If built from interface, non-resilient access should not be allowed.
+    if (Opts.AllowNonResilientAccess &&
+        (FrontendOpts.RequestedAction ==
+             FrontendOptions::ActionType::CompileModuleFromInterface ||
+         FrontendOpts.RequestedAction ==
+             FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
+      Diags.diagnose(
+          SourceLoc(), diag::warn_ignore_option_overriden_by,
+          "-experimental-allow-non-resilient-access",
+          "-compile-module-from-interface or -typecheck-module-from-interface");
+      Opts.AllowNonResilientAccess = false;
+    }
+  }
+
+  // HACK: The driver currently erroneously passes all flags to module interface
+  // verification jobs. -experimental-skip-non-exportable-decls is not
+  // appropriate for verification tasks and should be ignored, though.
+  if (FrontendOpts.RequestedAction ==
+      FrontendOptions::ActionType::TypecheckModuleFromInterface)
+    Opts.SkipNonExportableDecls = false;
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   std::string TargetArgScratch;
@@ -2097,11 +2146,9 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
-                         IRGenOptions &IRGenOpts,
-                         const FrontendOptions &FEOpts,
+                         IRGenOptions &IRGenOpts, const FrontendOptions &FEOpts,
                          const TypeCheckerOptions &TCOpts,
-                         DiagnosticEngine &Diags,
-                         const llvm::Triple &Triple,
+                         DiagnosticEngine &Diags, LangOptions &LangOpts,
                          ClangImporterOptions &ClangOpts) {
   using namespace options;
 
@@ -2139,7 +2186,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.SkipFunctionBodies = TCOpts.SkipFunctionBodies;
 
   // Propagate -experimental-skip-non-exportable-decls to SIL.
-  Opts.SkipNonExportableDecls = FEOpts.SkipNonExportableDecls;
+  Opts.SkipNonExportableDecls = LangOpts.SkipNonExportableDecls;
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -2346,8 +2393,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
 
-  if (Args.hasArg(OPT_ExperimentalPackageCMO)) {
-    if (!FEOpts.AllowNonResilientAccess) {
+  if (Args.hasArg(OPT_ExperimentalPackageCMO) ||
+      LangOpts.hasFeature(Feature::PackageCMO)) {
+    if (!LangOpts.AllowNonResilientAccess) {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-package-cmo",
                      "-experimental-allow-non-resilient-access");
@@ -2439,8 +2487,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
     Opts.Sanitizers = parseSanitizerArgValues(
-        Args, A, Triple, Diags,
-        /* sanitizerRuntimeLibExists= */[](StringRef libName, bool shared) {
+        Args, A, LangOpts.Target, Diags,
+        /* sanitizerRuntimeLibExists= */ [](StringRef libName, bool shared) {
 
           // The driver has checked the existence of the library
           // already.
@@ -3288,8 +3336,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
-                   TypeCheckerOpts, Diags,
-                   LangOpts.Target, ClangImporterOpts)) {
+                   TypeCheckerOpts, Diags, LangOpts, ClangImporterOpts)) {
     return true;
   }
 
