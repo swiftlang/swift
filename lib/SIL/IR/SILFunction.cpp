@@ -899,7 +899,9 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
     return false;
 
   // Otherwise, only public or package functions can be referenced.
-  return hasPublicOrPackageVisibility(getLinkage(), getModule().getOptions().EnableSerializePackage);
+  // If it has a package linkage at this point, package CMO must
+  // have been enabled, so opt in for visibility.
+  return hasPublicOrPackageVisibility(getLinkage(), /*includePackage*/ true);
 }
 
 bool

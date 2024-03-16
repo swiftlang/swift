@@ -289,6 +289,9 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
   llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
+/// Opt in package linkage for visibility in case Package CMO is enabled.
+/// Used in SIL verification and other checks that determine inlinability to
+/// accomodate for the optimization.
 inline bool hasPublicOrPackageVisibility(SILLinkage linkage, bool includePackage) {
     switch (linkage) {
     case SILLinkage::Public:
