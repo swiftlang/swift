@@ -18,6 +18,14 @@
 
 import SIL
 
+private let verbose = false
+
+private func log(_ message: @autoclosure () -> String) {
+  if verbose {
+    print("### \(message())")
+  }
+}
+
 /// Return true if any use in `value`s forward-extend lifetime has
 /// .pointerEscape operand ownership.
 ///
@@ -370,6 +378,7 @@ struct NonEscapingClosureDefUseWalker {
       if operand.instruction.isIncidentalUse {
         return .continueWalk
       }
+      log(">>> Unexpected closure use \(operand)")
       // Escaping or unexpected closure use. Expected escaping uses include ReturnInst with a lifetime-dependent result.
       //
       // TODO: Check in the SIL verifier that all uses are expected.
