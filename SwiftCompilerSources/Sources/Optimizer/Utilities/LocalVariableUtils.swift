@@ -25,7 +25,7 @@
 
 import SIL
 
-private let verbose = true
+private let verbose = false
 
 private func log(_ message: @autoclosure () -> String) {
   if verbose {
@@ -732,6 +732,7 @@ extension LocalVariableReachableAccess {
       forwardPropagateEffect(in: block, blockInfo: blockInfo, effect: currentEffect, blockList: &blockList,
                              accessStack: &accessStack)
     }
+    log("Local variable reachable uses: \(accessMap)\n\(accessStack)")
     return true
   }
 
