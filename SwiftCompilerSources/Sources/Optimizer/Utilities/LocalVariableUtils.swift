@@ -188,8 +188,8 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   }
 
   var description: String {
-    return "\(access)" +
-      "\n    fully-assigned: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!))"
+    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)) "
+      + "\(access)"
   }
 }
 
@@ -200,7 +200,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
 /// map.
 ///
 /// TODO: In addition to isFullyAssigned, consider adding a lazily computed access path if any need arises.
-struct LocalVariableAccessMap: Collection, FormattedLikeArray {
+struct LocalVariableAccessMap: Collection, CustomStringConvertible {
   let context: Context
   let allocation: Value
 
@@ -279,6 +279,10 @@ struct LocalVariableAccessMap: Collection, FormattedLikeArray {
   subscript(_ accessIndex: Int) -> LocalVariableAccessInfo { accessList[accessIndex] }
 
   subscript(instruction: Instruction) -> LocalVariableAccessInfo? { accessMap[instruction] }
+
+  public var description: String {
+    "Access map:\n" + map({String(describing: $0)}).joined(separator: "\n")
+  }
 }
 
 /// Gather the accesses of a local allocation: alloc_box, alloc_stack, @in, @inout.
@@ -733,7 +737,8 @@ extension LocalVariableReachableAccess {
       forwardPropagateEffect(in: block, blockInfo: blockInfo, effect: currentEffect, blockList: &blockList,
                              accessStack: &accessStack)
     }
-    log("Local variable reachable uses: \(accessMap)\n\(accessStack)")
+    log("\(accessMap)")
+    log("Reachable access:\n\(accessStack.map({ String(describing: $0)}).joined(separator: "\n"))")
     return true
   }
 
