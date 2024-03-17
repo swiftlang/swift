@@ -1028,10 +1028,10 @@ public:
     return asImpl().shouldEmitVerboseLogging();
   }
 
-  /// Call handleFailure on our CRTP subclass.
-  void handleFailure(const PartitionOp &op, Element elt,
-                     TransferringOperand transferringOp) const {
-    return asImpl().handleFailure(op, elt, transferringOp);
+  /// Call handleLocalUseAfterTransfer on our CRTP subclass.
+  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
+                                   TransferringOperand transferringOp) const {
+    return asImpl().handleLocalUseAfterTransfer(op, elt, transferringOp);
   }
 
   /// Call handleTransferNonTransferrable on our CRTP subclass.
@@ -1086,7 +1086,8 @@ public:
       // value... emit an error.
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[1], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[1],
+                                      transferredOperand);
         }
       }
       p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
@@ -1169,12 +1170,14 @@ public:
       // if attempting to merge a transferred region, handle the failure
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[0], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[0],
+                                      transferredOperand);
         }
       }
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[1], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[1],
+                                      transferredOperand);
         }
       }
 
@@ -1187,7 +1190,8 @@ public:
              "Require PartitionOp's argument should already be tracked");
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[0], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[0],
+                                      transferredOperand);
         }
       }
       return;
@@ -1233,8 +1237,8 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// 3. The operand of the instruction that originally transferred the
   /// region. Can be used to get the immediate value transferred or the
   /// transferring instruction.
-  void handleFailure(const PartitionOp &op, Element elt,
-                     TransferringOperand transferringOp) const {}
+  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
+                                   TransferringOperand transferringOp) const {}
 
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.

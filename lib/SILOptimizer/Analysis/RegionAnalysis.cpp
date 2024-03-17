@@ -3009,8 +3009,8 @@ bool BlockPartitionState::recomputeExitFromEntry(
   };
   ComputeEvaluator eval(workingPartition, ptrSetFactory, translator);
   for (const auto &partitionOp : blockPartitionOps) {
-    // By calling apply without providing a `handleFailure` closure, errors
-    // will be suppressed
+    // By calling apply without providing any error handling callbacks, errors
+    // will be surpressed.  will be suppressed
     eval.apply(partitionOp);
   }
   LLVM_DEBUG(llvm::dbgs() << "    Working Partition: ";
