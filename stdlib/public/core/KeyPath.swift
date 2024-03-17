@@ -80,7 +80,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     }
   }
   
-  public static func ==(a: AnyKeyPath, b: AnyKeyPath) -> Bool {
+  public static func == (a: AnyKeyPath, b: AnyKeyPath) -> Bool {
     // Fast-path identical objects
     if a === b {
       return true
@@ -538,7 +538,7 @@ internal struct ComputedPropertyID: Hashable {
   internal var value: Int
   internal var kind: KeyPathComputedIDKind
 
-  internal static func ==(
+  internal static func == (
     x: ComputedPropertyID, y: ComputedPropertyID
   ) -> Bool {
     return x.value == y.value
@@ -753,7 +753,7 @@ internal enum KeyPathComponent: Hashable {
   /// The keypath wraps a value in an optional.
   case optionalWrap
 
-  internal static func ==(a: KeyPathComponent, b: KeyPathComponent) -> Bool {
+  internal static func == (a: KeyPathComponent, b: KeyPathComponent) -> Bool {
     switch (a, b) {
     case (.struct(offset: let a), .struct(offset: let b)),
          (.class (offset: let a), .class (offset: let b)):
