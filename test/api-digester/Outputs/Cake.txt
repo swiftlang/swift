@@ -1,6 +1,7 @@
 
 /* Generic Signature Changes */
 cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>
+cake: Func addingAnInverse(_:) has generic signature change from <T> to <T where T : ~Copyable>
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
 
 /* RawRepresentable Changes */

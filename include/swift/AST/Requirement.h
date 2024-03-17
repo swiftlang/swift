@@ -270,6 +270,8 @@ struct InverseRequirement {
   static void expandDefaults(ASTContext &ctx,
                              ArrayRef<Type> gps,
                              SmallVectorImpl<StructuralRequirement> &result);
+
+  void print(raw_ostream &os, const PrintOptions &opts, bool forInherited=false) const;
 };
 
 } // end namespace swift

@@ -3409,7 +3409,6 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
       serialization::validateSerializedAST(
         data,
         getSILOptions().EnableOSSAModules,
-        LangOpts.hasFeature(Feature::NoncopyableGenerics),
         LangOpts.SDKName,
         &extendedInfo);
 
@@ -3448,7 +3447,6 @@ CompilerInvocation::setUpInputForSILTool(
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(),
       getSILOptions().EnableOSSAModules,
-      LangOpts.hasFeature(Feature::NoncopyableGenerics),
       LangOpts.SDKName,
       &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
