@@ -1261,9 +1261,9 @@ struct DiagnosticEvaluator final
         transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
         transferredNonTransferrable(transferredNonTransferrable) {}
 
-  void handleFailure(const PartitionOp &partitionOp,
-                     TrackableValueID transferredVal,
-                     TransferringOperand transferringOp) const {
+  void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
+                                   TrackableValueID transferredVal,
+                                   TransferringOperand transferringOp) const {
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and transferringOp was not set with closure
     // capture.
