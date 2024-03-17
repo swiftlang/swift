@@ -61,6 +61,29 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
                        /* IsFixedBuffer = */ false, NumExtraInhabitants);
 }
 
+DebugTypeInfo DebugTypeInfo::getFromType(swift::Type Ty, 
+                                             IRGenModule &IGM) {
+  std::optional<AbstractionPattern> Pattern =
+      AbstractionPattern::buildAbstractionPatternIfPossible(Ty);
+  if (Pattern) {
+    const TypeInfo &Info = IGM.getTypeInfoForUnlowered(*Pattern, Ty);
+    return getFromTypeInfo(Ty, Info, IGM);
+  }
+  return getForwardDecl(Ty);
+}
+
+DebugTypeInfo DebugTypeInfo::getFromAbstractionPattern(swift::Type Ty,
+                                             AbstractionPattern &Pattern,
+                                             IRGenModule &IGM) {
+  const TypeInfo &Info = IGM.getTypeInfoForUnlowered(Pattern, Ty);
+  return getFromTypeInfo(Ty, Info, IGM);
+}
+
+DebugTypeInfo DebugTypeInfo::getFromSILType(swift::Type Ty, SILType SILTy,
+                                             IRGenModule &IGM) {
+ return getFromTypeInfo(Ty, IGM.getTypeInfo(SILTy), IGM); 
+}
+
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
                                               const TypeInfo &Info,
                                               IRGenModule &IGM) {
@@ -208,8 +231,9 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
 #endif
 
 std::optional<CompletedDebugTypeInfo>
-CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM) {
-  auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
+CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
+                                        IRGenModule &IGM) {
+  auto *StorageType = Info.getStorageType();
   std::optional<uint64_t> SizeInBits;
   if (StorageType->isSized())
     SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
@@ -221,4 +245,14 @@ CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IR
 
   return CompletedDebugTypeInfo::get(
       DebugTypeInfo::getFromTypeInfo(Ty, Info, IGM), SizeInBits);
+}
+
+std::optional<CompletedDebugTypeInfo>
+CompletedDebugTypeInfo::getFromType(swift::Type Ty, IRGenModule &IGM) {
+  std::optional<AbstractionPattern> Pattern =
+      AbstractionPattern::buildAbstractionPatternIfPossible(Ty);
+  if (!Pattern)
+    return {};
+  const TypeInfo &Info = IGM.getTypeInfoForUnlowered(*Pattern, Ty);
+  return getFromTypeInfo(Ty, Info, IGM);
 }

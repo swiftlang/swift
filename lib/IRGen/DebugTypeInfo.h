@@ -50,6 +50,10 @@ protected:
   bool IsMetadataType = false;
   bool IsFixedBuffer = false;
 
+  /// Create a standalone type from a TypeInfo object.
+  static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
+                                       IRGenModule &IGM);
+
 public:
   DebugTypeInfo() = default;
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy = nullptr,
@@ -71,8 +75,16 @@ public:
   /// Create a forward declaration for a type whose size is unknown.
   static DebugTypeInfo getForwardDecl(swift::Type Ty);
 
-  /// Create a standalone type from a TypeInfo object.
-  static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
+  /// Create a DebugTypeInfo using the type to build the type info.
+  static DebugTypeInfo getFromType(swift::Type Ty, IRGenModule &IGM);
+
+  /// Create a DebugTypeInfo from a SIL type.
+  static DebugTypeInfo getFromSILType(swift::Type Ty, SILType SILTy,
+                                      IRGenModule &IGM);
+
+  /// Create a DebugTypeInfo using the provided AbstractionPattern.
+  static DebugTypeInfo getFromAbstractionPattern(swift::Type Ty,
+                                       AbstractionPattern &Pattern,
                                        IRGenModule &IGM);
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV,
@@ -125,6 +137,9 @@ class CompletedDebugTypeInfo : public DebugTypeInfo {
   CompletedDebugTypeInfo(DebugTypeInfo DbgTy, Size::int_type SizeInBits)
     : DebugTypeInfo(DbgTy), SizeInBits(SizeInBits) {}
 
+  static std::optional<CompletedDebugTypeInfo>
+  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM);
+
 public:
   static std::optional<CompletedDebugTypeInfo>
   get(DebugTypeInfo DbgTy, std::optional<Size::int_type> SizeInBits) {
@@ -134,7 +149,7 @@ public:
   }
 
   static std::optional<CompletedDebugTypeInfo>
-  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM);
+  getFromType(swift::Type Ty, IRGenModule &IGM);
 
   Size::int_type getSizeInBits() const { return SizeInBits; }
 };

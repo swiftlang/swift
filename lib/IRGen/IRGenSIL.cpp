@@ -5516,7 +5516,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
                                             IGM);
   } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
     // Handle the cases that read from a SIL file
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy), IGM);
+    DbgTy = DebugTypeInfo::getFromSILType(RealTy, SILTy, IGM);
   } else
     return;
 
@@ -5917,7 +5917,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
   } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
              !VarInfo->Name.empty()) {
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
+    DbgTy = DebugTypeInfo::getFromSILType(RealType, SILTy, IGM);
   } else
     return;
 
