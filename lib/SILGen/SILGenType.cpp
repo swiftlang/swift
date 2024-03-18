@@ -23,9 +23,9 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
@@ -260,6 +260,8 @@ public:
   }
 
   void emitVTable() {
+    PrettyStackTraceDecl("silgen emitVTable", theClass);
+
     // Imported types don't have vtables right now.
     if (theClass->hasClangNode())
       return;
@@ -528,6 +530,11 @@ public:
 
     PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
+
+    // Check whether the conformance is valid first.
+    Conformance->resolveValueWitnesses();
+    if (Conformance->isInvalid())
+      return nullptr;
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
@@ -1113,6 +1120,8 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
+    PrettyStackTraceDecl("silgen emitType", theType);
+
     SGM.emitLazyConformancesForType(theType);
 
     for (Decl *member : theType->getABIMembers()) {
@@ -1150,7 +1159,7 @@ public:
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::NonInherited)) {
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-        SGM.getWitnessTable(normal);
+        (void)SGM.getWitnessTable(normal);
     }
   }
 
@@ -1287,6 +1296,8 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
+    PrettyStackTraceDecl("silgen emitExtension", e);
+
     // Arguably, we should divert to SILGenType::emitType() here if it's an
     // @_objcImplementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
@@ -1309,7 +1320,7 @@ public:
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All)) {
         if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
-          SGM.getWitnessTable(normal);
+          (void)SGM.getWitnessTable(normal);
       }
     }
   }

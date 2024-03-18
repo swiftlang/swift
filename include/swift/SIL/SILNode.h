@@ -225,6 +225,7 @@ protected:
     SHARED_FIELD(AllocStackInst, uint8_t
                  dynamicLifetime : 1,
                  lexical : 1,
+                 fromVarDecl : 1,
                  usesMoveableValueDebugInfo : 1,
                  hasInvalidatedVarInfo : 1);
 

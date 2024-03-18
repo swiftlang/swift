@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
-// REQUIRES: noncopyable_generics
-// XFAIL: noncopyable_generics
-
 // CHECK-LABEL: (file).genericFn@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>
 func genericFn<T>(_ t: T) {}
@@ -189,30 +186,19 @@ struct Cond<T: ~Copyable>: ~Copyable {}
 extension Cond: Copyable where T: Copyable {}
 
 
-// CHECK-LABEL: .ImplicitCond@
+// CHECK-LABEL: .FullyGenericArg@
 // CHECK: Generic signature: <T>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0>
-struct ImplicitCond<T: ~Escapable & ~Copyable> {}
+struct FullyGenericArg<T: ~Escapable & ~Copyable> {}
 
-// CHECK-LABEL: StructDecl name=ImplicitCond
-// CHECK-NEXT:    (normal_conformance type="ImplicitCond<T>" protocol="Sendable"
-// CHECK-NOT:      (assoc_conformance type="Self" proto="Escapable"
+// CHECK-LABEL: StructDecl name=FullyGenericArg
+// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Copyable")
+// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Escapable")
 
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
 // CHECK: Generic signature: <T>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0>
 
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
-// CHECK-NEXT: (normal_conformance type="ImplicitCond<T>" protocol="Empty")
-extension ImplicitCond: Empty where T: ~Copyable, T: ~Escapable {}
-
-
-// NOTE: the following extensions were implicitly synthesized, so they appear at the end!
-
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
-// CHECK:       (normal_conformance type="ImplicitCond<T>" protocol="Copyable"
-// CHECK-NEXT:       (requirement "T" conforms_to "Copyable"))
-
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
-// CHECK:       (normal_conformance type="ImplicitCond<T>" protocol="Escapable"
-// CHECK-NEXT:       (requirement "T" conforms_to "Escapable"))
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
+// CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty")
+extension FullyGenericArg: Empty where T: ~Copyable, T: ~Escapable {}

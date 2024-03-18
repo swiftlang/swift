@@ -461,12 +461,24 @@ protected:
     bool innermostTypeDecl;
     bool extension;
     std::optional<unsigned> mangledDepth; // for inverses
+    std::optional<unsigned> suppressedInnermostDepth;
   public:
     bool reachedInnermostTypeDecl() {
       bool answer = innermostTypeDecl;
       innermostTypeDecl = false;
       return answer;
     }
+
+    /// Whether inverses of the innermost declaration's generic parameters
+    /// should be suppressed.
+    ///
+    /// This makes sense only for entities that can only ever be defined
+    /// within the primary type, such as enum cases and the stored properties
+    /// of struct and class types.
+    std::optional<unsigned> getSuppressedInnermostInversesDepth() const {
+      return suppressedInnermostDepth;
+    }
+
     bool reachedExtension() const { return extension; }
     void setReachedExtension() { assert(!extension); extension = true; }
     GenericSignature getSignature() const { return sig; }

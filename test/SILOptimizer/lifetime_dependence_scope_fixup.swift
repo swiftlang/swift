@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify \
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -disable-experimental-parser-round-trip \
-// RUN: -enable-experimental-feature NoncopyableGenerics \
-// RUN:  -Xllvm -enable-lifetime-dependence-diagnostics=true
+// RUN: -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: asserts
 
@@ -139,8 +138,10 @@ func test5(_ a: Array<Int>) {
   }
 }
 
+// rdar://124651399
+// XFAIL: *
 func test6(_ a: Array<Int>) {
-  var p : View?
+  var p : View? // error: type 'View' does not conform to protocol 'Escapable'
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
     mutate(&x)

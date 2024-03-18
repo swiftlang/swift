@@ -184,7 +184,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
-      "armv6m   armv6m-none-none-eabi     armv6-none-none-eabi"
+      "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
       "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
       "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
     )
@@ -206,8 +206,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
       # Without specifying the `windows` component LLVM refuses to
       # generate valid COFF object files.
-      "i686    i686-unknown-windows-coff   i686-unknown-windows-coff"
-      "x86_64  x86_64-unknown-windows-coff x86_64-unknown-windows-coff"
+      "i686    i686-unknown-windows-msvc   i686-unknown-windows-msvc"
+      "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
     )
   endif()
 

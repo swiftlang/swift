@@ -66,7 +66,7 @@ func test_isolation_crossing_sensitivity(a : A) async {
 }
 
 func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
-    // expected-tns-note @-1:36 {{value is task isolated since it is in the same region as 'ns_arg'}}
+    // expected-tns-note @-1:36 {{value is task-isolated since it is in the same region as 'ns_arg'}}
     let ns_let = NonSendable();
 
     // Safe to consume an rvalue.
@@ -76,7 +76,7 @@ func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
     await a.foo(ns_let); // expected-complete-warning {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
     // Not safe to consume an arg.
-    await a.foo(ns_arg); // expected-tns-warning {{task isolated value of type 'NonSendable' transferred to actor-isolated context; later accesses to value could race}}
+    await a.foo(ns_arg); // expected-tns-warning {{task-isolated value of type 'NonSendable' transferred to actor-isolated context; later accesses to value could race}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
     // Check for no duplicate warnings once self is "consumed"
@@ -381,14 +381,14 @@ class C_NonSendable {
     func bar() {}
 
     func bar(a : A) async {
-        // expected-tns-note @-1:10 {{value is task isolated since it is in the same region as 'self'}}
+        // expected-tns-note @-1:10 {{value is task-isolated since it is in the same region as 'self'}}
         let captures_self = { self.bar() }
 
         // this is not a cross-isolation call, so it should be permitted
         foo_noniso(captures_self)
 
         // this is a cross-isolation call that captures non-Sendable self, so it should not be permitted
-        await a.foo(captures_self) // expected-tns-warning {{task isolated value of type '() -> ()' transferred to actor-isolated context; later accesses to value could race}}
+        await a.foo(captures_self) // expected-tns-warning {{task-isolated value of type '() -> ()' transferred to actor-isolated context; later accesses to value could race}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
         // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }
@@ -424,8 +424,7 @@ actor A_Sendable {
         // actor and is non-Sendable. For now, we ban this since we do not
         // support the ability to dynamically invoke the synchronous closure on
         // the specific actor.
-        // TODO: Should use special closure error.
-        await a.foo(captures_self) // expected-tns-warning {{task isolated value of type '() -> ()' transferred to actor-isolated context}}
+        await a.foo(captures_self) // expected-tns-warning {{actor-isolated value of type '() -> ()' transferred to actor-isolated context}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
         // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }

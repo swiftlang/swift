@@ -211,7 +211,7 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
 void validateLinkerArguments(DiagnosticEngine &diags,
                              ArgStringList linkerArgs) {
   for (auto arg : linkerArgs) {
-    if (StringRef(arg).startswith("--global-base=")) {
+    if (StringRef(arg).starts_with("--global-base=")) {
       diags.diagnose(SourceLoc(), diag::error_wasm_doesnt_support_global_base);
     }
   }

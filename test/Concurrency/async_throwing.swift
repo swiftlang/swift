@@ -150,3 +150,28 @@ func asyncTest() async {
     // ignore
   }
 }
+
+// rdar://123356909 - spurious error - `call can throw, but it is not marked with 'try' and the error is not handled`
+do {
+  struct AsyncTestSequence<Element>: AsyncSequence {
+    typealias Element = Element
+
+    let stream: AsyncMapSequence<AsyncStream<[String : Any]>, Element>
+
+    init(stream: AsyncMapSequence<AsyncStream<[String : Any]>, Element>) {
+      self.stream = stream
+    }
+
+    func makeAsyncIterator() -> AsyncIterator {
+      .init(iterator: stream.makeAsyncIterator())
+    }
+
+    struct AsyncIterator: AsyncIteratorProtocol {
+      var iterator: AsyncMapSequence<AsyncStream<[String : Any]>, Element>.AsyncIterator
+
+      mutating func next() async -> Element? {
+        await iterator.next() // Ok
+      }
+    }
+  }
+}

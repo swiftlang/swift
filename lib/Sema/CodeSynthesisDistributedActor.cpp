@@ -724,13 +724,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
 
-  // NOTE: So we don't need a thunk in the protocol, we should call the
-  // underlying thing instead, which MUST have a thunk, since it must be a
-  // distributed func as well...
-  if (isa<ProtocolDecl>(DC)) {
-    return nullptr;
-  }
-
   DeclName thunkName;
 
   // Since accessors don't have names, let's generate one based on
@@ -754,11 +747,9 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   thunk->getAttrs().add(
       new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
-  thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
-
-  /// Record which function this is a thunk for, we'll need this to link back
-  /// calls in case this is a distributed requirement witness.
-  thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));
+  // Protocol requirements don't have bodies.
+  if (func->hasBody())
+    thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
   return thunk;
 }
@@ -874,6 +865,10 @@ void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
 }
 
 static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarget) {
+  // `distributed` protocol requirements are allowed without additional checks.
+  if (isa<ProtocolDecl>(distributedTarget->getDeclContext()))
+    return true;
+
   if (getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
     return true;
   }
@@ -1042,4 +1037,30 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
 
   return addDistributedActorCodableConformance(classDecl,
                                                C.getProtocol(protoKind));
+}
+
+bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *actor) const {
+
+  if (actor && !isa<ClassDecl>(actor))
+    return false;
+
+  if (!actor->isDistributedActor())
+    return false;
+
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(actor);
+  if (!systemTy)
+    return false;
+
+  if (!systemTy->getAnyNominal())
+    return false;
+
+  auto idTy = getDistributedActorSystemActorIDType(systemTy->getAnyNominal());
+  if (!idTy)
+    return false;
+
+  return TypeChecker::conformsToKnownProtocol(
+             idTy, KnownProtocolKind::Decodable, actor->getParentModule()) &&
+         TypeChecker::conformsToKnownProtocol(
+             idTy, KnownProtocolKind::Encodable, actor->getParentModule());
 }

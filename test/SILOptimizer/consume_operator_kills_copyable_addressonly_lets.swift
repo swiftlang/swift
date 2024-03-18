@@ -147,7 +147,7 @@ public func conditionalBadConsumingUseLoop2<T>(_ x: T) {
 
 // This is ok, no uses after.
 public func simpleMoveOfParameter<T>(_ x: T) -> () {
-    let _ = consume x // expected-error {{'consume' applied to value that the compiler does not support}}
+    let _ = consume x
 }
 
 public func simpleMoveOfOwnedParameter<T>(_ x: __owned T) -> () {
@@ -200,6 +200,26 @@ public func errorLoopMoveOfParameterNonConsume<T>(_ x: __owned T) -> () { // exp
     for _ in 0..<1024 {
         nonConsumingUse(x) // expected-note {{used here}}
     }
+}
+
+func consumeConsuming<T>(_ k: consuming T) {
+  _ = consume k
+}
+
+func consumeBorrowing<T>(_ k: borrowing T) { // expected-error{{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note{{consumed here}}
+}
+
+func consumeOwned<T>(_ k: __owned T) {
+  _ = consume k
+}
+
+func consumeShared<T>(_ k: __shared T) {
+  _ = consume k
+}
+
+func consumeBare<T>(_ k: T) {
+  _ = consume k
 }
 
 ////////////////////////

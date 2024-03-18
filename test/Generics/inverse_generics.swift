@@ -166,17 +166,16 @@ struct Silly: ~Copyable, Copyable {} // expected-error {{struct 'Silly' required
 enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sally' required to be 'Copyable' but is marked with '~Copyable'}}
 
 class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Copyable'}}
-                                      // expected-error@-1 {{class 'NiceTry' required to be 'Copyable' but is marked with '~Copyable}}
 
 @_moveOnly class NiceTry2: Copyable {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}
-                                       // expected-error@-1 {{class 'NiceTry2' required to be 'Copyable' but is marked with '~Copyable'}}
 
 
 struct Extendo: ~Copyable {}
-extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
+extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+// expected-error@-1 {{struct 'Extendo' required to be 'Copyable' but is marked with '~Copyable'}}
 
 enum EnumExtendo {}
-extension EnumExtendo: ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
+extension EnumExtendo: ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
 
 extension NeedsCopyable where Self: ~Copyable {}
 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
@@ -471,11 +470,9 @@ struct UnethicalPointer<Pointee: ~Copyable> {}
 extension UnethicalPointer: Arbitrary {}
 extension UnethicalPointer: AnotherOne where Pointee: Copyable {}
 
-struct StillIllegal1<Pointee: ~Escapable> {}
-extension StillIllegal1: Arbitrary {}
-// expected-error@-1 {{conditional conformance to non-marker protocol 'Arbitrary' cannot depend on conformance of 'Pointee' to marker protocol 'Escapable'}}
-extension StillIllegal1: AnotherOne where Pointee: Escapable {}
-// expected-error@-1 {{conditional conformance to non-marker protocol 'AnotherOne' cannot depend on conformance of 'Pointee' to marker protocol 'Escapable'}}
+struct AlsoLegal1<Pointee: ~Escapable> {}
+extension AlsoLegal1: Arbitrary {}
+extension AlsoLegal1: AnotherOne where Pointee: Escapable {}
 
 struct SillIllegal2<Pointee> {}
 extension SillIllegal2: Arbitrary where Pointee: Sendable {}
@@ -485,3 +482,14 @@ struct SSS: ~Copyable, PPP {}
 protocol PPP: ~Copyable {}
 let global__old__: any PPP = SSS() // expected-error {{value of type 'SSS' does not conform to specified type 'Copyable'}}
 let global__new__: any PPP & ~Copyable = SSS()
+
+
+struct Example<T> {}
+
+struct TestResolution {
+  var maybeNC: NC? = nil // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var maybeIOUNC: NC! = nil // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var arrayNC: [NC] = [] // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var dictNC: [String: NC] = [:] // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+  var exampleNC: Example<NC> = Example() // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+}

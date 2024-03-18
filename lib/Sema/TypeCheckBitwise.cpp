@@ -239,13 +239,6 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
-  if (!dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isEscapable()) {
-    if (!isImplicit(check)) {
-      nominal->diagnose(diag::non_bitwise_copyable_type_nonescapable);
-    }
-    return true;
-  }
-
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {
       nominal->diagnose(diag::non_bitwise_copyable_type_class);

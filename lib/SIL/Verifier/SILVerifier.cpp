@@ -15,6 +15,7 @@
 #include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -95,6 +96,41 @@ extern llvm::cl::opt<bool> SILPrintDebugInfo;
 //===----------------------------------------------------------------------===//
 //                                SILVerifier
 //===----------------------------------------------------------------------===//
+
+// Augment ASTSynthesis with some operations to synthesize SILTypes.
+namespace {
+
+template <class S>
+struct ObjectTypeSynthesizer {
+  S sub;
+};
+template <class S>
+constexpr ObjectTypeSynthesizer<S> _object(const S &s) {
+  return ObjectTypeSynthesizer<S>{s};
+}
+template <class S>
+SILType synthesizeSILType(SynthesisContext &SC,
+                          const ObjectTypeSynthesizer<S> &s) {
+  return SILType::getPrimitiveObjectType(
+           synthesizeType(SC, s.sub)->getCanonicalType());
+}
+
+template <class S>
+struct AddressTypeSynthesizer {
+  S sub;
+};
+template <class S>
+constexpr AddressTypeSynthesizer<S> _address(const S &s) {
+  return AddressTypeSynthesizer<S>{s};
+}
+template <class S>
+SILType synthesizeSILType(SynthesisContext &SC,
+                          const AddressTypeSynthesizer<S> &s) {
+  return SILType::getPrimitiveAddressType(
+           synthesizeType(SC, s.sub)->getCanonicalType());
+}
+
+} // end anonymous namespace
 
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
@@ -961,6 +997,19 @@ public:
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint,
              [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
+  }
+
+  SynthesisContext getSynthesisContext() {
+    auto dc = F.getDeclContext();
+    if (!dc) dc = F.getParentModule();
+    return SynthesisContext(F.getASTContext(), dc);
+  }
+
+  template <class S>
+  void requireType(SILType type1, const S &s, const Twine &what) {
+    auto sc = getSynthesisContext();
+    SILType type2 = synthesizeSILType(sc, s);
+    requireSameType(type1, type2, "type mismatch in " + what);
   }
 
   /// Require two function types to be ABI-compatible.
@@ -2240,6 +2289,57 @@ public:
               "_copy used within a generic context");
     }
 
+    if (builtinKind == BuiltinValueKind::CreateAsyncTask) {
+      requireType(BI->getType(), _object(_tuple(_nativeObject, _rawPointer)),
+                  "result of createAsyncTask");
+      require(arguments.size() == 5,
+              "createAsyncTask expects five arguments");
+      requireType(arguments[0]->getType(), _object(_swiftInt),
+                  "first argument of createAsyncTask");
+      requireType(arguments[1]->getType(), _object(_optional(_executor)),
+                  "second argument of createAsyncTask");
+      requireType(arguments[2]->getType(), _object(_optional(_rawPointer)),
+                  "third argument of createAsyncTask");
+      requireType(arguments[3]->getType(), _object(_optional(_executor)),
+                  "fourth argument of createAsyncTask");
+      auto fnType = requireObjectType(SILFunctionType, arguments[4],
+                                      "result of createAsyncTask");
+      auto expectedExtInfo =
+        SILExtInfoBuilder().withAsync(true).withSendable(true).build();
+      require(fnType->getExtInfo().isEqualTo(expectedExtInfo, /*clang types*/true),
+              "function argument to createAsyncTask has incorrect ext info");
+      // FIXME: it'd be better if we took a consuming closure here
+      require(fnType->getCalleeConvention() ==
+                ParameterConvention::Direct_Guaranteed,
+              "function argument to createAsyncTask has wrong callee convention");
+      require(fnType->getNumParameters() == 0,
+              "function argument to createAsyncTask cannot take an argument");
+      require(fnType->getNumYields() == 0,
+              "function argument to createAsyncTask cannot have yields");
+      // The absence of substitutions means this is a discarding task.
+      if (auto subs = BI->getSubstitutions()) {
+        require(fnType->getNumResults() == 1 &&
+                fnType->getSingleResult().getConvention() ==
+                  ResultConvention::Indirect,
+                "function argument to non-discarding createAsyncTask has wrong "
+                "result convention");
+        // TODO: type check
+      } else {
+        require(fnType->getNumResults() == 0,
+                "function argument to discarding createAsyncTask has results");
+      }
+      // TODO: should we have different SIL-level builtins for discarding
+      // and non-discarding tasks so that we can't get this wrong?
+      // If we generalize this to allow an arbitrary error type,
+      // handle that here.
+      require(fnType->hasErrorResult() &&
+              fnType->getErrorResult().getConvention()
+                == ResultConvention::Owned &&
+              fnType->getErrorResult().getInterfaceType()
+                == F.getASTContext().getErrorExistentialType(),
+              "function argument to createAsyncTask has wrong error convention");
+    }
+
     if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
       require(false, "this builtin is pre-SIL-only");
     }
@@ -2318,8 +2418,10 @@ public:
               "cannot access storage of resilient global");
     }
     if (F.isSerialized()) {
+      // If it has a package linkage at this point, package CMO must
+      // have been enabled, so opt in for visibility.
       require(RefG->isSerialized()
-                || hasPublicVisibility(RefG->getLinkage()),
+              || hasPublicOrPackageVisibility(RefG->getLinkage(), /*includePackage*/ true),
               "alloc_global inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -2337,8 +2439,10 @@ public:
               "cannot access storage of resilient global");
     }
     if (F.isSerialized()) {
+      // If it has a package linkage at this point, package CMO must
+      // have been enabled, so opt in for visibility.
       require(RefG->isSerialized()
-              || hasPublicVisibility(RefG->getLinkage()),
+              || hasPublicOrPackageVisibility(RefG->getLinkage(), /*includePackage*/ true),
               "global_addr/value inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -6420,6 +6524,17 @@ public:
     require(!FTy->hasErasedIsolation() ||
              FTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "only thick function types can have erased isolation");
+
+    // If our function hasTransferringResult, then /all/ results must be
+    // transferring.
+    require(FTy->hasTransferringResult() ==
+                (FTy->getResults().size() &&
+                 llvm::all_of(FTy->getResults(),
+                              [](SILResultInfo result) {
+                                return result.hasOption(
+                                    SILResultInfo::IsTransferring);
+                              })),
+            "transferring result means all results are transferring");
   }
 
   struct VerifyFlowSensitiveRulesDetails {

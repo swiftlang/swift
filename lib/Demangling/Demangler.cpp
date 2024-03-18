@@ -189,7 +189,7 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
 
   // Look for any of the known prefixes
   for (auto prefix : prefixes) {
-    if (mangledName.startswith(prefix))
+    if (mangledName.starts_with(prefix))
       return prefix.size();
   }
 
@@ -210,12 +210,12 @@ bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
 
 bool swift::Demangle::isObjCSymbol(llvm::StringRef mangledName) {
   StringRef nameWithoutPrefix = dropSwiftManglingPrefix(mangledName);
-  return nameWithoutPrefix.startswith("So") ||
-         nameWithoutPrefix.startswith("SC");
+  return nameWithoutPrefix.starts_with("So") ||
+         nameWithoutPrefix.starts_with("SC");
 }
 
 bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
-  return mangledName.startswith("_T");
+  return mangledName.starts_with("_T");
 }
 
 llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
@@ -1422,7 +1422,7 @@ NodePointer Demangler::demangleBuiltinType() {
         return nullptr;
       NodePointer EltType = popTypeAndGetChild();
       if (!EltType || EltType->getKind() != Node::Kind::BuiltinTypeName ||
-          !EltType->getText().startswith(BUILTIN_TYPE_NAME_PREFIX))
+          !EltType->getText().starts_with(BUILTIN_TYPE_NAME_PREFIX))
         return nullptr;
       CharVector name;
       name.append(BUILTIN_TYPE_NAME_VEC, *this);

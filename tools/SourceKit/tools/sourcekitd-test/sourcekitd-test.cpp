@@ -333,7 +333,7 @@ static std::optional<int64_t> getReqOptValueAsInt(StringRef Value) {
 }
 
 static std::optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
-  if (!Value.startswith("uid:"))
+  if (!Value.starts_with("uid:"))
     return std::nullopt;
   Value = Value.drop_front(4);
   return sourcekitd_uid_get_from_buf(Value.data(), Value.size());
@@ -341,7 +341,7 @@ static std::optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
 
 static std::optional<sourcekitd_object_t>
 getReqOptValueAsArray(StringRef Value) {
-  if (!Value.startswith("[") || !Value.endswith("]"))
+  if (!Value.starts_with("[") || !Value.endswith("]"))
     return std::nullopt;
   SmallVector<StringRef, 4> Elements;
   Value.drop_front().drop_back().split(Elements, ';');
@@ -2640,7 +2640,7 @@ firstPlaceholderRange(StringRef Source, unsigned from) {
       break;
     unsigned OffsetStart = Source.data() + Pos - StartPtr;
     Source = Source.substr(Pos+2);
-    if (Source.startswith("__skip__") || Source.startswith("T##__skip__"))
+    if (Source.starts_with("__skip__") || Source.starts_with("T##__skip__"))
       continue;
     Pos = Source.find("#>");
     if (Pos == StringRef::npos)

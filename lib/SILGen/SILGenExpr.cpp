@@ -486,6 +486,8 @@ namespace {
                                        SGFContext C);
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
+    RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                             SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
              CovariantFunctionConversionExpr *E,
              SGFContext C);
@@ -1092,8 +1094,9 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                                 bool hasDynamicLifetime,
-                                                 bool isLexical,
+                                                 HasDynamicLifetime_t dynamic,
+                                                 IsLexical_t isLexical,
+                                                 IsFromVarDecl_t isFromVarDecl,
                                                  bool generateDebugInfo) {
   ty = ty.getObjectType();
   std::optional<SILDebugVariable> DbgVar;
@@ -1101,7 +1104,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
     if (auto *VD = loc.getAsASTNode<VarDecl>())
       DbgVar = SILDebugVariable(VD->isLet(), 0);
   auto *alloc =
-      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical, false
+      B.createAllocStack(loc, ty, DbgVar, dynamic, isLexical, isFromVarDecl,
+                         DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
                          ,
                          !generateDebugInfo
@@ -2105,6 +2109,14 @@ RValue RValueEmitter::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *
                                                    nonIsolatedType));
 }
 
+RValue RValueEmitter::visitExtractFunctionIsolationExpr(
+    ExtractFunctionIsolationExpr *E, SGFContext C) {
+  auto arg = SGF.emitRValue(E->getFunctionExpr());
+  auto result = SGF.emitExtractFunctionIsolation(
+      E, ArgumentSource(E, std::move(arg)), C);
+  return RValue(SGF, E, result);
+}
+
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   if (auto result = tryEmitAsBridgingConversion(SGF, E, false, C)) {
     return RValue(SGF, E, *result);
@@ -2902,12 +2914,12 @@ static bool canEmitClosureFunctionUnderConversion(
   // interferes with the implementation of `reasync`.
   auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
-    .withConcurrent(false)
+    .withSendable(false)
     .withThrows(false, Type());
 
   auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
-    .withConcurrent(false)
+    .withSendable(false)
     .withThrows(false, Type());
 
   // If the converted type has erased isolation, remove the isolation from
@@ -5420,7 +5432,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   // For move checking purposes, binding always consumes the value whole.
   if (optValue.getType().isMoveOnly() && optValue.getType().isAddress()) {
-    optValue = B.createFormalAccessOpaqueConsumeBeginAccess(loc, optValue);
+    optValue = B.createOpaqueConsumeBeginAccess(loc, optValue);
   }
 
   SILType optValueTy = optValue.getType();

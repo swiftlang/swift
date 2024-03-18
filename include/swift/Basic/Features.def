@@ -164,10 +164,12 @@ LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros")
 SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
-LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
+CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
+LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
+SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -217,6 +219,19 @@ EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
+/// Enables a module to allow non resilient access from other
+/// modules within a package if built from source.
+EXPERIMENTAL_FEATURE(AllowNonResilientAccessInPackage, false)
+
+/// Enables a client module within a package to bypass resilient
+/// access (at use site) to decls defined in another module within
+/// the same package.
+EXPERIMENTAL_FEATURE(ClientBypassResilientAccessInPackage, false)
+
+/// Enables serialization of package decls and bodies and performs
+/// CMO within a package.
+EXPERIMENTAL_FEATURE(PackageCMO, false)
+
 /// Whether to enable experimental layout string value witnesses
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnesses, true)
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnessesInstantiation, true)
@@ -237,7 +252,7 @@ EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
 EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
-EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure, true)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
@@ -297,7 +312,7 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 EXPERIMENTAL_FEATURE(Embedded, true)
 
 /// Enables noncopyable generics
-EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
@@ -331,6 +346,9 @@ EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
 
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
+
+// Enable explicit isolation of closures.
+EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)

@@ -313,8 +313,8 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   auto FirstDemangledName = std::partition(
       Names.begin(), Names.end(), [](const std::string &Name) -> bool {
         StringRef NameRef(Name);
-        return NameRef.startswith("_T") ||
-               NameRef.startswith(MANGLING_PREFIX_STR);
+        return NameRef.starts_with("_T") ||
+               NameRef.starts_with(MANGLING_PREFIX_STR);
       });
 
   // Then grab offsets to avoid any issues with iterator invalidation when we

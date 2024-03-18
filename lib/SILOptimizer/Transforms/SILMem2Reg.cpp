@@ -679,43 +679,6 @@ replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
   }
 }
 
-/// Instantiate the specified type by recursively tupling and structing the
-/// unique instances of the empty types and undef "instances" of the non-empty
-/// types aggregated together at each level.
-static SILValue createEmptyAndUndefValue(SILType ty,
-                                         SILInstruction *insertionPoint,
-                                         SILBuilderContext &ctx) {
-  auto *function = insertionPoint->getFunction();
-  if (auto tupleTy = ty.getAs<TupleType>()) {
-    SmallVector<SILValue, 4> elements;
-    for (unsigned idx : range(tupleTy->getNumElements())) {
-      SILType elementTy = ty.getTupleElementType(idx);
-      auto element = createEmptyAndUndefValue(elementTy, insertionPoint, ctx);
-      elements.push_back(element);
-    }
-    SILBuilderWithScope builder(insertionPoint, ctx);
-    return builder.createTuple(insertionPoint->getLoc(), ty, elements);
-  } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
-    TypeExpansionContext tec = *function;
-    auto &module = function->getModule();
-    if (decl->isResilient(tec.getContext()->getParentModule(),
-                          tec.getResilienceExpansion())) {
-      llvm::errs() << "Attempting to create value for illegal empty type:\n";
-      ty.print(llvm::errs());
-      llvm::report_fatal_error("illegal empty type: resilient struct");
-    }
-    SmallVector<SILValue, 4> elements;
-    for (auto *field : decl->getStoredProperties()) {
-      auto elementTy = ty.getFieldType(field, module, tec);
-      auto element = createEmptyAndUndefValue(elementTy, insertionPoint, ctx);
-      elements.push_back(element);
-    }
-    SILBuilderWithScope builder(insertionPoint, ctx);
-    return builder.createStruct(insertionPoint->getLoc(), ty, elements);
-  } else {
-    return SILUndef::get(insertionPoint->getFunction(), ty);
-  }
-}
 
 /// Whether lexical lifetimes should be added for the values stored into the
 /// alloc_stack.
@@ -777,7 +740,7 @@ beginOwnedLexicalLifetimeAfterStore(AllocStackInst *asi, StoreInst *inst) {
 
   MoveValueInst *mvi = nullptr;
   SILBuilderWithScope::insertAfter(inst, [&](SILBuilder &builder) {
-    mvi = builder.createMoveValue(loc, stored, /*isLexical*/ true);
+    mvi = builder.createMoveValue(loc, stored, IsLexical);
   });
   StorageStateTracking<LiveValues> vals = {LiveValues::forOwned(stored, mvi),
                                            /*isStorageValid=*/true};
@@ -798,7 +761,7 @@ beginGuaranteedLexicalLifetimeAfterStore(AllocStackInst *asi,
     return {LiveValues::forGuaranteed(stored, {}), /*isStorageValid*/ true};
   }
   auto *borrow = SILBuilderWithScope(inst->getNextInstruction())
-                     .createBeginBorrow(loc, stored, /*isLexical*/ true);
+                     .createBeginBorrow(loc, stored, IsLexical);
   return {LiveValues::forGuaranteed(stored, borrow), /*isStorageValid*/ true};
 }
 

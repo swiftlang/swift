@@ -6,6 +6,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// rdar://124277662
+// XFAIL: freestanding
+
 actor MyActor: CustomStringConvertible {
   let description = "MyActor"
 }

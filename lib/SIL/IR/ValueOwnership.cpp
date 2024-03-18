@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 
@@ -589,11 +590,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroup)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroup)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskWithExecutor)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroupWithExecutor)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroupWithExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
@@ -690,3 +686,17 @@ ValueOwnershipKind ValueBase::getOwnershipKind() const {
   assert(result && "Returned ownership kind invalid on values");
   return result;
 }
+
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - message
+static FunctionTest GetOwnershipKind("get-ownership-kind", [](auto &function,
+                                                              auto &arguments,
+                                                              auto &test) {
+  SILValue value = arguments.takeValue();
+  llvm::outs() << value;
+  llvm::outs() << "OwnershipKind: " << value->getOwnershipKind() << "\n";
+});
+} // end namespace swift::test

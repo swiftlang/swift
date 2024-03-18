@@ -215,6 +215,7 @@ class SILPassManager {
 
   unsigned maxNumPassesToRun = UINT_MAX;
   unsigned maxNumSubpassesToRun = UINT_MAX;
+  unsigned breakBeforePassCount = UINT_MAX;
 
   /// For invoking Swift passes.
   SwiftPassInvocation swiftPassInvocation;
@@ -428,7 +429,8 @@ public:
   void runSwiftModuleVerification();
 
 private:
-  void parsePassCount(StringRef countsStr);
+  void parsePassesToRunCount(StringRef countsStr);
+  void parseBreakBeforePassCount(StringRef countsStr);
 
   bool doPrintBefore(SILTransform *T, SILFunction *F);
 
@@ -460,6 +462,9 @@ private:
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.
   bool continueTransforming();
+
+  /// Break before running a pass.
+  bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT);
 
   /// Return true if all analyses are unlocked.
   bool analysesUnlocked();

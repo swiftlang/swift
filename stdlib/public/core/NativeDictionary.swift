@@ -68,6 +68,9 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
 #endif
 }
 
+@available(*, unavailable)
+extension _NativeDictionary: Sendable {}
+
 extension _NativeDictionary { // Primitive fields
   @usableFromInline
   internal typealias Bucket = _HashTable.Bucket
@@ -852,6 +855,9 @@ extension _NativeDictionary: Sequence {
   }
 }
 
+@available(*, unavailable)
+extension _NativeDictionary.Iterator: Sendable {}
+
 extension _NativeDictionary.Iterator: IteratorProtocol {
   @usableFromInline
   internal typealias Element = (key: Key, value: Value)
@@ -879,4 +885,3 @@ extension _NativeDictionary.Iterator: IteratorProtocol {
     return (key, value)
   }
 }
-

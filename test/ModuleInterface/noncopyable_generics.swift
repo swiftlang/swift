@@ -86,12 +86,12 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : ~Copyable {
 // CHECK-MISC-NEXT: }
-// CHECK-MISC-NEXT: #endif
+// CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Copyable where T : ~Escapable {
 // CHECK-MISC-NEXT: }
-// CHECK-MISC-NEXT: #endif
+// CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public protocol TestAssocTypes {

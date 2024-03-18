@@ -6,6 +6,9 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// rdar://123970272
+// UNSUPPORTED: CPU=arm64e
+
 import _Concurrency
 import Distributed
 

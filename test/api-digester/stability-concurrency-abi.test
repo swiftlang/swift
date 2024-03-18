@@ -59,11 +59,23 @@ Func _asyncLet_get(_:_:) has return type change from Builtin.RawPointer to ()
 Func _asyncLet_get_throwing(_:_:) has mangled name changing from '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> Builtin.RawPointer' to '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> ()'
 Func _asyncLet_get_throwing(_:_:) has return type change from Builtin.RawPointer to ()
 Protocol Actor has added inherited protocol AnyActor
+Protocol Actor has added inherited protocol Copyable
+Protocol Actor has added inherited protocol Escapable
 Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift.Sendable> to <Self : _Concurrency.AnyActor>
 Protocol AsyncIteratorProtocol has generic signature change from to <Self.Failure : Swift.Error>
+Protocol AsyncIteratorProtocol has added inherited protocol Copyable
+Protocol AsyncIteratorProtocol has added inherited protocol Escapable
 Protocol AsyncSequence has generic signature change from <Self.AsyncIterator : _Concurrency.AsyncIteratorProtocol, Self.Element == Self.AsyncIterator.Element> to <Self.AsyncIterator : _Concurrency.AsyncIteratorProtocol, Self.Element == Self.AsyncIterator.Element, Self.Failure == Self.AsyncIterator.Failure>
+Protocol AsyncSequence has added inherited protocol Copyable
+Protocol AsyncSequence has added inherited protocol Escapable
 Struct CheckedContinuation has removed conformance to UnsafeSendable
 Protocol AsyncIteratorProtocol is now without @rethrows
+Protocol Executor has added inherited protocol Copyable
+Protocol Executor has added inherited protocol Escapable
+Protocol GlobalActor has added inherited protocol Copyable
+Protocol GlobalActor has added inherited protocol Escapable
+Protocol SerialExecutor has added inherited protocol Copyable
+Protocol SerialExecutor has added inherited protocol Escapable
 Protocol AsyncSequence is now without @rethrows
 
 // SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations

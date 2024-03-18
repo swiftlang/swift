@@ -288,8 +288,8 @@ public:
                 cd->getClangDecl()->getAttrs().end(), [](clang::Attr *attr) {
                   if (auto *sa = dyn_cast<clang::SwiftAttrAttr>(attr)) {
                     llvm::StringRef value = sa->getAttribute();
-                    if ((value.startswith("retain:") ||
-                         value.startswith("release:")) &&
+                    if ((value.starts_with("retain:") ||
+                         value.starts_with("release:")) &&
                         !value.endswith(":immortal"))
                       return true;
                   }
@@ -1535,7 +1535,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 /// directly to a C++ method.
 static bool canRemapBoolPropertyNameDirectly(StringRef name) {
   auto startsWithAndLonger = [&](StringRef prefix) -> bool {
-    return name.startswith(prefix) && name.size() > prefix.size();
+    return name.starts_with(prefix) && name.size() > prefix.size();
   };
   return startsWithAndLonger("is") || startsWithAndLonger("has");
 }

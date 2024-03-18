@@ -74,11 +74,20 @@ public func _fixLifetime<T>(_ x: T) {
 ///     execution.
 /// - Returns: The return value, if any, of the `body` closure.
 @inlinable
-public func withUnsafeMutablePointer<T, Result>(
+@_alwaysEmitIntoClient
+public func withUnsafeMutablePointer<T, E: Error, Result>(
+  to value: inout T,
+  _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
+) throws(E) -> Result {
+  try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
+}
+
+@_silgen_name("$ss24withUnsafeMutablePointer2to_q_xz_q_SpyxGKXEtKr0_lF")
+@usableFromInline
+func __abi_se0413_withUnsafeMutablePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
-) rethrows -> Result
-{
+) throws -> Result {
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
@@ -87,10 +96,10 @@ public func withUnsafeMutablePointer<T, Result>(
 /// This function is similar to `withUnsafeMutablePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeMutablePointer<T, Result>(
+public func _withUnprotectedUnsafeMutablePointer<T, E: Error, Result>(
   to value: inout T,
-  _ body: (UnsafeMutablePointer<T>) throws -> Result
-) rethrows -> Result
+  _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
+) throws(E) -> Result
 {
 #if $BuiltinUnprotectedAddressOf
   return try body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))

@@ -130,6 +130,7 @@ UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor)
 UNINTERESTING_FEATURE(BuiltinUnprotectedStackAlloc)
 UNINTERESTING_FEATURE(BuiltinAllocVector)
+UNINTERESTING_FEATURE(BuiltinCreateTask)
 
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
@@ -341,6 +342,10 @@ static bool usesFeatureExtern(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExternAttr>();
 }
 
+static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
+  return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
+}
+
 static bool usesFeatureExpressionMacroDefaultArguments(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto param : *func->getParameters()) {
@@ -463,6 +468,8 @@ static bool usesFeatureLayoutPrespecialization(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(AccessLevelOnImport)
+UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
+UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
 UNINTERESTING_FEATURE(LayoutStringValueWitnesses)
 UNINTERESTING_FEATURE(LayoutStringValueWitnessesInstantiation)
 UNINTERESTING_FEATURE(DifferentiableProgramming)
@@ -470,6 +477,7 @@ UNINTERESTING_FEATURE(ForwardModeDifferentiation)
 UNINTERESTING_FEATURE(AdditiveArithmeticDerivedConformances)
 UNINTERESTING_FEATURE(SendableCompletionHandlers)
 UNINTERESTING_FEATURE(OpaqueTypeErasure)
+UNINTERESTING_FEATURE(PackageCMO)
 UNINTERESTING_FEATURE(ParserRoundTrip)
 UNINTERESTING_FEATURE(ParserValidation)
 UNINTERESTING_FEATURE(ParserDiagnostics)
@@ -509,6 +517,16 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
         return true;
     }
 
+    if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+      auto reqSig = proto->getRequirementSignature();
+
+      SmallVector<Requirement, 2> reqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      reqSig.getRequirementsWithInverses(proto, reqs, inverses);
+      if (!inverses.empty())
+        return true;
+    }
+
     if (isa<AbstractFunctionDecl>(valueDecl) ||
         isa<AbstractStorageDecl>(valueDecl)) {
       if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
@@ -533,6 +551,13 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   SmallVector<InverseRequirement, 2> inverseReqs;
 
   if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+
+    // We have baked-in support for Sendable not needing to state inverses
+    // in its inheritance clause within interface files. So, it technically is
+    // not using the feature with respect to the concerns of an interface file.
+    if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+      return false;
+
     proto->getRequirementSignature().getRequirementsWithInverses(
         proto, reqs, inverseReqs);
   } else if (auto *genCtx = decl->getAsGenericContext()) {
@@ -639,6 +664,8 @@ static bool usesFeatureDynamicActorIsolation(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BorrowingSwitch)
+
+UNINTERESTING_FEATURE(ClosureIsolation)
 
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {

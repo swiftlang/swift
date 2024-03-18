@@ -197,6 +197,7 @@ For (2), external dependencies are also triggered by specific code needing them,
 - **atomics instrinsics**
   - on CPU architectures that don't have direct load-acquire/store-release support in the ISA, LLVM calls helper functions for atomic operations
   - needed by refcounting in the Embedded Swift runtime (so any class usage will trigger this dependency)
+  - also needed when using atomics from the Synchronization module
 - **multiplication/division/modulo instrinsics**
   - on CPU architectures that don't have direct support for the math operations in the ISA
   - dependency (on Mach-O): `__divti3`

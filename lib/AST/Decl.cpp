@@ -32,7 +32,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
@@ -1037,10 +1036,10 @@ bool AbstractFunctionDecl::isTransparent() const {
 
 bool ParameterList::hasInternalParameter(StringRef Prefix) const {
   for (auto param : *this) {
-    if (param->hasName() && param->getNameStr().startswith(Prefix))
+    if (param->hasName() && param->getNameStr().starts_with(Prefix))
       return true;
     auto argName = param->getArgumentName();
-    if (!argName.empty() && argName.str().startswith(Prefix))
+    if (!argName.empty() && argName.str().starts_with(Prefix))
       return true;
   }
   return false;
@@ -1061,10 +1060,10 @@ bool Decl::hasUnderscoredNaming() const {
 
   if (const auto PD = dyn_cast<ProtocolDecl>(D)) {
     StringRef NameStr = PD->getNameStr();
-    if (NameStr.startswith("_Builtin")) {
+    if (NameStr.starts_with("_Builtin")) {
       return true;
     }
-    if (NameStr.startswith("_ExpressibleBy")) {
+    if (NameStr.starts_with("_ExpressibleBy")) {
       return true;
     }
   }
@@ -1324,12 +1323,10 @@ static GenericSignature getPlaceholderGenericSignature(
       auto type = genericParam->getDeclaredInterfaceType();
       genericParams.push_back(type->castTo<GenericTypeParamType>());
 
-      if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-        for (auto ip : InvertibleProtocolSet::full()) {
-          auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-          requirements.emplace_back(RequirementKind::Conformance, type,
-                                    proto->getDeclaredInterfaceType());
-        }
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        requirements.emplace_back(RequirementKind::Conformance, type,
+                                  proto->getDeclaredInterfaceType());
       }
     }
   }
@@ -3377,7 +3374,7 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
     return AnyFunctionType::ExtInfo();
   return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
-      .withConcurrent(info.isSendable())
+      .withSendable(info.isSendable())
       .withAsync(info.isAsync())
       .withThrows(info.isThrowing(), info.getThrownError())
       .withClangFunctionType(info.getClangTypeInfo().getType())
@@ -4068,7 +4065,7 @@ bool ValueDecl::shouldHideFromEditor() const {
 
   // '$__' names are reserved by compiler internal.
   if (!getBaseName().isSpecial() &&
-      getBaseIdentifier().str().startswith("$__"))
+      getBaseIdentifier().str().starts_with("$__"))
     return true;
 
   // Macro unique names are only intended to be used inside the expanded code.
@@ -4947,22 +4944,10 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
 }
 
 TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeCopyable() const {
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return !hasInverseMarking(InvertibleProtocolKind::Copyable)
-               ? CanBeInvertible::Always
-               : CanBeInvertible::Never;
-  }
-
   return conformanceExists(this, InvertibleProtocolKind::Copyable);
 }
 
 TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeEscapable() const {
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return !hasInverseMarking(InvertibleProtocolKind::Escapable)
-               ? CanBeInvertible::Always
-               : CanBeInvertible::Never;
-  }
-
   return conformanceExists(this, InvertibleProtocolKind::Escapable);
 }
 
@@ -6467,6 +6452,15 @@ ProtocolDecl::getInvertibleProtocolKind() const {
   return std::nullopt;
 }
 
+ObjCRequirementMap ProtocolDecl::getObjCRequiremenMap() const {
+  ObjCRequirementMap defaultMap;
+  if (!isObjC())
+    return defaultMap;
+
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ObjCRequirementMapRequest{this}, defaultMap);
+}
+
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
@@ -6618,129 +6612,6 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 
   auto allInherited = getAllInheritedProtocols();
   return (llvm::find(allInherited, super) != allInherited.end());
-}
-
-static void findInheritedType(
-    InheritedTypes inherited,
-    llvm::function_ref<bool(Type, NullablePtr<TypeRepr>)> isMatch) {
-  for (size_t i = 0; i < inherited.size(); i++) {
-    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
-    if (!type)
-      continue;
-
-    if (isMatch(type, inherited.getTypeRepr(i)))
-      break;
-  }
-}
-
-static InverseMarking::Mark
-findInverseInInheritance(InheritedTypes inherited,
-                         InvertibleProtocolKind target) {
-  auto isInverseOfTarget = [&](Type t) {
-    if (auto pct = t->getAs<ProtocolCompositionType>())
-      return pct->getInverses().contains(target);
-    return false;
-  };
-
-  InverseMarking::Mark inverse;
-  findInheritedType(inherited,
-                    [&](Type inheritedTy, NullablePtr<TypeRepr> repr) {
-                      if (!isInverseOfTarget(inheritedTy))
-                        return false;
-
-                      inverse = InverseMarking::Mark(
-                          InverseMarking::Kind::Explicit,
-                          repr.isNull() ? SourceLoc() : repr.get()->getLoc());
-                      return true;
-                    });
-  return inverse;
-}
-
-InverseMarking::Mark
-AssociatedTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  auto &ctx = getASTContext();
-
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::Mark();
-
-  return findInverseInInheritance(getInherited(), target);
-}
-
-InverseMarking::Mark
-NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  switch (target) {
-  case InvertibleProtocolKind::Copyable:
-    // Handle the legacy '@_moveOnly' for types they can validly appear.
-    // TypeCheckAttr handles the illegal situations for us.
-    if (auto attr = getAttrs().getAttribute<MoveOnlyAttr>())
-      if (isa<StructDecl, EnumDecl, ClassDecl>(this))
-        return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
-                                    attr->getLocation());
-    break;
-
-  case InvertibleProtocolKind::Escapable:
-    // Handle the legacy '@_nonEscapable' attribute
-    if (auto attr = getAttrs().getAttribute<NonEscapableAttr>()) {
-      assert((isa<ClassDecl, StructDecl, EnumDecl>(this)));
-      return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
-                                  attr->getLocation());
-    }
-    break;
-  }
-
-  auto &ctx = getASTContext();
-
-  // Legacy support stops here.
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::Mark(InverseMarking::Kind::None);
-
-  // Claim that the tuple decl has an explicit ~TARGET marking.
-  if (isa<BuiltinTupleDecl>(this))
-    return InverseMarking::Mark(InverseMarking::Kind::Explicit);
-
-  if (auto P = dyn_cast<ProtocolDecl>(this))
-    return P->hasInverseMarking(target);
-
-  // Search the inheritance clause first.
-  if (auto inverse = findInverseInInheritance(getInherited(), target))
-    return inverse;
-
-  return InverseMarking::Mark();
-}
-
-InverseMarking::Mark
-ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  auto &ctx = getASTContext();
-
-  // Legacy support stops here.
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::Mark();
-
-  if (auto inverse = findInverseInInheritance(getInherited(), target))
-    return inverse;
-
-  auto *whereClause = getTrailingWhereClause();
-  if (!whereClause)
-    return InverseMarking::Mark();
-
-  for (const auto &reqRepr : whereClause->getRequirements()) {
-    if (reqRepr.isInvalid() ||
-        reqRepr.getKind() != RequirementReprKind::TypeConstraint)
-      continue;
-
-    auto *subjectRepr =
-        dyn_cast<UnqualifiedIdentTypeRepr>(reqRepr.getSubjectRepr());
-    auto *constraintRepr = reqRepr.getConstraintRepr();
-
-    if (!subjectRepr || !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
-      continue;
-
-    if (constraintRepr->isInverseOf(target, getDeclContext()))
-      return InverseMarking::Mark(InverseMarking::Kind::Explicit,
-                                  constraintRepr->getLoc());
-  }
-
-  return InverseMarking::Mark();
 }
 
 bool ProtocolDecl::requiresClass() const {
@@ -7855,6 +7726,17 @@ bool VarDecl::isOrdinaryStoredProperty() const {
   // the assert into a full-fledged part of the condition if needed.
   assert(!isAsyncLet());
   return hasStorage() && !hasObservers();
+}
+
+VarDecl *VarDecl::createImplicitStringInterpolationVar(DeclContext *DC) {
+  // Make the variable which will contain our temporary value.
+  ASTContext &C = DC->getASTContext();
+  auto var =
+      new (C) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
+                      /*NameLoc=*/SourceLoc(), C.Id_dollarInterpolation, DC);
+  var->setImplicit(true);
+  var->setUserAccessible(false);
+  return var;
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {
@@ -11795,7 +11677,7 @@ bool MacroDecl::isUniqueNamePlaceholder(DeclName name) {
 
 bool MacroDecl::isUniqueMacroName(StringRef name) {
   // Unique macro names are mangled names, which always start with "$s".
-  if (!name.startswith("$s"))
+  if (!name.starts_with("$s"))
     return false;
 
   // Unique macro names end with fMu<digits>_. Match that.

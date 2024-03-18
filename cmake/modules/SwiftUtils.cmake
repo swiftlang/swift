@@ -171,14 +171,10 @@ function(swift_create_post_build_symlink target)
     ""
     ${ARGN})
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    if(CS_IS_DIRECTORY)
-      set(cmake_symlink_option "copy_directory")
-    else()
-      set(cmake_symlink_option "copy_if_different")
-    endif()
+  if(CS_IS_DIRECTORY)
+    set(cmake_symlink_option "${SWIFT_COPY_OR_SYMLINK_DIR}")
   else()
-      set(cmake_symlink_option "create_symlink")
+    set(cmake_symlink_option "${SWIFT_COPY_OR_SYMLINK}")
   endif()
 
   add_custom_command(TARGET "${target}" POST_BUILD

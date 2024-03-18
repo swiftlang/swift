@@ -1627,6 +1627,11 @@ public:
     }
   };
 
+  struct BuiltInverseRequirement {
+    BuiltType SubjectType;
+    InvertibleProtocolKind Kind;
+  };
+
   DecodedMetadataBuilder(Demangler &demangler,
                          SubstGenericParameterFn substGenericParameter,
                          SubstDependentWitnessTableFn substWitnessTable)
@@ -1912,8 +1917,10 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType>
-  createConstrainedExistentialType(BuiltType base,
-                                   llvm::ArrayRef<BuiltRequirement> rs) const {
+  createConstrainedExistentialType(
+      BuiltType base,
+      llvm::ArrayRef<BuiltRequirement> rs,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) const {
     // FIXME: Runtime plumbing.
     return BuiltType();
   }
@@ -2198,10 +2205,16 @@ public:
     return {};
   }
 
+  BuiltInverseRequirement createInverseRequirement(
+      BuiltType subjectType, InvertibleProtocolKind kind) {
+    return BuiltInverseRequirement{subjectType, kind};
+  }
+
   TypeLookupErrorOr<BuiltType> createSILBoxTypeWithLayout(
       llvm::ArrayRef<BuiltSILBoxField> Fields,
       llvm::ArrayRef<BuiltSubstitution> Substitutions,
-      llvm::ArrayRef<BuiltRequirement> Requirements) const {
+      llvm::ArrayRef<BuiltRequirement> Requirements,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) const {
     // FIXME: Implement.
     return BuiltType();
   }
@@ -2961,7 +2974,7 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   // ObjC metadata.
   StringRef typeStr(typeName);
   const Metadata *metadata = nullptr;
-  if (typeStr.startswith("_Tt")) {
+  if (typeStr.starts_with("_Tt")) {
     Demangler demangler;
     auto node = demangler.demangleSymbol(typeName);
     if (!node)

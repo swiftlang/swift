@@ -256,15 +256,15 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   // Test sendable.
   auto F14 = Builder.createFunctionType(
-      Parameters1, Result, FunctionTypeFlags().withConcurrent(true),
+      Parameters1, Result, FunctionTypeFlags().withSendable(true),
       ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F15 = Builder.createFunctionType(
-      Parameters1, Result, FunctionTypeFlags().withConcurrent(true),
+      Parameters1, Result, FunctionTypeFlags().withSendable(true),
       ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F16 = Builder.createFunctionType(
-      Parameters1, Result, FunctionTypeFlags().withConcurrent(false),
+      Parameters1, Result, FunctionTypeFlags().withSendable(false),
       ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_EQ(F14, F15);

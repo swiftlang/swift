@@ -939,8 +939,6 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 // Old Transfer Non Sendable Diagnostics
 //
 
-ERROR(regionbasedisolation_selforargtransferred, none,
-      "call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller", ())
 ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
       "transferring value of non-Sendable type %0; later accesses could race",
       (Type))
@@ -954,11 +952,11 @@ ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, non
       "binding of non-Sendable type %0 accessed after being transferred; later accesses could race",
       (Type))
 ERROR(regionbasedisolation_arg_transferred, none,
-      "task isolated value of type %0 transferred to %1 context; later accesses to value could race",
-      (Type, ActorIsolation))
+      "%0 value of type %1 transferred to %2 context; later accesses to value could race",
+      (StringRef, Type, ActorIsolation))
 ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
-      "task isolated value of type %0 passed as a strongly transferred parameter; later accesses could race",
-      (Type))
+      "%0 value of type %1 passed as a strongly transferred parameter; later accesses could race",
+      (StringRef, Type))
 NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
      "value is %0 since it is in the same region as %1",
      (StringRef, DeclBaseName))
@@ -970,27 +968,23 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
       "transferring %0 may cause a race",
       (Identifier))
-ERROR(regionbasedisolation_stronglytransfer_assignment_yields_race_name, none,
-      "assigning %0 to transferring parameter %1 may cause a race",
-      (Identifier, Identifier))
-NOTE(regionbasedisolation_stronglytransfer_taskisolated_assign_note, none,
-      "%0 is a task isolated value that is assigned into transferring parameter %1. Transferred uses of %1 may race with caller uses of %0",
-      (Identifier, Identifier))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
      "%0 is transferred from %1 caller to %2 callee. Later uses in caller could race with potential uses in callee",
      (Identifier, ActorIsolation, ActorIsolation))
-NOTE(regionbasedisolation_transfer_non_transferrable_named_note, none,
+NOTE(regionbasedisolation_named_transfer_non_transferrable, none,
       "transferring %1 %0 to %2 callee could cause races between %2 and %1 uses",
       (Identifier, ActorIsolation, ActorIsolation))
-NOTE(regionbasedisolation_named_info_isolated_capture, none,
-     "%1 value %0 is captured by %2 closure. Later local uses could race",
-     (Identifier, ActorIsolation, ActorIsolation))
-NOTE(regionbasedisolation_named_arg_info, none,
-     "Transferring task isolated function argument %0 could yield races with caller uses",
-     (Identifier))
-NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
-     "Cannot access a transferring parameter after the parameter has been transferred", ())
+NOTE(regionbasedisolation_named_transfer_into_transferring_param, none,
+     "%0 %1 is passed as a transferring parameter; Uses in callee may race with later %0 uses",
+     (StringRef, Identifier))
+NOTE(regionbasedisolation_named_notransfer_transfer_into_result, none,
+     "%0 %1 cannot be a transferring result. %0 uses may race with caller uses",
+     (StringRef, Identifier))
+
+// Misc Error.
+ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,
+      "task or actor isolated value cannot be transferred", ())
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,

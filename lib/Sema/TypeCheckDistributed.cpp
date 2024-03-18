@@ -499,6 +499,9 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
 /// \returns \c true if there was a problem with adding the attribute, \c false
 /// otherwise.
 bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
+  if (!func->isDistributed())
+    return false;
+
   auto &C = func->getASTContext();
   return evaluateOrDefault(C.evaluator,
                            CheckDistributedFunctionRequest{func},
@@ -520,6 +523,11 @@ bool CheckDistributedFunctionRequest::evaluate(
   /// If no distributed module is available, then no reason to even try checks.
   if (!C.getLoadedModule(C.Id_Distributed))
     return true;
+
+//  // No checking for protocol requirements because they are not required
+//  // to have `SerializationRequirement`.
+//  if (isa<ProtocolDecl>(func->getDeclContext()))
+//    return false;
 
   Type serializationReqType =
       getDistributedActorSerializationType(func->getDeclContext());
@@ -678,7 +686,7 @@ void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal) {
-  if (!nominal)
+  if (!nominal || !nominal->isDistributedActor())
     return;
 
   // ==== Ensure the Distributed module is available,
@@ -736,9 +744,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 }
 
 bool TypeChecker::checkDistributedFunc(FuncDecl *func) {
-  if (!func->isDistributed())
-    return false;
-
   return swift::checkDistributedFunction(func);
 }
 

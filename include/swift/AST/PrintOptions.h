@@ -379,6 +379,12 @@ struct PrintOptions {
   /// Suppress the @isolated(any) attribute.
   bool SuppressIsolatedAny = false;
 
+  /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
+  bool SuppressOptionalIsolatedParams = false;
+
+  /// Suppress Noncopyable generics.
+  bool SuppressNoncopyableGenerics = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,

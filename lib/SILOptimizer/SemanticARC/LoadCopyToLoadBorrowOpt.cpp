@@ -386,9 +386,9 @@ bool SemanticARCOptVisitor::performLoadCopyToLoadBorrowOptimization(
   SILValue replacement = lbi;
   if (original != li) {
     getCallbacks().eraseAndRAUWSingleValueInst(li, lbi);
-    auto *bbi =
-        SILBuilderWithScope(cast<SingleValueInstruction>(original))
-            .createBeginBorrow(li->getLoc(), lbi, original->isLexical());
+    auto *bbi = SILBuilderWithScope(cast<SingleValueInstruction>(original))
+                    .createBeginBorrow(li->getLoc(), lbi,
+                                       IsLexical_t(original->isLexical()));
     replacement = bbi;
     lr.insertEndBorrowsAtDestroys(bbi, getDeadEndBlocks(),
                                   ctx.lifetimeFrontier);

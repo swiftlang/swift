@@ -903,7 +903,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
           auto *decl = DRE->getDecl();
           if (decl && decl->hasName()) {
             auto baseName = DRE->getDecl()->getBaseIdentifier();
-            if (baseName.str().startswith("$__builder")) {
+            if (baseName.str().starts_with("$__builder")) {
               diagnostic =
                   diag::cannot_convert_result_builder_result_to_return_type;
               break;
@@ -3473,9 +3473,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
       evaluateOrDefault(getASTContext().evaluator,
                         ResolveTypeWitnessesRequest{conformance},
                         evaluator::SideEffect());
-      evaluateOrDefault(getASTContext().evaluator,
-                        ResolveValueWitnessesRequest{conformance},
-                        evaluator::SideEffect());
+      conformance->resolveValueWitnesses();
 
       fakeConformances.push_back(conformance);
     }
@@ -5863,12 +5861,16 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
 
     // Move requires postfix comma only if argument is moved in-between
     // other arguments.
-    bool requiresComma =
-        !isExpr<BinaryExpr>(anchor) && PrevArgIdx != args->size() - 1;
+    std::string argumentSeparator;
+    if (auto *BE = getAsExpr<BinaryExpr>(anchor)) {
+      auto operatorName = std::string(*getOperatorName(BE->getFn()));
+      argumentSeparator = " " + operatorName + " ";
+    } else if (PrevArgIdx != args->size() - 1) {
+      argumentSeparator = ", ";
+    }
 
     diag.fixItRemove(removalRange);
-    diag.fixItInsert(secondRange.Start,
-                     text.str() + (requiresComma ? ", " : ""));
+    diag.fixItInsert(secondRange.Start, text.str() + argumentSeparator);
   };
 
   // There are 4 diagnostic messages variations depending on
@@ -6417,13 +6419,11 @@ bool NotCopyableFailure::diagnoseAsError() {
   emitDiagnostic(diag::noncopyable_generics, noncopyableTy);
 
 #ifndef NDEBUG
-  if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     getLocator()->dump(&getConstraintSystem());
 #pragma clang diagnostic pop
     llvm_unreachable("NoncopyableGenerics: vague diagnostic for locator");
-  }
 #endif
 
   return true;
@@ -8202,7 +8202,6 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
 
 bool UnableToInferGenericPackElementType::diagnoseAsError() {
   auto *locator = getLocator();
-  auto path = locator->getPath();
 
   auto packElementElt = locator->getLastElementAs<LocatorPathElt::PackElement>();
   assert(packElementElt && "Expected path to end with a pack element locator");

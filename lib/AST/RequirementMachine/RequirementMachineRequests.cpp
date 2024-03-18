@@ -754,13 +754,11 @@ AbstractGenericSignatureRequest::evaluate(
 static GenericSignature getPlaceholderGenericSignature(
     ASTContext &ctx, ArrayRef<GenericTypeParamType *> genericParams) {
   SmallVector<Requirement, 2> requirements;
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto param : genericParams) {
-      for (auto ip : InvertibleProtocolSet::full()) {
-        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-        requirements.emplace_back(RequirementKind::Conformance, param,
-                                  proto->getDeclaredInterfaceType());
-      }
+  for (auto param : genericParams) {
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      requirements.emplace_back(RequirementKind::Conformance, param,
+                                proto->getDeclaredInterfaceType());
     }
   }
 

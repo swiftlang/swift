@@ -49,7 +49,7 @@ func test_field_fn_ptr_swap() {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s25ptrauth_field_fptr_import05test_B12_fn_ptr_temps5Int32VyF :
-// CHECK:   [[STK:%.*]] = alloc_stack $SecureStruct, let, name "struct_with_signed_val"
+// CHECK:   [[STK:%.*]] = alloc_stack [var_decl] $SecureStruct, let, name "struct_with_signed_val"
 // CHECK:   [[FLD:%.*]] = struct_element_addr [[STK]] : $*SecureStruct, #SecureStruct.secure_func_ptr1
 // CHECK:   [[SIGNED:%.*]] = begin_access [read] [signed] [[FLD]] : $*Optional<@convention(c) () -> Int32>
 // CHECK-LABEL: } // end sil function '$s25ptrauth_field_fptr_import05test_B12_fn_ptr_temps5Int32VyF'
@@ -103,7 +103,7 @@ func test_addr_discriminated_field_fn_ptr_swap() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s25ptrauth_field_fptr_import21test_addr_only_structs5Int32VyF :
 // CHECK: [[GLOB:%.*]] = global_addr @ptr_to_addr_discriminated_secure_struct : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>
-// CHECK: [[STK:%.*]] = alloc_stack $AddressDiscriminatedSecureStruct, let, name "struct_with_signed_val"
+// CHECK: [[STK:%.*]] = alloc_stack [var_decl] $AddressDiscriminatedSecureStruct, let, name "struct_with_signed_val"
 // CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[GLOB]] : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>
 // CHECK: [[LD1:%.*]] = load [trivial] [[A1]] : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>
 // CHECK: end_access [[A1]] : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>

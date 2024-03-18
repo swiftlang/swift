@@ -3704,11 +3704,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DeclAttrKind::DistributedThunkTarget: {
-    assert(false && "Not implemented");
-    break;
-  }
-
   case DeclAttrKind::TypeEraser: {
     // Parse leading '('
     if (Tok.isNot(tok::l_paren)) {
@@ -3877,11 +3872,14 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
   case DeclAttrKind::Nonisolated: {
-    auto isUnsafe =
-        parseSingleAttrOption<bool>(*this, Loc, AttrRange, AttrName, DK,
-                                    {{Context.Id_unsafe, true}}, false);
-    if (!isUnsafe) {
-      return makeParserSuccess();
+    std::optional<bool> isUnsafe(false);
+    if (EnableParameterizedNonisolated) {
+      isUnsafe =
+          parseSingleAttrOption<bool>(*this, Loc, AttrRange, AttrName, DK,
+                                      {{Context.Id_unsafe, true}}, *isUnsafe);
+      if (!isUnsafe) {
+        return makeParserSuccess();
+      }
     }
 
     if (!DiscardAttribute) {
@@ -5178,6 +5176,38 @@ ParserStatus Parser::parseDeclAttributeList(
 
   PatternBindingInitializer *initContext = nullptr;
   return parseDeclAttributeList(Attributes, IfConfigsAreDeclAttrs, initContext);
+}
+
+// effectively parseDeclAttributeList but with selective modifier handling
+ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
+  auto parsingNonisolated = [this] {
+    return Context.LangOpts.hasFeature(Feature::ClosureIsolation) &&
+           Tok.isContextualKeyword("nonisolated");
+  };
+
+  if (Tok.isNot(tok::at_sign, tok::pound_if) && !parsingNonisolated())
+    return makeParserSuccess();
+
+  PatternBindingInitializer *initContext = nullptr;
+  constexpr bool ifConfigsAreDeclAttrs = false;
+  ParserStatus Status;
+  while (Tok.isAny(tok::at_sign, tok::pound_if) || parsingNonisolated()) {
+    if (Tok.is(tok::at_sign)) {
+      SourceLoc AtEndLoc = Tok.getRange().getEnd();
+      SourceLoc AtLoc = consumeToken();
+      Status |= parseDeclAttribute(Attributes, AtLoc, AtEndLoc, initContext);
+    } else if (parsingNonisolated()) {
+      Status |=
+          parseNewDeclAttribute(Attributes, {}, DeclAttrKind::Nonisolated);
+    } else {
+      if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes()) {
+        break;
+      }
+      Status |= parseIfConfigDeclAttributes(Attributes, ifConfigsAreDeclAttrs,
+                                            initContext);
+    }
+  }
+  return Status;
 }
 
 /// \verbatim
@@ -7696,7 +7726,7 @@ void Parser::skipSILUntilSwiftDecl() {
     // SIL types need to be skipped specially as they can contain attributes on
     // tuples which can look like decl attributes.
     if (consumeIf(tok::sil_dollar)) {
-      if (Tok.isAnyOperator() && Tok.getText().startswith("*")) {
+      if (Tok.isAnyOperator() && Tok.getText().starts_with("*")) {
         consumeStartingCharacterOfCurrentToken();
       }
       (void)parseType();
@@ -9921,8 +9951,19 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   if (auto *lifetimeTyR =
           dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(FuncRetTy)) {
-    if (!lifetimeTyR->getBase()->isSimpleUnqualifiedIdentifier(
-            Context.Id_Self)) {
+    auto *base = lifetimeTyR->getBase();
+
+    auto isOptionalSimpleUnqualifiedIdentifier = [](TypeRepr *typeRepr,
+                                                    Identifier str) {
+      if (auto *optionalTR = dyn_cast<OptionalTypeRepr>(typeRepr)) {
+        return optionalTR->getBase()->isSimpleUnqualifiedIdentifier(str);
+      }
+      return false;
+    };
+
+    // Diagnose if return type is not Self or Self?
+    if (!base->isSimpleUnqualifiedIdentifier(Context.Id_Self) &&
+        !isOptionalSimpleUnqualifiedIdentifier(base, Context.Id_Self)) {
       diagnose(FuncRetTy->getStartLoc(),
                diag::lifetime_dependence_invalid_init_return);
       return nullptr;
@@ -10042,8 +10083,8 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Reject 'destructor' functions outside of structs, enums, classes, or
   // extensions that provide objc implementations.
   //
-  // Later in the type checker, we validate that structs/enums only do this if
-  // they are move only and that @objcImplementations are main-body.
+  // Later in the type checker, we validate that structs/enums are noncopyable
+  // and that @objcImplementations are main-body.
   auto rejectDestructor = [](DeclContext *dc) {
     if (isa<StructDecl>(dc) || isa<EnumDecl>(dc) ||
         isa<ClassDecl>(dc))

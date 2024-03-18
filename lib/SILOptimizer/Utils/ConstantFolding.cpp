@@ -1383,7 +1383,7 @@ bool isLossyUnderflow(APFloat srcVal, BuiltinFloatType *srcType,
 /// SIL instruction is specified using hex-float notation in the Swift source.
 bool isHexLiteralInSource(FloatLiteralInst *flitInst) {
   auto *flitExpr = flitInst->getLoc().getAsASTNode<FloatLiteralExpr>();
-  return flitExpr && flitExpr->getDigitsText().startswith("0x");
+  return flitExpr && flitExpr->getDigitsText().starts_with("0x");
 }
 
 bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {

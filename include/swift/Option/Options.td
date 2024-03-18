@@ -984,6 +984,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+
 def EnbaleDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform conservative cross-module optimization">;
@@ -1454,7 +1458,7 @@ def index_file_path : Separate<["-"], "index-file-path">,
   MetaVarName<"<path>">;
 
 def index_store_path : Separate<["-"], "index-store-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
+  Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
 
 def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
@@ -1893,6 +1897,11 @@ def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
   Flags<[HelpHidden, NewDriverOnlyOption, ArgumentIsPath]>,
   MetaVarName<"<path>">,
   HelpText<"Specify a directory where the clang importer and clang linker can find headers and libraries">;
+
+def experimental_clang_importer_direct_cc1_scan:
+  Flag<["-"], "experimental-clang-importer-direct-cc1-scan">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Enables swift driver to construct swift-frontend invocations using -direct-clang-cc1-module-build">;
 
 def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,

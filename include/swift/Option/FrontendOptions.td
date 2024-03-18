@@ -306,6 +306,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "disable-objc-interop">,
     HelpText<"Disable Objective-C interop code generation and config directives">;
 
+  def enable_experimental_opaque_type_erasure :
+    Flag<["-"], "enable-experimental-opaque-type-erasure">,
+    HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
+
   def enable_objc_attr_requires_foundation_module :
     Flag<["-"], "enable-objc-attr-requires-foundation-module">,
     HelpText<"Enable requiring uses of @objc to require importing the "
@@ -657,14 +661,6 @@ def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
 
-def enable_experimental_associated_type_inference :
-  Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference improvements">;
-
-def disable_experimental_associated_type_inference :
-  Flag<["-"], "disable-experimental-associated-type-inference">,
-  HelpText<"Disable experimental associated type inference improvements">;
-
 def enable_experimental_lifetime_dependence_inference :
   Flag<["-"], "enable-experimental-lifetime-dependence-inference">,
   HelpText<"Enable experimental lifetime dependence inference">;
@@ -704,10 +700,6 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
 def bypass_resilience : Flag<["-"], "bypass-resilience-checks">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Ignore all checks for module resilience.">;
-  
-def enable_experimental_opaque_type_erasure : Flag<["-"], "enable-experimental-opaque-type-erasure">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
 
 def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -1240,6 +1232,13 @@ def disable_import_ptrauth_field_function_pointers :
   Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
   HelpText<"Disable import of custom ptrauth qualified field function pointers">;
 
+def enable_lifetime_dependence_diagnostics :
+  Flag<["-"], "enable-lifetime-dependence-diagnostics">,
+  HelpText<"Enable lifetime dependence diagnostics for Nonescapable types.">;
+def disable_lifetime_dependence_diagnostics :
+  Flag<["-"], "disable-lifetime-dependence-diagnostics">,
+  HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
+
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,
   HelpText<"Enable collocate metadata functions">;
@@ -1259,6 +1258,12 @@ def enable_relative_protocol_witness_tables :
   HelpText<"Enable relative protocol witness tables">;
 def disable_relative_protocol_witness_tables :
   Flag<["-"], "disable-relative-protocol-witness-tables">,
+  HelpText<"Disable relative protocol witness tables">;
+def enable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "enable-fragile-relative-protocol-tables">,
+  HelpText<"Enable relative protocol witness tables">;
+def disable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
 def enable_new_llvm_pass_manager :

@@ -37,7 +37,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -2553,7 +2552,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
-      infoBuilder = infoBuilder.withConcurrent(AFD->isSendable());
+      infoBuilder = infoBuilder.withSendable(AFD->isSendable());
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
       // Defer bodies must not escape.
@@ -2870,9 +2869,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
 
     if (isDerivable) {
-      evaluateOrDefault(ctx.evaluator,
-                        ResolveValueWitnessesRequest{normal},
-                        evaluator::SideEffect());
+      normal->resolveValueWitnesses();
     }
   }
 
@@ -3088,9 +3085,6 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
     return deriveImplicitSendableConformance(evaluator, nominal);
   case KnownProtocolKind::BitwiseCopyable:
     return deriveImplicitBitwiseCopyableConformance(nominal);
-  case KnownProtocolKind::Escapable:
-  case KnownProtocolKind::Copyable:
-    return deriveConformanceForInvertible(evaluator, nominal, kp);
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }

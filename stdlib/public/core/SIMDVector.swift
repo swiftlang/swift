@@ -722,6 +722,8 @@ public struct SIMDMask<Storage>: SIMD
   }
 }
 
+extension SIMDMask: Sendable where Storage: Sendable {}
+
 extension SIMDMask {
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane, using the given generator as a source for randomness.

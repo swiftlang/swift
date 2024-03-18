@@ -174,12 +174,16 @@ extension DistributedActor {
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 
+    #if $TypedThrows
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
       let rawFn = unsafeBitCast(fn, to: NoActor.self)
       return try rawFn(self)
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
   }
 }
 

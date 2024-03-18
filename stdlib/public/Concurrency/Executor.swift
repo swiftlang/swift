@@ -120,7 +120,7 @@ public protocol SerialExecutor: Executor {
 ///
 /// Unstructured tasks do not inherit the task executor.
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 public protocol TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
   // get a redundant witness-table entry for it.  This allows us to
@@ -152,7 +152,7 @@ public protocol TaskExecutor: Executor {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension TaskExecutor {
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
     UnownedTaskExecutor(ordinary: self)
@@ -270,7 +270,7 @@ public struct UnownedSerialExecutor: Sendable {
 
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @frozen
 public struct UnownedTaskExecutor: Sendable {
   #if $BuiltinExecutor
@@ -279,7 +279,7 @@ public struct UnownedTaskExecutor: Sendable {
 
   /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
   /// which needs to reach for this from an @_transparent function which prevents @_spi use.
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   public var _executor: Builtin.Executor {
     self.executor
   }
@@ -303,7 +303,7 @@ public struct UnownedTaskExecutor: Sendable {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension UnownedTaskExecutor: Equatable {
   @inlinable
   public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
@@ -373,7 +373,7 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("_task_executor_getTaskExecutorRef")
 internal func _task_executor_getTaskExecutorRef(_ taskExecutor: any TaskExecutor) -> Builtin.Executor {
   return taskExecutor.asUnownedTaskExecutor().executor
@@ -396,7 +396,7 @@ where E: SerialExecutor {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
 internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: TaskExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

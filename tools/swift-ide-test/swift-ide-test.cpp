@@ -1846,7 +1846,7 @@ public:
     const char *LocPtr = getPtr(Node.Range.getStart());
     if (Node.Kind == SyntaxNodeKind::CommentLine && !TerminalOutput) {
       // Ignore CHECK lines.
-      if (StringRef(LocPtr, BufEnd - LocPtr).startswith("// CHECK"))
+      if (StringRef(LocPtr, BufEnd - LocPtr).starts_with("// CHECK"))
         return true;
     }
     return false;

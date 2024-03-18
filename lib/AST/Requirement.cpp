@@ -349,9 +349,6 @@ void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return;
-
   for (auto gp : gps) {
     for (auto ip : InvertibleProtocolSet::full()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));

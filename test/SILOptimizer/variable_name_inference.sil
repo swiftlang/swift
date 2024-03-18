@@ -31,6 +31,22 @@ sil @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
 sil @useIndirect : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil @sideEffect : $@convention(thin) () -> ()
 
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+enum FirstSecondEnum<T> {
+case first
+case second(T)
+}
+
+enum FirstSecondThirdEnum<T> {
+case first
+case second(T)
+case third(FakeOptional<T>)
+}
+
 //===----------------------------------------------------------------------===//
 //                                MARK: Tests
 //===----------------------------------------------------------------------===//
@@ -389,4 +405,195 @@ bb0(%0 : @owned $Klass, %1 : @guaranteed $KlassWithKlassPair):
   dealloc_stack %2 : $*Klass
   %37 = tuple ()
   return %37 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on function_argument_inference_through_structextract: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %3 = copy_value %2 : $Klass
+// CHECK: Name: 'self.lhs'
+// CHECK: Root: %0 = argument of bb0 : $KlassPair
+// CHECK: end running test 1 of 1 on function_argument_inference_through_structextract: variable-name-inference with: @trace[0]
+sil [ossa] @function_argument_inference_through_structextract : $@convention(thin) (@guaranteed KlassPair) -> @owned Klass {
+bb0(%0 : @guaranteed $KlassPair):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $KlassPair, let, name "self", argno 1, implicit
+  %2 = struct_extract %0 : $KlassPair, #KlassPair.lhs
+  %3 = copy_value %2 : $Klass
+  debug_value [trace] %3 : $Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on function_argument_inference_through_uncheckedenumdata: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %3 = copy_value %2 : $Klass
+// CHECK: Name: 'self.some'
+// CHECK: Root: %0 = argument of bb0 : $FakeOptional<Klass>
+// CHECK: end running test 1 of 1 on function_argument_inference_through_uncheckedenumdata: variable-name-inference with: @trace[0]
+sil [ossa] @function_argument_inference_through_uncheckedenumdata : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> @owned Klass {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $FakeOptional<Klass>, let, name "self", argno 1, implicit
+  %2 = unchecked_enum_data %0 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %3 = copy_value %2 : $Klass
+  debug_value [trace] %3 : $Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %3 = load [take] %2 : $*Klass
+// CHECK: Name: 'self.some'
+// CHECK: Root: %0 = argument of bb0 : $*FakeOptional<Klass>
+// CHECK: end running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr: variable-name-inference with: @trace[0]
+sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr : $@convention(thin) (@in FakeOptional<Klass>) -> @owned Klass {
+bb0(%0 : $*FakeOptional<Klass>):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1, implicit
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %3 = load [take] %2 : $*Klass
+  debug_value [trace] %3 : $Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr_2: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %2 = unchecked_take_enum_data_addr %0
+// CHECK: Name: 'self.some'
+// CHECK: Root: %0 = argument of bb0 : $*FakeOptional<Klass>
+// CHECK: end running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr_2: variable-name-inference with: @trace[0]
+sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr_2 : $@convention(thin) (@in FakeOptional<Klass>) -> @owned Klass {
+bb0(%0 : $*FakeOptional<Klass>):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1, implicit
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  debug_value [trace] %2 : $*Klass
+  %3 = load [take] %2 : $*Klass
+  return %3 : $Klass
+}
+
+// For diamonds, we just recursively visit the uses of the phi and take the
+// first one that gives a value. This is generally used for diagnostics, so we
+// are ok with just giving one.
+//
+// TODO: If we need to do better, we can perhaps emit all of them.
+
+// CHECK-LABEL: begin running test 1 of 1 on handle_diamond: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %9 = argument of bb3
+// CHECK: Name: 'myname.some'
+// CHECK: Root: %0 = argument of bb0
+// CHECK: end running test 1 of 1 on handle_diamond: variable-name-inference with: @trace[0]
+sil [ossa] @handle_diamond : $@convention(method) (@guaranteed FirstSecondEnum<Klass>) -> @sil_transferring @owned FakeOptional<Klass> {
+bb0(%0 : @guaranteed $FirstSecondEnum<Klass>):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $FirstSecondEnum<Klass>, var, name "myname"
+  switch_enum %0 : $FirstSecondEnum<Klass>, case #FirstSecondEnum.first!enumelt: bb1, case #FirstSecondEnum.second!enumelt: bb2
+
+bb1:
+  %nil = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%nil : $FakeOptional<Klass>)
+
+bb2(%1 : @guaranteed $Klass):
+  %2 = copy_value %1 : $Klass
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2 : $Klass
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%4 : @owned $FakeOptional<Klass>):
+  debug_value [trace] %4 : $FakeOptional<Klass>
+  return %4 : $FakeOptional<Klass>
+}
+
+// For diamonds, we just recursively visit the uses of the phi and take the
+// first one that gives a value. This is generally used for diagnostics, so we
+// are ok with just giving one.
+//
+// TODO: If we need to do better, we can perhaps emit all of them.
+
+// CHECK-LABEL: begin running test 1 of 1 on handle_loop: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %16 = argument of bb5
+// CHECK: Name: 'myname.some.third'
+// CHECK: Root: %0 = argument of bb0
+// CHECK: end running test 1 of 1 on handle_loop: variable-name-inference with: @trace[0]
+sil [ossa] @handle_loop : $@convention(method) (@guaranteed FirstSecondThirdEnum<Klass>) -> @sil_transferring @owned FirstSecondThirdEnum<Klass> {
+bb0(%0 : @guaranteed $FirstSecondThirdEnum<Klass>):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $FirstSecondThirdEnum<Klass>, var, name "myname"
+  %0a = copy_value %0 : $FirstSecondThirdEnum<Klass>
+  br bb1(%0a : $FirstSecondThirdEnum<Klass>)
+
+bb1(%1a : @owned $FirstSecondThirdEnum<Klass>):
+  br bb2(%1a : $FirstSecondThirdEnum<Klass>)
+
+bb2(%1b : @owned $FirstSecondThirdEnum<Klass>):
+  switch_enum %1b : $FirstSecondThirdEnum<Klass>, case #FirstSecondThirdEnum.first!enumelt: bb3, case #FirstSecondThirdEnum.second!enumelt: bb4, case #FirstSecondThirdEnum.third!enumeult: bb4a
+
+bb3:
+  %nil = enum $FirstSecondThirdEnum<Klass>, #FirstSecondThirdEnum.first!enumelt
+  br bb5(%nil : $FirstSecondThirdEnum<Klass>)
+
+bb4(%1 : @owned $Klass):
+  %2 = copy_value %1 : $Klass
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2 : $Klass
+  %3a = enum $FirstSecondThirdEnum<Klass>, #FirstSecondThirdEnum.third!enumelt, %3 : $FakeOptional<Klass>
+  destroy_value %1 : $Klass
+  br bb5(%3a : $FirstSecondThirdEnum<Klass>)
+
+bb5(%4 : @owned $FirstSecondThirdEnum<Klass>):
+  br bb6
+
+bb6:
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb1(%4 : $FirstSecondThirdEnum<Klass>)
+
+bb4a(%unused : @owned $FakeOptional<Klass>):
+  unreachable
+
+bb8:
+  debug_value [trace] %4 : $FirstSecondThirdEnum<Klass>
+  return %4 : $FirstSecondThirdEnum<Klass>
+}
+
+// Make sure that we properly scope by switching edge order.
+//
+// CHECK-LABEL: begin running test 1 of 1 on handle_loop_other_order: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %16 = argument of bb5
+// CHECK: Name: 'myname.some.third'
+// CHECK: Root: %0 = argument of bb0
+// CHECK: end running test 1 of 1 on handle_loop_other_order: variable-name-inference with: @trace[0]
+sil [ossa] @handle_loop_other_order : $@convention(method) (@guaranteed FirstSecondThirdEnum<Klass>) -> @sil_transferring @owned FirstSecondThirdEnum<Klass> {
+bb0(%0 : @guaranteed $FirstSecondThirdEnum<Klass>):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $FirstSecondThirdEnum<Klass>, var, name "myname"
+  %0a = copy_value %0 : $FirstSecondThirdEnum<Klass>
+  br bb1(%0a : $FirstSecondThirdEnum<Klass>)
+
+bb1(%1a : @owned $FirstSecondThirdEnum<Klass>):
+  br bb2(%1a : $FirstSecondThirdEnum<Klass>)
+
+bb2(%1b : @owned $FirstSecondThirdEnum<Klass>):
+  switch_enum %1b : $FirstSecondThirdEnum<Klass>, case #FirstSecondThirdEnum.first!enumelt: bb4, case #FirstSecondThirdEnum.second!enumelt: bb3, case #FirstSecondThirdEnum.third!enumeult: bb4a
+
+bb3(%1 : @owned $Klass):
+  %2 = copy_value %1 : $Klass
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2 : $Klass
+  %3a = enum $FirstSecondThirdEnum<Klass>, #FirstSecondThirdEnum.third!enumelt, %3 : $FakeOptional<Klass>
+  destroy_value %1 : $Klass
+  br bb5(%3a : $FirstSecondThirdEnum<Klass>)
+
+bb4:
+  %nil = enum $FirstSecondThirdEnum<Klass>, #FirstSecondThirdEnum.first!enumelt
+  br bb5(%nil : $FirstSecondThirdEnum<Klass>)
+
+bb5(%4 : @owned $FirstSecondThirdEnum<Klass>):
+  br bb6
+
+bb6:
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb1(%4 : $FirstSecondThirdEnum<Klass>)
+
+bb4a(%unused : @owned $FakeOptional<Klass>):
+  unreachable
+
+bb8:
+  debug_value [trace] %4 : $FirstSecondThirdEnum<Klass>
+  return %4 : $FirstSecondThirdEnum<Klass>
 }

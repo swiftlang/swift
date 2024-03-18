@@ -2032,6 +2032,9 @@ ERROR(attr_only_at_non_generic_scope, none,
 ERROR(attr_only_on_static_properties, none,
       "properties with attribute '_section' must be static", (StringRef))
 
+ERROR(weak_unowned_in_embedded_swift, none,
+      "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
+
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 NOTE(access_control_in_protocol_detail,none,
@@ -2496,7 +2499,7 @@ ERROR(inferred_opaque_type,none,
 
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
-      "type %0 is not invertible", (Type))
+      "type %0 cannot be suppressed", (Type))
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -3168,12 +3171,11 @@ ERROR(requires_not_suitable_archetype,none,
       (Type))
 
 ERROR(requires_not_suitable_inverse_subject,none,
-      "cannot apply inverse '~%1' to type %0 in conformance requirement",
+      "cannot suppress '~%1' on type %0",
       (Type, StringRef))
 
 ERROR(requires_not_suitable_inverse_outer_subject,none,
-      "cannot add inverse constraint '%0: ~%1' "
-      "on generic parameter '%0' defined in outer scope",
+      "cannot suppress '~%1' on generic parameter '%0' defined in outer scope",
       (StringRef, StringRef))
 
 ERROR(invalid_shape_requirement,none,
@@ -5501,9 +5503,6 @@ ERROR(distributed_actor_remote_func_implemented_manually,none,
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
-ERROR(nonisolated_storage_value_type,none,
-      "'nonisolated' is redundant on %0's stored properties",
-      (DescriptiveDeclKind))
 ERROR(distributed_actor_func_nonisolated, none,
       "cannot declare method %0 as both 'nonisolated' and 'distributed'",
       (DeclName))
@@ -5697,6 +5696,18 @@ NOTE(nonisolated_mutable_storage_note,none,
      "convert %0 to a 'let' constant or consider declaring it "
      "'nonisolated(unsafe)' if manually managing concurrency safety",
      (const VarDecl *))
+WARNING(nonisolated_unsafe_sendable_constant,none,
+     "'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type "
+     "%0, consider removing it",
+     (Type))
+WARNING(unsafe_sendable_actor_constant,none,
+     "'(unsafe)' is unnecessary for a constant public actor property with "
+     "'Sendable' type %0, consider removing it",
+     (Type))
+WARNING(nonisolated_unsafe_sendable_actor_constant,none,
+     "'nonisolated(unsafe)' is unnecessary for a constant actor-isolated "
+     "property with 'Sendable' type %0, consider removing it",
+     (Type))
 ERROR(nonisolated_non_sendable,none,
       "'nonisolated' can not be applied to variable with non-'Sendable' "
       "type %0",
@@ -5780,9 +5791,6 @@ ERROR(global_actor_on_actor_class,none,
       "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
-ERROR(global_actor_on_storage_of_value_type,none,
-      "stored property %0 within struct cannot have a global actor",
-      (DeclName))
 ERROR(unsafe_global_actor,none,
       "'(unsafe)' global actors are deprecated; "
       "use '@preconcurrency' instead",
@@ -7619,7 +7627,7 @@ ERROR(inverse_conflicts_explicit_composition, none,
       "composition cannot contain '~%0' when another member requires '%0'",
       (StringRef))
 ERROR(inverse_extension, none,
-      "cannot apply inverse %0 to extension",
+      "cannot suppress %0 in extension",
       (Type))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
@@ -7653,8 +7661,6 @@ NOTE(note_non_bitwise_copyable_type_indirect_enum_element,none,
      "indirect case is here", ())
 ERROR(non_bitwise_copyable_type_noncopyable,none,
       "noncopyable type cannot conform to 'BitwiseCopyable'", ())
-ERROR(non_bitwise_copyable_type_nonescapable,none,
-      "nonescapable type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_cxx_nontrivial,none,
       "non-trivial C++ type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_c_type_nontrivial,none,
@@ -7682,16 +7688,6 @@ ERROR(bitwise_copyable_outside_module,none,
       (const ValueDecl *))
 
 // -- older ones below --
-
-ERROR(noncopyable_within_copyable, none,
-      "%kind0 cannot contain a noncopyable type without also being noncopyable",
-      (const ValueDecl *))
-NOTE(noncopyable_within_copyable_location, none,
-     "contained noncopyable %0 '%1.%2'",
-     (DescriptiveDeclKind, StringRef, StringRef))
-ERROR(noncopyable_cannot_conform_to_type, none,
-     "noncopyable %kind0 cannot conform to %1",
-     (const ValueDecl *, Type))
 ERROR(noncopyable_parameter_requires_ownership, none,
       "parameter of noncopyable type %0 must specify ownership", (Type))
 ERROR(noncopyable_parameter_subscript_unsupported, none,

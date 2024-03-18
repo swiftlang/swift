@@ -699,8 +699,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
         assert(!isPack);
 
-        auto addr = emitTemporaryAllocation(vd, entryValue->getType(), false,
-                                            false, /*generateDebugInfo*/ false);
+        auto addr = emitTemporaryAllocation(vd, entryValue->getType(),
+                                            DoesNotHaveDynamicLifetime,
+                                            IsNotLexical, IsNotFromVarDecl,
+                                            /*generateDebugInfo*/ false);
         auto val = B.emitCopyValueOperation(loc, entryValue);
         auto &lowering = getTypeLowering(entryValue->getType());
         lowering.emitStore(B, loc, val, addr, StoreOwnershipQualifier::Init);
@@ -1119,16 +1121,6 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
-// The emitBuiltinCreateAsyncTask function symbol is exposed from
-// SILGenBuiltin so that it is available from SILGenFunction. There is a
-// fair bit of work involved going from what is available at the SGF to
-// what is needed for actually calling the CreateAsyncTask builtin, so in
-// order to avoid additional maintenance, it's good to re-use that.
-ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
-                                        SubstitutionMap subs,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C);
-
 void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   // Create the argc and argv arguments.
   auto entry = B.getInsertionBB();
@@ -1381,12 +1373,10 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
       emitWrapIntegerLiteral(moduleLoc, getLoweredType(ctx.getIntType()),
                              taskCreationFlagMask.getOpaqueValue());
 
-  SILValue task =
-      emitBuiltinCreateAsyncTask(
-          *this, moduleLoc, subs,
-          {ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
-           ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef)},
-          {}) //, /*inGroup=*/false, /*withExecutor=*/false)
+  SILValue task = emitCreateAsyncMainTask(
+          moduleLoc, subs,
+          ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
+          ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef))
           .forward(*this);
   DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
   task = structure->getResult(0);

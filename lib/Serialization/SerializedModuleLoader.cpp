@@ -394,8 +394,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
 llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
 SerializedModuleLoaderBase::getImportsOfModule(
     Twine modulePath, ModuleLoadingBehavior transitiveBehavior,
-    bool isFramework, bool isRequiredOSSAModules,
-    bool isRequiredNoncopyableGenerics, StringRef SDKName,
+    bool isFramework, bool isRequiredOSSAModules, StringRef SDKName,
     StringRef packageName, llvm::vfs::FileSystem *fileSystem,
     PathObfuscator &recoverer) {
   auto moduleBuf = fileSystem->getBufferForFile(modulePath);
@@ -408,7 +407,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules, isRequiredNoncopyableGenerics,
+      isRequiredOSSAModules,
       SDKName, recoverer, loadedModuleFile);
 
   for (const auto &dependency : loadedModuleFile->getDependencies()) {
@@ -455,7 +454,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
       ModuleLoadingBehavior::Required;
   auto binaryModuleImports = getImportsOfModule(
       modulePath, transitiveLoadingBehavior, isFramework,
-      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SourceMgr.getFileSystem().get(),
       Ctx.SearchPathOpts.DeserializedPathRecoverer);
@@ -465,7 +464,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   // Lookup optional imports of this module also
   auto binaryModuleOptionalImports = getImportsOfModule(
       modulePath, ModuleLoadingBehavior::Optional, isFramework,
-      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SourceMgr.getFileSystem().get(),
       Ctx.SearchPathOpts.DeserializedPathRecoverer);
@@ -889,7 +888,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       moduleInterfacePath, moduleInterfaceSourcePath,
       std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
       std::move(moduleSourceInfoInputBuffer), isFramework,
-      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
@@ -1028,10 +1027,6 @@ bool SerializedModuleLoaderBase::isRequiredOSSAModules() const {
   return Ctx.SILOpts.EnableOSSAModules;
 }
 
-bool SerializedModuleLoaderBase::isRequiredNoncopyableGenerics() const {
-  return Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
-}
-
 void swift::serialization::diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc,
     const serialization::ValidationInfo &loadInfo,
@@ -1068,9 +1063,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
       break;
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
-    break;
-  case serialization::Status::NoncopyableGenericsMismatch:
-    // Ignore; the module should get rebuilt from its interface.
     break;
   case serialization::Status::NotInOSSA:
     // soft reject, silently ignore.
@@ -1170,7 +1162,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::FormatTooNew:
   case serialization::Status::FormatTooOld:
   case serialization::Status::NotInOSSA:
-  case serialization::Status::NoncopyableGenericsMismatch:
   case serialization::Status::RevisionIncompatible:
   case serialization::Status::ChannelIncompatible:
   case serialization::Status::Malformed:
@@ -1265,10 +1256,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   }
 }
 
-bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
-                                              StringRef buffer,
-                                              llvm::StringSaver &ArgSaver,
-                                              SmallVectorImpl<const char *> &SubArgs) {
+bool swift::extractCompilerFlagsFromInterface(
+    StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
+    SmallVectorImpl<const char *> &SubArgs,
+    std::optional<llvm::Triple> PreferredTarget) {
   SmallVector<StringRef, 1> FlagMatches;
   auto FlagRe = llvm::Regex("^// swift-module-flags:(.*)$", llvm::Regex::Newline);
   if (!FlagRe.match(buffer, &FlagMatches))
@@ -1276,26 +1267,23 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
   assert(FlagMatches.size() == 2);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
 
-  auto intFileName = llvm::sys::path::filename(interfacePath);
-
-  // Sanitize arch if the file name and the encoded flags disagree.
-  // It's a known issue that we are using arm64e interfaces contents for the arm64 target,
-  // meaning the encoded module flags are using -target arm64e-x-x. Fortunately,
-  // we can tell the target arch from the interface file name, so we could sanitize
-  // the target to use by inferring target from the file name.
-  StringRef arm64 = "arm64";
-  StringRef arm64e = "arm64e";
-  if (intFileName.contains(arm64) && !intFileName.contains(arm64e)) {
-    for (unsigned I = 1; I < SubArgs.size(); ++I) {
-      if (strcmp(SubArgs[I - 1], "-target") != 0) {
-        continue;
-      }
-      StringRef triple(SubArgs[I]);
-      if (triple.startswith(arm64e)) {
-        SubArgs[I] = ArgSaver.save((llvm::Twine(arm64) +
-          triple.substr(arm64e.size())).str()).data();
-      }
+  // If the target triple parsed from the Swift interface file differs
+  // only in subarchitecture from the compatible target triple, then
+  // we have loaded a Swift interface from a different-but-compatible
+  // architecture slice. Use the compatible subarchitecture.
+  for (unsigned I = 1; I < SubArgs.size(); ++I) {
+    if (strcmp(SubArgs[I - 1], "-target") != 0) {
+      continue;
     }
+    llvm::Triple target(SubArgs[I]);
+    if (PreferredTarget &&
+        target.getSubArch() != PreferredTarget->getSubArch() &&
+        target.getArch() == PreferredTarget->getArch() &&
+        target.getVendor() == PreferredTarget->getVendor() &&
+        target.getOS() == PreferredTarget->getOS() &&
+        target.getEnvironment() == PreferredTarget->getEnvironment())
+      target.setArch(PreferredTarget->getArch(), PreferredTarget->getSubArch());
+    SubArgs[I] = ArgSaver.save(target.str()).data();
   }
 
   SmallVector<StringRef, 1> IgnFlagMatches;
@@ -1415,7 +1403,6 @@ bool SerializedModuleLoaderBase::canImportModule(
     auto metaData = serialization::validateSerializedAST(
         moduleInputBuffer->getBuffer(),
         Ctx.SILOpts.EnableOSSAModules,
-        Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
         Ctx.LangOpts.SDKName);
     versionInfo->setVersion(metaData.userModuleVersion,
                             ModuleVersionSourceKind::SwiftBinaryModule);

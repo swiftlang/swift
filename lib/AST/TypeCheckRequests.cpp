@@ -1684,6 +1684,38 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   llvm_unreachable("unhandled actor isolation kind!");
 }
 
+void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
+                                         StringRef openingQuotationMark) const {
+  switch (*this) {
+  case ActorIsolation::ActorInstance:
+    os << "actor-isolated";
+    break;
+
+  case ActorIsolation::GlobalActor: {
+    if (isMainActor()) {
+      os << "main actor-isolated";
+    } else {
+      Type globalActor = getGlobalActor();
+      os << "global actor " << openingQuotationMark << globalActor.getString()
+         << openingQuotationMark << "-isolated";
+    }
+    break;
+  }
+  case ActorIsolation::Erased:
+    os << "@isolated(any)";
+    break;
+
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::Unspecified:
+    os << "nonisolated";
+    if (*this == ActorIsolation::NonisolatedUnsafe) {
+      os << "(unsafe)";
+    }
+    break;
+  }
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   if (state.preconcurrency())

@@ -249,7 +249,7 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
   // Check if it's an integer first. The mangling of an integer type is
   // type ::= 'Bi' NATURAL '_'
   llvm::StringRef nameRef(Name);
-  if (nameRef.startswith("Bi") && nameRef.endswith("_")) {
+  if (nameRef.starts_with("Bi") && nameRef.endswith("_")) {
     // Drop the front "Bi" and "_" end, check that what we're left with is a
     // bool.
     llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
@@ -450,6 +450,21 @@ public:
   }
 };
 
+// Given a count, return a mask that is just
+// big enough to preserve values less than that count.
+// E.g., given a count of 6, max value is 5 (binary 0101),
+// so we want to return binary 0111.
+static uint32_t maskForCount(uint32_t t) {
+  t -= 1; // Convert count => max value
+  // Set all bits below highest bit...
+  t |= t >> 16;
+  t |= t >> 8;
+  t |= t >> 4;
+  t |= t >> 2;
+  t |= t >> 1;
+  return t;
+}
+
 // Enum with 2 or more non-payload cases and no payload cases
 class NoPayloadEnumTypeInfo: public EnumTypeInfo {
 public:
@@ -489,6 +504,9 @@ public:
     if (!reader.readInteger(address, getSize(), &tag)) {
       return false;
     }
+    // Strip bits that might be used by a containing MPE:
+    uint32_t mask = maskForCount(getNumCases());
+    tag &= mask;
     if (tag < getNumCases()) {
       *CaseIndex = tag;
       return true;

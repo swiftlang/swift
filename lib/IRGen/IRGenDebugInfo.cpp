@@ -578,8 +578,10 @@ private:
     } else {
       File = NormalizedFile;
       // Leave <compiler-generated> & friends as is, without directory.
-      if (!(File.startswith("<") && File.endswith(">")))
+      if (!(File.starts_with("<") && File.endswith(">")))
         Dir = CurDir;
+      else
+        Dir = llvm::sys::path::root_directory(CurDir);
     }
     llvm::DIFile *F =
         DBuilder.createFile(DebugPrefixMap.remapPath(File),
@@ -1044,11 +1046,10 @@ private:
                                         llvm::DINode::DIFlags Flags) {
     unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
     auto *Ty = getOrCreateType(DbgTy);
+    auto SizeInBits = getSizeInBits(Ty);
     auto *DITy = DBuilder.createMemberType(
-        Scope, Name, File, 0,
-        DbgTy.getRawSizeInBits() ? *DbgTy.getRawSizeInBits() : 0, 0,
-        OffsetInBits, Flags, Ty);
-    OffsetInBits += getSizeInBits(Ty);
+        Scope, Name, File, 0, SizeInBits, 0, OffsetInBits, Flags, Ty);
+    OffsetInBits += SizeInBits;
     OffsetInBits = llvm::alignTo(OffsetInBits,
                                  SizeOfByte * DbgTy.getAlignment().getValue());
     return DITy;
@@ -1068,8 +1069,8 @@ private:
       assert(!Name.empty() &&
              "no mangled name and no human readable name given");
     else
-      assert((UniqueID.startswith("_T") ||
-              UniqueID.startswith(MANGLING_PREFIX_STR)) &&
+      assert((UniqueID.starts_with("_T") ||
+              UniqueID.starts_with(MANGLING_PREFIX_STR)) &&
              "UID is not a mangled name");
 #endif
 
@@ -1142,7 +1143,7 @@ private:
           memberTy,
           IGM.getTypeInfoForUnlowered(
               IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-          IGM, false);
+          IGM);
       unsigned OffsetInBits = 0;
       llvm::DIType *DITy = createMemberType(DbgTy, VD->getName().str(),
                                             OffsetInBits, Scope, File, Flags);
@@ -1177,8 +1178,7 @@ private:
     UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
 
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-        UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM,
-        false);
+        UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
     Mangle::ASTMangler Mangler;
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
         UnsubstitutedTy->mapTypeOutOfContext(), {});
@@ -1196,8 +1196,7 @@ private:
       auto SuperClassTy = ClassTy->getSuperclass();
       if (SuperClassTy) {
         auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
-            SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM,
-            false);
+            SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM);
 
         llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
         assert(SuperClassDITy && "getOrCreateType should never return null!");
@@ -1350,14 +1349,14 @@ private:
   // Create debug information for an enum with no raw type.
   llvm::DICompositeType *
   createUnsubstitutedVariantType(DebugTypeInfo DbgTy, EnumDecl *Decl,
-                                 StringRef MangledName, unsigned AlignInBits,
+                                 StringRef MangledName,
+                                 unsigned SizeInBits, unsigned AlignInBits,
                                  llvm::DIScope *Scope, llvm::DIFile *File,
                                  unsigned Line, llvm::DINode::DIFlags Flags) {
     assert(!Decl->getRawType() &&
            "Attempting to create variant debug info from raw enum!");
 
     StringRef Name = Decl->getName().str();
-    unsigned SizeInBits = DbgTy.getRawSizeInBits().value_or(0);
     auto NumExtraInhabitants = DbgTy.getNumExtraInhabitants();
 
     // A variant part should actually be a child to a DW_TAG_structure_type
@@ -1377,7 +1376,7 @@ private:
         // A variant case which carries a payload.
         ArgTy = ElemDecl->getParentEnum()->mapTypeIntoContext(ArgTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
-            ArgTy, IGM.getTypeInfoForUnlowered(ArgTy), IGM, false);
+            ArgTy, IGM.getTypeInfoForUnlowered(ArgTy), IGM);
         unsigned Offset = 0;
         auto MTy =
             createMemberType(*ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
@@ -1419,10 +1418,8 @@ private:
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
     DebugTypeInfo BlandDbgTy(Ty, DbgTy.getFragmentStorageType(),
-                             DbgTy.getRawSizeInBits(), DbgTy.getAlignment(),
-                             DbgTy.hasDefaultAlignment(),
-                             DbgTy.isMetadataType(), DbgTy.isSizeFragmentSize(),
-                             DbgTy.isFixedBuffer());
+                             DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
+                             DbgTy.isMetadataType(), DbgTy.isFixedBuffer());
     return getOrCreateType(BlandDbgTy);
   }
 
@@ -1452,7 +1449,7 @@ private:
         // For full debug info don't generate just a forward declaration  for
         // the generic type parameters.
         ParamDebugType = DebugTypeInfo::getFromTypeInfo(
-            Param, IGM.getTypeInfoForUnlowered(Param), IGM, false);
+            Param, IGM.getTypeInfoForUnlowered(Param), IGM);
       else
         ParamDebugType = DebugTypeInfo::getForwardDecl(Param);
 
@@ -1623,7 +1620,7 @@ private:
       auto &elemTI = IGM.getTypeInfoForUnlowered(
           AbstractionPattern(genericSig, ElemTy->getCanonicalType()), ElemTy);
       auto DbgTy =
-            DebugTypeInfo::getFromTypeInfo(ElemTy, elemTI, IGM, false);
+            DebugTypeInfo::getFromTypeInfo(ElemTy, elemTI, IGM);
         Elements.push_back(
             createMemberType(DbgTy, "", OffsetInBits, Scope, MainFile, Flags));
     }
@@ -1687,10 +1684,13 @@ private:
     // emitting the storage size of the struct, but it may be necessary
     // to emit the (target!) size of the underlying basic type.
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-    // FIXME: SizeInBits is redundant with DbgTy, remove it.
-    uint64_t SizeInBits = 0;
-    if (DbgTy.getTypeSizeInBits())
-      SizeInBits = *DbgTy.getTypeSizeInBits();
+    auto CompletedDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
+      DbgTy.getType(), IGM.getTypeInfoForUnlowered(DbgTy.getType()), IGM);
+    std::optional<uint64_t> SizeInBitsOrNull;
+    if (CompletedDbgTy)
+      SizeInBitsOrNull = CompletedDbgTy->getSizeInBits();
+
+    uint64_t SizeInBits = SizeInBitsOrNull.value_or(0);
     unsigned AlignInBits = DbgTy.hasDefaultAlignment()
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
@@ -1718,14 +1718,14 @@ private:
     case TypeKind::BuiltinPackIndex:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;
-      if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+      if (CompletedDbgTy)
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
       break;
     }
 
     case TypeKind::BuiltinIntegerLiteral: {
       Encoding = llvm::dwarf::DW_ATE_unsigned; // ?
-      if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+      if (CompletedDbgTy)
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
       break;
     }
@@ -1791,7 +1791,7 @@ private:
                                 SizeInBits, AlignInBits, Flags, nullptr,
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       StringRef Name = Decl->getName().str();
-      if (!DbgTy.getTypeSizeInBits())
+      if (!SizeInBitsOrNull)
         return DBuilder.createForwardDecl(
             llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, L.File,
             FwdDeclLine, llvm::dwarf::DW_LANG_Swift, 0, AlignInBits);
@@ -1822,8 +1822,7 @@ private:
         auto SuperClassTy = ClassTy->getSuperclass();
         if (SuperClassTy) {
           auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
-              SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM,
-              false);
+              SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM);
 
           llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
           assert(SuperClassDITy && "getOrCreateType should never return null!");
@@ -1968,7 +1967,7 @@ private:
             IGM.getLoweredType(ProtocolDecl->getInterfaceType()).getASTType();
         auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
             ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy),
-            IGM, false);
+            IGM);
         auto PDITy = getOrCreateType(PDbgTy);
         Protocols.push_back(
             DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
@@ -2013,7 +2012,7 @@ private:
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+        if (CompletedDbgTy)
           return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
                                 Scope, L.File, L.Line, Flags);
       return createOpaqueStruct(Scope, Decl->getName().str(), L.File,
@@ -2032,15 +2031,14 @@ private:
         UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
 
         auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-            UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM,
-            false);
+            UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
         Mangle::ASTMangler Mangler;
         std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
             UnsubstitutedTy->mapTypeOutOfContext(), {});
         if (DeclTypeMangledName == MangledName) {
           return createUnsubstitutedVariantType(DbgTy, Decl, MangledName,
-                                   AlignInBits, Scope, File, FwdDeclLine,
-                                   Flags);
+                                   SizeInBits, AlignInBits, Scope, File,
+                                   FwdDeclLine, Flags);
         }
         // Force the creation of the unsubstituted type, don't create it
         // directly so it goes through all the caching/verification logic.
@@ -2060,7 +2058,7 @@ private:
       auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
       auto ElemTy = BuiltinVectorTy->getElementType();
       auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
-          ElemTy, IGM.getTypeInfoForUnlowered(ElemTy), IGM, false);
+          ElemTy, IGM.getTypeInfoForUnlowered(ElemTy), IGM);
       unsigned Count = BuiltinVectorTy->getNumElements();
       auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
       return DBuilder.createVectorType(SizeInBits, AlignInBits,
@@ -2093,9 +2091,9 @@ private:
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
-          AliasedTy, DbgTy.getFragmentStorageType(), DbgTy.getRawSizeInBits(),
-          DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
-          DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer(),
+          AliasedTy, DbgTy.getFragmentStorageType(),
+          DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
+          /* IsMetadataType = */ false, DbgTy.isFixedBuffer(),
           DbgTy.getNumExtraInhabitants());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     L.File, 0, Scope);
@@ -2188,7 +2186,11 @@ private:
   bool sanityCheckCachedType(DebugTypeInfo DbgTy, llvm::DIType *CachedType) {
     if (DbgTy.isForwardDecl())
       return true;
-    auto SizeInBits = DbgTy.getTypeSizeInBits();
+    auto CompletedDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
+      DbgTy.getType(), IGM.getTypeInfoForUnlowered(DbgTy.getType()), IGM);
+    std::optional<uint64_t> SizeInBits;
+    if (CompletedDbgTy)
+      SizeInBits = CompletedDbgTy->getSizeInBits();
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
     if ((SizeInBits && CachedSizeInBits != *SizeInBits) ||
         (!SizeInBits && CachedSizeInBits)) {
@@ -2211,7 +2213,7 @@ private:
       return;
     for (auto BuiltinType: IGM.getOrCreateSpecialStlibBuiltinTypes()) {
       auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-          BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM, false);
+          BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM);
       DBuilder.retainType(getOrCreateType(DbgTy));
     }
   }
@@ -2856,7 +2858,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
 
       auto DTI = DebugTypeInfo::getFromTypeInfo(
           errorResultTy,
-          IGM.getTypeInfo(SILTy), IGM, false);
+          IGM.getTypeInfo(SILTy), IGM);
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 
@@ -2868,9 +2870,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   // Because there's no good way to cross the CU boundary to insert a nested
   // DISubprogram definition in one CU into a type defined in another CU when
   // doing LTO builds.
-  if (Rep == SILFunctionTypeRepresentation::Method ||
-      Rep == SILFunctionTypeRepresentation::ObjCMethod ||
-      Rep == SILFunctionTypeRepresentation::WitnessMethod) {
+  if (llvm::isa<llvm::DICompositeType>(Scope)) {
     llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
         /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
         /*IsDefinition=*/false, /*IsOptimized=*/Opts.shouldOptimize());
@@ -2956,8 +2956,8 @@ bool IRGenDebugInfoImpl::handleFragmentDIExpr(
   if (!FieldTypeInfo)
     return false;
   llvm::Type *FieldTy = FieldTypeInfo->getStorageType();
-  // Doesn't support non-fixed type right now
-  if (!Offset || !FieldTy)
+  // Doesn't support non-fixed or empty types right now.
+  if (!Offset || !FieldTy || !FieldTy->isSized())
     return false;
 
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
@@ -2991,8 +2991,8 @@ bool IRGenDebugInfoImpl::handleTupleFragmentDIExpr(
   auto Offset = getFixedTupleElementOffset(IGM, ParentSILType, *Idx);
   auto ElementType = TT->getElement(*Idx).getType()->getCanonicalType();
   llvm::Type *FieldTy = IGM.getStorageTypeForLowered(ElementType);
-  // Doesn't support non-fixed type right now
-  if (!Offset || !FieldTy)
+  // Doesn't support non-fixed or empty types right now.
+  if (!Offset || !FieldTy || !FieldTy->isSized())
     return false;
 
   uint64_t SizeInBits = IGM.DataLayout.getTypeSizeInBits(FieldTy);

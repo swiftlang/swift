@@ -59,7 +59,7 @@ IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   // Vectors are VecNxT, where "N" is the number of elements and
   // T is the element type.
-  if (Name.startswith("Vec")) {
+  if (Name.starts_with("Vec")) {
     Name = Name.substr(3);
     StringRef::size_type xPos = Name.find('x');
     if (xPos == StringRef::npos)
@@ -295,12 +295,6 @@ struct CollectGenericParams {
     auto type = synthesizeType(SC, conf.Type);
     auto protocolType = synthesizeType(SC, conf.Protocol);
     Requirement req = {RequirementKind::Conformance, type, protocolType};
-
-    // If it's an invertible protocol and NoncopyableGenerics is disabled
-    // then skip the requirement.
-    if (req.getProtocolDecl()->getInvertibleProtocolKind())
-      if (!SC.Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-        return;
 
     AddedRequirements.push_back(req);
   }
@@ -726,18 +720,16 @@ namespace {
     }
 
     template <class G>
+    void addConformanceRequirement(const G &generator, KnownProtocolKind kp) {
+      addConformanceRequirement(generator, Context.getProtocol(kp));
+    }
+
+    template <class G>
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
       assert(proto && "missing protocol");
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
                       proto->getDeclaredInterfaceType());
-
-      // If it's an invertible protocol and NoncopyableGenerics is disabled
-      // then skip the requirement.
-      if (req.getProtocolDecl()->getInvertibleProtocolKind())
-        if (!Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-          return;
-
       addedRequirements.push_back(req);
     }
 
@@ -1194,14 +1186,23 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
   }
 
   BuiltinFunctionBuilder builder(Context);
+
+  auto genParam = makeGenericParam();
+
+  // Add safety, unless requested.
+  if (BV != BuiltinValueKind::UnsafeCastToNativeObject) {
+    builder.addConformanceRequirement(genParam, KnownProtocolKind::Copyable);
+    builder.addConformanceRequirement(genParam, KnownProtocolKind::Escapable);
+  }
+
   if (BV == BuiltinValueKind::CastToNativeObject ||
       BV == BuiltinValueKind::UnsafeCastToNativeObject ||
       BV == BuiltinValueKind::BridgeToRawPointer) {
-    builder.addParameter(makeGenericParam(), ownership);
+    builder.addParameter(genParam, ownership);
     builder.setResult(makeConcrete(builtinTy));
   } else {
     builder.addParameter(makeConcrete(builtinTy), ownership);
-    builder.setResult(makeGenericParam());
+    builder.setResult(genParam);
   }
   return builder.build(Id);
 }
@@ -1303,7 +1304,9 @@ static ValueDecl *getZeroInitializerOperation(ASTContext &Context,
                                              Identifier Id) {
   // <T> () -> T
   BuiltinFunctionBuilder builder(Context);
-  builder.setResult(makeGenericParam());
+  auto genParam = makeGenericParam();
+  builder.addConformanceRequirement(genParam, KnownProtocolKind::Escapable);
+  builder.setResult(genParam);
   return builder.build(Id);
 }
 
@@ -1510,6 +1513,32 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
+static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
+      _parameters(
+        _label("flags", _swiftInt),
+        _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("operation", _function(_async(_throws(_sendable(_thick))),
+                                      _typeparam(0), _parameters()))),
+      _tuple(_nativeObject, _rawPointer));
+}
+
+static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _parameters(
+        _label("flags", _swiftInt),
+        _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("operation", _function(_async(_throws(_sendable(_thick))),
+                                      _void, _parameters()))),
+      _tuple(_nativeObject, _rawPointer));
+}
+
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
                                      bool inGroup, bool withTaskExecutor,
                                      bool isDiscarding) {
@@ -1522,7 +1551,8 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
   if (withTaskExecutor) {
     builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows()
+                                    .withSendable(true).build();
   Type operationResultType;
   if (isDiscarding) {
     operationResultType = TupleType::getEmpty(ctx); // ()
@@ -1596,8 +1626,23 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   // TaskOptionRecord*
   builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
 
-  // operation async function pointer: () async throws -> T
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().withNoEscape().build();
+  // If transferring results are enabled, make async let return a transferring
+  // value.
+  //
+  // NOTE: If our actual returned function does not return something that is
+  // transferring, we will emit an error in Sema. In the case of SILGen, we just
+  // in such a case want to thunk and not emit an error. So in such a case, we
+  // always make this builtin take a transferring result.
+  bool hasTransferringResult =
+      ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults);
+
+  // operation async function pointer: () async throws -> transferring T
+  auto extInfo = ASTExtInfoBuilder()
+                     .withAsync()
+                     .withThrows()
+                     .withNoEscape()
+                     .withTransferringResult(hasTransferringResult)
+                     .build();
   builder.addParameter(
       makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
 
@@ -2162,7 +2207,7 @@ llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   using namespace llvm;
 
   // Swift intrinsic names start with int_.
-  if (!InName.startswith("int_"))
+  if (!InName.starts_with("int_"))
     return llvm::Intrinsic::not_intrinsic;
   InName = InName.drop_front(strlen("int_"));
   
@@ -2475,7 +2520,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   }
 
   // If this starts with fence, we have special suffixes to handle.
-  if (OperationName.startswith("ifdef_")) {
+  if (OperationName.starts_with("ifdef_")) {
     OperationName = OperationName.drop_front(strlen("ifdef_"));
     if (!Types.empty()) return nullptr;
     if (OperationName.empty()) return nullptr;
@@ -2483,7 +2528,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   }
   
   // If this starts with fence, we have special suffixes to handle.
-  if (OperationName.startswith("fence_")) {
+  if (OperationName.starts_with("fence_")) {
     OperationName = OperationName.drop_front(strlen("fence_"));
     
     // Verify we have a single integer, floating point, or pointer type.
@@ -2496,7 +2541,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     OperationName = OperationName.substr(Underscore);
     
     // Accept singlethread if present.
-    if (OperationName.startswith("_singlethread"))
+    if (OperationName.starts_with("_singlethread"))
       OperationName = OperationName.drop_front(strlen("_singlethread"));
     // Nothing else is allowed in the name.
     if (!OperationName.empty())
@@ -2505,7 +2550,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   }
   
   // If this starts with cmpxchg, we have special suffixes to handle.
-  if (OperationName.startswith("cmpxchg_")) {
+  if (OperationName.starts_with("cmpxchg_")) {
     OperationName = OperationName.drop_front(strlen("cmpxchg_"));
     
     // Verify we have a single integer, floating point, or pointer type.
@@ -2538,7 +2583,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   }
 
   // If this starts with atomicrmw, we have special suffixes to handle.
-  if (OperationName.startswith("atomicrmw_")) {
+  if (OperationName.starts_with("atomicrmw_")) {
     OperationName = OperationName.drop_front(strlen("atomicrmw_"));
     
     // Verify we have a single integer or pointer type.
@@ -2564,9 +2609,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     OperationName = OperationName.substr(Underscore);
     
     // Accept volatile and singlethread if present.
-    if (OperationName.startswith("_volatile"))
+    if (OperationName.starts_with("_volatile"))
       OperationName = OperationName.drop_front(strlen("_volatile"));
-    if (OperationName.startswith("_singlethread"))
+    if (OperationName.starts_with("_singlethread"))
       OperationName = OperationName.drop_front(strlen("_singlethread"));
     // Nothing else is allowed in the name.
     if (!OperationName.empty())
@@ -2576,7 +2621,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   // If this starts with atomicload or atomicstore, we have special suffixes to
   // handle.
-  if (OperationName.startswith("atomicload_")) {
+  if (OperationName.starts_with("atomicload_")) {
     OperationName = OperationName.drop_front(strlen("atomicload_"));
 
     // Verify we have a single integer, floating point, or pointer type.
@@ -2593,16 +2638,16 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     OperationName = OperationName.substr(Underscore);
 
     // Accept volatile and singlethread if present.
-    if (OperationName.startswith("_volatile"))
+    if (OperationName.starts_with("_volatile"))
       OperationName = OperationName.drop_front(strlen("_volatile"));
-    if (OperationName.startswith("_singlethread"))
+    if (OperationName.starts_with("_singlethread"))
       OperationName = OperationName.drop_front(strlen("_singlethread"));
     // Nothing else is allowed in the name.
     if (!OperationName.empty())
       return nullptr;
     return getAtomicLoadOperation(Context, Id, T);
   }
-  if (OperationName.startswith("atomicstore_")) {
+  if (OperationName.starts_with("atomicstore_")) {
     OperationName = OperationName.drop_front(strlen("atomicstore_"));
 
     // Verify we have a single integer, floating point, or pointer type.
@@ -2619,16 +2664,16 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     OperationName = OperationName.substr(Underscore);
 
     // Accept volatile and singlethread if present.
-    if (OperationName.startswith("_volatile"))
+    if (OperationName.starts_with("_volatile"))
       OperationName = OperationName.drop_front(strlen("_volatile"));
-    if (OperationName.startswith("_singlethread"))
+    if (OperationName.starts_with("_singlethread"))
       OperationName = OperationName.drop_front(strlen("_singlethread"));
     // Nothing else is allowed in the name.
     if (!OperationName.empty())
       return nullptr;
     return getAtomicStoreOperation(Context, Id, T);
   }
-  if (OperationName.startswith("allocWithTailElems_")) {
+  if (OperationName.starts_with("allocWithTailElems_")) {
     OperationName = OperationName.drop_front(strlen("allocWithTailElems_"));
     int NumTailTypes = 0;
     if (OperationName.getAsInteger(10, NumTailTypes))
@@ -2636,7 +2681,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
-  if (OperationName.startswith("applyDerivative_")) {
+  if (OperationName.starts_with("applyDerivative_")) {
     AutoDiffDerivativeFunctionKind kind;
     unsigned arity;
     bool throws;
@@ -2646,7 +2691,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
                                               throws, /*thrownType=*/Type());
   }
-  if (OperationName.startswith("applyTranspose_")) {
+  if (OperationName.starts_with("applyTranspose_")) {
     unsigned arity;
     bool throws;
     if (!autodiff::getBuiltinApplyTransposeConfig(
@@ -3014,6 +3059,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
 
+  case BuiltinValueKind::CreateTask:
+    return getCreateTask(Context, Id);
+
+  case BuiltinValueKind::CreateDiscardingTask:
+    return getCreateDiscardingTask(Context, Id);
+
   case BuiltinValueKind::CreateAsyncTask:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
                               /*withExecutor=*/false, /*isDiscarding=*/false);
@@ -3253,7 +3304,7 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
         llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
         t->getElementType().print(UnderlyingOS);
       }
-      if (UnderlyingStrVec.startswith(BUILTIN_TYPE_NAME_PREFIX))
+      if (UnderlyingStrVec.str().starts_with(BUILTIN_TYPE_NAME_PREFIX))
         UnderlyingStr = UnderlyingStrVec.substr(8);
       else
         UnderlyingStr = UnderlyingStrVec;

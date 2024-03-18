@@ -1136,7 +1136,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
                   return item.getPattern()->getKind() == PatternKind::Expr;
                 });
             isParentDoCatch = CS->getParentKind() == CaseParentKind::DoCatch;
-            isDefault = CS->isDefault();
+            isDefault = CS->isDefault() && !CS->hasUnknownAttr();
           }
         } else {
           Loc = clauses[firstRow].getCasePattern()->getStartLoc();
@@ -3408,10 +3408,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           } else {
             // Initiate a fixed borrow on the subject, so that it's treated as
             // opaque by the move checker.
-            subjectMV = subjectUndergoesFormalAccess
-              ? B.createFormalAccessBeginBorrow(S, subjectMV,
-                                                false, /*fixed*/true)
-              : B.createBeginBorrow(S, subjectMV, false, /*fixed*/ true);
+            subjectMV =
+                subjectUndergoesFormalAccess
+                    ? B.createFormalAccessBeginBorrow(
+                          S, subjectMV, IsNotLexical, BeginBorrowInst::IsFixed)
+                    : B.createBeginBorrow(S, subjectMV, IsNotLexical,
+                                          BeginBorrowInst::IsFixed);
           }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
           
@@ -3439,8 +3441,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           if (subjectMV.getType().isAddress()) {
             subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
           } else {
-            subjectMV = B.createBeginBorrow(S, subjectMV,
-                                            false, /*fixed*/ true);
+            subjectMV = B.createBeginBorrow(S, subjectMV, IsNotLexical,
+                                            BeginBorrowInst::IsFixed);
           }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
         }

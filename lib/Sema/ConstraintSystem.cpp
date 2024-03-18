@@ -1803,7 +1803,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       // All global functions should be @Sendable
       if (funcDecl->getDeclContext()->isModuleScopeContext()) {
         funcType =
-            funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
+            funcType->withExtInfo(funcType->getExtInfo().withSendable());
       }
     }
 
@@ -2033,23 +2033,6 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   assert(result.second);
   (void)result;
 
-  if (Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return typeVar;
-  }
-
-  // Add a constraint that generic parameters conform to Copyable.
-  // This lookup only can fail if the stdlib (i.e. the Swift module) has not
-  // been loaded because you've passed `-parse-stdlib` and are not building the
-  // stdlib itself (which would have `-module-name Swift` too).
-  if (!outerDC->getParentModule()->isBuiltinModule()) {
-    if (auto *copyable = getASTContext().getProtocol(KnownProtocolKind::Copyable)) {
-      addConstraint(
-          ConstraintKind::ConformsTo, typeVar,
-          copyable->getDeclaredInterfaceType(),
-          locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
-    }
-  }
-  
   return typeVar;
 }
 
@@ -2812,11 +2795,11 @@ ConstraintSystem::getTypeOfMemberReference(
         // Add @Sendable to functions without conditional conformances
         functionType =
             functionType
-                ->withExtInfo(functionType->getExtInfo().withConcurrent())
+                ->withExtInfo(functionType->getExtInfo().withSendable())
                 ->getAs<FunctionType>();
       }
       // Unapplied values should always be Sendable
-      info = info.withConcurrent();
+      info = info.withSendable();
     }
 
     // We'll do other adjustment later, but we need to handle parameter
@@ -2890,6 +2873,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     return Type();
   }
 
@@ -3418,26 +3402,26 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
-  bool concurrent = expr->getAttrs().hasAttribute<SendableAttr>();
+  bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
-      .withConcurrent(concurrent)
+      .withSendable(sendable)
       .build();
   }
 
   // Scan the body to determine the effects.
   auto body = expr->getBody();
   if (!body)
-    return ASTExtInfoBuilder().withConcurrent(concurrent).build();
+    return ASTExtInfoBuilder().withSendable(sendable).build();
 
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
       .withAsync(bool(findAsyncNode(expr)))
-      .withConcurrent(concurrent)
+      .withSendable(sendable)
       .build();
 }
 
@@ -3569,6 +3553,7 @@ void ConstraintSystem::bindOverloadType(
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
   case OverloadChoiceKind::KeyPathApplication:
     bindTypeOrIUO(openedType);
     return;
@@ -3825,6 +3810,15 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // base type just like TupleIndex does.
     adjustedRefType =
         getPatternTypeOfSingleUnlabeledPackExpansionTuple(choice.getBaseType());
+    refType = adjustedRefType;
+    break;
+  }
+
+  case OverloadChoiceKind::ExtractFunctionIsolation: {
+    // The type of `.isolation` is `(any Actor)?`
+    auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
+    adjustedRefType =
+        OptionalType::get(actor->getDeclaredExistentialType());
     refType = adjustedRefType;
     break;
   }
@@ -4466,6 +4460,7 @@ DeclName OverloadChoice::getName() const {
 
     case OverloadChoiceKind::MaterializePack:
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
       llvm_unreachable("no name!");
   }
 
@@ -5830,6 +5825,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
 
       case OverloadChoiceKind::TupleIndex:
       case OverloadChoiceKind::MaterializePack:
+      case OverloadChoiceKind::ExtractFunctionIsolation:
         // FIXME: Actually diagnose something here.
         break;
       }

@@ -1378,6 +1378,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
       "storeBytes to misaligned raw pointer")
 
     var temp = value
+#if hasFeature(TypedThrows)
     withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       // FIXME: to be replaced by _memcpy when conversions are implemented.
@@ -1385,6 +1386,15 @@ public struct UnsafeMutableRawPointer: _Pointer {
         (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
         /*volatile:*/ false._value)
     }
+#else
+    __abi_se0413_withUnsafeMutablePointer(to: &temp) { source in
+      let rawSrc = UnsafeMutableRawPointer(source)._rawValue
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value)
+    }
+#endif
   }
 
   /// Copies the specified number of bytes from the given raw pointer's memory

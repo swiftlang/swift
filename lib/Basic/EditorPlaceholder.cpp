@@ -38,7 +38,7 @@ using namespace swift;
 
 std::optional<EditorPlaceholderData>
 swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
-  if (!PlaceholderText.startswith("<#") ||
+  if (!PlaceholderText.starts_with("<#") ||
       !PlaceholderText.endswith("#>"))
     return std::nullopt;
 
@@ -47,7 +47,7 @@ swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
   PHDataBasic.Kind = EditorPlaceholderKind::Basic;
   PHDataBasic.Display = PlaceholderText;
 
-  if (!PlaceholderText.startswith("T##")) {
+  if (!PlaceholderText.starts_with("T##")) {
     // Basic.
     return PHDataBasic;
   }
@@ -56,7 +56,7 @@ swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
   EditorPlaceholderData PHDataTyped;
   PHDataTyped.Kind = EditorPlaceholderKind::Typed;
 
-  assert(PlaceholderText.startswith("T##"));
+  assert(PlaceholderText.starts_with("T##"));
   PlaceholderText = PlaceholderText.drop_front(3);
   size_t Pos = PlaceholderText.find("##");
   if (Pos == llvm::StringRef::npos) {
@@ -79,5 +79,5 @@ swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
 }
 
 bool swift::isEditorPlaceholder(llvm::StringRef IdentifierText) {
-  return IdentifierText.startswith("<#");
+  return IdentifierText.starts_with("<#");
 }

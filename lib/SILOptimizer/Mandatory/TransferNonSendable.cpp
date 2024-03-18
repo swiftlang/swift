@@ -72,9 +72,13 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
     unsigned argNum = [&]() -> unsigned {
       if (fai.isCalleeOperand(*op))
         return op->getOperandNumber();
-      return fai.getAppliedArgIndex(*op);
+      return fai.getAppliedArgIndexWithoutIndirectResults(*op);
     }();
-    assert(argNum < sourceApply->getArgs()->size());
+
+    // Something happened that we do not understand.
+    if (argNum >= sourceApply->getArgs()->size()) {
+      return nullptr;
+    }
 
     foundExpr = sourceApply->getArgs()->getExpr(argNum);
 
@@ -394,12 +398,16 @@ struct TransferredNonTransferrableInfo {
 
   /// The non-transferrable value that is in the same region as \p
   /// transferredOperand.get().
-  SILValue nonTransferrableValue;
+  llvm::PointerUnion<SILValue, SILInstruction *> nonTransferrable;
 
   TransferredNonTransferrableInfo(Operand *transferredOperand,
                                   SILValue nonTransferrableValue)
       : transferredOperand(transferredOperand),
-        nonTransferrableValue(nonTransferrableValue) {}
+        nonTransferrable(nonTransferrableValue) {}
+  TransferredNonTransferrableInfo(Operand *transferredOperand,
+                                  SILInstruction *nonTransferrableInst)
+      : transferredOperand(transferredOperand),
+        nonTransferrable(nonTransferrableInst) {}
 };
 
 class TransferNonSendableImpl {
@@ -859,105 +867,217 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
 
 namespace {
 
-class TransferNonTransferrableDiagnosticInferrer {
+class TransferNonTransferrableDiagnosticEmitter {
+  TransferredNonTransferrableInfo info;
+  RegionAnalysisFunctionInfo *regionInfo;
+  bool emittedErrorDiagnostic = false;
+
 public:
-  enum class UseDiagnosticInfoKind {
-    Invalid = 0,
+  TransferNonTransferrableDiagnosticEmitter(
+      TransferredNonTransferrableInfo info,
+      RegionAnalysisFunctionInfo *regionInfo)
+      : info(info), regionInfo(regionInfo) {}
 
-    /// Used if we have a use that we haven't categorized so we emit the generic
-    /// call site is self error.
-    MiscUse = 1,
-
-    /// Used if we have a function argument that is transferred into an apply.
-    FunctionArgumentApply = 2,
-
-    /// Used if we have a function argument that is transferred into an closure.
-    FunctionArgumentClosure = 3,
-
-    /// Used if we have a function argument passed as an explicitly strongly
-    /// transferring argument to a function.
-    FunctionArgumentApplyStronglyTransferred = 4,
-
-    /// Used if we have a named variable.
-    NamedIsolation = 5,
-  };
-
-  class UseDiagnosticInfo {
-    UseDiagnosticInfoKind kind;
-    std::optional<ApplyIsolationCrossing> transferredIsolationCrossing = {};
-    llvm::PointerUnion<Type, Identifier> inferredTypeOrIdentifier = {};
-    std::optional<Identifier> transferredParamIdentifier = {};
-
-  public:
-    UseDiagnosticInfoKind getKind() const { return kind; }
-    ApplyIsolationCrossing getIsolationCrossing() const {
-      return transferredIsolationCrossing.value();
+  ~TransferNonTransferrableDiagnosticEmitter() {
+    if (!emittedErrorDiagnostic) {
+      emitUnknownPatternError();
     }
-    Identifier getName() const {
-      return inferredTypeOrIdentifier.get<Identifier>();
-    }
-    Identifier getTransferredParamIdentifier() const {
-      return transferredParamIdentifier.value();
-    }
-    Type getType() const { return inferredTypeOrIdentifier.get<Type>(); }
+  }
 
-    static UseDiagnosticInfo forMiscUse() {
-      return {UseDiagnosticInfoKind::MiscUse};
+  Operand *getOperand() const { return info.transferredOperand; }
+
+  SILValue getNonTransferrableValue() const {
+    return info.nonTransferrable.dyn_cast<SILValue>();
+  }
+
+  SILInstruction *getNonTransferringActorIntroducingInst() const {
+    return info.nonTransferrable.dyn_cast<SILInstruction *>();
+  }
+
+  /// Return the isolation region info for \p getNonTransferrableValue().
+  ValueIsolationRegionInfo getIsolationRegionInfo() const {
+    // If we have a value, then lookup the value isolation info.
+    if (auto value = getNonTransferrableValue()) {
+      return regionInfo->getValueMap().getIsolationRegion(value);
     }
 
-    static UseDiagnosticInfo
-    forNamed(Identifier valueName, ApplyIsolationCrossing isolationCrossing) {
-      return {UseDiagnosticInfoKind::NamedIsolation, isolationCrossing,
-              valueName};
-    }
+    // If we have an instruction, then we have an actor in
+    auto *inst = getNonTransferringActorIntroducingInst();
+    auto trackableValue =
+        regionInfo->getValueMap().getTrackableValueForActorIntroducingInst(
+            inst);
+    if (!trackableValue)
+      return {};
+    return trackableValue->getIsolationRegionInfo();
+  }
 
-    static UseDiagnosticInfo
-    forFunctionArgumentApply(ApplyIsolationCrossing isolation,
-                             Type inferredType) {
-      return {UseDiagnosticInfoKind::FunctionArgumentApply, isolation,
-              inferredType};
-    }
+  void emitUnknownPatternError() {
+    diagnoseError(getOperand()->getUser(),
+                  diag::regionbasedisolation_unknown_pattern);
+  }
 
-    static UseDiagnosticInfo
-    forFunctionArgumentClosure(ApplyIsolationCrossing isolation, Type inferredType) {
-      return {UseDiagnosticInfoKind::FunctionArgumentClosure, isolation, inferredType};
-    }
+  void emitUnknownUse(SILLocation loc) {
+    // TODO: This will eventually be an unknown pattern error.
+    diagnoseError(
+        loc, diag::regionbasedisolation_task_or_actor_isolated_transferred);
+  }
 
-    static UseDiagnosticInfo forFunctionArgumentApplyStronglyTransferred(Type inferredType) {
-      return {UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred, {},
-        inferredType};
+  void emitFunctionArgumentApply(SILLocation loc, Type type,
+                                 ApplyIsolationCrossing crossing) {
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
     }
+    diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
+                  StringRef(descriptiveKindStr), type,
+                  crossing.getCalleeIsolation())
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
 
-  private:
-    UseDiagnosticInfo(
-        UseDiagnosticInfoKind kind,
-        std::optional<ApplyIsolationCrossing> isolation = {},
-        llvm::PointerUnion<Type, Identifier> inferredTypeOrIdentifier = {},
-        std::optional<Identifier> transferredParamIdentifier = {})
-        : kind(kind), transferredIsolationCrossing(isolation),
-          inferredTypeOrIdentifier(inferredTypeOrIdentifier),
-          transferredParamIdentifier(transferredParamIdentifier) {}
-  };
+    if (getIsolationRegionInfo().isTaskIsolated()) {
+      auto *fArg =
+          cast<SILFunctionArgument>(info.nonTransferrable.get<SILValue>());
+      if (fArg->getDecl()) {
+        diagnoseNote(
+            fArg->getDecl()->getLoc(),
+            diag::regionbasedisolation_isolated_since_in_same_region_basename,
+            "task-isolated", fArg->getDecl()->getBaseName());
+      }
+    }
+  }
+
+  void emitFunctionArgumentClosure(SourceLoc loc, Type type,
+                                   ApplyIsolationCrossing crossing) {
+    diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
+                  "task-isolated", type, crossing.getCalleeIsolation())
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+    // Only emit the note if our value is different from the function
+    // argument.
+    auto rep = regionInfo->getValueMap()
+                   .getTrackableValue(getOperand()->get())
+                   .getRepresentative();
+    if (!info.nonTransferrable.is<SILValue>() ||
+        rep.maybeGetValue() == info.nonTransferrable.get<SILValue>())
+      return;
+    auto *fArg =
+        cast<SILFunctionArgument>(info.nonTransferrable.get<SILValue>());
+    diagnoseNote(
+        fArg->getDecl()->getLoc(),
+        diag::regionbasedisolation_isolated_since_in_same_region_basename,
+        "task-isolated", fArg->getDecl()->getBaseName());
+  }
+
+  void emitFunctionArgumentApplyStronglyTransferred(SILLocation loc,
+                                                    Type type) {
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+    auto diag =
+        diag::regionbasedisolation_arg_passed_to_strongly_transferred_param;
+    diagnoseError(loc, diag, descriptiveKindStr, type)
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+  }
+
+  void emitNamedOnlyError(SILLocation loc, Identifier name) {
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+  }
+
+  void emitNamedIsolation(SILLocation loc, Identifier name,
+                          ApplyIsolationCrossing isolationCrossing) {
+    emitNamedOnlyError(loc, name);
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_transfer_non_transferrable,
+                 name, isolationCrossing.getCallerIsolation(),
+                 isolationCrossing.getCalleeIsolation());
+  }
+
+  void emitNamedFunctionArgumentApplyStronglyTransferred(SILLocation loc,
+                                                         Identifier varName) {
+    emitNamedOnlyError(loc, varName);
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+    auto diag =
+        diag::regionbasedisolation_named_transfer_into_transferring_param;
+    diagnoseNote(loc, diag, descriptiveKindStr, varName);
+  }
+
+  void emitNamedTransferringReturn(SILLocation loc, Identifier varName) {
+    emitNamedOnlyError(loc, varName);
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+    auto diag =
+        diag::regionbasedisolation_named_notransfer_transfer_into_result;
+    diagnoseNote(loc, diag, descriptiveKindStr, varName);
+  }
 
 private:
-  TransferredNonTransferrableInfo info;
-  std::optional<UseDiagnosticInfo> diagnosticInfo;
-  SourceLoc loc;
+  ASTContext &getASTContext() const {
+    return getOperand()->getFunction()->getASTContext();
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(getASTContext()
+                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+                         .warnUntilSwiftVersion(6));
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+};
+
+class TransferNonTransferrableDiagnosticInferrer {
+  TransferNonTransferrableDiagnosticEmitter diagnosticEmitter;
 
 public:
   TransferNonTransferrableDiagnosticInferrer(
-      TransferredNonTransferrableInfo info)
-      : info(info),
-        loc(info.transferredOperand->getUser()->getLoc().getSourceLoc()) {}
+      TransferredNonTransferrableInfo info,
+      RegionAnalysisFunctionInfo *regionInfo)
+      : diagnosticEmitter(info, regionInfo) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
   /// further diagnostics, since we may not have any diagnostics or be in an
   /// inconcistent state.
   bool run();
-
-  UseDiagnosticInfo getDiagnostic() const { return diagnosticInfo.value(); }
-  SourceLoc getLoc() const { return loc; }
 
 private:
   bool initForIsolatedPartialApply(Operand *op, AbstractClosureExpr *ace);
@@ -976,10 +1096,9 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
   unsigned opIndex = ApplySite(op->getUser()).getAppliedArgIndex(*op);
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) == opIndex) {
-      loc = std::get<0>(p).getLoc();
       Type type = std::get<0>(p).getDecl()->getInterfaceType();
-      diagnosticInfo =
-        UseDiagnosticInfo::forFunctionArgumentClosure(std::get<2>(p), type);
+      diagnosticEmitter.emitFunctionArgumentClosure(std::get<0>(p).getLoc(),
+                                                    type, std::get<2>(p));
       return true;
     }
   }
@@ -989,34 +1108,39 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
 
 bool TransferNonTransferrableDiagnosticInferrer::run() {
   // We need to find the isolation info.
-  auto *op = info.transferredOperand;
-  auto loc = info.transferredOperand->getUser()->getLoc();
+  auto *op = diagnosticEmitter.getOperand();
+  auto loc = op->getUser()->getLoc();
 
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
-    std::optional<ApplyIsolationCrossing> isolation = {};
+    // First see if we have a transferring argument.
+    if (auto fas = FullApplySite::isa(op->getUser())) {
+      if (fas.getArgumentParameterInfo(*op).hasOption(
+              SILParameterInfo::Transferring)) {
+
+        // See if we can infer a name from the value.
+        SmallString<64> resultingName;
+        if (auto varName = inferNameFromValue(op->get())) {
+          diagnosticEmitter.emitNamedFunctionArgumentApplyStronglyTransferred(
+              loc, *varName);
+          return true;
+        }
+
+        Type type = op->get()->getType().getASTType();
+        if (auto *inferredArgExpr =
+                inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
+          type = inferredArgExpr->findOriginalType();
+        }
+        diagnosticEmitter.emitFunctionArgumentApplyStronglyTransferred(loc,
+                                                                       type);
+        return true;
+      }
+    }
 
     // First try to get the apply from the isolation crossing.
-    if (auto value = sourceApply->getIsolationCrossing())
-      isolation = value;
+    auto isolation = sourceApply->getIsolationCrossing();
 
     // If we could not infer an isolation...
     if (!isolation) {
-      // First see if we have a transferring argument.
-      if (auto fas = FullApplySite::isa(op->getUser())) {
-        if (fas.getArgumentParameterInfo(*op).hasOption(
-                SILParameterInfo::Transferring)) {
-          Type type = op->get()->getType().getASTType();
-          if (auto *inferredArgExpr =
-              inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
-            type = inferredArgExpr->findOriginalType();
-          }
-
-          diagnosticInfo =
-              UseDiagnosticInfo::forFunctionArgumentApplyStronglyTransferred(type);
-          return true;
-        }
-      }
-
       // Otherwise, emit a "we don't know error" that tells the user to file a
       // bug.
       diagnoseError(op->getUser(), diag::regionbasedisolation_unknown_pattern);
@@ -1027,28 +1151,27 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
     // See if we can infer a name from the value.
     SmallString<64> resultingName;
     if (auto name = inferNameFromValue(op->get())) {
-      diagnosticInfo = UseDiagnosticInfo::forNamed(*name, *isolation);
+      diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
       return true;
     }
 
     // Attempt to find the specific sugared ASTType if we can to emit a better
     // diagnostic.
     Type type = op->get()->getType().getASTType();
-    if (auto fas = FullApplySite::isa(info.transferredOperand->getUser())) {
+    if (auto fas = FullApplySite::isa(op->getUser())) {
       if (auto *inferredArgExpr =
               inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
         type = inferredArgExpr->findOriginalType();
       }
     }
 
-    diagnosticInfo =
-        UseDiagnosticInfo::forFunctionArgumentApply(*isolation, type);
+    diagnosticEmitter.emitFunctionArgumentApply(loc, type, *isolation);
     return true;
   }
 
   if (auto *ace = loc.getAsASTNode<AbstractClosureExpr>()) {
     if (ace->getActorIsolation().isActorIsolated()) {
-      if (initForIsolatedPartialApply(info.transferredOperand, ace)) {
+      if (initForIsolatedPartialApply(op, ace)) {
         return true;
       }
     }
@@ -1057,13 +1180,40 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   // See if we are in SIL and have an apply site specified isolation.
   if (auto fas = FullApplySite::isa(op->getUser())) {
     if (auto isolation = fas.getIsolationCrossing()) {
-      diagnosticInfo = UseDiagnosticInfo::forFunctionArgumentApply(
-          *isolation, op->get()->getType().getASTType());
+      diagnosticEmitter.emitFunctionArgumentApply(
+          loc, op->get()->getType().getASTType(), *isolation);
       return true;
     }
   }
 
-  diagnosticInfo = UseDiagnosticInfo::forMiscUse();
+  if (auto *ri = dyn_cast<ReturnInst>(op->getUser())) {
+    auto fType = ri->getFunction()->getLoweredFunctionType();
+    if (fType->getNumResults() &&
+        fType->getResults()[0].hasOption(SILResultInfo::IsTransferring)) {
+      assert(llvm::all_of(fType->getResults(),
+                          [](SILResultInfo resultInfo) {
+                            return resultInfo.hasOption(
+                                SILResultInfo::IsTransferring);
+                          }) &&
+             "All result info must be the same... if that changes... update "
+             "this code!");
+      SmallString<64> resultingName;
+      if (auto name = inferNameFromValue(op->get())) {
+        diagnosticEmitter.emitNamedTransferringReturn(loc, *name);
+        return true;
+      }
+    } else {
+      assert(llvm::none_of(fType->getResults(),
+                           [](SILResultInfo resultInfo) {
+                             return resultInfo.hasOption(
+                                 SILResultInfo::IsTransferring);
+                           }) &&
+             "All result info must be the same... if that changes... update "
+             "this code!");
+    }
+  }
+
+  diagnosticEmitter.emitUnknownUse(loc);
   return true;
 }
 
@@ -1075,85 +1225,10 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
   LLVM_DEBUG(
       llvm::dbgs() << "Emitting transfer non transferrable diagnostics.\n");
 
-  using UseDiagnosticInfoKind =
-      TransferNonTransferrableDiagnosticInferrer::UseDiagnosticInfoKind;
-
-  auto &astContext = regionInfo->getFunction()->getASTContext();
   for (auto info : transferredNonTransferrable) {
-    auto *op = info.transferredOperand;
-    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(info);
-    if (!diagnosticInferrer.run())
-      continue;
-
-    auto diagnosticInfo = diagnosticInferrer.getDiagnostic();
-    auto loc = diagnosticInferrer.getLoc();
-    switch (diagnosticInfo.getKind()) {
-    case UseDiagnosticInfoKind::Invalid:
-      llvm_unreachable("Should never see this");
-    case UseDiagnosticInfoKind::MiscUse:
-      diagnoseError(astContext, loc,
-                    diag::regionbasedisolation_selforargtransferred);
-      break;
-    case UseDiagnosticInfoKind::FunctionArgumentApply: {
-      diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
-                    diagnosticInfo.getType(),
-                    diagnosticInfo.getIsolationCrossing().getCalleeIsolation())
-          .highlight(op->getUser()->getLoc().getSourceRange());
-      // Only emit the note if our value is different from the function
-      // argument.
-      auto rep = regionInfo->getValueMap()
-                     .getTrackableValue(op->get())
-                     .getRepresentative();
-      if (rep.maybeGetValue() == info.nonTransferrableValue)
-        continue;
-      auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
-      if (fArg->getDecl()) {
-        diagnoseNote(
-            astContext, fArg->getDecl()->getLoc(),
-            diag::regionbasedisolation_isolated_since_in_same_region_basename,
-            "task isolated", fArg->getDecl()->getBaseName());
-      }
-      break;
-    }
-    case UseDiagnosticInfoKind::FunctionArgumentClosure: {
-      diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
-                    diagnosticInfo.getType(),
-                    diagnosticInfo.getIsolationCrossing().getCalleeIsolation())
-          .highlight(op->getUser()->getLoc().getSourceRange());
-      // Only emit the note if our value is different from the function
-      // argument.
-      auto rep = regionInfo->getValueMap()
-                     .getTrackableValue(op->get())
-                     .getRepresentative();
-      if (rep.maybeGetValue() == info.nonTransferrableValue)
-        continue;
-      auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
-      diagnoseNote(
-          astContext, fArg->getDecl()->getLoc(),
-          diag::regionbasedisolation_isolated_since_in_same_region_basename,
-          "task isolated", fArg->getDecl()->getBaseName());
-      break;
-    }
-    case UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred: {
-      diagnoseError(
-          astContext, loc,
-          diag::regionbasedisolation_arg_passed_to_strongly_transferred_param,
-          diagnosticInfo.getType())
-          .highlight(op->getUser()->getLoc().getSourceRange());
-      break;
-    }
-    case UseDiagnosticInfoKind::NamedIsolation:
-      diagnoseError(astContext, loc,
-                    diag::regionbasedisolation_named_transfer_yields_race,
-                    diagnosticInfo.getName());
-      diagnoseNote(
-          astContext, loc,
-          diag::regionbasedisolation_transfer_non_transferrable_named_note,
-          diagnosticInfo.getName(),
-          diagnosticInfo.getIsolationCrossing().getCallerIsolation(),
-          diagnosticInfo.getIsolationCrossing().getCalleeIsolation());
-      break;
-    }
+    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(info,
+                                                                  regionInfo);
+    diagnosticInferrer.run();
   }
 }
 
@@ -1218,10 +1293,6 @@ struct DiagnosticEvaluator final
                                            partitionOp.getSourceInst());
   }
 
-  ArrayRef<Element> getNonTransferrableElements() const {
-    return info->getValueMap().getNonTransferrableElements();
-  }
-
   void handleTransferNonTransferrable(const PartitionOp &partitionOp,
                                       TrackableValueID transferredVal) const {
     LLVM_DEBUG(llvm::dbgs()
@@ -1236,8 +1307,52 @@ struct DiagnosticEvaluator final
                                                    nonTransferrableValue);
   }
 
+  void handleTransferNonTransferrable(
+      const PartitionOp &partitionOp, TrackableValueID transferredVal,
+      TrackableValueID actualNonTransferrableValue) const {
+    LLVM_DEBUG(llvm::dbgs()
+               << "    Emitting TransferNonTransferrable Error!\n"
+               << "        ID:  %%" << transferredVal << "\n"
+               << "        Rep: "
+               << *info->getValueMap().getRepresentative(transferredVal));
+    auto *self = const_cast<DiagnosticEvaluator *>(this);
+    // If we have a non-actor introducing fake representative value, just use
+    // the value that actually introduced the actor isolation.
+    if (auto nonTransferrableValue = info->getValueMap().maybeGetRepresentative(
+            actualNonTransferrableValue)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        ActualTransfer: " << nonTransferrableValue);
+      self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
+                                                     nonTransferrableValue);
+    } else if (auto *nonTransferrableInst =
+                   info->getValueMap().maybeGetActorIntroducingInst(
+                       actualNonTransferrableValue)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        ActualTransfer: " << *nonTransferrableInst);
+      self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
+                                                     nonTransferrableInst);
+    } else {
+      // Otherwise, just use the actual value.
+      //
+      // TODO: We are eventually going to want to be able to say that it is b/c
+      // of the actor isolated parameter. Maybe we should put in the actual
+      // region isolation info here.
+      self->transferredNonTransferrable.emplace_back(
+          partitionOp.getSourceOp(),
+          info->getValueMap().getRepresentative(transferredVal));
+    }
+  }
+
   bool isActorDerived(Element element) const {
-    return info->getValueMap().isActorDerived(element);
+    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
+  }
+
+  bool isTaskIsolatedDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
+  }
+
+  ValueIsolationRegionInfo::Kind hasSpecialDerivation(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).getKind();
   }
 
   bool isClosureCaptured(Element element, Operand *op) const {

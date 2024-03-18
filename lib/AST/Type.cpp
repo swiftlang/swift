@@ -281,12 +281,10 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
 static void expandDefaults(SmallVectorImpl<ProtocolDecl *> &protocols,
                            InvertibleProtocolSet inverses,
                            ASTContext &ctx) {
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto ip : InvertibleProtocolSet::full()) {
-      if (!inverses.contains(ip)) {
-        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
-        protocols.push_back(proto);
-      }
+  for (auto ip : InvertibleProtocolSet::full()) {
+    if (!inverses.contains(ip)) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      protocols.push_back(proto);
     }
   }
 
@@ -920,7 +918,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     // Strip off Sendable and (possibly) the global actor.
     ASTExtInfo extInfo =
         fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
-    extInfo = extInfo.withConcurrent(false);
+    extInfo = extInfo.withSendable(false);
     if (dropGlobalActor)
       extInfo = extInfo.withoutIsolation();
 
@@ -3039,7 +3037,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         && !result.getConformance()->getType()->isEqual(type)) {
       auto specialized = type->getASTContext()
         .getSpecializedConformance(type,
-             cast<RootProtocolConformance>(result.getConformance()),
+             cast<NormalProtocolConformance>(result.getConformance()),
              boundGenericType->getContextSubstitutionMap(dc->getParentModule(),
                                                  boundGenericType->getDecl()));
       result = ForeignRepresentationInfo::forBridged(specialized);
@@ -3156,12 +3154,12 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     // Removing '@Sendable' is ABI-compatible because there's nothing wrong with
     // a function being sendable when it doesn't need to be.
     if (!ext2.isSendable())
-      ext1 = ext1.withConcurrent(false);
+      ext1 = ext1.withSendable(false);
   }
 
   if (matchMode.contains(TypeMatchFlags::IgnoreFunctionSendability)) {
-    ext1 = ext1.withConcurrent(false);
-    ext2 = ext2.withConcurrent(false);
+    ext1 = ext1.withSendable(false);
+    ext2 = ext2.withSendable(false);
   }
 
   // If specified, allow an escaping function parameter to override a
@@ -3702,6 +3700,20 @@ Type ProtocolCompositionType::getInverseOf(const ASTContext &C,
                                            InvertibleProtocolKind IP) {
   return ProtocolCompositionType::get(C, {}, /*Inverses=*/{IP},
                                       /*HasExplicitAnyObject=*/false);
+}
+
+Type ProtocolCompositionType::withoutMarkerProtocols() const {
+  SmallVector<Type, 4> newMembers;
+  llvm::copy_if(getMembers(), std::back_inserter(newMembers), [](Type member) {
+    auto *P = member->getAs<ProtocolType>();
+    return !(P && P->getDecl()->isMarkerProtocol());
+  });
+
+  if (newMembers.size() == getMembers().size())
+    return Type(const_cast<ProtocolCompositionType *>(this));
+
+  return ProtocolCompositionType::get(getASTContext(), newMembers,
+                                      getInverses(), hasExplicitAnyObject());
 }
 
 Type ProtocolCompositionType::get(const ASTContext &C,

@@ -106,9 +106,9 @@ func testNonStrongTransferDoesntMerge() async {
 //////////////////////////////////
 
 func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) async {
-  // expected-note @-1:71 {{value is task isolated since it is in the same region as 'y'}}
+  // expected-note @-1:71 {{value is task-isolated since it is in the same region as 'y'}}
   await transferToMain(x)
-  await transferToMain(y) // expected-warning {{task isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
+  await transferToMain(y) // expected-warning {{task-isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
 }
 
 func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
@@ -129,9 +129,8 @@ actor MyActor {
   var field = Klass()
 
   func canTransferWithTransferringMethodArg(_ x: transferring Klass, _ y: Klass) async {
-    // expected-note @-1:72 {{value is task isolated since it is in the same region as 'y'}}
     await transferToMain(x)
-    await transferToMain(y) // expected-warning {{task isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
+    await transferToMain(y) // expected-warning {{actor-isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
@@ -169,12 +168,13 @@ actor MyActor {
 
 @MainActor func canAssignTransferringIntoGlobalActor2(_ x: transferring Klass) async {
   globalKlass = x
+  // TODO: This is incorrect! transferring should be independent of @MainActor.
   await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring main actor-isolated 'x' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
-  await transferToCustom(globalKlass) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
+  await transferToCustom(globalKlass) // expected-warning {{main actor-isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
 }
 
 func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
@@ -333,18 +333,33 @@ func testTransferOtherParamTuple(_ x: transferring Klass, y: (Klass, Klass)) asy
   x = y.0
 }
 
-func useSugaredTypeNameWhenEmittingTaskIsolationError(_ x: @escaping @MainActor () async -> ()) {
+func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
   func fakeInit(operation: transferring @escaping () async -> ()) {}
 
-  fakeInit(operation: x) // expected-warning {{task isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter}}
+  fakeInit(operation: x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
+}
+
+@MainActor func actorIsolatedError(_ x: @escaping @MainActor () async -> ()) {
+  func fakeInit(operation: transferring @escaping () async -> ()) {}
+
+  // TODO: This needs to say actor-isolated.
+  fakeInit(operation: x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
 }
 
 // Make sure we error here on only the second since x by being assigned a part
-// of y becomes task isolated
+// of y becomes task-isolated
 func testMergeWithTaskIsolated(_ x: transferring Klass, y: Klass) async {
   await transferToMain(x)
   x = y
-  // TODO: We need to say that this is task isolated.
+  // TODO: We need to say that this is task-isolated.
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring nonisolated 'x' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+}
+
+@MainActor func testMergeWithActorIsolated(_ x: transferring Klass, y: Klass) async {
+  x = y
+  await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring main actor-isolated 'x' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }

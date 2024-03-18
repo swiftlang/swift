@@ -207,13 +207,11 @@ static llvm::Error resolveExplicitModuleInputs(
   auto &service = cache.getScanService();
   auto remapPath = [&](StringRef path) { return service.remapPath(path); };
   std::vector<std::string> rootIDs;
-  if (auto ID = resolvingDepInfo.getCASFSRootID())
-    rootIDs.push_back(*ID);
-
   std::vector<std::string> includeTrees;
   if (auto ID = resolvingDepInfo.getClangIncludeTree())
     includeTrees.push_back(*ID);
 
+  auto tracker = cache.getScanService().createSwiftDependencyTracker();
   auto addBridgingHeaderDeps =
       [&](const ModuleDependencyInfo &depInfo) -> llvm::Error {
     auto sourceDepDetails = depInfo.getAsSwiftSourceModule();
@@ -223,8 +221,7 @@ static llvm::Error resolveExplicitModuleInputs(
     if (sourceDepDetails->textualModuleDetails
             .CASBridgingHeaderIncludeTreeRootID.empty()) {
       if (!sourceDepDetails->textualModuleDetails.bridgingSourceFiles.empty()) {
-        if (auto tracker =
-                cache.getScanService().createSwiftDependencyTracker()) {
+        if (tracker) {
           tracker->startTracking();
           for (auto &file :
                sourceDepDetails->textualModuleDetails.bridgingSourceFiles)
@@ -290,19 +287,11 @@ static llvm::Error resolveExplicitModuleInputs(
         }
       }
       if (!clangDepDetails->moduleCacheKey.empty()) {
-        auto appendXclang = [&]() {
-          if (!resolvingDepInfo.isClangModule()) {
-            // clang module build using cc1 arg so this is not needed.
-            commandLine.push_back("-Xcc");
-            commandLine.push_back("-Xclang");
-          }
-          commandLine.push_back("-Xcc");
-        };
-        appendXclang();
+        commandLine.push_back("-Xcc");
         commandLine.push_back("-fmodule-file-cache-key");
-        appendXclang();
+        commandLine.push_back("-Xcc");
         commandLine.push_back(clangDepDetails->mappedPCMPath);
-        appendXclang();
+        commandLine.push_back("-Xcc");
         commandLine.push_back(clangDepDetails->moduleCacheKey);
       }
 
@@ -336,6 +325,41 @@ static llvm::Error resolveExplicitModuleInputs(
     // Merge CASFS from clang dependency.
     auto &CASFS = cache.getScanService().getSharedCachingFS();
     auto &CAS = CASFS.getCAS();
+
+    assert(tracker && "no caching tracker is available");
+    // Compute the CASFS root ID for the resolving dependency.
+    if (auto *sourceDep = resolvingDepInfo.getAsSwiftSourceModule()) {
+      tracker->startTracking();
+      tracker->addCommonSearchPathDeps(
+          instance.getInvocation().getSearchPathOptions());
+      llvm::for_each(
+          sourceDep->sourceFiles,
+          [&tracker](const std::string &file) { tracker->trackFile(file); });
+      llvm::for_each(
+          sourceDep->auxiliaryFiles,
+          [&tracker](const std::string &file) { tracker->trackFile(file); });
+      auto root = tracker->createTreeFromDependencies();
+      if (!root)
+        return root.takeError();
+      auto rootID = root->getID().toString();
+      dependencyInfoCopy.updateCASFileSystemRootID(rootID);
+      rootIDs.push_back(rootID);
+    } else if (auto *textualDep =
+                   resolvingDepInfo.getAsSwiftInterfaceModule()) {
+      tracker->startTracking();
+      tracker->addCommonSearchPathDeps(
+          instance.getInvocation().getSearchPathOptions());
+      tracker->trackFile(textualDep->swiftInterfaceFile);
+      llvm::for_each(
+          textualDep->auxiliaryFiles,
+          [&tracker](const std::string &file) { tracker->trackFile(file); });
+      auto root = tracker->createTreeFromDependencies();
+      if (!root)
+        return root.takeError();
+      auto rootID = root->getID().toString();
+      dependencyInfoCopy.updateCASFileSystemRootID(rootID);
+      rootIDs.push_back(rootID);
+    }
 
     // Update build command line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
@@ -1906,9 +1930,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
-  auto mainModuleDepInfo = scanner.getMainModuleDependencyInfo(
-      instance.getMainModule(),
-      cache.getScanService().createSwiftDependencyTracker());
+  auto mainModuleDepInfo =
+      scanner.getMainModuleDependencyInfo(instance.getMainModule());
   auto mainModuleName = instance.getMainModule()->getNameStr();
   auto mainModuleID = ModuleDependencyID{mainModuleName.str(),
                                          ModuleDependencyKind::SwiftSource};

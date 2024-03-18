@@ -837,7 +837,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
-  BLOCK_RECORD(control_block, HAS_NONCOPYABLE_GENERICS);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -987,7 +986,6 @@ void Serializer::writeHeader() {
     control_block::ChannelLayout Channel(Out);
     control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
-    control_block::HasNoncopyableGenerics HasNoncopyableGenerics(Out);
 
     // Write module 'real name', which can be different from 'name'
     // in case module aliasing is used (-module-alias flag)
@@ -1041,9 +1039,6 @@ void Serializer::writeHeader() {
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
 
     IsOSSA.emit(ScratchRecord, Options.IsOSSA);
-
-    HasNoncopyableGenerics.emit(ScratchRecord,
-            getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics));
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
@@ -1141,7 +1136,7 @@ void Serializer::writeHeader() {
         auto &Opts = Options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
           StringRef arg(*Arg);
-          if (arg.startswith("-ivfsoverlay")) {
+          if (arg.starts_with("-ivfsoverlay")) {
             // FIXME: This is a hack and calls for a better design.
             //
             // Filter out any -ivfsoverlay options that include an
@@ -1155,10 +1150,10 @@ void Serializer::writeHeader() {
               ++Arg;
               continue;
             }
-          } else if (arg.startswith("-fdebug-prefix-map=") ||
-              arg.startswith("-ffile-prefix-map=") ||
-              arg.startswith("-fcoverage-prefix-map=") ||
-              arg.startswith("-fmacro-prefix-map=")) {
+          } else if (arg.starts_with("-fdebug-prefix-map=") ||
+              arg.starts_with("-ffile-prefix-map=") ||
+              arg.starts_with("-fcoverage-prefix-map=") ||
+              arg.starts_with("-fmacro-prefix-map=")) {
             // We don't serialize any of the prefix map flags as these flags
             // contain absolute paths that are not usable on different
             // machines. These flags are not necessary to compile the
@@ -3064,9 +3059,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
           S.addDeclRef(afd), pieces.size(), pieces);
       return;
-    }
-    case DeclAttrKind::DistributedThunkTarget: {
-      assert(false && "not implemented");
     }
 
     case DeclAttrKind::TypeEraser: {
@@ -5219,6 +5211,11 @@ getRawSILResultInfoOptions(swift::SILResultInfo::Options options) {
     result |= SILResultInfoFlags::NotDifferentiable;
   }
 
+  if (options.contains(SILResultInfo::IsTransferring)) {
+    options -= SILResultInfo::IsTransferring;
+    result |= SILResultInfoFlags::IsTransferring;
+  }
+
   // If we still have any options set, then this code is out of sync. Signal an
   // error by returning none!
   if (bool(options))
@@ -5235,7 +5232,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
   T->print(OS);
-  assert(FullName.startswith(BUILTIN_TYPE_NAME_PREFIX));
+  assert(FullName.str().starts_with(BUILTIN_TYPE_NAME_PREFIX));
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
@@ -5706,7 +5703,7 @@ public:
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         fnTy->isUnimplementable(), fnTy->hasErasedIsolation(),
-        stableDiffKind, fnTy->hasErrorResult(), fnTy->hasTransferringResult(),
+        stableDiffKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
         invocationSigID, invocationSubstMapID, patternSubstMapID,

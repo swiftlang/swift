@@ -11,18 +11,211 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
+@_spi(Compiler) import SwiftParser
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  func generate(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedStringLiteralExpr {
-    let openDelimiterOrQuoteLoc = self.generateSourceLoc(node.openingPounds ?? node.openingQuote)
-
-    // FIXME: Handle interpolated strings.
-    // FIXME: Avoid 'String' instantiation
-    var segment = node.segments.first!.as(StringSegmentSyntax.self)!.content.text
-    return segment.withBridgedString { bridgedSegment in
-      return .createParsed(self.ctx, value: bridgedSegment, loc: openDelimiterOrQuoteLoc)
+  func generate(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedExpr {
+    if node.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) {
+      return self.generateStringLiteralExpr(stringLiteralExpr: node).asExpr
+    } else {
+      return self.generateInterpolatedStringLiteralExpr(stringLiteralExpr: node).asExpr
     }
+  }
+
+  func generateStringLiteralExpr(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedStringLiteralExpr {
+    // This generator only handles non-interpolated string literal.
+    assert(node.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }))
+
+    let stringLiteralKind = node.stringLiteralKind ?? .singleLine
+    let delimiterLength = node.delimiterLength
+
+    var value: String = ""
+    for case .stringSegment(let seg) in node.segments where !seg.hasError {
+      seg.appendUnescapedLiteralValue(
+        stringLiteralKind: stringLiteralKind,
+        delimiterLength: delimiterLength,
+        to: &value
+      )
+    }
+    return value.withBridgedString {
+      BridgedStringLiteralExpr.createParsed(
+        self.ctx,
+        value: $0,
+        loc: self.generateSourceLoc(node)
+      )
+    }
+  }
+
+  func generateInterpolatedStringLiteralExpr(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedInterpolatedStringLiteralExpr {
+    // Non-interpolated string literal should use 'generateStringLiteralExpr()' above.
+    assert(node.segments.contains(where: { $0.is(ExpressionSegmentSyntax.self) }))
+
+    let stringLiteralKind = node.stringLiteralKind ?? .singleLine
+    let delimiterLength = node.delimiterLength
+    let startLoc = self.generateSourceLoc(node)
+    let afterQuoteLoc: BridgedSourceLoc = {
+      var l = startLoc
+      if let pound = node.openingPounds {
+        l = l.advanced(by: pound.trimmedLength.utf8Length)
+        l = l.advanced(by: pound.trailingTriviaLength.utf8Length)
+        l = l.advanced(by: node.openingQuote.leadingTriviaLength.utf8Length)
+      }
+      l = l.advanced(by: node.openingQuote.trimmedLength.utf8Length)
+      return l
+    }()
+
+    // 'stmts' is a list of body elements of 'TapExpr' aka "appendingExpr" for the 'InterpolatedStringLiteralExpr'.
+    var stmts: [ASTNode] = []
+
+    // The first element is a 'VarDecl'.
+    let interpolationVar = BridgedVarDecl.createImplicitStringInterpolationVar(self.declContext)
+    stmts.append(.decl(interpolationVar.asDecl))
+
+    // Name reference to `appendLiteral(_:)`
+    let appendLiteral = BridgedDeclNameRef.createParsed(
+      self.ctx,
+      baseName: .createIdentifier(self.ctx.getIdentifier("appendLiteral")),
+      argumentLabels: CollectionOfOne(BridgedIdentifier()).bridgedArray(in: self)
+    )
+    // Name reference to `appendInterpolation`. Arguments labels are not determined yet.
+    let appendInterpolation = BridgedDeclNameRef.createParsed(
+      .createIdentifier(self.ctx.getIdentifier("appendInterpolation"))
+    )
+
+    // Total byte length of "literal" segments.
+    var literalCapacity: Int = 0
+    // Count of "expression" segments.
+    var interpolationCount = 0
+
+    // In multi-line string literals, each line has '.stringSegment' even without
+    // interpolations. We need to join them into single string literal value in AST.
+    var currLiteral: (value: String, loc: BridgedSourceLoc)? = nil
+    var isFirst = true
+    func consumeCurrentLiteralValue() {
+      guard var literal = currLiteral else {
+        return
+      }
+      currLiteral = nil
+
+      // Construct '$interpolation.appendLiteral(_:)(literalValue)'
+      let literalExpr: BridgedStringLiteralExpr = literal.value.withBridgedString { bridgedValue in
+        literalCapacity += bridgedValue.count
+        return .createParsed(
+          self.ctx,
+          value: bridgedValue,
+          loc: isFirst ? startLoc : literal.loc
+        )
+      }
+      let interpolationVarRef = BridgedDeclRefExpr.create(
+        self.ctx,
+        decl: interpolationVar.asDecl,
+        loc: BridgedDeclNameLoc.createParsed(isFirst ? afterQuoteLoc : literal.loc),
+        isImplicit: true
+      )
+      let appendLiteralRef = BridgedUnresolvedDotExpr.createParsed(
+        self.ctx,
+        base: interpolationVarRef.asExpr,
+        dotLoc: nil,
+        name: appendLiteral,
+        nameLoc: BridgedDeclNameLoc()
+      )
+      appendLiteralRef.asExpr.setImplicit()
+      let argList = BridgedArgumentList.createImplicitUnlabeled(
+        self.ctx,
+        exprs: CollectionOfOne(literalExpr).bridgedArray(in: self)
+      )
+      let callExpr = BridgedCallExpr.createParsed(
+        self.ctx,
+        fn: appendLiteralRef.asExpr,
+        args: argList
+      )
+      callExpr.asExpr.setImplicit()
+      stmts.append(.expr(callExpr.asExpr))
+
+      isFirst = false
+    }
+
+    for seg in node.segments {
+      switch seg {
+      case .stringSegment(let seg):
+        if currLiteral == nil {
+          currLiteral = (
+            value: "",
+            loc: self.generateSourceLoc(seg)
+          )
+        }
+        if seg.hasError {
+          continue
+        }
+        seg.appendUnescapedLiteralValue(
+          stringLiteralKind: stringLiteralKind,
+          delimiterLength: delimiterLength,
+          to: &currLiteral!.value
+        )
+      case .expressionSegment(let seg):
+        // Consume literals before this interpolation.
+        consumeCurrentLiteralValue()
+
+        let loc = self.generateSourceLoc(seg)
+
+        // Construct '$interpolation.appendExpression(<interpolation value>)'
+        let interpolationVarRef = BridgedDeclRefExpr.create(
+          self.ctx,
+          decl: interpolationVar.asDecl,
+          loc: BridgedDeclNameLoc.createParsed(loc),
+          isImplicit: true
+        )
+        let appendInterpolationRef = BridgedUnresolvedDotExpr.createParsed(
+          self.ctx,
+          base: interpolationVarRef.asExpr,
+          dotLoc: self.generateSourceLoc(seg.backslash),
+          name: appendInterpolation,
+          nameLoc: BridgedDeclNameLoc.createParsed(self.generateSourceLoc(seg))
+        )
+        appendInterpolationRef.asExpr.setImplicit()
+        let argList = self.generateArgumentList(
+          leftParen: seg.leftParen,
+          labeledExprList: seg.expressions,
+          rightParen: seg.rightParen,
+          trailingClosure: nil,
+          additionalTrailingClosures: nil
+        )
+        let callExpr = BridgedCallExpr.createParsed(
+          self.ctx,
+          fn: appendInterpolationRef.asExpr,
+          args: argList
+        )
+        stmts.append(.expr(callExpr.asExpr))
+
+        interpolationCount += 1
+      #if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+      #endif
+      }
+    }
+
+    // Consume remaining literal value.
+    consumeCurrentLiteralValue()
+
+    let body = BridgedBraceStmt.createParsed(
+      self.ctx,
+      lBraceLoc: nil,
+      elements: stmts.lazy.map({ $0.bridged }).bridgedArray(in: self),
+      rBraceLoc: nil
+    )
+    let appendingExpr = BridgedTapExpr.create(
+      self.ctx,
+      body: body
+    )
+    return BridgedInterpolatedStringLiteralExpr.createParsed(
+      self.ctx,
+      loc: startLoc,
+      literalCapacity: literalCapacity,
+      interpolationCount: interpolationCount,
+      appendingExpr: appendingExpr
+    )
   }
 
   func generate(integerLiteralExpr node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
@@ -88,10 +281,10 @@ extension ASTGenVisitor {
       colonLocs = elementNodes.lazy
         .map({ self.generateSourceLoc($0.colon) })
         .bridgedArray(in: self)
-#if RESILIENT_SWIFT_SYNTAX
+    #if RESILIENT_SWIFT_SYNTAX
     @unknown default:
       fatalError()
-#endif
+    #endif
     }
     return .createParsed(
       self.ctx,

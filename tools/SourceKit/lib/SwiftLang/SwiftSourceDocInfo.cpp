@@ -78,7 +78,7 @@ private:
 static StringRef getTagForDecl(const Decl *D, bool isRef) {
   auto UID = SwiftLangSupport::getUIDForDecl(D, isRef);
   static const char *prefix = "source.lang.swift.";
-  assert(UID.getName().startswith(prefix));
+  assert(UID.getName().starts_with(prefix));
   return UID.getName().drop_front(strlen(prefix));
 }
 
@@ -2344,7 +2344,7 @@ static void resolveCursorFromUSR(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      if (USR.startswith("c:")) {
+      if (USR.starts_with("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
         CursorInfoData Info;
         Info.InternalDiagnostic = "Lookup for C/C++/ObjC USRs not implemented.";
@@ -2652,36 +2652,6 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 // SwiftLangSupport::findActiveRegionsInFile
 //===----------------------------------------------------------------------===//
 
-namespace {
-class IfConfigScanner : public SourceEntityWalker {
-  unsigned BufferID = -1;
-  SmallVectorImpl<IfConfigInfo> &Infos;
-  bool Cancelled = false;
-
-public:
-  explicit IfConfigScanner(unsigned BufferID,
-                           SmallVectorImpl<IfConfigInfo> &Infos)
-      : BufferID(BufferID), Infos(Infos) {}
-
-private:
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    if (Cancelled)
-      return false;
-
-    if (auto *IfDecl = dyn_cast<IfConfigDecl>(D)) {
-      for (auto &Clause : IfDecl->getClauses()) {
-        unsigned Offset = D->getASTContext().SourceMgr.getLocOffsetInBuffer(
-            Clause.Loc, BufferID);
-        Infos.emplace_back(Offset, Clause.isActive);
-      }
-    }
-
-    return true;
-  }
-};
-
-} // end anonymous namespace
-
 void SwiftLangSupport::findActiveRegionsInFile(
     StringRef PrimaryFilePath, StringRef InputBufferName,
     ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
@@ -2717,16 +2687,25 @@ void SwiftLangSupport::findActiveRegionsInFile(
         return;
       }
 
-      SmallVector<IfConfigInfo> Configs;
-      IfConfigScanner Scanner(*SF->getBufferID(), Configs);
-      Scanner.walk(SF);
+      auto &SM = SF->getASTContext().SourceMgr;
+      auto BufferID = *SF->getBufferID();
 
-      // Sort by offset so nested decls are reported
-      // in source order (not tree order).
-      llvm::sort(Configs,
-                 [](const IfConfigInfo &LHS, const IfConfigInfo &RHS) -> bool {
-                   return LHS.Offset < RHS.Offset;
-                 });
+      SmallVector<IfConfigInfo> Configs;
+      for (auto &range : SF->getIfConfigClauseRanges()) {
+        bool isActive = false;
+        switch (range.getKind()) {
+        case IfConfigClauseRangeInfo::ActiveClause:
+          isActive = true;
+          break;
+        case IfConfigClauseRangeInfo::InactiveClause:
+          isActive = false;
+          break;
+        case IfConfigClauseRangeInfo::EndDirective:
+          continue;
+        }
+        auto offset = SM.getLocOffsetInBuffer(range.getStartLoc(), BufferID);
+        Configs.emplace_back(offset, isActive);
+      }
       ActiveRegionsInfo Info;
       Info.Configs = Configs;
       Receiver(RequestResult<ActiveRegionsInfo>::fromResult(Info));

@@ -3196,15 +3196,18 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
                    << substType << "\n"
-                   << "of " << origType << "\n";
+                   << "of " << origType << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
 
   if (!lowering.isTrivial() && conformance) {
-    // A non-trivial type can have a conformance in one case:
+    // A non-trivial type can have a conformance in a few cases:
     // (1) contains a conforming archetype
     // (2) is resilient with minimal expansion
+    // (3) containing or being ~Escapable
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
@@ -3215,6 +3218,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (nominal && nominal->isResilient() &&
               forExpansion.getResilienceExpansion() ==
                   ResilienceExpansion::Minimal) {
+            return true;
+          }
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
             return true;
           }
           // Walk into every aggregate.
@@ -3236,6 +3245,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return false;
           }
 
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+            return false;
+          }
+
           // An archetype may conform but be non-trivial (case (1)).
           if (origTy.isTypeParameter())
             return false;
@@ -3246,7 +3262,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
       llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
-      llvm::errs() << "\n";
+      llvm::errs() << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
@@ -3783,7 +3801,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
                                       funcType->isThrowing(),
                                       funcType->getThrownError())
-          .withConcurrent(funcType->isSendable())
+          .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())

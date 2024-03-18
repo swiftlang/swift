@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift -plugin-path %swift-plugin-dir
 // RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -plugin-path %swift-plugin-dir -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color --dump-input=always
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -20,7 +20,7 @@ import FakeDistributedActorSystems
 
 @_DistributedProtocol
 protocol GreeterProtocol: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
-  distributed func greet() async throws -> String
+  distributed func greet() -> String
 }
 
 // ==== ------------------------------------------------------------------------
@@ -40,6 +40,7 @@ distributed actor DAFL: GreeterProtocol {
     let fakeRoundtripSystem = FakeRoundtripActorSystem()
     let fr = DAFR(actorSystem: fakeRoundtripSystem)
     let frid = fr.id
+    _ = DAFL(actorSystem: .init())
 
     let gfr: any GreeterProtocol = try $GreeterProtocol.resolve(id: frid, using: fakeRoundtripSystem)
 

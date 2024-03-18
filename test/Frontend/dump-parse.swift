@@ -67,14 +67,14 @@ escaping({ $0 })
 // CHECK-AST:        (declref_expr type="(@escaping (Int) -> Int) -> ()"
 // CHECK-AST-NEXT:        (argument_list
 // CHECK-AST-NEXT:          (argument
-// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=0 escaping single_expression
+// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=0 nonisolated escaping single_expression
 
 func nonescaping(_: (Int) -> Int) {}
 nonescaping({ $0 })
 // CHECK-AST:        (declref_expr type="((Int) -> Int) -> ()"
 // CHECK-AST-NEXT:        (argument_list
 // CHECK-AST-NEXT:          (argument
-// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=1 single_expression
+// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=1 nonisolated single_expression
 
 // CHECK-LABEL: (struct_decl range=[{{.+}}] "MyStruct")
 struct MyStruct {}

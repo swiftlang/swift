@@ -383,7 +383,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 15 };
-  enum { NumSILExtInfoBits = 15 };
+  enum { NumSILExtInfoBits = 14 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -4462,6 +4462,11 @@ public:
     /// - The function type is `@differentiable`, the function is
     ///   differentiable with respect to this result.
     NotDifferentiable = 0x1,
+
+    /// Set if a return type is transferring. This means that the returned value
+    /// must be disconnected and not in any strongly structured regions like an
+    /// actor or a task isolated variable.
+    IsTransferring = 0x2,
   };
 
   using Options = OptionSet<Flag>;
@@ -4906,8 +4911,13 @@ public:
   SILFunctionTypeIsolation getIsolation() const {
     return getExtInfo().getIsolation();
   }
+
+  /// Return true if all
   bool hasTransferringResult() const {
-    return getExtInfo().hasTransferringResult();
+    // For now all functions either have all transferring results or no
+    // transferring results. This is validated with a SILVerifier check.
+    return getNumResults() &&
+           getResults().front().hasOption(SILResultInfo::IsTransferring);
   }
 
   /// Return the array of all the yields.
@@ -6049,6 +6059,10 @@ public:
   bool hasExplicitAnyObject() const {
     return Bits.ProtocolCompositionType.HasExplicitAnyObject;
   }
+
+  /// Produce a new type (potentially not be a protoocl composition)
+  /// which drops all of the marker protocol types associated with this one.
+  Type withoutMarkerProtocols() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

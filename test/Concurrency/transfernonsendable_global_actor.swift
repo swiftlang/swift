@@ -49,12 +49,12 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
   let x = firstList
 
   // TODO: This should say global actor isolated isolated.
-  await transferToMainActor(x) // expected-tns-warning {{task isolated value of type 'NonSendableLinkedList<Int>' transferred to main actor-isolated context}}
+  await transferToMainActor(x) // expected-tns-warning {{global actor 'GlobalActor'-isolated value of type 'NonSendableLinkedList<Int>' transferred to main actor-isolated context}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedList<Int>' into main actor-isolated context may introduce data races}}
 
   let y = secondList.listHead!.next!
 
-  await transferToMainActor(y) // expected-tns-warning {{task isolated value of type 'NonSendableLinkedListNode<Int>' transferred to main actor-isolated context}}
+  await transferToMainActor(y) // expected-tns-warning {{global actor 'GlobalActor'-isolated value of type 'NonSendableLinkedListNode<Int>' transferred to main actor-isolated context}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
 
@@ -140,10 +140,30 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 
   x.1 = firstList
 
-  // TODO: This should be a global actor isolated error, not a task isolated error.
-  await transferToNonIsolated(x) // expected-tns-warning {{task isolated value of type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' transferred to nonisolated context}}
+  // TODO: This should be a global actor isolated error, not a task-isolated error.
+  await transferToNonIsolated(x) // expected-tns-warning {{global actor 'GlobalActor'-isolated value of type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' transferred to nonisolated context}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x)
+}
+
+struct Clock {
+  public func measure<T>(
+    _ work: () async throws -> T
+  ) async rethrows -> T {
+    try await work()
+  }
+
+  public func sleep<T>() async throws -> T { fatalError() }
+}
+
+// We used to crash when inferring the type for the diagnostic below.
+@MainActor func testIndirectParametersHandledCorrectly() async {
+  let c = Clock()
+  let _: Int = await c.measure { // expected-tns-warning {{main actor-isolated value of type '() async -> Int' transferred to nonisolated context}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() async -> Int' outside of main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    try! await c.sleep()
+  }
 }

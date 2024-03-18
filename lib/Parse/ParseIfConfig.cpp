@@ -558,7 +558,7 @@ public:
     if (Name.empty())
       return false;
 
-    if (Name.startswith("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
+    if (Name.starts_with("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;
 
     return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
@@ -889,10 +889,12 @@ Result Parser::parseIfConfigRaw(
           ClauseLoc, Condition, isActive, IfConfigElementsRole::Skipped);
     }
 
-    // Record the active body range for the SourceManager.
-    if (shouldEvaluate && isActive) {
-      assert(!activeBodyRange.isValid() && "Multiple active regions?");
-      activeBodyRange = CharSourceRange(SourceMgr, bodyStart, Tok.getLoc());
+    // Record the clause range info in SourceFile.
+    if (shouldEvaluate) {
+      auto kind = isActive ? IfConfigClauseRangeInfo::ActiveClause
+                           : IfConfigClauseRangeInfo::InactiveClause;
+      SF.recordIfConfigClauseRangeInfo(
+          {ClauseLoc, bodyStart, Tok.getLoc(), kind});
     }
 
     if (Tok.isNot(tok::pound_elseif, tok::pound_else))
@@ -905,11 +907,11 @@ Result Parser::parseIfConfigRaw(
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);
 
-  // Record the #if ranges on the SourceManager.
+  // Record the '#end' ranges in SourceFile.
   if (!HadMissingEnd && shouldEvaluate) {
-    auto wholeRange = Lexer::getCharSourceRangeFromSourceRange(
-        SourceMgr, SourceRange(startLoc, EndLoc));
-    SF.recordIfConfigRangeInfo({wholeRange, activeBodyRange});
+    SourceLoc EndOfEndLoc = getEndOfPreviousLoc();
+    SF.recordIfConfigClauseRangeInfo({EndLoc, EndOfEndLoc, EndOfEndLoc,
+                                      IfConfigClauseRangeInfo::EndDirective});
   }
   return finish(EndLoc, HadMissingEnd);
 }

@@ -675,13 +675,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
-  SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
-  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftTaskOptionRecordTy = createStructType(
-      *this, "swift.task_option", {
+  SwiftTaskOptionRecordTy =
+    llvm::StructType::create(getLLVMContext(), "swift.task_option");
+  SwiftTaskOptionRecordPtrTy = SwiftTaskOptionRecordTy->getPointerTo(DefaultAS);
+  SwiftTaskOptionRecordTy->setBody({
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
   });
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
   SwiftTaskGroupTaskOptionRecordTy = createStructType(
       *this, "swift.task_group_task_option", {
     SwiftTaskOptionRecordTy,    // Base option record
@@ -701,6 +702,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
+  });
+  SwiftInitialSerialExecutorTaskOptionRecordTy =
+      createStructType(*this, "swift.serial_executor_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    SwiftExecutorTy,         // Executor
   });
   SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy =
       createStructType(*this, "swift.task_executor_task_option", {

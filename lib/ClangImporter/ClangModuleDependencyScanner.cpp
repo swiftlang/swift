@@ -104,7 +104,7 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
     auto moduleFormatPos = std::find_if(commandLineArgs.begin(),
                                         commandLineArgs.end(),
                                         [](StringRef arg) {
-      return arg.startswith("-fmodule-format=");
+      return arg.starts_with("-fmodule-format=");
     });
     assert(moduleFormatPos != commandLineArgs.end());
     assert(moduleFormatPos != commandLineArgs.begin());
@@ -199,8 +199,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     // Swift frontend option for input file path (Foo.modulemap).
     swiftArgs.push_back(remapPath(clangModuleDep.ClangModuleMapFile));
 
-    // Handle VFSOverlay.
-    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
+    // Handle VFSOverlay. If include tree is used, there is no need for overlay.
+    if (!ctx.ClangImporterOpts.UseClangIncludeTree) {
       for (auto &overlay : ctx.SearchPathOpts.VFSOverlayFiles) {
         swiftArgs.push_back("-vfsoverlay");
         swiftArgs.push_back(remapPath(overlay));
@@ -455,7 +455,6 @@ bool ClangImporter::addHeaderDependencies(
     ModuleDependencyID moduleID,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     ModuleDependenciesCache &cache) {
-  auto &ctx = Impl.SwiftContext;
   auto optionalTargetModule = cache.findDependency(moduleID);
   assert(optionalTargetModule.has_value());
   auto targetModule = *(optionalTargetModule.value());

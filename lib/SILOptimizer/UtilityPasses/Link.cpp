@@ -86,6 +86,13 @@ public:
 
     if (M.linkFunction(Fn, LinkMode))
       invalidateAnalysis(Fn, SILAnalysis::InvalidationKind::Everything);
+
+    // Make sure that dead-function-elimination doesn't remove runtime functions.
+    // TODO: lazily emit runtime functions in IRGen so that we don't have to
+    //       rely on dead-stripping in the linker to remove unused runtime
+    //       functions.
+    if (Fn->isDefinition())
+      Fn->setLinkage(SILLinkage::Public);
   }
 };
 } // end anonymous namespace

@@ -154,7 +154,7 @@ static llvm::StringRef substrAfter(llvm::StringRef whole,
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                      swift::Demangle::Context &DCtx,
                      const swift::Demangle::DemangleOptions &options) {
-  if (name.startswith("__")) {
+  if (name.starts_with("__")) {
     name = name.substr(1);
   }
   swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
   } else {
     swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
-      if (name.startswith("S")) {
+      if (name.starts_with("S")) {
         std::string correctedName = std::string("$") + name.str();
         demangle(llvm::outs(), correctedName, DCtx, options);
       } else {

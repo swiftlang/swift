@@ -58,7 +58,9 @@
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
+#include "clang/CAS/CASOptions.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
+#include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
@@ -73,8 +75,10 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
+#include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/FileCollector.h"
@@ -1067,26 +1071,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     ClangImporter *importer, ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
     bool ignoreClangTarget) {
-  // If using direct cc1 module build, return extra args only.
-  if (ctx.ClangImporterOpts.DirectClangCC1ModuleBuild)
-    return ctx.ClangImporterOpts.ExtraArgs;
-
-  // Otherwise, create cc1 arguments from driver args.
-  auto driverArgs = getClangDriverArguments(ctx, ignoreClangTarget);
-
-  llvm::SmallVector<const char *> invocationArgs;
-  invocationArgs.reserve(driverArgs.size());
-  llvm::for_each(driverArgs, [&](const std::string &Arg) {
-    invocationArgs.push_back(Arg.c_str());
-  });
-
-  if (ctx.ClangImporterOpts.DumpClangDiagnostics) {
-    llvm::errs() << "clang importer driver args: '";
-    llvm::interleave(
-        invocationArgs, [](StringRef arg) { llvm::errs() << arg; },
-        [] { llvm::errs() << "' '"; });
-    llvm::errs() << "'\n";
-  }
+  std::unique_ptr<clang::CompilerInvocation> CI;
 
   // Set up a temporary diagnostic client to report errors from parsing the
   // command line, which may be important for Swift clients if, for example,
@@ -1098,24 +1083,64 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   // clang::CompilerInstance is created.
   llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
       new clang::DiagnosticOptions};
-
   auto *tempDiagClient =
       new ClangDiagnosticConsumer(importer->Impl, *tempDiagOpts,
                                   ctx.ClangImporterOpts.DumpClangDiagnostics);
-
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
       tempDiagOpts.get(), tempDiagClient,
       /*owned*/ true);
 
-  clang::CreateInvocationOptions CIOpts;
-  CIOpts.VFS = VFS;
-  CIOpts.Diags = clangDiags;
-  CIOpts.RecoverOnError = false;
-  CIOpts.ProbePrecompiled = true;
-  auto CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
+  // If using direct cc1 module build, use extra args to setup ClangImporter.
+  if (ctx.ClangImporterOpts.DirectClangCC1ModuleBuild) {
+    llvm::SmallVector<const char *> clangArgs;
+    clangArgs.reserve(ctx.ClangImporterOpts.ExtraArgs.size());
+    llvm::for_each(
+        ctx.ClangImporterOpts.ExtraArgs,
+        [&](const std::string &Arg) { clangArgs.push_back(Arg.c_str()); });
 
-  if (!CI)
-    return std::nullopt;
+    // Try parse extra args, if failed, return nullopt.
+    CI = std::make_unique<clang::CompilerInvocation>();
+    if (!clang::CompilerInvocation::CreateFromArgs(*CI, clangArgs,
+                                                   *clangDiags))
+      return std::nullopt;
+
+    // Forwards some options from swift to clang even using direct mode. This is
+    // to reduce the number of argument passing on the command-line and swift
+    // compiler can be more efficient to compute swift cache key without having
+    // the knowledge about clang command-line options.
+    if (ctx.CASOpts.EnableCaching)
+      CI->getCASOpts() = ctx.CASOpts.CASOpts;
+
+    // Forward the index store path. That information is not passed to scanner
+    // and it is cached invariant so we don't want to re-scan if that changed.
+    CI->getFrontendOpts().IndexStorePath = ctx.ClangImporterOpts.IndexStorePath;
+  } else {
+    // Otherwise, create cc1 arguments from driver args.
+    auto driverArgs = getClangDriverArguments(ctx, ignoreClangTarget);
+
+    llvm::SmallVector<const char *> invocationArgs;
+    invocationArgs.reserve(driverArgs.size());
+    llvm::for_each(driverArgs, [&](const std::string &Arg) {
+      invocationArgs.push_back(Arg.c_str());
+    });
+
+    if (ctx.ClangImporterOpts.DumpClangDiagnostics) {
+      llvm::errs() << "clang importer driver args: '";
+      llvm::interleave(
+          invocationArgs, [](StringRef arg) { llvm::errs() << arg; },
+          [] { llvm::errs() << "' '"; });
+      llvm::errs() << "'\n";
+    }
+
+    clang::CreateInvocationOptions CIOpts;
+    CIOpts.VFS = VFS;
+    CIOpts.Diags = clangDiags;
+    CIOpts.RecoverOnError = false;
+    CIOpts.ProbePrecompiled = true;
+    CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
+    if (!CI)
+      return std::nullopt;
+  }
 
   // FIXME: clang fails to generate a module if there is a `-fmodule-map-file`
   // argument pointing to a missing file.
@@ -2039,7 +2064,7 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
 
   if (modulePath.hasSubmodule()) {
     for (auto &component : modulePath.getSubmodulePath()) {
-      clangModule = clangModule->findSubmodule(component.Item.str());
+      clangModule = clangModule->findOrInferSubmodule(component.Item.str());
 
       // Special case: a submodule named "Foo.Private" can be moved to a
       // top-level module named "Foo_Private". Clang has special support for
@@ -2688,7 +2713,7 @@ ClangImporter::Implementation::importIdentifier(
   StringRef name = identifier->getName();
   // Remove the prefix, if any.
   if (!removePrefix.empty()) {
-    if (name.startswith(removePrefix)) {
+    if (name.starts_with(removePrefix)) {
       name = name.slice(removePrefix.size(), name.size());
     }
   }
@@ -2764,7 +2789,7 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
     return false;
 
   clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
-  if (!setterID || !setterID->getName().startswith("set"))
+  if (!setterID || !setterID->getName().starts_with("set"))
     return false;
 
   for (auto *prop : proto->properties()) {
@@ -3917,6 +3942,66 @@ clang::CodeGenOptions &ClangImporter::getCodeGenOpts() const {
 
 std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
+}
+
+std::vector<std::string>
+ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
+  llvm::SmallVector<const char*> clangArgs;
+  clangArgs.reserve(Impl.ClangArgs.size());
+  llvm::for_each(Impl.ClangArgs, [&](const std::string &Arg) {
+    clangArgs.push_back(Arg.c_str());
+  });
+
+  clang::CompilerInvocation instance;
+  clang::DiagnosticsEngine clangDiags(new clang::DiagnosticIDs(),
+                                      new clang::DiagnosticOptions(),
+                                      new clang::IgnoringDiagConsumer());
+  bool success = clang::CompilerInvocation::CreateFromArgs(instance, clangArgs,
+                                                           clangDiags);
+  (void)success;
+  assert(success && "clang options from clangImporter failed to parse");
+
+  if (!Impl.SwiftContext.CASOpts.EnableCaching)
+    return instance.getCC1CommandLine();
+
+  // Clear some options that are not needed.
+  instance.clearImplicitModuleBuildOptions();
+
+  // CASOpts are forwarded from swift arguments.
+  instance.getCASOpts() = clang::CASOptions();
+
+  // HeaderSearchOptions.
+  // Clang search options are only used by scanner and clang importer from main
+  // module should not using search paths to find modules.
+  auto &HSOpts = instance.getHeaderSearchOpts();
+  HSOpts.VFSOverlayFiles.clear();
+  HSOpts.UserEntries.clear();
+  HSOpts.SystemHeaderPrefixes.clear();
+
+  // FrontendOptions.
+  auto &FEOpts = instance.getFrontendOpts();
+  FEOpts.IncludeTimestamps = false;
+  FEOpts.ModuleMapFiles.clear();
+
+  // IndexStorePath is forwarded from swift.
+  FEOpts.IndexStorePath.clear();
+
+  // PreprocessorOptions.
+  // Cannot clear macros as the main module clang importer doesn't have clang
+  // include tree created and it has to be created from command-line. However,
+  // include files are no collected into CASFS so they will not be found so
+  // clear them to avoid problem.
+  auto &PPOpts = instance.getPreprocessorOpts();
+  PPOpts.MacroIncludes.clear();
+  PPOpts.Includes.clear();
+
+  if (Impl.SwiftContext.ClangImporterOpts.UseClangIncludeTree) {
+    // FileSystemOptions.
+    auto &FSOpts = instance.getFileSystemOpts();
+    FSOpts.WorkingDir.clear();
+  }
+
+  return instance.getCC1CommandLine();
 }
 
 std::optional<Decl *>
@@ -6931,7 +7016,7 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
   if (!func->hasName())
     return false;
   auto id = func->getBaseName().userFacingName();
-  return id.startswith("__") && id.endswith("Unsafe");
+  return id.starts_with("__") && id.endswith("Unsafe");
 }
 
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
@@ -7551,7 +7636,7 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   auto retainFnAttr =
       llvm::find_if(decl->getAttrs(), [&operationStr](auto *attr) {
         if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-          return swiftAttr->getAttribute().startswith(operationStr);
+          return swiftAttr->getAttribute().starts_with(operationStr);
         return false;
       });
   if (retainFnAttr == decl->getAttrs().end()) {

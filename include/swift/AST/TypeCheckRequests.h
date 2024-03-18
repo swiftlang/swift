@@ -1054,6 +1054,24 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Determine whether the given class is a distributed actor.
+class CanSynthesizeDistributedActorCodableConformanceRequest :
+    public SimpleRequest<CanSynthesizeDistributedActorCodableConformanceRequest,
+        bool(NominalTypeDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Retrieve the implicit conformance for the given distributed actor type to
 /// the Codable protocol protocol.
 ///
@@ -4805,6 +4823,23 @@ private:
   friend SimpleRequest;
 
   ArrayRef<TypeDecl *> evaluate(Evaluator &evaluator, SourceFile *sf) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class ObjCRequirementMapRequest
+    : public SimpleRequest<ObjCRequirementMapRequest,
+                           ObjCRequirementMap(const ProtocolDecl *proto),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ObjCRequirementMap evaluate(Evaluator &evaluator,
+                              const ProtocolDecl *proto) const;
 
 public:
   bool isCached() const { return true; }

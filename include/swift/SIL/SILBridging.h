@@ -350,7 +350,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   BRIDGED_INLINE bool isMoveOnly() const;
-  BRIDGED_INLINE bool isEscapable() const;
+  BRIDGED_INLINE bool isEscapable(BridgedFunction f) const;
   BRIDGED_INLINE bool isOrContainsObjectiveCClass() const;
   BRIDGED_INLINE bool isBuiltinInteger() const;
   BRIDGED_INLINE bool isBuiltinFloat() const;
@@ -1128,8 +1128,9 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondFail(BridgedValue condition,
                                                                        BridgedStringRef message) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIntegerLiteral(BridgedType type, SwiftInt value) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocStack(BridgedType type,
-                                          bool hasDynamicLifetime, bool isLexical, bool wasMoved) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createAllocStack(BridgedType type, bool hasDynamicLifetime, bool isLexical,
+                   bool isFromVarDecl, bool wasMoved) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocVector(BridgedValue capacity,
                                                                           BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDeallocStack(BridgedValue operand) const;

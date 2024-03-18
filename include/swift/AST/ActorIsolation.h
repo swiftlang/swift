@@ -274,6 +274,9 @@ public:
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
+  void printForDiagnostics(llvm::raw_ostream &os,
+                           StringRef openingQuotationMark = "'") const;
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 

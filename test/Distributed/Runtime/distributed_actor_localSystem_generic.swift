@@ -17,13 +17,9 @@
 import Distributed
 
 @available(SwiftStdlib 6.0, *)
-distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable>, ActorSystem.ActorID: Codable {
+distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func hi(name: String) {
     print("Hi, \(name)!")
-  }
-
-  nonisolated var description: Swift.String {
-    "Worker(\(id))"
   }
 }
 

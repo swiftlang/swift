@@ -215,11 +215,19 @@ public func _encodeBitsAsWords<T>(_ x: T) -> [Int] {
   _internalInvariant(!result.isEmpty)
   var tmp = x
   // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
+#if hasFeature(TypedThrows)
   _withUnprotectedUnsafeMutablePointer(to: &tmp) {
     _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
             src: $0,
             size: UInt(MemoryLayout<T>.size))
   }
+#else
+  __abi_se0413_withUnsafeMutablePointer(to: &tmp) {
+    _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
+            src: $0,
+            size: UInt(MemoryLayout<T>.size))
+  }
+#endif
   return result
 }
 
@@ -712,3 +720,6 @@ final internal class __VaListBuilder {
 }
 
 #endif
+
+@available(*, unavailable)
+extension __VaListBuilder: Sendable {}

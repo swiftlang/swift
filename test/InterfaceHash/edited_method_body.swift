@@ -1,4 +1,8 @@
 // UNSUPPORTED: OS=windows-msvc
+
+// rdar://124402245
+// UNSUPPORTED: OS=linux-gnu
+
 // When adding a private protocol method, the interface hash should stay the same
 // The per-type fingerprint should change
 

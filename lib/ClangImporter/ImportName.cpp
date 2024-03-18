@@ -743,7 +743,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     // Special case: mapping to an initializer.
-    if (attr->getName().startswith("init(")) {
+    if (attr->getName().starts_with("init(")) {
       // If we have a class method, honor the annotation to turn a class
       // method into an initializer.
       if (method->isClassMethod()) return decodeAttr(attr);
@@ -768,7 +768,7 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
                  const clang::ObjCMethodDecl *method,
                  ImportNameVersion version) {
   if (auto customNameAttr = findSwiftNameAttr(method, version)) {
-    if (customNameAttr->name.startswith("init("))
+    if (customNameAttr->name.starts_with("init("))
       return FactoryAsInitKind::AsInitializer;
     else
       return FactoryAsInitKind::AsClassMethod;
@@ -2076,7 +2076,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
       // Drop "With" if present after the "init".
       bool droppedWith = false;
-      if (argName.startswith("With")) {
+      if (argName.starts_with("With")) {
         argName = argName.substr(4);
         droppedWith = true;
       }
@@ -2156,7 +2156,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty()) {
-      if (baseName.startswith(removePrefix)) {
+      if (baseName.starts_with(removePrefix)) {
         baseName = baseName.substr(removePrefix.size());
         strippedPrefix = true;
       } else if (givenName) {

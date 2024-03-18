@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -422,14 +423,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
       auto partialConsumptionEnabled =
           Ctx.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
+      auto *subExpr = consumeExpr->getSubExpr();
+      bool noncopyable =
+          subExpr->getType()->getCanonicalType()->isNoncopyable();
 
-      bool noncopyable = false;
       bool partial = false;
-      Expr *current = consumeExpr->getSubExpr();
+      Expr *current = subExpr;
       while (current) {
-        if (current->getType()->getCanonicalType()->isNoncopyable()) {
-          noncopyable = true;
-        }
         if (auto *dre = dyn_cast<DeclRefExpr>(current)) {
           if (partial & !noncopyable) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
@@ -5806,6 +5806,11 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       auto isKeyPathLiteral = [&](Expr *argExpr) -> KeyPathExpr * {
         if (auto *DTBE = getAsExpr<DerivedToBaseExpr>(argExpr))
           argExpr = DTBE->getSubExpr();
+        // Sendable key path literals are represented as an existential
+        // protocol composition with `Sendable` protocol which has to be
+        // opened in certain scenarios i.e. to pass it to non-Sendable version.
+        if (auto *OEE = getAsExpr<OpenExistentialExpr>(argExpr))
+          argExpr = OEE->getExistentialValue();
         return getAsExpr<KeyPathExpr>(argExpr);
       };
 
@@ -6668,105 +6673,4 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
   }
 
   return false;
-}
-
-//===----------------------------------------------------------------------===//
-//              Copyable Type Containing Move Only Type Visitor
-//===----------------------------------------------------------------------===//
-
-void swift::diagnoseCopyableTypeContainingMoveOnlyType(
-    NominalTypeDecl *copyableNominalType) {
-  auto &ctx = copyableNominalType->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return; // taken care of in conformance checking
-
-  // If we already have a move only type, just bail, we have no further work to
-  // do.
-  if (!copyableNominalType->canBeCopyable())
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "DiagnoseCopyableType for: "
-                          << copyableNominalType->getName() << '\n');
-
-  auto &DE = copyableNominalType->getASTContext().Diags;
-  auto emitError = [&copyableNominalType,
-                    &DE](PointerUnion<EnumElementDecl *, VarDecl *>
-                             topFieldToError,
-                         DeclBaseName parentName, DescriptiveDeclKind fieldKind,
-                         DeclBaseName fieldName) {
-    assert(!topFieldToError.isNull());
-    if (auto *eltDecl = topFieldToError.dyn_cast<EnumElementDecl *>()) {
-      DE.diagnoseWithNotes(
-          copyableNominalType->diagnose(
-              diag::noncopyable_within_copyable,
-              copyableNominalType),
-          [&]() {
-            eltDecl->diagnose(
-                diag::
-                    noncopyable_within_copyable_location,
-                fieldKind, parentName.userFacingName(),
-                fieldName.userFacingName());
-          });
-      return;
-    }
-
-    auto *varDecl = topFieldToError.get<VarDecl *>();
-    DE.diagnoseWithNotes(
-        copyableNominalType->diagnose(
-            diag::noncopyable_within_copyable,
-            copyableNominalType),
-        [&]() {
-          varDecl->diagnose(
-              diag::noncopyable_within_copyable_location,
-              fieldKind, parentName.userFacingName(),
-              fieldName.userFacingName());
-        });
-  };
-
-  // If we have a struct decl...
-  if (auto *structDecl = dyn_cast<StructDecl>(copyableNominalType)) {
-    // Visit each of the stored property var decls of the struct decl...
-    for (auto *fieldDecl : structDecl->getStoredProperties()) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Visiting struct field: " << fieldDecl->getName() << '\n');
-      if (!fieldDecl->getInterfaceType()->isNoncopyable())
-        continue;
-      emitError(fieldDecl, structDecl->getBaseName(),
-                fieldDecl->getDescriptiveKind(), fieldDecl->getBaseName());
-    }
-    // We completed our checking, just return.
-    return;
-  }
-
-  if (auto *enumDecl = dyn_cast<EnumDecl>(copyableNominalType)) {
-    // If we have an enum but we don't have any elements, just continue, we
-    // have nothing to check.
-    if (enumDecl->getAllElements().empty())
-      return;
-
-    // Otherwise for each element...
-    for (auto *enumEltDecl : enumDecl->getAllElements()) {
-      // If the element doesn't have any associated values, we have nothing to
-      // check, so continue.
-      if (!enumEltDecl->hasAssociatedValues())
-        continue;
-
-      LLVM_DEBUG(llvm::dbgs() << "Visiting enum elt decl: "
-                 << enumEltDecl->getName() << '\n');
-
-      // Otherwise, we have a case and need to check the types of the
-      // parameters of the case payload.
-      for (auto payloadParam : *enumEltDecl->getParameterList()) {
-        LLVM_DEBUG(llvm::dbgs() << "Visiting payload param: "
-                   << payloadParam->getName() << '\n');
-        if (payloadParam->getInterfaceType()->isNoncopyable()) {
-            emitError(enumEltDecl, enumDecl->getBaseName(),
-                      enumEltDecl->getDescriptiveKind(),
-                      enumEltDecl->getBaseName());
-        }
-      }
-    }    
-    // We have finished processing this enum... so return.
-    return;
-  }
 }

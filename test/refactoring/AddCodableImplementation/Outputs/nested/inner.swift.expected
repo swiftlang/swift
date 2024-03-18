@@ -7,7 +7,7 @@ struct Response: Codable {
     struct Result: Codable {
       let title: String
 
-      enum CodingKeys: CodingKey {
+      private enum CodingKeys: CodingKey {
         case title
       }
 
@@ -26,4 +26,5 @@ struct Response: Codable {
     }
   }
 }
+
 

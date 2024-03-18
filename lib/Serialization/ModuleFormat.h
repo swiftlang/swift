@@ -58,8 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR =
-    862; // add lifetime dependence info in type serialization as well.
+const uint16_t SWIFTMODULE_VERSION_MINOR = 865; // removal of noncopyable generics control block
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -424,6 +423,7 @@ using ResultConventionField = BCFixed<3>;
 /// module version.
 enum class SILResultInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
+  IsTransferring = 0x2,
 };
 
 using SILResultInfoOptions = OptionSet<SILResultInfoFlags>;
@@ -864,7 +864,6 @@ namespace control_block {
     CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
-    HAS_NONCOPYABLE_GENERICS,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -913,11 +912,6 @@ namespace control_block {
   using AllowableClientLayout = BCRecordLayout<
     ALLOWABLE_CLIENT_NAME,
     BCBlob
-  >;
-
-  using HasNoncopyableGenerics = BCRecordLayout<
-      HAS_NONCOPYABLE_GENERICS,
-      BCFixed<1>
   >;
 }
 
@@ -1364,7 +1358,6 @@ namespace decls_block {
     BCFixed<1>,                         // erased isolation?
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
-    BCFixed<1>,                         // transferring result
     BCVBR<6>,                           // number of parameters
     BCVBR<5>,                           // number of yields
     BCVBR<5>,                           // number of results
@@ -2387,14 +2380,6 @@ namespace decls_block {
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
   >;
-
-  using DistributedThunkTargetDeclAttrLayout = BCRecordLayout<
-      DistributedThunkTarget_DECL_ATTR,
-      BCFixed<1>, // implicit flag
-      DeclIDField // target function
-          // FIXME: not entirely right?
-  >;
-
 
   using TypeEraserDeclAttrLayout = BCRecordLayout<
     TypeEraser_DECL_ATTR,

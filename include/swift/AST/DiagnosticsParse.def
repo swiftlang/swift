@@ -1296,6 +1296,8 @@ ERROR(anon_closure_tuple_param_destructuring,none,
       "closure tuple parameter does not support destructuring", ())
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
+ERROR(nonisolated_closure_parameter_parentheses,none,
+      "the parameter list of a 'nonisolated' closure requires parentheses", ())
 ERROR(expected_capture_specifier,none,
       "expected 'weak', 'unowned', or no specifier in capture list", ())
 ERROR(expected_capture_specifier_name,none,

@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 protocol P {
   func speak()
 }
@@ -45,8 +47,7 @@ func main() {
   // CHECK: hello
   attemptCall(Cat<Noncopyable, Ordinary>())
 
-  // FIXME: this should succeeed!!
-  // CHECK: failed to cast (test_radar124171788)
+  // CHECK: cast succeeded
   test_radar124171788(.nothing)
 }
 
@@ -56,8 +57,8 @@ enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   case nothing
 }
 extension Maybe: Copyable {}
-extension Maybe: CustomStringConvertible {
-  var description: String {
+extension Maybe: CustomDebugStringConvertible {
+  var debugDescription: String {
     "cast succeeded"
   }
 }

@@ -757,10 +757,10 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
       !module->isBuiltFromInterface() &&
       !module->isStdlibModule()) {
-    module->getASTContext().setIgnoreAdjacentModules(true);
+    auto &ctx = module->getASTContext();
+    llvm::SaveAndRestore<bool> S(ctx.IgnoreAdjacentModules, true);
 
     ImportPath::Module::Builder builder(module->getName());
-    ASTContext &ctx = module->getASTContext();
     auto reloadedModule = ctx.getModule(builder.get(),
                                         /*AllowMemoryCached=*/false);
 

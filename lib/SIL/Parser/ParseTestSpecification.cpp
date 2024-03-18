@@ -201,7 +201,7 @@ private:
 
   bool empty() { return specification.empty(); }
 
-  bool peekPrefix(StringRef prefix) { return specification.startswith(prefix); }
+  bool peekPrefix(StringRef prefix) { return specification.starts_with(prefix); }
 
   bool consumePrefix(StringRef prefix) {
     return specification.consume_front(prefix);

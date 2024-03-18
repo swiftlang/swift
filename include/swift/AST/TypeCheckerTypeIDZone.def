@@ -120,6 +120,9 @@ SWIFT_REQUEST(TypeChecker, IsDistributedActorRequest, bool(NominalTypeDecl *),
 SWIFT_REQUEST(TypeChecker, GetDistributedActorImplicitCodableRequest,
                NormalProtocolConformance *(NominalTypeDecl *, KnownProtocolKind),
                Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CanSynthesizeDistributedActorCodableConformanceRequest,
+               bool (NominalTypeDecl *),
+               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorSystemRemoteCallFunctionRequest,
               AbstractFunctionDecl *(NominalTypeDecl *, bool),
               Cached, NoLocationInfo)
@@ -556,3 +559,7 @@ SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
 SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
               ArrayRef<TypeDecl *>(SourceFile *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ObjCRequirementMapRequest,
+              ObjCRequirementMap(const ProtocolDecl *proto),
+              Cached, NoLocationInfo)
+

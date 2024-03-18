@@ -212,6 +212,9 @@ public struct AnyHashable {
   }
 }
 
+@available(*, unavailable)
+extension AnyHashable: Sendable {}
+
 @_unavailableInEmbedded
 extension AnyHashable: Equatable {
   /// Returns a Boolean value indicating whether two type-erased hashable

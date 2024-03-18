@@ -3786,6 +3786,7 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' alloc-stack-option* sil-type (',' debug-var-attr)*
   alloc-stack-option ::= '[dynamic_lifetime]'
   alloc-stack-option ::= '[lexical]'
+  alloc-stack-option ::= '[var_decl]'
   alloc-stack-option ::= '[moveable_value_debuginfo]'
 
   %1 = alloc_stack $T
@@ -3805,7 +3806,12 @@ The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
 
-The optional ``lexical`` attribute specifies that the storage corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
+local variable with a lexical lifetime in the Swift source, so special care
+must be taken when hoisting ``destroy_addr``s.  Compare to the ``var_decl``
+attribute.
+
+The optional ``var_decl`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
 
 The optional ``moveable_value_debuginfo`` attribute specifies that when emitting
@@ -7031,18 +7037,25 @@ unchecked_take_enum_data_addr
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
 
-Invalidates an enum value, and takes the address of the payload for the given
-enum ``case`` in-place in memory. The referenced enum value is no longer valid,
-but the payload value referenced by the result address is valid and must be
-destroyed. It is undefined behavior if the referenced enum does not contain a
-value of the given ``case``. The result shares memory with the original enum
-value; the enum memory cannot be reinitialized as an enum until the payload has
-also been invalidated.
+Takes the address of the payload for the given enum ``case`` in-place in
+memory. It is undefined behavior if the referenced enum does not contain a
+value of the given ``case``. 
 
-(1.0 only)
+The result shares memory with the original enum value.  If an enum declaration
+is unconditionally loadable (meaning it's loadable regardless of any generic
+parameters), and it has more than one case with an associated value, then it
+may embed the enum tag within the payload area. If this is the case, then
+`unchecked_take_enum_data_addr` will clear the tag from the payload,
+invalidating the referenced enum value, but leaving the
+payload value referenced by the result address valid. In these cases,
+the enum memory cannot be reinitialized as an enum until the payload has also
+been invalidated.
 
-For the first payloaded case of an enum, ``unchecked_take_enum_data_addr``
-is guaranteed to have no side effects; the enum value will not be invalidated.
+If an enum has no more than one payload case, or if the declaration is ever
+address-only, then `unchecked_take_enum_data_addr` is guaranteed to be
+nondestructive, and the payload address can be accessed without invalidating
+the enum in these cases. The payload can be invalidated to invalidate the
+enum (assuming the enum does not have a `deinit` at the type level).
 
 select_enum
 ```````````

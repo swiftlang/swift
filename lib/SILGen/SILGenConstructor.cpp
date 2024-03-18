@@ -683,13 +683,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  // When lifetime dependence specifiers are present, epilog will take the
-  // explicit 'self' return.
-  prepareEpilog(ctor,
-                ctor->hasLifetimeDependentReturn()
-                    ? std::optional<Type>(ctor->getResultInterfaceType())
-                    : std::nullopt,
-                ctor->getEffectiveThrownErrorType(), CleanupLocation(ctor));
+  prepareEpilog(ctor, std::nullopt, ctor->getEffectiveThrownErrorType(),
+                CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -772,11 +767,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   emitProfilerIncrement(ctor->getTypecheckedBody());
   // Emit the constructor body.
   emitStmt(ctor->getTypecheckedBody());
-
-  if (ctor->hasLifetimeDependentReturn()) {
-    emitEpilog(ctor, /*UsesCustomEpilog*/ false);
-    return;
-  }
 
   // Build a custom epilog block, since the AST representation of the
   // constructor decl (which has no self in the return type) doesn't match the
