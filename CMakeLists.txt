@@ -100,6 +100,11 @@ include(FetchContent)
 # optional until we have a bootstrap story.
 check_language(Swift)
 if(CMAKE_Swift_COMPILER)
+  # we are not interested in logging any Swift module used
+  # when configuring the build system -- those are not useful
+  # since they will not contribute to the build of the compiler itself
+  unset(ENV{SWIFT_LOADED_MODULE_TRACE_FILE})
+
   enable_language(Swift)
   set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION "${CMAKE_Swift_COMPILER_VERSION}")
 else()
