@@ -721,22 +721,6 @@ function(_compile_swift_files
       list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
     endif()
 
-    set(optional_arg)
-    if(SWIFTFILE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS OR
-       SWIFTFILE_SDK STREQUAL "MACCATALYST")
-      # Allow installation of stdlib without building all variants on Darwin.
-      set(optional_arg "OPTIONAL")
-    endif()
-
-    swift_install_in_component(DIRECTORY "${specific_module_dir}"
-                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
-    if(SWIFTFILE_STATIC)
-      swift_install_in_component(DIRECTORY "${specific_module_dir_static}"
-                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${library_subdir}"
-                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
-    endif()
-
     # macCatalyst zippered module setup
     if(maccatalyst_build_flavor STREQUAL "zippered")
       compute_library_subdir(maccatalyst_library_subdir
@@ -778,7 +762,8 @@ function(_compile_swift_files
       swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
                                  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${maccatalyst_library_subdir}"
                                  COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
-                                 "${optional_arg}")
+                                 PATTERN "Project" EXCLUDE
+                                 OPTIONAL)
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
