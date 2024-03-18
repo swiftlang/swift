@@ -351,18 +351,6 @@ struct TypeTreeLeafTypeRange {
                                   deinitBitOffset}};
   }
 
-  /// Given a type \p rootType and a set of needed elements specified by the bit
-  /// vector \p neededElements, place into \p foundContiguousTypeRanges a set of
-  /// TypeTreeLeafTypeRanges that are associated with the bit vectors
-  /// elements. As a constraint, we ensure that if \p neededElements has bits
-  /// set that are part of subsequent fields of a type that is only partially
-  /// needed, the two fields are represented as separate ranges. This ensures
-  /// that it is easy to use this API to correspond to independent operations
-  /// for the fields.
-  static void convertNeededElementsToContiguousTypeRanges(
-      SILFunction *fn, SILType rootType, SmallBitVector &neededElements,
-      SmallVectorImpl<TypeTreeLeafTypeRange> &foundContiguousTypeRanges);
-
   static void constructProjectionsForNeededElements(
       SILValue rootValue, SILInstruction *insertPt,
       SmallBitVector &neededElements,
