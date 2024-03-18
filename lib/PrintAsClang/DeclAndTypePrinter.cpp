@@ -1493,6 +1493,8 @@ private:
       os << " SWIFT_NOEXCEPT";
     if (!funcABI.useCCallingConvention())
       os << " SWIFT_CALL";
+    if (funcTy->getResult()->isUninhabited())
+      os << " SWIFT_NORETURN";
     printAvailability(FD);
     os << ';';
     if (funcABI.useMangledSymbolName()) {
