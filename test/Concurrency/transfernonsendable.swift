@@ -544,7 +544,7 @@ func testConversionsAndSendable(a: Actor, f: @Sendable () -> Void, f2: () -> Voi
   await a.useNonSendableFunction(f2) // expected-complete-warning {{passing argument of non-sendable type '() -> Void' into actor-isolated context may introduce data races}}
   // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   // expected-tns-warning @-2 {{transferring 'f2' may cause a race}}
-  // expected-tns-note @-3 {{transferring nonisolated 'f2' to actor-isolated callee could cause races between actor-isolated and nonisolated uses}}
+  // expected-tns-note @-3 {{transferring task-isolated 'f2' to actor-isolated callee could cause races between actor-isolated and task-isolated uses}}
 }
 
 func testSendableClosureCapturesNonSendable(a: Actor) {

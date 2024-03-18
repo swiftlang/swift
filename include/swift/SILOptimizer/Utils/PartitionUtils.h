@@ -1090,15 +1090,16 @@ public:
   }
 
   bool hasActorIsolation() const {
-    return std::holds_alternative<std::optional<ActorIsolation>>(data);
+    return kind == Actor &&
+           std::holds_alternative<std::optional<ActorIsolation>>(data);
   }
 
   bool hasActorInstance() const {
-    return std::holds_alternative<NominalTypeDecl *>(data);
+    return kind == Actor && std::holds_alternative<NominalTypeDecl *>(data);
   }
 
   bool hasTaskIsolatedValue() const {
-    return std::holds_alternative<SILValue>(data);
+    return kind == Task && std::holds_alternative<SILValue>(data);
   }
 
   /// If we actually have an actor decl, return that. Otherwise, see if we have
@@ -1128,8 +1129,19 @@ public:
     if (unsigned(other.kind) < unsigned(kind))
       return *this;
 
-    assert(kind != ValueIsolationRegionInfo::Actor &&
-           "Actor should never be merged with another actor?!");
+    // TODO: Make this failing mean that we emit an unknown SIL error instead of
+    // asserting.
+    if (other.isActorIsolated() && isActorIsolated()) {
+      if (other.hasActorInstance() && hasActorInstance()) {
+        assert(other.getActorInstance() == getActorInstance() &&
+               "Actor should never be merged with another actor unless with "
+               "the same actor?!");
+      } else if (other.hasActorIsolation() && hasActorIsolation()) {
+        assert(other.getActorIsolation() == getActorIsolation() &&
+               "Actor should never be merged with another actor unless with "
+               "the same actor?!");
+      }
+    }
 
     // Otherwise, take the other value.
     return other;
@@ -1204,15 +1216,18 @@ public:
   }
 
   /// Call handleTransferNonTransferrable on our CRTP subclass.
-  void handleTransferNonTransferrable(const PartitionOp &op,
-                                      Element elt) const {
-    return asImpl().handleTransferNonTransferrable(op, elt);
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt,
+      ValueIsolationRegionInfo isolationRegionInfo) const {
+    return asImpl().handleTransferNonTransferrable(op, elt,
+                                                   isolationRegionInfo);
   }
-
   /// Just call our CRTP subclass.
-  void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                      Element otherElement) const {
-    return asImpl().handleTransferNonTransferrable(op, elt, otherElement);
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt, Element otherElement,
+      ValueIsolationRegionInfo isolationRegionInfo) const {
+    return asImpl().handleTransferNonTransferrable(op, elt, otherElement,
+                                                   isolationRegionInfo);
   }
 
   /// Call isActorDerived on our CRTP subclass.
@@ -1282,39 +1297,35 @@ public:
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Transfer PartitionOp's argument should already be tracked");
 
+      ValueIsolationRegionInfo isolationRegionInfo =
+          getIsolationRegionInfo(op.getOpArgs()[0]);
+
       // If we know our direct value is actor derived... immediately emit an
       // error.
-      if (isActorDerived(op.getOpArgs()[0]))
-        return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+      if (isolationRegionInfo.hasActorIsolation()) {
+        return handleTransferNonTransferrable(op, op.getOpArgs()[0],
+                                              isolationRegionInfo);
+      }
 
-      // Otherwise, we may have a value that is actor derived or task isolated
-      // from another value. We need to prefer actor derived.
-      //
-      // While we are checking for actor derived, also check if our value or any
-      // value in our region is closure captured and propagate that bit in our
-      // transferred inst.
+      // Otherwise, we need to merge our isolation region info with the
+      // isolation region info of everything else in our region. This is the
+      // dynamic isolation region info found by the dataflow.
       bool isClosureCapturedElt =
           isClosureCaptured(op.getOpArgs()[0], op.getSourceOp());
       Region elementRegion = p.getRegion(op.getOpArgs()[0]);
-      std::optional<Element> actorDerivedElt;
-      std::optional<Element> taskDerivedElt;
       for (const auto &pair : p.range()) {
         if (pair.second == elementRegion) {
-          if (isActorDerived(pair.first))
-            actorDerivedElt = pair.first;
-          if (isTaskIsolatedDerived(pair.first))
-            taskDerivedElt = pair.first;
+          isolationRegionInfo =
+              isolationRegionInfo.merge(getIsolationRegionInfo(pair.first));
           isClosureCapturedElt |=
               isClosureCaptured(pair.first, op.getSourceOp());
         }
       }
 
-      // Now try to add the actor derived elt first and then the task derived
-      // elt, preferring actor derived.
-      if (actorDerivedElt.has_value() || taskDerivedElt.has_value()) {
-        return handleTransferNonTransferrable(
-            op, op.getOpArgs()[0],
-            actorDerivedElt.has_value() ? *actorDerivedElt : *taskDerivedElt);
+      // If we merged anything, we need to handle a transfer non-transferrable.
+      if (bool(isolationRegionInfo) && !isolationRegionInfo.isDisconnected()) {
+        return handleTransferNonTransferrable(op, op.getOpArgs()[0],
+                                              isolationRegionInfo);
       }
 
       // Mark op.getOpArgs()[0] as transferred.
@@ -1415,14 +1426,13 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.
-  void handleTransferNonTransferrable(const PartitionOp &op,
-                                      Element elt) const {}
+  void
+  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
+                                 ValueIsolationRegionInfo regionInfo) const {}
 
-  /// This is called if we detect a never transferred element that was passed to
-  /// a transfer instruction but the actual element that could not be
-  /// transferred is a different element in its region.
-  void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                      Element otherEltInRegion) const {}
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt, Element otherElement,
+      ValueIsolationRegionInfo isolationRegionInfo) const {}
 
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
