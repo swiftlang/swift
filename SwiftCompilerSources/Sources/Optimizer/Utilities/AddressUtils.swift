@@ -97,12 +97,18 @@ extension AddressUseVisitor {
       if markDep.type.isAddress {
         return projectedAddressUse(of: operand, into: markDep)
       }
-      if LifetimeDependence(markDep, context) != nil {
-        // This is unreachable from InteriorUseVisitor because the
-        // base address of a `mark_dependence [nonescaping]` must be a
-        // `begin_access`, and interior liveness does not check uses of
-        // the accessed address.
+      switch markDep.dependenceKind {
+      case .Unresolved:
+        if LifetimeDependence(markDep, context) == nil {
+          break
+        }
+        fallthrough
+      case .NonEscaping:
+        // Note: This is unreachable from InteriorUseVisitor because the base address of a `mark_dependence
+        // [nonescaping]` must be a `begin_access`, and interior liveness does not check uses of the accessed address.
         return dependentAddressUse(of: operand, into: markDep)
+      case .Escaping:
+        break
       }
       // A potentially escaping value depends on this address.
       return escapingAddressUse(of: operand)
