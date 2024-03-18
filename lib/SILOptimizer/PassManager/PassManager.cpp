@@ -18,6 +18,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "../../IRGen/IRGenModule.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -1836,6 +1837,25 @@ void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFun
 bool FullApplySite_canInline(BridgedInstruction apply) {
   return swift::SILInliner::canInlineApplySite(
       swift::FullApplySite(apply.unbridged()));
+}
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
+                                                    BridgedFunction function,
+                                                    bool sourceTypeIsExact) {
+  static_assert((int)DynamicCastFeasibility::WillSucceed == (int)BridgedDynamicCastResult::willSucceed);
+  static_assert((int)DynamicCastFeasibility::MaySucceed  == (int)BridgedDynamicCastResult::maySucceed);
+  static_assert((int)DynamicCastFeasibility::WillFail    == (int)BridgedDynamicCastResult::willFail);
+
+  return static_cast<BridgedDynamicCastResult>(
+    classifyDynamicCast(function.getFunction()->getModule().getSwiftModule(),
+                        sourceTy.unbridged().getASTType(),
+                        destTy.unbridged().getASTType(),
+                        sourceTypeIsExact));
+}
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst) {
+  SILDynamicCastInst castInst(inst.unbridged());
+  return static_cast<BridgedDynamicCastResult>(castInst.classifyFeasibility(/*allowWholeModule=*/ false));
 }
 
 // TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
