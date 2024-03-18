@@ -192,6 +192,7 @@ public:
   }
 
   NominalTypeDecl *getActor() const;
+  NominalTypeDecl *getActorOrNullPtr() const;
 
   VarDecl *getActorInstance() const;
 
