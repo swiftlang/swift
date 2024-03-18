@@ -291,16 +291,13 @@ struct TypeTreeLeafTypeRange {
   /// The leaf type sub-range of the type tree of \p rootAddress, consisting of
   /// \p projectedAddress and all of \p projectedAddress's descendent fields in
   /// the type tree.
-  ///
-  /// \returns None if we are unable to understand the path in between \p
-  /// projectedAddress and \p rootAddress.
-  static std::optional<TypeTreeLeafTypeRange> get(SILValue projectedValue,
-                                                  SILValue rootValue) {
+  static void get(SILValue projectedValue, SILValue rootValue,
+                  SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
     auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
     if (!startEltOffset)
-      return std::nullopt;
-    return {{*startEltOffset,
-             *startEltOffset + TypeSubElementCount(projectedValue)}};
+      return;
+    ranges.push_back({*startEltOffset,
+                      *startEltOffset + TypeSubElementCount(projectedValue)});
   }
 
   /// Which bits of \p rootValue are involved in \p op.
