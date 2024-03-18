@@ -816,3 +816,13 @@ func test_mismatch_between_param_and_optional_chain() {
     }
   }
 }
+
+// rdar://124549952 - incorrect "type of expression is ambiguous without a type annotation"
+do {
+  func fn() -> (any BinaryInteger)? {}
+
+  func test() {
+    let _ = fn()?.op().value
+    // expected-error@-1 {{value of type 'any BinaryInteger' has no member 'op'}}
+  }
+}
