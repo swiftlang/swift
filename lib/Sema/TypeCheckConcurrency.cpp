@@ -6454,16 +6454,24 @@ static ActorIsolation getActorIsolationForReference(
     if (var->isLet() && isStoredProperty(var) &&
         declIsolation.isNonisolated()) {
       if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
-        if (nominal->isAnyActor())
+        if (nominal->isAnyActor()) {
+          fprintf(stderr, "[%s:%d](%s) return isolation: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+          ActorIsolation::forActorInstanceSelf(decl).dump();
           return ActorIsolation::forActorInstanceSelf(decl);
+        }
 
         auto nominalIsolation = getActorIsolation(nominal);
-        if (nominalIsolation.isGlobalActor())
+        if (nominalIsolation.isGlobalActor()) {
           return getActorIsolationForReference(nominal, fromDC);
+        }
       }
     }
+
+
   }
 
+  fprintf(stderr, "[%s:%d](%s) return isolation: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  declIsolation.dump();
   return declIsolation;
 }
 

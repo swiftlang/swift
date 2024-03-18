@@ -201,6 +201,7 @@ namespace {
                       CleanupLocation(cleanupLoc));
     }
     JumpDest createThrowDest(Stmt *cleanupLoc, ThrownErrorInfo errorInfo) {
+      fprintf(stderr, "[%s:%d](%s) create ThrowDest \n", __FILE_NAME__, __LINE__, __FUNCTION__);
       return JumpDest(SGF.createBasicBlock(FunctionSection::Postmatter),
                       SGF.getCleanupsDepth(),
                       CleanupLocation(cleanupLoc),
@@ -1121,6 +1122,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   }
 
   // Create the throw destination at the end of the function.
+  fprintf(stderr, "[%s:%d](%s) // Create the throw destination at the end of the function.\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   JumpDest throwDest = createThrowDest(S->getBody(),
                                        ThrownErrorInfo(exnArg));
 
@@ -1150,6 +1152,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // Emit the body.
   {
     // Push the new throw destination.
+    fprintf(stderr, "[%s:%d](%s) save and restore ThrowDest \n", __FILE_NAME__, __LINE__, __FUNCTION__);
     llvm::SaveAndRestore<JumpDest> savedThrowDest(SGF.ThrowDest, throwDest);
 
     visit(S->getBody());
@@ -1535,6 +1538,9 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   assert(ThrowDest.isValid() &&
          "calling emitThrow with invalid throw destination!");
 
+  fprintf(stderr, "[%s:%d](%s) ThrowDest.isValid() IS VALID = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          ThrowDest.getBlock());
+
   if (getASTContext().LangOpts.ThrowsAsTraps) {
     B.createUnconditionalFail(loc, "throw turned into a trap");
     B.createUnreachable(loc);
@@ -1676,5 +1682,6 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   }
 
   // Branch to the cleanup destination.
+  fprintf(stderr, "[%s:%d](%s) ThrowDest cleanups\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   Cleanups.emitBranchAndCleanups(ThrowDest, loc, args, IsForUnwind);
 }

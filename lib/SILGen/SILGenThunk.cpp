@@ -115,34 +115,47 @@ void SILGenModule::emitDistributedThunkForDecl(
     llvm::PointerUnion<AbstractFunctionDecl *, VarDecl *> varOrAFD) {
   FuncDecl *thunkDecl = nullptr;
 
-  if (varOrAFD.is<AbstractFunctionDecl *>()) {
+  if (varOrAFD.is<VarDecl *>()) {
+    auto var = varOrAFD.get<VarDecl *>();
+    thunkDecl = var->getDistributedThunk();
+
+    if (thunkDecl) {
+      fprintf(stderr, "[%s:%d](%s) EMIT THUNK FOR VAR: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      thunkDecl->dumpRef();
+      fprintf(stderr, "[%s:%d](%s) VAR:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      var->dump();
+      var->dumpRef();
+
+      fprintf(stderr, "[%s:%d](%s) VAR THUNK IS:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      thunkDecl->dump();
+    }
+  } else if (varOrAFD.is<AbstractFunctionDecl *>()) {
     auto afd = varOrAFD.get<AbstractFunctionDecl *>();
-//    if (auto acc = dyn_cast<AccessorDecl>(afd)) {
-//      fprintf(stderr, "[%s:%d](%s) AVOID ACCESSOR, we'll do the var!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      afd->dumpRef();
-//      fprintf(stderr, "[%s:%d](%s) acc storage:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      acc->getStorage()->dumpRef();
-//      return;
-//    }
+
+    // FIXME: maybe not necessary
+    if (auto acc = dyn_cast<AccessorDecl>(afd)) {
+      fprintf(stderr, "[%s:%d](%s) AVOID ACCESSOR, we'll do the var!\n",
+      __FILE_NAME__, __LINE__, __FUNCTION__); afd->dumpRef();
+      fprintf(stderr, "[%s:%d](%s) acc storage:\n", __FILE_NAME__,
+      __LINE__, __FUNCTION__); acc->getStorage()->dumpRef();
+      return;
+    }
+
     thunkDecl = afd->getDistributedThunk();
     if (thunkDecl) {
-      fprintf(stderr, "[%s:%d](%s) EMIT THUNK FOR: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      fprintf(stderr, "[%s:%d](%s) EMIT THUNK FOR AFD: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
       thunkDecl->dumpRef();
       fprintf(stderr, "[%s:%d](%s) AFD:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       afd->dumpRef();
-    }
-  } else {
-    auto var = varOrAFD.get<VarDecl *>();
-    thunkDecl = var->getDistributedThunk();
-    if (thunkDecl) {
-      fprintf(stderr, "[%s:%d](%s) EMIT THUNK FOR: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      thunkDecl->dumpRef();
-      fprintf(stderr, "[%s:%d](%s) VAR:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      var->dumpRef();
+
+      fprintf(stderr, "[%s:%d](%s) AFD THUNK IS:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      thunkDecl->dump();
     }
   }
-  if (!thunkDecl)
+  if (!thunkDecl) {
+    fprintf(stderr, "[%s:%d](%s) NO THUNK ~~~~\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     return;
+  }
 
   if (!thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;

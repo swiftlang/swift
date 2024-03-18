@@ -69,8 +69,11 @@ template <class T> class SILVTableVisitor {
 
   void maybeAddEntry(SILDeclRef declRef) {
     // Introduce a new entry if required.
-    if (declRef.requiresNewVTableEntry())
+    if (declRef.requiresNewVTableEntry()) {
+      fprintf(stderr, "[%s:%d](%s) add for decl: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      declRef.dump();
       asDerived().addMethod(declRef);
+    }
 
     // Update any existing entries that it overrides.
     auto nextRef = declRef;
