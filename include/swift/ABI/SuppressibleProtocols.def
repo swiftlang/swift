@@ -1,0 +1,33 @@
+//===--- SuppressibleProtocols.def - Suppressible protocol meta -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with ABI-defined
+// suppressible protocols.
+//
+// The SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) macro is used to specify
+// each suppressible protocol that's conceptually part of the ABI. The
+// arguments are:
+//   Name: The name of the protocol, e.g., Copyable
+//   Bit: The bit in the set bitset of suppressible protocols that is used
+//        to indicate this.
+//   MangleChar: The character used for the name mangling to refer to this
+//               protocol.
+//===----------------------------------------------------------------------===//
+
+#ifndef SUPPRESSIBLE_PROTOCOL
+#  error Must define SUPPRESSIBLE_PROTOCOL macro before including this file
+#endif
+
+SUPPRESSIBLE_PROTOCOL(Copyable, 0, 'c')
+SUPPRESSIBLE_PROTOCOL(Escapable, 1, 'e')
+
+#undef SUPPRESSIBLE_PROTOCOL
