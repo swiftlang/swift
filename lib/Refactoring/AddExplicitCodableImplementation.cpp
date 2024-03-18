@@ -133,7 +133,7 @@ class AddCodableContext {
           kind == KnownProtocolKind::Decodable) {
         for (auto requirement : protocol->getProtocolRequirements()) {
           auto witness = conformance->getWitnessDecl(requirement);
-          if (witness->isSynthesized()) {
+          if (witness && witness->isSynthesized()) {
             Printer.printNewline();
             witness->print(Printer, Options);
             Printer.printNewline();
