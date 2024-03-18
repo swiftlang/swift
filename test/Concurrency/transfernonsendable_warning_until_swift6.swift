@@ -24,7 +24,7 @@ func testIsolationError() async {
   useValue(x) // expected-note {{access here could race}}
 }
 
-func testTransferArgumentError(_ x: NonSendableType) async { // expected-note {{value is task-isolated since it is in the same region as 'x'}}
+func testTransferArgumentError(_ x: NonSendableType) async {
   await transferToMain(x) // expected-error {{task-isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
 }
 
