@@ -755,9 +755,31 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::ClassMethod: {
+      bool isDistributedThunkTarget = false;
+      if (auto func = dyn_cast_or_null<AccessorDecl>(constant->getFuncDecl())) {
+        if (func->getStorage()->isDistributed()) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            /// We must adjust the constant to use a distributed thunk.
+            fprintf(stderr, "[%s:%d](%s) ASSUME IS DISTRIBUTED\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+            fprintf(stderr, "[%s:%d](%s) constant\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+            constant->dump();
+
+            constant = constant->asDistributed();
+
+            fprintf(stderr, "[%s:%d](%s) constant asDistributed\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+            constant->dump();
+
+            isDistributedThunkTarget = true;
+          }
+        }
+      }
+
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(
           SGF.getTypeExpansionContext(), *constant);
-      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      auto typeInfo = createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      typeInfo.isDistributedThunkTarget = isDistributedThunkTarget;
+      return typeInfo;
     }
     case Kind::SuperMethod: {
       auto base = constant->getOverriddenVTableEntry();
@@ -766,19 +788,24 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::WitnessMethod: {
+      bool isDistributedThunkTarget = false;
       if (auto func = constant->getFuncDecl()) {
         if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
           // If we're calling cross-actor, we must always use a distributed thunk
           if (!isSameActorIsolated(func, SGF.FunctionDC)) {
             /// We must adjust the constant to use a distributed thunk.
             constant = constant->asDistributed();
+            isDistributedThunkTarget = true;
           }
         }
       }
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      auto typeInfo =
+          createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      typeInfo.isDistributedThunkTarget = isDistributedThunkTarget;
+      return typeInfo;
     }
     case Kind::DynamicMethod: {
       auto formalType = getDynamicMethodLoweredType(
@@ -2000,7 +2027,14 @@ static void emitRawApply(SILGenFunction &SGF,
     options -= ApplyFlags::DoesNotThrow;
 
   // If we don't have an error result, we can make a simple 'apply'.
-  if (!substFnType->hasErrorResult()) {
+  if (substFnType->hasErrorResult() &&
+      SGF.F.isDistributed() &&
+      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) &&
+      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext())->isDistributedActor()) {
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    rawResults.push_back(result);
+
+  } else if (!substFnType->hasErrorResult()) {
     auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
     rawResults.push_back(result);
 
@@ -2017,8 +2051,11 @@ static void emitRawApply(SILGenFunction &SGF,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
-    SGF.B.createTryApply(loc, fnValue, subs, argValues,
+    auto inst = SGF.B.createTryApply(loc, fnValue, subs, argValues,
                          normalBB, errorBB, options);
+
+    fprintf(stderr, "[%s:%d](%s) created inst: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    inst->dump();
     SGF.B.emitBlock(normalBB);
   }
 }
@@ -5525,14 +5562,20 @@ RValue SILGenFunction::emitApply(
     const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
     SGFContext evalContext,
     std::optional<ActorIsolation> implicitActorHopTarget) {
-  auto substFnType = calleeTypeInfo.substFnType;
+  auto substFnType = calleeTypeInfo.substFnType; // TODO: this has error but should not
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
   resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);
 
   SILValue indirectErrorAddr;
-  if (substFnType->hasErrorResult()) {
+  if (substFnType->hasErrorResult() &&
+      F.isDistributed() /* caller is distributed thunk */ &&
+      calleeTypeInfo.isDistributedThunkTarget) {
+    fprintf(stderr, "[%s:%d](%s) EMIT APPLY IN A THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    substFnType.dump();
+  } else
+      if (substFnType->hasErrorResult()) {
     auto errorResult = substFnType->getErrorResult();
     if (errorResult.getConvention() == ResultConvention::Indirect) {
       auto loweredErrorResultType = getSILType(errorResult, substFnType);
@@ -5674,6 +5717,8 @@ RValue SILGenFunction::emitApply(
   SILValue rawDirectResult;
   {
     SmallVector<SILValue, 1> rawDirectResults;
+    fprintf(stderr, "[%s:%d](%s) emit raw apply\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    substFnType.dump();
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
                  indirectResultAddrs, indirectErrorAddr,
                  rawDirectResults, breadcrumb);
@@ -6660,6 +6705,14 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          SubstitutionMap subs,
                                          bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
+
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    if (accessor->isGetter()) {
+      if (accessor->getStorage()->isDistributed()) {
+        return Callee::forDirect(SGF, constant, subs, loc);
+      }
+    }
+  }
 
 //  if (constant.isDistributedThunk()) {
 //    auto distributedThunk = constant.getFuncDecl();
