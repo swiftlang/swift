@@ -375,8 +375,8 @@ bool Implementation::gatherUses(SILValue value) {
       // the switch dispatch. If the final pattern match ends up destructuring
       // the value, then SILGen emits that as a separate access.
       if (auto switchEnum = dyn_cast<SwitchEnumInst>(nextUse->getUser())) {
-        auto leafRange = TypeTreeLeafTypeRange::get(switchEnum->getOperand(),
-                                                    getRootValue());
+        auto leafRange = TypeTreeLeafTypeRange::get(
+            &switchEnum->getOperandRef(), getRootValue());
         if (!leafRange) {
           LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
           return false;
