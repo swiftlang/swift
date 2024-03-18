@@ -230,6 +230,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskOptions = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
+    taskOptions = IGF.Builder.CreateIntToPtr(taskOptions,
+                                             IGF.IGM.SwiftTaskOptionRecordPtrTy);
 
     auto asyncLet = emitBuiltinStartAsyncLet(
         IGF,
@@ -249,6 +251,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
     auto localBuffer = args.claimNext();
+    taskOptions = IGF.Builder.CreateIntToPtr(taskOptions,
+                                             IGF.IGM.SwiftTaskOptionRecordPtrTy);
 
     auto asyncLet = emitBuiltinStartAsyncLet(
         IGF,
