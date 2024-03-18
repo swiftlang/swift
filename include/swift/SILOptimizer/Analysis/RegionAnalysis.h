@@ -135,8 +135,7 @@ using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
 class regionanalysisimpl::TrackableValueState {
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
-  ValueIsolationRegionInfo regionInfo =
-      ValueIsolationRegionInfo::getDisconnected();
+  IsolationRegionInfo regionInfo = IsolationRegionInfo::getDisconnected();
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
@@ -153,7 +152,7 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  ValueIsolationRegionInfo::Kind getRegionInfoKind() {
+  IsolationRegionInfo::Kind getIsolationRegionInfoKind() const {
     return regionInfo.getKind();
   }
 
@@ -161,11 +160,11 @@ public:
     return regionInfo.getActorIsolation().value();
   }
 
-  void mergeIsolationRegionInfo(ValueIsolationRegionInfo newRegionInfo) {
+  void mergeIsolationRegionInfo(IsolationRegionInfo newRegionInfo) {
     regionInfo = regionInfo.merge(newRegionInfo);
   }
 
-  ValueIsolationRegionInfo getIsolationRegionInfo() const { return regionInfo; }
+  IsolationRegionInfo getIsolationRegionInfo() const { return regionInfo; }
 
   TrackableValueID getID() const { return TrackableValueID(id); }
 
@@ -264,7 +263,7 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  ValueIsolationRegionInfo getIsolationRegionInfo() const {
+  IsolationRegionInfo getIsolationRegionInfo() const {
     return valueState.getIsolationRegionInfo();
   }
 
@@ -334,8 +333,8 @@ public:
   /// exists. Returns nullptr otherwise.
   SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
 
-  ValueIsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
-  ValueIsolationRegionInfo getIsolationRegion(SILValue trackableValueID) const;
+  IsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
+  IsolationRegionInfo getIsolationRegion(SILValue trackableValueID) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -358,9 +357,8 @@ private:
   std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
-                                    ValueIsolationRegionInfo isolation) const;
-  bool mergeIsolationRegionInfo(SILValue value,
-                                ValueIsolationRegionInfo isolation);
+                                    IsolationRegionInfo isolation) const;
+  bool mergeIsolationRegionInfo(SILValue value, IsolationRegionInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   TrackableValueID lookupValueID(SILValue value);
 };
