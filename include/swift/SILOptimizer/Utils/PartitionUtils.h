@@ -21,6 +21,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
+#include <variant>
 
 #define DEBUG_TYPE "transfer-non-sendable"
 
