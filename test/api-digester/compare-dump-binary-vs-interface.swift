@@ -29,6 +29,3 @@
 // RUN: %clang -E -P -x c %S/Outputs/Cake-binary-vs-interface.txt -o - | sed '/^\s*$/d' > %t.expected
 // RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
 // RUN: diff -u %t.expected %t.result.tmp
-
-// FIXME(NCG): This test requires NoncopyableGenerics to be a "suppressible" compiler feature.
-// XFAIL: !noncopyable_generics
