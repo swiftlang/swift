@@ -1587,9 +1587,9 @@ shouldVisitAsEndPointUse(Operand *op) {
   // If an access is static and marked as "no nested conflict", we use that
   // in switch codegen to mark an opaque sub-access that move-only checking
   // should not look through.
-  if (auto *ba = dyn_cast<BeginAccessInst>(op->getUser())) {
-    if (ba->getEnforcement() == SILAccessEnforcement::Static
-        && ba->hasNoNestedConflict()) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(op->getUser())) {
+    if (bai->getEnforcement() == SILAccessEnforcement::Static &&
+        bai->hasNoNestedConflict()) {
       return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUser;
     }
   }
