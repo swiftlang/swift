@@ -1594,7 +1594,7 @@ shouldVisitAsEndPointUse(Operand *op) {
     }
   }
   // A drop_deinit consumes the deinit bit.
-  if (auto *dd = dyn_cast<DropDeinitInst>(op->getUser())) {
+  if (isa<DropDeinitInst>(op->getUser())) {
     return TransitiveAddressWalkerTransitiveUseVisitation::BothUserAndUses;
   }
   return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUses;
