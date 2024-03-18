@@ -995,6 +995,175 @@ private:
   }
 };
 
+class ValueIsolationRegionInfo {
+public:
+  /// The lattice is:
+  ///
+  /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
+  ///
+  /// Unknown means no information. We error when merging on it.
+  enum Kind {
+    Unknown,
+    Disconnected,
+    Task,
+    Actor,
+  };
+
+private:
+  Kind kind;
+  // clang-format off
+  std::variant<
+    // Used for actor isolated when we have ActorIsolation info from the AST.
+    std::optional<ActorIsolation>,
+    // Used for actor isolation when we infer the actor at the SIL level.
+    NominalTypeDecl *,
+    // The task isolated parameter when we find a task isolated value.
+    SILValue
+  > data;
+  // clang-format on
+
+  ValueIsolationRegionInfo(Kind kind,
+                           std::optional<ActorIsolation> actorIsolation)
+      : kind(kind), data(actorIsolation) {}
+  ValueIsolationRegionInfo(Kind kind, NominalTypeDecl *decl)
+      : kind(kind), data(decl) {}
+
+  ValueIsolationRegionInfo(Kind kind, SILValue value)
+      : kind(kind), data(value) {}
+
+public:
+  ValueIsolationRegionInfo() : kind(Kind::Unknown), data() {}
+
+  operator bool() const { return kind != Kind::Unknown; }
+
+  operator Kind() const { return kind; }
+
+  Kind getKind() const { return kind; }
+
+  bool isDisconnected() const { return kind == Kind::Disconnected; }
+  bool isActorIsolated() const { return kind == Kind::Actor; }
+  bool isTaskIsolated() const { return kind == Kind::Task; }
+
+  void print(llvm::raw_ostream &os) const {
+    switch (Kind(*this)) {
+    case Unknown:
+      os << "unknown";
+      return;
+    case Disconnected:
+      os << "disconnected";
+      return;
+    case Actor:
+      os << "actor";
+      return;
+    case Task:
+      os << "task";
+      return;
+    }
+  }
+
+  void printForDiagnostics(llvm::raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
+
+  std::optional<ActorIsolation> getActorIsolation() const {
+    assert(kind == Actor);
+    assert(std::holds_alternative<std::optional<ActorIsolation>>(data) &&
+           "Doesn't have an actor isolation?!");
+    return std::get<std::optional<ActorIsolation>>(data);
+  }
+
+  NominalTypeDecl *getActorInstance() const {
+    assert(kind == Actor);
+    assert(std::holds_alternative<NominalTypeDecl *>(data) &&
+           "Doesn't have an actor instance?!");
+    return std::get<NominalTypeDecl *>(data);
+  }
+
+  SILValue getTaskIsolatedValue() const {
+    assert(kind == Task);
+    assert(std::holds_alternative<SILValue>(data) &&
+           "Doesn't have a task isolated value");
+    return std::get<SILValue>(data);
+  }
+
+  bool hasActorIsolation() const {
+    return std::holds_alternative<std::optional<ActorIsolation>>(data);
+  }
+
+  bool hasActorInstance() const {
+    return std::holds_alternative<NominalTypeDecl *>(data);
+  }
+
+  bool hasTaskIsolatedValue() const {
+    return std::holds_alternative<SILValue>(data);
+  }
+
+  /// If we actually have an actor decl, return that. Otherwise, see if we have
+  /// an actor isolation if we can find one in there. Returns nullptr if we
+  /// fail.
+  NominalTypeDecl *tryInferActorDecl() const {
+    if (hasActorIsolation()) {
+      auto actorIsolation = getActorIsolation();
+      if (auto *actor = actorIsolation->getActorOrNullPtr()) {
+        return actor;
+      }
+      return nullptr;
+    }
+
+    if (hasActorInstance()) {
+      auto actorDecl = getActorInstance();
+      return actorDecl;
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] ValueIsolationRegionInfo
+  merge(ValueIsolationRegionInfo other) const {
+    // If we are greater than the other kind, then we are further along the
+    // lattice. We ignore the change.
+    if (unsigned(other.kind) < unsigned(kind))
+      return *this;
+
+    assert(kind != ValueIsolationRegionInfo::Actor &&
+           "Actor should never be merged with another actor?!");
+
+    // Otherwise, take the other value.
+    return other;
+  }
+
+  ValueIsolationRegionInfo withActorIsolated(ActorIsolation isolation) {
+    return ValueIsolationRegionInfo::getActorIsolated(isolation);
+  }
+
+  static ValueIsolationRegionInfo getDisconnected() {
+    return {Kind::Disconnected, {}};
+  }
+
+  static ValueIsolationRegionInfo
+  getActorIsolated(ActorIsolation actorIsolation) {
+    return {Kind::Actor, actorIsolation};
+  }
+
+  /// Sometimes we may have something that is actor isolated or that comes from
+  /// a type. First try getActorIsolation and otherwise, just use the type.
+  static ValueIsolationRegionInfo getActorIsolated(NominalTypeDecl *nomDecl) {
+    auto actorIsolation = swift::getActorIsolation(nomDecl);
+    if (actorIsolation.isActorIsolated())
+      return getActorIsolated(actorIsolation);
+    if (nomDecl->isActor())
+      return {Kind::Actor, nomDecl};
+    return {};
+  }
+
+  static ValueIsolationRegionInfo getTaskIsolated(SILValue value) {
+    return {Kind::Task, value};
+  }
+};
+
 /// A data structure that applies a series of PartitionOps to a single Partition
 /// that it modifies.
 ///
