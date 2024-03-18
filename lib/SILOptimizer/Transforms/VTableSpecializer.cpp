@@ -38,7 +38,6 @@ namespace {
 
 class VTableSpecializer : public SILModuleTransform {
   bool specializeVTables(SILModule &module);
-  bool specializeVTablesOfSuperclasses(SILModule &module);
 
   /// The entry point to the transformation.
   void run() override {
@@ -58,6 +57,8 @@ static SILFunction *specializeVTableMethod(SILFunction *origMethod,
                                            SubstitutionMap subs,
                                            SILModule &module,
                                            SILTransform *transform);
+
+static bool specializeVTablesOfSuperclasses(SILModule &module, SILTransform *transform);
 
 static bool specializeVTablesInFunction(SILFunction &func, SILModule &module,
                                         SILTransform *transform) {
@@ -89,7 +90,7 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
     changed |= specializeVTablesInFunction(func, module, this);
   }
 
-  changed |= specializeVTablesOfSuperclasses(module);
+  changed |= specializeVTablesOfSuperclasses(module, this);
 
   for (SILVTable *vtable : module.getVTables()) {
     if (vtable->getClass()->isGenericContext()) continue;
@@ -115,24 +116,36 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
   return changed;
 }
 
-bool VTableSpecializer::specializeVTablesOfSuperclasses(SILModule &module) {
+static bool specializeVTablesOfSuperclasses(SILVTable *vtable,
+                                            SILModule &module,
+                                            SILTransform *transform) {
+  if (vtable->getClass()->isGenericContext() && !vtable->getClassType())
+    return false;
+
+  SILType superClassTy;
+  if (SILType classTy = vtable->getClassType()) {
+    superClassTy = classTy.getSuperclass();
+  } else {
+    if (Type superTy = vtable->getClass()->getSuperclass())
+      superClassTy =
+          SILType::getPrimitiveObjectType(superTy->getCanonicalType());
+  }
+  if (superClassTy) {
+    return (specializeVTableForType(superClassTy, module, transform) !=
+            nullptr);
+  }
+
+  return false;
+}
+
+static bool specializeVTablesOfSuperclasses(SILModule &module,
+                                            SILTransform *transform) {
   bool changed = false;
-  // The module's vtable table can grow while we are specializing superclass vtables.
+  // The module's vtable table can grow while we are specializing superclass
+  // vtables.
   for (unsigned i = 0; i < module.getVTables().size(); ++i) {
     SILVTable *vtable = module.getVTables()[i];
-    if (vtable->getClass()->isGenericContext() && !vtable->getClassType())
-      continue;
-
-    SILType superClassTy;
-    if (SILType classTy = vtable->getClassType()) {
-      superClassTy = classTy.getSuperclass();
-    } else {
-      if (Type superTy = vtable->getClass()->getSuperclass())
-        superClassTy = SILType::getPrimitiveObjectType(superTy->getCanonicalType());
-    }
-    if (superClassTy) {
-      changed |= (specializeVTableForType(superClassTy, module, this) != nullptr);
-    }
+    specializeVTablesOfSuperclasses(vtable, module, transform);
   }
   return changed;
 }
@@ -173,6 +186,9 @@ SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
 
   SILVTable *vtable = SILVTable::create(module, classDecl, classTy,
                                         IsNotSerialized, newEntries);
+
+  specializeVTablesOfSuperclasses(vtable, module, transform);
+
   return vtable;
 }
 
