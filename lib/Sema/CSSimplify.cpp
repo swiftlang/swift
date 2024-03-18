@@ -5586,10 +5586,10 @@ bool ConstraintSystem::repairFailures(
         // we need to wait until the very last moment to strip
         // the concurrency annotations from the inner most type.
         conversionsOrFixes.empty()) {
-      // `swift_attr` attributes in the type context were ignored before,
-      // which means that we need to maintain status quo to avoid breaking
-      // witness matching by stripping everything concurrency related from
-      // inner types in non-full checking mode.
+      // Allow requirements to introduce `swift_attr` annotations
+      // (note that `swift_attr` in type contexts weren't supported
+      // before) and for witnesses to adopt them gradually by matching
+      // with a warning in non-strict concurrency mode.
       if (!(Context.isSwiftVersionAtLeast(6) ||
             Context.LangOpts.StrictConcurrencyLevel ==
                 StrictConcurrency::Complete)) {
