@@ -46,7 +46,7 @@
 // https://github.com/apple/swift/issues/55803
 // We currently only have a baseline for Intel CPUs on macOS.
 // REQUIRES: OS=macosx
-// XXX: CPU=x86_64
+// REQUIRES: CPU=x86_64
 
 // The digester can incorrectly register a generic signature change when
 // declarations are shuffled. rdar://problem/46618883
