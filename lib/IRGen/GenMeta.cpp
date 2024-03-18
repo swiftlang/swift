@@ -498,7 +498,6 @@ namespace {
         ContextDescriptorFlags(asImpl().getContextKind(),
                                !asImpl().getGenericSignature().isNull(),
                                asImpl().isUniqueDescriptor(),
-                               asImpl().getVersion(),
                                asImpl().getKindSpecificFlags())
           .getIntValue());
     }
@@ -578,10 +577,6 @@ namespace {
       irgen::addGenericPackShapeDescriptors(IGM, B, shapes, packArgs);
     }
 
-    uint8_t getVersion() {
-      return 0;
-    }
-    
     uint16_t getKindSpecificFlags() {
       return 0;
     }

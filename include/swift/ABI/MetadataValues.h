@@ -1688,13 +1688,11 @@ public:
   constexpr ContextDescriptorFlags(ContextDescriptorKind kind,
                                    bool isGeneric,
                                    bool isUnique,
-                                   uint8_t version,
                                    uint16_t kindSpecificFlags)
     : ContextDescriptorFlags(ContextDescriptorFlags()
                                .withKind(kind)
                                .withGeneric(isGeneric)
                                .withUnique(isUnique)
-                               .withVersion(version)
                                .withKindSpecificFlags(kindSpecificFlags))
   {}
 
@@ -1711,12 +1709,6 @@ public:
   /// Whether this is a unique record describing the referenced context.
   constexpr bool isUnique() const {
     return (Value & 0x40u) != 0;
-  }
-
-  /// The format version of the descriptor. Higher version numbers may have
-  /// additional fields that aren't present in older versions.
-  constexpr uint8_t getVersion() const {
-    return (Value >> 8u) & 0xFFu;
   }
 
   /// The most significant two bytes of the flags word, which can have
@@ -1738,10 +1730,6 @@ public:
   constexpr ContextDescriptorFlags withUnique(bool isUnique) const {
     return ContextDescriptorFlags((Value & 0xFFFFFFBFu)
                                   | (isUnique ? 0x40u : 0));
-  }
-
-  constexpr ContextDescriptorFlags withVersion(uint8_t version) const {
-    return ContextDescriptorFlags((Value & 0xFFFF00FFu) | (version << 8u));
   }
 
   constexpr ContextDescriptorFlags
