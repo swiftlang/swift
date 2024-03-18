@@ -29,9 +29,6 @@
 // REQUIRES: asserts
 // REQUIRES: concurrency
 
-// FIXME(NCG): This test requires NoncopyableGenerics to be a "suppressible" compiler feature.
-// XFAIL: !noncopyable_generics
-
 //--- API.swift
 public func compute<T>(_: ((T) -> Void)?) {}
 
