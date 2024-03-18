@@ -213,23 +213,24 @@ void
 ModularizationError::diagnose(const ModuleFile *MF,
                               DiagnosticBehavior limit) const {
   auto &ctx = MF->getContext();
+  auto loc = getSourceLoc();
 
   auto diagnoseError = [&](Kind errorKind) {
     switch (errorKind) {
     case Kind::DeclMoved:
-      return ctx.Diags.diagnose(getSourceLoc(),
+      return ctx.Diags.diagnose(loc,
                                 diag::modularization_issue_decl_moved,
                                 declIsType, name, expectedModule,
                                 foundModule);
     case Kind::DeclKindChanged:
       return
-        ctx.Diags.diagnose(getSourceLoc(),
+        ctx.Diags.diagnose(loc,
                            diag::modularization_issue_decl_type_changed,
                            declIsType, name, expectedModule,
                            referenceModule->getName(), foundModule,
                            foundModule != expectedModule);
     case Kind::DeclNotFound:
-      return ctx.Diags.diagnose(getSourceLoc(),
+      return ctx.Diags.diagnose(loc,
                                 diag::modularization_issue_decl_not_found,
                                 declIsType, name, expectedModule);
     }
@@ -245,7 +246,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // expected module name and the decl name from the diagnostic.
 
   // Show context with relevant file paths.
-  ctx.Diags.diagnose(SourceLoc(),
+  ctx.Diags.diagnose(loc,
                      diag::modularization_issue_note_expected,
                      declIsType, expectedModule,
                      expectedModule->getModuleSourceFilename());
@@ -257,14 +258,14 @@ ModularizationError::diagnose(const ModuleFile *MF,
     auto CML = ctx.getClangModuleLoader();
     auto &CSM = CML->getClangASTContext().getSourceManager();
     StringRef filename = CSM.getFilename(expectedUnderlying->DefinitionLoc);
-    ctx.Diags.diagnose(SourceLoc(),
+    ctx.Diags.diagnose(loc,
                        diag::modularization_issue_note_expected_underlying,
                        expectedUnderlying->Name,
                        filename);
   }
 
   if (foundModule)
-    ctx.Diags.diagnose(SourceLoc(),
+    ctx.Diags.diagnose(loc,
                        diag::modularization_issue_note_found,
                        declIsType, foundModule,
                        foundModule->getModuleSourceFilename());
@@ -277,7 +278,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
     clientLangVersion = MF->getContext().LangOpts.EffectiveLanguageVersion;
   ModuleDecl *referenceModuleDecl = referenceModule->getAssociatedModule();
   if (clientLangVersion != moduleLangVersion) {
-    ctx.Diags.diagnose(SourceLoc(),
+    ctx.Diags.diagnose(loc,
                        diag::modularization_issue_swift_version,
                        referenceModuleDecl, moduleLangVersion,
                        clientLangVersion);
@@ -292,7 +293,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
   if (referenceModule->getResilienceStrategy() ==
                                                ResilienceStrategy::Resilient &&
       referenceModuleIsDistributed) {
-    ctx.Diags.diagnose(SourceLoc(),
+    ctx.Diags.diagnose(loc,
                        diag::modularization_issue_stale_module,
                        referenceModuleDecl,
                        referenceModule->getModuleFilename());
@@ -302,7 +303,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // it may be hidden by some clang defined passed via `-Xcc` affecting how
   // headers are seen.
   if (expectedUnderlying) {
-    ctx.Diags.diagnose(SourceLoc(),
+    ctx.Diags.diagnose(loc,
                        diag::modularization_issue_audit_headers,
                        expectedModule->isNonSwiftModule(), expectedModule);
   }
@@ -313,11 +314,11 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // Local modules can reference both local modules and distributed modules.
   if (referenceModuleIsDistributed) {
     if (!expectedModule->isNonUserModule()) {
-      ctx.Diags.diagnose(SourceLoc(),
+      ctx.Diags.diagnose(loc,
                          diag::modularization_issue_layering_expected_local,
                          referenceModuleDecl, expectedModule);
     } else if (foundModule && !foundModule->isNonUserModule()) {
-      ctx.Diags.diagnose(SourceLoc(),
+      ctx.Diags.diagnose(loc,
                          diag::modularization_issue_layering_found_local,
                          referenceModuleDecl, foundModule);
     }
@@ -335,11 +336,13 @@ ModularizationError::diagnose(const ModuleFile *MF,
          expectedModuleName.startswith(foundModuleName)) &&
         (expectedUnderlying ||
          expectedModule->findUnderlyingClangModule())) {
-      ctx.Diags.diagnose(SourceLoc(),
+      ctx.Diags.diagnose(loc,
                          diag::modularization_issue_related_modules,
                          declIsType, name);
     }
   }
+
+  ctx.Diags.flushConsumers();
 }
 
 void TypeError::diagnose(const ModuleFile *MF) const {
