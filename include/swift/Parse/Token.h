@@ -267,9 +267,14 @@ public:
     return MultilineString;
   }
 
-  bool isLifetimeDependenceToken() const {
+  bool isLifetimeDependenceToken(bool isInSILMode) const {
     return isContextualKeyword("_copy") || isContextualKeyword("_consume") ||
-           isContextualKeyword("_borrow") || isContextualKeyword("_mutate");
+           isContextualKeyword("_borrow") || isContextualKeyword("_mutate") ||
+           // SIL tests are currently written with _inherit/_scope
+           // Once we have dependsOn()/dependsOn(borrowed:) other tokens go
+           // away.
+           (isInSILMode &&
+            (isContextualKeyword("_inherit") || isContextualKeyword("_scope")));
   }
 
   /// Count of extending escaping '#'.
