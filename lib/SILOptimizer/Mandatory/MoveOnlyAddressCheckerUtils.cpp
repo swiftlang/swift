@@ -1876,22 +1876,25 @@ void PartialReinitChecker::performPartialReinitChecking(
       // By computing the bits here directly, we do not need to worry about
       // having to split contiguous ranges into separate representable SILTypes.
       SmallBitVector neededElements(useState.getNumSubelements());
-      auto range = *TypeTreeLeafTypeRange::get(value, useState.address);
-      for (unsigned index : range.getRange()) {
-        emittedError = !liveness.findEarlierConsumingUse(
-            initToValues.first, index,
-            [&](SILInstruction *consumingInst) -> bool {
-              return !checkForPartialMutation(
-                  useState, diagnosticEmitter, PartialMutation::Kind::Reinit,
-                  initToValues.first, value->getType(),
-                  TypeTreeLeafTypeRange(index, index + 1),
-                  PartialMutation::reinit(*consumingInst));
-            });
+      SmallVector<TypeTreeLeafTypeRange, 2> ranges;
+      TypeTreeLeafTypeRange::get(value, useState.address, ranges);
+      for (auto range : ranges) {
+        for (unsigned index : range.getRange()) {
+          emittedError = !liveness.findEarlierConsumingUse(
+              initToValues.first, index,
+              [&](SILInstruction *consumingInst) -> bool {
+                return !checkForPartialMutation(
+                    useState, diagnosticEmitter, PartialMutation::Kind::Reinit,
+                    initToValues.first, value->getType(),
+                    TypeTreeLeafTypeRange(index, index + 1),
+                    PartialMutation::reinit(*consumingInst));
+              });
 
-        // If we emitted an error for this index break. We only want to emit one
-        // error per value.
-        if (emittedError)
-          break;
+          // If we emitted an error for this index break. We only want to emit
+          // one error per value.
+          if (emittedError)
+            break;
+        }
       }
 
       // If we emitted an error for this value break. We only want to emit one
@@ -1912,19 +1915,22 @@ void PartialReinitChecker::performPartialReinitChecking(
       // By computing the bits here directly, we do not need to worry about
       // having to split contiguous ranges into separate representable SILTypes.
       SmallBitVector neededElements(useState.getNumSubelements());
-      auto range = *TypeTreeLeafTypeRange::get(value, useState.address);
-      for (unsigned index : range.getRange()) {
-        emittedError = !liveness.findEarlierConsumingUse(
-            reinitToValues.first, index,
-            [&](SILInstruction *consumingInst) -> bool {
-              return !checkForPartialMutation(
-                  useState, diagnosticEmitter, PartialMutation::Kind::Reinit,
-                  reinitToValues.first, value->getType(),
-                  TypeTreeLeafTypeRange(index, index + 1),
-                  PartialMutation::reinit(*consumingInst));
-            });
-        if (emittedError)
-          break;
+      SmallVector<TypeTreeLeafTypeRange, 2> ranges;
+      TypeTreeLeafTypeRange::get(value, useState.address, ranges);
+      for (auto range : ranges) {
+        for (unsigned index : range.getRange()) {
+          emittedError = !liveness.findEarlierConsumingUse(
+              reinitToValues.first, index,
+              [&](SILInstruction *consumingInst) -> bool {
+                return !checkForPartialMutation(
+                    useState, diagnosticEmitter, PartialMutation::Kind::Reinit,
+                    reinitToValues.first, value->getType(),
+                    TypeTreeLeafTypeRange(index, index + 1),
+                    PartialMutation::reinit(*consumingInst));
+              });
+          if (emittedError)
+            break;
+        }
       }
       if (emittedError)
         break;
