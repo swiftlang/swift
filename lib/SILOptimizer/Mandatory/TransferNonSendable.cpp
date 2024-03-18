@@ -1355,6 +1355,10 @@ struct DiagnosticEvaluator final
     return info->getValueMap().getIsolationRegion(element).getKind();
   }
 
+  ValueIsolationRegionInfo getIsolationRegionInfo(Element element) const {
+    return info->getValueMap().getIsolationRegion(element);
+  }
+
   bool isClosureCaptured(Element element, Operand *op) const {
     auto value = info->getValueMap().maybeGetRepresentative(element);
     if (!value)

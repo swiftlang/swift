@@ -1220,6 +1220,10 @@ public:
     return asImpl().isActorDerived(elt);
   }
 
+  ValueIsolationRegionInfo getIsolationRegionInfo(Element elt) const {
+    return asImpl().getIsolationRegionInfo(elt);
+  }
+
   bool isTaskIsolatedDerived(Element elt) const {
     return asImpl().isTaskIsolatedDerived(elt);
   }
@@ -1428,6 +1432,12 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// This is used to determine if an element is in the same region as a task
   /// isolated value.
   bool isTaskIsolatedDerived(Element elt) const { return false; }
+
+  /// Returns the information about \p elt's isolation that we ascertained from
+  /// SIL and the AST.
+  ValueIsolationRegionInfo getIsolationRegionInfo(Element elt) const {
+    return ValueIsolationRegionInfo();
+  }
 
   /// Check if the representative value of \p elt is closure captured at \p
   /// op.
