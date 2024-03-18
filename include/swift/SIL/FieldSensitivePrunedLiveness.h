@@ -308,48 +308,7 @@ struct TypeTreeLeafTypeRange {
   /// This is a subset of (usually equal to) the bits of op->getType() in \p
   /// rootValue.
   static std::optional<TypeTreeLeafTypeRange> get(Operand *op,
-                                                  SILValue rootValue) {
-    auto projectedValue = op->get();
-    auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
-    if (!startEltOffset)
-      return std::nullopt;
-
-    // A drop_deinit only consumes the deinit bit of its operand.
-    if (isa<DropDeinitInst>(op->getUser())) {
-      auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
-      return {{upperBound - 1, upperBound}};
-    }
-
-    // An `inject_enum_addr` only initializes the enum tag.
-    if (auto inject = dyn_cast<InjectEnumAddrInst>(op->getUser())) {
-      auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
-      unsigned payloadUpperBound = 0;
-      if (inject->getElement()->hasAssociatedValues()) {
-        auto payloadTy = projectedValue->getType()
-          .getEnumElementType(inject->getElement(), op->getFunction());
-        
-        payloadUpperBound = *startEltOffset
-          + TypeSubElementCount(payloadTy, op->getFunction());
-      }
-      // TODO: account for deinit component if enum has deinit.
-      assert(!projectedValue->getType().isValueTypeWithDeinit());
-      return {{payloadUpperBound, upperBound}};
-    }
-
-    // Uses that borrow a value do not involve the deinit bit.
-    //
-    // FIXME: This shouldn't be limited to applies.
-    unsigned deinitBitOffset = 0;
-    if (op->get()->getType().isValueTypeWithDeinit() &&
-        op->getOperandOwnership() == OperandOwnership::Borrow &&
-        ApplySite::isa(op->getUser())) {
-      deinitBitOffset = 1;
-    }
-
-    return {{*startEltOffset, *startEltOffset +
-                                  TypeSubElementCount(projectedValue) -
-                                  deinitBitOffset}};
-  }
+                                                  SILValue rootValue);
 
   static void constructProjectionsForNeededElements(
       SILValue rootValue, SILInstruction *insertPt,
