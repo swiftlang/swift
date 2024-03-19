@@ -169,7 +169,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
       self = .storeBorrow(sbi)
     case let bai as BeginApplyInst:
       self = .beginApply(bai)
-    case let pai as PartialApplyInst where pai.isOnStack:
+    case let pai as PartialApplyInst where !pai.mayEscape:
       self = .partialApply(pai)
     case let mdi as MarkDependenceInst:
       self = .markDependence(mdi)
@@ -405,8 +405,9 @@ func gatherBorrowIntroducers(for value: Value,
 }
 
 /// Compute the live range for the borrow scopes of a guaranteed value. This returns a separate instruction range for
-/// each of the value's borrow introducers. Unioning those ranges would be incorrect. We typically want their
-/// intersection.
+/// each of the value's borrow introducers.
+///
+/// TODO: This should return a single multiply-defined instruction range.
 func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
   -> SingleInlineArray<(BeginBorrowValue, InstructionRange)> {
   assert(value.ownership == .guaranteed)
@@ -418,10 +419,10 @@ func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
   // If introducers is empty, then the dependence is on a trivial value, so
   // there is no ownership range.
   while let beginBorrow = introducers.pop() {
-    /// FIXME: Remove calls to computeInteriorLiveness as soon as lifetime completion runs immediately after
+    /// FIXME: Remove calls to computeKnownLiveness() as soon as lifetime completion runs immediately after
     /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
     /// like LifetimeDependenc.Scope.computeRange().
-    ranges.push((beginBorrow, computeInteriorLiveness(for: beginBorrow.value, context)))
+    ranges.push((beginBorrow, computeKnownLiveness(for: beginBorrow.value, context)))
   }
   return ranges
 }

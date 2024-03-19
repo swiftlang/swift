@@ -23,6 +23,14 @@
 
 import SIL
 
+private let verbose = false
+
+private func log(_ message: @autoclosure () -> String) {
+  if verbose {
+    print("### \(message())")
+  }
+}
+
 /// Compute liveness and return a range, which the caller must deinitialize.
 ///
 /// `definingValue` must introduce an OSSA lifetime. It may be either
@@ -66,15 +74,13 @@ typealias InnerScopeHandler = (Value) -> WalkResult
 
 /// Compute liveness and return a range, which the caller must deinitialize.
 ///
-/// An OSSA lifetime begins with a single "defining" value, which must
-/// be owned, or must begin a borrow scope. A complete OSSA lifetime
-/// has a linear lifetime, meaning that it has a lifetime-ending use
-/// on all paths. Interior liveness computes liveness without assuming
-/// the lifetime is complete. To do this, it must find all "use
-/// points" and prove that the defining value is never propagated
-/// beyond those points. This is used to initially complete OSSA
-/// lifetimes and fix them after transformations that's don't preserve
-/// OSSA.
+/// An OSSA lifetime begins with a single "defining" value, which must be owned, or must begin a borrow scope. A
+/// complete OSSA lifetime has a linear lifetime, meaning that it has a lifetime-ending use on all paths. Interior
+/// liveness computes liveness without assuming the lifetime is complete. To do this, it must find all "use points" and
+/// prove that the defining value is never propagated beyond those points. This is used to initially complete OSSA
+/// lifetimes and fix them after transformations that's don't preserve OSSA.
+///
+/// The caller must check that `definingValue` has no pointer escape before calling this.
 ///
 /// Invariants:
 ///
@@ -83,39 +89,100 @@ typealias InnerScopeHandler = (Value) -> WalkResult
 /// - Liveness does not extend beyond lifetime-ending operations
 /// (a.k.a. affine lifetimes).
 ///
-/// - All inner scopes are complete. (Use `innerScopeHandler` to
-/// complete them or bail-out).
-func computeInteriorLiveness(for definingValue: Value,
-  _ context: FunctionPassContext,
-  innerScopeHandler: InnerScopeHandler? = nil) -> InstructionRange {
-
-  assert(definingValue.ownership == .owned
-    || BeginBorrowValue(definingValue) != nil,
-    "value must define an OSSA lifetime")
-
-  var range = InstructionRange(for: definingValue, context)
-
-  var visitor = InteriorUseWalker(definingValue: definingValue, context) {
-    range.insert($0.instruction)
-    return .continueWalk
-  }
-  defer { visitor.deinitialize() }
-  visitor.innerScopeHandler = innerScopeHandler
-  let success = visitor.visitUses()
-  switch visitor.pointerStatus {
-  case .nonEscaping:
+/// - All inner scopes are complete. (Use `innerScopeHandler` to complete them or bail-out).
+func computeInteriorLiveness(for definingValue: Value, _ context: FunctionPassContext,
+                             innerScopeHandler: InnerScopeHandler? = nil) -> InstructionRange {
+  let result = InteriorLivenessResult.compute(for: definingValue, ignoreEscape: false, context)
+  switch result.pointerStatus {
+  case .nonescaping:
     break
-  case let .escaping(operand):
+  case let .escaping(operands):
     fatalError("""
                  check findPointerEscape() before computing interior liveness.
-                 Pointer escape: \(operand.instruction)
+                 Pointer escape: \(operands[0].instruction)
                  """)
   case let .unknown(operand):
     fatalError("Unrecognized SIL address user \(operand.instruction)")
   }
-  assert(success == .continueWalk, "our visitor never fails")
-  assert(visitor.unenclosedPhis.isEmpty, "missing adjacent phis")
-  return range
+  return result.range
+}
+
+/// Compute known liveness and return a range, which the caller must deinitialize.
+///
+/// This computes a minimal liveness, ignoring pointer escaping uses.
+func computeKnownLiveness(for definingValue: Value, _ context: FunctionPassContext) -> InstructionRange {
+  return InteriorLivenessResult.compute(for: definingValue, ignoreEscape: true, context).range
+}
+
+/// If any interior pointer may escape, then record the first instance here. If 'ignoseEscape' is true, this
+/// immediately aborts the walk, so further instances are unavailable.
+///
+/// .escaping may either be a non-address operand with
+/// .pointerEscape ownership, or and address operand that escapes
+/// the address (address_to_pointer).
+///
+/// .unknown is an address operand whose user is unrecognized.
+enum InteriorPointerStatus: CustomDebugStringConvertible {
+  case nonescaping
+  case escaping(SingleInlineArray<Operand>)
+  case unknown(Operand)
+
+  mutating func setEscaping(operand: Operand) {
+    switch self {
+    case .nonescaping:
+      self = .escaping(SingleInlineArray(element: operand))
+    case let .escaping(oldOperands):
+      var newOperands = SingleInlineArray<Operand>()
+      newOperands.append(contentsOf: oldOperands)
+      newOperands.append(operand)
+      self = .escaping(newOperands)
+    case .unknown:
+      break
+    }
+  }
+
+  var debugDescription: String {
+    switch self {
+    case .nonescaping:
+      return "No pointer escape"
+    case let .escaping(operands):
+      return "Pointer escapes: " + operands.map({ "\($0)" }).joined(separator: "\n                 ")
+    case let .unknown(operand):
+      return "Unknown use: \(operand)"
+    }
+  }
+}
+
+struct InteriorLivenessResult: CustomDebugStringConvertible {
+  let success: WalkResult
+  let range: InstructionRange
+  let pointerStatus: InteriorPointerStatus
+
+  static func compute(for definingValue: Value, ignoreEscape: Bool = false,
+                      _ context: FunctionPassContext,
+                      innerScopeHandler: InnerScopeHandler? = nil) -> InteriorLivenessResult {
+
+    assert(definingValue.ownership == .owned || BeginBorrowValue(definingValue) != nil,
+           "value must define an OSSA lifetime")
+
+    var range = InstructionRange(for: definingValue, context)
+
+    var visitor = InteriorUseWalker(definingValue: definingValue, ignoreEscape: ignoreEscape, context) {
+      range.insert($0.instruction)
+      return .continueWalk
+    }
+    defer { visitor.deinitialize() }
+    visitor.innerScopeHandler = innerScopeHandler
+    let success = visitor.visitUses()
+    assert(visitor.unenclosedPhis.isEmpty, "missing adjacent phis")
+    let result = InteriorLivenessResult(success: success, range: range, pointerStatus: visitor.pointerStatus)
+    log("Interior liveness for: \(definingValue)\n\(result)")
+    return result
+  }
+
+  var debugDescription: String {
+    "\(success)\n\(range)\n\(pointerStatus)"
+  }
 }
 
 /// Classify ownership uses. This reduces operand ownership to a
@@ -388,7 +455,7 @@ extension OwnershipUseVisitor {
     -> WalkResult {
     switch operand.instruction {
     case let pai as PartialApplyInst:
-      assert(pai.isOnStack)
+      assert(!pai.mayEscape)
       return dependentUse(of: operand, into: pai)
     case let mdi as MarkDependenceInst:
       assert(operand == mdi.baseOperand && mdi.isNonEscaping)
@@ -455,6 +522,7 @@ struct InteriorUseWalker {
   var context: Context { functionContext }
 
   let definingValue: Value
+  let ignoreEscape: Bool
   let useVisitor: (Operand) -> WalkResult
 
   var innerScopeHandler: InnerScopeHandler? = nil
@@ -470,21 +538,7 @@ struct InteriorUseWalker {
 
   var function: Function { definingValue.parentFunction }
 
-  /// If any interior pointer may escape, then record the first instance
-  /// here. This immediately aborts the walk, so further instances are
-  /// unavailable.
-  ///
-  /// .escaping may either be a non-address operand with
-  /// .pointerEscape ownership, or and address operand that escapes
-  /// the address (address_to_pointer).
-  ///
-  /// .unknown is an address operand whose user is unrecognized.
-  enum InteriorPointerStatus {
-    case nonEscaping
-    case escaping(Operand)
-    case unknown(Operand)
-  }
-  var pointerStatus: InteriorPointerStatus = .nonEscaping
+  var pointerStatus: InteriorPointerStatus = .nonescaping
 
   private var visited: ValueSet
 
@@ -492,11 +546,12 @@ struct InteriorUseWalker {
     visited.deinitialize()
   }
 
-  init(definingValue: Value, _ context: FunctionPassContext,
+  init(definingValue: Value, ignoreEscape: Bool, _ context: FunctionPassContext,
     visitor: @escaping (Operand) -> WalkResult) {
     assert(!definingValue.type.isAddress, "address values have no ownership")
     self.functionContext = context
     self.definingValue = definingValue
+    self.ignoreEscape = ignoreEscape
     self.useVisitor = visitor
     self.visited = ValueSet(context)
   }
@@ -598,8 +653,8 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     if useVisitor(operand) == .abortWalk {
       return .abortWalk
     }
-    pointerStatus = .escaping(operand)
-    return .abortWalk
+    pointerStatus.setEscaping(operand: operand)
+    return ignoreEscape ? .continueWalk : .abortWalk
   }
 
   // Call the innerScopeHandler before visiting the scope-ending uses.
@@ -695,8 +750,8 @@ extension InteriorUseWalker: AddressUseVisitor {
   }    
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
-    pointerStatus = .escaping(operand)
-    return .abortWalk
+    pointerStatus.setEscaping(operand: operand)
+    return ignoreEscape ? .continueWalk : .abortWalk
   }
 
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
@@ -894,7 +949,7 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   var range = InstructionRange(for: value, context)
   defer { range.deinitialize() }
 
-  var visitor = InteriorUseWalker(definingValue: value, context) {
+  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, context) {
     range.insert($0.instruction)
     return .continueWalk
   }
@@ -903,10 +958,12 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   let success = visitor.visitUses()
 
   switch visitor.pointerStatus {
-  case .nonEscaping:
+  case .nonescaping:
     break
-  case let .escaping(operand):
-    print("Pointer escape: \(operand.instruction)")
+  case let .escaping(operands):
+    for operand in operands {
+      print("Pointer escape: \(operand.instruction)")
+    }
   case let .unknown(operand):
     print("Unrecognized SIL address user \(operand.instruction)")
   }
