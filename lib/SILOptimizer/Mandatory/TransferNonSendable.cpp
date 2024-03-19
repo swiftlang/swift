@@ -1235,7 +1235,7 @@ struct DiagnosticEvaluator final
 
   void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
                                    TrackableValueID transferredVal,
-                                   TransferringOperand transferringOp) const {
+                                   TransferringOperand *transferringOp) const {
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and transferringOp was not set with closure
     // capture.
@@ -1244,7 +1244,7 @@ struct DiagnosticEvaluator final
       if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
           !regionanalysisimpl::isNonSendableType(svi->getType(),
                                                  svi->getFunction())) {
-        bool isCapture = transferringOp.isClosureCaptured();
+        bool isCapture = transferringOp->isClosureCaptured();
         if (!isCapture) {
           return;
         }
@@ -1254,14 +1254,14 @@ struct DiagnosticEvaluator final
     auto rep = info->getValueMap().getRepresentative(transferredVal);
     LLVM_DEBUG(llvm::dbgs()
                << "    Emitting Use After Transfer Error!\n"
-               << "        Transferring Inst: " << *transferringOp.getUser()
+               << "        Transferring Inst: " << *transferringOp->getUser()
                << "        Transferring Op Value: "
-               << transferringOp.getOperand()->get()
+               << transferringOp->getOperand()->get()
                << "        Require Inst: " << *partitionOp.getSourceInst()
                << "        ID:  %%" << transferredVal << "\n"
                << "        Rep: " << *rep << "        Transferring Op Num: "
-               << transferringOp.getOperand()->getOperandNumber() << '\n');
-    transferOpToRequireInstMultiMap.insert(transferringOp.getOperand(),
+               << transferringOp->getOperand()->getOperandNumber() << '\n');
+    transferOpToRequireInstMultiMap.insert(transferringOp->getOperand(),
                                            partitionOp.getSourceInst());
   }
 
