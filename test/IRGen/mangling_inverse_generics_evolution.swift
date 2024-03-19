@@ -76,3 +76,13 @@ open class ManagedBuffer<Header, Element: ~Copyable> {
     fatalError("boom")
   }
 }
+
+extension UnsafePointer {
+  struct AtomicRepresentation { }
+}
+
+// CHECK: $sSP4testE20AtomicRepresentationVySi_GD
+func useAtomicRepresentation() {
+  let x = UnsafePointer<Int>.AtomicRepresentation()
+  print(x)
+}
