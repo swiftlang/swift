@@ -933,7 +933,7 @@ extension SIMD where Scalar: FloatingPoint {
     // Swift Builtin to support it.
     //
     // Use -0 so that LLVM can optimize away initial value + self[0].
-    var result: Scalar = -0.0
+    var result = -Scalar.zero
     for i in indices {
       result += self[i]
     }
