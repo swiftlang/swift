@@ -43,6 +43,18 @@ func print(_ array: [Int]) {
     print("]")
 }
 
+func isArray<S: Sequence>(_ s: S) -> Bool where S.Element == Int {
+  return s is [Int]
+}
+
+public func testIsArray() -> Bool {
+  return isArray(Array<Int>())
+}
+
+public func testIsNotArray() -> Bool {
+  return isArray(Array<Int>().lazy)
+}
+
 func test() {
   var a = [1, 2, 3]
   a.append(8)
@@ -51,6 +63,11 @@ func test() {
   var c = b
   c = c.reversed().filter { $0 % 2 == 0 }
   print(c) // CHECK: [8, 4, 2]
+
+  // CHECK: yes
+  print(testIsArray() ? "yes" : "no")
+  // CHECK: no
+  print(testIsNotArray() ? "yes" : "no")
 }
 
 test()

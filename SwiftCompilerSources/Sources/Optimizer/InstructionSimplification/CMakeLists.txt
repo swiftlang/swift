@@ -12,6 +12,7 @@ swift_compiler_sources(Optimizer
   SimplifyBeginCOWMutation.swift
   SimplifyBranch.swift
   SimplifyBuiltin.swift
+  SimplifyCheckedCast.swift
   SimplifyCondBranch.swift
   SimplifyCondFail.swift
   SimplifyConvertEscapeToNoEscape.swift

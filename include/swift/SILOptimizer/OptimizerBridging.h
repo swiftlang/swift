@@ -331,6 +331,18 @@ struct BridgedPassContext {
 
 bool FullApplySite_canInline(BridgedInstruction apply);
 
+enum class BridgedDynamicCastResult {
+  willSucceed,
+  maySucceed,
+  willFail
+};
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
+                                                    BridgedFunction function,
+                                                    bool sourceTypeIsExact);
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst);
+
 //===----------------------------------------------------------------------===//
 //                          Pass registration
 //===----------------------------------------------------------------------===//

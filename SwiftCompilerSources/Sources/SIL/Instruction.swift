@@ -1481,5 +1481,35 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
 }
 
-final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {
+final public class CheckedCastAddrBranchInst : TermInst {
+  public var source: Value { operands[0].value }
+  public var destination: Value { operands[1].value }
+
+  public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
+  public var failureBlock: BasicBlock { bridged.CheckedCastAddrBranch_getFailureBlock().block }
+
+  public enum CastConsumptionKind {
+    /// The source value is always taken, regardless of whether the cast
+    /// succeeds.  That is, if the cast fails, the source value is
+    /// destroyed.
+    case TakeAlways
+
+    /// The source value is taken only on a successful cast; otherwise,
+    /// it is left in place.
+    case TakeOnSuccess
+
+    /// The source value is always left in place, and the destination
+    /// value is copied into on success.
+    case CopyOnSuccess
+  }
+
+  public var consumptionKind: CastConsumptionKind {
+    switch bridged.CheckedCastAddrBranch_getConsumptionKind() {
+    case .TakeAlways:    return .TakeAlways
+    case .TakeOnSuccess: return .TakeOnSuccess
+    case .CopyOnSuccess: return .CopyOnSuccess
+    default:
+      fatalError("invalid cast consumption kind")
+    }
+  }
 }
