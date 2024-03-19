@@ -14,9 +14,9 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    print((prefix ? "### " : "") + message())
   }
 }
 
@@ -32,7 +32,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   if !context.options.hasFeature(.NonescapableTypes) {
     return
   }
-  log(" --- Diagnosing lifetime dependence in \(function.name)")
+  log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
 
   for argument in function.arguments
