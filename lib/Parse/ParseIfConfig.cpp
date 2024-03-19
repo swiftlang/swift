@@ -772,7 +772,6 @@ Result Parser::parseIfConfigRaw(
                             bool isActive, IfConfigElementsRole role)>
       parseElements,
     llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
-  auto startLoc = Tok.getLoc();
   assert(Tok.is(tok::pound_if));
 
   Parser::StructureMarkerRAII ParsingDecl(
