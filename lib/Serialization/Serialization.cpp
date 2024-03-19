@@ -3061,10 +3061,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DeclAttrKind::DistributedThunkTarget: {
-      return; // FIXME: do we care to serialize this?
-    }
-
     case DeclAttrKind::TypeEraser: {
       auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];
       auto attr = cast<TypeEraserAttr>(DA);
