@@ -121,34 +121,16 @@ void SILGenModule::emitDistributedThunkForDecl(
   } else if (varOrAFD.is<AbstractFunctionDecl *>()) {
     auto afd = varOrAFD.get<AbstractFunctionDecl *>();
 
-    // FIXME: maybe not necessary
-    if (auto acc = dyn_cast<AccessorDecl>(afd)) {
-//      fprintf(stderr, "[%s:%d](%s) AVOID ACCESSOR, we'll do the var!\n",
-//      __FILE_NAME__, __LINE__, __FUNCTION__); afd->dumpRef();
-//      fprintf(stderr, "[%s:%d](%s) acc storage:\n", __FILE_NAME__,
-//      __LINE__, __FUNCTION__); acc->getStorage()->dumpRef();
+    if (isa<AccessorDecl>(afd)) {
       // If it is an accessor, we'll end up visiting here from the `VarDecl`,
       // and will emit the thunk for it at that time.
       return;
     }
 
     thunkDecl = afd->getDistributedThunk();
-    if (thunkDecl) {
-//      fprintf(stderr, "[%s:%d](%s) EMIT THUNK FOR AFD: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      thunkDecl->dumpRef();
-//      fprintf(stderr, "[%s:%d](%s) AFD:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      afd->dumpRef();
-//
-//      fprintf(stderr, "[%s:%d](%s) AFD THUNK IS:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      thunkDecl->dump();
-    }
-  }
-  if (!thunkDecl) {
-//    fprintf(stderr, "[%s:%d](%s) NO THUNK ~~~~\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    return;
   }
 
-  if (!thunkDecl->hasBody() || thunkDecl->isBodySkipped())
+  if (!thunkDecl || !thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;
 
   auto thunk = SILDeclRef(thunkDecl).asDistributed();

@@ -17,11 +17,6 @@
 #ifndef STDLIB_SHIMS_H
 #define STDLIB_SHIMS_H
 
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
-#include <dispatch/dispatch.h>
-#endif
-
-
 #ifdef __cplusplus
 extern "C" [[noreturn]]
 #endif

@@ -1263,7 +1263,6 @@ RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
-  assert(false);
   // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
 
   // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
@@ -1311,7 +1310,6 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
   FullExpr localCleanups(SGF.Cleanups, E);
 
-//  fprintf(stderr, "[%s:%d](%s) ThrowDest save and restore \n", __FILE_NAME__, __LINE__, __FUNCTION__);
   llvm::SaveAndRestore<JumpDest> throwDest{
     SGF.ThrowDest,
     JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E,

@@ -14,13 +14,6 @@
 // rdar://90373022
 // UNSUPPORTED: OS=watchos
 
-// FIXME: pending fixes about thunk bodies in extensions
-//   ld: Undefined symbols:
-//    _$s4main14WorkerProtocolPAA11Distributed01_D9ActorStubRzrlE19distributedVariableSSyYaKFTE, referenced from:
-//        _$s4main15$WorkerProtocolCAA0bC0A2aDP19distributedVariableSSvgTWTE in distributed_actor_localSystem_distributedProtocol-143279.o
-//    _$s4main14WorkerProtocolPAA11Distributed01_D9ActorStubRzrlE19distributedVariableSSyYaKFTETu, referenced from:
-//        _$s4main15$WorkerProtocolCAA0bC0A2aDP19distributedVariableSSvgTWTE in distributed_actor_localSystem_distributedProtocol-143279.o
-
 import Distributed
 
 @_DistributedProtocol
