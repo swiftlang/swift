@@ -792,17 +792,13 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 //         "must be an accessor");
   assert(thunk && "couldn't create a distributed thunk");
 
-  /// Record which function this is a thunk for, we'll need this to link back
-  /// calls in case this is a distributed requirement witness.
-  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-//    fprintf(stderr, "[%s:%d](%s) THE STORAGE CONTEXT:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    accessor->getStorage()->getDeclContext()->dumpContext();
-//    fprintf(stderr, "[%s:%d](%s) STORE THE STORAGE:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    accessor->getStorage()->dump();
-    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(accessor->getStorage()));
-  } else {
-    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));
-  }
+//  /// Record which function this is a thunk for, we'll need this to link back
+//  /// calls in case this is a distributed requirement witness.
+//  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+//    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(accessor->getStorage()));
+//  } else {
+//    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));
+//  }
 
   // Protocol requirements don't have bodies.
   if (func->hasBody())
