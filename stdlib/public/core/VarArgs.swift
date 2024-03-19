@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -358,19 +358,23 @@ extension OpaquePointer: CVarArg {
   }
 }
 
-extension UnsafePointer: CVarArg {
+@_preInverseGenerics
+extension UnsafePointer: CVarArg where Pointee: ~Copyable {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
+  @_preInverseGenerics
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension UnsafeMutablePointer: CVarArg {
+@_preInverseGenerics
+extension UnsafeMutablePointer: CVarArg where Pointee: ~Copyable {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
+  @_preInverseGenerics
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }

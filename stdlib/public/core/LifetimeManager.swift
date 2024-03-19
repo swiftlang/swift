@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,8 +20,10 @@
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @inlinable
-public func withExtendedLifetime<T, Result>(
-  _ x: T, _ body: () throws -> Result
+@_preInverseGenerics
+public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
+  _ x: borrowing T,
+  _ body: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -38,6 +40,7 @@ public func withExtendedLifetime<T, Result>(
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @inlinable
 public func withExtendedLifetime<T, Result>(
+  // FIXME(NCG): This should have T, Result as ~Copyable, but then the closure would need to take a borrow
   _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
@@ -47,7 +50,8 @@ public func withExtendedLifetime<T, Result>(
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
 @_transparent
-public func _fixLifetime<T>(_ x: T) {
+@_preInverseGenerics
+public func _fixLifetime<T: ~Copyable>(_ x: borrowing T) {
   Builtin.fixLifetime(x)
 }
 
@@ -73,18 +77,20 @@ public func _fixLifetime<T>(_ x: T) {
 ///     The pointer argument is valid only for the duration of the function's
 ///     execution.
 /// - Returns: The return value, if any, of the `body` closure.
-@inlinable
 @_alwaysEmitIntoClient
-public func withUnsafeMutablePointer<T, E: Error, Result>(
+public func withUnsafeMutablePointer<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
   try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss24withUnsafeMutablePointer2to_q_xz_q_SpyxGKXEtKr0_lF")
 @usableFromInline
-func __abi_se0413_withUnsafeMutablePointer<T, Result>(
+internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) throws -> Result {
@@ -96,7 +102,9 @@ func __abi_se0413_withUnsafeMutablePointer<T, Result>(
 /// This function is similar to `withUnsafeMutablePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeMutablePointer<T, E: Error, Result>(
+public func _withUnprotectedUnsafeMutablePointer<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
 ) throws(E) -> Result
@@ -129,9 +137,8 @@ public func _withUnprotectedUnsafeMutablePointer<T, E: Error, Result>(
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
-@inlinable
-public func withUnsafePointer<T, E, Result>(
-  to value: T,
+public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
+  to value: borrowing T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result
 {
@@ -140,9 +147,10 @@ public func withUnsafePointer<T, E, Result>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
 /// which is ABI-compatible with "rethrows".
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_x_q_SPyxGKXEtKr0_lF")
 @usableFromInline
-func __abi_withUnsafePointer<T, Result>(
+internal func __abi_withUnsafePointer<T, Result>(
   to value: T,
   _ body: (UnsafePointer<T>) throws -> Result
 ) throws -> Result
@@ -174,9 +182,8 @@ func __abi_withUnsafePointer<T, Result>(
 ///     type. If you need to mutate the argument through the pointer, use
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@inlinable
 @_alwaysEmitIntoClient
-public func withUnsafePointer<T, E: Error, Result>(
+public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
@@ -185,9 +192,10 @@ public func withUnsafePointer<T, E: Error, Result>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_xz_q_SPyxGKXEtKr0_lF")
 @usableFromInline
-func __abi_se0413_withUnsafePointer<T, Result>(
+internal func __abi_se0413_withUnsafePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws -> Result
 ) throws -> Result {
@@ -199,7 +207,9 @@ func __abi_se0413_withUnsafePointer<T, Result>(
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafePointer<T, E: Error, Result>(
+public func _withUnprotectedUnsafePointer<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
