@@ -994,6 +994,9 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
             existentialType->getConstraintType().getPointer())
       return Type(this);
 
+    if (newConstraintType->getClassOrBoundGenericClass())
+      return newConstraintType;
+
     return ExistentialType::get(newConstraintType);
   }
 
