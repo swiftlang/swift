@@ -542,8 +542,8 @@ struct PartitionOpEvaluatorWithFailureCallback final
       : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
         failureCallback(failureCallback) {}
 
-  void handleFailure(const PartitionOp &op, Element elt,
-                     TransferringOperand transferringOp) const {
+  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
+                                   TransferringOperand transferringOp) const {
     failureCallback(op, elt, transferringOp);
   }
 };

@@ -130,162 +130,12 @@ enum class TrackableValueFlag {
 
 using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
 
-class ValueIsolationRegionInfo {
-public:
-  /// The lattice is:
-  ///
-  /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
-  ///
-  /// Unknown means no information. We error when merging on it.
-  enum Kind {
-    Unknown,
-    Disconnected,
-    Task,
-    Actor,
-  };
-
-private:
-  Kind kind;
-  // clang-format off
-  std::variant<
-    // Used for actor isolated when we have ActorIsolation info from the AST.
-    std::optional<ActorIsolation>,
-    // Used for actor isolation when we infer the actor at the SIL level.
-    NominalTypeDecl *,
-    // The task isolated parameter when we find a task isolated value.
-    SILValue
-  > data;
-  // clang-format on
-
-  ValueIsolationRegionInfo(Kind kind,
-                           std::optional<ActorIsolation> actorIsolation)
-      : kind(kind), data(actorIsolation) {}
-  ValueIsolationRegionInfo(Kind kind, NominalTypeDecl *decl)
-      : kind(kind), data(decl) {}
-
-  ValueIsolationRegionInfo(Kind kind, SILValue value)
-      : kind(kind), data(value) {}
-
-public:
-  ValueIsolationRegionInfo() : kind(Kind::Unknown), data() {}
-
-  operator bool() const { return kind != Kind::Unknown; }
-
-  operator Kind() const { return kind; }
-
-  Kind getKind() const { return kind; }
-
-  bool isDisconnected() const { return kind == Kind::Disconnected; }
-  bool isActorIsolated() const { return kind == Kind::Actor; }
-  bool isTaskIsolated() const { return kind == Kind::Task; }
-
-  void print(llvm::raw_ostream &os) const {
-    switch (Kind(*this)) {
-    case Unknown:
-      os << "unknown";
-      return;
-    case Disconnected:
-      os << "disconnected";
-      return;
-    case Actor:
-      os << "actor";
-      return;
-    case Task:
-      os << "task";
-      return;
-    }
-  }
-
-  void printForDiagnostics(llvm::raw_ostream &os) const;
-
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
-    llvm::dbgs() << '\n';
-  }
-
-  std::optional<ActorIsolation> getActorIsolation() const {
-    assert(kind == Actor);
-    assert(std::holds_alternative<std::optional<ActorIsolation>>(data) &&
-           "Doesn't have an actor isolation?!");
-    return std::get<std::optional<ActorIsolation>>(data);
-  }
-
-  NominalTypeDecl *getActorInstance() const {
-    assert(kind == Actor);
-    assert(std::holds_alternative<NominalTypeDecl *>(data) &&
-           "Doesn't have an actor instance?!");
-    return std::get<NominalTypeDecl *>(data);
-  }
-
-  SILValue getTaskIsolatedValue() const {
-    assert(kind == Task);
-    assert(std::holds_alternative<SILValue>(data) &&
-           "Doesn't have a task isolated value");
-    return std::get<SILValue>(data);
-  }
-
-  bool hasActorIsolation() const {
-    return std::holds_alternative<std::optional<ActorIsolation>>(data);
-  }
-
-  bool hasActorInstance() const {
-    return std::holds_alternative<NominalTypeDecl *>(data);
-  }
-
-  bool hasTaskIsolatedValue() const {
-    return std::holds_alternative<SILValue>(data);
-  }
-
-  [[nodiscard]] ValueIsolationRegionInfo
-  merge(ValueIsolationRegionInfo other) const {
-    // If we are greater than the other kind, then we are further along the
-    // lattice. We ignore the change.
-    if (unsigned(other.kind) < unsigned(kind))
-      return *this;
-
-    assert(kind != ValueIsolationRegionInfo::Actor &&
-           "Actor should never be merged with another actor?!");
-
-    // Otherwise, take the other value.
-    return other;
-  }
-
-  ValueIsolationRegionInfo withActorIsolated(ActorIsolation isolation) {
-    return ValueIsolationRegionInfo::getActorIsolated(isolation);
-  }
-
-  static ValueIsolationRegionInfo getDisconnected() {
-    return {Kind::Disconnected, {}};
-  }
-
-  static ValueIsolationRegionInfo
-  getActorIsolated(ActorIsolation actorIsolation) {
-    return {Kind::Actor, actorIsolation};
-  }
-
-  /// Sometimes we may have something that is actor isolated or that comes from
-  /// a type. First try getActorIsolation and otherwise, just use the type.
-  static ValueIsolationRegionInfo getActorIsolated(NominalTypeDecl *nomDecl) {
-    auto actorIsolation = swift::getActorIsolation(nomDecl);
-    if (actorIsolation.isActorIsolated())
-      return getActorIsolated(actorIsolation);
-    if (nomDecl->isActor())
-      return {Kind::Actor, nomDecl};
-    return {};
-  }
-
-  static ValueIsolationRegionInfo getTaskIsolated(SILValue value) {
-    return {Kind::Task, value};
-  }
-};
-
 } // namespace regionanalysisimpl
 
 class regionanalysisimpl::TrackableValueState {
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
-  ValueIsolationRegionInfo regionInfo =
-      ValueIsolationRegionInfo::getDisconnected();
+  IsolationRegionInfo regionInfo = IsolationRegionInfo::getDisconnected();
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
@@ -302,7 +152,7 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  ValueIsolationRegionInfo::Kind getRegionInfoKind() {
+  IsolationRegionInfo::Kind getIsolationRegionInfoKind() const {
     return regionInfo.getKind();
   }
 
@@ -310,11 +160,11 @@ public:
     return regionInfo.getActorIsolation().value();
   }
 
-  void mergeIsolationRegionInfo(ValueIsolationRegionInfo newRegionInfo) {
+  void mergeIsolationRegionInfo(IsolationRegionInfo newRegionInfo) {
     regionInfo = regionInfo.merge(newRegionInfo);
   }
 
-  ValueIsolationRegionInfo getIsolationRegionInfo() const { return regionInfo; }
+  IsolationRegionInfo getIsolationRegionInfo() const { return regionInfo; }
 
   TrackableValueID getID() const { return TrackableValueID(id); }
 
@@ -413,7 +263,7 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  ValueIsolationRegionInfo getIsolationRegionInfo() const {
+  IsolationRegionInfo getIsolationRegionInfo() const {
     return valueState.getIsolationRegionInfo();
   }
 
@@ -451,7 +301,6 @@ public:
   using TrackableValueState = regionanalysisimpl::TrackableValueState;
   using TrackableValueID = Element;
   using RepresentativeValue = regionanalysisimpl::RepresentativeValue;
-  using ValueIsolationRegionInfo = regionanalysisimpl::ValueIsolationRegionInfo;
 
 private:
   /// A map from the representative of an equivalence class of values to their
@@ -484,8 +333,8 @@ public:
   /// exists. Returns nullptr otherwise.
   SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
 
-  ValueIsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
-  ValueIsolationRegionInfo getIsolationRegion(SILValue trackableValueID) const;
+  IsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
+  IsolationRegionInfo getIsolationRegion(SILValue trackableValueID) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -508,9 +357,8 @@ private:
   std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
-                                    ValueIsolationRegionInfo isolation) const;
-  bool mergeIsolationRegionInfo(SILValue value,
-                                ValueIsolationRegionInfo isolation);
+                                    IsolationRegionInfo isolation) const;
+  bool mergeIsolationRegionInfo(SILValue value, IsolationRegionInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   TrackableValueID lookupValueID(SILValue value);
 };

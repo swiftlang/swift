@@ -974,7 +974,7 @@ NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
      (Identifier, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_named_transfer_non_transferrable, none,
       "transferring %1 %0 to %2 callee could cause races between %2 and %1 uses",
-      (Identifier, ActorIsolation, ActorIsolation))
+      (Identifier, StringRef, ActorIsolation))
 NOTE(regionbasedisolation_named_transfer_into_transferring_param, none,
      "%0 %1 is passed as a transferring parameter; Uses in callee may race with later %0 uses",
      (StringRef, Identifier))

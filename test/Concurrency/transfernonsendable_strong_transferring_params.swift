@@ -106,7 +106,6 @@ func testNonStrongTransferDoesntMerge() async {
 //////////////////////////////////
 
 func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) async {
-  // expected-note @-1:71 {{value is task-isolated since it is in the same region as 'y'}}
   await transferToMain(x)
   await transferToMain(y) // expected-warning {{task-isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
 }
@@ -345,7 +344,7 @@ func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
 
   // TODO: This needs to say actor-isolated.
   fakeInit(operation: x) // expected-warning {{transferring 'x' may cause a race}}
-  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note @-1 {{main actor-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later main actor-isolated uses}}
 }
 
 // Make sure we error here on only the second since x by being assigned a part
@@ -353,9 +352,8 @@ func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
 func testMergeWithTaskIsolated(_ x: transferring Klass, y: Klass) async {
   await transferToMain(x)
   x = y
-  // TODO: We need to say that this is task-isolated.
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
-  // expected-note @-1 {{transferring nonisolated 'x' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+  // expected-note @-1 {{transferring task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
 }
 
 @MainActor func testMergeWithActorIsolated(_ x: transferring Klass, y: Klass) async {
