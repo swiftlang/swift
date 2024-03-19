@@ -597,3 +597,140 @@ bb8:
   debug_value [trace] %4 : $FirstSecondThirdEnum<Klass>
   return %4 : $FirstSecondThirdEnum<Klass>
 }
+
+// Test that we can properly handle code generation from a borrowing loadable parameter
+//
+// CHECK-LABEL: begin running test 1 of 1 on loadable_borrowing_test: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %8 = store_borrow %6 to %7 : $*Klass            // user: %9
+// CHECK: Name: 'x'
+// CHECK: Root: %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+// CHECK: end running test 1 of 1 on loadable_borrowing_test: variable-name-inference with: @trace[0]
+sil hidden [ossa] @loadable_borrowing_test : $@convention(thin) @async (@guaranteed Klass) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Klass):
+  specify_test "variable-name-inference @trace[0]"
+  %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $Klass
+  %2 = copy_value %1 : $@moveOnly Klass
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $@moveOnly Klass
+  debug_value %3 : $@moveOnly Klass, let, name "x", argno 1
+  %7 = begin_borrow %3 : $@moveOnly Klass
+  %8 = moveonlywrapper_to_copyable [guaranteed] %7 : $@moveOnly Klass
+  %9 = alloc_stack $Klass
+  %10 = store_borrow %8 to %9 : $*Klass
+  debug_value [trace] %10 : $*Klass
+  end_borrow %10 : $*Klass
+  dealloc_stack %9 : $*Klass
+  end_borrow %7 : $@moveOnly Klass
+  destroy_value %3 : $@moveOnly Klass
+  %25 = tuple ()
+  return %25 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on store_borrow_tuple_test: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %25 = store_borrow %23 to %24 : $*Klass
+// CHECK: Name: 'z'
+// CHECK: Root: %20 = move_value [lexical] [var_decl] %19 : $Klass
+// CHECK: end running test 1 of 1 on store_borrow_tuple_test: variable-name-inference with: @trace[0]
+sil hidden [ossa] @store_borrow_tuple_test : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %2 = integer_literal $Builtin.IntLiteral, 0
+  %7 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %8 = apply %7() : $@convention(thin) () -> @owned Klass
+  %9 = tuple (%2 : $Builtin.IntLiteral, %8 : $Klass)
+  %10 = move_value [lexical] [var_decl] %9 : $(Builtin.IntLiteral, Klass)
+  debug_value %10 : $(Builtin.IntLiteral, Klass), let, name "test"
+  %12 = begin_borrow %10 : $(Builtin.IntLiteral, Klass)
+  (%13, %14) = destructure_tuple %12 : $(Builtin.IntLiteral, Klass)
+  %15 = copy_value %14 : $Klass
+  %16 = tuple (%13 : $Builtin.IntLiteral, %15 : $Klass)
+  %17 = alloc_stack $(Builtin.IntLiteral, Klass)
+  store %16 to [init] %17 : $*(Builtin.IntLiteral, Klass)
+  // original location of use.
+  destroy_addr %17 : $*(Builtin.IntLiteral, Klass)
+  dealloc_stack %17 : $*(Builtin.IntLiteral, Klass)
+  end_borrow %12 : $(Builtin.IntLiteral, Klass)
+  %25 = begin_borrow %10 : $(Builtin.IntLiteral, Klass)
+  %26 = copy_value %25 : $(Builtin.IntLiteral, Klass)
+  (%27, %28) = destructure_tuple %26 : $(Builtin.IntLiteral, Klass)
+  %29 = move_value [lexical] [var_decl] %28 : $Klass
+  debug_value %29 : $Klass, let, name "z"
+  end_borrow %25 : $(Builtin.IntLiteral, Klass)
+  %32 = begin_borrow %29 : $Klass
+  %33 = alloc_stack $Klass
+  %34 = store_borrow %32 to %33 : $*Klass
+  debug_value [trace] %34 : $*Klass
+  %35 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %36 = apply %35<Klass>(%34) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %34 : $*Klass
+  dealloc_stack %33 : $*Klass
+  end_borrow %32 : $Klass
+  %40 = begin_borrow %10 : $(Builtin.IntLiteral, Klass)
+  (%41, %42) = destructure_tuple %40 : $(Builtin.IntLiteral, Klass)
+  %43 = copy_value %42 : $Klass
+  %44 = tuple (%41 : $Builtin.IntLiteral, %43 : $Klass)
+  %45 = alloc_stack $(Builtin.IntLiteral, Klass)
+  store %44 to [init] %45 : $*(Builtin.IntLiteral, Klass)
+  %48 = apply %35<(Builtin.IntLiteral, Klass)>(%45) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %45 : $*(Builtin.IntLiteral, Klass)
+  dealloc_stack %45 : $*(Builtin.IntLiteral, Klass)
+  end_borrow %40 : $(Builtin.IntLiteral, Klass)
+  destroy_value %29 : $Klass
+  destroy_value %10 : $(Builtin.IntLiteral, Klass)
+  %54 = tuple ()
+  return %54 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on store_borrow_tuple_test_2: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %11 = alloc_stack $(Builtin.IntLiteral, Klass)
+// CHECK: Name: 'test'
+// CHECK: Root:   %4 = move_value [lexical] [var_decl] %3 : $(Builtin.IntLiteral, Klass)
+// CHECK: end running test 1 of 1 on store_borrow_tuple_test_2: variable-name-inference with: @trace[0]
+sil hidden [ossa] @store_borrow_tuple_test_2 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %2 = integer_literal $Builtin.IntLiteral, 0
+  %7 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %8 = apply %7() : $@convention(thin) () -> @owned Klass
+  %9 = tuple (%2 : $Builtin.IntLiteral, %8 : $Klass)
+  %10 = move_value [lexical] [var_decl] %9 : $(Builtin.IntLiteral, Klass)
+  debug_value %10 : $(Builtin.IntLiteral, Klass), let, name "test"
+  %12 = begin_borrow %10 : $(Builtin.IntLiteral, Klass)
+  (%13, %14) = destructure_tuple %12 : $(Builtin.IntLiteral, Klass)
+  %15 = copy_value %14 : $Klass
+  %16 = tuple (%13 : $Builtin.IntLiteral, %15 : $Klass)
+  %17 = alloc_stack $(Builtin.IntLiteral, Klass)
+  store %16 to [init] %17 : $*(Builtin.IntLiteral, Klass)
+  debug_value [trace] %17 : $*(Builtin.IntLiteral, Klass)
+  // original location of use.
+  destroy_addr %17 : $*(Builtin.IntLiteral, Klass)
+  dealloc_stack %17 : $*(Builtin.IntLiteral, Klass)
+  end_borrow %12 : $(Builtin.IntLiteral, Klass)
+  %25 = begin_borrow %10 : $(Builtin.IntLiteral, Klass)
+  %26 = copy_value %25 : $(Builtin.IntLiteral, Klass)
+  (%27, %28) = destructure_tuple %26 : $(Builtin.IntLiteral, Klass)
+  %29 = move_value [lexical] [var_decl] %28 : $Klass
+  debug_value %29 : $Klass, let, name "z"
+  end_borrow %25 : $(Builtin.IntLiteral, Klass)
+  %32 = begin_borrow %29 : $Klass
+  %33 = alloc_stack $Klass
+  %34 = store_borrow %32 to %33 : $*Klass
+  %35 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %36 = apply %35<Klass>(%34) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %34 : $*Klass
+  dealloc_stack %33 : $*Klass
+  end_borrow %32 : $Klass
+  %40 = begin_borrow %10 : $(Builtin.IntLiteral, Klass)
+  (%41, %42) = destructure_tuple %40 : $(Builtin.IntLiteral, Klass)
+  %43 = copy_value %42 : $Klass
+  %44 = tuple (%41 : $Builtin.IntLiteral, %43 : $Klass)
+  %45 = alloc_stack $(Builtin.IntLiteral, Klass)
+  store %44 to [init] %45 : $*(Builtin.IntLiteral, Klass)
+  %48 = apply %35<(Builtin.IntLiteral, Klass)>(%45) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %45 : $*(Builtin.IntLiteral, Klass)
+  dealloc_stack %45 : $*(Builtin.IntLiteral, Klass)
+  end_borrow %40 : $(Builtin.IntLiteral, Klass)
+  destroy_value %29 : $Klass
+  destroy_value %10 : $(Builtin.IntLiteral, Klass)
+  %54 = tuple ()
+  return %54 : $()
+}

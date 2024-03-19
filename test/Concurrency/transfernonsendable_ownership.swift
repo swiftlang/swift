@@ -67,23 +67,25 @@ func testConsumingUseAfterConsumeError(_ x: consuming Klass) async { // expected
 }
 
 func testBorrowing(_ x: borrowing Klass) async {
-  await transferToMain(x) // expected-warning {{task-isolated value of type 'Klass' transferred to main actor-isolated context}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
 }
 
 func testBorrowingError(_ x: borrowing Klass) async { // expected-error {{'x' is borrowed and cannot be consumed}}
-  await transferToMain(x) // expected-warning {{task-isolated value of type 'Klass' transferred to main actor-isolated context}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
   print(x) // expected-note {{consumed here}}
 }
 
 @CustomActor func testBorrowingErrorGlobalActor(_ x: borrowing Klass) async { // expected-error {{'x' is borrowed and cannot be consumed}}
-  await transferToMain(x) // expected-warning {{global actor 'CustomActor'-isolated value of type 'Klass' transferred to main actor-isolated context}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   print(x) // expected-note {{consumed here}}
 }
 
 func testInOut(_ x: inout Klass) async {
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
-  // TODO: This is wrong. Should say task isolated!
-  // expected-note @-2 {{transferring task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{transferring task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
 }
 
 func testInOutError(_ x: inout Klass) async {
