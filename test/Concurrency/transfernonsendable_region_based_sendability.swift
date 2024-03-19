@@ -246,8 +246,8 @@ func test_indirect_regions(a : A, b : Bool) async {
 
     // same aux value points to both 0 and 1
     let ns5_aux = NonSendable();
-    let ns5_0 = ns5_aux.x; // expected-tns-note {{variable defined here}}
-    let ns5_1 = ns5_aux.y; // expected-tns-note {{variable defined here}}
+    let ns5_0 = ns5_aux.x;
+    let ns5_1 = ns5_aux.y;
 
     // now check for each pair that consuming half of it consumed the other half
 

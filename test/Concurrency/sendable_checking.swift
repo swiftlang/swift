@@ -274,7 +274,7 @@ final class NonSendable {
 
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
-  let t = NonSendable() // expected-tns-note {{variable defined here}}
+  let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{transferring 't' may cause a race}}

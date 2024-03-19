@@ -479,9 +479,6 @@ public:
                  diag::regionbasedisolation_named_info_transfer_yields_race,
                  name, isolationCrossing.getCallerIsolation(),
                  isolationCrossing.getCalleeIsolation());
-    // Then emit the note about where the variable is defined.
-    diagnoseNote(variableDefinedLoc, diag::variable_defined_here,
-                 false /*variable*/);
     emitRequireInstDiagnostics();
   }
 
