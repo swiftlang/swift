@@ -406,7 +406,7 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
       if (m->hasGuaranteedInitialKind())
         continue;
     curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
-                                  MarkDependenceKind::Escaping);
+                                  MarkDependenceKind::NonEscaping);
   }
 
   return curr;

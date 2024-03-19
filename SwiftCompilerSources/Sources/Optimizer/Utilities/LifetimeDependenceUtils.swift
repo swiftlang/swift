@@ -54,7 +54,7 @@
 
 import SIL
 
-private let verbose = true
+private let verbose = false
 
 private func log(_ message: @autoclosure () -> String) {
   if verbose {
@@ -530,13 +530,12 @@ extension LifetimeDependence {
       visitedValues.insert(value)
     }
 
-    // Visit the base value of a lifetime dependence. If the base is
-    // an address, the dependence scope is the enclosing access. The
-    // walker does not walk past an `mark_dependence [nonescaping]`
-    // that produces an address, because that will never occur inside
-    // of an access scope. An address type mark_dependence
-    // [nonescaping]` can only result from an indirect function result
-    // when opaque values are not enabled.
+    // Visit the base value of a lifetime dependence. If the base is an address, the dependence scope is the enclosing
+    // access. The walker does not walk past an `mark_dependence [nonescaping]` that produces an address, because that
+    // will never occur inside of an access scope. An address type mark_dependence [unresolved]` can only result from an
+    // indirect function result when opaque values are not enabled. Address type `mark_dependence [nonescaping]`
+    // instruction are also produced for captured arguments but ClosureLifetimeFixup, but those aren't considered to
+    // have a LifetimeDependence scope.
     mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult {
       let base = owner ?? value
       guard let scope = LifetimeDependence.Scope(base: base, context)
@@ -617,17 +616,13 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 
 /// Walk up the lifetime dependence chain.
 ///
-/// This finds the introducers of a dependence chain. which represent
-/// the value's "inherited" dependencies. This stops at phis; all
-/// introducers dominate. This stops at addresses in general, but if
-/// the value is loaded from a singly-initialized location, then it
-/// continues walking up the value stored by the initializer. This
+/// This finds the introducers of a dependence chain. which represent the value's "inherited" dependencies. This stops
+/// at phis, so all introducers dominate their dependencies. This stops at addresses in general, but if the value is
+/// loaded from a singly-initialized location, then it continues walking up the value stored by the initializer. This
 /// bypasses the copies to temporary memory locations emitted by SILGen.
 ///
-/// In this example, the dependence root is
-/// copied, borrowed, and forwarded before being used as the base
-/// operand of `mark_dependence`. The dependence "root" is the parent
-/// of the outer-most dependence scope.
+/// In this example, the dependence root is copied, borrowed, and forwarded before being used as the base operand of
+/// `mark_dependence`. The dependence "root" is the parent of the outer-most dependence scope.
 ///
 ///   %root = apply                  // lifetime dependence root
 ///   %copy = copy_value %root
@@ -635,14 +630,10 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 ///   %base = struct_extract %parent // lifetime dependence base value
 ///   %dependent = mark_dependence [nonescaping] %value on %base
 ///
-/// This extends the ForwardingUseDefWalker, which finds the
-/// forward-extended lifetime introducers. Certain forward-extended
-/// lifetime introducers can inherit a lifetime dependency from their
-/// operand: namely copies, moves, and borrows. These introducers are
-/// considered part of their operand's dependence scope because
-/// non-escapable values can be copied, moved, and
-/// borrowed. Nonetheless, all of their uses must remain within
-/// original dependence scope.
+/// This extends the ForwardingUseDefWalker, which finds the forward-extended lifetime introducers. Certain
+/// forward-extended lifetime introducers can inherit a lifetime dependency from their operand: namely copies, moves,
+/// and borrows. These introducers are considered part of their operand's dependence scope because non-escapable values
+/// can be copied, moved, and borrowed. Nonetheless, all of their uses must remain within original dependence scope.
 ///
 ///   # owned lifetime dependence
 ///   %parent = apply               // begin dependence scope -+
@@ -662,10 +653,9 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 ///   ...                                                      |
 ///   destroy_value %parent        // end dependence scope    -+
 ///
-/// All of the dependent uses including `end_borrow %5` and
-/// `destroy_value %4` must be before the end of the dependence scope:
-/// `destroy_value %parent`. In this case, the dependence parent is an
-/// owned value, so the scope is simply the value's OSSA lifetime.
+/// All of the dependent uses including `end_borrow %5` and `destroy_value %4` must be before the end of the dependence
+/// scope: `destroy_value %parent`. In this case, the dependence parent is an owned value, so the scope is simply the
+/// value's OSSA lifetime.
 ///
 /// Minimal requirements:
 ///   var context: Context
@@ -740,6 +730,7 @@ extension LifetimeDependenceUseDefWalker {
     if Phi(value) != nil {
       return introducer(value, owner)
     }
+    // ForwardingUseDefWalker will callback to introducer() when it finds no forwarding instruction.
     return walkUpDefault(forwarded: value, owner)
   }
 
@@ -792,6 +783,8 @@ extension LifetimeDependenceUseDefWalker {
 ///   yieldedDependence(result: Operand) -> WalkResult
 /// Start walking:
 ///   walkDown(root: Value)
+///
+/// Note: this may visit values that are not dominated by `root` because of dependent phi operands.
 protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
                                           OwnershipUseVisitor,
                                           AddressUseVisitor {

@@ -272,7 +272,7 @@ bb3:
 // CHECK:       [[SUCCESS_1]]
 // CHECK:         copy_addr [[INSTANCE]] to [init] [[STACK]] : $*Self, {{.*}} scope [[STACK_SCOPE:[0-9]+]]
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] undef<Self>([[STACK]])
-// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [[CLOSURE]] {{.*}} on [[STACK]]
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] {{.*}} on [[STACK]]
 // CHECK:         try_apply undef([[DEPENDENCY]]) {{.*}}, normal [[SUCCESS_2:bb[0-9]+]], error [[FAILURE_2:bb[0-9]+]]
 // CHECK:       [[SUCCESS_2]]
 // CHECK:         destroy_value [[DEPENDENCY]]

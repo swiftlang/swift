@@ -258,6 +258,10 @@ bool BridgedType::isNoEscapeFunction() const {
   return unbridged().isNoEscapeFunction();
 }
 
+bool BridgedType::containsNoEscapeFunction() const {
+  return unbridged().containsNoEscapeFunction();
+}
+
 bool BridgedType::isAsyncFunction() const {
   return unbridged().isAsyncFunction();
 }

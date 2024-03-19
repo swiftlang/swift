@@ -534,6 +534,22 @@ public:
     return false;
   }
 
+  bool containsNoEscapeFunction() const {
+    auto ty = getASTType();
+    if (auto *fTy = ty->getAs<SILFunctionType>()) {
+      return fTy->isNoEscape();
+    }
+    // Look through box types to handle mutable 'var' bindings.
+    if (auto boxType = dyn_cast<SILBoxType>(ty)) {
+      for (auto field : boxType->getLayout()->getFields()) {
+        if (field.getLoweredType()->isNoEscape())
+          return true;
+      }
+    }
+    // Handle whatever AST types are known to hold functions. Namely tuples.
+    return ty->isNoEscape();
+  }
+
   bool isAsyncFunction() const {
     if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
       return fTy->isAsync();
