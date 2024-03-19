@@ -668,8 +668,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 ///
 /// \param DC The declaration context of the newly created function
 static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
-                                                         FuncDecl *func,
-                                                         DeclName thunkName) {
+                                                         FuncDecl *func) {
   auto &C = func->getASTContext();
 
   // --- Prepare generic parameters
@@ -707,45 +706,28 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   }
   ParameterList *params = ParameterList::create(C, paramDecls);
 
-  // DeclName funcName = nameOverride.value_or(func->getName());
-  DeclName funcName = thunkName;
-
   FuncDecl *thunk;
   if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-    // TODO: try a Func, but make DC the Storage;
-    // Isolation of var has to match the type
-    // TODO: inside addMethod get the DC and
-
-//    fprintf(stderr, "[%s:%d](%s) target is accessor: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    accessor->dump();
-//    accessor->dumpRef();
-
-//    copy = FuncDecl::createImplicit(
-//        C, swift::StaticSpellingKind::None,
-//        funcName, SourceLoc(),
-//        /*async=*/forceAsync || func->hasAsync(),
-//        /*throws=*/forceThrows || func->hasThrows(),
-//        /*thrownType=*/Type(), // TODO(distributed): support typed throws
-//        genericParamList,
-//        params, func->getResultInterfaceType(),
-//        /*DC=*/DC); // Note: we act like the storage is the DC so we can pull it out in SILGenType
-
     auto accessorThunk = AccessorDecl::createImplicit(
         C, AccessorKind::DistributedGet,
         /*storage=*/accessor->getStorage(),
         /*async=*/true, /*throws=*/true, // since it's a distributed thunk
-        /*thrownType=*/TypeLoc::withoutLoc(Type()), // TODO(distributed): support typed throws
+        /*thrownType=*/TypeLoc::withoutLoc(Type()),
         func->getResultInterfaceType(),
-        DC); // TODO: wrong context
+        DC);
     accessorThunk->setParameters(params);
-    // accessorThunk->setName(funcName); // we're not doing this anymore
+    // An accessor does not have a name; the `var` does though,
+    // and we'll be mangling the accessor based on the Storage name (the var)
     thunk = accessorThunk;
   } else {
+    // Let's use the name of a 'distributed func'
+    DeclName thunkName = func->getName();
+
     thunk = FuncDecl::createImplicit(
         C, swift::StaticSpellingKind::None,
-        funcName, SourceLoc(),
+        thunkName, SourceLoc(),
         /*async=*/true, /*throws=*/true, // since it's a distributed thunk
-        /*thrownType=*/Type(), // TODO(distributed): support typed throws
+        /*thrownType=*/Type(),
         genericParamList,
         params, func->getResultInterfaceType(), DC);
   }
@@ -766,39 +748,11 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
 }
 
 static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
-  auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
 
-  // Since accessors don't have names, let's generate one based on
-  // the computed property.
-  DeclName thunkName;
-  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
-    auto *var = accessor->getStorage();
-    thunkName = DeclName(C, var->getBaseName(),
-                         /*argumentNames=*/ArrayRef<Identifier>());
-//    fprintf(stderr, "[%s:%d](%s) VAR NAME: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    thunkName.dump();
-  } else {
-    // Let's use the name of a 'distributed func'
-    thunkName = func->getName();
-  }
-
   FuncDecl *thunk =
-      createSameSignatureDistributedThunkDecl(DC, func, thunkName);
-//  fprintf(stderr, "[%s:%d](%s) FUNC IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(func));
-//  fprintf(stderr, "[%s:%d](%s) THUNK IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(thunk));
-//  assert((!isa<AccessorDecl>(func) || (isa<AccessorDecl>(func) && isa<AccessorDecl>(thunk))) &&
-//         "If emitting a thunk for a distributed property accessor, it also "
-//         "must be an accessor");
+      createSameSignatureDistributedThunkDecl(DC, func);
   assert(thunk && "couldn't create a distributed thunk");
-
-//  /// Record which function this is a thunk for, we'll need this to link back
-//  /// calls in case this is a distributed requirement witness.
-//  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-//    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(accessor->getStorage()));
-//  } else {
-//    thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));
-//  }
 
   // Protocol requirements don't have bodies.
   if (func->hasBody())
