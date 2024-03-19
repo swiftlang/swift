@@ -429,36 +429,12 @@ public:
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-//      fprintf(stderr, "[%s:%d](%s) NOT ACCESSOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       // TODO: we enter here, because we are a FUNC
       // if (is distributed THUNK)
       // get DC and get the variable decl = that is our a
       //  set the storage...
       //  FALL THROUGH
       // else
-      auto reqAFD = dyn_cast<AbstractFunctionDecl>(reqDecl);
-      if (reqAFD->isDistributedThunk()) {
-//        fprintf(stderr, "[%s:%d](%s) AFD IS THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//        reqDecl->dumpRef();
-
-        auto distributedThunkTarget =
-            reqAFD->getAttrs().getAttribute<DistributedThunkTargetAttr>();
-        if (!distributedThunkTarget) {
-//          fprintf(stderr, "[%s:%d](%s) no target attribute\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-          return;
-        }
-        assert(distributedThunkTarget &&
-               "distributed_thunk must declare its target in an attribute");
-//        fprintf(stderr, "[%s:%d](%s) TARGET IS: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//        distributedThunkTarget->getTarget()->dumpRef();
-//        storage = distributedThunkTarget->getTarget();
-
-//        if (auto targetAFD =
-//                dyn_cast<AbstractFunctionDecl>(distributedThunkTarget)) {
-//          storage = targetAFD;
-//        }
-      }
-
       if (!storage) {
         if (auto witness = asDerived().getWitness(reqDecl)) {
           auto newDecl = requirementRef.withDecl(witness.getDecl());
@@ -477,7 +453,6 @@ public:
         }
         return asDerived().addMissingMethod(requirementRef);
       } // else, fallthrough to the usual accessor handling!
-//      fprintf(stderr, "[%s:%d](%s) FALL\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     } else {
       // Otherwise, we need to map the storage declaration and then get
       // the appropriate accessor for it.
@@ -485,10 +460,6 @@ public:
     }
 
     auto witness = asDerived().getWitness(storage);
-//    fprintf(stderr, "[%s:%d](%s) FOUND WITNESS: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, witness);
-//    if (witness) {
-//      witness.dump();
-//    }
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 

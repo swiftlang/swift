@@ -4089,11 +4089,10 @@ void LValue::addMemberVarComponent(
       auto typeData = getLogicalStorageTypeData(
           SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
 
-      // If a protocol, we do witness call, not direct
-      auto isDirectIfClass = isa<ClassDecl>(var->getDeclContext());
-      asImpl().emitUsingGetterSetter(accessor,
-                                     /*isDirect=*/isDirectIfClass, // FIXME:
-                                     typeData);
+      // If we're in a protocol, we must use a witness call for the getter,
+      // otherwise (in a class) we must use a direct call.
+      auto isDirect = isa<ClassDecl>(var->getDeclContext());
+      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/isDirect, typeData);
     }
 
   } emitter(SGF, loc, var, subs, isSuper, accessKind,

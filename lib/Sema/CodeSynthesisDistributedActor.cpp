@@ -654,12 +654,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
                                /*else=*/localBranchStmt, implicit, C);
 
   auto body = BraceStmt::create(C, sloc, {ifStmt}, sloc, implicit);
-
-//  fprintf(stderr, "[%s:%d](%s) THUNK >>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//  thunk->dump();
-//  fprintf(stderr, "[%s:%d](%s) DUMP BODY\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//  body->dump();
-
   return {body, /*isTypeChecked=*/false};
 }
 

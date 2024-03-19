@@ -69,9 +69,8 @@ template <class T> class SILVTableVisitor {
 
   void maybeAddEntry(SILDeclRef declRef) {
     // Introduce a new entry if required.
-    if (declRef.requiresNewVTableEntry()) {
+    if (declRef.requiresNewVTableEntry())
       asDerived().addMethod(declRef);
-    }
 
     // Update any existing entries that it overrides.
     auto nextRef = declRef;

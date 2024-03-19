@@ -85,7 +85,7 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
   case AccessorKind::DistributedGet:
     // TODO(distributed): probably does not matter since we mangle distributed
     //  thunk getters as the name of the Storage?
-    return "gd";
+    return "g";
   case AccessorKind::Set:
     return "s";
   case AccessorKind::WillSet:
@@ -4287,9 +4287,11 @@ void ASTMangler::appendDistributedThunk(
     appendContextOf(thunk, base);
   }
 
-  // TODO:
+
   if (auto accessor = dyn_cast<AccessorDecl>(thunk)) {
-    assert(accessor->getAccessorKind() == AccessorKind::DistributedGet);
+    assert(accessor->getAccessorKind() == AccessorKind::DistributedGet &&
+      "Only accessors marked as _distributed_get are expected to be mangled as thunks");
+    // A distributed getter is mangled as the name of its storage (i.e. "the var")
     appendIdentifier(accessor->getStorage()->getBaseIdentifier().str());
   } else {
     appendIdentifier(thunk->getBaseIdentifier().str());

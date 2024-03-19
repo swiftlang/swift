@@ -804,12 +804,6 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   if (!f->empty()) {
-    // TODO: here
-//    fprintf(stderr, "[%s:%d](%s) ERROR: CONSTANT:::\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    constant.dump();
-//    fprintf(stderr, "[%s:%d](%s) ERROR: FUNCTION:::\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    f->dump();
-
     diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
              f->getName());
     return;

@@ -201,7 +201,6 @@ namespace {
                       CleanupLocation(cleanupLoc));
     }
     JumpDest createThrowDest(Stmt *cleanupLoc, ThrownErrorInfo errorInfo) {
-//      fprintf(stderr, "[%s:%d](%s) create ThrowDest \n", __FILE_NAME__, __LINE__, __FUNCTION__);
       return JumpDest(SGF.createBasicBlock(FunctionSection::Postmatter),
                       SGF.getCleanupsDepth(),
                       CleanupLocation(cleanupLoc),
