@@ -529,9 +529,9 @@ struct UseState {
   /// A map from destroy_addr to the part of the type that it destroys.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> destroys;
 
-  /// A map from a liveness requiring use to the part of the type that it
-  /// requires liveness for.
-  InstToBitMap livenessUses;
+  /// Maps a non-consuming use to the part of the type that it requires
+  /// liveness for.
+  InstToBitMap nonconsumingUses;
 
   /// A map from a load [copy] or load [take] that we determined must be
   /// converted to a load_borrow to the part of the type tree that it needs to
@@ -635,11 +635,11 @@ struct UseState {
   }
 
   void recordLivenessUse(SILInstruction *inst, SmallBitVector const &bits) {
-    setAffectedBits(inst, bits, livenessUses);
+    setAffectedBits(inst, bits, nonconsumingUses);
   }
 
   void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
-    setAffectedBits(inst, range, livenessUses);
+    setAffectedBits(inst, range, nonconsumingUses);
   }
 
   void recordReinitUse(SILInstruction *inst, SILValue value,
@@ -702,7 +702,7 @@ struct UseState {
     cachedNumSubelements = std::nullopt;
     consumingBlocks.clear();
     destroys.clear();
-    livenessUses.clear();
+    nonconsumingUses.clear();
     borrows.clear();
     copyInsts.clear();
     takeInsts.clear();
@@ -722,7 +722,7 @@ struct UseState {
       llvm::dbgs() << *pair.first;
     }
     llvm::dbgs() << "LivenessUses:\n";
-    for (auto pair : livenessUses) {
+    for (auto pair : nonconsumingUses) {
       llvm::dbgs() << *pair.first;
     }
     llvm::dbgs() << "Borrows:\n";
@@ -826,8 +826,8 @@ struct UseState {
 
   bool isLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
     {
-      auto iter = livenessUses.find(inst);
-      if (iter != livenessUses.end()) {
+      auto iter = nonconsumingUses.find(inst);
+      if (iter != nonconsumingUses.end()) {
         if (span.intersects(iter->second))
           return true;
       }
@@ -1253,7 +1253,7 @@ void UseState::initializeLiveness(
                liveness.print(llvm::dbgs()));
   }
 
-  for (auto livenessInstAndValue : livenessUses) {
+  for (auto livenessInstAndValue : nonconsumingUses) {
     if (auto *lbi = dyn_cast<LoadBorrowInst>(livenessInstAndValue.first)) {
       auto accessPathWithBase =
           AccessPathWithBase::computeInScope(lbi->getOperand());
