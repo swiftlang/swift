@@ -130,8 +130,6 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
-if "@SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS@" == "TRUE":
-    config.available_features.add('noncopyable_generics')
 if "@SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES@" == "TRUE":
     config.available_features.add('nonescapable_types')
 if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE":
