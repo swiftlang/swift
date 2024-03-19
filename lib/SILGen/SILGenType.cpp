@@ -450,16 +450,13 @@ public:
         assert(distributedThunkTarget &&
                "distributed_thunk must declare its target in an attribute");
 //        fprintf(stderr, "[%s:%d](%s) TARGET IS: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-        distributedThunkTarget->getTarget()->dumpRef();
+//        distributedThunkTarget->getTarget()->dumpRef();
         storage = distributedThunkTarget->getTarget();
 
 //        if (auto targetAFD =
 //                dyn_cast<AbstractFunctionDecl>(distributedThunkTarget)) {
 //          storage = targetAFD;
 //        }
-      } else {
-//        fprintf(stderr, "[%s:%d](%s) AFD IS NOT THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-        reqDecl->dumpRef();
       }
 
       if (!storage) {

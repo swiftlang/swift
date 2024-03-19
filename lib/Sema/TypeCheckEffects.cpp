@@ -3578,7 +3578,7 @@ private:
         .highlight(E->getAwaitLoc());
       return;
     }
-    E->dump();
+//    E->dump();
     Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
     assert(false);
   }
