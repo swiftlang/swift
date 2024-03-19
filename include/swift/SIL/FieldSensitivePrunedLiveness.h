@@ -304,8 +304,8 @@ struct TypeTreeLeafTypeRange {
   ///
   /// This is a subset of (usually equal to) the bits of op->getType() in \p
   /// rootValue.
-  static std::optional<TypeTreeLeafTypeRange> get(Operand *op,
-                                                  SILValue rootValue);
+  static void get(Operand *op, SILValue rootValue,
+                  SmallVectorImpl<TypeTreeLeafTypeRange> &ranges);
 
   static void constructProjectionsForNeededElements(
       SILValue rootValue, SILInstruction *insertPt,
