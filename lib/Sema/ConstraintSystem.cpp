@@ -1695,20 +1695,21 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
          locator.endsWith<LocatorPathElt::Witness>();
 }
 
-AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue, OpenedTypeMap &replacements,
+FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
+    FunctionType *fnType, ValueDecl *decl, DeclContext *dc, unsigned numApplies,
+    bool isMainDispatchQueue, OpenedTypeMap &replacements,
     ConstraintLocatorBuilder locator) {
 
-  return swift::adjustFunctionTypeForConcurrency(
-      fnType, decl, dc, numApplies, isMainDispatchQueue,
-      GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this},
-      [&](Type type) {
+  auto *adjustedTy = swift::adjustFunctionTypeForConcurrency(
+      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this},
+      ClosureIsolatedByPreconcurrency{*this}, [&](Type type) {
         if (replacements.empty())
           return type;
 
         return openType(type, replacements, locator);
       });
+
+  return adjustedTy->castTo<FunctionType>();
 }
 
 /// For every parameter in \p type that has an error type, replace that
@@ -1781,9 +1782,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(value, false, functionRefKind);
-      openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
-          origOpenedType, func, useDC, numApplies, false, replacements,
-          locator));
+      openedType = adjustFunctionTypeForConcurrency(origOpenedType, func, useDC,
+                                                    numApplies, false,
+                                                    replacements, locator);
     }
 
     // The reference implicitly binds 'self'.
@@ -1818,9 +1819,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(
           funcDecl, false, functionRefKind);
-      openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
+      openedType = adjustFunctionTypeForConcurrency(
           origOpenedType->castTo<FunctionType>(), funcDecl, useDC, numApplies,
-          false, replacements, locator));
+          false, replacements, locator);
     }
 
     if (isForCodeCompletion() && openedType->hasError()) {
@@ -2819,11 +2820,11 @@ ConstraintSystem::getTypeOfMemberReference(
     unsigned numApplies = getNumApplications(
         value, hasAppliedSelf, functionRefKind);
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<AnyFunctionType>(), value, useDC, numApplies,
+        origOpenedType->castTo<FunctionType>(), value, useDC, numApplies,
         isMainDispatchQueueMember(locator), replacements, locator);
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<AnyFunctionType>(), subscript, useDC,
+        origOpenedType->castTo<FunctionType>(), subscript, useDC,
         /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements, locator);
   } else if (auto var = dyn_cast<VarDecl>(value)) {
     // Adjust the function's result type, since that's the Var's actual type.
