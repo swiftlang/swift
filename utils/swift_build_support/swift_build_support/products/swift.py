@@ -59,9 +59,6 @@ class Swift(product.Product):
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
-        # Add experimental NoncopyableGenerics flag.
-        self.cmake_options.extend(self._enable_experimental_noncopyable_generics)
-
         # Add experimental NonescapableTypes flag.
         self.cmake_options.extend(self._enable_experimental_nonescapable_types)
 
@@ -195,11 +192,6 @@ updated without updating swift.py?")
     def _enable_experimental_distributed(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
                  self.args.enable_experimental_distributed)]
-
-    @property
-    def _enable_experimental_noncopyable_generics(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS:BOOL',
-                 self.args.enable_experimental_noncopyable_generics)]
 
     @property
     def _enable_experimental_nonescapable_types(self):
