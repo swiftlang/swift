@@ -2499,8 +2499,6 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   // Whether we only want to return complete object initializers.
   bool onlyCompleteObjectInits = false;
 
-  // TODO: need to find the thunk
-
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   bool wantProtocolMembers = (options & NL_ProtocolMembers);

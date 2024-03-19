@@ -27,8 +27,8 @@ import Distributed
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
   distributed func distributedMethod() -> String
-//  distributed var distributedVariable: String { get }
-//  distributed func genericMethod<E: Codable>(_ value: E) async -> E
+  distributed var distributedVariable: String { get }
+  distributed func genericMethod<E: Codable>(_ value: E) async -> E
 }
 
 @available(SwiftStdlib 6.0, *)
@@ -37,22 +37,22 @@ distributed actor Worker: WorkerProtocol {
     "implemented method"
   }
 
-//  distributed var distributedVariable: String {
-//    "implemented variable"
-//  }
+  distributed var distributedVariable: String {
+    "implemented variable"
+  }
 
-//  distributed func genericMethod<E: Codable>(_ value: E) async -> E {
-//    return value
-//  }
+  distributed func genericMethod<E: Codable>(_ value: E) async -> E {
+    return value
+  }
 }
 
 // ==== Execute ----------------------------------------------------------------
 
 
-//@available(SwiftStdlib 6.0, *)
-//func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> String {
-//  try await actor.distributedVariable
-//}
+@available(SwiftStdlib 6.0, *)
+func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> String {
+  try await actor.distributedVariable
+}
 
 @available(SwiftStdlib 6.0, *)
 @main struct Main {
@@ -64,11 +64,11 @@ distributed actor Worker: WorkerProtocol {
     let m = try await actor.distributedMethod()
     print("m = \(m)") // CHECK: m = implemented method
 
-//    // force a call through witness table
-//    let v1 = try await test_distributedVariable(actor: actor)
-//    print("v1 = \(v1)") // CHECK: v1 = implemented!
+    // force a call through witness table
+    let v1 = try await test_distributedVariable(actor: actor)
+    print("v1 = \(v1)") // CHECK: v1 = implemented variable
 
-//    let v = try await actor.distributedVariable
-//    print("v = \(v)") // CHECK: v = implemented variable
+    let v = try await actor.distributedVariable
+    print("v = \(v)") // CHECK: v = implemented variable
   }
 }

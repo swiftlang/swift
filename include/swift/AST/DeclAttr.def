@@ -485,7 +485,7 @@ SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
 SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   155)
-// Not used: 156; Used to be DistributedThunkTarget, but replaced by making getter thunks '_distributed_get' accessor decls
+// Unused '156': Used to be `_distributedThunkTarget` but completed implementation in Swift 6.0 does not need it after all
 DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
   157)
