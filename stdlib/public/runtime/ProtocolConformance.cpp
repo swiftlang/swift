@@ -328,12 +328,20 @@ const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
   // If needed, check the conditional requirements.
   llvm::SmallVector<const void *, 8> conditionalArgs;
-  if (hasConditionalRequirements()) {
+
+  llvm::ArrayRef<GenericParamDescriptor> genericParams;
+  if (auto typeDescriptor = type->getTypeContextDescriptor())
+    genericParams = typeDescriptor->getGenericParams();
+
+  if (hasConditionalRequirements() || !genericParams.empty()) {
     SubstGenericParametersFromMetadata substitutions(type);
     auto error = _checkGenericRequirements(
-        getConditionalRequirements(), conditionalArgs,
+        genericParams, getConditionalRequirements(), conditionalArgs,
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index).Ptr;
+        },
+        [&substitutions](unsigned ordinal) {
+          return substitutions.getMetadataOrdinal(ordinal).Ptr;
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -1342,10 +1350,12 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
 }
 
 static std::optional<TypeLookupError>
-checkGenericRequirement(const GenericRequirementDescriptor &req,
-                        llvm::SmallVectorImpl<const void *> &extraArguments,
-                        SubstGenericParameterFn substGenericParam,
-                        SubstDependentWitnessTableFn substWitnessTable) {
+checkGenericRequirement(
+    const GenericRequirementDescriptor &req,
+    llvm::SmallVectorImpl<const void *> &extraArguments,
+    SubstGenericParameterFn substGenericParam,
+    SubstDependentWitnessTableFn substWitnessTable,
+    llvm::SmallVectorImpl<SuppressibleProtocolSet> &suppressed) {
   assert(!req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1433,6 +1443,20 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
     return TYPE_LOOKUP_ERROR_FMT("can't have same-shape requirement where "
                                  "subject type is not a pack");
   }
+  case GenericRequirementKind::SuppressedProtocols: {
+    uint16_t index = req.getSuppressedProtocolsGenericParamIndex();
+    if (index == 0xFFFF)
+      return TYPE_LOOKUP_ERROR_FMT("unable to suppress protocols");
+
+    // Expand the suppression set so we can record these protocols.
+    if (index >= suppressed.size()) {
+      suppressed.resize(index + 1, SuppressibleProtocolSet());
+    }
+
+    // Record these suppressed protocols for this generic parameter.
+    suppressed[index] |= req.getSuppressedProtocols();
+    return std::nullopt;
+  }
   }
 
   // Unknown generic requirement kind.
@@ -1441,10 +1465,12 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
 }
 
 static std::optional<TypeLookupError>
-checkGenericPackRequirement(const GenericRequirementDescriptor &req,
-                            llvm::SmallVectorImpl<const void *> &extraArguments,
-                            SubstGenericParameterFn substGenericParam,
-                            SubstDependentWitnessTableFn substWitnessTable) {
+checkGenericPackRequirement(
+    const GenericRequirementDescriptor &req,
+    llvm::SmallVectorImpl<const void *> &extraArguments,
+    SubstGenericParameterFn substGenericParam,
+    SubstDependentWitnessTableFn substWitnessTable,
+    llvm::SmallVectorImpl<SuppressibleProtocolSet> &suppressed) {
   assert(req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1584,6 +1610,21 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
 
     return std::nullopt;
   }
+
+  case GenericRequirementKind::SuppressedProtocols: {
+    uint16_t index = req.getSuppressedProtocolsGenericParamIndex();
+    if (index == 0xFFFF)
+      return TYPE_LOOKUP_ERROR_FMT("unable to suppress protocols");
+
+    // Expand the suppression set so we can record these protocols.
+    if (index >= suppressed.size()) {
+      suppressed.resize(index + 1, SuppressibleProtocolSet());
+    }
+
+    // Record these suppressed protocols for this generic parameter.
+    suppressed[index] |= req.getSuppressedProtocols();
+    return std::nullopt;
+  }
   }
 
   // Unknown generic requirement kind.
@@ -1591,25 +1632,163 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
                                (unsigned)req.getKind());
 }
 
+static std::optional<TypeLookupError>
+checkSuppressibleRequirementsStructural(const Metadata *type,
+                                        SuppressibleProtocolSet ignored) {
+  // FIXME: Implement me!
+  return std::nullopt;
+}
+
+/// Check that the given `type` meets all suppressible protocol requirements
+/// that haven't been explicitly suppressed by `ignored`.
+static std::optional<TypeLookupError>
+checkSuppressibleRequirements(const Metadata *type, 
+                              SuppressibleProtocolSet ignored) {
+  auto contextDescriptor = type->getTypeContextDescriptor();
+  if (!contextDescriptor)
+    return checkSuppressibleRequirementsStructural(type, ignored);
+
+  // If no conformances are suppressed, then it conforms to everything.
+  if (!contextDescriptor->hasSuppressibleProtocols()) {
+    return std::nullopt;
+  }
+
+  // If this type has suppressed conformances, but we can't find them...
+  // bail out.
+  auto suppressedProtocols = contextDescriptor->getSuppresssedProtocols();
+  if (!suppressedProtocols) {
+    return TYPE_LOOKUP_ERROR_FMT("unable to find suppressed protocols");
+  }
+
+  // Determine the set of suppressible conformances that the type has
+  // suppressed but aren't being ignored. These are missing conformances
+  // based on the primary definition of the type.
+  SuppressibleProtocolSet missingConformances = *suppressedProtocols - ignored;
+  if (missingConformances.empty())
+    return std::nullopt;
+
+  // If the context descriptor is not generic, there are no conditional
+  // conformances: fail.
+  if (!contextDescriptor->isGeneric()) {
+    return TYPE_LOOKUP_ERROR_FMT("type missing suppressible conformances %x",
+                                 missingConformances.rawBits());
+  }
+
+  auto genericContext = contextDescriptor->getGenericContext();
+  if (!genericContext ||
+      !genericContext->hasConditionalSuppressedProtocols()) {
+    return TYPE_LOOKUP_ERROR_FMT("type missing suppressible conformances %x",
+                                 missingConformances.rawBits());
+  }
+
+  // If there are missing conformances that do not have corresponding
+  // conditional conformances, then the nominal type does not satisfy these
+  // suppressed conformances. We're done.
+  auto conditionalSuppressed =
+      genericContext->getConditionalSuppressedProtocols();
+  auto alwaysMissingConformances = missingConformances - conditionalSuppressed;
+  if (!alwaysMissingConformances.empty()) {
+    return TYPE_LOOKUP_ERROR_FMT("type missing suppressible conformances %x",
+                                 alwaysMissingConformances.rawBits());
+  }
+
+  // Now we need to check the conditional conformances for each of the
+  // missing conformances.
+  for (auto suppressibleKind : missingConformances) {
+    // Get the conditional requirements.
+    // Note: This will end up being quadratic in the number of suppressible
+    // protocols. That number is small (currently 2) and cannot be more than 16,
+    // but if it's a problem we can switch to a different strategy.
+    auto condReqs =
+        genericContext->getConditionalSuppressibleProtocolRequirementsFor(
+                                                             suppressibleKind);
+
+    // Check the conditional requirements.
+    llvm::ArrayRef<GenericRequirementDescriptor> requirements(
+        reinterpret_cast<const GenericRequirementDescriptor *>(condReqs.data()),
+        condReqs.size());
+    SubstGenericParametersFromMetadata substFn(type);
+    llvm::SmallVector<const void *, 1> extraArguments;
+    auto error = _checkGenericRequirements(
+        genericContext->getGenericParams(),
+        requirements, extraArguments,
+        [&substFn](unsigned depth, unsigned index) {
+          return substFn.getMetadata(depth, index).Ptr;
+        },
+        [&substFn](unsigned ordinal) {
+          return substFn.getMetadataOrdinal(ordinal).Ptr;
+        },
+        [&substFn](const Metadata *type, unsigned index) {
+          return substFn.getWitnessTable(type, index);
+        });
+    if (error)
+      return error;
+  }
+
+  return std::nullopt;
+}
+
 std::optional<TypeLookupError> swift::_checkGenericRequirements(
+    llvm::ArrayRef<GenericParamDescriptor> genericParams,
     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
+    SubstGenericParameterOrdinalFn substGenericParamOrdinal,
     SubstDependentWitnessTableFn substWitnessTable) {
+  // The suppressed conformances for each generic parameter.
+  llvm::SmallVector<SuppressibleProtocolSet, 4> allSuppressed;
+
   for (const auto &req : requirements) {
     if (req.getFlags().isPackRequirement()) {
       auto error = checkGenericPackRequirement(req, extraArguments,
                                                substGenericParam,
-                                               substWitnessTable);
+                                               substWitnessTable,
+                                               allSuppressed);
       if (error)
         return error;
     } else {
       auto error = checkGenericRequirement(req, extraArguments,
                                            substGenericParam,
-                                           substWitnessTable);
+                                           substWitnessTable,
+                                           allSuppressed);
       if (error)
         return error;
     }
+  }
+
+  // Now, check all of the generic arguments for suppressible protocols.
+  unsigned numGenericParams = genericParams.size();
+  for (unsigned index = 0; index != numGenericParams; ++index) {
+    SuppressibleProtocolSet suppressed;
+    if (index < allSuppressed.size())
+      suppressed = allSuppressed[index];
+
+    switch (genericParams[index].getKind()) {
+    case GenericParamKind::Type:
+      break;
+
+    case GenericParamKind::TypePack:
+      // FIXME: variadic generics
+      continue;
+
+    default:
+      return TYPE_LOOKUP_ERROR_FMT("unknown generic parameter kind %u",
+                                   index);
+    }
+
+    MetadataOrPack metadataOrPack(substGenericParamOrdinal(index));
+    if (!metadataOrPack)
+      return TYPE_LOOKUP_ERROR_FMT("unable to find generic argument %u",
+                                   index);
+
+    if (metadataOrPack.isMetadataPack()) {
+      // FIXME: variadic generics
+      continue;
+    }
+
+    auto metadata = metadataOrPack.getMetadata();
+    if (auto error = checkSuppressibleRequirements(metadata, suppressed))
+      return error;
   }
 
   // Success!

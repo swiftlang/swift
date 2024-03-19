@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_KNOWNPROTOCOLS_H
 #define SWIFT_AST_KNOWNPROTOCOLS_H
 
+#include "swift/ABI/SuppressibleProtocols.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/FixedBitSet.h"
 #include "swift/AST/InvertibleProtocolKind.h"
@@ -71,6 +72,9 @@ KnownProtocolKind getKnownProtocolKind(InvertibleProtocolKind ip);
 
 void simple_display(llvm::raw_ostream &out,
                     const InvertibleProtocolKind &value);
+
+SuppressibleProtocolKind asSuppressible(InvertibleProtocolKind kind);
+InvertibleProtocolKind asInvertible(SuppressibleProtocolKind kind);
 
 } // end namespace swift
 

@@ -1354,6 +1354,9 @@ public:
       case GenericRequirementKind::SameShape:
         return TypeLookupError(
             "Unexpected same-shape requirement in runtime generic signature");
+      case GenericRequirementKind::SuppressedProtocols:
+        return TypeLookupError(
+            "Unexpected suppressible protocol in runtime generic signature");
       }
     }
 
@@ -2882,6 +2885,8 @@ private:
           }
 
           case GenericRequirementKind::SameShape:
+            llvm_unreachable("Implement me");
+          case GenericRequirementKind::SuppressedProtocols:
             llvm_unreachable("Implement me");
           }
         }

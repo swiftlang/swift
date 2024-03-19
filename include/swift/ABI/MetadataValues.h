@@ -1688,11 +1688,15 @@ public:
   constexpr ContextDescriptorFlags(ContextDescriptorKind kind,
                                    bool isGeneric,
                                    bool isUnique,
+                                   bool hasSuppressibleProtocols,
                                    uint16_t kindSpecificFlags)
     : ContextDescriptorFlags(ContextDescriptorFlags()
                                .withKind(kind)
                                .withGeneric(isGeneric)
                                .withUnique(isUnique)
+                               .withSuppressibleProtocols(
+                                 hasSuppressibleProtocols
+                               )
                                .withKindSpecificFlags(kindSpecificFlags))
   {}
 
@@ -1709,6 +1713,12 @@ public:
   /// Whether this is a unique record describing the referenced context.
   constexpr bool isUnique() const {
     return (Value & 0x40u) != 0;
+  }
+
+  /// Whether the context has information about suppressible protocols, which
+  /// will show up as a trailing field in the context descriptor.
+  constexpr bool hasSuppressibleProtocols() const {
+    return (Value & 0x20u) != 0;
   }
 
   /// The most significant two bytes of the flags word, which can have
@@ -1730,6 +1740,13 @@ public:
   constexpr ContextDescriptorFlags withUnique(bool isUnique) const {
     return ContextDescriptorFlags((Value & 0xFFFFFFBFu)
                                   | (isUnique ? 0x40u : 0));
+  }
+
+  constexpr ContextDescriptorFlags withSuppressibleProtocols(
+      bool hasSuppressibleProtocols
+  ) const {
+    return ContextDescriptorFlags((Value & ~0x20u)
+                                  | (hasSuppressibleProtocols ? 0x20u : 0));
   }
 
   constexpr ContextDescriptorFlags
@@ -1969,10 +1986,13 @@ public:
   explicit constexpr GenericContextDescriptorFlags(uint16_t value)
     : Value(value) {}
 
-  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
-    : GenericContextDescriptorFlags(
+  constexpr GenericContextDescriptorFlags(
+      bool hasTypePacks, bool hasConditionalSuppressedProtocols
+  ) : GenericContextDescriptorFlags(
         GenericContextDescriptorFlags((uint16_t)0)
-          .withHasTypePacks(hasTypePacks)) {}
+          .withHasTypePacks(hasTypePacks)
+          .withConditionalSuppressedProtocols(
+            hasConditionalSuppressedProtocols)) {}
 
   /// Whether this generic context has at least one type parameter
   /// pack, in which case the generic context will have a trailing
@@ -1981,10 +2001,23 @@ public:
     return (Value & 0x1) != 0;
   }
 
+  /// Whether this generic context has any conditional conformances to
+  /// suppressed protocols, in which case the generic context will have a
+  /// trailing SuppressedProtocolSet and conditional requirements.
+  constexpr bool hasConditionalSuppressedProtocols() const {
+    return (Value & 0x2) != 0;
+  }
+
   constexpr GenericContextDescriptorFlags
   withHasTypePacks(bool hasTypePacks) const {
     return GenericContextDescriptorFlags((uint16_t)(
       (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
+  }
+
+  constexpr GenericContextDescriptorFlags
+  withConditionalSuppressedProtocols(bool value) const {
+    return GenericContextDescriptorFlags((uint16_t)(
+      (Value & ~0x2) | (value ? 0x2 : 0)));
   }
 
   constexpr uint16_t getIntValue() const {
@@ -2083,6 +2116,12 @@ enum class GenericRequirementKind : uint8_t {
   SameConformance = 3,
   /// A same-shape requirement between generic parameter packs.
   SameShape = 4,
+  /// A requirement stating which suppressible protocol checks are
+  /// suppressed.
+  ///
+  /// This is more of an "anti-requirement", specifing which checks don't need
+  /// to happen for a given type.
+  SuppressedProtocols = 5,
   /// A layout requirement.
   Layout = 0x1F,
 };
