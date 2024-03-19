@@ -5889,8 +5889,10 @@ namespace {
     std::optional<SpareBitsMaskInfo> calculateSpareBitsMask() const override {
       SpareBitVector spareBits;
       for (auto enumCase : getElementsWithPayload()) {
-        cast<FixedTypeInfo>(enumCase.ti)
-            ->applyFixedSpareBitsMask(IGM, spareBits);
+        if (auto fixedTI = llvm::dyn_cast<FixedTypeInfo>(enumCase.ti))
+          fixedTI->applyFixedSpareBitsMask(IGM, spareBits);
+        else
+          return {};
       }
       // Trim leading/trailing zero bytes, then pad to a multiple of 32 bits
       llvm::APInt bits = spareBits.asAPInt();
