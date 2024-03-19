@@ -21,6 +21,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
+#include <variant>
 
 #define DEBUG_TYPE "transfer-non-sendable"
 
@@ -995,6 +996,183 @@ private:
   }
 };
 
+class IsolationRegionInfo {
+public:
+  /// The lattice is:
+  ///
+  /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
+  ///
+  /// Unknown means no information. We error when merging on it.
+  enum Kind {
+    Unknown,
+    Disconnected,
+    Task,
+    Actor,
+  };
+
+private:
+  Kind kind;
+  // clang-format off
+  std::variant<
+    // Used for actor isolated when we have ActorIsolation info from the AST.
+    std::optional<ActorIsolation>,
+    // Used for actor isolation when we infer the actor at the SIL level.
+    NominalTypeDecl *,
+    // The task isolated parameter when we find a task isolated value.
+    SILValue
+  > data;
+  // clang-format on
+
+  IsolationRegionInfo(Kind kind, std::optional<ActorIsolation> actorIsolation)
+      : kind(kind), data(actorIsolation) {}
+  IsolationRegionInfo(Kind kind, NominalTypeDecl *decl)
+      : kind(kind), data(decl) {}
+
+  IsolationRegionInfo(Kind kind, SILValue value) : kind(kind), data(value) {}
+
+public:
+  IsolationRegionInfo() : kind(Kind::Unknown), data() {}
+
+  operator bool() const { return kind != Kind::Unknown; }
+
+  operator Kind() const { return kind; }
+
+  Kind getKind() const { return kind; }
+
+  bool isDisconnected() const { return kind == Kind::Disconnected; }
+  bool isActorIsolated() const { return kind == Kind::Actor; }
+  bool isTaskIsolated() const { return kind == Kind::Task; }
+
+  void print(llvm::raw_ostream &os) const {
+    switch (Kind(*this)) {
+    case Unknown:
+      os << "unknown";
+      return;
+    case Disconnected:
+      os << "disconnected";
+      return;
+    case Actor:
+      os << "actor";
+      return;
+    case Task:
+      os << "task";
+      return;
+    }
+  }
+
+  void printForDiagnostics(llvm::raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
+
+  std::optional<ActorIsolation> getActorIsolation() const {
+    assert(kind == Actor);
+    assert(std::holds_alternative<std::optional<ActorIsolation>>(data) &&
+           "Doesn't have an actor isolation?!");
+    return std::get<std::optional<ActorIsolation>>(data);
+  }
+
+  NominalTypeDecl *getActorInstance() const {
+    assert(kind == Actor);
+    assert(std::holds_alternative<NominalTypeDecl *>(data) &&
+           "Doesn't have an actor instance?!");
+    return std::get<NominalTypeDecl *>(data);
+  }
+
+  SILValue getTaskIsolatedValue() const {
+    assert(kind == Task);
+    assert(std::holds_alternative<SILValue>(data) &&
+           "Doesn't have a task isolated value");
+    return std::get<SILValue>(data);
+  }
+
+  bool hasActorIsolation() const {
+    return kind == Actor &&
+           std::holds_alternative<std::optional<ActorIsolation>>(data);
+  }
+
+  bool hasActorInstance() const {
+    return kind == Actor && std::holds_alternative<NominalTypeDecl *>(data);
+  }
+
+  bool hasTaskIsolatedValue() const {
+    return kind == Task && std::holds_alternative<SILValue>(data);
+  }
+
+  /// If we actually have an actor decl, return that. Otherwise, see if we have
+  /// an actor isolation if we can find one in there. Returns nullptr if we
+  /// fail.
+  NominalTypeDecl *tryInferActorDecl() const {
+    if (hasActorIsolation()) {
+      auto actorIsolation = getActorIsolation();
+      if (auto *actor = actorIsolation->getActorOrNullPtr()) {
+        return actor;
+      }
+      return nullptr;
+    }
+
+    if (hasActorInstance()) {
+      auto actorDecl = getActorInstance();
+      return actorDecl;
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] IsolationRegionInfo merge(IsolationRegionInfo other) const {
+    // If we are greater than the other kind, then we are further along the
+    // lattice. We ignore the change.
+    if (unsigned(other.kind) < unsigned(kind))
+      return *this;
+
+    // TODO: Make this failing mean that we emit an unknown SIL error instead of
+    // asserting.
+    if (other.isActorIsolated() && isActorIsolated()) {
+      if (other.hasActorInstance() && hasActorInstance()) {
+        assert(other.getActorInstance() == getActorInstance() &&
+               "Actor should never be merged with another actor unless with "
+               "the same actor?!");
+      } else if (other.hasActorIsolation() && hasActorIsolation()) {
+        assert(other.getActorIsolation() == getActorIsolation() &&
+               "Actor should never be merged with another actor unless with "
+               "the same actor?!");
+      }
+    }
+
+    // Otherwise, take the other value.
+    return other;
+  }
+
+  IsolationRegionInfo withActorIsolated(ActorIsolation isolation) {
+    return IsolationRegionInfo::getActorIsolated(isolation);
+  }
+
+  static IsolationRegionInfo getDisconnected() {
+    return {Kind::Disconnected, {}};
+  }
+
+  static IsolationRegionInfo getActorIsolated(ActorIsolation actorIsolation) {
+    return {Kind::Actor, actorIsolation};
+  }
+
+  /// Sometimes we may have something that is actor isolated or that comes from
+  /// a type. First try getActorIsolation and otherwise, just use the type.
+  static IsolationRegionInfo getActorIsolated(NominalTypeDecl *nomDecl) {
+    auto actorIsolation = swift::getActorIsolation(nomDecl);
+    if (actorIsolation.isActorIsolated())
+      return getActorIsolated(actorIsolation);
+    if (nomDecl->isActor())
+      return {Kind::Actor, nomDecl};
+    return {};
+  }
+
+  static IsolationRegionInfo getTaskIsolated(SILValue value) {
+    return {Kind::Task, value};
+  }
+};
+
 /// A data structure that applies a series of PartitionOps to a single Partition
 /// that it modifies.
 ///
@@ -1028,27 +1206,34 @@ public:
     return asImpl().shouldEmitVerboseLogging();
   }
 
-  /// Call handleFailure on our CRTP subclass.
-  void handleFailure(const PartitionOp &op, Element elt,
-                     TransferringOperand transferringOp) const {
-    return asImpl().handleFailure(op, elt, transferringOp);
+  /// Call handleLocalUseAfterTransfer on our CRTP subclass.
+  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
+                                   TransferringOperand transferringOp) const {
+    return asImpl().handleLocalUseAfterTransfer(op, elt, transferringOp);
   }
 
   /// Call handleTransferNonTransferrable on our CRTP subclass.
-  void handleTransferNonTransferrable(const PartitionOp &op,
-                                      Element elt) const {
-    return asImpl().handleTransferNonTransferrable(op, elt);
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt,
+      IsolationRegionInfo isolationRegionInfo) const {
+    return asImpl().handleTransferNonTransferrable(op, elt,
+                                                   isolationRegionInfo);
   }
-
   /// Just call our CRTP subclass.
-  void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                      Element otherElement) const {
-    return asImpl().handleTransferNonTransferrable(op, elt, otherElement);
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt, Element otherElement,
+      IsolationRegionInfo isolationRegionInfo) const {
+    return asImpl().handleTransferNonTransferrable(op, elt, otherElement,
+                                                   isolationRegionInfo);
   }
 
   /// Call isActorDerived on our CRTP subclass.
   bool isActorDerived(Element elt) const {
     return asImpl().isActorDerived(elt);
+  }
+
+  IsolationRegionInfo getIsolationRegionInfo(Element elt) const {
+    return asImpl().getIsolationRegionInfo(elt);
   }
 
   bool isTaskIsolatedDerived(Element elt) const {
@@ -1086,7 +1271,8 @@ public:
       // value... emit an error.
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[1], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[1],
+                                      transferredOperand);
         }
       }
       p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
@@ -1108,39 +1294,35 @@ public:
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Transfer PartitionOp's argument should already be tracked");
 
+      IsolationRegionInfo isolationRegionInfo =
+          getIsolationRegionInfo(op.getOpArgs()[0]);
+
       // If we know our direct value is actor derived... immediately emit an
       // error.
-      if (isActorDerived(op.getOpArgs()[0]))
-        return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+      if (isolationRegionInfo.hasActorIsolation()) {
+        return handleTransferNonTransferrable(op, op.getOpArgs()[0],
+                                              isolationRegionInfo);
+      }
 
-      // Otherwise, we may have a value that is actor derived or task isolated
-      // from another value. We need to prefer actor derived.
-      //
-      // While we are checking for actor derived, also check if our value or any
-      // value in our region is closure captured and propagate that bit in our
-      // transferred inst.
+      // Otherwise, we need to merge our isolation region info with the
+      // isolation region info of everything else in our region. This is the
+      // dynamic isolation region info found by the dataflow.
       bool isClosureCapturedElt =
           isClosureCaptured(op.getOpArgs()[0], op.getSourceOp());
       Region elementRegion = p.getRegion(op.getOpArgs()[0]);
-      std::optional<Element> actorDerivedElt;
-      std::optional<Element> taskDerivedElt;
       for (const auto &pair : p.range()) {
         if (pair.second == elementRegion) {
-          if (isActorDerived(pair.first))
-            actorDerivedElt = pair.first;
-          if (isTaskIsolatedDerived(pair.first))
-            taskDerivedElt = pair.first;
+          isolationRegionInfo =
+              isolationRegionInfo.merge(getIsolationRegionInfo(pair.first));
           isClosureCapturedElt |=
               isClosureCaptured(pair.first, op.getSourceOp());
         }
       }
 
-      // Now try to add the actor derived elt first and then the task derived
-      // elt, preferring actor derived.
-      if (actorDerivedElt.has_value() || taskDerivedElt.has_value()) {
-        return handleTransferNonTransferrable(
-            op, op.getOpArgs()[0],
-            actorDerivedElt.has_value() ? *actorDerivedElt : *taskDerivedElt);
+      // If we merged anything, we need to handle a transfer non-transferrable.
+      if (bool(isolationRegionInfo) && !isolationRegionInfo.isDisconnected()) {
+        return handleTransferNonTransferrable(op, op.getOpArgs()[0],
+                                              isolationRegionInfo);
       }
 
       // Mark op.getOpArgs()[0] as transferred.
@@ -1169,12 +1351,14 @@ public:
       // if attempting to merge a transferred region, handle the failure
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[0], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[0],
+                                      transferredOperand);
         }
       }
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[1], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[1],
+                                      transferredOperand);
         }
       }
 
@@ -1187,7 +1371,8 @@ public:
              "Require PartitionOp's argument should already be tracked");
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleFailure(op, op.getOpArgs()[0], transferredOperand);
+          handleLocalUseAfterTransfer(op, op.getOpArgs()[0],
+                                      transferredOperand);
         }
       }
       return;
@@ -1233,19 +1418,17 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// 3. The operand of the instruction that originally transferred the
   /// region. Can be used to get the immediate value transferred or the
   /// transferring instruction.
-  void handleFailure(const PartitionOp &op, Element elt,
-                     TransferringOperand transferringOp) const {}
+  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
+                                   TransferringOperand transferringOp) const {}
 
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.
-  void handleTransferNonTransferrable(const PartitionOp &op,
-                                      Element elt) const {}
-
-  /// This is called if we detect a never transferred element that was passed to
-  /// a transfer instruction but the actual element that could not be
-  /// transferred is a different element in its region.
   void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                      Element otherEltInRegion) const {}
+                                      IsolationRegionInfo regionInfo) const {}
+
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt, Element otherElement,
+      IsolationRegionInfo isolationRegionInfo) const {}
 
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
@@ -1255,6 +1438,12 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// This is used to determine if an element is in the same region as a task
   /// isolated value.
   bool isTaskIsolatedDerived(Element elt) const { return false; }
+
+  /// Returns the information about \p elt's isolation that we ascertained from
+  /// SIL and the AST.
+  IsolationRegionInfo getIsolationRegionInfo(Element elt) const {
+    return IsolationRegionInfo();
+  }
 
   /// Check if the representative value of \p elt is closure captured at \p
   /// op.

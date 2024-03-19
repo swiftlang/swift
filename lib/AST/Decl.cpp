@@ -11348,6 +11348,31 @@ NominalTypeDecl *ActorIsolation::getActor() const {
   return actorInstance.get<NominalTypeDecl *>();
 }
 
+NominalTypeDecl *ActorIsolation::getActorOrNullPtr() const {
+  if (getKind() != ActorInstance || getKind() != GlobalActor)
+    return nullptr;
+
+  if (silParsed)
+    return nullptr;
+
+  Type actorType;
+
+  if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
+    actorType = instance->getTypeInContext();
+  } else if (auto *instance = actorInstance.dyn_cast<Expr *>()) {
+    actorType = instance->getType();
+  }
+
+  if (actorType) {
+    if (auto wrapped = actorType->getOptionalObjectType()) {
+      actorType = wrapped;
+    }
+    return actorType->getReferenceStorageReferent()->getAnyActor();
+  }
+
+  return actorInstance.get<NominalTypeDecl *>();
+}
+
 VarDecl *ActorIsolation::getActorInstance() const {
   assert(getKind() == ActorInstance);
 

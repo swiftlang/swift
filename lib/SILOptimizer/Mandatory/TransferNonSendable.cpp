@@ -400,21 +400,33 @@ struct TransferredNonTransferrableInfo {
   /// transferredOperand.get().
   llvm::PointerUnion<SILValue, SILInstruction *> nonTransferrable;
 
+  /// The region info that describes the dynamic dataflow derived isolation
+  /// region info for the non-transferrable value.
+  ///
+  /// This is equal to the merge of the IsolationRegionInfo from all elements in
+  /// nonTransferrable's region when the error was diagnosed.
+  IsolationRegionInfo isolationRegionInfo;
+
   TransferredNonTransferrableInfo(Operand *transferredOperand,
-                                  SILValue nonTransferrableValue)
+                                  SILValue nonTransferrableValue,
+                                  IsolationRegionInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
-        nonTransferrable(nonTransferrableValue) {}
+        nonTransferrable(nonTransferrableValue),
+        isolationRegionInfo(isolationRegionInfo) {}
   TransferredNonTransferrableInfo(Operand *transferredOperand,
-                                  SILInstruction *nonTransferrableInst)
+                                  SILInstruction *nonTransferrableInst,
+                                  IsolationRegionInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
-        nonTransferrable(nonTransferrableInst) {}
+        nonTransferrable(nonTransferrableInst),
+        isolationRegionInfo(isolationRegionInfo) {}
 };
 
 class TransferNonSendableImpl {
   RegionAnalysisFunctionInfo *regionInfo;
   SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
       transferOpToRequireInstMultiMap;
-  SmallVector<TransferredNonTransferrableInfo, 8> transferredNonTransferrable;
+  SmallVector<TransferredNonTransferrableInfo, 8>
+      transferredNonTransferrableInfoList;
 
 public:
   TransferNonSendableImpl(RegionAnalysisFunctionInfo *regionInfo)
@@ -869,14 +881,12 @@ namespace {
 
 class TransferNonTransferrableDiagnosticEmitter {
   TransferredNonTransferrableInfo info;
-  RegionAnalysisFunctionInfo *regionInfo;
   bool emittedErrorDiagnostic = false;
 
 public:
   TransferNonTransferrableDiagnosticEmitter(
-      TransferredNonTransferrableInfo info,
-      RegionAnalysisFunctionInfo *regionInfo)
-      : info(info), regionInfo(regionInfo) {}
+      TransferredNonTransferrableInfo info)
+      : info(info) {}
 
   ~TransferNonTransferrableDiagnosticEmitter() {
     if (!emittedErrorDiagnostic) {
@@ -895,20 +905,8 @@ public:
   }
 
   /// Return the isolation region info for \p getNonTransferrableValue().
-  ValueIsolationRegionInfo getIsolationRegionInfo() const {
-    // If we have a value, then lookup the value isolation info.
-    if (auto value = getNonTransferrableValue()) {
-      return regionInfo->getValueMap().getIsolationRegion(value);
-    }
-
-    // If we have an instruction, then we have an actor in
-    auto *inst = getNonTransferringActorIntroducingInst();
-    auto trackableValue =
-        regionInfo->getValueMap().getTrackableValueForActorIntroducingInst(
-            inst);
-    if (!trackableValue)
-      return {};
-    return trackableValue->getIsolationRegionInfo();
+  IsolationRegionInfo getIsolationRegionInfo() const {
+    return info.isolationRegionInfo;
   }
 
   void emitUnknownPatternError() {
@@ -933,17 +931,6 @@ public:
                   StringRef(descriptiveKindStr), type,
                   crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
-
-    if (getIsolationRegionInfo().isTaskIsolated()) {
-      auto *fArg =
-          cast<SILFunctionArgument>(info.nonTransferrable.get<SILValue>());
-      if (fArg->getDecl()) {
-        diagnoseNote(
-            fArg->getDecl()->getLoc(),
-            diag::regionbasedisolation_isolated_since_in_same_region_basename,
-            "task-isolated", fArg->getDecl()->getBaseName());
-      }
-    }
   }
 
   void emitFunctionArgumentClosure(SourceLoc loc, Type type,
@@ -951,20 +938,6 @@ public:
     diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
                   "task-isolated", type, crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
-    // Only emit the note if our value is different from the function
-    // argument.
-    auto rep = regionInfo->getValueMap()
-                   .getTrackableValue(getOperand()->get())
-                   .getRepresentative();
-    if (!info.nonTransferrable.is<SILValue>() ||
-        rep.maybeGetValue() == info.nonTransferrable.get<SILValue>())
-      return;
-    auto *fArg =
-        cast<SILFunctionArgument>(info.nonTransferrable.get<SILValue>());
-    diagnoseNote(
-        fArg->getDecl()->getLoc(),
-        diag::regionbasedisolation_isolated_since_in_same_region_basename,
-        "task-isolated", fArg->getDecl()->getBaseName());
   }
 
   void emitFunctionArgumentApplyStronglyTransferred(SILLocation loc,
@@ -989,10 +962,14 @@ public:
   void emitNamedIsolation(SILLocation loc, Identifier name,
                           ApplyIsolationCrossing isolationCrossing) {
     emitNamedOnlyError(loc, name);
-    diagnoseNote(loc,
-                 diag::regionbasedisolation_named_transfer_non_transferrable,
-                 name, isolationCrossing.getCallerIsolation(),
-                 isolationCrossing.getCalleeIsolation());
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+    diagnoseNote(
+        loc, diag::regionbasedisolation_named_transfer_non_transferrable, name,
+        descriptiveKindStr, isolationCrossing.getCalleeIsolation());
   }
 
   void emitNamedFunctionArgumentApplyStronglyTransferred(SILLocation loc,
@@ -1069,9 +1046,8 @@ class TransferNonTransferrableDiagnosticInferrer {
 
 public:
   TransferNonTransferrableDiagnosticInferrer(
-      TransferredNonTransferrableInfo info,
-      RegionAnalysisFunctionInfo *regionInfo)
-      : diagnosticEmitter(info, regionInfo) {}
+      TransferredNonTransferrableInfo info)
+      : diagnosticEmitter(info) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
@@ -1219,15 +1195,14 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
 // Top level emission for transfer non transferable diagnostic.
 void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
-  if (transferredNonTransferrable.empty())
+  if (transferredNonTransferrableInfoList.empty())
     return;
 
   LLVM_DEBUG(
       llvm::dbgs() << "Emitting transfer non transferrable diagnostics.\n");
 
-  for (auto info : transferredNonTransferrable) {
-    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(info,
-                                                                  regionInfo);
+  for (auto info : transferredNonTransferrableInfoList) {
+    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(info);
     diagnosticInferrer.run();
   }
 }
@@ -1261,9 +1236,9 @@ struct DiagnosticEvaluator final
         transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
         transferredNonTransferrable(transferredNonTransferrable) {}
 
-  void handleFailure(const PartitionOp &partitionOp,
-                     TrackableValueID transferredVal,
-                     TransferringOperand transferringOp) const {
+  void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
+                                   TrackableValueID transferredVal,
+                                   TransferringOperand transferringOp) const {
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and transferringOp was not set with closure
     // capture.
@@ -1293,28 +1268,38 @@ struct DiagnosticEvaluator final
                                            partitionOp.getSourceInst());
   }
 
-  void handleTransferNonTransferrable(const PartitionOp &partitionOp,
-                                      TrackableValueID transferredVal) const {
+  void handleTransferNonTransferrable(
+      const PartitionOp &partitionOp, TrackableValueID transferredVal,
+      IsolationRegionInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
-               << "    Emitting TransferNonTransferrable Error!\n"
-               << "        ID:  %%" << transferredVal << "\n"
-               << "        Rep: "
-               << *info->getValueMap().getRepresentative(transferredVal));
+                   << "    Emitting TransferNonTransferrable Error!\n"
+                   << "        ID:  %%" << transferredVal << "\n"
+                   << "        Rep: "
+                   << *info->getValueMap().getRepresentative(transferredVal)
+                   << "        Dynamic Isolation Region: ";
+               isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+               llvm::dbgs() << '\n');
     auto *self = const_cast<DiagnosticEvaluator *>(this);
     auto nonTransferrableValue =
         info->getValueMap().getRepresentative(transferredVal);
-    self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
-                                                   nonTransferrableValue);
+
+    self->transferredNonTransferrable.emplace_back(
+        partitionOp.getSourceOp(), nonTransferrableValue, isolationRegionInfo);
   }
 
   void handleTransferNonTransferrable(
       const PartitionOp &partitionOp, TrackableValueID transferredVal,
-      TrackableValueID actualNonTransferrableValue) const {
+      TrackableValueID actualNonTransferrableValue,
+      IsolationRegionInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
-               << "    Emitting TransferNonTransferrable Error!\n"
-               << "        ID:  %%" << transferredVal << "\n"
-               << "        Rep: "
-               << *info->getValueMap().getRepresentative(transferredVal));
+                   << "    Emitting TransferNonTransferrable Error!\n"
+                   << "        ID:  %%" << transferredVal << "\n"
+                   << "        Rep: "
+                   << *info->getValueMap().getRepresentative(transferredVal)
+                   << "        Dynamic Isolation Region: ";
+               isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+               llvm::dbgs() << '\n');
+
     auto *self = const_cast<DiagnosticEvaluator *>(this);
     // If we have a non-actor introducing fake representative value, just use
     // the value that actually introduced the actor isolation.
@@ -1323,14 +1308,15 @@ struct DiagnosticEvaluator final
       LLVM_DEBUG(llvm::dbgs()
                  << "        ActualTransfer: " << nonTransferrableValue);
       self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
-                                                     nonTransferrableValue);
+                                                     nonTransferrableValue,
+                                                     isolationRegionInfo);
     } else if (auto *nonTransferrableInst =
                    info->getValueMap().maybeGetActorIntroducingInst(
                        actualNonTransferrableValue)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "        ActualTransfer: " << *nonTransferrableInst);
-      self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
-                                                     nonTransferrableInst);
+      self->transferredNonTransferrable.emplace_back(
+          partitionOp.getSourceOp(), nonTransferrableInst, isolationRegionInfo);
     } else {
       // Otherwise, just use the actual value.
       //
@@ -1339,7 +1325,8 @@ struct DiagnosticEvaluator final
       // region isolation info here.
       self->transferredNonTransferrable.emplace_back(
           partitionOp.getSourceOp(),
-          info->getValueMap().getRepresentative(transferredVal));
+          info->getValueMap().getRepresentative(transferredVal),
+          isolationRegionInfo);
     }
   }
 
@@ -1351,8 +1338,12 @@ struct DiagnosticEvaluator final
     return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
   }
 
-  ValueIsolationRegionInfo::Kind hasSpecialDerivation(Element element) const {
+  IsolationRegionInfo::Kind hasSpecialDerivation(Element element) const {
     return info->getValueMap().getIsolationRegion(element).getKind();
+  }
+
+  IsolationRegionInfo getIsolationRegionInfo(Element element) const {
+    return info->getValueMap().getIsolationRegion(element);
   }
 
   bool isClosureCaptured(Element element, Operand *op) const {
@@ -1384,7 +1375,7 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
     Partition workingPartition = blockState.getEntryPartition();
     DiagnosticEvaluator eval(workingPartition, regionInfo,
                              transferOpToRequireInstMultiMap,
-                             transferredNonTransferrable);
+                             transferredNonTransferrableInfoList);
 
     // And then evaluate all of our partition ops on the entry partition.
     for (auto &partitionOp : blockState.getPartitionOps()) {

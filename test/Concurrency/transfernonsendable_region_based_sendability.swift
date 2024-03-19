@@ -66,7 +66,6 @@ func test_isolation_crossing_sensitivity(a : A) async {
 }
 
 func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
-    // expected-tns-note @-1:36 {{value is task-isolated since it is in the same region as 'ns_arg'}}
     let ns_let = NonSendable();
 
     // Safe to consume an rvalue.
@@ -381,7 +380,6 @@ class C_NonSendable {
     func bar() {}
 
     func bar(a : A) async {
-        // expected-tns-note @-1:10 {{value is task-isolated since it is in the same region as 'self'}}
         let captures_self = { self.bar() }
 
         // this is not a cross-isolation call, so it should be permitted

@@ -44,7 +44,6 @@ actor ProtectsNonSendable {
 
   // This should get the note since l is different from 'ns'.
   nonisolated func testParameterMergedIntoLocal(_ ns: NonSendableKlass) async {
-    // expected-note @-1 {{value is task-isolated since it is in the same region as 'ns'}}
     let l = NonSendableKlass()
     doSomething(l, ns)
     self.assumeIsolated { isolatedSelf in
