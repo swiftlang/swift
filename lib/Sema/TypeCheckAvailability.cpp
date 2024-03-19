@@ -3557,6 +3557,7 @@ private:
   /// availability.
   void maybeDiagKeyPath(KeyPathExpr *KP) {
     auto flags = DeclAvailabilityFlags();
+    auto declContext = Where.getDeclContext();
     if (KP->isObjC())
       flags = DeclAvailabilityFlag::ForObjCKeyPath;
 
@@ -3566,7 +3567,10 @@ private:
       case KeyPathExpr::Component::Kind::Subscript: {
         auto decl = component.getDeclRef();
         auto loc = component.getLoc();
-        diagnoseDeclRefAvailability(decl, loc, nullptr, flags);
+        auto range = component.getSourceRange();
+        if (diagnoseDeclRefAvailability(decl, loc, nullptr, flags))
+          break;
+        maybeDiagStorageAccess(decl.getDecl(), range, declContext);
         break;
       }
 

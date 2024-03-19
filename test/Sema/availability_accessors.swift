@@ -34,21 +34,21 @@ struct BaseStruct {
 
   var unavailableGetter: Value {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 24 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 28 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
     set {}
   }
 
   var unavailableSetter: Value {
     get { .defaultValue }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 12 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 16 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: Value {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 24 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 28 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 12 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 16 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
 }
 
@@ -117,10 +117,10 @@ func testKeyPathLoads() {
   _ = a[keyPath: \.[takesIntInOut(&x.available.a.b)]]
   _ = a[keyPath: \.[takesIntInOut(&x.available[0].b)]]
 
-  _ = x[keyPath: \.unavailableGetter] // FIXME: missing diagnostic for getter
-  _ = x[keyPath: \.unavailableGetter.a] // FIXME: missing diagnostic for getter
-  _ = x[keyPath: \.unavailableGetter[0]] // FIXME: missing diagnostic for getter
-  _ = x[keyPath: \.unavailableGetter[0].b] // FIXME: missing diagnostic for getter
+  _ = x[keyPath: \.unavailableGetter] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = x[keyPath: \.unavailableGetter.a] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = x[keyPath: \.unavailableGetter[0]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = x[keyPath: \.unavailableGetter[0].b] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetter.a.b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetter[0].b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
@@ -131,10 +131,10 @@ func testKeyPathLoads() {
   _ = a[keyPath: \.[takesIntInOut(&x.unavailableSetter.a.b)]] // FIXME: missing diagnostic for setter
   _ = a[keyPath: \.[takesIntInOut(&x.unavailableSetter[0].b)]] // expected-error {{setter for 'unavailableSetter' is unavailable}}
 
-  _ = x[keyPath: \.unavailableGetterAndSetter] // FIXME: missing diagnostic for getter
-  _ = x[keyPath: \.unavailableGetterAndSetter.a] // FIXME: missing diagnostic for getter
-  _ = x[keyPath: \.unavailableGetterAndSetter[0]] // FIXME: missing diagnostic for getter
-  _ = x[keyPath: \.unavailableGetterAndSetter[0].b] // FIXME: missing diagnostic for getter
+  _ = x[keyPath: \.unavailableGetterAndSetter] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = x[keyPath: \.unavailableGetterAndSetter.a] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = x[keyPath: \.unavailableGetterAndSetter[0]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = x[keyPath: \.unavailableGetterAndSetter[0].b] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter.a.b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} FIXME: missing diagnostic for setter
   _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
@@ -158,17 +158,17 @@ func testKeyPathAssignments() {
   a[keyPath: \.[takesIntInOut(&x.unavailableGetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
   a[keyPath: \.[takesIntInOut(&x.unavailableGetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
-  x[keyPath: \.unavailableSetter] = someValue
-  x[keyPath: \.unavailableSetter.a] = someValue.a // FIXME: missing diagnostic for setter
-  x[keyPath: \.unavailableSetter[0]] = someValue.a // FIXME: missing diagnostic for setter
-  x[keyPath: \.unavailableSetter[0].b] = 1 // FIXME: missing diagnostic for setter
+  x[keyPath: \.unavailableSetter] = someValue // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  x[keyPath: \.unavailableSetter.a] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  x[keyPath: \.unavailableSetter[0]] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  x[keyPath: \.unavailableSetter[0].b] = 1 // expected-error {{setter for 'unavailableSetter' is unavailable}}
   a[keyPath: \.[takesIntInOut(&x.unavailableSetter.a.b)]] = 0 // FIXME: missing diagnostic for setter
   a[keyPath: \.[takesIntInOut(&x.unavailableSetter[0].b)]] = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}}
 
-  x[keyPath: \.unavailableGetterAndSetter] = someValue
-  x[keyPath: \.unavailableGetterAndSetter.a] = someValue.a // FIXME: missing diagnostics for getter and setter
-  x[keyPath: \.unavailableGetterAndSetter[0]] = someValue.a // FIXME: missing diagnostics for getter and setter
-  x[keyPath: \.unavailableGetterAndSetter[0].b] = 1 // FIXME: missing diagnostics for getter and setter
+  x[keyPath: \.unavailableGetterAndSetter] = someValue // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  x[keyPath: \.unavailableGetterAndSetter.a] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  x[keyPath: \.unavailableGetterAndSetter[0]] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  x[keyPath: \.unavailableGetterAndSetter[0].b] = 1 // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} FIXME: missing diagnostic for setter
   a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
