@@ -32,6 +32,7 @@
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
