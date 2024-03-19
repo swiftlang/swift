@@ -21,7 +21,12 @@ enum Cat<Left: ~Copyable, Right: ~Copyable>: Copyable {
     case meows
     init() { self = .meows }
 }
-extension Cat: P where Left: Copyable {}
+extension Cat: P where Left: Copyable, Right: ~Copyable {}
+
+struct ConditionallyCopyable<T: ~Copyable>: ~Copyable {
+  var value: Int = 17
+}
+extension ConditionallyCopyable: Copyable where T: Copyable { }
 
 func attemptCall(_ a: Any) {
   if let value = a as? P {
@@ -36,16 +41,20 @@ func main() {
   // CHECK: hello
   attemptCall(Dog<Ordinary>())
 
-  // FIXME: this is NOT suppose to succeed! (rdar://123466649)
-  // CHECK: hello
+  // CHECK: failed to cast (attemptCall)
   attemptCall(Dog<Noncopyable>())
+
+  // CHECK: failed to cast (attemptCall)
+  attemptCall(Dog<ConditionallyCopyable<Noncopyable>>())
 
   // CHECK: hello
   attemptCall(Cat<Ordinary, Noncopyable>())
 
-  // FIXME: this is NOT suppose to succeed! (rdar://123466649)
-  // CHECK: hello
+  // CHECK: failed to cast (attemptCall)
   attemptCall(Cat<Noncopyable, Ordinary>())
+
+   // CHECK: failed to cast (attemptCall)
+  attemptCall(Cat<Noncopyable, ConditionallyCopyable<Ordinary>>())
 
   // CHECK: cast succeeded
   test_radar124171788(.nothing)
