@@ -27,7 +27,7 @@ struct Test2: TestProtocol { // expected-warning{{conformance of 'C2' to 'Sendab
 
 @MainActor
 func iterate(stream: AsyncStream<Int>) async {
-  nonisolated(unsafe) var it = stream.makeAsyncIterator() // expected-region-isolation-note {{variable defined here}}
+  nonisolated(unsafe) var it = stream.makeAsyncIterator()
   // FIXME: Region isolation should consider a value from a 'nonisolated(unsafe)'
   // declaration to be in a disconnected region
 

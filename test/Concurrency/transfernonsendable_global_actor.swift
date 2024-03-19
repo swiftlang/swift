@@ -103,7 +103,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 }
 
 @GlobalActor func useGlobalActor6() async {
-  var x = StructContainingValue() // expected-tns-note {{variable defined here}}
+  var x = StructContainingValue()
   x = StructContainingValue()
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
