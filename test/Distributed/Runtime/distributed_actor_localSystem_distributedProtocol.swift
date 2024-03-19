@@ -16,7 +16,7 @@
 
 import Distributed
 
-// @_DistributedProtocol
+@_DistributedProtocol
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
   //  distributed func hi(name: String)
@@ -34,17 +34,17 @@ distributed actor Worker: WorkerProtocol {
 //  }
 }
 
-@available(SwiftStdlib 6.0, *)
-extension WorkerProtocol {
-    distributed var distributedVariable: String { "" }
-}
+//@available(SwiftStdlib 6.0, *)
+//extension WorkerProtocol {
+//    distributed var distributedVariable: String { "" }
+//}
 
 // ==== Execute ----------------------------------------------------------------
 
 
 @available(SwiftStdlib 6.0, *)
-func test<DA: WorkerProtocol>(actor: DA) async throws {
-    _ = try await actor.distributedVariable
+func test<DA: WorkerProtocol>(actor: DA) async throws -> String {
+    try await actor.distributedVariable
 }
 
 @available(SwiftStdlib 6.0, *)
@@ -55,11 +55,11 @@ func test<DA: WorkerProtocol>(actor: DA) async throws {
     let actor = Worker(actorSystem: system)
     try await test(actor: actor)
 
-//    // local calls should still just work
-//
-//    let v = try await actor.distributedVariable
-//    print("v = \(v)") // CHECK: v = implemented!
+    // force a call through witness table
+//    let v1 = try await test(actor: actor)
+//    print("v1 = \(v1)") // CHECK: v1 = implemented!
 
-
+    let v2 = try await actor.distributedVariable
+    print("v2 = \(v2)") // CHECK: v2 = implemented!
   }
 }

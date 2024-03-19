@@ -682,7 +682,13 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
+        auto isDistributedFuncOrAccessor =
+            func->isDistributed();
+        if (auto acc = dyn_cast<AccessorDecl>(func)) {
+          isDistributedFuncOrAccessor =
+              acc->getStorage()->isDistributed();
+        }
+        if (isa<ProtocolDecl>(func->getDeclContext()) && isDistributedFuncOrAccessor) {
           // If we're calling cross-actor, we must always use a distributed thunk
           if (!isSameActorIsolated(func, SGF.FunctionDC)) {
             // the protocol witness must always be a distributed thunk, as we
