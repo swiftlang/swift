@@ -130,9 +130,10 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
   x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring value of non-Sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' from global actor 'GlobalActor'-isolated context to nonisolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
+  // expected-tns-note @-1 {{'x' is transferred from global actor 'GlobalActor'-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{access here could race}}
 }
@@ -142,10 +143,10 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 
   x.1 = firstList
 
-  // TODO: This should be a global actor isolated error, not a task-isolated error.
-  await transferToNonIsolated(x) // expected-tns-warning {{global actor 'GlobalActor'-isolated value of type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' transferred to nonisolated context}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
+  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'GlobalActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x)
 }

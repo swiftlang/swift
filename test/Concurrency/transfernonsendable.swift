@@ -15,7 +15,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 35{{}}
+class NonSendableKlass { // expected-complete-note 36{{}}
   // expected-typechecker-only-note @-1 4{{}}
   // expected-tns-note @-2 2{{}}
   var field: NonSendableKlass? = nil
@@ -1275,8 +1275,9 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive7() async {
 
 func varSendableTrivialLetTupleFieldTest() async {
   let test = (0, SendableKlass(), NonSendableKlass())
-  await transferToMain(test) // expected-tns-warning {{transferring value of non-Sendable type '(Int, SendableKlass, NonSendableKlass)' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
+  // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
   let z = test.0
   useValue(z)
   useValue(test) // expected-tns-note {{access here could race}}
@@ -1284,8 +1285,9 @@ func varSendableTrivialLetTupleFieldTest() async {
 
 func varSendableNonTrivialLetTupleFieldTest() async {
   let test = (0, SendableKlass(), NonSendableKlass())
-  await transferToMain(test) // expected-tns-warning {{transferring value of non-Sendable type '(Int, SendableKlass, NonSendableKlass)' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
+  // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
   let z = test.1
   useValue(z)
   useValue(test) // expected-tns-note {{access here could race}}
@@ -1293,8 +1295,9 @@ func varSendableNonTrivialLetTupleFieldTest() async {
 
 func varNonSendableNonTrivialLetTupleFieldTest() async {
   let test = (0, SendableKlass(), NonSendableKlass())
-  await transferToMain(test) // expected-tns-warning {{transferring value of non-Sendable type '(Int, SendableKlass, NonSendableKlass)' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
+  // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
   let z = test.2
   // The SIL emitted for the assignment of the tuple is just a jumble of
   // instructions that are not semantically significant. The result is that we
@@ -1306,8 +1309,19 @@ func varNonSendableNonTrivialLetTupleFieldTest() async {
 func varSendableTrivialVarTupleFieldTest() async {
   var test = (0, SendableKlass(), NonSendableKlass()) 
   test = (0, SendableKlass(), NonSendableKlass())
-  await transferToMain(test) // expected-tns-warning {{transferring value of non-Sendable type '(Int, SendableKlass, NonSendableKlass)' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
+  // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
+  _ = test.0
+  useValue(test) // expected-tns-note {{access here could race}}
+}
+
+func varSendableTrivialVarTupleFieldTest2() async {
+  var test = (0, SendableKlass(), NonSendableKlass()) 
+  test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test.2) // expected-tns-warning {{transferring 'test.2' may cause a race}}
+  // expected-tns-note @-1 {{'test.2' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   _ = test.0
   useValue(test) // expected-tns-note {{access here could race}}
 }
@@ -1315,8 +1329,9 @@ func varSendableTrivialVarTupleFieldTest() async {
 func varSendableNonTrivialVarTupleFieldTest() async {
   var test = (0, SendableKlass(), NonSendableKlass()) 
   test = (0, SendableKlass(), NonSendableKlass())
-  await transferToMain(test) // expected-tns-warning {{transferring value of non-Sendable type '(Int, SendableKlass, NonSendableKlass)' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
+  // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
   _ = test.1
   useValue(test) // expected-tns-note {{access here could race}}
 }
@@ -1324,8 +1339,9 @@ func varSendableNonTrivialVarTupleFieldTest() async {
 func varNonSendableNonTrivialVarTupleFieldTest() async {
   var test = (0, SendableKlass(), NonSendableKlass()) 
   test = (0, SendableKlass(), NonSendableKlass())
-  await transferToMain(test) // expected-tns-warning {{transferring value of non-Sendable type '(Int, SendableKlass, NonSendableKlass)' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
+  // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
   let z = test.2 // expected-tns-note {{access here could race}}
   useValue(z)
   useValue(test)
