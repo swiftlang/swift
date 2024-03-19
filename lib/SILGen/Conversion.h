@@ -52,11 +52,9 @@ public:
     /// A subtype conversion.
     Subtype,
 
-    /// An orig-to-subst conversion.
-    OrigToSubst,
-
-    /// A subst-to-orig conversion.  These can always be annihilated.
-    SubstToOrig,
+    /// A reabstraction conversion.  There can also be a subtype difference
+    /// between the substituted types.
+    Reabstract,
   };
 
   static bool isBridgingKind(KindTy kind) {
@@ -69,8 +67,7 @@ public:
     case Subtype:
       return true;
 
-    case OrigToSubst:
-    case SubstToOrig:
+    case Reabstract:
       return false;
     }
     llvm_unreachable("bad kind");
@@ -78,8 +75,7 @@ public:
   
   static bool isReabstractionKind(KindTy kind) {
     switch (kind) {
-    case OrigToSubst:
-    case SubstToOrig:
+    case Reabstract:
       return true;
 
     case BridgeToObjC:
@@ -104,12 +100,12 @@ private:
   };
 
   struct ReabstractionTypes {
-    // Whether this abstraction pattern applies to the input or output
-    // substituted type is determined by the kind.
-    AbstractionPattern OrigType;
-    CanType SubstSourceType;
-    CanType SubstResultType;
-    SILType LoweredResultType;
+    AbstractionPattern InputOrigType;
+    AbstractionPattern OutputOrigType;
+    CanType InputSubstType;
+    CanType OutputSubstType;
+    SILType InputLoweredTy;
+    SILType OutputLoweredTy;
   };
 
   using Members = ExternalUnionMembers<BridgingTypes, ReabstractionTypes>;
@@ -124,8 +120,7 @@ private:
     case Subtype:
       return Members::indexOf<BridgingTypes>();
 
-    case OrigToSubst:
-    case SubstToOrig:
+    case Reabstract:
       return Members::indexOf<ReabstractionTypes>();
     }
     llvm_unreachable("bad kind");
@@ -142,32 +137,41 @@ private:
                                           loweredResultTy, isExplicit);
   }
 
-  Conversion(KindTy kind, AbstractionPattern origType, CanType substSourceType,
-             CanType substResultType, SILType loweredResultTy)
-      : Kind(kind) {
-    Types.emplaceAggregate<ReabstractionTypes>(kind, origType, substSourceType,
-                                               substResultType, loweredResultTy);
+  Conversion(AbstractionPattern inputOrigType, CanType inputSubstType,
+             SILType inputLoweredTy,
+             AbstractionPattern outputOrigType, CanType outputSubstType,
+             SILType outputLoweredTy)
+      : Kind(Reabstract) {
+    Types.emplaceAggregate<ReabstractionTypes>(Kind, inputOrigType, outputOrigType,
+                                               inputSubstType, outputSubstType,
+                                               inputLoweredTy, outputLoweredTy);
   }
 
 public:
   static Conversion getOrigToSubst(AbstractionPattern origType,
                                    CanType substType,
-                                   SILType loweredResultTy) {
-    return Conversion(OrigToSubst, origType, substType, substType, loweredResultTy);
+                                   SILType inputLoweredTy,
+                                   SILType outputLoweredTy) {
+    return getReabstract(origType, substType, inputLoweredTy,
+                         AbstractionPattern(substType), substType, outputLoweredTy);
   }
 
   static Conversion getSubstToOrig(AbstractionPattern origType,
                                    CanType substType,
-                                   SILType loweredResultTy) {
-    return Conversion(SubstToOrig, origType, substType, substType, loweredResultTy);
+                                   SILType inputLoweredTy,
+                                   SILType outputLoweredTy) {
+    return getReabstract(AbstractionPattern(substType), substType, inputLoweredTy,
+                         origType, substType, outputLoweredTy);
   }
 
-  static Conversion getSubstToOrig(CanType inputSubstType,
-                                   AbstractionPattern outputOrigType,
-                                   CanType outputSubstType,
-                                   SILType loweredResultTy) {
-    return Conversion(SubstToOrig, outputOrigType, inputSubstType,
-                      outputSubstType, loweredResultTy);
+  static Conversion getReabstract(AbstractionPattern inputOrigType,
+                                  CanType inputSubstType,
+                                  SILType inputLoweredTy,
+                                  AbstractionPattern outputOrigType,
+                                  CanType outputSubstType,
+                                  SILType outputLoweredTy) {
+    return Conversion(inputOrigType, inputSubstType, inputLoweredTy,
+                      outputOrigType, outputSubstType, outputLoweredTy);
   }
 
   static Conversion getBridging(KindTy kind, CanType origType,
@@ -194,20 +198,28 @@ public:
     return isReabstractionKind(getKind());
   }
 
-  AbstractionPattern getReabstractionOrigType() const {
-    return Types.get<ReabstractionTypes>(Kind).OrigType;
+  AbstractionPattern getReabstractionInputOrigType() const {
+    return Types.get<ReabstractionTypes>(Kind).InputOrigType;
   }
 
-  CanType getReabstractionSubstSourceType() const {
-    return Types.get<ReabstractionTypes>(Kind).SubstSourceType;
+  CanType getReabstractionInputSubstType() const {
+    return Types.get<ReabstractionTypes>(Kind).InputSubstType;
   }
 
-  CanType getReabstractionSubstResultType() const {
-    return Types.get<ReabstractionTypes>(Kind).SubstResultType;
+  SILType getReabstractionInputLoweredType() const {
+    return Types.get<ReabstractionTypes>(Kind).InputLoweredTy;
   }
 
-  SILType getReabstractionLoweredResultType() const {
-    return Types.get<ReabstractionTypes>(Kind).LoweredResultType;
+  AbstractionPattern getReabstractionOutputOrigType() const {
+    return Types.get<ReabstractionTypes>(Kind).OutputOrigType;
+  }
+
+  CanType getReabstractionOutputSubstType() const {
+    return Types.get<ReabstractionTypes>(Kind).OutputSubstType;
+  }
+
+  SILType getReabstractionOutputLoweredType() const {
+    return Types.get<ReabstractionTypes>(Kind).OutputLoweredTy;
   }
 
   bool isBridgingExplicit() const {
@@ -259,7 +271,10 @@ public:
 
     /// The inner conversion is a subtype conversion and can be done implicitly
     /// as part of the outer conversion.
-    SubtypeIntoSubstToOrig,
+    SubtypeIntoReabstract,
+
+    /// Both conversions are reabstractions and can be combined.
+    Reabstract,
   };
 
 private:

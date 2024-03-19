@@ -1042,7 +1042,8 @@ ManagedValue SILGenFunction::emitAsOrig(SILLocation loc,
                                         ValueProducerRef produceValue) {
   // If the lowered substituted type already matches the substitution,
   // we can just emit directly.
-  if (getLoweredType(substType).getASTType() == expectedTy.getASTType()) {
+  auto loweredSubstTy = getLoweredType(substType);
+  if (loweredSubstTy.getASTType() == expectedTy.getASTType()) {
     auto result = produceValue(*this, loc, C);
 
     // For convenience, force the result into the destination.
@@ -1054,7 +1055,7 @@ ManagedValue SILGenFunction::emitAsOrig(SILLocation loc,
   }
 
   auto conversion =
-    Conversion::getSubstToOrig(origType, substType, expectedTy);
+    Conversion::getSubstToOrig(origType, substType, loweredSubstTy, expectedTy);
   auto result = emitConvertedRValue(loc, conversion, C, produceValue);
 
   // emitConvertedRValue always forces results into the context.
@@ -1178,19 +1179,30 @@ emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
   case ConversionPeepholeHint::Identity:
     return produceValue(C);
 
-  case ConversionPeepholeHint::SubtypeIntoSubstToOrig: {
+  case ConversionPeepholeHint::SubtypeIntoReabstract: {
     assert(!hint.isForced());
     assert(innerConversion.getKind() == Conversion::Subtype);
-    assert(outerConversion.getKind() == Conversion::SubstToOrig);
-    // The outer conversion's source type is somewhere between
-    // the inner conversion's source type and the outer conversion's result
-    // type, but subtyping is not path-dependent (right?) so we shouldn't
-    // have to preserve it.
-    auto newConversion = Conversion::getSubstToOrig(
-      innerConversion.getBridgingSourceType(),
-      outerConversion.getReabstractionOrigType(),
-      outerConversion.getReabstractionSubstResultType(),
-      outerConversion.getReabstractionLoweredResultType());
+    assert(outerConversion.getKind() == Conversion::Reabstract);
+
+    auto inputSubstType = innerConversion.getBridgingSourceType();
+    auto inputOrigType = AbstractionPattern(inputSubstType);
+    auto inputLoweredTy = SGF.getLoweredType(inputOrigType, inputSubstType);
+    auto newConversion = Conversion::getReabstract(
+      inputOrigType, inputSubstType, inputLoweredTy,
+      outerConversion.getReabstractionOutputOrigType(),
+      outerConversion.getReabstractionOutputSubstType(),
+      outerConversion.getReabstractionOutputLoweredType());
+    return SGF.emitConvertedRValue(loc, newConversion, C, produceOrigValue);
+  }
+
+  case ConversionPeepholeHint::Reabstract: {
+    auto newConversion = Conversion::getReabstract(
+      innerConversion.getReabstractionInputOrigType(),
+      innerConversion.getReabstractionInputSubstType(),
+      innerConversion.getReabstractionInputLoweredType(),
+      outerConversion.getReabstractionOutputOrigType(),
+      outerConversion.getReabstractionOutputSubstType(),
+      outerConversion.getReabstractionOutputLoweredType());
     return SGF.emitConvertedRValue(loc, newConversion, C, produceOrigValue);
   }
 
@@ -1337,21 +1349,15 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
                                         getBridgingLoweredResultType(), C,
                                         /*isResult*/ true);
 
-  case SubstToOrig:
+  case Reabstract:
+    assert(value.getType().getObjectType() ==
+           getReabstractionInputLoweredType().getObjectType());
     return SGF.emitTransformedValue(loc, value,
-                 AbstractionPattern(getReabstractionSubstSourceType()),
-                                    getReabstractionSubstSourceType(),
-                                    getReabstractionOrigType(),
-                                    getReabstractionSubstResultType(),
-                                    getReabstractionLoweredResultType(), C);
-
-  case OrigToSubst:
-    return SGF.emitTransformedValue(loc, value,
-                                    getReabstractionOrigType(),
-                                    getReabstractionSubstSourceType(),
-                 AbstractionPattern(getReabstractionSubstResultType()),
-                                    getReabstractionSubstResultType(),
-                                    getReabstractionLoweredResultType(), C);
+                                    getReabstractionInputOrigType(),
+                                    getReabstractionInputSubstType(),
+                                    getReabstractionOutputOrigType(),
+                                    getReabstractionOutputSubstType(),
+                                    getReabstractionOutputLoweredType(), C);
   }
   llvm_unreachable("bad kind");
 }
@@ -1359,8 +1365,7 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
 std::optional<Conversion>
 Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   switch (getKind()) {
-  case SubstToOrig:
-  case OrigToSubst:
+  case Reabstract:
     // TODO: handle reabstraction conversions here, too.
     return std::nullopt;
 
@@ -1382,8 +1387,7 @@ Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
 
 std::optional<Conversion> Conversion::adjustForInitialForceValue() const {
   switch (getKind()) {
-  case SubstToOrig:
-  case OrigToSubst:
+  case Reabstract:
   case AnyErasure:
   case BridgeFromObjC:
   case BridgeResultFromObjC:
@@ -1411,14 +1415,18 @@ void Conversion::dump() const {
 
 static void printReabstraction(const Conversion &conversion,
                                llvm::raw_ostream &out, StringRef name) {
-  out << name << "(orig: ";
-  conversion.getReabstractionOrigType().print(out);
-  out << ", substSource: ";
-  conversion.getReabstractionSubstSourceType().print(out);
-  out << ", substResult: ";
-  conversion.getReabstractionSubstResultType().print(out);
-  out << ", loweredResult: ";
-  conversion.getReabstractionLoweredResultType().print(out);
+  out << name << "(inputOrig: ";
+  conversion.getReabstractionInputOrigType().print(out);
+  out << ", inputSubst: ";
+  conversion.getReabstractionInputSubstType().print(out);
+  out << ", inputLowered: ";
+  conversion.getReabstractionInputLoweredType().print(out);
+  out << ", outputOrig: ";
+  conversion.getReabstractionOutputOrigType().print(out);
+  out << ", outputSubst: ";
+  conversion.getReabstractionOutputSubstType().print(out);
+  out << ", outputLowered: ";
+  conversion.getReabstractionOutputLoweredType().print(out);
   out << ')';
 }
 
@@ -1433,10 +1441,8 @@ static void printBridging(const Conversion &conversion, llvm::raw_ostream &out,
 
 void Conversion::print(llvm::raw_ostream &out) const {
   switch (getKind()) {
-  case SubstToOrig:
-    return printReabstraction(*this, out, "SubstToOrig");
-  case OrigToSubst:
-    return printReabstraction(*this, out, "OrigToSubst");
+  case Reabstract:
+    return printReabstraction(*this, out, "Reabstract");
   case AnyErasure:
     return printBridging(*this, out, "AnyErasure");
   case Subtype:
@@ -1533,6 +1539,130 @@ static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
   return false;
 }
 
+/// Can a sequence of conversions from type1 -> type2 -> type3 be represented
+/// as a conversion from type1 -> type3, or does that lose critical information?
+static bool isPeepholeableConversionImpl(CanType type1,
+                                         CanType type2,
+                                         CanType type3) {
+  if (type1 == type2 || type2 == type3) return true;
+
+  // If the final result type is optional, then either we've got two
+  // optional->optional conversions or we injected into optional in at
+  // least one of the stages.  Our analysis of how to do the conversion is
+  // going to be sensitive to the static optional depth, so make sure we
+  // don't lose that.
+  if (auto object3 = type3.getOptionalObjectType()) {
+    if (auto object2 = type2.getOptionalObjectType()) {
+      // If we have optional -> optional conversions at both stages,
+      // look through them all.
+      if (auto object1 = type1.getOptionalObjectType()) {
+        return isPeepholeableConversionImpl(object1, object2, object3);
+
+      // If we have an injection in the first stage, we'll still know we have
+      // an injection in the overall conversion.
+      } else {
+        return isPeepholeableConversionImpl(type1, object2, object3);
+      }
+
+    // We have an injection in the second stage.  If we lose optionality
+    // in the first stage (i.e. we're converting an optional to an
+    // existential), then the combined conversion will be misinterpreted
+    // as an optional-to-optional conversion.
+    } else if (type1.getOptionalObjectType()) {
+      return false;
+
+    // Otherwise, we're preserving that we have an injection overall.
+    } else {
+      return isPeepholeableConversionImpl(type1, type2, object3);
+    }
+  }
+
+  // When we open an existential, we bind the erased type; this type should
+  // not change if we combine the conversions.  The binding looks
+  // polymorphically through certain types but not through others.
+  if (type3.isExistentialType()) {
+    // We need to consider type2 to see if it has structure that
+    // would make it non-polymorphic, like if it's an optional.
+
+    // Existentials (including existential metatypes) are polymorphic.
+    if (type2.isAnyExistentialType())
+      return true;
+
+    // Class types are polymorphic.
+    if (type2.isAnyClassReferenceType())
+      return true;
+
+    // Metatypes are polymorphic.
+    if (isa<MetatypeType>(type2))
+      return true;
+
+    // Otherwise, no.  Since we know that type1 != type2, we know that type2
+    // must have some kind of subtype-supporting structure; with the cases
+    // above ruled out, that must be either an optional or a function type.
+    // Note that, with an optional, we can probably still dynamically cast
+    // successfully, but that's not the standard we need to enforce here.
+    return false;
+  }
+
+  // If we have a function or tuple type, we need to see if we have a
+  // non-peepholeable conversion in the subconversions.
+
+  if (auto tuple3 = dyn_cast<TupleType>(type3)) {
+    auto tuple2 = cast<TupleType>(type2);
+    auto tuple1 = cast<TupleType>(type1);
+    assert(tuple1->getNumElements() == tuple3->getNumElements());
+    assert(tuple2->getNumElements() == tuple3->getNumElements());
+    for (auto i : range(tuple3->getNumElements())) {
+      if (!isPeepholeableConversionImpl(tuple1.getElementType(i),
+                                        tuple2.getElementType(i),
+                                        tuple3.getElementType(i)))
+        return false;
+    }
+    return true;
+  }
+
+  if (auto fn3 = dyn_cast<AnyFunctionType>(type3)) {
+    auto fn2 = cast<AnyFunctionType>(type2);
+    auto fn1 = cast<AnyFunctionType>(type1);
+    assert(fn1->getNumParams() == fn3->getNumParams());
+    assert(fn2->getNumParams() == fn3->getNumParams());
+    if (!isPeepholeableConversionImpl(fn1.getResult(),
+                                      fn2.getResult(),
+                                      fn3.getResult()))
+      return false;
+    for (auto i : range(fn3->getNumParams())) {
+      // Note the reversal for invariance.
+      if (!isPeepholeableConversionImpl(fn3.getParams()[i].getParameterType(),
+                                        fn2.getParams()[i].getParameterType(),
+                                        fn1.getParams()[i].getParameterType()))
+        return false;
+    }
+    return true;
+  }
+
+  if (auto exp3 = dyn_cast<PackExpansionType>(type3)) {
+    auto exp2 = cast<PackExpansionType>(type2);
+    auto exp1 = cast<PackExpansionType>(type1);
+    return isPeepholeableConversionImpl(exp1.getPatternType(),
+                                        exp2.getPatternType(),
+                                        exp3.getPatternType());
+  }
+
+  // The only remaining types that support subtyping are classes and
+  // metatypes, and we can definitely just convert those.
+  return true;
+}
+
+/// Can we combine the given conversions so that we go straight from
+/// innerSrcType to outerDestType, or does that lose information?
+static bool isPeepholeableConversion(CanType innerSrcType, CanType innerDestType,
+                                     CanType outerSrcType, CanType outerDestType) {
+  assert(innerDestType == outerSrcType &&
+         "unexpected intermediate conversion");
+
+  return isPeepholeableConversionImpl(innerSrcType, innerDestType, outerDestType);
+}
+
 /// TODO: this would really be a lot cleaner if it just returned a
 /// std::optional<Conversion>.
 std::optional<ConversionPeepholeHint>
@@ -1540,28 +1670,37 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
                                  const Conversion &outerConversion,
                                  const Conversion &innerConversion) {
   switch (outerConversion.getKind()) {
-  case Conversion::OrigToSubst:
-  case Conversion::SubstToOrig:
+  case Conversion::Reabstract:
     switch (innerConversion.getKind()) {
-    case Conversion::OrigToSubst:
-    case Conversion::SubstToOrig:
-      if (innerConversion.getKind() == outerConversion.getKind())
-        break;
+    case Conversion::Reabstract:
+      // We can never combine conversions in a way that would lose information
+      // about the intermediate types.
+      if (!isPeepholeableConversion(
+             innerConversion.getReabstractionInputSubstType(),
+             innerConversion.getReabstractionOutputSubstType(),
+             outerConversion.getReabstractionInputSubstType(),
+             outerConversion.getReabstractionOutputSubstType()))
+        return std::nullopt;
 
-      if (innerConversion.getReabstractionOrigType().getCachingKey() !=
-          outerConversion.getReabstractionOrigType().getCachingKey() ||
-          innerConversion.getReabstractionSubstSourceType() !=
-          outerConversion.getReabstractionSubstResultType()) {
-        break;
-      }
+      // Recognize when the whole conversion is an identity.
+      if (innerConversion.getReabstractionInputLoweredType().getObjectType() ==
+          outerConversion.getReabstractionOutputLoweredType().getObjectType())
+        return ConversionPeepholeHint(ConversionPeepholeHint::Identity, false);
 
-      return ConversionPeepholeHint(ConversionPeepholeHint::Identity, false);
+      return ConversionPeepholeHint(ConversionPeepholeHint::Reabstract, false);
 
     case Conversion::Subtype:
-      if (outerConversion.getKind() == Conversion::SubstToOrig)
-        return ConversionPeepholeHint(
-                 ConversionPeepholeHint::SubtypeIntoSubstToOrig, false);
-      break;
+      // We can never combine conversions in a way that would lose information
+      // about the intermediate types.
+      if (!isPeepholeableConversion(
+             innerConversion.getBridgingSourceType(),
+             innerConversion.getBridgingResultType(),
+             outerConversion.getReabstractionInputSubstType(),
+             outerConversion.getReabstractionOutputSubstType()))
+        return std::nullopt;
+
+      return ConversionPeepholeHint(
+               ConversionPeepholeHint::SubtypeIntoReabstract, false);
 
     default:
       break;
@@ -1570,7 +1709,11 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
     return std::nullopt;
 
   case Conversion::Subtype:
-    if (innerConversion.getKind() == Conversion::Subtype)
+    if (innerConversion.getKind() == Conversion::Subtype &&
+        isPeepholeableConversion(innerConversion.getBridgingSourceType(),
+                                 innerConversion.getBridgingResultType(),
+                                 outerConversion.getBridgingSourceType(),
+                                 outerConversion.getBridgingResultType()))
       return ConversionPeepholeHint(ConversionPeepholeHint::Subtype, false);
     return std::nullopt;
 
