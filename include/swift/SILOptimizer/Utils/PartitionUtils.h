@@ -134,51 +134,20 @@ struct TransferringOperand {
        << "User: " << *getUser();
   }
 
+  static void Profile(llvm::FoldingSetNodeID &id, Operand *op,
+                      bool isClosureCaptured) {
+    id.AddPointer(op);
+    id.AddBoolean(isClosureCaptured);
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    Profile(id, getOperand(), isClosureCaptured());
+  }
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
 } // namespace swift
-
-namespace llvm {
-
-template <>
-struct PointerLikeTypeTraits<swift::TransferringOperand> {
-  using TransferringOperand = swift::TransferringOperand;
-
-  static inline void *getAsVoidPointer(TransferringOperand ptr) {
-    return PointerLikeTypeTraits<
-        TransferringOperand::ValueType>::getAsVoidPointer(ptr.value);
-  }
-  static inline TransferringOperand getFromVoidPointer(void *ptr) {
-    return {PointerLikeTypeTraits<
-        TransferringOperand::ValueType>::getFromVoidPointer(ptr)};
-  }
-
-  static constexpr int NumLowBitsAvailable = PointerLikeTypeTraits<
-      TransferringOperand::ValueType>::NumLowBitsAvailable;
-};
-
-template <>
-struct DenseMapInfo<swift::TransferringOperand> {
-  using TransferringOperand = swift::TransferringOperand;
-  using ParentInfo = DenseMapInfo<TransferringOperand::ValueType>;
-
-  static TransferringOperand getEmptyKey() {
-    return TransferringOperand(ParentInfo::getEmptyKey());
-  }
-  static TransferringOperand getTombstoneKey() {
-    return TransferringOperand(ParentInfo::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(TransferringOperand operand) {
-    return ParentInfo::getHashValue(operand.value);
-  }
-  static bool isEqual(TransferringOperand LHS, TransferringOperand RHS) {
-    return ParentInfo::isEqual(LHS.value, RHS.value);
-  }
-};
-
-} // namespace llvm
 
 namespace swift {
 
@@ -371,9 +340,9 @@ public:
 
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSet = ImmutablePointerSet<TransferringOperand>;
+  using TransferringOperandSet = ImmutablePointerSet<TransferringOperand *>;
   using TransferringOperandSetFactory =
-      ImmutablePointerSetFactory<TransferringOperand>;
+      ImmutablePointerSetFactory<TransferringOperand *>;
 
 private:
   /// A map from a region number to a instruction that consumes it.
@@ -721,8 +690,8 @@ public:
       bool isClosureCaptured = false;
       if (isTransferred) {
         isClosureCaptured = llvm::any_of(
-            iter->getSecond()->range(), [](const TransferringOperand &operand) {
-              return operand.isClosureCaptured();
+            iter->getSecond()->range(), [](const TransferringOperand *operand) {
+              return operand->isClosureCaptured();
             });
       }
 
@@ -765,8 +734,8 @@ public:
       bool isClosureCaptured = false;
       if (isTransferred) {
         isClosureCaptured = llvm::any_of(
-            iter->getSecond()->range(), [](const TransferringOperand &operand) {
-              return operand.isClosureCaptured();
+            iter->getSecond()->range(), [](const TransferringOperand *operand) {
+              return operand->isClosureCaptured();
             });
       }
 
@@ -795,7 +764,7 @@ public:
       if (isTransferred) {
         for (auto op : iter->getSecond()->data()) {
           os << "    ";
-          op.print(os);
+          op->print(os);
         }
       } else {
         os << "None.\n";
@@ -1208,7 +1177,7 @@ public:
 
   /// Call handleLocalUseAfterTransfer on our CRTP subclass.
   void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   TransferringOperand transferringOp) const {
+                                   TransferringOperand *transferringOp) const {
     return asImpl().handleLocalUseAfterTransfer(op, elt, transferringOp);
   }
 
@@ -1326,9 +1295,9 @@ public:
       }
 
       // Mark op.getOpArgs()[0] as transferred.
-      p.markTransferred(
-          op.getOpArgs()[0],
-          ptrSetFactory.get({op.getSourceOp(), isClosureCapturedElt}));
+      auto *ptrSet =
+          ptrSetFactory.emplace(op.getSourceOp(), isClosureCapturedElt);
+      p.markTransferred(op.getOpArgs()[0], ptrSet);
       return;
     }
     case PartitionOpKind::UndoTransfer: {
@@ -1419,7 +1388,7 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// region. Can be used to get the immediate value transferred or the
   /// transferring instruction.
   void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   TransferringOperand transferringOp) const {}
+                                   TransferringOperand *transferringOp) const {}
 
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.
