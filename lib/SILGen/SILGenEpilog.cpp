@@ -90,7 +90,6 @@ void SILGenFunction::prepareRethrowEpilog(
 
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc,
                        ThrownErrorInfo(IndirectErrorResult));
-  fprintf(stderr, "[%s:%d](%s) ThrowDest epilogue = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, ThrowDest.getBlock());
 }
 
 void SILGenFunction::prepareCoroutineUnwindEpilog(CleanupLocation cleanupLoc) {
@@ -404,7 +403,6 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   SILValue exn;
   SILLocation throwLoc = topLevel;
 
-  fprintf(stderr, "[%s:%d](%s) prepareExtraEpilog(*this, ThrowDest, throwLoc,\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   if (!prepareExtraEpilog(*this, ThrowDest, throwLoc,
                           !IndirectErrorResult ? &exn : nullptr)) {
     return;
@@ -420,7 +418,6 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
     B.createThrowAddr(CleanupLocation(throwLoc));
   }
 
-  fprintf(stderr, "[%s:%d](%s) ThrowDest invalid\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   ThrowDest = JumpDest::invalid();
 }
 

@@ -137,10 +137,10 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
     returnValue = emitTopLevelReturnValue(0);
 
   // Handle the implicit rethrow block.
-  fprintf(stderr, "[%s:%d](%s) // TopLevelSGF.ThrowDest Handle the implicit rethrow block.\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//  fprintf(stderr, "[%s:%d](%s) // TopLevelSGF.ThrowDest Handle the implicit rethrow block.\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   auto rethrowBB = TopLevelSGF.ThrowDest.getBlock();
   TopLevelSGF.ThrowDest = JumpDest::invalid();
-  fprintf(stderr, "[%s:%d](%s) TopLevelSGF.ThrowDest = INVALID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//  fprintf(stderr, "[%s:%d](%s) TopLevelSGF.ThrowDest = INVALID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 
   // If the rethrow block wasn't actually used, just remove it.
   if (rethrowBB->pred_empty()) {

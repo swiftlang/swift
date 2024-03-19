@@ -429,7 +429,7 @@ public:
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      fprintf(stderr, "[%s:%d](%s) NOT ACCESSOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      fprintf(stderr, "[%s:%d](%s) NOT ACCESSOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       // TODO: we enter here, because we are a FUNC
       // if (is distributed THUNK)
       // get DC and get the variable decl = that is our a
@@ -438,18 +438,18 @@ public:
       // else
       auto reqAFD = dyn_cast<AbstractFunctionDecl>(reqDecl);
       if (reqAFD->isDistributedThunk()) {
-        fprintf(stderr, "[%s:%d](%s) AFD IS THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-        reqDecl->dumpRef();
+//        fprintf(stderr, "[%s:%d](%s) AFD IS THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//        reqDecl->dumpRef();
 
         auto distributedThunkTarget =
             reqAFD->getAttrs().getAttribute<DistributedThunkTargetAttr>();
         if (!distributedThunkTarget) {
-          fprintf(stderr, "[%s:%d](%s) no target attribute\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//          fprintf(stderr, "[%s:%d](%s) no target attribute\n", __FILE_NAME__, __LINE__, __FUNCTION__);
           return;
         }
         assert(distributedThunkTarget &&
                "distributed_thunk must declare its target in an attribute");
-        fprintf(stderr, "[%s:%d](%s) TARGET IS: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//        fprintf(stderr, "[%s:%d](%s) TARGET IS: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
         distributedThunkTarget->getTarget()->dumpRef();
         storage = distributedThunkTarget->getTarget();
 
@@ -458,7 +458,7 @@ public:
 //          storage = targetAFD;
 //        }
       } else {
-        fprintf(stderr, "[%s:%d](%s) AFD IS NOT THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//        fprintf(stderr, "[%s:%d](%s) AFD IS NOT THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
         reqDecl->dumpRef();
       }
 
@@ -480,7 +480,7 @@ public:
         }
         return asDerived().addMissingMethod(requirementRef);
       } // else, fallthrough to the usual accessor handling!
-      fprintf(stderr, "[%s:%d](%s) FALL\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      fprintf(stderr, "[%s:%d](%s) FALL\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     } else {
       // Otherwise, we need to map the storage declaration and then get
       // the appropriate accessor for it.
@@ -488,7 +488,7 @@ public:
     }
 
     auto witness = asDerived().getWitness(storage);
-    fprintf(stderr, "[%s:%d](%s) FOUND WITNESS: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, witness);
+//    fprintf(stderr, "[%s:%d](%s) FOUND WITNESS: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, witness);
     if (witness) {
       witness.dump();
     }
@@ -1308,8 +1308,8 @@ public:
 
     visitAbstractStorageDecl(vd);
 
-    fprintf(stderr, "[%s:%d](%s) emit distributed thunk for...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    vd->dump();
+//    fprintf(stderr, "[%s:%d](%s) emit distributed thunk for...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    vd->dump();
     SGM.emitDistributedThunkForDecl(vd);
   }
 
@@ -1489,8 +1489,8 @@ public:
 
     visitAbstractStorageDecl(vd);
 
-    fprintf(stderr, "[%s:%d](%s) emit distributed thunk for...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    vd->dump();
+//    fprintf(stderr, "[%s:%d](%s) emit distributed thunk for...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    vd->dump();
     SGM.emitDistributedThunkForDecl(vd);
   }
 

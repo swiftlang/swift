@@ -126,14 +126,14 @@ public:
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
 //    fprintf(stderr, "[%s:%d](%s) VISIT AbstractStorageDecl\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 //    sd->dump();
-    sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+    sd->visitOpaqueAccessors([&](AccessorDecl *accessor) { // TODO: do not produce _distributedGet
       if (accessor->requiresNewWitnessTableEntry()) {
 //        fprintf(stderr, "[%s:%d](%s) DO IT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
-//        addDistributedWitnessMethodsIfRequired(accessor,
-//                                               SILDeclRef::Kind::Func);
+        addDistributedWitnessMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
       }
     });
   }
