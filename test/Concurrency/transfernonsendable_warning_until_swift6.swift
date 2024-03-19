@@ -20,12 +20,14 @@ func transferValue<T>(_ t: transferring T) {}
 
 func testIsolationError() async {
   let x = NonSendableType()
-  await transferToMain(x) // expected-error {{transferring value of non-Sendable type 'NonSendableType' from nonisolated context to main actor-isolated context; later accesses could race}}
+  await transferToMain(x) // expected-error {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   useValue(x) // expected-note {{access here could race}}
 }
 
 func testTransferArgumentError(_ x: NonSendableType) async {
-  await transferToMain(x) // expected-error {{task-isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
+  await transferToMain(x) // expected-error {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
 }
 
 func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {

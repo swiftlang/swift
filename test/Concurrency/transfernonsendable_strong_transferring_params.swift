@@ -107,7 +107,8 @@ func testNonStrongTransferDoesntMerge() async {
 
 func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) async {
   await transferToMain(x)
-  await transferToMain(y) // expected-warning {{task-isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
+  await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
+  // expected-note @-1 {{transferring task-isolated 'y' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
 }
 
 func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
@@ -127,7 +128,8 @@ actor MyActor {
 
   func canTransferWithTransferringMethodArg(_ x: transferring Klass, _ y: Klass) async {
     await transferToMain(x)
-    await transferToMain(y) // expected-warning {{actor-isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
+    await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
+    // expected-note @-1 {{transferring actor-isolated 'y' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
@@ -206,7 +208,8 @@ func assigningIsAMergeError(_ x: transferring Klass) async {
   x = y
 
   // We can still transfer y since x is disconnected.
-  await transferToMain(y) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context}}
+  await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
+  // expected-note @-1 {{'y' is transferred from nonisolated caller to main actor-isolated callee}}
 
   useValue(x) // expected-note {{access here could race}}
 }
@@ -312,7 +315,8 @@ func doubleArgument() async {
 
 func testTransferSrc(_ x: transferring Klass) async {
   let y = Klass()
-  await transferToMain(y) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context}}
+  await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
+  // expected-note @-1 {{'y' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   x = y // expected-note {{access here could race}}
 }
 

@@ -597,3 +597,30 @@ bb8:
   debug_value [trace] %4 : $FirstSecondThirdEnum<Klass>
   return %4 : $FirstSecondThirdEnum<Klass>
 }
+
+// Test that we can properly handle code generation from a borrowing loadable parameter
+//
+// CHECK-LABEL: begin running test 1 of 1 on loadable_borrowing_test: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %8 = store_borrow %6 to %7 : $*Klass            // user: %9
+// CHECK: Name: 'x'
+// CHECK: Root: %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+// CHECK: end running test 1 of 1 on loadable_borrowing_test: variable-name-inference with: @trace[0]
+sil hidden [ossa] @loadable_borrowing_test : $@convention(thin) @async (@guaranteed Klass) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Klass):
+  specify_test "variable-name-inference @trace[0]"
+  %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $Klass
+  %2 = copy_value %1 : $@moveOnly Klass
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $@moveOnly Klass
+  debug_value %3 : $@moveOnly Klass, let, name "x", argno 1
+  %7 = begin_borrow %3 : $@moveOnly Klass
+  %8 = moveonlywrapper_to_copyable [guaranteed] %7 : $@moveOnly Klass
+  %9 = alloc_stack $Klass
+  %10 = store_borrow %8 to %9 : $*Klass
+  debug_value [trace] %10 : $*Klass  
+  end_borrow %10 : $*Klass
+  dealloc_stack %9 : $*Klass
+  end_borrow %7 : $@moveOnly Klass
+  destroy_value %3 : $@moveOnly Klass
+  %25 = tuple ()
+  return %25 : $()
+}

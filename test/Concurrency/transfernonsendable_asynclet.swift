@@ -290,12 +290,13 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr3() async {
 func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr4() async {
   let x = NonSendableKlass()
 
-  async let y = useValue(transferToMainInt(x) + transferToMainInt(x)) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-tns-note @-1:67 {{access here could race}}
+  async let y = useValue(transferToMainInt(x) + transferToMainInt(x)) // expected-tns-warning {{transferring 'x' may cause a race}}
+  // expected-tns-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-tns-note @-2:67 {{access here could race}}
 
-  // expected-complete-warning @-3 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
-  // expected-complete-warning @-4 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  // expected-complete-warning @-4 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-5 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  // expected-complete-warning @-6 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   let _ = await y
 }
@@ -745,7 +746,8 @@ func asyncLetWithoutCapture() async {
   async let x: NonSendableKlass = await returnValueFromMain()
   // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
   let y = await x
-  await transferToMain(y) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  await transferToMain(y) // expected-tns-warning {{transferring 'y' may cause a race}}
+  // expected-tns-note @-1 {{'y' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   useValue(y) // expected-tns-note {{access here could race}}
 }

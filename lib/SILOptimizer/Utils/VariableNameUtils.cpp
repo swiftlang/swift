@@ -51,6 +51,11 @@ findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
       }
     }
 
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst)) {
+      if (sbi->getDest() == allocInst)
+        return sbi->getSrc();
+    }
+
     // If we do not identify the write... return SILValue(). We weren't able
     // to understand the write.
     break;
@@ -183,7 +188,7 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
 SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     AllocationInst *allocInst) {
-  struct AddressWalker : public TransitiveAddressWalker<AddressWalker> {
+  struct AddressWalker final : public TransitiveAddressWalker<AddressWalker> {
     AddressWalkerState &state;
 
     AddressWalker(AddressWalkerState &state) : state(state) {}
@@ -192,6 +197,12 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
       if (use->getUser()->mayWriteToMemory())
         state.writes.insert(use->getUser());
       return true;
+    }
+
+    TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+        return TransitiveUseVisitation::OnlyUser;
+      return TransitiveUseVisitation::OnlyUses;
     }
 
     void onError(Operand *use) { state.foundError = true; }
@@ -286,6 +297,13 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
       variableNamePath.push_back(allocInst);
       return allocInst;
+    }
+
+    // If we have a store_borrow, always look at the dest. We are going to see
+    // if we can determine if dest is a temporary alloc_stack.
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(searchValue)) {
+      searchValue = sbi->getDest();
+      continue;
     }
 
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
@@ -487,7 +505,9 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperAddrInst>(searchValue) ||
-        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue)) {
+        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
+        isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
+        isa<CopyableToMoveOnlyWrapperValueInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
