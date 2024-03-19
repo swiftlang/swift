@@ -507,14 +507,6 @@ public:
     // Here we notice a `distributed var` thunk requirement,
     // and witness it with the distributed thunk -- the "getter thunk".
     if (requirementRef.isDistributedThunk()) {
-//      fprintf(stderr, "[%s:%d](%s) witness THUNK >>>>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      witnessThunk->dump();
-
-//      if (!isa<ProtocolDecl>(witnessStorage->getDeclContext())) {
-//        auto synthesized = witnessThunk->getBody();
-//        fprintf(stderr, "[%s:%d](%s) after body >>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//        witnessThunk->dump();
-//      }
 
       return addMethodImplementation(
           requirementRef, getWitnessRef(requirementRef, witnessStorage->getDistributedThunk()),
