@@ -1282,8 +1282,19 @@ ASTBuilder::findDeclContext(NodePointer node) {
         continue;
       }
 
-      if (ext->getGenericSignature().getCanonicalSignature() == genericSig) {
+      auto extSig = ext->getGenericSignature().getCanonicalSignature();
+      if (extSig == genericSig) {
         return ext;
+      }
+
+      // If the extension mangling doesn't include a generic signature, it
+      // might be because the nominal type suppresses conformance.
+      if (!genericSig) {
+        SmallVector<Requirement, 2> requirements;
+        SmallVector<InverseRequirement, 2> inverses;
+        extSig->getRequirementsWithInverses(requirements, inverses);
+        if (requirements.empty())
+          return ext;
       }
     }
 
