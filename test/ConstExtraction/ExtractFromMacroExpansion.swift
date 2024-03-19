@@ -43,6 +43,9 @@ struct MyStruct {
   #AddMacroAddedVar
   
   @AddPeerVar
+  @AddExtension
+  @AddMemberVar
+  @AddPeerStruct
   struct Inner { }
 }
 
@@ -128,6 +131,47 @@ extension MyStruct {
 // CHECK:   "value": "5"
 
 // CHECK:   "label": "_extension__Peer_MyStruct",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "3"
+
+
+// CHECK: "typeName": "ExtractFromMacroExpansion.MyStruct.Inner",
+// CHECK: "properties": [
+// CHECK:   "label": "_member_Inner",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "5"
+
+// CHECK:   "label": "_extension_Inner",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "3"
+
+
+// CHECK: "typeName": "ExtractFromMacroExpansion.MyStruct._Peer_Inner",
+// CHECK: "properties": [
+// CHECK:   "label": "peerMacroVar",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "7"
+
+// CHECK:   "label": "macroAddedVar",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "2"
+
+// CHECK:   "label": "_peer_peerMacroVar",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "4"
+
+// CHECK:   "label": "_member__Peer_Inner",
+// CHECK:   "type": "Swift.Int",
+// CHECK:   "valueKind": "RawLiteral",
+// CHECK:   "value": "5"
+
+// CHECK:   "label": "_extension__Peer_Inner",
 // CHECK:   "type": "Swift.Int",
 // CHECK:   "valueKind": "RawLiteral",
 // CHECK:   "value": "3"
