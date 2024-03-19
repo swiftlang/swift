@@ -115,9 +115,7 @@ if #available(SwiftStdlib 5.9, *) {
       check(string, test.pieces)
     }
   }
-}
 
-if #available(SwiftStdlib 5.8, *) {
   StringGraphemeBreaking.test("GB11") {
     // MAN, ZERO WIDTH JOINER, ZERO WIDTH JOINER, GIRL
     let string = "\u{1f468}\u{200d}\u{200d}\u{1f467}"
