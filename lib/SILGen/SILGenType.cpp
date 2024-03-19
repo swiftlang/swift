@@ -429,12 +429,6 @@ public:
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      // TODO: we enter here, because we are a FUNC
-      // if (is distributed THUNK)
-      // get DC and get the variable decl = that is our a
-      //  set the storage...
-      //  FALL THROUGH
-      // else
       if (!storage) {
         if (auto witness = asDerived().getWitness(reqDecl)) {
           auto newDecl = requirementRef.withDecl(witness.getDecl());
@@ -733,7 +727,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
-  // SIMILAR TO THIS?
   auto shouldUseDistributedThunkWitness =
       // always use a distributed thunk for distributed requirements:
       requirement.isDistributedThunk() ||
@@ -1278,8 +1271,6 @@ public:
 
     visitAbstractStorageDecl(vd);
 
-//    fprintf(stderr, "[%s:%d](%s) emit distributed thunk for...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    vd->dump();
     SGM.emitDistributedThunkForDecl(vd);
   }
 
@@ -1459,8 +1450,6 @@ public:
 
     visitAbstractStorageDecl(vd);
 
-//    fprintf(stderr, "[%s:%d](%s) emit distributed thunk for...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    vd->dump();
     SGM.emitDistributedThunkForDecl(vd);
   }
 

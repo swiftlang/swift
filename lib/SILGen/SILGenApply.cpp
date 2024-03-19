@@ -2049,7 +2049,7 @@ static void emitRawApply(SILGenFunction &SGF,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
-    auto inst = SGF.B.createTryApply(loc, fnValue, subs, argValues,
+    SGF.B.createTryApply(loc, fnValue, subs, argValues,
                          normalBB, errorBB, options);
 
     SGF.B.emitBlock(normalBB);

@@ -5262,10 +5262,6 @@ bool HasIsolatedSelfRequest::evaluate(
 
   // For accessors, consider the storage declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    // (accessor_decl implicit <anonymous @ 0x12f8228a8> interface type="(isolated Worker) -> () async throws -> String" access=internal final nonisolated distributed_thunk _distributed_get for="distributedVariable"
-    //  (parameter "self" interface type="Worker" known_to_be_local)
-    //  (parameter_list)
-    //  (brace_stmt implicit
     if (accessor->isDistributedThunk()) {
       return false;
     }
@@ -6401,14 +6397,6 @@ bool swift::isPotentiallyIsolatedActor(
 /// declaration.
 static ActorIsolation getActorIsolationForReference(
     ValueDecl *decl, const DeclContext *fromDC) {
-
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (var->isDistributed()) {
-//      var->dump();
-//      fprintf(stderr, "[%s:%d](%s) HERE\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    }
-  }
-
   auto declIsolation = getActorIsolation(decl);
 
   // If the isolation is preconcurrency global actor, adjust it based on
@@ -6454,24 +6442,16 @@ static ActorIsolation getActorIsolationForReference(
     if (var->isLet() && isStoredProperty(var) &&
         declIsolation.isNonisolated()) {
       if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
-        if (nominal->isAnyActor()) {
-//          fprintf(stderr, "[%s:%d](%s) return isolation: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//          ActorIsolation::forActorInstanceSelf(decl).dump();
+        if (nominal->isAnyActor())
           return ActorIsolation::forActorInstanceSelf(decl);
-        }
 
         auto nominalIsolation = getActorIsolation(nominal);
-        if (nominalIsolation.isGlobalActor()) {
+        if (nominalIsolation.isGlobalActor())
           return getActorIsolationForReference(nominal, fromDC);
-        }
       }
     }
-
-
   }
 
-//  fprintf(stderr, "[%s:%d](%s) return isolation: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//  declIsolation.dump();
   return declIsolation;
 }
 
