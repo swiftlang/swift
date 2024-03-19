@@ -60,11 +60,11 @@ func illegalTypes<T>(_ t: T) {
 
   _ = t as! ValBox<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 
-  let _: Optional<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
-  let _: MO? // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
-  let _: MO?? // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
-  let _: MO! // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
-  let _: MO?! // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: Optional<MO>
+  let _: MO?
+  let _: MO??
+  let _: MO!
+  let _: MO?!
 
   let _: Klass & MO // expected-error {{non-protocol, non-class type 'MO' cannot be used within a protocol-constrained type}}
   let _: any MO // expected-error {{'any' has no effect on concrete type 'MO'}}

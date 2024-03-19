@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -517,8 +517,6 @@ extension MutableCollection {
   }
 }
 
-// the legacy swap free function
-//
 /// Exchanges the values of the two arguments.
 ///
 /// The two arguments must not alias each other. To swap two elements of a
@@ -529,7 +527,8 @@ extension MutableCollection {
 ///   - a: The first value to swap.
 ///   - b: The second value to swap.
 @inlinable
-public func swap<T>(_ a: inout T, _ b: inout T) {
+@_preInverseGenerics
+public func swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
 #if $BuiltinUnprotectedAddressOf

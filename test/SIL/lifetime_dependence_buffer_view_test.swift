@@ -9,6 +9,9 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: noncopyable_generics
 
+// FIXME(NCG): This requires nonescaping Optionals.
+// XFAIL: *
+
 // TODO: Use real Range
 public struct FakeRange<Bound> {
   public let lowerBound: Bound
@@ -143,7 +146,7 @@ extension Array {
   // rdar://123071321
 // CHECK: sil hidden @$sSa31lifetime_dependence_scope_fixupE4viewAA10BufferViewVyxGvg : $@convention(method) <Element> (@guaranteed Array<Element>) -> _scope(0) @owned BufferView<Element> {
   var view: BufferView<Element> {
-    var _view : BufferView<Element>? 
+    var _view : BufferView<Element>? // FIXME(NCG): This is not a thing. How did this work?
     withUnsafePointer(to:self) {
       _view = BufferView(baseAddress: $0, count: self.count, dependsOn: self)
     }

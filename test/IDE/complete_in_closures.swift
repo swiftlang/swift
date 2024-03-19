@@ -335,8 +335,8 @@ var foo = {
 func testWithMemoryRebound(_ bar: UnsafePointer<UInt64>) {
     _ = bar.withMemoryRebound(to: Int64.self, capacity: 3) { ptr in
         return ptr #^SINGLE_EXPR_CLOSURE_CONTEXT^#
-        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: .deallocate()[#Void#]; name=deallocate()
-        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem:    .pointee[#Int64#]; name=pointee
+        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Convertible]: .deallocate[#() -> ()#]; name=deallocate
+        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem/TypeRelation[Convertible]: .pointee[#Int64#]; name=pointee
     }
 }
 
