@@ -21,5 +21,5 @@ UserInaccessibleAreNotAttributes
 #endif
 
 #if hasAttribute(17)
-// expected-error@-1{{unexpected platform condition argument: expected attribute name}}
+// expected-error@-1:18 {{unexpected platform condition argument: expected attribute name}}
 #endif
