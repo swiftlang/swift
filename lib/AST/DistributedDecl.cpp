@@ -1355,15 +1355,14 @@ AbstractFunctionDecl::getDistributedThunk() const {
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
 
+  // For an accessor, get the Storage (VarDecl) and get the thunk off it.
+  //
+  // Since only 'get' computed distributed properties are allowed, we know
+  // this will be the equivalent 'get' thunk for this AccessorDecl.
+  //
+  // The AccessorDecl is not marked distributed, but the VarDecl will be.
   if (auto accessor = dyn_cast<AccessorDecl>(mutableThis)) {
-//    fprintf(stderr, "[%s:%d](%s) GET VAR THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     auto Storage = accessor->getStorage();
-//    Storage->dump();
-//    fprintf(stderr, "[%s:%d](%s) GOR THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    if (auto thunk = Storage->getDistributedThunk()) {
-//      thunk->dump();
-//    }
-
     return Storage->getDistributedThunk();
   }
 

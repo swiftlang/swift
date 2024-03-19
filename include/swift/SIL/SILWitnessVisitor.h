@@ -124,11 +124,8 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
-//    fprintf(stderr, "[%s:%d](%s) VISIT AbstractStorageDecl\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    sd->dump();
-    sd->visitOpaqueAccessors([&](AccessorDecl *accessor) { // TODO: do not produce _distributedGet
+    sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
       if (accessor->requiresNewWitnessTableEntry()) {
-//        fprintf(stderr, "[%s:%d](%s) DO IT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
@@ -206,21 +203,15 @@ private:
 
   void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
-    if (!AFD) {
+    if (!AFD)
       return;
-    }
 
-//    fprintf(stderr, "[%s:%d](%s) ADD DISTRIBUTED METHOD FOR ????: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    AFD->dump();
+    auto thunk = AFD->getDistributedThunk();
+    if (!thunk)
+      return;
 
-    if (auto thunk = AFD->getDistributedThunk()) {
-//      fprintf(stderr, "[%s:%d](%s) EMIT THUNK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      thunk->dump();
-      SILDeclRef declRef(thunk, kind);
-      asDerived().addMethod(declRef.asDistributed());
-    }
-
-//    fprintf(stderr, "[%s:%d](%s) NO THUNK FOR \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    SILDeclRef declRef(thunk, kind);
+    asDerived().addMethod(declRef.asDistributed());
   }
 };
 

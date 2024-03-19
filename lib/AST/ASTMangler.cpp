@@ -83,7 +83,9 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
   case AccessorKind::Get:
     return "g";
   case AccessorKind::DistributedGet:
-    return "g";
+    // TODO(distributed): probably does not matter since we mangle distributed
+    //  thunk getters as the name of the Storage?
+    return "gd";
   case AccessorKind::Set:
     return "s";
   case AccessorKind::WillSet:

@@ -1636,7 +1636,6 @@ namespace  {
     UNINTERESTING_ATTR(NonEscapable)
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
     UNINTERESTING_ATTR(StaticExclusiveOnly)
-    UNINTERESTING_ATTR(DistributedThunkTarget)
     UNINTERESTING_ATTR(PreInverseGenerics)
 #undef UNINTERESTING_ATTR
 

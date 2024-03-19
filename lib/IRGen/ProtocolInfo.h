@@ -116,13 +116,6 @@ public:
   bool isFunction() const { return Kind == WitnessKind::MethodKind; }
 
   bool matchesFunction(SILDeclRef declRef) const {
-//    if (isFunction()) {
-//      fprintf(stderr, "[%s:%d](%s) witness = \n", __FILE_NAME__, __LINE__,
-//              __FUNCTION__);
-//      MethodEntry.Witness.dump();
-//    } else {
-//      fprintf(stderr, "[%s:%d](%s) witness = NOT function\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    }
     return isFunction() && MethodEntry.Witness == declRef;
   }
 
@@ -290,18 +283,10 @@ public:
   /// function requirement.
   WitnessIndex getFunctionIndex(SILDeclRef declRef) const {
     assert(getKind() >= ProtocolInfoKind::Full);
-
-    // TODO: for the func we have 3 entries here; for var just two
     for (auto &witness : getWitnessEntries()) {
-//      fprintf(stderr, "[%s:%d](%s) witness candidate: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
       if (witness.matchesFunction(declRef))
         return getNonBaseWitnessIndex(&witness);
     }
-
-//    fprintf(stderr, "[%s:%d](%s) NOT FOUND FOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    declRef.dump();
-//    declRef.getDecl()->getDeclContext()->dumpContext();
-
     llvm_unreachable("didn't find entry for function");
   }
 
