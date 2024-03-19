@@ -3496,6 +3496,20 @@ private:
     return call;
   }
 
+  /// Walks up to the first enclosing LoadExpr and returns it.
+  const LoadExpr *getEnclosingLoadExpr() const {
+    assert(!ExprStack.empty() && "must be called while visiting an expression");
+    ArrayRef<const Expr *> stack = ExprStack;
+    stack = stack.drop_back();
+
+    for (auto expr : llvm::reverse(stack)) {
+      if (auto loadExpr = dyn_cast<LoadExpr>(expr))
+        return loadExpr;
+    }
+
+    return nullptr;
+  }
+
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) {
     // We take over recursive walking of assignment expressions in order to
@@ -3575,7 +3589,12 @@ private:
 
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
-    walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
+    // If there is a LoadExpr in the stack, then this InOutExpr is not actually
+    // indicative of any mutation so the access context should just be Getter.
+    auto accessContext = getEnclosingLoadExpr() ? MemberAccessContext::Getter
+                                                : MemberAccessContext::InOut;
+
+    walkInContext(E, E->getSubExpr(), accessContext);
   }
 
   bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
