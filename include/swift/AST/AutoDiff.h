@@ -53,6 +53,10 @@ enum class DifferentiabilityKind : uint8_t {
   Linear = 4,
 };
 
+StringRef getDifferentiabilityKindSpelling(DifferentiabilityKind kind);
+
+void simple_display(llvm::raw_ostream &, DifferentiabilityKind);
+
 /// The kind of an linear map.
 struct AutoDiffLinearMapKind {
   enum innerty : uint8_t {

@@ -179,6 +179,9 @@ Proto3
   func method(_ b: Bool)
 }
 
+// FIXME: warning for 'class'
+protocol ClassOnly: class {}
+
 typealias
 Alias<T>
 =
@@ -224,6 +227,9 @@ where
 {
   /*static*/ func method(_ b: Bool) {}
 }
+
+// FIXME: AST dumps do not match
+//struct FileDescriptor: ~Copyable {}
 
 class
 Class<T>: Proto1 where T: Proto3 {

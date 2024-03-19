@@ -35,6 +35,7 @@ namespace swift {
 class ASTContext;
 class DiagnosticArgument;
 class DiagnosticEngine;
+class DiagnosticSuppression;
 }
 
 class BridgedASTContext;
@@ -407,6 +408,24 @@ void BridgedDiagnostic_fixItReplace(BridgedDiagnostic cDiag,
 /// Finish the given diagnostic and emit it.
 SWIFT_NAME("BridgedDiagnostic.finish(self:)")
 void BridgedDiagnostic_finish(BridgedDiagnostic cDiag);
+
+/// A bridging diagnostic suppression mechanism for use in Swift. No RAII--we
+/// do not want this to cost us ARC in Swift. Diagnostic suppression through
+/// this interface requires a heap allocation, and is by design most
+/// memory-efficient when reusing an instance multiple times vs. constructing
+/// new instances on demand.
+class BridgedDiagnosticSuppression {
+  swift::DiagnosticEngine *_Nonnull diagEngine;
+  swift::DiagnosticSuppression *_Nullable suppression;
+  bool isSuppressing;
+
+public:
+  SWIFT_NAME("init(diagnosticEngine:)")
+  BridgedDiagnosticSuppression(BridgedDiagnosticEngine cDiag);
+
+  void start();
+  void stop();
+};
 
 //===----------------------------------------------------------------------===//
 // MARK: DeclContexts

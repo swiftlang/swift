@@ -16,6 +16,7 @@
 
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/ASTContext.h"
+#include "llvm/ADT/ArrayRef.h"
 
 using namespace swift;
 
@@ -36,4 +37,8 @@ DeclNameLoc::DeclNameLoc(ASTContext &ctx, SourceLoc baseNameLoc,
               argumentLabelLocs.size() * sizeof(SourceLoc));
 
   LocationInfo = storedLocs.data();
+}
+
+ArrayRef<SourceLoc> DeclNameLoc::getArgumentLabelLocs() const {
+  return {getSourceLocs() + FirstArgumentLabelIndex, NumArgumentLabels};
 }

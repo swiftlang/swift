@@ -134,6 +134,12 @@ public:
 
     /// Validate the new SwiftSyntax parser diagnostics.
     ValidateNewParserDiagnostics = 1 << 6,
+
+    /// Run the Swift (swift-syntax) parser on the file, and for every
+    /// `TypeSyntax` node in the parsed syntax tree, validate the result of
+    /// translating the node to compiler AST against the legacy parser and emit
+    /// errors on unexpected mismatches.
+    ValidateTypeReprASTGen = 1 << 7,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 

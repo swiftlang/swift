@@ -408,4 +408,8 @@ int LayoutConstraint::compare(LayoutConstraint rhs) const {
   return 0;
 }
 
+void simple_display(llvm::raw_ostream &out, LayoutConstraint LC) {
+  LC.print(out);
+}
+
 } // end namespace swift

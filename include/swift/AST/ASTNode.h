@@ -70,9 +70,14 @@ namespace swift {
     void walk(ASTWalker &Walker);
     void walk(ASTWalker &&walker) { walk(walker); }
 
-    /// get the underlying entity as a decl context if it is one,
+    /// Get the underlying entity as a decl context if it is one,
     /// otherwise, return nullptr;
     DeclContext *getAsDeclContext() const;
+
+    /// Get an integer identifying the pointer type the union is set to.
+    ///
+    /// \Note The pointer held in the union must not be null.
+    int getTypeDiscriminator() const;
 
     /// Provides some utilities to decide detailed node kind.
 #define FUNC(T) bool is##T(T##Kind Kind) const;

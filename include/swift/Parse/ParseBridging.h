@@ -53,10 +53,20 @@ BridgedStmt BridgedLegacyParser_parseStmt(BridgedLegacyParser,
                                           BridgedSourceLoc loc,
                                           BridgedDeclContext DC);
 
-SWIFT_NAME("BridgedLegacyParser.parseType(self:_:_:)")
+SWIFT_NAME("BridgedLegacyParser.parseType(self:loc:declContext:"
+           "generateChildrenWithASTGen:)")
 BridgedTypeRepr BridgedLegacyParser_parseType(BridgedLegacyParser,
                                               BridgedSourceLoc loc,
-                                              BridgedDeclContext DC);
+                                              BridgedDeclContext DC,
+                                              bool generateChildrenWithASTGen);
+
+/// Validate the `TypeRepr` translated from a `TypeSyntax` by ASTGen against the
+/// `TypeRepr` parsed at it by the legacy parser, and emit errors on unexpected
+/// mismatches.
+SWIFT_NAME("validateGeneratedTypeRepr(_:legacyParserResult:astgenResult:)")
+void validateGeneratedTypeRepr(BridgedASTContext cContext,
+                               BridgedTypeRepr legacyParserResult,
+                               BridgedTypeRepr astgenResult);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

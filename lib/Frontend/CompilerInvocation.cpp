@@ -1509,7 +1509,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   /// Swift parser for such cases.
   if (!Args.hasArg(OPT_disable_experimental_parser_round_trip)) {
     Opts.enableFeature(Feature::ParserRoundTrip);
-    Opts.enableFeature(Feature::ParserValidation);
+    Opts.enableFeature(Feature::ValidateNewParserDiagnostics);
   }
 #endif
   return HadError || UnsupportedOS || UnsupportedArch;

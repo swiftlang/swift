@@ -82,18 +82,34 @@ struct ASTGenVisitor {
   /// implementation for the AST node kind.
   let legacyParse: BridgedLegacyParser
 
+  /// Whether we are in the midst of generating a `TypeRepr` that is going
+  /// to be validated.
+  @Boxed var isGeneratingTypeReprForValidation: Bool = false
+
+  /// Whether to validate `TypeRepr` generation against the legacy parser.
+  let validateTypeReprGeneration: Bool
+
+  /// Needed to suppress diagnostics when running the legacy parser for
+  /// validation purposes.
+  ///
+  /// - Note: Do not set this property outside `ASTGenVisitor.init`.
+  @Boxed var diagnosticSuppression: BridgedDiagnosticSuppression
+
   init(
     diagnosticEngine: BridgedDiagnosticEngine,
     sourceBuffer: UnsafeBufferPointer<UInt8>,
     declContext: BridgedDeclContext,
     astContext: BridgedASTContext,
-    legacyParser: BridgedLegacyParser
+    legacyParser: BridgedLegacyParser,
+    validateTypeReprGeneration: Bool
   ) {
     self.diagnosticEngine = diagnosticEngine
     self.base = sourceBuffer
     self.declContext = declContext
     self.ctx = astContext
     self.legacyParse = legacyParser
+    self.validateTypeReprGeneration = validateTypeReprGeneration
+    self.diagnosticSuppression = .init(diagnosticEngine: diagnosticEngine)
   }
 
   func generate(sourceFile node: SourceFileSyntax) -> [BridgedDecl] {
@@ -412,6 +428,7 @@ public func buildTopLevelASTNodes(
   dc: BridgedDeclContext,
   ctx: BridgedASTContext,
   legacyParser: BridgedLegacyParser,
+  validateTypeReprGeneration: CInt,
   outputContext: UnsafeMutableRawPointer,
   callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
@@ -421,7 +438,8 @@ public func buildTopLevelASTNodes(
     sourceBuffer: sourceFile.pointee.buffer,
     declContext: dc,
     astContext: ctx,
-    legacyParser: legacyParser
+    legacyParser: legacyParser,
+    validateTypeReprGeneration: validateTypeReprGeneration != 0
   )
   .generate(sourceFile: sourceFile.pointee.syntax)
   .forEach { callback($0.raw, outputContext) }
@@ -437,6 +455,7 @@ private func _build<Node: SyntaxProtocol, Result>(
   declContext: BridgedDeclContext,
   astContext: BridgedASTContext,
   legacyParser: BridgedLegacyParser,
+  validateTypeReprGeneration: Bool = false,
   endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
 ) -> Result? {
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
@@ -465,7 +484,8 @@ private func _build<Node: SyntaxProtocol, Result>(
       sourceBuffer: sourceFile.pointee.buffer,
       declContext: declContext,
       astContext: astContext,
-      legacyParser: legacyParser
+      legacyParser: legacyParser,
+      validateTypeReprGeneration: validateTypeReprGeneration
     )
   )(node)
 }
@@ -479,6 +499,7 @@ func buildTypeRepr(
   declContext: BridgedDeclContext,
   astContext: BridgedASTContext,
   legacyParser: BridgedLegacyParser,
+  validateTypeReprGeneration: CInt,
   endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
 ) -> UnsafeMutableRawPointer? {
   return _build(
@@ -489,6 +510,7 @@ func buildTypeRepr(
     declContext: declContext,
     astContext: astContext,
     legacyParser: legacyParser,
+    validateTypeReprGeneration: validateTypeReprGeneration != 0,
     endLocPtr: endLocPtr
   )?.raw
 }

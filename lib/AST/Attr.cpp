@@ -81,6 +81,10 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 
+SourceLoc TypeAttribute::getAtLoc() const {
+  return static_cast<const AtTypeAttrBase *>(this)->getAtLoc();
+}
+
 SourceLoc TypeAttribute::getStartLoc() const {
   switch (getKind()) {
 #define TYPE_ATTR(_, CLASS)                                                    \
@@ -853,21 +857,13 @@ static void printDifferentiableAttrArguments(
   };
 
   // Print if the function is marked as linear.
-  switch (attr->getDifferentiabilityKind()) {
-  case DifferentiabilityKind::Normal:
-    isLeadingClause = true;
-    break;
-  case DifferentiabilityKind::Forward:
-    stream << "_forward";
-    break;
-  case DifferentiabilityKind::Reverse:
-    stream << "reverse";
-    break;
-  case DifferentiabilityKind::Linear:
-    stream << "_linear";
-    break;
-  case DifferentiabilityKind::NonDifferentiable:
-    llvm_unreachable("Impossible case `NonDifferentiable`");
+  {
+    const auto diffKind = attr->getDifferentiabilityKind();
+    if (diffKind == DifferentiabilityKind::Normal) {
+      isLeadingClause = true;
+    }
+
+    stream << getDifferentiabilityKindSpelling(diffKind);
   }
 
   // If the declaration is not available, there is not enough context to print
@@ -2966,4 +2962,32 @@ bool swift::hasAttribute(
     return false;
 
   return true;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, DeclAttrKind kind) {
+  switch (kind) {
+#define DECL_ATTR(_, CLASS, ...)                                               \
+  case DeclAttrKind::CLASS:                                                    \
+    out << #CLASS;                                                             \
+    return;
+#include "swift/AST/DeclAttr.def"
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, TypeAttrKind kind) {
+  out << "@" << TypeAttribute::getAttrName(kind);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           IsolatedTypeAttr::IsolationKind kind) {
+  switch (kind) {
+#define CASE(X)                                                                \
+  case IsolatedTypeAttr::IsolationKind::X:                                     \
+    out << #X;                                                                 \
+    return;
+    CASE(Dynamic)
+#undef CASE
+  }
+  llvm_unreachable("Unhandled case in switch");
 }

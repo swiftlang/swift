@@ -1650,6 +1650,7 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
       typeOpts.SkipFunctionBodies != FunctionBodySkipping::None) {
     opts -= ParsingFlags::RoundTrip;
     opts -= ParsingFlags::ValidateNewParserDiagnostics;
+    opts -= ParsingFlags::ValidateTypeReprASTGen;
   }
 
   // Enable interface hash computation for primaries or emit-module-separately,

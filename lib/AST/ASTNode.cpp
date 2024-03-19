@@ -69,6 +69,11 @@ DeclContext *ASTNode::getAsDeclContext() const {
   return nullptr;
 }
 
+int ASTNode::getTypeDiscriminator() const {
+  assert(!this->isNull());
+  return this->Val.getInt();
+}
+
 bool ASTNode::isImplicit() const {
   if (const auto *E = this->dyn_cast<Expr*>())
     return E->isImplicit();
@@ -122,7 +127,7 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
   else if (auto P = dyn_cast<Pattern*>())
     P->dump(OS, Indent);
   else if (auto T = dyn_cast<TypeRepr*>())
-    T->print(OS);
+    T->dump(OS, Indent);
   else if (auto *C = dyn_cast<StmtConditionElement *>())
     OS.indent(Indent) << "(statement condition)";
   else if (auto *I = dyn_cast<CaseLabelItem *>()) {

@@ -3337,8 +3337,10 @@ SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
     opts |= ParsingFlags::CollectParsedTokens;
   if (langOpts.hasFeature(Feature::ParserRoundTrip))
     opts |= ParsingFlags::RoundTrip;
-  if (langOpts.hasFeature(Feature::ParserValidation))
+  if (langOpts.hasFeature(Feature::ValidateNewParserDiagnostics))
     opts |= ParsingFlags::ValidateNewParserDiagnostics;
+  if (langOpts.hasFeature(Feature::ValidateTypeReprASTGen))
+    opts |= ParsingFlags::ValidateTypeReprASTGen;
   return opts;
 }
 

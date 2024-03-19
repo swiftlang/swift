@@ -2204,6 +2204,8 @@ enum class ParamSpecifier : uint8_t {
 
 StringRef getNameForParamSpecifier(ParamSpecifier name);
 
+void simple_display(llvm::raw_ostream &, ParamSpecifier);
+
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {

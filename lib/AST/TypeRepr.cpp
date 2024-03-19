@@ -35,6 +35,18 @@ using namespace swift;
                 "TypeReprs are BumpPtrAllocated; the d'tor is never called");
 #include "swift/AST/TypeReprNodes.def"
 
+void swift::simple_display(llvm::raw_ostream &out, TypeReprKind kind) {
+  switch (kind) {
+#define TYPEREPR(ID, PARENT)                                                   \
+  case TypeReprKind::ID:                                                       \
+    out << #ID;                                                                \
+    return;
+#define LAST_TYPEREPR(ID)
+#include "swift/AST/TypeReprNodes.def"
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 SourceLoc TypeRepr::getLoc() const {
   switch (getKind()) {
 #define TYPEREPR(CLASS, PARENT) \
@@ -896,6 +908,24 @@ void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
   // Consume and emit the diagnostic.
   Context.Diags.diagnose(Range.Start, *DelayedDiag).highlight(Range);
   DelayedDiag = std::nullopt;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, ParamSpecifier specifier) {
+  switch (kind) {
+#define CASE(X)                                                                \
+  case ParamSpecifier::X:                                                      \
+    out << #X;                                                                 \
+    return;
+    CASE(Default)
+    CASE(InOut)
+    CASE(Borrowing)
+    CASE(Consuming)
+    CASE(LegacyShared)
+    CASE(LegacyOwned)
+    CASE(ImplicitlyCopyableConsuming)
+#undef CASE
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

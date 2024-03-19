@@ -20,6 +20,38 @@
 
 using namespace swift;
 
+StringRef swift::getDifferentiabilityKindSpelling(DifferentiabilityKind kind) {
+  switch (kind) {
+  case DifferentiabilityKind::Normal:
+    return "";
+  case DifferentiabilityKind::Forward:
+    return "_forward";
+  case DifferentiabilityKind::Reverse:
+    return "reverse";
+  case DifferentiabilityKind::Linear:
+    return "_linear";
+  case DifferentiabilityKind::NonDifferentiable:
+    llvm_unreachable("Impossible case `NonDifferentiable`");
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, DifferentiabilityKind kind) {
+  switch (kind) {
+#define CASE(X)                                                                \
+  case DifferentiabilityKind::X:                                               \
+    out << #X;                                                                 \
+    return;
+    CASE(NonDifferentiable)
+    CASE(Forward)
+    CASE(Reverse)
+    CASE(Normal)
+    CASE(Linear)
+#undef CASE
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 AutoDiffDerivativeFunctionKind::AutoDiffDerivativeFunctionKind(
     StringRef string) {
   std::optional<innerty> result =

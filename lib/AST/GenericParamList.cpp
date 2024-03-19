@@ -20,6 +20,21 @@
 #include "swift/AST/TypeRepr.h"
 
 using namespace swift;
+
+void swift::simple_display(llvm::raw_ostream &out, RequirementReprKind kind) {
+  switch (kind) {
+#define CASE(X)                                                                \
+  case RequirementReprKind::X:                                                 \
+    out << #X;                                                                 \
+    return;
+    CASE(TypeConstraint)
+    CASE(SameType)
+    CASE(LayoutConstraint)
+#undef CASE
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 SourceRange RequirementRepr::getSourceRange() const {
   if (getKind() == RequirementReprKind::LayoutConstraint)
     return SourceRange(FirstType->getSourceRange().Start,

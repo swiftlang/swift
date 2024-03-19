@@ -11,8 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/ParseBridging.h"
+#include "swift/AST/ASTMatcher.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -68,17 +72,25 @@ BridgedStmt BridgedLegacyParser_parseStmt(BridgedLegacyParser p,
 
 BridgedTypeRepr BridgedLegacyParser_parseType(BridgedLegacyParser p,
                                               BridgedSourceLoc loc,
-                                              BridgedDeclContext DC) {
+                                              BridgedDeclContext DC,
+                                              bool generateChildrenWithASTGen) {
   auto &P = p.unbridged();
   auto PP =
       P.getParserPosition(loc.unbridged(), /*PreviousLoc=*/loc.unbridged());
   P.CurDeclContext = DC.unbridged();
   P.restoreParserPosition(PP);
 
+  if (!generateChildrenWithASTGen) {
+    P.IsForASTGen = false;
+  }
+
   // FIXME: Calculate 'ParseTypeReason' in ASTGen.
   ParserResult<TypeRepr> result =
       P.parseType(diag::expected_type, Parser::ParseTypeReason::Unspecified,
                   /*fromASTGen=*/true);
+
+  P.IsForASTGen = true;
+
   return result.getPtrOrNull();
 }
 
@@ -133,8 +145,12 @@ ParserResult<TypeRepr> Parser::parseTypeReprFromSyntaxTree() {
   return parseASTFromSyntaxTree<TypeRepr>(*this, [&](void *exportedSourceFile,
                                                      BridgedSourceLoc sourceLoc,
                                                      BridgedSourceLoc &endLoc) {
-    return swift_ASTGen_buildTypeRepr(&Diags, exportedSourceFile, sourceLoc,
-                                      CurDeclContext, Context, *this, &endLoc);
+    const auto parsingOpts = this->SF.getParsingOptions();
+    return swift_ASTGen_buildTypeRepr(
+        &Diags, exportedSourceFile, sourceLoc, CurDeclContext, Context, *this,
+        /*validateTypeReprGeneration=*/
+        parsingOpts.contains(SourceFile::ParsingFlags::ValidateTypeReprASTGen),
+        &endLoc);
   });
 #else
   llvm_unreachable("ASTGen is not supported");
@@ -178,4 +194,38 @@ ParserResult<Stmt> Parser::parseStmtFromSyntaxTree() {
 #else
   llvm_unreachable("ASTGen is not supported");
 #endif
+}
+
+// MARK: ASTGen validation.
+
+namespace {
+
+class Matcher final : public ASTMatcher<Matcher> {
+  const ASTContext &ctx;
+  ASTNode legacyParserResult;
+  ASTNode astgenResult;
+
+public:
+  Matcher(ASTContext &ctx, ASTNode legacyParserResult, ASTNode astgenResult)
+      : ctx(ctx), legacyParserResult(legacyParserResult),
+        astgenResult(astgenResult) {}
+
+  MismatchAction mismatch(ASTNode lhs, ASTNode rhs) const {
+    ctx.Diags.diagnose(this->getLhsMatchingLoc(), diag::astgen_ast_mismatch);
+
+    return MismatchAction::Continue;
+  }
+};
+
+} // end anonymous namespace
+
+void validateGeneratedTypeRepr(BridgedASTContext cContext,
+                               BridgedTypeRepr legacyParserResult,
+                               BridgedTypeRepr astgenResult) {
+  auto &ctx = cContext.unbridged();
+
+  Matcher matcher(ctx, legacyParserResult.unbridged(),
+                  astgenResult.unbridged());
+  matcher.match</*LocatedMismatches=*/true>(legacyParserResult.unbridged(),
+                                            astgenResult.unbridged(), &ctx);
 }

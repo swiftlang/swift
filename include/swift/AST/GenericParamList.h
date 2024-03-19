@@ -45,6 +45,8 @@ enum class RequirementReprKind : unsigned {
   // when adding enumerators.
 };
 
+void simple_display(llvm::raw_ostream &, RequirementReprKind);
+
 /// A single requirement in a 'where' clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
 /// function, type, or protocol.
@@ -55,6 +57,9 @@ enum class RequirementReprKind : unsigned {
 /// \c GenericParamList assumes these are POD-like.
 
 class RequirementRepr {
+  template <class>
+  friend class ASTMatcher;
+
   SourceLoc SeparatorLoc;
   RequirementReprKind Kind : 2;
   bool Invalid : 1;

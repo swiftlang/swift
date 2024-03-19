@@ -3009,6 +3009,8 @@ public:
     Bits.TypeAttribute.Implicit = true;
   }
 
+  SourceLoc getAtLoc() const;
+
   /// Return the location of the attribute identifier / keyword.
   SourceLoc getAttrLoc() const {
     return AttrLoc;
@@ -3235,6 +3237,7 @@ public:
 using TypeOrCustomAttr =
   llvm::PointerUnion<CustomAttr*, TypeAttribute*>;
 
+void simple_display(llvm::raw_ostream &, IsolatedTypeAttr::IsolationKind);
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 
 inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {

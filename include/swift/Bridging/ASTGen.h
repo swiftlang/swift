@@ -51,11 +51,21 @@ int swift_ASTGen_emitParserDiagnostics(
     void *_Nonnull diagEngine, void *_Nonnull sourceFile, int emitOnlyErrors,
     int downgradePlaceholderErrorsToWarnings);
 
+/// For every `TypeSyntax` node in the syntax tree of the given source file,
+/// validate the result of translating the node against the legacy parser and
+/// emit errors on unexpected mismatches.
+void swift_ASTGen_validateTypeReprGeneration(BridgedDiagnosticEngine diagEngine,
+                                             void *_Nonnull sourceFile,
+                                             BridgedDeclContext declContext,
+                                             BridgedASTContext astContext,
+                                             BridgedLegacyParser legacyParser);
+
 // Build AST nodes for the top-level entities in the syntax.
 void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedDeclContext declContext, BridgedASTContext astContext,
-    BridgedLegacyParser legacyParser, void *_Nonnull outputContext,
+    BridgedLegacyParser legacyParser, int validateTypeReprGeneration,
+    void *_Nonnull outputContext,
     void (*_Nonnull)(void *_Nonnull, void *_Nonnull));
 
 void *_Nullable swift_ASTGen_resolveMacroType(const void *_Nonnull macroType);
@@ -114,7 +124,7 @@ swift::TypeRepr *_Nullable swift_ASTGen_buildTypeRepr(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
     BridgedASTContext astContext, BridgedLegacyParser legacyParser,
-    BridgedSourceLoc *_Nonnull endSourceLoc);
+    int validateTypeReprGeneration, BridgedSourceLoc *_Nonnull endSourceLoc);
 
 /// Build a Decl for AST node for the type at the given source location in the
 /// specified file.
