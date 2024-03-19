@@ -18,8 +18,7 @@
 // Check that the generated header can be
 // built with Clang modules enabled in C++.
 
-// RUN: %target-interop-build-clangxx -fsyntax-only -x c++-header %t/full-cxx-swift-cxx-bridging.h -std=gnu++17 -c -fmodules -fcxx-modules -I %t -D_LIBCPP_DISABLE_AVAILABILITY
-// FIXME: remove _LIBCPP_DISABLE_AVAILABILITY above (https://github.com/apple/swift/issues/67841)
+// RUN: %target-interop-build-clangxx -fsyntax-only -x c++-header %t/full-cxx-swift-cxx-bridging.h -std=gnu++17 -c -fmodules -fcxx-modules -I %t 
 // FIXME: test c++20 (rdar://117419434)
 
 // XFAIL: OS=linux-android, OS=linux-androideabi

@@ -43,8 +43,14 @@ public struct AddExtensionMacro: ExtensionMacro {
   ) throws -> [ExtensionDeclSyntax] {
     let typeName = declaration.declGroupName
     return protocols.map {
-      ("extension \(typeName): \($0) { }" as DeclSyntax)
-        .cast(ExtensionDeclSyntax.self)
+      ("""
+      extension \(typeName): \($0) {
+        struct _Extension_\($0): \($0) {
+          var nested = 8
+        }
+      }
+      """ as DeclSyntax)
+      .cast(ExtensionDeclSyntax.self)
     } + [
     ("""
     extension \(typeName) {
