@@ -207,7 +207,6 @@ private:
   void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
     if (!AFD) {
-//      fprintf(stderr, "[%s:%d](%s) BAIL OUT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       return;
     }
 

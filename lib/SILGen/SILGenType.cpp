@@ -451,7 +451,7 @@ public:
                "distributed_thunk must declare its target in an attribute");
 //        fprintf(stderr, "[%s:%d](%s) TARGET IS: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
 //        distributedThunkTarget->getTarget()->dumpRef();
-        storage = distributedThunkTarget->getTarget();
+//        storage = distributedThunkTarget->getTarget();
 
 //        if (auto targetAFD =
 //                dyn_cast<AbstractFunctionDecl>(distributedThunkTarget)) {
@@ -486,9 +486,9 @@ public:
 
     auto witness = asDerived().getWitness(storage);
 //    fprintf(stderr, "[%s:%d](%s) FOUND WITNESS: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, witness);
-    if (witness) {
-      witness.dump();
-    }
+//    if (witness) {
+//      witness.dump();
+//    }
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
@@ -503,9 +503,19 @@ public:
     if (reqAccessor->isSetter() && !witnessStorage->supportsMutation()) {
       return asDerived().addMissingMethod(requirementRef);
     }
+
     // Here we notice a `distributed var` thunk requirement,
     // and witness it with the distributed thunk -- the "getter thunk".
     if (requirementRef.isDistributedThunk()) {
+//      fprintf(stderr, "[%s:%d](%s) witness THUNK >>>>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      witnessThunk->dump();
+
+//      if (!isa<ProtocolDecl>(witnessStorage->getDeclContext())) {
+//        auto synthesized = witnessThunk->getBody();
+//        fprintf(stderr, "[%s:%d](%s) after body >>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//        witnessThunk->dump();
+//      }
+
       return addMethodImplementation(
           requirementRef, getWitnessRef(requirementRef, witnessStorage->getDistributedThunk()),
           witness);

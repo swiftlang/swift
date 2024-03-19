@@ -16,7 +16,6 @@
 
 import Distributed
 
-@_DistributedProtocol
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
   distributed var distributedVariable: String { get }
@@ -28,9 +27,13 @@ distributed actor Worker: WorkerProtocol {
     "implemented!"
   }
 }
+//
+@available(SwiftStdlib 6.0, *)
+extension WorkerProtocol {
+    distributed var distributedVariable: String { "" }
+}
 
 // ==== Execute ----------------------------------------------------------------
-
 
 @available(SwiftStdlib 6.0, *)
 func test<DA: WorkerProtocol>(actor: DA) async throws -> String {
