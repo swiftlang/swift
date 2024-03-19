@@ -473,17 +473,19 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
   llvm_unreachable("Not understand subtype");
 }
 
-std::optional<TypeTreeLeafTypeRange>
-TypeTreeLeafTypeRange::get(Operand *op, SILValue rootValue) {
+void TypeTreeLeafTypeRange::get(
+    Operand *op, SILValue rootValue,
+    SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
   auto projectedValue = op->get();
   auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
   if (!startEltOffset)
-    return std::nullopt;
+    return;
 
   // A drop_deinit only consumes the deinit bit of its operand.
   if (isa<DropDeinitInst>(op->getUser())) {
     auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
-    return {{upperBound - 1, upperBound}};
+    ranges.push_back({upperBound - 1, upperBound});
+    return;
   }
 
   // An `inject_enum_addr` only initializes the enum tag.
@@ -499,7 +501,8 @@ TypeTreeLeafTypeRange::get(Operand *op, SILValue rootValue) {
     }
     // TODO: account for deinit component if enum has deinit.
     assert(!projectedValue->getType().isValueTypeWithDeinit());
-    return {{payloadUpperBound, upperBound}};
+    ranges.push_back({payloadUpperBound, upperBound});
+    return;
   }
 
   // Uses that borrow a value do not involve the deinit bit.
@@ -512,9 +515,9 @@ TypeTreeLeafTypeRange::get(Operand *op, SILValue rootValue) {
     deinitBitOffset = 1;
   }
 
-  return {{*startEltOffset, *startEltOffset +
-                                TypeSubElementCount(projectedValue) -
-                                deinitBitOffset}};
+  ranges.push_back({*startEltOffset, *startEltOffset +
+                                         TypeSubElementCount(projectedValue) -
+                                         deinitBitOffset});
 }
 
 void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(

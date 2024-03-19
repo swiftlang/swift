@@ -2061,24 +2061,30 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     // TODO: What about copy_addr of itself. We really should just pre-process
     // those maybe.
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
     }
 
-    useState.recordInitUse(user, op->get(), *leafRange);
+    for (auto leafRange : leafRanges) {
+      useState.recordInitUse(user, op->get(), leafRange);
+    }
     return true;
   }
 
   if (noncopyable::memInstMustReinitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *user);
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
     }
-    useState.recordReinitUse(user, op->get(), *leafRange);
+    for (auto leafRange : leafRanges) {
+      useState.recordReinitUse(user, op->get(), leafRange);
+    }
     return true;
   }
 
@@ -2086,13 +2092,16 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // ignore destroy_addr, so we need to track it separately from other uses.
   if (auto *dvi = dyn_cast<DestroyAddrInst>(user)) {
     LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
     }
 
-    useState.destroys.insert({dvi, *leafRange});
+    for (auto leafRange : leafRanges) {
+      useState.destroys.insert({dvi, leafRange});
+    }
     return true;
   }
 
@@ -2111,13 +2120,16 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   if (auto *ebi = dyn_cast<EndBorrowInst>(user)) {
     if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
       LLVM_DEBUG(llvm::dbgs() << "Found store_borrow: " << *sbi);
-      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
       }
 
-      useState.recordInitUse(user, op->get(), *leafRange);
+      for (auto leafRange : leafRanges) {
+        useState.recordInitUse(user, op->get(), leafRange);
+      }
       return true;
     }
   }
@@ -2142,53 +2154,58 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
     }
 
-    // If we have a non-move only type, just treat this as a liveness use.
-    if (isCopyableValue(copyAddr->getSrc())) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Found copy of copyable type. Treating as liveness use! "
-                 << *user);
-      useState.recordLivenessUse(user, *leafRange);
-      return true;
-    }
-
-    if (markedValue->getCheckKind() ==
-        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
-      if (isa<ProjectBoxInst>(stripAccessMarkers(markedValue->getOperand()))) {
+    for (auto leafRange : leafRanges) {
+      // If we have a non-move only type, just treat this as a liveness use.
+      if (isCopyableValue(copyAddr->getSrc())) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "Found mark must check [nocopy] use of escaping box: " << *user);
-        diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(
-            markedValue);
-        return true;
+                   << "Found copy of copyable type. Treating as liveness use! "
+                   << *user);
+        useState.recordLivenessUse(user, leafRange);
+        continue;
       }
 
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Found mark must check [nocopy] error: " << *user);
-      diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
-      return true;
-    }
+      if (markedValue->getCheckKind() ==
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
+        if (isa<ProjectBoxInst>(
+                stripAccessMarkers(markedValue->getOperand()))) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Found mark must check [nocopy] use of escaping box: "
+                     << *user);
+          diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(
+              markedValue);
+          continue;
+        }
 
-    // TODO: Add borrow checking here like below.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Found mark must check [nocopy] error: " << *user);
+        diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
+        continue;
+      }
 
-    // If we have a copy_addr, we are either going to have a take or a
-    // copy... in either case, this copy_addr /is/ going to be a consuming
-    // operation. Make sure to check if we semantically destructure.
-    checkForPartialMutation(useState, diagnosticEmitter,
-                            PartialMutation::Kind::Consume, op->getUser(),
-                            op->get()->getType(), *leafRange,
-                            PartialMutation::consume());
+      // TODO: Add borrow checking here like below.
 
-    if (copyAddr->isTakeOfSrc()) {
-      LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
-      useState.recordTakeUse(user, *leafRange);
-    } else {
-      LLVM_DEBUG(llvm::dbgs() << "Found copy: " << *user);
-      useState.recordCopyUse(user, *leafRange);
+      // If we have a copy_addr, we are either going to have a take or a
+      // copy... in either case, this copy_addr /is/ going to be a consuming
+      // operation. Make sure to check if we semantically destructure.
+      checkForPartialMutation(useState, diagnosticEmitter,
+                              PartialMutation::Kind::Consume, op->getUser(),
+                              op->get()->getType(), leafRange,
+                              PartialMutation::consume());
+
+      if (copyAddr->isTakeOfSrc()) {
+        LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
+        useState.recordTakeUse(user, leafRange);
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "Found copy: " << *user);
+        useState.recordCopyUse(user, leafRange);
+      }
     }
     return true;
   }
@@ -2207,12 +2224,15 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // use.
     if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial ||
         isCopyableValue(li)) {
-      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
       }
-      useState.recordLivenessUse(user, *leafRange);
+      for (auto leafRange : leafRanges) {
+        useState.recordLivenessUse(user, leafRange);
+      }
       return true;
     }
 
@@ -2244,8 +2264,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     // Now, validate that what we will transform into a take isn't a take that
     // would invalidate a field that has a deinit.
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed to compute leaf range for: " << *op->get());
       return false;
@@ -2311,8 +2332,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
       // If set, this will tell the checker that we can change this load into
       // a load_borrow.
-      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
       }
@@ -2324,17 +2346,19 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         return true;
       }
 
-      useState.borrows.insert({user, *leafRange});
+      for (auto leafRange : leafRanges) {
+        useState.borrows.insert({user, leafRange});
 
-      // If we had a load [copy], borrow then we know that all of its destroys
-      // must have been destroy_value. So we can just gather up those
-      // destroy_value and use then to create liveness to ensure that our
-      // value is alive over the entire borrow scope we are going to create.
-      LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
-                                 "since they will become end_borrows.\n");
-      for (auto *consumeUse : li->getConsumingUses()) {
-        auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-        useState.recordLivenessUse(dvi, *leafRange);
+        // If we had a load [copy], borrow then we know that all of its destroys
+        // must have been destroy_value. So we can just gather up those
+        // destroy_value and use then to create liveness to ensure that our
+        // value is alive over the entire borrow scope we are going to create.
+        LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
+                                   "since they will become end_borrows.\n");
+        for (auto *consumeUse : li->getConsumingUses()) {
+          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+          useState.recordLivenessUse(dvi, leafRange);
+        }
       }
 
       return true;
@@ -2357,50 +2381,52 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       return true;
     }
 
-    if (!moveChecker.canonicalizer.foundFinalConsumingUses()) {
-      LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
-      if (checkForExclusivityHazards(li)) {
-        LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-        return true;
-      }
+    for (auto leafRange : leafRanges) {
+      if (!moveChecker.canonicalizer.foundFinalConsumingUses()) {
+        LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
+        if (checkForExclusivityHazards(li)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
+          return true;
+        }
 
-      useState.borrows.insert({user, *leafRange});
-      // If we had a load [copy], borrow then we know that all of its destroys
-      // must have been destroy_value. So we can just gather up those
-      // destroy_value and use then to create liveness to ensure that our
-      // value is alive over the entire borrow scope we are going to create.
-      LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
-                                 "since they will become end_borrows.\n");
-      for (auto *consumeUse : li->getConsumingUses()) {
-        auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-        useState.recordLivenessUse(dvi, *leafRange);
-      }
-    } else {
-      // Now that we know that we are going to perform a take, perform a
-      // checkForDestructure.
-      checkForPartialMutation(useState, diagnosticEmitter,
-                              PartialMutation::Kind::Consume, op->getUser(),
-                              op->get()->getType(), *leafRange,
-                              PartialMutation::consume());
-
-      // If we emitted an error diagnostic, do not transform further and instead
-      // mark that we emitted an early diagnostic and return true.
-      if (numDiagnostics !=
-          moveChecker.diagnosticEmitter.getDiagnosticCount()) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Emitting destructure through deinit error!\n");
-        return true;
-      }
-
-      // If we had a load [copy], store this into the copy list. These are the
-      // things that we must merge into destroy_addr or reinits after we are
-      // done checking. The load [take] are already complete and good to go.
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
-        useState.recordTakeUse(user, *leafRange);
+        useState.borrows.insert({user, leafRange});
+        // If we had a load [copy], borrow then we know that all of its destroys
+        // must have been destroy_value. So we can just gather up those
+        // destroy_value and use then to create liveness to ensure that our
+        // value is alive over the entire borrow scope we are going to create.
+        LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
+                                   "since they will become end_borrows.\n");
+        for (auto *consumeUse : li->getConsumingUses()) {
+          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+          useState.recordLivenessUse(dvi, leafRange);
+        }
       } else {
-        LLVM_DEBUG(llvm::dbgs() << "Found copy inst: " << *user);
-        useState.recordCopyUse(user, *leafRange);
+        // Now that we know that we are going to perform a take, perform a
+        // checkForDestructure.
+        checkForPartialMutation(useState, diagnosticEmitter,
+                                PartialMutation::Kind::Consume, op->getUser(),
+                                op->get()->getType(), leafRange,
+                                PartialMutation::consume());
+
+        // If we emitted an error diagnostic, do not transform further and
+        // instead mark that we emitted an early diagnostic and return true.
+        if (numDiagnostics !=
+            moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Emitting destructure through deinit error!\n");
+          return true;
+        }
+
+        // If we had a load [copy], store this into the copy list. These are the
+        // things that we must merge into destroy_addr or reinits after we are
+        // done checking. The load [take] are already complete and good to go.
+        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+          LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
+          useState.recordTakeUse(user, leafRange);
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "Found copy inst: " << *user);
+          useState.recordCopyUse(user, leafRange);
+        }
       }
     }
     return true;
@@ -2428,28 +2454,32 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       return true;
     }
 
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
     }
 
-    // Now check if we have a destructure through deinit. If we do, emit an
-    // error.
-    unsigned numDiagnostics =
-        moveChecker.diagnosticEmitter.getDiagnosticCount();
-    checkForPartialMutation(useState, diagnosticEmitter,
-                            PartialMutation::Kind::Consume, op->getUser(),
-                            op->get()->getType(), *leafRange,
-                            PartialMutation::consume());
-    if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Emitting destructure through deinit error!\n");
-      return true;
-    }
+    for (auto leafRange : leafRanges) {
+      // Now check if we have a destructure through deinit. If we do, emit an
+      // error.
+      unsigned numDiagnostics =
+          moveChecker.diagnosticEmitter.getDiagnosticCount();
+      checkForPartialMutation(useState, diagnosticEmitter,
+                              PartialMutation::Kind::Consume, op->getUser(),
+                              op->get()->getType(), leafRange,
+                              PartialMutation::consume());
+      if (numDiagnostics !=
+          moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Emitting destructure through deinit error!\n");
+        return true;
+      }
 
-    LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
-    useState.recordTakeUse(user, *leafRange);
+      LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
+      useState.recordTakeUse(user, leafRange);
+    }
     return true;
   }
 
@@ -2457,13 +2487,16 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     switch (fas.getArgumentConvention(*op)) {
     case SILArgumentConvention::Indirect_In_Guaranteed: {
       LLVM_DEBUG(llvm::dbgs() << "in_guaranteed argument to function application\n");
-      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
       }
 
-      useState.recordLivenessUse(user, *leafRange);
+      for (auto leafRange : leafRanges) {
+        useState.recordLivenessUse(user, leafRange);
+      }
       return true;
     }
 
@@ -2485,13 +2518,16 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   if (auto *yi = dyn_cast<YieldInst>(user)) {
     if (yi->getYieldInfoForOperand(*op).isGuaranteed()) {
       LLVM_DEBUG(llvm::dbgs() << "coroutine yield\n");
-      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
       }
 
-      useState.recordLivenessUse(user, *leafRange);
+      for (auto leafRange : leafRanges) {
+        useState.recordLivenessUse(user, leafRange);
+      }
       return true;
     }
   }
@@ -2530,21 +2566,23 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply or inout usage!\n");
       // On-stack partial applications and their final consumes are always a
       // liveness use of their captures.
-      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
         return false;
       }
 
-      // Attempt to find calls of the non-escaping partial apply and places
-      // where the partial apply is passed to a function. We treat those as
-      // liveness uses. If we find a use we don't understand, we return false
-      // here.
-      if (!findNonEscapingPartialApplyUses(pas, *leafRange, useState)) {
-        LLVM_DEBUG(
-            llvm::dbgs()
-            << "Failed to understand use of a non-escaping partial apply?!\n");
-        return false;
+      for (auto leafRange : leafRanges) {
+        // Attempt to find calls of the non-escaping partial apply and places
+        // where the partial apply is passed to a function. We treat those as
+        // liveness uses. If we find a use we don't understand, we return false
+        // here.
+        if (!findNonEscapingPartialApplyUses(pas, leafRange, useState)) {
+          LLVM_DEBUG(llvm::dbgs() << "Failed to understand use of a "
+                                     "non-escaping partial apply?!\n");
+          return false;
+        }
       }
 
       return true;
@@ -2557,25 +2595,31 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     assert(!explicitCopy->isTakeOfSrc() &&
            "If we had a take of src, this should have already been identified "
            "as a must consume");
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
       return false;
     }
 
-    useState.recordLivenessUse(user, *leafRange);
+    for (auto leafRange : leafRanges) {
+      useState.recordLivenessUse(user, leafRange);
+    }
     return true;
   }
 
   if (auto *fixLifetime = dyn_cast<FixLifetimeInst>(op->getUser())) {
     LLVM_DEBUG(llvm::dbgs() << "fix_lifetime use\n");
-    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-    if (!leafRange) {
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
       return false;
     }
 
-    useState.recordLivenessUse(user, *leafRange);
+    for (auto leafRange : leafRanges) {
+      useState.recordLivenessUse(user, leafRange);
+    }
     return true;
   }
   
@@ -2586,13 +2630,16 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     case SILAccessKind::Read: {
       LLVM_DEBUG(llvm::dbgs() << "begin_access [read]\n");
 
-      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
       }
 
-      useState.recordLivenessUse(user, *leafRange);
+      for (auto leafRange : leafRanges) {
+        useState.recordLivenessUse(user, leafRange);
+      }
       return true;
     }
     // Treat a deinit access as a consume of the entire value.
@@ -2609,8 +2656,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // to be careful.
   LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *user);
 
-  auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
-  if (!leafRange) {
+  SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+  TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+  if (!leafRanges.size()) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
     return false;
   }
@@ -2627,7 +2675,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
   }
 #endif
-  useState.recordLivenessUse(user, *leafRange);
+  for (auto leafRange : leafRanges) {
+    useState.recordLivenessUse(user, leafRange);
+  }
 
   return true;
 }
