@@ -72,6 +72,9 @@ static bool isTrivialReturnBlock(SILBasicBlock *RetBB) {
   //   % = tuple ()
   //   return % : $()
   if (RetOperand->getType().isVoid()) {
+    if (!RetBB->args_empty())
+      return false;
+
     auto *TupleI = dyn_cast<TupleInst>(RetBB->begin());
     if (!TupleI || !TupleI->getType().isVoid())
       return false;
