@@ -103,7 +103,7 @@ public func callerConsumeClassLetFieldForArgumentSpillingTestInOutArg(_ x: inout
 
 // TODO: more specific error message path than "unknown"
 public func callerConsumeClassLetFieldForArgumentSpillingTestConsumingArg(_ x: consuming CopyableKlass) {
-    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'unknown'}}
+  consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestLetGlobal() {
@@ -170,7 +170,7 @@ public func callerConsumeClassVarFieldForArgumentSpillingTestInOutArg(_ x: inout
 
 // TODO: more precise error path reporting than 'unknown'
 public func callerConsumeClassVarFieldForArgumentSpillingTestConsumingArg(_ x: consuming CopyableKlass) {
-    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'unknown'}}
+  consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestLetGlobal() {
