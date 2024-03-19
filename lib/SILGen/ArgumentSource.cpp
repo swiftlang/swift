@@ -81,8 +81,10 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               SILType loweredTy,
                                               SGFContext C) && {
   auto substFormalType = getSubstRValueType();
+  auto loweredFormalTy = SGF.getLoweredType(substFormalType);
   auto conversion =
-    Conversion::getSubstToOrig(origFormalType, substFormalType, loweredTy);
+    Conversion::getSubstToOrig(origFormalType, substFormalType,
+                               loweredFormalTy, loweredTy);
   return std::move(*this).getConverted(SGF, conversion, C);
 }
 

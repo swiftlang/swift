@@ -4594,7 +4594,8 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                 origFormalType.getType(),
                                 substFormalType, rvalueTL.getLoweredType())
       : Conversion::getOrigToSubst(origFormalType, substFormalType,
-                                   rvalueTL.getLoweredType());
+                                   /*input*/addrRValueType,
+                                   /*output*/rvalueTL.getLoweredType());
 
   return emitConvertedRValue(loc, conversion, C,
       [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
