@@ -54,7 +54,7 @@
 
 import SIL
 
-private let verbose = true
+private let verbose = false
 
 private func log(_ message: @autoclosure () -> String) {
   if verbose {
