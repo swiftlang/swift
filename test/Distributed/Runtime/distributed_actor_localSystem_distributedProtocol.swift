@@ -16,22 +16,15 @@
 
 import Distributed
 
-@_DistributedProtocol
+// @_DistributedProtocol
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
-//  distributed func hi(name: String)
-
+  //  distributed func hi(name: String)
   distributed var distributedVariable: String { get }
-
-//  distributed func generic<T: Codable & Sendable>(incoming: T) throws -> T
 }
 
 @available(SwiftStdlib 6.0, *)
 distributed actor Worker: WorkerProtocol {
-//  distributed func hi(name: String) {
-//    print("Hi, \(name)!")
-//  }
-
   distributed var distributedVariable: String {
     "implemented!"
   }
@@ -41,18 +34,32 @@ distributed actor Worker: WorkerProtocol {
 //  }
 }
 
+@available(SwiftStdlib 6.0, *)
+extension WorkerProtocol {
+    distributed var distributedVariable: String { "" }
+}
+
 // ==== Execute ----------------------------------------------------------------
+
+
+@available(SwiftStdlib 6.0, *)
+func test<DA: WorkerProtocol>(actor: DA) async throws {
+    _ = try await actor.distributedVariable
+}
+
 @available(SwiftStdlib 6.0, *)
 @main struct Main {
   static func main() async throws {
     let system = LocalTestingDistributedActorSystem()
 
-    let actor: any WorkerProtocol = Worker(actorSystem: system)
+    let actor = Worker(actorSystem: system)
+    try await test(actor: actor)
 
-    // local calls should still just work
+//    // local calls should still just work
+//
+//    let v = try await actor.distributedVariable
+//    print("v = \(v)") // CHECK: v = implemented!
 
-    let v = try await actor.distributedVariable
-    print("v = \(v)") // CHECK: v = implemented!
 
   }
 }

@@ -4086,14 +4086,13 @@ void LValue::addMemberVarComponent(
                           SILDeclRef::Kind::Func,
                           /*isForeign=*/false, /*isDistributed=*/true);
 
-//      auto thunkDecl = var->getDistributedThunk();
-//      thunkDecl->dump();
-
       auto typeData = getLogicalStorageTypeData(
           SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
 
+      // If a protocol, we do witness call, not direct
+      auto isDirectIfClass = isa<ClassDecl>(var->getDeclContext());
       asImpl().emitUsingGetterSetter(accessor,
-                                     /*isDirect=*/false, // TODO?
+                                     /*isDirect=*/isDirectIfClass, // FIXME:
                                      typeData);
     }
 

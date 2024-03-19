@@ -655,10 +655,10 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   auto body = BraceStmt::create(C, sloc, {ifStmt}, sloc, implicit);
 
-  fprintf(stderr, "[%s:%d](%s) THUNK >>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  thunk->dump();
-  fprintf(stderr, "[%s:%d](%s) DUMP BODY\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  body->dump();
+//  fprintf(stderr, "[%s:%d](%s) THUNK >>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//  thunk->dump();
+//  fprintf(stderr, "[%s:%d](%s) DUMP BODY\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//  body->dump();
 
   return {body, /*isTypeChecked=*/false};
 }
@@ -716,9 +716,9 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
     // Isolation of var has to match the type
     // TODO: inside addMethod get the DC and
 
-    fprintf(stderr, "[%s:%d](%s) target is accessor: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    accessor->dump();
-    accessor->dumpRef();
+//    fprintf(stderr, "[%s:%d](%s) target is accessor: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    accessor->dump();
+//    accessor->dumpRef();
 
 //    copy = FuncDecl::createImplicit(
 //        C, swift::StaticSpellingKind::None,
@@ -776,8 +776,8 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     auto *var = accessor->getStorage();
     thunkName = DeclName(C, var->getBaseName(),
                          /*argumentNames=*/ArrayRef<Identifier>());
-    fprintf(stderr, "[%s:%d](%s) VAR NAME: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    thunkName.dump();
+//    fprintf(stderr, "[%s:%d](%s) VAR NAME: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    thunkName.dump();
   } else {
     // Let's use the name of a 'distributed func'
     thunkName = func->getName();
@@ -785,8 +785,8 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 
   FuncDecl *thunk =
       createSameSignatureDistributedThunkDecl(DC, func, thunkName);
-  fprintf(stderr, "[%s:%d](%s) FUNC IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(func));
-  fprintf(stderr, "[%s:%d](%s) THUNK IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(thunk));
+//  fprintf(stderr, "[%s:%d](%s) FUNC IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(func));
+//  fprintf(stderr, "[%s:%d](%s) THUNK IS accessor: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isa<AccessorDecl>(thunk));
 //  assert((!isa<AccessorDecl>(func) || (isa<AccessorDecl>(func) && isa<AccessorDecl>(thunk))) &&
 //         "If emitting a thunk for a distributed property accessor, it also "
 //         "must be an accessor");
@@ -795,10 +795,10 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   /// Record which function this is a thunk for, we'll need this to link back
   /// calls in case this is a distributed requirement witness.
   if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-    fprintf(stderr, "[%s:%d](%s) THE STORAGE CONTEXT:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    accessor->getStorage()->getDeclContext()->dumpContext();
-    fprintf(stderr, "[%s:%d](%s) STORE THE STORAGE:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    accessor->getStorage()->dump();
+//    fprintf(stderr, "[%s:%d](%s) THE STORAGE CONTEXT:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    accessor->getStorage()->getDeclContext()->dumpContext();
+//    fprintf(stderr, "[%s:%d](%s) STORE THE STORAGE:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    accessor->getStorage()->dump();
     thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(accessor->getStorage()));
   } else {
     thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));

@@ -298,9 +298,9 @@ public:
         return getNonBaseWitnessIndex(&witness);
     }
 
-    fprintf(stderr, "[%s:%d](%s) NOT FOUND FOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    declRef.dump();
-    declRef.getDecl()->getDeclContext()->dumpContext();
+//    fprintf(stderr, "[%s:%d](%s) NOT FOUND FOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    declRef.dump();
+//    declRef.getDecl()->getDeclContext()->dumpContext();
 
     llvm_unreachable("didn't find entry for function");
   }
