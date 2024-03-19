@@ -18,7 +18,7 @@ actor Bar {
   init(_ _: NonSendable) {
   }
   func bar() async {
-    let ns = NonSendable() // expected-note {{variable defined here}}
+    let ns = NonSendable()
     _ = Bar(ns) // expected-warning {{transferring 'ns' may cause a race}}
     // TODO: This needs to be:
     // disconnected 'ns' is transferred to actor-isolated callee. Later local uses could race with uses in callee.

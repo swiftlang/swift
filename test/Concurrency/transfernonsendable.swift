@@ -107,7 +107,7 @@ extension FinalActor {
 
 // This test makes sure that we can properly pattern match project_box.
 func formClosureWithoutCrashing() {
-  var c = NonSendableKlass() // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+ var c = NonSendableKlass() // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
   let _ = { print(c) }
 }
 
@@ -115,7 +115,7 @@ func formClosureWithoutCrashing() {
 // treat assignments into contents as a merge operation rather than an assign.
 func closureInOut(_ a: Actor) async {
   var contents = NonSendableKlass()
-  let ns0 = NonSendableKlass() // expected-tns-note {{variable defined here}}
+  let ns0 = NonSendableKlass()
   let ns1 = NonSendableKlass()
 
   contents = ns0
@@ -141,8 +141,8 @@ func closureInOut(_ a: Actor) async {
 
 func closureInOut2(_ a: Actor) async {
   var contents = NonSendableKlass()
-  let ns0 = NonSendableKlass() // expected-tns-note {{variable defined here}}
-  let ns1 = NonSendableKlass() // expected-tns-note {{variable defined here}}
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
 
   contents = ns0
   contents = ns1
@@ -165,7 +165,7 @@ func closureInOut2(_ a: Actor) async {
 func closureNonInOut(_ a: Actor) async {
   var contents = NonSendableKlass()
   let ns0 = NonSendableKlass()
-  let ns1 = NonSendableKlass() // expected-tns-note {{variable defined here}}
+  let ns1 = NonSendableKlass()
 
   contents = ns0
   contents = ns1
@@ -298,7 +298,7 @@ extension Actor {
   }
 
   func simpleClosureCaptureSelfWithReinit3() async {
-    var closure: () -> () = {} // expected-tns-note {{variable defined here}}
+    var closure: () -> () = {}
 
     // We get a transfer after use error.
     await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
@@ -498,7 +498,7 @@ extension Actor {
 
 extension Actor {
   func testVarReassignStopActorDerived() async {
-    var closure: () -> () = { // expected-tns-note {{variable defined here}}
+    var closure: () -> () = {
       print(self)
     }
 
@@ -566,7 +566,7 @@ func testSendableClosureCapturesNonSendable2(a: MainActorIsolatedKlass) {
 /////////////////////////////////////////////////////
 
 func singleFieldVarMergeTest() async {
-  var box = SingleFieldKlassBox() // expected-tns-note {{variable defined here}}
+  var box = SingleFieldKlassBox()
   box = SingleFieldKlassBox()
 
   // This transfers the entire region.
@@ -599,7 +599,7 @@ func singleFieldVarMergeTest() async {
 }
 
 func multipleFieldVarMergeTest1() async {
-  var box = TwoFieldKlassBox() // expected-tns-note {{variable defined here}}
+  var box = TwoFieldKlassBox()
   box = TwoFieldKlassBox()
 
   // This transfers the entire region.
@@ -640,7 +640,7 @@ func multipleFieldVarMergeTest2() async {
 }
 
 func multipleFieldTupleMergeTest1() async {
-  var box = (NonSendableKlass(), NonSendableKlass()) // expected-tns-note {{variable defined here}}
+  var box = (NonSendableKlass(), NonSendableKlass())
   box = (NonSendableKlass(), NonSendableKlass())
 
   // This transfers the entire region.
@@ -844,7 +844,7 @@ func letNonSendableNonTrivialLetStructFieldTest() async {
 }
 
 func letSendableTrivialVarStructFieldTest() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
@@ -854,7 +854,7 @@ func letSendableTrivialVarStructFieldTest() async {
 }
 
 func letSendableNonTrivialVarStructFieldTest() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
@@ -864,7 +864,7 @@ func letSendableNonTrivialVarStructFieldTest() async {
 }
 
 func letNonSendableNonTrivialVarStructFieldTest() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
@@ -921,7 +921,7 @@ func varNonSendableNonTrivialLetStructFieldTest() async {
 }
 
 func varSendableTrivialVarStructFieldTest() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
@@ -931,7 +931,7 @@ func varSendableTrivialVarStructFieldTest() async {
 }
 
 func varSendableNonTrivialVarStructFieldTest() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
@@ -941,7 +941,7 @@ func varSendableNonTrivialVarStructFieldTest() async {
 }
 
 func varNonSendableNonTrivialVarStructFieldTest() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
@@ -953,7 +953,7 @@ func varNonSendableNonTrivialVarStructFieldTest() async {
 
 // vars cannot access sendable let/var if captured in a closure.
 func varNonSendableNonTrivialLetStructFieldClosureTest1() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   let cls = {
     test = StructFieldTests()
@@ -968,7 +968,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest1() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureTest2() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   let cls = {
     test = StructFieldTests()
@@ -983,7 +983,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest2() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureTest3() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   let cls = {
     test = StructFieldTests()
@@ -998,7 +998,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest3() async {
 
 // vars cannot access sendable let/var if captured in a closure.
 func varNonSendableNonTrivialLetStructFieldClosureTest4() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
   cls = {
@@ -1014,7 +1014,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest4() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureTest5() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
   cls = {
@@ -1030,7 +1030,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest5() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureTest6() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
   cls = {
@@ -1045,7 +1045,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest6() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureTest7() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
   cls = {
@@ -1060,7 +1060,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest7() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureTest8() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
   cls = {
@@ -1075,7 +1075,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest8() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureTest9() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
   cls = {
@@ -1090,7 +1090,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest9() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive1() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
 
@@ -1111,7 +1111,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive1() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive2() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
 
@@ -1133,7 +1133,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive2() async {
 // We do not error when accessing the sendable field in this example since the
 // transfer is not reachable from the closure. Instead we emit an error on test.
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive3() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
 
@@ -1153,7 +1153,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive3() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive4() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
 
@@ -1179,7 +1179,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive4() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
-  var test = StructFieldTests() // expected-tns-note {{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
 
   // The reason why we error here is that even though we reassign at the end of
@@ -1202,7 +1202,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
-  var test = StructFieldTests() // expected-tns-note 2{{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
 
@@ -1230,7 +1230,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
 // In this case since we are tracking the transfer from the else statement, we
 // track the closure.
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive7() async {
-  var test = StructFieldTests() // expected-tns-note 2{{variable defined here}}
+  var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
 
@@ -1341,7 +1341,7 @@ func controlFlowTest1() async {
 // as well afterwards since if we exit from the loop header, we have that large
 // merge region leave the for loop.
 func controlFlowTest2() async {
-  var x = NonSendableKlass() // expected-tns-note {{variable defined here}}
+  var x = NonSendableKlass()
 
   for _ in 0..<1024 {
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a race}}
