@@ -598,10 +598,10 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
 }
 
 //===----------------------------------------------------------------------===//
-//                       MARK: ValueIsolationRegionInfo
+//                           MARK: SILIsolationInfo
 //===----------------------------------------------------------------------===//
 
-void IsolationRegionInfo::printForDiagnostics(llvm::raw_ostream &os) const {
+void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     llvm::report_fatal_error("Printing unknown for diagnostics?!");
@@ -1139,7 +1139,7 @@ struct PartitionOpBuilder {
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
 
   TrackableValueID
-  getActorIntroducingRepresentative(IsolationRegionInfo actorIsolation);
+  getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
 
   void addAssignFresh(SILValue value) {
     currentInstPartitionOps.emplace_back(
@@ -1194,7 +1194,7 @@ struct PartitionOpBuilder {
   /// Mark \p value artifically as being part of an actor isolated region by
   /// introducing a new fake actor introducing representative and merging them.
   void addActorIntroducingInst(SILValue value,
-                               IsolationRegionInfo actorIsolation) {
+                               SILIsolationInfo actorIsolation) {
     assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
            "merged values should already have been encountered");
 
@@ -1473,7 +1473,7 @@ public:
         // transfer list and to the region join list.
         LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
         valueMap.mergeIsolationRegionInfo(
-            arg, IsolationRegionInfo::getTaskIsolated(arg));
+            arg, SILIsolationInfo::getTaskIsolated(arg));
         nonSendableJoinedIndices.push_back(state->getID());
       }
     }
@@ -1515,13 +1515,13 @@ private:
 
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
-                                    IsolationRegionInfo actorIsolation) const {
+                                    SILIsolationInfo actorIsolation) const {
     return valueMap.getActorIntroducingRepresentative(introducingInst,
                                                       actorIsolation);
   }
 
   bool mergeIsolationRegionInfo(SILValue value,
-                                IsolationRegionInfo isolationRegion) {
+                                SILIsolationInfo isolationRegion) {
     return valueMap.mergeIsolationRegionInfo(value, isolationRegion);
   }
 
@@ -1570,7 +1570,7 @@ public:
   template <typename TargetRange, typename SourceRange>
   void translateSILMultiAssign(const TargetRange &resultValues,
                                const SourceRange &sourceValues,
-                               IsolationRegionInfo isolationInfo = {}) {
+                               SILIsolationInfo isolationInfo = {}) {
     SmallVector<SILValue, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
@@ -1732,7 +1732,7 @@ public:
   ///
   /// Semantically this causes all arguments of the applysite to be transferred.
   void translateIsolatedPartialApply(PartialApplyInst *pai,
-                                     IsolationRegionInfo actorIsolation) {
+                                     SILIsolationInfo actorIsolation) {
     ApplySite applySite(pai);
     LLVM_DEBUG(llvm::dbgs() << "Translating Isolated Partial Apply!\n");
 
@@ -1790,7 +1790,7 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = IsolationRegionInfo::get(pai)) {
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
@@ -1813,7 +1813,7 @@ public:
   }
 
   void translateNonIsolationCrossingSILApply(FullApplySite fas) {
-    IsolationRegionInfo isolationInfo;
+    SILIsolationInfo isolationInfo;
 
     // If self is an actor and we are isolated to it, propagate actor self.
     if (fas.hasSelfArgument()) {
@@ -1823,7 +1823,7 @@ public:
         if (auto *nomDecl =
                 self.get()->getType().getNominalOrBoundGenericNominal()) {
           // First try to see if this nom decl is isolated to an actor.
-          isolationInfo = IsolationRegionInfo::getActorIsolated(nomDecl);
+          isolationInfo = SILIsolationInfo::getActorIsolated(nomDecl);
         }
       }
     }
@@ -1903,7 +1903,7 @@ public:
       }
     }
 
-    auto isolationRegionInfo = IsolationRegionInfo::get(inst);
+    auto isolationRegionInfo = SILIsolationInfo::get(inst);
 
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
@@ -2294,7 +2294,7 @@ TrackableValueID PartitionOpBuilder::lookupValueID(SILValue value) {
 }
 
 TrackableValueID PartitionOpBuilder::getActorIntroducingRepresentative(
-    IsolationRegionInfo actorIsolation) {
+    SILIsolationInfo actorIsolation) {
   return translator
       ->getActorIntroducingRepresentative(currentInst, actorIsolation)
       .getID();
@@ -3204,7 +3204,7 @@ RegionAnalysisValueMap::maybeGetRepresentative(Element trackableValueID) const {
   return getValueForId(trackableValueID)->getRepresentative().maybeGetValue();
 }
 
-IsolationRegionInfo
+SILIsolationInfo
 RegionAnalysisValueMap::getIsolationRegion(Element trackableValueID) const {
   auto iter = getValueForId(trackableValueID);
   if (!iter)
@@ -3212,7 +3212,7 @@ RegionAnalysisValueMap::getIsolationRegion(Element trackableValueID) const {
   return iter->getValueState().getIsolationRegionInfo();
 }
 
-IsolationRegionInfo
+SILIsolationInfo
 RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
   auto iter = equivalenceClassValuesToState.find(RepresentativeValue(value));
   if (iter == equivalenceClassValuesToState.end())
@@ -3247,7 +3247,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // underlying object, use that. It is never wrong.
     if (info.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          IsolationRegionInfo::getActorIsolated(*info.actorIsolation));
+          SILIsolationInfo::getActorIsolated(*info.actorIsolation));
     }
 
     auto storage = AccessStorageWithBase::compute(value);
@@ -3267,7 +3267,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         auto *nomDecl =
             rei->getOperand()->getType().getNominalOrBoundGenericNominal();
         iter.first->getSecond().mergeIsolationRegionInfo(
-            IsolationRegionInfo::getActorIsolated(nomDecl));
+            SILIsolationInfo::getActorIsolated(nomDecl));
       }
 
       // See if the memory base is a global_addr from a global actor protected global.
@@ -3277,7 +3277,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
             auto isolation = getActorIsolation(globalDecl);
             if (isolation.isGlobalActor()) {
               iter.first->getSecond().mergeIsolationRegionInfo(
-                  IsolationRegionInfo::getActorIsolated(isolation));
+                  SILIsolationInfo::getActorIsolated(isolation));
             }
           }
         }
@@ -3315,8 +3315,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     auto parentAddrInfo = getUnderlyingTrackedValue(svi);
     if (parentAddrInfo.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          IsolationRegionInfo::getActorIsolated(
-              *parentAddrInfo.actorIsolation));
+          SILIsolationInfo::getActorIsolated(*parentAddrInfo.actorIsolation));
     }
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
@@ -3326,7 +3325,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
                             ->getType()
                             .getNominalOrBoundGenericNominal();
         iter.first->getSecond().mergeIsolationRegionInfo(
-            IsolationRegionInfo::getActorIsolated(nomDecl));
+            SILIsolationInfo::getActorIsolated(nomDecl));
       }
     }
   }
@@ -3334,14 +3333,14 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   // See if we have a struct_extract from a global actor isolated type.
   if (auto *sei = dyn_cast<StructExtractInst>(iter.first->first.getValue())) {
     iter.first->getSecond().mergeIsolationRegionInfo(
-        IsolationRegionInfo::getActorIsolated(sei->getStructDecl()));
+        SILIsolationInfo::getActorIsolated(sei->getStructDecl()));
   }
 
   // See if we have an unchecked_enum_data from a global actor isolated type.
   if (auto *uedi =
           dyn_cast<UncheckedEnumDataInst>(iter.first->first.getValue())) {
     iter.first->getSecond().mergeIsolationRegionInfo(
-        IsolationRegionInfo::getActorIsolated(uedi->getEnumDecl()));
+        SILIsolationInfo::getActorIsolated(uedi->getEnumDecl()));
   }
 
   // Handle a switch_enum from a global actor isolated type.
@@ -3351,7 +3350,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         auto enumDecl =
             sei->getOperand()->getType().getEnumOrBoundGenericEnum();
         iter.first->getSecond().mergeIsolationRegionInfo(
-            IsolationRegionInfo::getActorIsolated(enumDecl));
+            SILIsolationInfo::getActorIsolated(enumDecl));
       }
     }
   }
@@ -3364,7 +3363,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         auto isolation = getGlobalActorInitIsolation(calleeFunction);
         if (isolation && isolation->isGlobalActor()) {
           iter.first->getSecond().mergeIsolationRegionInfo(
-              IsolationRegionInfo::getActorIsolated(*isolation));
+              SILIsolationInfo::getActorIsolated(*isolation));
         }
       }
     }
@@ -3382,7 +3381,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
       if (self &&
           ((nomDecl = self->getType().getNominalOrBoundGenericNominal()))) {
         iter.first->getSecond().mergeIsolationRegionInfo(
-            IsolationRegionInfo::getActorIsolated(nomDecl));
+            SILIsolationInfo::getActorIsolated(nomDecl));
         return {iter.first->first, iter.first->second};
       }
 
@@ -3402,13 +3401,13 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
 
         if (isolation.isActorIsolated()) {
           iter.first->getSecond().mergeIsolationRegionInfo(
-              IsolationRegionInfo::getActorIsolated(isolation));
+              SILIsolationInfo::getActorIsolated(isolation));
           return {iter.first->first, iter.first->second};
         }
       }
 
       iter.first->getSecond().mergeIsolationRegionInfo(
-          IsolationRegionInfo::getTaskIsolated(fArg));
+          SILIsolationInfo::getTaskIsolated(fArg));
       return {iter.first->first, iter.first->second};
     }
   }
@@ -3437,7 +3436,7 @@ RegionAnalysisValueMap::tryToTrackValue(SILValue value) const {
 }
 
 TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
-    SILInstruction *introducingInst, IsolationRegionInfo actorIsolation) const {
+    SILInstruction *introducingInst, SILIsolationInfo actorIsolation) const {
   auto *self = const_cast<RegionAnalysisValueMap *>(this);
   auto iter = self->equivalenceClassValuesToState.try_emplace(
       introducingInst,
@@ -3456,7 +3455,7 @@ TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
 }
 
 bool RegionAnalysisValueMap::mergeIsolationRegionInfo(
-    SILValue value, IsolationRegionInfo actorIsolation) {
+    SILValue value, SILIsolationInfo actorIsolation) {
   value = getUnderlyingTrackedValue(value).value;
   auto iter = equivalenceClassValuesToState.find(value);
   if (iter == equivalenceClassValuesToState.end())
