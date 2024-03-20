@@ -286,7 +286,15 @@ public:
   void printForDiagnostics(llvm::raw_ostream &os,
                            StringRef openingQuotationMark = "'") const;
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
+
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
+    printForDiagnostics(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
 };
 
 /// Determine how the given value declaration is isolated.
