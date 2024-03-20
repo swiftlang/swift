@@ -1827,21 +1827,6 @@ public:
   }
 
   void translateNonIsolationCrossingSILApply(FullApplySite fas) {
-    SILIsolationInfo isolationInfo;
-
-    // If self is an actor and we are isolated to it, propagate actor self.
-    if (fas.hasSelfArgument()) {
-      auto &self = fas.getSelfArgumentOperand();
-      if (fas.getArgumentParameterInfo(self).hasOption(
-              SILParameterInfo::Isolated)) {
-        if (auto *nomDecl =
-                self.get()->getType().getNominalOrBoundGenericNominal()) {
-          // First try to see if this nom decl is isolated to an actor.
-          isolationInfo = SILIsolationInfo::getActorIsolated(nomDecl);
-        }
-      }
-    }
-
     // For non-self parameters, gather all of the transferring parameters and
     // gather our non-transferring parameters.
     SmallVector<SILValue, 8> nonTransferringParameters;
@@ -1883,6 +1868,7 @@ public:
     getApplyResults(*fas, applyResults);
 
     auto type = fas.getSubstCalleeSILType().castTo<SILFunctionType>();
+    auto isolationInfo = SILIsolationInfo::get(*fas);
 
     // If our result is not transferring, just do the normal multi-assign.
     if (!type->hasTransferringResult()) {
