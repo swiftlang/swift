@@ -493,17 +493,21 @@ public:
   /// LiveWithin blocks have at least one use and/or def within the block, but
   /// are not (yet) LiveOut.
   ///
+  /// DeadToLiveEdge blocks are not live within the block itself, but the value
+  /// becomes live on one or more of the edges out.
+  ///
   /// LiveOut blocks are live on at least one successor path. LiveOut blocks may
   /// or may not contain defs or uses.
-  ///
-  /// NOTE: The values below for Dead, LiveWithin, LiveOut were picked to ensure
-  /// that given a 2 bit representation of the value, a value is Dead if the
-  /// first bit is 0 and is LiveOut if the second bit is set.
   enum IsLive {
     Dead = 0,
     LiveWithin = 1,
+    DeadToLiveEdge = 2,
     LiveOut = 3,
   };
+  
+  static bool isDead(IsLive liveness) {
+    return liveness == Dead || liveness == DeadToLiveEdge;
+  }
 
   /// A bit vector that stores information about liveness. This is composed
   /// with SmallBitVector since it contains two bits per liveness so that it
@@ -524,37 +528,27 @@ public:
     unsigned size() const { return bits.size() / 2; }
 
     IsLive getLiveness(unsigned bitNo) const {
-      if (!bits[bitNo * 2])
-        return IsLive::Dead;
-      return bits[bitNo * 2 + 1] ? LiveOut : LiveWithin;
+      return IsLive((bits[bitNo * 2 + 1] << 1) | bits[bitNo * 2]);
     }
 
     /// Returns the liveness in \p resultingFoundLiveness. We only return the
     /// bits for endBitNo - startBitNo.
     void getLiveness(unsigned startBitNo, unsigned endBitNo,
                      SmallVectorImpl<IsLive> &resultingFoundLiveness) const {
-      unsigned actualStartBitNo = startBitNo * 2;
-      unsigned actualEndBitNo = endBitNo * 2;
-
-      for (unsigned i = actualStartBitNo, e = actualEndBitNo; i != e; i += 2) {
-        if (!bits[i]) {
-          resultingFoundLiveness.push_back(Dead);
-          continue;
-        }
-
-        resultingFoundLiveness.push_back(bits[i + 1] ? LiveOut : LiveWithin);
-      }
-    }
-
-    void setLiveness(unsigned startBitNo, unsigned endBitNo, IsLive isLive) {
-      for (unsigned i = startBitNo * 2, e = endBitNo * 2; i != e; i += 2) {
-        bits[i] = isLive & 1;
-        bits[i + 1] = isLive & 2;
+      for (unsigned i = startBitNo, e = endBitNo; i != e; ++i) {
+        resultingFoundLiveness.push_back(getLiveness(i));
       }
     }
 
     void setLiveness(unsigned bitNo, IsLive isLive) {
-      setLiveness(bitNo, bitNo + 1, isLive);
+      bits[bitNo * 2] = isLive & 1;
+      bits[bitNo * 2 + 1] = bool(isLive & 2);
+    }
+
+    void setLiveness(unsigned startBitNo, unsigned endBitNo, IsLive isLive) {
+      for (unsigned i = startBitNo, e = endBitNo; i != e; ++i) {
+        setLiveness(i, isLive);
+      }
     }
   };
 
@@ -620,9 +614,10 @@ public:
   }
 
   void initializeDefBlock(SILBasicBlock *defBB, unsigned startBitNo,
-                          unsigned endBitNo) {
+                          unsigned endBitNo,
+                          IsLive isLive = LiveWithin) {
     assert(isInitialized());
-    markBlockLive(defBB, startBitNo, endBitNo, LiveWithin);
+    markBlockLive(defBB, startBitNo, endBitNo, isLive);
   }
 
   /// Update this liveness result for a single use.
@@ -632,7 +627,7 @@ public:
     auto *block = user->getParent();
     if (!isUserBeforeDef) {
       auto liveness = getBlockLiveness(block, bitNo);
-      if (liveness != Dead)
+      if (!isDead(liveness))
         return liveness;
     }
     computeScalarUseBlockLiveness(block, bitNo);
@@ -696,6 +691,7 @@ protected:
       // If we are dead, always update to the new liveness.
       switch (iterAndInserted.first->getSecond().getLiveness(bitNo)) {
       case Dead:
+      case DeadToLiveEdge:
         iterAndInserted.first->getSecond().setLiveness(bitNo, bitNo + 1,
                                                        isLive);
         break;
@@ -935,10 +931,12 @@ public:
     return UserBlockRange(getAllUsers(), op);
   }
 
-  void initializeDefBlock(SILBasicBlock *defBB, TypeTreeLeafTypeRange span) {
+  void initializeDefBlock(SILBasicBlock *defBB, TypeTreeLeafTypeRange span,
+                          FieldSensitivePrunedLiveBlocks::IsLive isLive
+                            = FieldSensitivePrunedLiveBlocks::LiveWithin) {
     assert(isInitialized());
     liveBlocks.initializeDefBlock(defBB, span.startEltOffset,
-                                  span.endEltOffset);
+                                  span.endEltOffset, isLive);
   }
 
   /// For flexibility, \p lifetimeEnding is provided by the
@@ -1303,6 +1301,14 @@ public:
                         FieldSensitivePrunedLivenessBoundary &boundary) const;
 };
 
+static inline SILBasicBlock *getDefinedInBlock(SILNode *node) {
+  // try_apply defines the value only on the success edge.
+  if (auto ta = dyn_cast<TryApplyInst>(node)) {
+    return ta->getNormalBB();
+  }
+  return node->getParentBlock();
+}
+
 /// MultiDefPrunedLiveness is computed incrementally by calling updateForUse.
 ///
 /// Defs should be initialized before calling updatingForUse on any def
@@ -1351,9 +1357,17 @@ public:
   void initializeDef(SILNode *node, TypeTreeLeafTypeRange span) {
     assert(Super::isInitialized());
     defs.insert(node, span);
-    auto *block = node->getParentBlock();
-    defBlocks.insert(block, span);
-    initializeDefBlock(block, span);
+    auto defBlock = getDefinedInBlock(node);
+    defBlocks.insert(defBlock, span);
+    initializeDefBlock(defBlock, span);
+    
+    if (auto ta = dyn_cast<TryApplyInst>(node)) {
+      // The value becomes live on the success edge.
+      // Mark the basic block the try_apply terminates as a dead-to-live
+      // edge.
+      initializeDefBlock(ta->getParent(), span,
+                         FieldSensitivePrunedLiveBlocks::DeadToLiveEdge);
+    }
   }
 
   void initializeDef(SILInstruction *def, TypeTreeLeafTypeRange span) {
