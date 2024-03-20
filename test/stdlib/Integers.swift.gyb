@@ -865,6 +865,42 @@ tests.test("Strideable") {
   }
 }
 
+% if int(WORD_BITS) <= 64:
+%   for suffix in ['64', '']:
+tests.test("Strideable/Distance/Int${suffix}/MaxPlus1") {
+  func f(_ a: Int${suffix}, _ b: Int${suffix}) -> Int {
+    return a.distance(to: b)
+  }
+  expectCrashLater()
+  _ = f(Int${suffix}(-1), Int${suffix}(Int.max))
+}
+
+tests.test("Strideable/Distance/Int${suffix}/MinMinus1") {
+  func f(_ a: Int${suffix}, _ b: Int${suffix}) -> Int {
+    return a.distance(to: b)
+  }
+  expectCrashLater()
+  _ = f(Int${suffix}(Int.max), Int${suffix}(-2))
+}
+
+tests.test("Strideable/Distance/UInt${suffix}/MaxPlus1") {
+  func f(_ a: UInt${suffix}, _ b: UInt${suffix}) -> Int {
+    return a.distance(to: b)
+  }
+  expectCrashLater()
+  _ = f(UInt${suffix}.min, UInt${suffix}(Int.max) + 1)
+}
+
+tests.test("Strideable/Distance/UInt${suffix}/MinMinus1") {
+  func f(_ a: UInt${suffix}, _ b: UInt${suffix}) -> Int {
+    return a.distance(to: b)
+  }
+  expectCrashLater()
+  _ = f(UInt${suffix}(Int.max) + 2, UInt${suffix}.min)
+}
+%  end
+% end
+
 tests.test("signum/generic") {
   func check<T : BinaryInteger>(_ expected: T, _ x: T) {
     expectEqual(expected, x.signum())
