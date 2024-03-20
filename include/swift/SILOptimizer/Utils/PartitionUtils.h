@@ -257,6 +257,9 @@ public:
   /// Attempt to infer the isolation region info for \p inst.
   static SILIsolationInfo get(SILInstruction *inst);
 
+  /// Attempt to infer the isolation region info for \p arg.
+  static SILIsolationInfo get(SILFunctionArgument *arg);
+
   bool operator==(const SILIsolationInfo &other) const {
     if (getKind() != other.getKind())
       return false;
