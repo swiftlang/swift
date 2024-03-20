@@ -330,13 +330,7 @@ public:
   SILInstruction *optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                      ConvertFunctionInst *CFI);
 
-  bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
-  bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee);
-  bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
-                                  KeyPathInst *kp);
-  bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
-                                  KeyPathInst *kp);
 
   /// Sinks owned forwarding instructions to their uses if they do not have
   /// non-debug non-consuming uses. Deletes any debug_values and destroy_values

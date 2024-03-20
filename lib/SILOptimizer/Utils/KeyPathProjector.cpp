@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 
 using namespace swift;
 
@@ -669,9 +670,10 @@ private:
 
 KeyPathInst *
 KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
-  if (auto *upCast = dyn_cast<UpcastInst>(keyPath))
-    keyPath = upCast->getOperand();
-  // TODO: Look through other conversions, copies, etc.?
+  while (auto *upCast = dyn_cast<UpcastInst>(keyPath)) {
+    keyPath = lookThroughOwnershipInsts(upCast->getOperand());
+  }
+
   return dyn_cast<KeyPathInst>(keyPath);
 }
 
