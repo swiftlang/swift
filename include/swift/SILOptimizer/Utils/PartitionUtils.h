@@ -1262,6 +1262,32 @@ public:
     return asImpl().getIsolationRegionInfo(elt);
   }
 
+  /// Compute the isolation region info for all elements in \p region.
+  ///
+  /// The bool result is if it is captured by a closure element. That only is
+  /// computed if \p sourceOp is non-null.
+  std::pair<IsolationRegionInfo, bool>
+  getIsolationRegionInfo(Region region, Operand *sourceOp) const {
+    bool isClosureCapturedElt = false;
+    IsolationRegionInfo isolationRegionInfo;
+
+    for (const auto &pair : p.range()) {
+      if (pair.second == region) {
+        isolationRegionInfo =
+            isolationRegionInfo.merge(getIsolationRegionInfo(pair.first));
+        if (sourceOp)
+          isClosureCapturedElt |= isClosureCaptured(pair.first, sourceOp);
+      }
+    }
+
+    return {isolationRegionInfo, isClosureCapturedElt};
+  }
+
+  /// Overload of \p getIsolationRegionInfo without an Operand.
+  IsolationRegionInfo getIsolationRegionInfo(Region region) const {
+    return getIsolationRegionInfo(region, nullptr).first;
+  }
+
   bool isTaskIsolatedDerived(Element elt) const {
     return asImpl().isTaskIsolatedDerived(elt);
   }
@@ -1320,35 +1346,23 @@ public:
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Transfer PartitionOp's argument should already be tracked");
 
-      IsolationRegionInfo isolationRegionInfo =
-          getIsolationRegionInfo(op.getOpArgs()[0]);
-
-      // If we know our direct value is actor derived... immediately emit an
-      // error.
-      if (isolationRegionInfo.hasActorIsolation()) {
-        return handleTransferNonTransferrable(op, op.getOpArgs()[0],
-                                              isolationRegionInfo);
-      }
-
       // Otherwise, we need to merge our isolation region info with the
       // isolation region info of everything else in our region. This is the
       // dynamic isolation region info found by the dataflow.
-      bool isClosureCapturedElt =
-          isClosureCaptured(op.getOpArgs()[0], op.getSourceOp());
-      Region elementRegion = p.getRegion(op.getOpArgs()[0]);
-      for (const auto &pair : p.range()) {
-        if (pair.second == elementRegion) {
-          isolationRegionInfo =
-              isolationRegionInfo.merge(getIsolationRegionInfo(pair.first));
-          isClosureCapturedElt |=
-              isClosureCaptured(pair.first, op.getSourceOp());
-        }
-      }
+      Element transferredElement = op.getOpArgs()[0];
+      Region transferredRegion = p.getRegion(transferredElement);
+      bool isClosureCapturedElt = false;
+      IsolationRegionInfo transferredRegionIsolation;
+      std::tie(transferredRegionIsolation, isClosureCapturedElt) =
+          getIsolationRegionInfo(transferredRegion, op.getSourceOp());
 
-      // If we merged anything, we need to handle a transfer non-transferrable.
-      if (bool(isolationRegionInfo) && !isolationRegionInfo.isDisconnected()) {
+      // If we merged anything, we need to handle a transfer
+      // non-transferrable. We pass in the dynamic isolation region info of our
+      // region.
+      if (bool(transferredRegionIsolation) &&
+          !transferredRegionIsolation.isDisconnected()) {
         return handleTransferNonTransferrable(op, op.getOpArgs()[0],
-                                              isolationRegionInfo);
+                                              transferredRegionIsolation);
       }
 
       // Mark op.getOpArgs()[0] as transferred.
