@@ -599,6 +599,13 @@ bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
                                  bool isMandatory);
 
+bool tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder);
+bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee, SILBuilder Builder);
+bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
+                                KeyPathInst *kp, SILBuilder Builder);
+bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
+                                KeyPathInst *kp, SILBuilder Builder);
+
 /// Instantiate the specified type by recursively tupling and structing the
 /// unique instances of the empty types and undef "instances" of the non-empty
 /// types aggregated together at each level.

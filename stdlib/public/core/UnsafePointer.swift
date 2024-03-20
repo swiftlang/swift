@@ -370,7 +370,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   ///            by the key path, or `nil`.
   @inlinable
   @_alwaysEmitIntoClient
-  @_unavailableInEmbedded
+  @_transparent
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
@@ -1132,7 +1132,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///            by the key path, or `nil`.
   @inlinable
   @_alwaysEmitIntoClient
-  @_unavailableInEmbedded
+  @_transparent
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
@@ -1155,7 +1155,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///            by the key path, or `nil`.
   @inlinable
   @_alwaysEmitIntoClient
-  @_unavailableInEmbedded
+  @_transparent
   public func pointer<Property>(
     to property: WritableKeyPath<Pointee, Property>
   ) -> UnsafeMutablePointer<Property>? {
