@@ -368,8 +368,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     return std::nullopt;
   }
 
-  // Perform lifetime dependence inference under a flag only. Currently all
-  // stdlib types can appear is ~Escapable and ~Copyable.
+  // Disable inference if requested.
   if (!ctx.LangOpts.EnableExperimentalLifetimeDependenceInference) {
     return std::nullopt;
   }
@@ -384,6 +383,17 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
 
   if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return std::nullopt;
+  }
+
+  auto *cd = dyn_cast<ConstructorDecl>(afd);
+  if (cd && cd->isImplicit()) {
+    if (cd->getParameters()->size() == 0) {
+      return std::nullopt;
+    } else {
+      diags.diagnose(cd->getLoc(),
+                     diag::lifetime_dependence_cannot_infer_implicit_init);
+      return std::nullopt;
+    }
   }
 
   if (afd->getKind() != DeclKind::Constructor && afd->hasImplicitSelfDecl()) {
@@ -411,11 +421,6 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     }
     return LifetimeDependenceInfo::getForParamIndex(afd, /*selfIndex*/ 0,
                                                     ownership);
-  }
-
-  auto *cd = dyn_cast<ConstructorDecl>(afd);
-  if (cd && cd->isImplicit() && cd->getParameters()->size() == 0) {
-    return std::nullopt;
   }
 
   LifetimeDependenceInfo lifetimeDependenceInfo;
@@ -451,11 +456,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     lifetimeDependenceInfo = LifetimeDependenceInfo::getForParamIndex(
         afd, paramIndex + 1, param->getValueOwnership());
   }
-  if (cd && cd->isImplicit()) {
-    diags.diagnose(cd->getLoc(),
-                   diag::lifetime_dependence_cannot_infer_implicit_init);
-    return std::nullopt;
-  }
+
   if (!candidateParam && !hasParamError) {
     // Explicitly turn off error messages for builtins, since some of are
     // ~Escapable currently.
