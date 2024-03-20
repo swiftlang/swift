@@ -1709,6 +1709,18 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         return openType(type, replacements, locator);
       });
 
+  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto *DC = FD->getDeclContext();
+      // All global functions should be @Sendable
+      if (DC->isModuleScopeContext() &&
+          !adjustedTy->getExtInfo().isSendable()) {
+        adjustedTy =
+            adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
+      }
+    }
+  }
+
   return adjustedTy->castTo<FunctionType>();
 }
 
@@ -1799,14 +1811,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
-
-    if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-      // All global functions should be @Sendable
-      if (funcDecl->getDeclContext()->isModuleScopeContext()) {
-        funcType =
-            funcType->withExtInfo(funcType->getExtInfo().withSendable());
-      }
-    }
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
