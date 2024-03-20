@@ -954,6 +954,10 @@ NOTE(modularization_issue_stale_module,none,
      "the module %0 has enabled library-evolution; "
      "the following file may need to be deleted if the SDK was modified: '%1'",
      (const ModuleDecl *, StringRef))
+NOTE(modularization_issue_type_mismatch,none,
+     "a candidate was filtered out because of a type mismatch; "
+     "expected: %0, found: %1",
+     (const Type, const Type))
 NOTE(modularization_issue_swift_version,none,
      "the module %0 was built with a Swift language version set to %1 "
      "while the current invocation uses %2; "
