@@ -223,17 +223,8 @@ public:
 
     // TODO: Make this failing mean that we emit an unknown SIL error instead of
     // asserting.
-    if (other.isActorIsolated() && isActorIsolated()) {
-      if (other.hasActorInstance() && hasActorInstance()) {
-        assert(other.getActorInstance() == getActorInstance() &&
-               "Actor should never be merged with another actor unless with "
-               "the same actor?!");
-      } else if (other.hasActorIsolation() && hasActorIsolation()) {
-        assert(other.getActorIsolation() == getActorIsolation() &&
-               "Actor should never be merged with another actor unless with "
-               "the same actor?!");
-      }
-    }
+    assert((!other.isActorIsolated() || !isActorIsolated() || *this == other) &&
+           "Actor can only be merged with the same actor");
 
     // Otherwise, take the other value.
     return other;
@@ -264,6 +255,36 @@ public:
 
   static IsolationRegionInfo getTaskIsolated(SILValue value) {
     return {Kind::Task, value};
+  }
+
+  bool operator==(const IsolationRegionInfo &other) const {
+    if (getKind() != other.getKind())
+      return false;
+
+    switch (getKind()) {
+    case Unknown:
+    case Disconnected:
+      return true;
+    case Task:
+      return getTaskIsolatedValue() == other.getTaskIsolatedValue();
+    case Actor:
+      // First try to use actor isolation if we have them.
+      if (hasActorIsolation() && other.hasActorIsolation()) {
+        auto lhsIsolation = getActorIsolation();
+        auto rhsIsolation = other.getActorIsolation();
+        if (lhsIsolation && rhsIsolation)
+          return *lhsIsolation == *rhsIsolation;
+      }
+
+      // Otherwise, try to use the inferred actor decl.
+      auto *lhsDecl = tryInferActorDecl();
+      auto *rhsDecl = tryInferActorDecl();
+      if (lhsDecl && rhsDecl)
+        return lhsDecl == rhsDecl;
+
+      // Otherwise, false, they are not equal.
+      return false;
+    }
   }
 };
 
