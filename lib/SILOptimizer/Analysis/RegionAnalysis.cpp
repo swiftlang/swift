@@ -1937,10 +1937,6 @@ public:
   ///
   /// Semantically this causes all arguments of the applysite to be transferred.
   void translateIsolationCrossingSILApply(FullApplySite applySite) {
-    ApplyExpr *sourceApply = applySite.getLoc().getAsASTNode<ApplyExpr>();
-    assert((sourceApply || bool(applySite.getIsolationCrossing())) &&
-           "only ApplyExpr's should cross isolation domains");
-
     // Require all operands first before we emit transferring.
     for (auto op : applySite.getArguments())
       if (auto value = tryToTrackValue(op))
