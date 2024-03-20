@@ -2816,6 +2816,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
       for (auto isLive : isLiveArray) {
         switch (isLive) {
         case IsLive::Dead:
+        case IsLive::DeadToLiveEdge:
           LLVM_DEBUG(llvm::dbgs() << "    Dead block!\n");
           // Ignore a dead block. Our error use could not be in such a block.
           //

@@ -579,6 +579,7 @@ void FieldSensitivePrunedLiveBlocks::computeScalarUseBlockLiveness(
       case LiveWithin:
         markBlockLive(predBlock, bitNo, LiveOut);
         break;
+      case DeadToLiveEdge:
       case LiveOut:
         break;
       }
@@ -615,6 +616,7 @@ void FieldSensitivePrunedLiveBlocks::updateForUse(
       } else {
         LLVM_FALLTHROUGH;
       }
+    case DeadToLiveEdge:
     case Dead: {
       // This use block has not yet been marked live. Mark it and its
       // predecessor blocks live.
@@ -634,6 +636,8 @@ FieldSensitivePrunedLiveBlocks::getStringRef(IsLive isLive) const {
     return "Dead";
   case LiveWithin:
     return "LiveWithin";
+  case DeadToLiveEdge:
+    return "DeadToLiveEdge";
   case LiveOut:
     return "LiveOut";
   }
@@ -853,6 +857,7 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Visiting bit: " << bit << '\n');
     bool isLive = false;
     switch (pair.value()) {
+    case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
     case FieldSensitivePrunedLiveBlocks::Dead:
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "        Dead... continuing!\n");
       // We are only not within the boundary if all of our bits are dead. We
@@ -942,6 +947,8 @@ static StringRef getStringRef(FieldSensitivePrunedLiveBlocks::IsLive isLive) {
     return "Dead";
   case FieldSensitivePrunedLiveBlocks::LiveWithin:
     return "LiveWithin";
+  case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
+    return "DeadToLiveEdge";
   case FieldSensitivePrunedLiveBlocks::LiveOut:
     return "LiveOut";
   }
@@ -972,8 +979,8 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
       switch (pair.value()) {
       case FieldSensitivePrunedLiveBlocks::LiveOut:
         for (SILBasicBlock *succBB : block->getSuccessors()) {
-          if (getBlockLiveness(succBB, index) ==
-              FieldSensitivePrunedLiveBlocks::Dead) {
+          if (FieldSensitivePrunedLiveBlocks::isDead(
+                getBlockLiveness(succBB, index))) {
             PRUNED_LIVENESS_LOG(llvm::dbgs() << "Marking succBB as boundary edge: bb"
                                     << succBB->getDebugID() << '\n');
             boundary.getBoundaryEdgeBits(succBB).set(index);
@@ -989,6 +996,9 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
         foundAnyNonDead = true;
         break;
       }
+      case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
+        foundAnyNonDead = true;
+        LLVM_FALLTHROUGH;
       case FieldSensitivePrunedLiveBlocks::Dead:
         // We do not assert here like in the normal pruned liveness
         // implementation since we can have dead on some bits and liveness along
@@ -1178,7 +1188,7 @@ void findBoundaryInSSADefBlock(SILNode *ssaDef, unsigned bitNo,
   // defInst is null for argument defs.
   PRUNED_LIVENESS_LOG(llvm::dbgs() << "Searching using findBoundaryInSSADefBlock.\n");
   SILInstruction *defInst = dyn_cast<SILInstruction>(ssaDef);
-  for (SILInstruction &inst : llvm::reverse(*ssaDef->getParentBlock())) {
+  for (SILInstruction &inst : llvm::reverse(*getDefinedInBlock(ssaDef))) {
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "Visiting: " << inst);
     if (&inst == defInst) {
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead def: " << *defInst);
@@ -1192,9 +1202,21 @@ void findBoundaryInSSADefBlock(SILNode *ssaDef, unsigned bitNo,
     }
   }
 
-  auto *deadArg = cast<SILArgument>(ssaDef);
-  PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead arg: " << *deadArg);
-  boundary.getDeadDefsBits(deadArg).set(bitNo);
+  if (auto *deadArg = dyn_cast<SILArgument>(ssaDef)) {
+    PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead arg: " << *deadArg);
+    boundary.getDeadDefsBits(deadArg).set(bitNo);
+    return;
+  }
+  
+  // If we searched the success branch of a try_apply and found no uses, then
+  // the try_apply itself is a dead def.
+  if (isa<TryApplyInst>(ssaDef)) {
+    PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead try_apply: " << *ssaDef);
+    boundary.getDeadDefsBits(ssaDef).set(bitNo);
+    return;
+  }
+  
+  llvm_unreachable("def not found?!");
 }
 
 //===----------------------------------------------------------------------===//
