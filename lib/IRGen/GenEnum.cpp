@@ -1861,6 +1861,7 @@ namespace {
                                            DeinitIsNeeded);
       IGF.getTypeInfo(theEnumType)
           .collectMetadataForOutlining(collector, theEnumType);
+      collector.materialize();
       if (!consumeEnumFunction)
         consumeEnumFunction =
             emitConsumeEnumFunction(IGF.IGM, theEnumType, collector);
@@ -4870,6 +4871,7 @@ namespace {
         OutliningMetadataCollector collector(T, IGF, LayoutIsNotNeeded,
                                              DeinitIsNeeded);
         IGF.getTypeInfo(T).collectMetadataForOutlining(collector, T);
+        collector.materialize();
         if (!consumeEnumFunction)
           consumeEnumFunction = emitConsumeEnumFunction(IGM, T, collector);
         Explosion tmp;

@@ -216,6 +216,8 @@ public func takeOuterNC_1<T>(_ o: consuming OuterNC_1<T>) {
 // CHECK-SAME:      ptr{{.*}} %0,
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
+// CHECK-NOT:     @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"
+// CHECK-NOT:     @"$s24moveonly_value_functions9OuterNC_2VMa"
 // CHECK:         call{{.*}} @"$s24moveonly_value_functions9OuterNC_2VyxGlWOh"(
 // CHECK-SAME:        ptr %0,
 // CHECK-SAME:        ptr %T)
@@ -248,6 +250,8 @@ public func takeOuterNC_2<T>(_ o: consuming OuterNC_2<T>) {
 // CHECK-SAME:      ptr %T, 
 // CHECK-SAME:      ptr %T.P)
 // CHECK-SAME:  {
+// CHECK-NOT:     @"$s24moveonly_value_functions16GenericContext_1VA2A1PRzlE9Inner_NC1VMa"
+// CHECK-NOT:     @"$s24moveonly_value_functions16GenericContext_1VA2A1PRzlE9OuterNC_1VMa"
 // CHECK:         call ptr @"$s24moveonly_value_functions16GenericContext_1VA2A1PRzlE9OuterNC_1Vyx_GAaDRzlWOh"(
 // CHECK-SAME:        ptr %0, 
 // CHECK-SAME:        ptr %T, 
@@ -319,6 +323,8 @@ public func takeOuterSinglePayloadNC_2<T>(_ e: consuming OuterSinglePayloadNC_2<
 // CHECK-SAME:      ptr noalias %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME: {
+// CHECK-NOT:     @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"
+// CHECK-NOT:     @"$s24moveonly_value_functions22OuterSinglePayloadNC_3OMa"
 // CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_3OyxGlWOh"(
 // CHECK-SAME:        ptr %0, 
 // CHECK-SAME:        ptr %T)
@@ -341,6 +347,8 @@ public func takeOuterSinglePayloadNC_3<T>(_ e: consuming OuterSinglePayloadNC_3<
 // CHECK-SAME:      ptr noalias %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
+// CHECK-NOT:     @"$s24moveonly_value_functions26InnerDeinitingWithLayoutNCVMa"
+// CHECK-NOT:     @"$s24moveonly_value_functions21OuterMultiPayloadNC_1OMa"
 // CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_1OyxGlWOh"(
 // CHECK-SAME:        ptr %0, 
 // CHECK-SAME:        ptr %T)
@@ -416,6 +424,8 @@ public func takeOuterMultiPayloadNC_3<T>(_ e: consuming OuterMultiPayloadNC_3<T>
 // CHECK-SAME:      ptr noalias %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
+// CHECK-NOT:     @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"
+// CHECK-NOT:     @"$s24moveonly_value_functions21OuterMultiPayloadNC_4OMa"
 // CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_4OyxGlWOh"(
 // CHECK-SAME:        ptr %0, 
 // CHECK-SAME:        ptr %T)
