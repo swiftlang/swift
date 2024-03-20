@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafePointer: AtomicRepresentable {
+extension UnsafePointer: AtomicRepresentable where Pointee: ~Copyable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -65,7 +65,7 @@ extension UnsafePointer: AtomicRepresentable {
 }
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafePointer: AtomicOptionalRepresentable {
+extension UnsafePointer: AtomicOptionalRepresentable where Pointee: ~Copyable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -121,7 +121,7 @@ extension UnsafePointer: AtomicOptionalRepresentable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutablePointer: AtomicRepresentable {
+extension UnsafeMutablePointer: AtomicRepresentable where Pointee: ~Copyable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -171,7 +171,8 @@ extension UnsafeMutablePointer: AtomicRepresentable {
 }
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutablePointer: AtomicOptionalRepresentable {
+extension UnsafeMutablePointer: AtomicOptionalRepresentable
+where Pointee: ~Copyable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -773,7 +774,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeBufferPointer: AtomicRepresentable {
+extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -839,7 +840,9 @@ extension UnsafeBufferPointer: AtomicRepresentable {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutableBufferPointer: AtomicRepresentable {
+extension UnsafeMutableBufferPointer: AtomicRepresentable
+where Element: ~Copyable
+{
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -35,18 +35,20 @@ internal func _swift_bufferAllocate(
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Header`.
 @_fixed_layout
-open class ManagedBuffer<Header, Element> {
+open class ManagedBuffer<Header, Element: ~Copyable> {
   /// The stored `Header` instance.
   ///
   /// During instance creation, in particular during
   /// `ManagedBuffer.create`'s call to initialize, `ManagedBuffer`'s
   /// `header` property is as-yet uninitialized, and therefore
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
+  @_preInverseGenerics
   public final var header: Header
 
   #if $Embedded
   // In embedded mode this initializer has to be public, otherwise derived
   // classes cannot be specialized.
+  @_preInverseGenerics
   public init(_doNotCallMe: ()) {
     _internalInvariantFailure("Only initialize these by calling create")
   }
@@ -54,23 +56,26 @@ open class ManagedBuffer<Header, Element> {
   // This is really unfortunate. In Swift 5.0, the method descriptor for this
   // initializer was public and subclasses would "inherit" it, referencing its
   // method descriptor from their class override table.
+  @_preInverseGenerics
   @usableFromInline
   internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("Only initialize these by calling create")
   }
   #endif
 
+  @_preInverseGenerics
   @inlinable
   deinit {}
 }
 
 @available(*, unavailable)
-extension ManagedBuffer: Sendable {}
+extension ManagedBuffer: Sendable where Element: ~Copyable {}
 
-extension ManagedBuffer {
+extension ManagedBuffer where Element: ~Copyable {
   /// Create a new instance of the most-derived class, calling
   /// `factory` on the partially-constructed object to generate
   /// an initial `Header`.
+  @_preInverseGenerics
   @inlinable
   public final class func create(
     minimumCapacity: Int,
@@ -96,6 +101,7 @@ extension ManagedBuffer {
   /// This header may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "header" area when
   /// an instance is created.
+  @_preInverseGenerics
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public final var capacity: Int {
@@ -106,12 +112,14 @@ extension ManagedBuffer {
     return realCapacity
   }
 
+  @_preInverseGenerics
   @inlinable
   internal final var firstElementAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(
       Builtin.projectTailElems(self, Element.self))
   }
 
+  @_preInverseGenerics
   @inlinable
   internal final var headerAddress: UnsafeMutablePointer<Header> {
     return UnsafeMutablePointer<Header>(Builtin.addressof(&header))
@@ -122,6 +130,7 @@ extension ManagedBuffer {
   ///
   /// - Note: This pointer is valid only for the duration of the
   ///   call to `body`.
+  @_preInverseGenerics
   @inlinable
   public final func withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
@@ -134,6 +143,7 @@ extension ManagedBuffer {
   ///
   /// - Note: This pointer is valid only for the duration of the
   ///   call to `body`.
+  @_preInverseGenerics
   @inlinable
   public final func withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
@@ -146,6 +156,7 @@ extension ManagedBuffer {
   ///
   /// - Note: These pointers are valid only for the duration of the
   ///   call to `body`.
+  @_preInverseGenerics
   @inlinable
   public final func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
@@ -191,8 +202,9 @@ extension ManagedBuffer {
 ///      }
 ///
 @frozen
-public struct ManagedBufferPointer<Header, Element> {
+public struct ManagedBufferPointer<Header, Element: ~Copyable> {
 
+  @_preInverseGenerics
   @usableFromInline
   internal var _nativeBuffer: Builtin.NativeObject
 
@@ -211,6 +223,7 @@ public struct ManagedBufferPointer<Header, Element> {
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Header` and any constructed `Element`s.
+  @_preInverseGenerics
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public init(
@@ -224,7 +237,7 @@ public struct ManagedBufferPointer<Header, Element> {
 
     // initialize the header field
     try withUnsafeMutablePointerToHeader {
-      $0.initialize(to: 
+      $0.initialize(to:
         try factory(
           self.buffer,
           {
@@ -240,6 +253,7 @@ public struct ManagedBufferPointer<Header, Element> {
   ///
   /// - Precondition: `buffer` is an instance of a non-`@objc` class whose
   ///   `deinit` destroys its stored `Header` and any constructed `Element`s.
+  @_preInverseGenerics
   @inlinable
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
@@ -257,6 +271,7 @@ public struct ManagedBufferPointer<Header, Element> {
   /// _debugPreconditions in _checkValidBufferClass for any array. Since we know
   /// for the _ContiguousArrayBuffer that this check must always succeed we omit
   /// it in this specialized constructor.
+  @_preInverseGenerics
   @inlinable
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._internalInvariantValidBufferClass(type(of: buffer))
@@ -274,6 +289,7 @@ public struct ManagedBufferPointer<Header, Element> {
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Header` and any constructed `Element`s.
+  @_preInverseGenerics
   @inlinable
   internal init(
     bufferClass: AnyClass,
@@ -290,12 +306,14 @@ public struct ManagedBufferPointer<Header, Element> {
 
   /// Internal version for use by _ContiguousArrayBuffer.init where we know that
   /// we have a valid buffer class and that the capacity is >= 0.
+  @_preInverseGenerics
   @inlinable
   internal init(
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
   ) {
-    ManagedBufferPointer._internalInvariantValidBufferClass(_uncheckedBufferClass, creating: true)
+    ManagedBufferPointer._internalInvariantValidBufferClass(
+      _uncheckedBufferClass, creating: true)
     _internalInvariant(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
@@ -315,14 +333,16 @@ public struct ManagedBufferPointer<Header, Element> {
   ///
   /// - Note: It is an error to use the `header` property of the resulting
   ///   instance unless it has been initialized.
+  @_preInverseGenerics
   @inlinable
   internal init(_ buffer: ManagedBuffer<Header, Element>) {
     _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 }
 
-extension ManagedBufferPointer {
+extension ManagedBufferPointer where Element: ~Copyable {
   /// The stored `Header` instance.
+  @_preInverseGenerics
   @inlinable
   public var header: Header {
     _read {
@@ -334,6 +354,7 @@ extension ManagedBufferPointer {
   }
 
   /// Returns the object instance being used for storage.
+  @_preInverseGenerics
   @inlinable
   public var buffer: AnyObject {
     return Builtin.castFromNativeObject(_nativeBuffer)
@@ -344,6 +365,7 @@ extension ManagedBufferPointer {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "header" area when
   /// an instance is created.
+  @_preInverseGenerics
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public var capacity: Int {
@@ -357,6 +379,7 @@ extension ManagedBufferPointer {
   ///
   /// - Note: This pointer is valid only
   ///   for the duration of the call to `body`.
+  @_preInverseGenerics
   @inlinable
   public func withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
@@ -369,6 +392,7 @@ extension ManagedBufferPointer {
   ///
   /// - Note: This pointer is valid only for the duration of the
   ///   call to `body`.
+  @_preInverseGenerics
   @inlinable
   public func withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
@@ -381,9 +405,12 @@ extension ManagedBufferPointer {
   ///
   /// - Note: These pointers are valid only for the duration of the
   ///   call to `body`.
+  @_preInverseGenerics
   @inlinable
   public func withUnsafeMutablePointers<R>(
-    _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
+    _ body: (
+      UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>
+    ) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(_nativeBuffer) }
     return try body(_headerPointer, _elementPointer)
@@ -393,13 +420,15 @@ extension ManagedBufferPointer {
   /// buffer; otherwise, returns `false`.
   ///
   /// See `isKnownUniquelyReferenced` for details.
+  @_preInverseGenerics
   @inlinable
   public mutating func isUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
   }
 }
 
-extension ManagedBufferPointer {
+extension ManagedBufferPointer where Element: ~Copyable {
+  @_preInverseGenerics
   @inlinable
   internal static func _checkValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
@@ -418,6 +447,7 @@ extension ManagedBufferPointer {
     )
   }
 
+  @_preInverseGenerics
   @inlinable
   internal static func _internalInvariantValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
@@ -437,8 +467,9 @@ extension ManagedBufferPointer {
   }
 }
 
-extension ManagedBufferPointer {
+extension ManagedBufferPointer where Element: ~Copyable {
   /// The required alignment for allocations of this type, minus 1
+  @_preInverseGenerics
   @inlinable
   internal static var _alignmentMask: Int {
     return max(
@@ -447,6 +478,7 @@ extension ManagedBufferPointer {
   }
 
   /// The actual number of bytes allocated for this object.
+  @_preInverseGenerics
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   internal var _capacityInBytes: Int {
@@ -454,12 +486,14 @@ extension ManagedBufferPointer {
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
+  @_preInverseGenerics
   @inlinable
   internal var _address: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_nativeBuffer))
   }
 
   /// Offset from the allocated storage for `self` to the stored `Header`
+  @_preInverseGenerics
   @inlinable
   internal static var _headerOffset: Int {
     _onFastPath()
@@ -471,6 +505,7 @@ extension ManagedBufferPointer {
   /// An **unmanaged** pointer to the storage for the `Header`
   /// instance.  Not safe to use without _fixLifetime calls to
   /// guarantee it doesn't dangle
+  @_preInverseGenerics
   @inlinable
   internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
@@ -481,6 +516,7 @@ extension ManagedBufferPointer {
   /// An **unmanaged** pointer to the storage for `Element`s.  Not
   /// safe to use without _fixLifetime calls to guarantee it doesn't
   /// dangle.
+  @_preInverseGenerics
   @inlinable
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
@@ -489,6 +525,7 @@ extension ManagedBufferPointer {
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
+  @_preInverseGenerics
   @inlinable
   internal static var _elementOffset: Int {
     _onFastPath()

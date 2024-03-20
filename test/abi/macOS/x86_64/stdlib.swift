@@ -239,6 +239,12 @@ Added: _$sSMsSmRzrlE15removeSubrangesyys8RangeSetVy5IndexSlQzGF
 // (extension in Swift):Swift.MutableCollection.moveSubranges(_: Swift.RangeSet<A.Index>, to: A.Index) -> Swift.Range<A.Index>
 Added: _$sSMsE13moveSubranges_2toSny5IndexQzGs8RangeSetVyADG_ADtF
 
+// `isEmpty` is a newly explicit property on Unsafe[Mutable]BufferPointer
+// property descriptor for Swift.UnsafeBufferPointer.isEmpty : Swift.Bool
+Added: _$sSR7isEmptySbvpMV
+// property descriptor for Swift.UnsafeMutableBufferPointer.isEmpty : Swift.Bool
+Added: _$sSr7isEmptySbvpMV
+
 // Runtime Symbols
 Added: __swift_pod_copy
 Added: __swift_pod_destroy

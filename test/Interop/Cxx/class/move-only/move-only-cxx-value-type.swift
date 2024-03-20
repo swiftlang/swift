@@ -4,9 +4,6 @@
 //
 // REQUIRES: executable_test
 
-// Needs an UnsafeMutablePointer where Pointee: ~Copyable (rdar://124544696)
-// XFAIL: *
-
 import MoveOnlyCxxValueType
 import StdlibUnittest
 
