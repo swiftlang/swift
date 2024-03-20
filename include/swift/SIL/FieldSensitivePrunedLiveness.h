@@ -480,10 +480,10 @@ public:
 
     /// Returns the liveness in \p resultingFoundLiveness. We only return the
     /// bits for endBitNo - startBitNo.
-    void getLiveness(unsigned startBitNo, unsigned endBitNo,
+    void getLiveness(SmallBitVector const &bitsOfInterest,
                      SmallVectorImpl<IsLive> &resultingFoundLiveness) const {
-      for (unsigned i = startBitNo, e = endBitNo; i != e; ++i) {
-        resultingFoundLiveness.push_back(getLiveness(i));
+      for (auto bit : bitsOfInterest.set_bits()) {
+        resultingFoundLiveness.push_back(getLiveness(bit));
       }
     }
 
@@ -601,17 +601,26 @@ public:
   void getBlockLiveness(SILBasicBlock *bb, unsigned startBitNo,
                         unsigned endBitNo,
                         SmallVectorImpl<IsLive> &foundLivenessInfo) const {
+    SmallBitVector bits(*numBitsToTrack);
+    for (auto index = startBitNo; index < endBitNo; ++index) {
+      bits.set(index);
+    }
+    getBlockLiveness(bb, bits, foundLivenessInfo);
+  }
+
+  void getBlockLiveness(SILBasicBlock *bb, SmallBitVector const &bits,
+                        SmallVectorImpl<IsLive> &foundLivenessInfo) const {
     assert(isInitialized());
     auto liveBlockIter = liveBlocks.find(bb);
     if (liveBlockIter == liveBlocks.end()) {
-      for (unsigned i : range(endBitNo - startBitNo)) {
-        (void)i;
+      for (auto bit : bits.set_bits()) {
+        (void)bit;
         foundLivenessInfo.push_back(Dead);
       }
       return;
     }
 
-    liveBlockIter->second.getLiveness(startBitNo, endBitNo, foundLivenessInfo);
+    liveBlockIter->second.getLiveness(bits, foundLivenessInfo);
   }
 
   llvm::StringRef getStringRef(IsLive isLive) const;
@@ -919,6 +928,12 @@ public:
                                 resultingFoundLiveness);
   }
 
+  void getBlockLiveness(SILBasicBlock *bb, SmallBitVector const &bits,
+                        SmallVectorImpl<FieldSensitivePrunedLiveBlocks::IsLive>
+                            &foundLivenessInfo) const {
+    liveBlocks.getBlockLiveness(bb, bits, foundLivenessInfo);
+  }
+
   /// Return the liveness for this specific sub-element of our root value.
   FieldSensitivePrunedLiveBlocks::IsLive
   getBlockLiveness(SILBasicBlock *bb, unsigned subElementNumber) const {
@@ -963,16 +978,16 @@ public:
     return record->isInterestingUser(element);
   }
 
-  /// Whether \p user uses the fields in \p range as indicated by \p kind.
+  /// Whether \p user uses the fields in \p bits as indicated by \p kind.
   bool isInterestingUserOfKind(SILInstruction *user, IsInterestingUser kind,
-                               TypeTreeLeafTypeRange range) const {
+                               SmallBitVector const &bits) const {
     auto *record = getInterestingUser(user);
     if (!record) {
       return kind == IsInterestingUser::NonUser;
     }
 
-    for (auto element : range.getRange()) {
-      if (record->isInterestingUser(element) != kind)
+    for (auto bit : bits.set_bits()) {
+      if (record->isInterestingUser(bit) != kind)
         return false;
     }
     return true;
@@ -1119,10 +1134,10 @@ public:
       : FieldSensitivePrunedLiveness(fn, discoveredBlocks) {}
 
   /// Check if \p inst occurs in between the definition of a def and the
-  /// liveness boundary for bits in \p span.
+  /// liveness boundary for \p bits.
   ///
-  /// NOTE: It is assumed that \p inst is correctly described by span.
-  bool isWithinBoundary(SILInstruction *inst, TypeTreeLeafTypeRange span) const;
+  /// NOTE: It is assumed that \p inst is correctly described by \p bits.
+  bool isWithinBoundary(SILInstruction *inst, SmallBitVector const &bits) const;
 
   /// Customize updateForUse for FieldSensitivePrunedLiveness such that we check
   /// that we consider defs as stopping liveness from being propagated up.

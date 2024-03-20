@@ -604,7 +604,9 @@ void Implementation::checkDestructureUsesOnBoundary() const {
                << "    DestructureNeedingUse: " << *use->getUser());
 
     auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use, getRootValue());
-    if (!liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
+    SmallBitVector destructureUseBits(liveness.getNumSubElements());
+    destructureUseSpan.setBits(destructureUseBits);
+    if (!liveness.isWithinBoundary(use->getUser(), destructureUseBits)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "        On boundary or within boundary! No error!\n");
       continue;

@@ -26,6 +26,7 @@ sil @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
 sil @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
 sil @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
 sil @get_out_2 : $@convention(thin) () -> (@out M, @out M)
+sil @take_addr_2 : $@convention(thin) (@in M, @in M) -> ()
 
 /// Two non-contiguous fields (#M4.s2, #M4.s4) are borrowed by @see_addr_2.
 /// Two non-contiguous fields (#M4.s1, #M$.s3) are consumed by @end_2.
@@ -155,4 +156,27 @@ sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
   dealloc_stack %stack_addr : $*M4
   %22 = tuple ()
   return %22 : $()
+}
+
+// Two non-contiguous fields (#M4.s2, #M$.s4) are consumed by @take_addr_2.
+// CHECK-LABEL: sil [ossa] @consume_noncontiguous : $@convention(thin) (@in M4) -> () {
+// CHECK:       bb0([[M4:%[^,]+]] :
+// CHECK:         [[S1:%[^,]+]] = struct_element_addr [[M4]] : $*M4, #M4.s1
+// CHECK:         [[S3:%[^,]+]] = struct_element_addr [[M4]] : $*M4, #M4.s3
+// CHECK:         [[TAKE_ADDR_2:%[^,]+]] = function_ref @take_addr_2
+// CHECK:         apply [[TAKE_ADDR_2]]([[S1]], [[S3]])
+// CHECK-LABEL: } // end sil function 'consume_noncontiguous'
+sil [ossa] @consume_noncontiguous : $@convention(thin) (@in M4) -> () {
+entry(%m4_addr : $*M4):
+  %m4 = mark_unresolved_non_copyable_value [consumable_and_assignable] %m4_addr : $*M4
+  %s1 = struct_element_addr %m4 : $*M4, #M4.s1
+  %s2 = struct_element_addr %m4 : $*M4, #M4.s2
+  %s3 = struct_element_addr %m4 : $*M4, #M4.s3
+  %s4 = struct_element_addr %m4 : $*M4, #M4.s4
+  %take_addr_2 = function_ref @take_addr_2 : $@convention(thin) (@in M, @in M) -> ()
+  apply %take_addr_2(%s1, %s3) : $@convention(thin) (@in M, @in M) -> ()
+  destroy_addr %s2 : $*M
+  destroy_addr %s4 : $*M
+  %retval = tuple ()
+  return %retval : $()
 }
