@@ -875,16 +875,15 @@ static FunctionTest FieldSensitiveSSAUseLivenessTest(
 
 template <typename LivenessWithDefs>
 bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
-    SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+    SILInstruction *inst, SmallBitVector const &bits) const {
   assert(asImpl().isInitialized());
 
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs() << "FieldSensitivePrunedLiveRange::isWithinBoundary!\n"
-                   << "Span: ";
-      span.print(llvm::dbgs()); llvm::dbgs() << '\n');
+  PRUNED_LIVENESS_LOG(llvm::dbgs()
+                      << "FieldSensitivePrunedLiveRange::isWithinBoundary!\n"
+                      << "Bits: " << bits << "\n");
 
   // If we do not have any span, return true since we have no counter examples.
-  if (span.empty()) {
+  if (bits.empty()) {
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "    span is empty! Returning true!\n");
     return true;
   }
@@ -894,13 +893,13 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   auto *block = inst->getParent();
 
   SmallVector<IsLive, 8> outVector;
-  getBlockLiveness(block, span, outVector);
+  getBlockLiveness(block, bits, outVector);
 
-  for (auto pair : llvm::enumerate(outVector)) {
-    unsigned bit = span.startEltOffset + pair.index();
+  for (auto bitAndIndex : llvm::enumerate(bits.set_bits())) {
+    unsigned bit = bitAndIndex.value();
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Visiting bit: " << bit << '\n');
     bool isLive = false;
-    switch (pair.value()) {
+    switch (outVector[bitAndIndex.index()]) {
     case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
     case FieldSensitivePrunedLiveBlocks::Dead:
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "        Dead... continuing!\n");
