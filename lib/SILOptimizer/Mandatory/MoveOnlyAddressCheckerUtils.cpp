@@ -1382,6 +1382,12 @@ public:
       iter = finalBlockConsumes.insert({block, {}}).first;
     }
     LLVM_DEBUG(llvm::dbgs() << "Recorded Final Consume: " << *inst);
+    for (auto &pair : iter->second) {
+      if (pair.first == inst) {
+        pair.second |= bits;
+        return;
+      }
+    }
     iter->second.emplace_back(inst, bits);
   }
 
