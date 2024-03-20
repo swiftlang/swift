@@ -380,6 +380,25 @@ extension UInt64 {
   }
 }
 
+/// Extends `UInt8` providing initialization from a Unicode scalar.
+extension UInt8 {
+  /// Converts a UInt8 value into a UnicodeScalar
+  @_transparent @_alwaysEmitIntoClient
+  var ascii: Unicode.Scalar? {
+    guard self < 0x80 else { return nil }
+    return Unicode.Scalar(self)
+  }
+  /// Initializes a FixedWidthInteger with the value of the provided Unicode scalar.
+  ///
+  /// - Parameter unicode: The Unicode scalar to initialize from.
+  /// - Note: Construct with value `v.value`.
+  @inlinable @_alwaysEmitIntoClient
+  public init?(ifASCII v: Unicode.Scalar) {
+    guard v.value < 0x80 else { return nil }
+    self = Self(v.value)
+  }
+}
+
 /// Extends `UInt8` to allow direct comparisons with double quoted literals.
 extension UInt8 {
   /// Returns a Boolean indicating whether the `UInt8` is equal to the provided Unicode scalar.
@@ -390,22 +409,31 @@ extension UInt8 {
   /// - Returns: `true` when the `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
-    guard s.value < 128 else { return false }
+    #if DEBUG
     return i == UInt8(ascii: s)
+    #else
+    return i == UInt8(ifASCII: s)
+    #endif
   }
 
   /// Returns a Boolean indicating whether the `UInt8` is not equal to the provided Unicode scalar.
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
-    guard s.value < 128 else { return true }
+    #if DEBUG
     return i != UInt8(ascii: s)
+    #else
+    return i != UInt8(ifASCII: s)
+    #endif
   }
 
   /// Enables pattern matching of Unicode scalars in switch statements.
   @_transparent @_alwaysEmitIntoClient
   public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
-    guard s.value < 128 else { return false }
+    #if DEBUG
     return i == UInt8(ascii: s)
+    #else
+    return i == UInt8(ifASCII: s)
+    #endif
   }
 }
 
@@ -419,31 +447,31 @@ extension UInt8? {
   /// - Returns: `true` if the optional `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
-    guard s.value < 128 else { return false }
+    #if DEBUG
     return i == UInt8(ascii: s)
+    #else
+    return i == UInt8(ifASCII: s)
+    #endif
   }
 
   /// Returns a Boolean value indicating whether the optional `UInt8` is not equal to the provided Unicode scalar.
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
-    guard s.value < 128 else { return true }
+    #if DEBUG
     return i != UInt8(ascii: s)
+    #else
+    return i != UInt8(ifASCII: s)
+    #endif
   }
 
   /// Allows pattern matching of Unicode scalars in switch statements.
   @_transparent @_alwaysEmitIntoClient
   public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
-    guard s.value < 128 else { return false }
+    #if DEBUG
     return i == UInt8(ascii: s)
-  }
-}
-
-/// Converts a UInt8 value into a UnicodeScalar
-extension UInt8 {
-  @_transparent @_alwaysEmitIntoClient
-  var ascii: Unicode.Scalar? {
-    guard self < 128 else { return nil }
-    return Unicode.Scalar(self)
+    #else
+    return i == UInt8(ifASCII: s)
+    #endif
   }
 }
 
