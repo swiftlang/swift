@@ -1,4 +1,12 @@
-// RUN: %target-sil-opt -module-name moveonly_addresschecker -enable-experimental-feature MoveOnlyPartialConsumption -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -move-only-address-checker-disable-lifetime-extension=true | %FileCheck %s
+// RUN: %target-sil-opt                                                \
+// RUN:     -sil-move-only-address-checker                             \
+// RUN:     %s                                                         \
+// RUN:     -module-name moveonly_addresschecker                       \
+// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption    \
+// RUN:     -enable-experimental-feature MoveOnlyClasses               \
+// RUN:     -enable-sil-verify-all                                     \
+// RUN:     -move-only-address-checker-disable-lifetime-extension=true \
+// RUN: | %FileCheck %s
 
 @_moveOnly
 struct M {
