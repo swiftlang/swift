@@ -48,25 +48,6 @@ using namespace swift::regionanalysisimpl;
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
-/// SILApplyCrossesIsolation determines if a SIL instruction is an isolation
-/// crossing apply expression. This is done by checking its correspondence to an
-/// ApplyExpr AST node, and then checking the internal flags of that AST node to
-/// see if the ActorIsolationChecker determined it crossed isolation.  It's
-/// possible this is brittle and a more nuanced check is needed, but this
-/// suffices for all cases tested so far.
-static bool isIsolationBoundaryCrossingApply(SILInstruction *inst) {
-  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
-    return apply->getIsolationCrossing().has_value();
-  if (auto fas = FullApplySite::isa(inst)) {
-    if (bool(fas.getIsolationCrossing()))
-      return true;
-  }
-
-  // We assume that any instruction that does not correspond to an ApplyExpr
-  // cannot cross an isolation domain.
-  return false;
-}
-
 namespace {
 
 struct UnderlyingTrackedValueInfo {
@@ -1776,8 +1757,6 @@ public:
   }
 
   void translateSILPartialApply(PartialApplyInst *pai) {
-    assert(!isIsolationBoundaryCrossingApply(pai));
-
     // First check if our partial apply is Sendable. In such a case, we will
     // have emitted an earlier warning in Sema.
     //
@@ -1811,12 +1790,8 @@ public:
       }
     }
 
-    if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
-      auto actorIsolation = ace->getActorIsolation();
-      if (actorIsolation.isActorIsolated()) {
-        return translateIsolatedPartialApply(
-            pai, IsolationRegionInfo::getActorIsolated(actorIsolation));
-      }
+    if (auto isolationRegionInfo = IsolationRegionInfo::get(pai)) {
+      return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
     SmallVector<SILValue, 8> applyResults;
@@ -1928,9 +1903,11 @@ public:
       }
     }
 
+    auto isolationRegionInfo = IsolationRegionInfo::get(inst);
+
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
-    if (!isIsolationBoundaryCrossingApply(inst))
+    if (!bool(isolationRegionInfo))
       return translateNonIsolationCrossingSILApply(fas);
 
     if (auto cast = dyn_cast<ApplyInst>(inst))

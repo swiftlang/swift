@@ -257,6 +257,9 @@ public:
     return {Kind::Task, value};
   }
 
+  /// Attempt to infer the isolation region info for \p inst.
+  static IsolationRegionInfo get(SILInstruction *inst);
+
   bool operator==(const IsolationRegionInfo &other) const {
     if (getKind() != other.getKind())
       return false;
