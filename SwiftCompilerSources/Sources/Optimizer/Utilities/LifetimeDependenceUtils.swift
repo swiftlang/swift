@@ -369,6 +369,11 @@ extension LifetimeDependence.Scope {
         }
       case let .yield(result):
         self = Self(yield: result)
+      case .storeBorrow(let sb):
+        guard let scope = Self(base: sb.source, context) else {
+          return nil
+        }
+        self = scope
       case .pointer, .unidentified:
         self = .unknown(address)
       }
@@ -1084,7 +1089,8 @@ extension LifetimeDependenceDefUseWalker {
         return returnedDependence(address: arg, using: operand)
       }
       break
-    case .global, .class, .tail, .yield, .pointer, .unidentified:
+    case .global, .class, .tail, .yield, .storeBorrow, .pointer, .unidentified:
+      // An address produced by .storeBorrow should never be stored into.
       break
     }
     if let allocation = allocation {
