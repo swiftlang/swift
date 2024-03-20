@@ -1732,6 +1732,7 @@ shouldEmitPartialMutationErrorForType(SILType ty, NominalTypeDecl *nominal,
   // A non-frozen type can't be partially mutated within code built in its
   // defining module if that code will be emitted into a client.
   if (fn->getLinkage() == SILLinkage::PublicNonABI &&
+      nominal->getFormalAccess() < AccessLevel::Public &&
       nominal->isUsableFromInline() &&
       !hasExplicitFixedLayoutAnnotation(nominal)) {
     return {PartialMutationError::nonfrozenUsableFromInlineType(ty, *nominal)};
