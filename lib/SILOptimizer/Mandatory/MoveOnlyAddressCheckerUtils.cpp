@@ -2222,8 +2222,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // Before we do anything, see if this load is of a copyable field or is a
     // trivial load. If it is, then we just treat this as a liveness requiring
     // use.
-    if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial ||
-        isCopyableValue(li)) {
+    auto qualifier = li->getOwnershipQualifier();
+    if (qualifier == LoadOwnershipQualifier::Trivial || isCopyableValue(li)) {
       SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
       TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
       if (!leafRanges.size()) {
@@ -2231,7 +2231,18 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         return false;
       }
       for (auto leafRange : leafRanges) {
-        useState.recordLivenessUse(user, leafRange);
+        switch (qualifier) {
+        case LoadOwnershipQualifier::Unqualified:
+          llvm_unreachable("unqualified load in ossa!?");
+        case LoadOwnershipQualifier::Take:
+          useState.recordTakeUse(user, leafRange);
+          break;
+        case LoadOwnershipQualifier::Copy:
+          LLVM_FALLTHROUGH;
+        case LoadOwnershipQualifier::Trivial:
+          useState.recordLivenessUse(user, leafRange);
+          break;
+        }
       }
       return true;
     }
