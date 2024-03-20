@@ -245,10 +245,18 @@ public:
     return !(lhs == rhs);
   }
 
+  void Profile(llvm::FoldingSetNodeID &id) {
+    id.AddInteger(getKind());
+    id.AddPointer(pointer);
+    id.AddBoolean(isolatedByPreconcurrency);
+    id.AddBoolean(silParsed);
+    id.AddInteger(parameterIndex);
+  }
+
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
-    return llvm::hash_combine(
-        state.kind, state.pointer, state.isolatedByPreconcurrency,
-        state.parameterIndex);
+    return llvm::hash_combine(state.kind, state.pointer,
+                              state.isolatedByPreconcurrency, state.silParsed,
+                              state.parameterIndex);
   }
 
   void print(llvm::raw_ostream &os) const {
