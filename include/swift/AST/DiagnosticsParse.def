@@ -1945,7 +1945,7 @@ ERROR(platform_condition_expected_argument,none,
       "expected argument to platform condition",
       ())
 ERROR(platform_condition_expected_one_argument,none,
-      "expected only one argument to platform condition",
+      "expected only one unlabeled argument to platform condition",
       ())
 ERROR(unsupported_platform_runtime_condition_argument,none,
       "unexpected argument for the '_runtime' condition; "
