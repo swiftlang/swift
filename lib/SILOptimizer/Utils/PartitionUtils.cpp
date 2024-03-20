@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
+#include "swift/AST/Expr.h"
+#include "swift/SIL/ApplySite.h"
 #include "llvm/Support/CommandLine.h"
+
+using namespace swift;
 
 //===----------------------------------------------------------------------===//
 //                               MARK: Logging
@@ -31,3 +35,33 @@ static llvm::cl::opt<bool, true> // The parser
                                REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING));
 
 #endif
+
+//===----------------------------------------------------------------------===//
+//                         MARK: IsolationRegionInfo
+//===----------------------------------------------------------------------===//
+
+IsolationRegionInfo IsolationRegionInfo::get(SILInstruction *inst) {
+  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
+    if (auto crossing = apply->getIsolationCrossing())
+      return IsolationRegionInfo::getActorIsolated(
+          crossing->getCalleeIsolation());
+
+  if (auto fas = FullApplySite::isa(inst)) {
+    if (auto crossing = fas.getIsolationCrossing())
+      return IsolationRegionInfo::getActorIsolated(
+          crossing->getCalleeIsolation());
+  }
+
+  if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
+    if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
+      auto actorIsolation = ace->getActorIsolation();
+      if (actorIsolation.isActorIsolated()) {
+        return IsolationRegionInfo::getActorIsolated(actorIsolation);
+      }
+    }
+  }
+
+  // We assume that any instruction that does not correspond to an ApplyExpr
+  // cannot cross an isolation domain.
+  return IsolationRegionInfo();
+}
