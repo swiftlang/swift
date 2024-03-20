@@ -297,6 +297,8 @@ private struct LifetimeVariable {
       // TODO: bridge VarDecl for FunctionConvention.Yields
       self.varDecl = nil
       self.sourceLoc = result.parentInstruction.location.sourceLoc
+    case .storeBorrow(let sb):
+      self = .init(dependent: sb.source, context)
     case .pointer(let ptrToAddr):
       self.varDecl = nil
       self.sourceLoc = ptrToAddr.location.sourceLoc

@@ -1230,7 +1230,15 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
 
 final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
 
-final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction { }
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
+  var allocStack: AllocStackInst {
+    var dest = destination
+    if let mark = dest as? MarkUnresolvedNonCopyableValueInst {
+      dest = mark.operand.value
+    }
+    return dest as! AllocStackInst
+  }
+}
 
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   // The raw values must match SILAccessKind.
