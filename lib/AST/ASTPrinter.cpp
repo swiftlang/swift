@@ -7766,7 +7766,9 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
                                           llvm::SmallVectorImpl<InheritedEntry> &Results) {
   auto &ctx = proto->getASTContext();
 
-  if (auto superclassTy = proto->getSuperclass()) {
+  auto genericSig = proto->getGenericSignature();
+  if (auto superclassTy = genericSig->getSuperclassBound(
+        proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
                          /*isUnchecked=*/false,
                          /*isRetroactive=*/false,
