@@ -702,6 +702,10 @@ UNINTERESTING_FEATURE(CImplementation)
 
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 
+static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

@@ -508,14 +508,17 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
       (fromModule == var->getDeclContext()->getParentModule());
 
   if (!var->isLet()) {
-    // A mutable storage of a value type accessed from within the module is
-    // okay.
-    if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
-        !var->isStatic() &&
-        var->hasStorage() &&
-        var->getTypeInContext()->isSendableType() &&
-        accessWithinModule) {
-      return true;
+    ASTContext &ctx = var->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+      // A mutable storage of a value type accessed from within the module is
+      // okay.
+      if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
+          !var->isStatic() && 
+          var->hasStorage() &&
+          var->getTypeInContext()->isSendableType() &&
+          accessWithinModule) {
+        return true;
+      }
     }
     // Otherwise, must be immutable.
     return false;
