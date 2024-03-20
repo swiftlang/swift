@@ -90,7 +90,7 @@ struct DenseMapInfo<swift::PartitionPrimitives::Region> {
 
 namespace swift {
 
-class IsolationRegionInfo {
+class SILIsolationInfo {
 public:
   /// The lattice is:
   ///
@@ -117,15 +117,14 @@ private:
   > data;
   // clang-format on
 
-  IsolationRegionInfo(Kind kind, std::optional<ActorIsolation> actorIsolation)
+  SILIsolationInfo(Kind kind, std::optional<ActorIsolation> actorIsolation)
       : kind(kind), data(actorIsolation) {}
-  IsolationRegionInfo(Kind kind, NominalTypeDecl *decl)
-      : kind(kind), data(decl) {}
+  SILIsolationInfo(Kind kind, NominalTypeDecl *decl) : kind(kind), data(decl) {}
 
-  IsolationRegionInfo(Kind kind, SILValue value) : kind(kind), data(value) {}
+  SILIsolationInfo(Kind kind, SILValue value) : kind(kind), data(value) {}
 
 public:
-  IsolationRegionInfo() : kind(Kind::Unknown), data() {}
+  SILIsolationInfo() : kind(Kind::Unknown), data() {}
 
   operator bool() const { return kind != Kind::Unknown; }
 
@@ -215,7 +214,7 @@ public:
     return nullptr;
   }
 
-  [[nodiscard]] IsolationRegionInfo merge(IsolationRegionInfo other) const {
+  [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const {
     // If we are greater than the other kind, then we are further along the
     // lattice. We ignore the change.
     if (unsigned(other.kind) < unsigned(kind))
@@ -230,21 +229,19 @@ public:
     return other;
   }
 
-  IsolationRegionInfo withActorIsolated(ActorIsolation isolation) {
-    return IsolationRegionInfo::getActorIsolated(isolation);
+  SILIsolationInfo withActorIsolated(ActorIsolation isolation) {
+    return SILIsolationInfo::getActorIsolated(isolation);
   }
 
-  static IsolationRegionInfo getDisconnected() {
-    return {Kind::Disconnected, {}};
-  }
+  static SILIsolationInfo getDisconnected() { return {Kind::Disconnected, {}}; }
 
-  static IsolationRegionInfo getActorIsolated(ActorIsolation actorIsolation) {
+  static SILIsolationInfo getActorIsolated(ActorIsolation actorIsolation) {
     return {Kind::Actor, actorIsolation};
   }
 
   /// Sometimes we may have something that is actor isolated or that comes from
   /// a type. First try getActorIsolation and otherwise, just use the type.
-  static IsolationRegionInfo getActorIsolated(NominalTypeDecl *nomDecl) {
+  static SILIsolationInfo getActorIsolated(NominalTypeDecl *nomDecl) {
     auto actorIsolation = swift::getActorIsolation(nomDecl);
     if (actorIsolation.isActorIsolated())
       return getActorIsolated(actorIsolation);
@@ -253,14 +250,14 @@ public:
     return {};
   }
 
-  static IsolationRegionInfo getTaskIsolated(SILValue value) {
+  static SILIsolationInfo getTaskIsolated(SILValue value) {
     return {Kind::Task, value};
   }
 
   /// Attempt to infer the isolation region info for \p inst.
-  static IsolationRegionInfo get(SILInstruction *inst);
+  static SILIsolationInfo get(SILInstruction *inst);
 
-  bool operator==(const IsolationRegionInfo &other) const {
+  bool operator==(const SILIsolationInfo &other) const {
     if (getKind() != other.getKind())
       return false;
 
@@ -1239,16 +1236,17 @@ public:
   }
 
   /// Call handleTransferNonTransferrable on our CRTP subclass.
-  void handleTransferNonTransferrable(
-      const PartitionOp &op, Element elt,
-      IsolationRegionInfo isolationRegionInfo) const {
+  void
+  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
+                                 SILIsolationInfo isolationRegionInfo) const {
     return asImpl().handleTransferNonTransferrable(op, elt,
                                                    isolationRegionInfo);
   }
   /// Just call our CRTP subclass.
-  void handleTransferNonTransferrable(
-      const PartitionOp &op, Element elt, Element otherElement,
-      IsolationRegionInfo isolationRegionInfo) const {
+  void
+  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
+                                 Element otherElement,
+                                 SILIsolationInfo isolationRegionInfo) const {
     return asImpl().handleTransferNonTransferrable(op, elt, otherElement,
                                                    isolationRegionInfo);
   }
@@ -1258,7 +1256,7 @@ public:
     return asImpl().isActorDerived(elt);
   }
 
-  IsolationRegionInfo getIsolationRegionInfo(Element elt) const {
+  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
     return asImpl().getIsolationRegionInfo(elt);
   }
 
@@ -1266,10 +1264,10 @@ public:
   ///
   /// The bool result is if it is captured by a closure element. That only is
   /// computed if \p sourceOp is non-null.
-  std::pair<IsolationRegionInfo, bool>
+  std::pair<SILIsolationInfo, bool>
   getIsolationRegionInfo(Region region, Operand *sourceOp) const {
     bool isClosureCapturedElt = false;
-    IsolationRegionInfo isolationRegionInfo;
+    SILIsolationInfo isolationRegionInfo;
 
     for (const auto &pair : p.range()) {
       if (pair.second == region) {
@@ -1284,7 +1282,7 @@ public:
   }
 
   /// Overload of \p getIsolationRegionInfo without an Operand.
-  IsolationRegionInfo getIsolationRegionInfo(Region region) const {
+  SILIsolationInfo getIsolationRegionInfo(Region region) const {
     return getIsolationRegionInfo(region, nullptr).first;
   }
 
@@ -1352,7 +1350,7 @@ public:
       Element transferredElement = op.getOpArgs()[0];
       Region transferredRegion = p.getRegion(transferredElement);
       bool isClosureCapturedElt = false;
-      IsolationRegionInfo transferredRegionIsolation;
+      SILIsolationInfo transferredRegionIsolation;
       std::tie(transferredRegionIsolation, isClosureCapturedElt) =
           getIsolationRegionInfo(transferredRegion, op.getSourceOp());
 
@@ -1464,11 +1462,12 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.
   void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                      IsolationRegionInfo regionInfo) const {}
+                                      SILIsolationInfo regionInfo) const {}
 
-  void handleTransferNonTransferrable(
-      const PartitionOp &op, Element elt, Element otherElement,
-      IsolationRegionInfo isolationRegionInfo) const {}
+  void
+  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
+                                 Element otherElement,
+                                 SILIsolationInfo isolationRegionInfo) const {}
 
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
@@ -1481,8 +1480,8 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   /// Returns the information about \p elt's isolation that we ascertained from
   /// SIL and the AST.
-  IsolationRegionInfo getIsolationRegionInfo(Element elt) const {
-    return IsolationRegionInfo();
+  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
+    return SILIsolationInfo();
   }
 
   /// Check if the representative value of \p elt is closure captured at \p

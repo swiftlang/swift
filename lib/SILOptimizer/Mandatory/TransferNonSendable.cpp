@@ -405,17 +405,17 @@ struct TransferredNonTransferrableInfo {
   ///
   /// This is equal to the merge of the IsolationRegionInfo from all elements in
   /// nonTransferrable's region when the error was diagnosed.
-  IsolationRegionInfo isolationRegionInfo;
+  SILIsolationInfo isolationRegionInfo;
 
   TransferredNonTransferrableInfo(Operand *transferredOperand,
                                   SILValue nonTransferrableValue,
-                                  IsolationRegionInfo isolationRegionInfo)
+                                  SILIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableValue),
         isolationRegionInfo(isolationRegionInfo) {}
   TransferredNonTransferrableInfo(Operand *transferredOperand,
                                   SILInstruction *nonTransferrableInst,
-                                  IsolationRegionInfo isolationRegionInfo)
+                                  SILIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableInst),
         isolationRegionInfo(isolationRegionInfo) {}
@@ -902,7 +902,7 @@ public:
   }
 
   /// Return the isolation region info for \p getNonTransferrableValue().
-  IsolationRegionInfo getIsolationRegionInfo() const {
+  SILIsolationInfo getIsolationRegionInfo() const {
     return info.isolationRegionInfo;
   }
 
@@ -1265,9 +1265,10 @@ struct DiagnosticEvaluator final
                                            partitionOp.getSourceInst());
   }
 
-  void handleTransferNonTransferrable(
-      const PartitionOp &partitionOp, TrackableValueID transferredVal,
-      IsolationRegionInfo isolationRegionInfo) const {
+  void
+  handleTransferNonTransferrable(const PartitionOp &partitionOp,
+                                 TrackableValueID transferredVal,
+                                 SILIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1284,10 +1285,11 @@ struct DiagnosticEvaluator final
         partitionOp.getSourceOp(), nonTransferrableValue, isolationRegionInfo);
   }
 
-  void handleTransferNonTransferrable(
-      const PartitionOp &partitionOp, TrackableValueID transferredVal,
-      TrackableValueID actualNonTransferrableValue,
-      IsolationRegionInfo isolationRegionInfo) const {
+  void
+  handleTransferNonTransferrable(const PartitionOp &partitionOp,
+                                 TrackableValueID transferredVal,
+                                 TrackableValueID actualNonTransferrableValue,
+                                 SILIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1335,11 +1337,11 @@ struct DiagnosticEvaluator final
     return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
   }
 
-  IsolationRegionInfo::Kind hasSpecialDerivation(Element element) const {
+  SILIsolationInfo::Kind hasSpecialDerivation(Element element) const {
     return info->getValueMap().getIsolationRegion(element).getKind();
   }
 
-  IsolationRegionInfo getIsolationRegionInfo(Element element) const {
+  SILIsolationInfo getIsolationRegionInfo(Element element) const {
     return info->getValueMap().getIsolationRegion(element);
   }
 
