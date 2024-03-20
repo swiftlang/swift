@@ -175,10 +175,6 @@ option(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK
        "Should stdlib be built with -experimental-hermetic-seal-at-link"
        FALSE)
 
-option(SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS
-       "Should stdlib be built with NoncopyableGenerics enabled?"
-       TRUE)
-
 option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
        "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
        FALSE)

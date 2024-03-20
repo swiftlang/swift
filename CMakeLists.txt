@@ -668,10 +668,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
 
-option(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS
-  "Enable experimental NoncopyableGenerics"
-  FALSE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES
   "Enable experimental NonescapableTypes"
   FALSE)
@@ -1283,7 +1279,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
-  message(STATUS "NoncopyableGenerics Support:        ${SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS}")
   message(STATUS "NonEscapableTypes Support:          ${SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Backtracing Support:                ${SWIFT_ENABLE_BACKTRACING}")
