@@ -228,8 +228,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 
 // SWIFT_CC(swiftasync) is the Swift async calling convention.
 // We assume that it supports mandatory tail call elimination.
-#if __has_feature(swiftasynccc) && __has_attribute(swiftasynccall)
-#define SWIFT_CC_swiftasync __attribute__((swiftasynccall))
+#if __has_attribute(swiftasynccall)
+# if __has_feature(swiftasynccc) || __has_extension(swiftasynccc)
+#  define SWIFT_CC_swiftasync __attribute__((swiftasynccall))
+# else
+#  define SWIFT_CC_swiftasync SWIFT_CC_swift
+# endif
 #else
 #define SWIFT_CC_swiftasync SWIFT_CC_swift
 #endif
