@@ -286,6 +286,35 @@ public:
       return false;
     }
   }
+
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    id.AddInteger(getKind());
+    switch (getKind()) {
+    case Unknown:
+    case Disconnected:
+      return;
+    case Task:
+      id.AddPointer(getTaskIsolatedValue());
+      return;
+    case Actor:
+      // We profile in integer cases here so that we can always distinguish in
+      // between the various cases and the non-case. Just being paranoid.
+      if (hasActorIsolation()) {
+        if (auto isolation = getActorIsolation()) {
+          id.AddInteger(1);
+          return isolation->Profile(id);
+        }
+      }
+
+      if (hasActorInstance()) {
+        id.AddInteger(2);
+        return id.AddPointer(getActorInstance());
+      }
+
+      id.AddInteger(3);
+      break;
+    }
+  }
 };
 
 } // namespace swift
