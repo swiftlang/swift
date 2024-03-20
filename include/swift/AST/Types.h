@@ -4155,6 +4155,25 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+inline bool isMutatingParameter(ParameterConvention conv) {
+  switch (conv) {
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Pack_Inout:
+    return true;
+
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Pack_Owned:
+    return false;
+  }
+  llvm_unreachable("bad convention kind");
+}
+
 /// Returns true if conv indicates a pack parameter.
 inline bool isPackParameter(ParameterConvention conv) {
   switch (conv) {
@@ -4174,6 +4193,8 @@ inline bool isPackParameter(ParameterConvention conv) {
   }
   llvm_unreachable("bad convention kind");
 }
+
+StringRef getStringForParameterConvention(ParameterConvention conv);
 
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
