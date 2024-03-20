@@ -5122,10 +5122,6 @@ class ProtocolDecl final : public NominalTypeDecl {
     /// The superclass decl and a bit to indicate whether the
     /// superclass was computed yet or not.
     llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
-
-    /// The superclass type and a bit to indicate whether the
-    /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
   /// The generic signature representing exactly the new requirements introduced
@@ -5217,15 +5213,9 @@ public:
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
-  /// Retrieve the superclass of this protocol, or null if there is no superclass.
-  Type getSuperclass() const;
-
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
-
-  /// Set the superclass of this protocol.
-  void setSuperclass(Type superclass);
 
   /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
   /// saves loading the set of members in cases where there's no possibility of
