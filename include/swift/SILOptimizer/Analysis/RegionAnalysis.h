@@ -52,6 +52,11 @@ inline bool isNonSendableType(SILType type, SILFunction *fn) {
   return !type.isSendable(fn);
 }
 
+/// Return the ApplyIsolationCrossing for a specific \p inst if it
+/// exists. Returns std::nullopt otherwise.
+std::optional<ApplyIsolationCrossing>
+getApplyIsolationCrossing(SILInstruction *inst);
+
 // This is our PImpl type that we use to hide all of the internal details of
 // the computation.
 class PartitionOpTranslator;

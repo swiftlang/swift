@@ -48,6 +48,20 @@ using namespace swift::regionanalysisimpl;
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
+std::optional<ApplyIsolationCrossing>
+regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
+  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
+    if (auto crossing = apply->getIsolationCrossing())
+      return crossing;
+
+  if (auto fas = FullApplySite::isa(inst)) {
+    if (auto crossing = fas.getIsolationCrossing())
+      return crossing;
+  }
+
+  return {};
+}
+
 namespace {
 
 struct UnderlyingTrackedValueInfo {
@@ -1903,11 +1917,9 @@ public:
       }
     }
 
-    auto isolationRegionInfo = SILIsolationInfo::get(inst);
-
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
-    if (!bool(isolationRegionInfo))
+    if (!getApplyIsolationCrossing(*fas))
       return translateNonIsolationCrossingSILApply(fas);
 
     if (auto cast = dyn_cast<ApplyInst>(inst))
