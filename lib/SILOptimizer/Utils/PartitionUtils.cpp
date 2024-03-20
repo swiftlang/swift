@@ -63,3 +63,26 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // cannot cross an isolation domain.
   return SILIsolationInfo();
 }
+
+SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
+  if (auto *self = arg->getFunction()->maybeGetSelfArgument()) {
+    if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
+      return SILIsolationInfo::getActorIsolated(nomDecl);
+    }
+  }
+
+  if (auto *decl = arg->getDecl()) {
+    auto isolation = swift::getActorIsolation(const_cast<ValueDecl *>(decl));
+    if (!bool(isolation)) {
+      if (auto *dc = decl->getDeclContext()) {
+        isolation = swift::getActorIsolationOfContext(dc);
+      }
+    }
+
+    if (isolation.isActorIsolated()) {
+      return SILIsolationInfo::getActorIsolated(isolation);
+    }
+  }
+
+  return SILIsolationInfo::getTaskIsolated(arg);
+}
