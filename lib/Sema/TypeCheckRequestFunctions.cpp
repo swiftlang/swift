@@ -84,28 +84,14 @@ Type InheritedTypeRequest::evaluate(
 
 Type
 SuperclassTypeRequest::evaluate(Evaluator &evaluator,
-                                NominalTypeDecl *nominalDecl,
+                                ClassDecl *classDecl,
                                 TypeResolutionStage stage) const {
-  assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
+  if (!classDecl->getSuperclassDecl())
+    return Type();
 
-  // If this is a protocol that came from a serialized module, compute the
-  // superclass via its generic signature.
-  if (auto *proto = dyn_cast<ProtocolDecl>(nominalDecl)) {
-    if (proto->wasDeserialized()) {
-      return proto->getGenericSignature()
-          ->getSuperclassBound(proto->getSelfInterfaceType());
-    }
-
-    if (!proto->getSuperclassDecl())
-      return Type();
-  } else if (auto classDecl = dyn_cast<ClassDecl>(nominalDecl)) {
-    if (!classDecl->getSuperclassDecl())
-      return Type();
-  }
-
-  for (unsigned int idx : nominalDecl->getInherited().getIndices()) {
+  for (unsigned int idx : classDecl->getInherited().getIndices()) {
     auto result = evaluateOrDefault(evaluator,
-                                    InheritedTypeRequest{nominalDecl, idx, stage},
+                                    InheritedTypeRequest{classDecl, idx, stage},
                                     Type());
     if (!result)
       continue;
