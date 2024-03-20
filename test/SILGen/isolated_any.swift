@@ -210,8 +210,6 @@ func testEraseInheritingSyncNonIsolatedClosure() {
 // CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test29takeInheritingSyncIsolatedAny2fnyyyYbYAc_tF
 // CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
 // CHECK-NEXT:    destroy_value [[CLOSURE]]
-// CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    return
 @MainActor
 func testEraseInheritingSyncMainActorClosure() {
   takeInheritingSyncIsolatedAny { @MainActor in
@@ -321,8 +319,6 @@ func testEraseInheritingAsyncNonIsolatedClosure() {
 // CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYbYAc_tF
 // CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
 // CHECK-NEXT:    destroy_value [[CLOSURE]]
-// CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    return
 @MainActor
 func testEraseInheritingAsyncMainActorClosure() {
   takeInheritingAsyncIsolatedAny {
@@ -355,8 +351,6 @@ actor MyGlobalActorInstance {}
 // CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYbYAc_tF
 // CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
 // CHECK-NEXT:    destroy_value [[CLOSURE]]
-// CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    return
 @MyGlobalActor
 func testEraseInheritingAsyncGlobalActorClosure() {
   takeInheritingAsyncIsolatedAny {
