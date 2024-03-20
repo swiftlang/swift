@@ -48,6 +48,19 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto fas = FullApplySite::isa(inst)) {
     if (auto crossing = fas.getIsolationCrossing())
       return SILIsolationInfo::getActorIsolated(crossing->getCalleeIsolation());
+
+    if (fas.hasSelfArgument()) {
+      auto &self = fas.getSelfArgumentOperand();
+      if (fas.getArgumentParameterInfo(self).hasOption(
+              SILParameterInfo::Isolated)) {
+        if (auto *nomDecl =
+                self.get()->getType().getNominalOrBoundGenericNominal()) {
+          // TODO: We should be doing this off of the instance... what if we
+          // have two instances of the same class?
+          return SILIsolationInfo::getActorIsolated(nomDecl);
+        }
+      }
+    }
   }
 
   if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
