@@ -7485,7 +7485,7 @@ std::string GenericSignature::getAsString() const {
   return out.str();
 }
 
-static StringRef getStringForParameterConvention(ParameterConvention conv) {
+StringRef swift::getStringForParameterConvention(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In: return "@in ";
   case ParameterConvention::Indirect_In_Guaranteed:  return "@in_guaranteed ";
