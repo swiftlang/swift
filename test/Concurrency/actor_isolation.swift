@@ -156,7 +156,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ anno: NoGlobalActorValueType) async {
   // these still do need an await in Swift 5
   _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
-  _ = await formance.counter
+  _ = formance.counter
   _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   _ = anno.counter // expected-warning {{non-sendable type 'NoGlobalActorValueType' passed in call to main actor-isolated property 'counter' cannot cross actor boundary}}
