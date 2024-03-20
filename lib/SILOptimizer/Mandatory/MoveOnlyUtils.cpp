@@ -318,6 +318,10 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
     auto convention = applySite.getArgumentConvention(*memOper);
     return !convention.isInoutConvention();
   }
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+    auto *utedai = cast<UncheckedTakeEnumDataAddrInst>(memInst);
+    return utedai->isDestructive();
+  }
   }
 }
 
