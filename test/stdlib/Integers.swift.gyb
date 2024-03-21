@@ -872,7 +872,7 @@ tests.test("Strideable/Distance/Int${suffix}/MaxPlus1") {
     return a.distance(to: b)
   }
   expectCrashLater()
-  _ = f(Int${suffix}(-1), Int${suffix}(Int.max))
+  noop(f(Int${suffix}(-1), Int${suffix}(Int.max)))
 }
 
 tests.test("Strideable/Distance/Int${suffix}/MinMinus1") {
@@ -880,7 +880,7 @@ tests.test("Strideable/Distance/Int${suffix}/MinMinus1") {
     return a.distance(to: b)
   }
   expectCrashLater()
-  _ = f(Int${suffix}(Int.max), Int${suffix}(-2))
+  noop(f(Int${suffix}(Int.max), Int${suffix}(-2)))
 }
 
 tests.test("Strideable/Distance/UInt${suffix}/MaxPlus1") {
@@ -888,7 +888,7 @@ tests.test("Strideable/Distance/UInt${suffix}/MaxPlus1") {
     return a.distance(to: b)
   }
   expectCrashLater()
-  _ = f(UInt${suffix}.min, UInt${suffix}(Int.max) + 1)
+  noop(f(UInt${suffix}.min, UInt${suffix}(Int.max) + 1))
 }
 
 tests.test("Strideable/Distance/UInt${suffix}/MinMinus1") {
@@ -896,7 +896,7 @@ tests.test("Strideable/Distance/UInt${suffix}/MinMinus1") {
     return a.distance(to: b)
   }
   expectCrashLater()
-  _ = f(UInt${suffix}(Int.max) + 2, UInt${suffix}.min)
+  noop(f(UInt${suffix}(Int.max) + 2, UInt${suffix}.min))
 }
 %  end
 % end
