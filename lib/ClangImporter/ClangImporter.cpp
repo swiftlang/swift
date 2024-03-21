@@ -461,12 +461,15 @@ static inline bool isPCHFilenameExtension(StringRef path) {
     .endswith(file_types::getExtension(file_types::TY_PCH));
 }
 
-void
-importer::getNormalInvocationArguments(
-    std::vector<std::string> &invocationArgStrs,
-    ASTContext &ctx) {
+void importer::getNormalInvocationArguments(
+    std::vector<std::string> &invocationArgStrs, ASTContext &ctx,
+    bool ignoreClangTarget) {
   const auto &LangOpts = ctx.LangOpts;
-  const llvm::Triple &triple = LangOpts.Target;
+  llvm::Triple triple = LangOpts.Target;
+  // Use clang specific target triple if given.
+  if (LangOpts.ClangTarget.has_value() && !ignoreClangTarget) {
+    triple = LangOpts.ClangTarget.value();
+  }
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
   ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
@@ -1057,7 +1060,7 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
   switch (ctx.ClangImporterOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
   case ClangImporterOptions::Modes::PrecompiledModule:
-    getNormalInvocationArguments(invocationArgStrs, ctx);
+    getNormalInvocationArguments(invocationArgStrs, ctx, ignoreClangTarget);
     break;
   case ClangImporterOptions::Modes::EmbedBitcode:
     getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx);
