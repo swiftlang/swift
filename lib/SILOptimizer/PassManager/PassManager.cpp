@@ -1402,8 +1402,8 @@ FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
 }
 
 BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
-  assert(numBlockSetsAllocated < BlockSetCapacity - 1 &&
-         "too many BasicBlockSets allocated");
+  require(numBlockSetsAllocated < BlockSetCapacity,
+          "too many BasicBlockSets allocated");
 
   auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
   BasicBlockSet *set = new (storage) BasicBlockSet(function);
@@ -1426,8 +1426,8 @@ void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
 }
 
 NodeSet *SwiftPassInvocation::allocNodeSet() {
-  assert(numNodeSetsAllocated < NodeSetCapacity - 1 &&
-         "too many BasicNodeSets allocated");
+  require(numNodeSetsAllocated < NodeSetCapacity,
+          "too many NodeSets allocated");
 
   auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
   NodeSet *set = new (storage) NodeSet(function);
@@ -1446,6 +1446,30 @@ void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
     auto *set = (NodeSet *)nodeSetStorage + numNodeSetsAllocated - 1;
     set->~NodeSet();
     --numNodeSetsAllocated;
+  }
+}
+
+OperandSet *SwiftPassInvocation::allocOperandSet() {
+  require(numOperandSetsAllocated < OperandSetCapacity,
+          "too many OperandSets allocated");
+
+  auto *storage = (OperandSet *)operandSetStorage + numOperandSetsAllocated;
+  OperandSet *set = new (storage) OperandSet(function);
+  aliveOperandSets[numOperandSetsAllocated] = true;
+  ++numOperandSetsAllocated;
+  return set;
+}
+
+void SwiftPassInvocation::freeOperandSet(OperandSet *set) {
+  int idx = set - (OperandSet *)operandSetStorage;
+  assert(idx >= 0 && idx < numOperandSetsAllocated);
+  assert(aliveOperandSets[idx] && "double free of OperandSet");
+  aliveOperandSets[idx] = false;
+
+  while (numOperandSetsAllocated > 0 && !aliveOperandSets[numOperandSetsAllocated - 1]) {
+    auto *set = (OperandSet *)operandSetStorage + numOperandSetsAllocated - 1;
+    set->~OperandSet();
+    --numOperandSetsAllocated;
   }
 }
 
@@ -1493,6 +1517,7 @@ void SwiftPassInvocation::endPass() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
   assert(numClonersAllocated == 0 && "Not all cloners deallocated");
   assert(!needFixStackNesting && "Stack nesting not fixed");
   if (ssaUpdater) {
@@ -1517,6 +1542,7 @@ void SwiftPassInvocation::endTransformFunction() {
   function = nullptr;
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
 }
 
 void SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
@@ -1535,6 +1561,7 @@ void SwiftPassInvocation::endVerifyFunction() {
            "verifyication must not change the SIL of a function");
     assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
     assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+    assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
     function = nullptr;
   }
 }

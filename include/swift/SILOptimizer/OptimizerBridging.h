@@ -50,6 +50,7 @@ class DominanceInfo;
 class PostDominanceInfo;
 class BasicBlockSet;
 class NodeSet;
+class OperandSet;
 class ClonerWithFixedLocation;
 class SwiftPassInvocation;
 class FixedSizeSlabPayload;
@@ -155,6 +156,15 @@ struct BridgedNodeSet {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
 };
 
+struct BridgedOperandSet {
+  swift::OperandSet * _Nonnull set;
+
+  BRIDGED_INLINE bool contains(BridgedOperand operand) const;
+  BRIDGED_INLINE bool insert(BridgedOperand operand) const;
+  BRIDGED_INLINE void erase(BridgedOperand operand) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
+
 struct BridgedCloner {
   swift::ClonerWithFixedLocation * _Nonnull cloner;
 
@@ -244,6 +254,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE void freeBasicBlockSet(BridgedBasicBlockSet set) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNodeSet allocNodeSet() const;
   BRIDGED_INLINE void freeNodeSet(BridgedNodeSet set) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandSet allocOperandSet() const;
+  BRIDGED_INLINE void freeOperandSet(BridgedOperandSet set) const;
 
   // Stack nesting
 

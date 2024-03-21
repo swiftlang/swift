@@ -335,6 +335,9 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
       for (SILValue result : II.getResults()) {
         result->resetBitfields();
       }
+      for (Operand &op : II.getAllOperands()) {
+        op.resetBitfields();
+      }
       II.asSILNode()->resetBitfields();
     
       II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
