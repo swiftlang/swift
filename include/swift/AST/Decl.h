@@ -598,7 +598,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -624,6 +624,9 @@ protected:
 
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
+
+    /// Whether we have computed a requirement signature.
+    HasRequirementSignature : 1,
 
     /// Whether we have a lazy-loaded requirement signature.
     HasLazyRequirementSignature : 1,
@@ -5126,7 +5129,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  std::optional<RequirementSignature> RequirementSig;
+  RequirementSignature RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
@@ -5435,7 +5438,7 @@ public:
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSig.has_value();
+    return Bits.ProtocolDecl.HasRequirementSignature;
   }
 
   void setRequirementSignature(RequirementSignature requirementSig);
