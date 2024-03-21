@@ -610,11 +610,11 @@ repositories.
         action='store_true')
     parser.add_argument(
         '--clean',
-        help='Clean unrelated files from each repository.',
+        help='Clean untracked files from each repository.',
         action='store_true')
     parser.add_argument(
         '--stash',
-        help='Stash unrelated files from each repository.',
+        help='Stash untracked files from each repository.',
         action='store_true')
     parser.add_argument(
         "--config",
