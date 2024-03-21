@@ -21,7 +21,7 @@ func transferValue<T>(_ t: transferring T) {}
 func testIsolationError() async {
   let x = NonSendableType()
   await transferToMain(x) // expected-error {{transferring 'x' may cause a race}}
-  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   useValue(x) // expected-note {{access here could race}}
 }
 

@@ -324,58 +324,58 @@ public:
 
 namespace swift {
 
-struct TransferringOperand {
+class TransferringOperand {
   using ValueType = llvm::PointerIntPair<Operand *, 1>;
   ValueType value;
 
-  TransferringOperand() : value() {}
-  TransferringOperand(Operand *op, bool isClosureCaptured)
-      : value(op, isClosureCaptured) {}
-  explicit TransferringOperand(Operand *op) : value(op, false) {}
-  TransferringOperand(ValueType newValue) : value(newValue) {}
+  /// The dynamic isolation info of the region of value when we transferred.
+  SILIsolationInfo isolationInfo;
+
+  TransferringOperand(ValueType newValue, SILIsolationInfo isolationRegionInfo)
+      : value(newValue), isolationInfo(isolationRegionInfo) {
+    assert(isolationInfo && "Should never see unknown isolation info");
+  }
+
+public:
+  TransferringOperand(Operand *op, bool isClosureCaptured,
+                      SILIsolationInfo isolationRegionInfo)
+      : TransferringOperand({op, isClosureCaptured}, isolationRegionInfo) {}
+  explicit TransferringOperand(Operand *op,
+                               SILIsolationInfo isolationRegionInfo)
+      : TransferringOperand({op, false}, isolationRegionInfo) {}
 
   operator bool() const { return bool(value.getPointer()); }
 
   Operand *getOperand() const { return value.getPointer(); }
 
+  SILValue get() const { return getOperand()->get(); }
+
   bool isClosureCaptured() const { return value.getInt(); }
 
   SILInstruction *getUser() const { return getOperand()->getUser(); }
 
-  bool operator<(const TransferringOperand &other) const {
-    return value < other.value;
-  }
+  SILIsolationInfo getIsolationInfo() const { return isolationInfo; }
 
-  bool operator>=(const TransferringOperand &other) const {
-    return !(value < other.value);
-  }
-
-  bool operator>(const TransferringOperand &other) const {
-    return value > other.value;
-  }
-
-  bool operator<=(const TransferringOperand &other) const {
-    return !(value > other.value);
-  }
-
-  bool operator==(const TransferringOperand &other) const {
-    return value == other.value;
-  }
+  unsigned getOperandNumber() const { return getOperand()->getOperandNumber(); }
 
   void print(llvm::raw_ostream &os) const {
     os << "Op Num: " << getOperand()->getOperandNumber() << ". "
        << "Capture: " << (isClosureCaptured() ? "yes. " : "no.  ")
-       << "User: " << *getUser();
+       << "IsolationInfo: ";
+    isolationInfo.print(os);
+    os << "\nUser: " << *getUser();
   }
 
   static void Profile(llvm::FoldingSetNodeID &id, Operand *op,
-                      bool isClosureCaptured) {
+                      bool isClosureCaptured,
+                      SILIsolationInfo isolationRegionInfo) {
     id.AddPointer(op);
     id.AddBoolean(isClosureCaptured);
+    isolationRegionInfo.Profile(id);
   }
 
   void Profile(llvm::FoldingSetNodeID &id) const {
-    Profile(id, getOperand(), isClosureCaptured());
+    Profile(id, getOperand(), isClosureCaptured(), isolationInfo);
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -1367,8 +1367,8 @@ public:
       }
 
       // Mark op.getOpArgs()[0] as transferred.
-      auto *ptrSet =
-          ptrSetFactory.emplace(op.getSourceOp(), isClosureCapturedElt);
+      auto *ptrSet = ptrSetFactory.emplace(
+          op.getSourceOp(), isClosureCapturedElt, transferredRegionIsolation);
       p.markTransferred(op.getOpArgs()[0], ptrSet);
       return;
     }

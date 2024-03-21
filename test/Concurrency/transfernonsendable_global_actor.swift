@@ -93,7 +93,7 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
   let x = NonSendableLinkedListNode<Int>()
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{'x' is transferred from global actor 'GlobalActor'-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'GlobalActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{access here could race}}
@@ -109,7 +109,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   x = StructContainingValue()
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{'x' is transferred from global actor 'GlobalActor'-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'GlobalActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{access here could race}}
@@ -131,7 +131,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{'x' is transferred from global actor 'GlobalActor'-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'GlobalActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 

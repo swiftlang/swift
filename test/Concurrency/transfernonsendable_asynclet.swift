@@ -291,7 +291,7 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr4() async {
   let x = NonSendableKlass()
 
   async let y = useValue(transferToMainInt(x) + transferToMainInt(x)) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-tns-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   // expected-tns-note @-2:67 {{access here could race}}
 
   // expected-complete-warning @-4 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
@@ -747,7 +747,7 @@ func asyncLetWithoutCapture() async {
   // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
   let y = await x
   await transferToMain(y) // expected-tns-warning {{transferring 'y' may cause a race}}
-  // expected-tns-note @-1 {{'y' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-tns-note @-1 {{transferring disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   useValue(y) // expected-tns-note {{access here could race}}
 }
