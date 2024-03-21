@@ -4026,7 +4026,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
-  // TODO: Handle LifetimeDependenceInfo here.
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
@@ -4237,7 +4236,6 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  // TODO: Handle LifetimeDependenceInfo here.
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
       isolation, diffKind, clangFnType, LifetimeDependenceInfo());
@@ -4410,6 +4408,19 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
   }
 
+  std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
+  if (auto *lifetimeDependentTypeRepr =
+          dyn_cast<LifetimeDependentReturnTypeRepr>(
+              repr->getResultTypeRepr())) {
+    lifetimeDependenceInfo = LifetimeDependenceInfo::fromTypeRepr(
+        lifetimeDependentTypeRepr, params, extInfoBuilder.hasSelfParam(),
+        getDeclContext());
+    if (lifetimeDependenceInfo.has_value()) {
+      extInfoBuilder =
+          extInfoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
+  }
+
   return SILFunctionType::get(genericSig.getCanonicalSignature(),
                               extInfoBuilder.build(), coroutineKind,
                               callee, params, yields, results, errorResult,
@@ -4522,6 +4533,14 @@ bool TypeResolver::resolveSingleSILResult(
   SILResultInfo::Options resultInfoOptions;
 
   options.setContext(TypeResolverContext::FunctionResult);
+
+  // Look through LifetimeDependentReturnTypeRepr.
+  // LifetimeDependentReturnTypeRepr will be processed separately when building
+  // SILFunctionType.
+  if (auto *lifetimeDependentTypeRepr =
+          dyn_cast<LifetimeDependentReturnTypeRepr>(repr)) {
+    repr = lifetimeDependentTypeRepr->getBase();
+  }
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     TypeAttrSet attrs(getASTContext());

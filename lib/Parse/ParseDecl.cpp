@@ -5059,13 +5059,13 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
 static std::optional<LifetimeDependenceKind>
 getLifetimeDependenceKind(const Token &T) {
-  if (T.isContextualKeyword("_copy")) {
+  if (T.isContextualKeyword("_copy") || T.isContextualKeyword("_inherit")) {
     return LifetimeDependenceKind::Copy;
   }
   if (T.isContextualKeyword("_consume")) {
     return LifetimeDependenceKind::Consume;
   }
-  if (T.isContextualKeyword("_borrow")) {
+  if (T.isContextualKeyword("_borrow") || T.isContextualKeyword("_scope")) {
     return LifetimeDependenceKind::Borrow;
   }
   if (T.isContextualKeyword("_mutate")) {
@@ -5465,7 +5465,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       continue;
     }
 
-    if (Tok.isLifetimeDependenceToken()) {
+    if (Tok.isLifetimeDependenceToken(P.isInSILMode())) {
       if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,

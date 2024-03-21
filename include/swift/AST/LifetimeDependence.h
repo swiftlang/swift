@@ -30,6 +30,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class LifetimeDependentReturnTypeRepr;
+class SILParameterInfo;
 
 enum class LifetimeDependenceKind : uint8_t {
   Copy = 0,
@@ -138,12 +139,6 @@ class LifetimeDependenceInfo {
                                                  unsigned index,
                                                  ValueOwnership ownership);
 
-  static std::optional<LifetimeDependenceInfo>
-  fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
-
-  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
-                                                     Type resultType);
-
 public:
   LifetimeDependenceInfo()
       : inheritLifetimeParamIndices(nullptr),
@@ -193,12 +188,30 @@ public:
   std::optional<LifetimeDependenceKind>
   getLifetimeDependenceOnParam(unsigned paramIndex);
 
+  /// Builds LifetimeDependenceInfo from a swift decl, either from the explicit
+  /// lifetime dependence specifiers or by inference based on types and
+  /// ownership modifiers.
   static std::optional<LifetimeDependenceInfo>
   get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
 
+  /// Builds LifetimeDependenceInfo from the bitvectors passes as parameters.
   static LifetimeDependenceInfo
   get(ASTContext &ctx, const SmallBitVector &inheritLifetimeIndices,
       const SmallBitVector &scopeLifetimeIndices);
+
+  /// Builds LifetimeDependenceInfo from a swift decl
+  static std::optional<LifetimeDependenceInfo>
+  fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
+
+  /// Builds LifetimeDependenceInfo from SIL
+  static std::optional<LifetimeDependenceInfo>
+  fromTypeRepr(LifetimeDependentReturnTypeRepr *lifetimeDependentRepr,
+               SmallVectorImpl<SILParameterInfo> &params, bool hasSelfParam,
+               DeclContext *dc);
+
+  /// Infer LifetimeDependenceInfo
+  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
+                                                     Type resultType);
 };
 
 } // namespace swift

@@ -284,6 +284,81 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       /*isExplicit*/ true);
 }
 
+// This utility is similar to its overloaded version that builds the
+// LifetimeDependenceInfo from the swift decl. Reason for duplicated code is the
+// apis on type and ownership is different in SIL compared to Sema.
+std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromTypeRepr(
+    LifetimeDependentReturnTypeRepr *lifetimeDependentRepr,
+    SmallVectorImpl<SILParameterInfo> &params, bool hasSelfParam,
+    DeclContext *dc) {
+  auto &ctx = dc->getASTContext();
+  auto &diags = ctx.Diags;
+  auto capacity = hasSelfParam ? params.size() : params.size() + 1;
+
+  SmallBitVector inheritLifetimeParamIndices(capacity);
+  SmallBitVector scopeLifetimeParamIndices(capacity);
+
+  auto updateLifetimeDependenceInfo = [&](LifetimeDependenceSpecifier specifier,
+                                          unsigned paramIndexToSet,
+                                          ParameterConvention paramConvention) {
+    auto loc = specifier.getLoc();
+    auto kind = specifier.getLifetimeDependenceKind();
+
+    // Once we have dependsOn()/dependsOn(scoped:) syntax, this enum values will
+    // be Scope and Inherit.
+    if (kind == LifetimeDependenceKind::Borrow &&
+        (!isGuaranteedParameter(paramConvention) &&
+         !isMutatingParameter(paramConvention))) {
+      diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "_scope",
+                     getStringForParameterConvention(paramConvention));
+      return true;
+    }
+
+    if (inheritLifetimeParamIndices.test(paramIndexToSet) ||
+        scopeLifetimeParamIndices.test(paramIndexToSet)) {
+      diags.diagnose(loc, diag::lifetime_dependence_duplicate_param_id);
+      return true;
+    }
+    if (kind == LifetimeDependenceKind::Copy) {
+      inheritLifetimeParamIndices.set(paramIndexToSet);
+    } else {
+      assert(kind == LifetimeDependenceKind::Borrow);
+      scopeLifetimeParamIndices.set(paramIndexToSet);
+    }
+    return false;
+  };
+
+  for (auto specifier : lifetimeDependentRepr->getLifetimeDependencies()) {
+    assert(specifier.getSpecifierKind() ==
+           LifetimeDependenceSpecifier::SpecifierKind::Ordered);
+    auto index = specifier.getIndex();
+    if (index > params.size()) {
+      diags.diagnose(specifier.getLoc(),
+                     diag::lifetime_dependence_invalid_param_index, index);
+      return std::nullopt;
+    }
+    if (index == 0 && !hasSelfParam) {
+      diags.diagnose(specifier.getLoc(),
+                     diag::lifetime_dependence_invalid_self);
+      return std::nullopt;
+    }
+    auto param = index == 0 ? params.back() : params[index - 1];
+    auto paramConvention = param.getConvention();
+    if (updateLifetimeDependenceInfo(specifier, index, paramConvention)) {
+      return std::nullopt;
+    }
+  }
+
+  return LifetimeDependenceInfo(
+      inheritLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
+          : nullptr,
+      scopeLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
+          : nullptr,
+      /*isExplicit*/ true);
+}
+
 std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   auto *dc = afd->getDeclContext();

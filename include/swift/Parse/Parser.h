@@ -1212,7 +1212,7 @@ public:
       return true;
     if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
         (Tok.isContextualKeyword("_resultDependsOn") ||
-         Tok.isLifetimeDependenceToken()))
+         Tok.isLifetimeDependenceToken(isInSILMode())))
       return true;
     return false;
   }
