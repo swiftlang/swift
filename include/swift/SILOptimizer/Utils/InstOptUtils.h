@@ -604,6 +604,10 @@ bool specializeAppliesInFunction(SILFunction &F,
 /// types aggregated together at each level.
 SILValue createEmptyAndUndefValue(SILType ty, SILInstruction *insertionPoint,
                                   SILBuilderContext &ctx, bool noUndef = false);
+
+/// Check if a struct or its fields can have unreferenceable storage.
+bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
+                                SILFunction *func);
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
