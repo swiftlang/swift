@@ -362,3 +362,33 @@ bb3:
   %8 = tuple ()
   return %8 : $()
 }
+
+struct NestedUnreferenceableStorage {
+  let e: EmptyCUnion
+}
+
+sil @no_init_nested_c_union : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
+
+// CHECK-LABEL: sil @test_empty_nested_c_union : $@convention(thin) () -> () {
+// CHECK: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_nested_c_union'
+sil @test_empty_nested_c_union : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<NestedUnreferenceableStorage>
+  %1 = init_enum_data_addr %0 : $*Optional<NestedUnreferenceableStorage>, #Optional.some!enumelt
+  %f = function_ref @no_init_nested_c_union : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
+  apply %f(%1) : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
+  inject_enum_addr %0 : $*Optional<NestedUnreferenceableStorage>, #Optional.some!enumelt
+  switch_enum_addr %0 : $*Optional<NestedUnreferenceableStorage>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<NestedUnreferenceableStorage>
+  %8 = tuple ()
+  return %8 : $()
+}

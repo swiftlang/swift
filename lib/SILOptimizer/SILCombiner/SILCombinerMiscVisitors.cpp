@@ -1246,7 +1246,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // We cannot create a struct when it has unreferenceable storage.
   if (elemType.isEmpty(*IEAI->getFunction()) && structDecl &&
-      structDecl->hasUnreferenceableStorage()) {
+      findUnreferenceableStorage(structDecl, elemType, IEAI->getFunction())) {
     return nullptr;
   }
 
