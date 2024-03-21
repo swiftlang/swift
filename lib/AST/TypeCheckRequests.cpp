@@ -330,7 +330,7 @@ std::optional<RequirementSignature>
 RequirementSignatureRequest::getCachedResult() const {
   auto proto = std::get<0>(getStorage());
   if (proto->isRequirementSignatureComputed())
-    return *proto->RequirementSig;
+    return proto->RequirementSig;
 
   return std::nullopt;
 }
