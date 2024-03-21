@@ -85,6 +85,9 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
       for (SILValue result : first->getResults()) {
         result->resetBitfields();
       }
+      for (Operand &op : first->getAllOperands()) {
+        op.resetBitfields();
+      }
       first->asSILNode()->resetBitfields();
     }
   }
