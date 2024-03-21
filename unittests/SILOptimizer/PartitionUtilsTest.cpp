@@ -34,7 +34,21 @@ struct Partition::PartitionTester {
 };
 
 namespace {
+
 using PartitionTester = Partition::PartitionTester;
+
+struct MockedPartitionOpEvaluator final
+    : PartitionOpEvaluatorBaseImpl<MockedPartitionOpEvaluator> {
+  MockedPartitionOpEvaluator(Partition &workingPartition,
+                             TransferringOperandSetFactory &ptrSetFactory)
+      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory) {}
+
+  // Just say that we always have a disconnected value.
+  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
+    return SILIsolationInfo::getDisconnected();
+  }
+};
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -67,7 +81,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   Partition::TransferringOperandSetFactory factory(allocator);
 
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -75,7 +89,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    PartitionOpEvaluatorBasic eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::AssignFresh(Element(5)),
                 PartitionOp::AssignFresh(Element(6)),
                 PartitionOp::AssignFresh(Element(7)),
@@ -83,7 +97,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    PartitionOpEvaluatorBasic eval(p3, factory);
+    MockedPartitionOpEvaluator eval(p3, factory);
     eval.apply({PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3)),
                 PartitionOp::AssignFresh(Element(4)),
@@ -95,7 +109,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   EXPECT_FALSE(Partition::equals(p1, p3));
 
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply({PartitionOp::AssignFresh(Element(4)),
                 PartitionOp::AssignFresh(Element(5)),
                 PartitionOp::AssignFresh(Element(6)),
@@ -104,7 +118,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    PartitionOpEvaluatorBasic eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3)),
@@ -113,7 +127,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    PartitionOpEvaluatorBasic eval(p3, factory);
+    MockedPartitionOpEvaluator eval(p3, factory);
     eval.apply({PartitionOp::AssignFresh(Element(6)),
                 PartitionOp::AssignFresh(Element(7)),
                 PartitionOp::AssignFresh(Element(0)),
@@ -132,12 +146,12 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
 
   auto apply_to_p1_and_p3 = [&](PartitionOp op) {
     {
-      PartitionOpEvaluatorBasic eval(p1, factory);
+      MockedPartitionOpEvaluator eval(p1, factory);
       eval.apply(op);
     }
 
     {
-      PartitionOpEvaluatorBasic eval(p3, factory);
+      MockedPartitionOpEvaluator eval(p3, factory);
       eval.apply(op);
     }
     expect_join_eq();
@@ -145,12 +159,12 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
 
   auto apply_to_p2_and_p3 = [&](PartitionOp op) {
     {
-      PartitionOpEvaluatorBasic eval(p2, factory);
+      MockedPartitionOpEvaluator eval(p2, factory);
       eval.apply(op);
     }
 
     {
-      PartitionOpEvaluatorBasic eval(p3, factory);
+      MockedPartitionOpEvaluator eval(p3, factory);
       eval.apply(op);
     }
     expect_join_eq();
@@ -183,7 +197,7 @@ TEST(PartitionUtilsTest, Join1) {
   Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
 
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -194,7 +208,7 @@ TEST(PartitionUtilsTest, Join1) {
 
   Partition p2 = Partition::separateRegions(llvm::ArrayRef(data1));
   {
-    PartitionOpEvaluatorBasic eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -222,7 +236,7 @@ TEST(PartitionUtilsTest, Join2) {
   Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
 
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -235,7 +249,7 @@ TEST(PartitionUtilsTest, Join2) {
                      Element(7), Element(8), Element(9)};
   Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
   {
-    PartitionOpEvaluatorBasic eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
                 PartitionOp::Assign(Element(5), Element(5)),
                 PartitionOp::Assign(Element(6), Element(4)),
@@ -267,7 +281,7 @@ TEST(PartitionUtilsTest, Join2Reversed) {
   Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
 
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -280,7 +294,7 @@ TEST(PartitionUtilsTest, Join2Reversed) {
                      Element(7), Element(8), Element(9)};
   Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
   {
-    PartitionOpEvaluatorBasic eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
                 PartitionOp::Assign(Element(5), Element(5)),
                 PartitionOp::Assign(Element(6), Element(4)),
@@ -316,7 +330,7 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(25), Element(26), Element(27), Element(28), Element(29)};
   Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(29)),
                 PartitionOp::Assign(Element(1), Element(17)),
                 PartitionOp::Assign(Element(2), Element(0)),
@@ -358,7 +372,7 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(40), Element(41), Element(42), Element(43), Element(44)};
   Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
   {
-    PartitionOpEvaluatorBasic eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(15), Element(31)),
                 PartitionOp::Assign(Element(16), Element(34)),
                 PartitionOp::Assign(Element(17), Element(35)),
@@ -448,19 +462,19 @@ TEST(PartitionUtilsTest, TestAssign) {
   Partition p2;
   Partition p3;
 
-  PartitionOpEvaluatorBasic evalP1(p1, factory);
+  MockedPartitionOpEvaluator evalP1(p1, factory);
   evalP1.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3))});
 
-  PartitionOpEvaluatorBasic evalP2(p2, factory);
+  MockedPartitionOpEvaluator evalP2(p2, factory);
   evalP2.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3))});
 
-  PartitionOpEvaluatorBasic evalP3(p3, factory);
+  MockedPartitionOpEvaluator evalP3(p3, factory);
   evalP3.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -530,13 +544,14 @@ TEST(PartitionUtilsTest, TestAssign) {
 
 namespace {
 
-struct PartitionOpEvaluatorWithFailureCallback final
-    : PartitionOpEvaluatorBaseImpl<PartitionOpEvaluatorWithFailureCallback> {
+struct MockedPartitionOpEvaluatorWithFailureCallback final
+    : PartitionOpEvaluatorBaseImpl<
+          MockedPartitionOpEvaluatorWithFailureCallback> {
   using FailureCallbackTy =
       std::function<void(const PartitionOp &, unsigned, TransferringOperand *)>;
   FailureCallbackTy failureCallback;
 
-  PartitionOpEvaluatorWithFailureCallback(
+  MockedPartitionOpEvaluatorWithFailureCallback(
       Partition &workingPartition, TransferringOperandSetFactory &ptrSetFactory,
       FailureCallbackTy failureCallback)
       : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
@@ -545,6 +560,11 @@ struct PartitionOpEvaluatorWithFailureCallback final
   void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
                                    TransferringOperand *transferringOp) const {
     failureCallback(op, elt, transferringOp);
+  }
+
+  // Just say that we always have a disconnected value.
+  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
+    return SILIsolationInfo::getDisconnected();
   }
 };
 
@@ -558,7 +578,7 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   Partition p;
 
   {
-    PartitionOpEvaluatorBasic eval(p, factory);
+    MockedPartitionOpEvaluator eval(p, factory);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -600,8 +620,8 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
                                     TransferringOperand *) { times_called++; };
 
   {
-    PartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                 increment_times_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
+                                                       increment_times_called);
     eval.apply({PartitionOp::Require(Element(0)),
                 PartitionOp::Require(Element(1)),
                 PartitionOp::Require(Element(2))});
@@ -609,33 +629,36 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   EXPECT_EQ(times_called, 3);
 
   {
-    PartitionOpEvaluatorWithFailureCallback eval(p, factory, never_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
+                                                       never_called);
     eval.apply({PartitionOp::Require(Element(3)),
                 PartitionOp::Require(Element(4)),
                 PartitionOp::Require(Element(5))});
   }
 
   {
-    PartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                 increment_times_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
+                                                       increment_times_called);
     eval.apply(
         {PartitionOp::Require(Element(6)), PartitionOp::Require(Element(7))});
   }
 
   {
-    PartitionOpEvaluatorWithFailureCallback eval(p, factory, never_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
+                                                       never_called);
     eval.apply(
         {PartitionOp::Require(Element(8)), PartitionOp::Require(Element(9))});
   }
 
   {
-    PartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                 increment_times_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
+                                                       increment_times_called);
     eval.apply(PartitionOp::Require(Element(10)));
   }
 
   {
-    PartitionOpEvaluatorWithFailureCallback eval(p, factory, never_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
+                                                       never_called);
     eval.apply(PartitionOp::Require(Element(11)));
   }
 
@@ -650,7 +673,7 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
 
   Partition p1;
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply(PartitionOp::AssignFresh(Element(0)));
   }
 
@@ -659,13 +682,13 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
 
   // Change p1 again.
   {
-    PartitionOpEvaluatorBasic eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply(PartitionOp::Transfer(Element(0), transferSingletons[0]));
   }
 
   {
     bool failure = false;
-    PartitionOpEvaluatorWithFailureCallback eval(
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
         p1, factory, [&](const PartitionOp &, unsigned, TransferringOperand *) {
           failure = true;
         });
@@ -674,7 +697,7 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
   }
 
   {
-    PartitionOpEvaluatorWithFailureCallback eval(
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
         p2, factory, [](const PartitionOp &, unsigned, TransferringOperand *) {
           EXPECT_TRUE(false);
         });
@@ -687,7 +710,7 @@ TEST(PartitionUtilsTest, TestUndoTransfer) {
   Partition::TransferringOperandSetFactory factory(allocator);
 
   Partition p;
-  PartitionOpEvaluatorWithFailureCallback eval(
+  MockedPartitionOpEvaluatorWithFailureCallback eval(
       p, factory, [&](const PartitionOp &, unsigned, TransferringOperand *) {
         EXPECT_TRUE(false);
       });
@@ -706,7 +729,7 @@ TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
   // First make sure that we do this correctly with an assign fresh.
   Partition p;
   {
-    PartitionOpEvaluatorBasic eval(p, factory);
+    MockedPartitionOpEvaluator eval(p, factory);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -718,7 +741,7 @@ TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
   // Now make sure that we do this correctly with assign.
   Partition p2;
   {
-    PartitionOpEvaluatorBasic eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
