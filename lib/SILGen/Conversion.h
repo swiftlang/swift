@@ -37,6 +37,9 @@ public:
     /// implicit force cast.
     ForceAndBridgeToObjC,
 
+    /// Force an optional value.
+    ForceOptional,
+
     /// A bridging conversion from a foreign type.
     BridgeFromObjC,
 
@@ -61,6 +64,7 @@ public:
     switch (kind) {
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
+    case ForceOptional:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
@@ -80,6 +84,7 @@ public:
 
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
+    case ForceOptional:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
@@ -114,6 +119,7 @@ private:
     switch (kind) {
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
+    case ForceOptional:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
@@ -236,6 +242,24 @@ public:
 
   SILType getBridgingLoweredResultType() const {
     return Types.get<BridgingTypes>(Kind).LoweredResultType;
+  }
+
+  CanType getSourceType() const {
+    if (isBridging())
+      return getBridgingSourceType();
+    return getReabstractionInputSubstType();
+  }
+
+  CanType getResultType() const {
+    if (isBridging())
+      return getBridgingResultType();
+    return getReabstractionOutputSubstType();
+  }
+
+  SILType getLoweredResultType() const {
+    if (isBridging())
+      return getBridgingLoweredResultType();
+    return getReabstractionOutputLoweredType();
   }
 
   ManagedValue emit(SILGenFunction &SGF, SILLocation loc,
