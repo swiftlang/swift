@@ -2705,7 +2705,10 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
                                                           mv.forward(SGF),
                                                           enumCase);
         if (payload->getType().isLoadable(SGF.F)) {
-          payload = SGF.B.createLoad(loc, payload, LoadOwnershipQualifier::Take);
+          payload = SGF.B.createLoad(loc, payload,
+                                     payload->getType().isTrivial(SGF.F)
+                                         ? LoadOwnershipQualifier::Trivial
+                                         : LoadOwnershipQualifier::Take);
         }
         visit(subPattern,
               SGF.emitManagedRValueWithCleanup(payload));
