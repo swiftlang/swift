@@ -1588,7 +1588,7 @@ extension BinaryInteger {
     if self.bitWidth < Int.bitWidth && other.bitWidth < Int.bitWidth {
       // Smaller integers always fit.
       return Int(truncatingIfNeeded: other) &- Int(truncatingIfNeeded: self)
-    } else if Self.isSigned ? true : self <= other {
+    } else if Self.isSigned || self <= other {
       // Use trapping subtraction for performance.
       if let result = Int(exactly: other - self) {
         return result
