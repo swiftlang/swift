@@ -148,7 +148,7 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
 
 def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, cross_repos_pr = pool_args
+        reset_to_remote, should_clean, should_stash, cross_repos_pr = pool_args
     repo_path = os.path.join(source_root, repo_name)
     if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
@@ -171,9 +171,13 @@ def update_single_repository(pool_args):
                                                             checkout_target)
 
             # The clean option restores a repository to pristine condition.
-            if should_clean:
-                shell.run(['git', 'clean', '-fdx'],
-                          echo=True, prefix=prefix)
+            if should_clean or should_stash:
+                if should_stash:
+                    shell.run(['git', 'stash'],
+                              echo=True, prefix=prefix)
+                elif should_clean:
+                    shell.run(['git', 'clean', '-fdx'],
+                              echo=True, prefix=prefix)
                 shell.run(['git', 'submodule', 'foreach', '--recursive',
                            'git', 'clean', '-fdx'],
                           echo=True, prefix=prefix)
@@ -343,6 +347,7 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    timestamp,
                    args.reset_to_remote,
                    args.clean,
+                   args.stash,
                    cross_repos_pr]
         pool_args.append(my_args)
 
@@ -605,7 +610,11 @@ repositories.
         action='store_true')
     parser.add_argument(
         '--clean',
-        help='Clean unrelated files from each repository.',
+        help='Clean untracked files from each repository.',
+        action='store_true')
+    parser.add_argument(
+        '--stash',
+        help='Stash untracked files from each repository.',
         action='store_true')
     parser.add_argument(
         "--config",
