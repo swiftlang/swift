@@ -754,7 +754,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                                            {selfDecl->getTypeInContext()},
                                            LookUpConformanceInModule(module)),
                       selfLV.getLValueAddress());
-    } else if (isa<StructDecl>(nominal) && !nominal->canBeCopyable()
+    } else if (isa<StructDecl>(nominal)
+               && lowering.getLoweredType().isMoveOnly()
                && nominal->getStoredProperties().empty()) {
       auto *si = B.createStruct(ctor, lowering.getLoweredType(), {});
       B.emitStoreValueOperation(ctor, si, selfLV.getLValueAddress(),
