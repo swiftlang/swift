@@ -294,9 +294,9 @@ public:
   bool isForced() const { return Forced; }
 };
 
-std::optional<ConversionPeepholeHint>
-canPeepholeConversions(SILGenFunction &SGF, const Conversion &outerConversion,
-                       const Conversion &innerConversion);
+bool canPeepholeConversions(SILGenFunction &SGF,
+                            const Conversion &outer,
+                            const Conversion &inner);
 
 /// An initialization where we ultimately want to apply a conversion to
 /// the value before completing the initialization.

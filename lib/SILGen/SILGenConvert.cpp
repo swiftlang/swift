@@ -34,6 +34,11 @@
 using namespace swift;
 using namespace Lowering;
 
+static std::optional<ConversionPeepholeHint>
+combineConversions(SILGenFunction &SGF, const Conversion &outer,
+                   const Conversion &inner);
+
+
 // FIXME: With some changes to their callers, all of the below functions
 // could be re-worked to use emitInjectEnum().
 ManagedValue
@@ -1255,7 +1260,7 @@ bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF, SILLocation loc,
                                            Conversion innerConversion,
                                            ValueProducerRef produceValue) {
   const auto &outerConversion = getConversion();
-  auto hint = canPeepholeConversions(SGF, outerConversion, innerConversion);
+  auto hint = combineConversions(SGF, outerConversion, innerConversion);
   if (!hint)
     return false;
 
@@ -1663,58 +1668,168 @@ static bool isPeepholeableConversion(CanType innerSrcType, CanType innerDestType
   return isPeepholeableConversionImpl(innerSrcType, innerDestType, outerDestType);
 }
 
-/// TODO: this would really be a lot cleaner if it just returned a
-/// std::optional<Conversion>.
-std::optional<ConversionPeepholeHint>
-Lowering::canPeepholeConversions(SILGenFunction &SGF,
-                                 const Conversion &outerConversion,
-                                 const Conversion &innerConversion) {
-  switch (outerConversion.getKind()) {
-  case Conversion::Reabstract:
-    switch (innerConversion.getKind()) {
-    case Conversion::Reabstract:
-      // We can never combine conversions in a way that would lose information
-      // about the intermediate types.
-      if (!isPeepholeableConversion(
-             innerConversion.getReabstractionInputSubstType(),
-             innerConversion.getReabstractionOutputSubstType(),
-             outerConversion.getReabstractionInputSubstType(),
-             outerConversion.getReabstractionOutputSubstType()))
-        return std::nullopt;
-
-      // Recognize when the whole conversion is an identity.
-      if (innerConversion.getReabstractionInputLoweredType().getObjectType() ==
-          outerConversion.getReabstractionOutputLoweredType().getObjectType())
-        return ConversionPeepholeHint(ConversionPeepholeHint::Identity, false);
-
-      return ConversionPeepholeHint(ConversionPeepholeHint::Reabstract, false);
-
-    case Conversion::Subtype:
-      // We can never combine conversions in a way that would lose information
-      // about the intermediate types.
-      if (!isPeepholeableConversion(
-             innerConversion.getBridgingSourceType(),
-             innerConversion.getBridgingResultType(),
-             outerConversion.getReabstractionInputSubstType(),
-             outerConversion.getReabstractionOutputSubstType()))
-        return std::nullopt;
-
-      return ConversionPeepholeHint(
-               ConversionPeepholeHint::SubtypeIntoReabstract, false);
-
-    default:
-      break;
-    }
-
+static std::optional<ConversionPeepholeHint>
+combineReabstract(SILGenFunction &SGF,
+                  const Conversion &outer,
+                  const Conversion &inner) {
+  // We can never combine conversions in a way that would lose information
+  // about the intermediate types.
+  if (!isPeepholeableConversion(inner.getReabstractionInputSubstType(),
+                                inner.getReabstractionOutputSubstType(),
+                                outer.getReabstractionInputSubstType(),
+                                outer.getReabstractionOutputSubstType()))
     return std::nullopt;
 
+  // Recognize when the whole conversion is an identity.
+  if (inner.getReabstractionInputLoweredType().getObjectType() ==
+      outer.getReabstractionOutputLoweredType().getObjectType())
+    return ConversionPeepholeHint(ConversionPeepholeHint::Identity, false);
+
+  return ConversionPeepholeHint(ConversionPeepholeHint::Reabstract, false);
+}
+
+static std::optional<ConversionPeepholeHint>
+combineSubtypeIntoReabstract(SILGenFunction &SGF,
+                             const Conversion &outer,
+                             const Conversion &inner) {
+  // We can never combine conversions in a way that would lose information
+  // about the intermediate types.
+  if (!isPeepholeableConversion(inner.getBridgingSourceType(),
+                                inner.getBridgingResultType(),
+                                outer.getReabstractionInputSubstType(),
+                                outer.getReabstractionOutputSubstType()))
+    return std::nullopt;
+
+  return ConversionPeepholeHint(
+           ConversionPeepholeHint::SubtypeIntoReabstract, false);
+}
+
+static std::optional<ConversionPeepholeHint>
+combineSubtype(SILGenFunction &SGF,
+               const Conversion &outer, const Conversion &inner) {
+  if (!isPeepholeableConversion(inner.getBridgingSourceType(),
+                                inner.getBridgingResultType(),
+                                outer.getBridgingSourceType(),
+                                outer.getBridgingResultType()))
+    return std::nullopt;
+
+  return ConversionPeepholeHint(ConversionPeepholeHint::Subtype, false);
+}
+
+static std::optional<ConversionPeepholeHint>
+combineBridging(SILGenFunction &SGF,
+               const Conversion &outer, const Conversion &inner) {
+  bool outerExplicit = outer.isBridgingExplicit();
+  bool innerExplicit = inner.isBridgingExplicit();
+
+  // Never peephole if both conversions are explicit; there might be
+  // something the user's trying to do which we don't understand.
+  if (outerExplicit && innerExplicit)
+    return std::nullopt;
+
+  // Otherwise, we can peephole if we understand the resulting conversion
+  // and applying the peephole doesn't change semantics.
+
+  CanType sourceType = inner.getBridgingSourceType();
+  CanType intermediateType = inner.getBridgingResultType();
+  assert(intermediateType == outer.getBridgingSourceType());
+
+  // If we're doing a peephole involving a force, we want to propagate
+  // the force to the source value.  If it's not in fact optional, that
+  // won't work.
+  bool forced = outer.getKind() == Conversion::ForceAndBridgeToObjC;
+  if (forced) {
+    sourceType = sourceType.getOptionalObjectType();
+    if (!sourceType)
+      return std::nullopt;
+    intermediateType = intermediateType.getOptionalObjectType();
+    assert(intermediateType);
+  }
+
+  CanType resultType = outer.getBridgingResultType();
+  SILType loweredSourceTy = SGF.getLoweredType(sourceType);
+  SILType loweredResultTy = outer.getBridgingLoweredResultType();
+
+  auto applyPeephole = [&](ConversionPeepholeHint::Kind kind) {
+    return ConversionPeepholeHint(kind, forced);
+  };
+
+  // Converting to Any doesn't do anything semantically special, so we
+  // can apply the peephole unconditionally.
+  if (isMatchedAnyToAnyObjectConversion(intermediateType, resultType)) {
+    if (loweredSourceTy == loweredResultTy) {
+      return applyPeephole(ConversionPeepholeHint::Identity);
+    } else if (isValueToAnyConversion(sourceType, intermediateType)) {
+      return applyPeephole(ConversionPeepholeHint::BridgeToAnyObject);
+    } else {
+      return applyPeephole(ConversionPeepholeHint::Subtype);
+    }
+  }
+
+  // Otherwise, undoing a bridging conversions can change semantics by
+  // e.g. removing a copy, so we shouldn't do it unless the special
+  // syntactic bridging peephole applies.  That requires one of the
+  // conversions to be explicit.
+  // TODO: use special SILGen to preserve semantics in this case,
+  // e.g. by making a copy.
+  if (!outerExplicit && !innerExplicit) {
+    return std::nullopt;
+  }
+
+  // Okay, now we're in the domain of the bridging peephole: an
+  // explicit bridging conversion can cancel out an implicit bridge
+  // between related types.
+
+  // If the source and destination types have exactly the same
+  // representation, then (1) they're related and (2) we can directly
+  // emit into the context.
+  if (loweredSourceTy.getObjectType() == loweredResultTy.getObjectType()) {
+    return applyPeephole(ConversionPeepholeHint::Identity);
+  }
+
+  // Look for a subtype relationship between the source and destination.
+  if (areRelatedTypesForBridgingPeephole(sourceType, resultType)) {
+    return applyPeephole(ConversionPeepholeHint::Subtype);
+  }
+
+  // If the inner conversion is a result conversion that removes
+  // optionality, and the non-optional source type is a subtype of the
+  // value type, this is just an implicit force.
+  if (!forced &&
+      inner.getKind() == Conversion::BridgeResultFromObjC) {
+    if (auto sourceValueType = sourceType.getOptionalObjectType()) {
+      if (!intermediateType.getOptionalObjectType() &&
+          areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
+        forced = true;
+        return applyPeephole(ConversionPeepholeHint::Subtype);
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+/// TODO: this would really be a lot cleaner if it just returned a
+/// std::optional<Conversion>.
+static std::optional<ConversionPeepholeHint>
+combineConversions(SILGenFunction &SGF, const Conversion &outer,
+                   const Conversion &inner) {
+  switch (outer.getKind()) {
+  case Conversion::Reabstract:
+    switch (inner.getKind()) {
+    case Conversion::Reabstract:
+      return combineReabstract(SGF, outer, inner);
+
+    case Conversion::Subtype:
+      return combineSubtypeIntoReabstract(SGF, outer, inner);
+
+    default:
+      return std::nullopt;
+    }
+
   case Conversion::Subtype:
-    if (innerConversion.getKind() == Conversion::Subtype &&
-        isPeepholeableConversion(innerConversion.getBridgingSourceType(),
-                                 innerConversion.getBridgingResultType(),
-                                 outerConversion.getBridgingSourceType(),
-                                 outerConversion.getBridgingResultType()))
-      return ConversionPeepholeHint(ConversionPeepholeHint::Subtype, false);
+    if (inner.getKind() == Conversion::Subtype)
+      return combineSubtype(SGF, outer, inner);
     return std::nullopt;
 
   case Conversion::AnyErasure:
@@ -1726,104 +1841,21 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
 
   case Conversion::ForceAndBridgeToObjC:
   case Conversion::BridgeToObjC:
-    switch (innerConversion.getKind()) {
+    switch (inner.getKind()) {
     case Conversion::AnyErasure:
     case Conversion::BridgeFromObjC:
-    case Conversion::BridgeResultFromObjC: {
-      bool outerExplicit = outerConversion.isBridgingExplicit();
-      bool innerExplicit = innerConversion.isBridgingExplicit();
-
-      // Never peephole if both conversions are explicit; there might be
-      // something the user's trying to do which we don't understand.
-      if (outerExplicit && innerExplicit)
-        return std::nullopt;
-
-      // Otherwise, we can peephole if we understand the resulting conversion
-      // and applying the peephole doesn't change semantics.
-
-      CanType sourceType = innerConversion.getBridgingSourceType();
-      CanType intermediateType = innerConversion.getBridgingResultType();
-      assert(intermediateType == outerConversion.getBridgingSourceType());
-
-      // If we're doing a peephole involving a force, we want to propagate
-      // the force to the source value.  If it's not in fact optional, that
-      // won't work.
-      bool forced =
-        outerConversion.getKind() == Conversion::ForceAndBridgeToObjC;
-      if (forced) {
-        sourceType = sourceType.getOptionalObjectType();
-        if (!sourceType)
-          return std::nullopt;
-        intermediateType = intermediateType.getOptionalObjectType();
-        assert(intermediateType);
-      }
-
-      CanType resultType = outerConversion.getBridgingResultType();
-      SILType loweredSourceTy = SGF.getLoweredType(sourceType);
-      SILType loweredResultTy = outerConversion.getBridgingLoweredResultType();
-
-      auto applyPeephole = [&](ConversionPeepholeHint::Kind kind) {
-        return ConversionPeepholeHint(kind, forced);
-      };
-
-      // Converting to Any doesn't do anything semantically special, so we
-      // can apply the peephole unconditionally.
-      if (isMatchedAnyToAnyObjectConversion(intermediateType, resultType)) {
-        if (loweredSourceTy == loweredResultTy) {
-          return applyPeephole(ConversionPeepholeHint::Identity);
-        } else if (isValueToAnyConversion(sourceType, intermediateType)) {
-          return applyPeephole(ConversionPeepholeHint::BridgeToAnyObject);
-        } else {
-          return applyPeephole(ConversionPeepholeHint::Subtype);
-        }
-      }
-
-      // Otherwise, undoing a bridging conversions can change semantics by
-      // e.g. removing a copy, so we shouldn't do it unless the special
-      // syntactic bridging peephole applies.  That requires one of the
-      // conversions to be explicit.
-      // TODO: use special SILGen to preserve semantics in this case,
-      // e.g. by making a copy.
-      if (!outerExplicit && !innerExplicit) {
-        return std::nullopt;
-      }
-
-      // Okay, now we're in the domain of the bridging peephole: an
-      // explicit bridging conversion can cancel out an implicit bridge
-      // between related types.
-
-      // If the source and destination types have exactly the same
-      // representation, then (1) they're related and (2) we can directly
-      // emit into the context.
-      if (loweredSourceTy.getObjectType() == loweredResultTy.getObjectType()) {
-        return applyPeephole(ConversionPeepholeHint::Identity);
-      }
-
-      // Look for a subtype relationship between the source and destination.
-      if (areRelatedTypesForBridgingPeephole(sourceType, resultType)) {
-        return applyPeephole(ConversionPeepholeHint::Subtype);
-      }
-
-      // If the inner conversion is a result conversion that removes
-      // optionality, and the non-optional source type is a subtype of the
-      // value type, this is just an implicit force.
-      if (!forced &&
-          innerConversion.getKind() == Conversion::BridgeResultFromObjC) {
-        if (auto sourceValueType = sourceType.getOptionalObjectType()) {
-          if (!intermediateType.getOptionalObjectType() &&
-              areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
-            forced = true;
-            return applyPeephole(ConversionPeepholeHint::Subtype);
-          }
-        }
-      }
-
-      return std::nullopt;
-    }
+    case Conversion::BridgeResultFromObjC:
+      return combineBridging(SGF, outer, inner);
 
     default:
       return std::nullopt;
     }
   }
   llvm_unreachable("bad kind");
+}
+
+bool Lowering::canPeepholeConversions(SILGenFunction &SGF,
+                                      const Conversion &outer,
+                                      const Conversion &inner) {
+  return combineConversions(SGF, outer, inner).has_value();
 }
