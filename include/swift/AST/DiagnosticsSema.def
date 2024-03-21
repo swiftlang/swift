@@ -964,7 +964,7 @@ NOTE(modularization_issue_swift_version,none,
      "APINotes may change how clang declarations are imported",
      (const ModuleDecl *, llvm::VersionTuple, llvm::VersionTuple))
 NOTE(modularization_issue_audit_headers,none,
-     "declarations in the %select{underlying|}0 clang module %1 "
+     "declarations in the %select{underlying |}0clang module %1 "
      "may be hidden by clang preprocessor macros",
      (bool, const ModuleDecl*))
 NOTE(modularization_issue_layering_expected_local,none,
