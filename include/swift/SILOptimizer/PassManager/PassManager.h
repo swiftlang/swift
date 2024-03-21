@@ -84,6 +84,11 @@ class SwiftPassInvocation {
   bool aliveNodeSets[NodeSetCapacity];
   int numNodeSetsAllocated = 0;
 
+  static constexpr int OperandSetCapacity = Operand::numCustomBits;
+  char operandSetStorage[sizeof(OperandSet) * OperandSetCapacity];
+  bool aliveOperandSets[OperandSetCapacity];
+  int numOperandSetsAllocated = 0;
+
   int numClonersAllocated = 0;
 
   bool needFixStackNesting = false;
@@ -123,6 +128,10 @@ public:
   NodeSet *allocNodeSet();
 
   void freeNodeSet(NodeSet *set);
+
+  OperandSet *allocOperandSet();
+
+  void freeOperandSet(OperandSet *set);
 
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);

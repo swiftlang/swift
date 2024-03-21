@@ -14,7 +14,7 @@ import SILBridging
 
 /// An operand of an instruction.
 public struct Operand : CustomStringConvertible, NoReflectionChildren {
-  fileprivate let bridged: BridgedOperand
+  public let bridged: BridgedOperand
 
   public init(bridged: BridgedOperand) {
     self.bridged = bridged
