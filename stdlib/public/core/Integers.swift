@@ -1585,51 +1585,26 @@ extension BinaryInteger {
   @inlinable
   @inline(__always)
   public func distance(to other: Self) -> Int {
-    if Self.isSigned {
-      if self.bitWidth <= Int.bitWidth && other.bitWidth <= Int.bitWidth {
-        let lhs = Int(truncatingIfNeeded: self)
-        let rhs = Int(truncatingIfNeeded: other)
-        let result = rhs.subtractingReportingOverflow(lhs)
-        if !result.overflow {
-          return result.partialValue
-        }
-      } else {
-        // Use trapping subtraction for performance.
-        if let result = Int(exactly: other - self) {
-          return result
-        }
+    if self.bitWidth < Int.bitWidth && other.bitWidth < Int.bitWidth {
+      // Smaller integers always fit.
+      return Int(truncatingIfNeeded: other) &- Int(truncatingIfNeeded: self)
+    } else if Self.isSigned ? true : self <= other {
+      // Use trapping subtraction for performance.
+      if let result = Int(exactly: other - self) {
+        return result
       }
     } else {
-      if self.bitWidth < Int.bitWidth && other.bitWidth < Int.bitWidth {
-        // Smaller unsigned integers always fit.
-        let lhs = Int(truncatingIfNeeded: self)
-        let rhs = Int(truncatingIfNeeded: other)
-        return rhs &- lhs
-      } else if self <= other {
-        let result: Self = other - self
-        let distance = Int(truncatingIfNeeded: result)
-        // The zero comparison generates better code in Swift 5.10.
-        if result.bitWidth <= Int.bitWidth {
-          if distance >= Int.zero {
-            return distance
-          }
-        } else {
-          if result <= Self(truncatingIfNeeded: Int.max.magnitude) {
-            return distance
-          }
+      // This type is unsigned and the distance is negative here.
+      let absolute = self - other
+      let distance = ~Int(truncatingIfNeeded: absolute) &+ 1
+      // The zero comparison generates better code in Swift 5.10.
+      if absolute.bitWidth <= Int.bitWidth {
+        if distance < Int.zero {
+          return distance
         }
       } else {
-        let result: Self = self - other
-        let distance = ~Int(truncatingIfNeeded: result) &+ 1
-        // The zero comparison generates better code in Swift 5.10.
-        if result.bitWidth <= Int.bitWidth {
-          if distance < Int.zero {
-            return distance
-          }
-        } else {
-          if result <= Self(truncatingIfNeeded: Int.min.magnitude) {
-            return distance
-          }
+        if absolute <= Self(truncatingIfNeeded: Int.min.magnitude) {
+          return distance
         }
       }
     }
