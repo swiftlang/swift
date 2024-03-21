@@ -674,9 +674,22 @@ struct ImmutableAddressUseVerifier {
         return true;
       case SILInstructionKind::UpcastInst:
       case SILInstructionKind::UncheckedAddrCastInst: {
-        if (isAddrCastToNonConsuming(cast<SingleValueInstruction>(inst))) {
+        auto svi = cast<SingleValueInstruction>(inst);
+
+        if (isAddrCastToNonConsuming(svi)) {
           break;
         }
+
+        // If we're attempting to do an unchecked address cast from a raw layout
+        // type to an unrelated type, allow it. Raw layout in general is an
+        // unsafe blob of memory that allows for interior pointers.
+        auto operandType = svi->getOperand(0)->getType();
+        if (auto nominal = operandType.getNominalOrBoundGenericNominal()) {
+          if (nominal->getAttrs().hasAttribute<RawLayoutAttr>()) {
+            return false;
+          }
+        }
+
         return true;
       }
       case SILInstructionKind::CheckedCastAddrBranchInst:
