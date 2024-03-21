@@ -1879,7 +1879,7 @@ bool hasSameUnderlyingType(const clang::Type *a,
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                  ASTContext &ctx);
+                                  ASTContext &ctx, bool ignoreClangTarget);
 
 /// Add command-line arguments common to all imports of Clang code.
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
