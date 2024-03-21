@@ -473,6 +473,50 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
   llvm_unreachable("Not understand subtype");
 }
 
+std::optional<TypeTreeLeafTypeRange>
+TypeTreeLeafTypeRange::get(Operand *op, SILValue rootValue) {
+  auto projectedValue = op->get();
+  auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
+  if (!startEltOffset)
+    return std::nullopt;
+
+  // A drop_deinit only consumes the deinit bit of its operand.
+  if (isa<DropDeinitInst>(op->getUser())) {
+    auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
+    return {{upperBound - 1, upperBound}};
+  }
+
+  // An `inject_enum_addr` only initializes the enum tag.
+  if (auto inject = dyn_cast<InjectEnumAddrInst>(op->getUser())) {
+    auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
+    unsigned payloadUpperBound = 0;
+    if (inject->getElement()->hasAssociatedValues()) {
+      auto payloadTy = projectedValue->getType().getEnumElementType(
+          inject->getElement(), op->getFunction());
+
+      payloadUpperBound =
+          *startEltOffset + TypeSubElementCount(payloadTy, op->getFunction());
+    }
+    // TODO: account for deinit component if enum has deinit.
+    assert(!projectedValue->getType().isValueTypeWithDeinit());
+    return {{payloadUpperBound, upperBound}};
+  }
+
+  // Uses that borrow a value do not involve the deinit bit.
+  //
+  // FIXME: This shouldn't be limited to applies.
+  unsigned deinitBitOffset = 0;
+  if (op->get()->getType().isValueTypeWithDeinit() &&
+      op->getOperandOwnership() == OperandOwnership::Borrow &&
+      ApplySite::isa(op->getUser())) {
+    deinitBitOffset = 1;
+  }
+
+  return {{*startEltOffset, *startEltOffset +
+                                TypeSubElementCount(projectedValue) -
+                                deinitBitOffset}};
+}
+
 void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
     SILValue rootValue, SILInstruction *insertPt,
     SmallBitVector &neededElements,
@@ -831,16 +875,15 @@ static FunctionTest FieldSensitiveSSAUseLivenessTest(
 
 template <typename LivenessWithDefs>
 bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
-    SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+    SILInstruction *inst, SmallBitVector const &bits) const {
   assert(asImpl().isInitialized());
 
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs() << "FieldSensitivePrunedLiveRange::isWithinBoundary!\n"
-                   << "Span: ";
-      span.print(llvm::dbgs()); llvm::dbgs() << '\n');
+  PRUNED_LIVENESS_LOG(llvm::dbgs()
+                      << "FieldSensitivePrunedLiveRange::isWithinBoundary!\n"
+                      << "Bits: " << bits << "\n");
 
   // If we do not have any span, return true since we have no counter examples.
-  if (span.empty()) {
+  if (bits.empty()) {
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "    span is empty! Returning true!\n");
     return true;
   }
@@ -850,13 +893,13 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   auto *block = inst->getParent();
 
   SmallVector<IsLive, 8> outVector;
-  getBlockLiveness(block, span, outVector);
+  getBlockLiveness(block, bits, outVector);
 
-  for (auto pair : llvm::enumerate(outVector)) {
-    unsigned bit = span.startEltOffset + pair.index();
+  for (auto bitAndIndex : llvm::enumerate(bits.set_bits())) {
+    unsigned bit = bitAndIndex.value();
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Visiting bit: " << bit << '\n');
     bool isLive = false;
-    switch (pair.value()) {
+    switch (outVector[bitAndIndex.index()]) {
     case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
     case FieldSensitivePrunedLiveBlocks::Dead:
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "        Dead... continuing!\n");
