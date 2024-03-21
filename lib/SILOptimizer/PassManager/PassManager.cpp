@@ -1402,8 +1402,8 @@ FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
 }
 
 BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
-  assert(numBlockSetsAllocated < BlockSetCapacity - 1 &&
-         "too many BasicBlockSets allocated");
+  require(numBlockSetsAllocated < BlockSetCapacity,
+          "too many BasicBlockSets allocated");
 
   auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
   BasicBlockSet *set = new (storage) BasicBlockSet(function);
@@ -1426,8 +1426,8 @@ void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
 }
 
 NodeSet *SwiftPassInvocation::allocNodeSet() {
-  assert(numNodeSetsAllocated < NodeSetCapacity - 1 &&
-         "too many BasicNodeSets allocated");
+  require(numNodeSetsAllocated < NodeSetCapacity,
+          "too many NodeSets allocated");
 
   auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
   NodeSet *set = new (storage) NodeSet(function);

@@ -14,6 +14,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/NodeBits.h"
+#include "swift/SIL/OperandBits.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -73,12 +74,12 @@ class SwiftPassInvocation {
 
   SILSSAUpdater *ssaUpdater = nullptr;
 
-  static constexpr int BlockSetCapacity = 16;
+  static constexpr int BlockSetCapacity = SILBasicBlock::numCustomBits;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
   int numBlockSetsAllocated = 0;
 
-  static constexpr int NodeSetCapacity = 8;
+  static constexpr int NodeSetCapacity = SILNode::numCustomBits;
   char nodeSetStorage[sizeof(NodeSet) * NodeSetCapacity];
   bool aliveNodeSets[NodeSetCapacity];
   int numNodeSetsAllocated = 0;
