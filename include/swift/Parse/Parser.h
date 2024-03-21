@@ -1963,7 +1963,7 @@ public:
   /// expression can be parsed.
   bool isStartOfStmt(bool preferExpr);
   
-  bool isStartOfStmtBody();
+  bool isStartOfConditionalStmtBody();
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);

@@ -1833,38 +1833,65 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   return Status;
 }
 
-bool Parser::isStartOfStmtBody() {
-  
+/// Returns `true` if the current token represents the start of a conditional statement body.
+bool Parser::isStartOfConditionalStmtBody() {
   Parser::BacktrackingScope Backtrack(*this);
   
-  if (!consumeIf(tok::l_brace)) {
+  if (!Tok.is(tok::l_brace)) {
+    // Statement bodies always start with a '{'. If there is no '{', we can't be at the statement body.
     return false;
   }
   
-  int braces = 1;
+  skipSingle();
   
-  while (!Tok.is(tok::eof)) {
-    if (consumeIf(tok::r_brace)) {
-      braces -= 1;
-    } else {
-      consumeToken();
-    }
-    if (braces == 0) {
-      if (Tok.is(tok::comma)) {
-        return false;
-      }
-      if (!Tok.isAtStartOfLine() && (Tok.is(tok::l_brace) || Tok.is(tok::l_paren))) {
-        return false;
-      }
-      return true;
-    }
-    if (consumeIf(tok::l_brace)) {
-      braces += 1;
-    }
+  if (Tok.is(tok::eof)) {
+    // There's nothing else in the source file that could be the statement body, so this must be it.
+    return true;
   }
   
-  return false;
+  if (Tok.is(tok::semi)) {
+    // We can't have a semicolon between the condition and the statement body, so this must be the statement body.
+    return true;
+  }
   
+  if (Tok.is(tok::kw_else)) {
+    // If the current token is an `else` keyword, this must be the statement body of an `if` statement since conditions can't be followed by `else`.
+    return true;
+  }
+
+  if (Tok.is(tok::l_paren)) {
+    return false;
+  }
+  
+  if (Tok.is(tok::r_brace) || Tok.is(tok::r_paren)) {
+    // A right brace or parenthesis cannot start a statement body, nor can the condition list continue afterwards. So, this must be the statement body.
+    // This covers cases like `if true, { if true, { } }` or `( if true, { print(0) } )`. While the latter is not valid code, it improves diagnostics.
+    return true;
+  }
+  
+  if (Tok.isAtStartOfLine()) {
+    // If the current token is at the start of a line, it is most likely a statement body. The only exceptions are:
+    if (Tok.is(tok::comma)) {
+      // If newline begins with ',' it must be a condition trailing comma, so this can't be the statement body, e.g.
+      // if true, { true }
+      // , true { print("body") }
+      return false;
+    }
+    if (Tok.is(tok::oper_binary_spaced)) {
+      // If current token is a binary operator this can't be the statement body since an `if` expression can't be the left-hand side of an operator, e.g.
+      // if true, { true }
+      // != nil
+      // {
+      //   print("body")
+      // }
+      return false;
+    }
+    // Excluded the above exceptions, this must be the statement body.
+    return true;
+  } else {
+    // If the current token isn't at the start of a line and isn't `EOF`, `;`, `else`, `)` or `}` this can't be the statement body.
+    return false;
+  }
 }
 
 /// Parse the condition of an 'if' or 'while'.
@@ -1897,13 +1924,13 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition, Diag<> Default
   while (true) {
 
     if (Context.LangOpts.hasFeature(Feature::TrailingComma)) {
-      
-      // 'guard' conditions terminator
+      // Condition terminator is `else` for `guard` statements.
       if (ParentKind == StmtKind::Guard && Tok.is(tok::kw_else)) {
         break;
       }
-      // 'if' and 'while' conditions terminator
-      if (ParentKind != StmtKind::Guard && isStartOfStmtBody()) {
+      // Condition terminator is start of statement body for `if` or `while` statements.
+      // Missing `else` is a common mistake for `guard` statements so we fall back to lookahead for a body.
+      if (isStartOfConditionalStmtBody()) {
         break;
       }
     }
