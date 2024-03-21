@@ -529,9 +529,9 @@ struct UseState {
   /// A map from destroy_addr to the part of the type that it destroys.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> destroys;
 
-  /// A map from a liveness requiring use to the part of the type that it
-  /// requires liveness for.
-  InstToBitMap livenessUses;
+  /// Maps a non-consuming use to the part of the type that it requires
+  /// liveness for.
+  InstToBitMap nonconsumingUses;
 
   /// A map from a load [copy] or load [take] that we determined must be
   /// converted to a load_borrow to the part of the type tree that it needs to
@@ -553,7 +553,7 @@ struct UseState {
   /// consider them to be takes since after the transform they must be a take.
   ///
   /// Importantly, these we know are never copied and are only consumed once.
-  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> takeInsts;
+  InstToBitMap takeInsts;
 
   /// A map from a copy_addr, load [copy], or load [take] that we determine
   /// semantically are true copies to the part of the type tree they must copy.
@@ -573,7 +573,7 @@ struct UseState {
   /// We represent these separately from \p takeInsts since:
   ///
   /// 1.
-  llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> copyInsts;
+  InstToBitMap copyInsts;
 
   /// A map from an instruction that initializes memory to the description of
   /// the part of the type tree that it initializes.
@@ -635,11 +635,11 @@ struct UseState {
   }
 
   void recordLivenessUse(SILInstruction *inst, SmallBitVector const &bits) {
-    setAffectedBits(inst, bits, livenessUses);
+    setAffectedBits(inst, bits, nonconsumingUses);
   }
 
   void recordLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
-    setAffectedBits(inst, range, livenessUses);
+    setAffectedBits(inst, range, nonconsumingUses);
   }
 
   void recordReinitUse(SILInstruction *inst, SILValue value,
@@ -652,6 +652,14 @@ struct UseState {
                      TypeTreeLeafTypeRange range) {
     initToValueMultiMap.insert(inst, value);
     setAffectedBits(inst, range, initInsts);
+  }
+
+  void recordTakeUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+    setAffectedBits(inst, range, takeInsts);
+  }
+
+  void recordCopyUse(SILInstruction *inst, TypeTreeLeafTypeRange range) {
+    setAffectedBits(inst, range, copyInsts);
   }
 
   /// Returns true if this is an instruction that is used by the pass to ensure
@@ -702,7 +710,7 @@ struct UseState {
     cachedNumSubelements = std::nullopt;
     consumingBlocks.clear();
     destroys.clear();
-    livenessUses.clear();
+    nonconsumingUses.clear();
     borrows.clear();
     copyInsts.clear();
     takeInsts.clear();
@@ -722,7 +730,7 @@ struct UseState {
       llvm::dbgs() << *pair.first;
     }
     llvm::dbgs() << "LivenessUses:\n";
-    for (auto pair : livenessUses) {
+    for (auto pair : nonconsumingUses) {
       llvm::dbgs() << *pair.first;
     }
     llvm::dbgs() << "Borrows:\n";
@@ -795,18 +803,18 @@ struct UseState {
     });
   }
 
-  bool isConsume(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+  bool isConsume(SILInstruction *inst, SmallBitVector const &bits) const {
     {
       auto iter = takeInsts.find(inst);
       if (iter != takeInsts.end()) {
-        if (span.setIntersection(iter->second))
+        if (bits.anyCommon(iter->second))
           return true;
       }
     }
     {
       auto iter = copyInsts.find(inst);
       if (iter != copyInsts.end()) {
-        if (span.setIntersection(iter->second))
+        if (bits.anyCommon(iter->second))
           return true;
       }
     }
@@ -816,26 +824,24 @@ struct UseState {
   bool isCopy(SILInstruction *inst, const SmallBitVector &bv) const {
     auto iter = copyInsts.find(inst);
     if (iter != copyInsts.end()) {
-      for (unsigned index : iter->second.getRange()) {
-        if (bv[index])
-          return true;
-      }
+      if (bv.anyCommon(iter->second))
+        return true;
     }
     return false;
   }
 
-  bool isLivenessUse(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+  bool isLivenessUse(SILInstruction *inst, SmallBitVector const &bits) const {
     {
-      auto iter = livenessUses.find(inst);
-      if (iter != livenessUses.end()) {
-        if (span.intersects(iter->second))
+      auto iter = nonconsumingUses.find(inst);
+      if (iter != nonconsumingUses.end()) {
+        if (bits.anyCommon(iter->second))
           return true;
       }
     }
     {
       auto iter = borrows.find(inst);
       if (iter != borrows.end()) {
-        if (span.setIntersection(iter->second))
+        if (iter->second.intersects(bits))
           return true;
       }
     }
@@ -843,7 +849,7 @@ struct UseState {
     if (!isReinitToInitConvertibleInst(inst)) {
       auto iter = reinitInsts.find(inst);
       if (iter != reinitInsts.end()) {
-        if (span.intersects(iter->second))
+        if (bits.anyCommon(iter->second))
           return true;
       }
     }
@@ -857,31 +863,11 @@ struct UseState {
     return false;
   }
 
-  bool isInitUse(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+  bool isInitUse(SILInstruction *inst, const SmallBitVector &requiredBits) const {
     {
       auto iter = initInsts.find(inst);
       if (iter != initInsts.end()) {
-        if (span.intersects(iter->second))
-          return true;
-      }
-    }
-    if (isReinitToInitConvertibleInst(inst)) {
-      auto iter = reinitInsts.find(inst);
-      if (iter != reinitInsts.end()) {
-        if (span.intersects(iter->second))
-          return true;
-      }
-    }
-    return false;
-  }
-
-  bool isInitUse(SILInstruction *inst, const SmallBitVector &requiredBits,
-                 SmallBitVector &foundInitBits) const {
-    {
-      auto iter = initInsts.find(inst);
-      if (iter != initInsts.end()) {
-        foundInitBits = iter->second & requiredBits;
-        if (foundInitBits.any())
+        if (requiredBits.anyCommon(iter->second))
           return true;
       }
     }
@@ -889,8 +875,7 @@ struct UseState {
     if (isReinitToInitConvertibleInst(inst)) {
       auto iter = reinitInsts.find(inst);
       if (iter != reinitInsts.end()) {
-        foundInitBits = iter->second & requiredBits;
-        if (foundInitBits.any())
+        if (requiredBits.anyCommon(iter->second))
           return true;
       }
     }
@@ -1253,7 +1238,7 @@ void UseState::initializeLiveness(
                liveness.print(llvm::dbgs()));
   }
 
-  for (auto livenessInstAndValue : livenessUses) {
+  for (auto livenessInstAndValue : nonconsumingUses) {
     if (auto *lbi = dyn_cast<LoadBorrowInst>(livenessInstAndValue.first)) {
       auto accessPathWithBase =
           AccessPathWithBase::computeInScope(lbi->getOperand());
@@ -1382,6 +1367,12 @@ public:
       iter = finalBlockConsumes.insert({block, {}}).first;
     }
     LLVM_DEBUG(llvm::dbgs() << "Recorded Final Consume: " << *inst);
+    for (auto &pair : iter->second) {
+      if (pair.first == inst) {
+        pair.second |= bits;
+        return;
+      }
+    }
     iter->second.emplace_back(inst, bits);
   }
 
@@ -2187,10 +2178,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
-      useState.takeInsts.insert({user, *leafRange});
+      useState.recordTakeUse(user, *leafRange);
     } else {
       LLVM_DEBUG(llvm::dbgs() << "Found copy: " << *user);
-      useState.copyInsts.insert({user, *leafRange});
+      useState.recordCopyUse(user, *leafRange);
     }
     return true;
   }
@@ -2399,10 +2390,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       // done checking. The load [take] are already complete and good to go.
       if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
         LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
-        useState.takeInsts.insert({user, *leafRange});
+        useState.recordTakeUse(user, *leafRange);
       } else {
         LLVM_DEBUG(llvm::dbgs() << "Found copy inst: " << *user);
-        useState.copyInsts.insert({user, *leafRange});
+        useState.recordCopyUse(user, *leafRange);
       }
     }
     return true;
@@ -2451,7 +2442,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
-    useState.takeInsts.insert({user, *leafRange});
+    useState.recordTakeUse(user, *leafRange);
     return true;
   }
 
@@ -2662,9 +2653,7 @@ struct GlobalLivenessChecker {
   /// Returns true if we emitted any errors.
   bool compute();
 
-  bool testInstVectorLiveness(
-      llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4>
-          &instsToTest);
+  bool testInstVectorLiveness(UseState::InstToBitMap &instsToTest);
 
   void clear() {
     livenessVector.clear();
@@ -2675,8 +2664,7 @@ struct GlobalLivenessChecker {
 } // namespace
 
 bool GlobalLivenessChecker::testInstVectorLiveness(
-    llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4>
-        &instsToTest) {
+    UseState::InstToBitMap &instsToTest) {
   bool emittedDiagnostic = false;
 
   for (auto takeInstAndValue : instsToTest) {
@@ -2829,9 +2817,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
 #ifndef NDEBUG
           SmallBitVector defBits(addressUseState.getNumSubelements());
           liveness.isDefBlock(block, errorSpan, defBits);
-          SmallBitVector errorSpanBits(addressUseState.getNumSubelements());
-          errorSpan.setBits(errorSpanBits);
-          assert((defBits & errorSpanBits).none() &&
+          assert((defBits & errorSpan).none() &&
                  "If in def block... we are in liveness block");
 #endif
           [[clang::fallthrough]];
@@ -3222,8 +3208,7 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
 
   // Check all takes.
   for (auto takeInst : addressUseState.takeInsts) {
-    SmallBitVector bits(liveness.getNumSubElements());
-    takeInst.second.setBits(bits);
+    auto &bits = takeInst.second;
     bool claimedConsume = consumes.claimConsume(takeInst.first, bits);
     (void)claimedConsume;
     if (!claimedConsume) {
@@ -3236,8 +3221,7 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
 
   // Then rewrite all copy insts to be takes and claim them.
   for (auto copyInst : addressUseState.copyInsts) {
-    SmallBitVector bits(liveness.getNumSubElements());
-    copyInst.second.setBits(bits);
+    auto &bits = copyInst.second;
     bool claimedConsume = consumes.claimConsume(copyInst.first, bits);
     if (!claimedConsume) {
       llvm::errs()
@@ -3402,7 +3386,7 @@ void ExtendUnconsumedLiveness::run() {
       }
     }
     for (auto pair : addressUseState.takeInsts) {
-      if (pair.second.contains(element)) {
+      if (pair.second.test(element)) {
         destroys[pair.first] = DestroyKind::Take;
       }
     }
