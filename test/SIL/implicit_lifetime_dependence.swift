@@ -12,7 +12,7 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
     self.c = c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChYlscfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _scope(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChYlicfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _inherit(1) @owned BufferView {
   init(_ otherBV: borrowing BufferView) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
@@ -49,8 +49,12 @@ func testBasic() {
   }
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(1) @owned BufferView {
 func derive(_ x: borrowing BufferView) -> BufferView {
+  return BufferView(x.ptr, x.c)
+}
+
+func derive(_ unused: Int, _ x: borrowing BufferView) -> BufferView {
   return BufferView(x.ptr, x.c)
 }
 
@@ -64,11 +68,11 @@ func use(_ x: borrowing BufferView) {}
 struct Wrapper : ~Escapable {
   var _view: BufferView
   var view: BufferView {
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvr : $@yield_once @convention(method) (@guaranteed Wrapper) -> _scope(0) @yields @guaranteed BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvr : $@yield_once @convention(method) (@guaranteed Wrapper) -> _inherit(0) @yields @guaranteed BufferView {
     _read {
       yield _view
     }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvM : $@yield_once @convention(method) (@inout Wrapper) -> _scope(0) @yields @inout BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvM : $@yield_once @convention(method) (@inout Wrapper) -> _inherit(0) @yields @inout BufferView {
     _modify {
       yield &_view
     }
@@ -77,7 +81,8 @@ struct Wrapper : ~Escapable {
   init(_ view: consuming BufferView) {
     self._view = view
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyYLsF : $@convention(method) (@guaranteed Wrapper) -> _scope(0) @owned BufferView {
+// TODO: Investigate why it was mangled as Yli and not YLi before
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyYLiF : $@convention(method) (@guaranteed Wrapper) -> _inherit(0) @owned BufferView {
   borrowing func getView1() -> BufferView {
     return _view
   }
@@ -147,7 +152,7 @@ struct GenericBufferView<Element> : ~Escapable {
       }
     }
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> _scope(0) @owned GenericBufferView<Element> {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> _inherit(0) @owned GenericBufferView<Element> {
   subscript(bounds: FakeRange<Pointer>) -> Self {
     get {
       GenericBufferView(
@@ -158,7 +163,7 @@ struct GenericBufferView<Element> : ~Escapable {
   }
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) (@owned BufferView, @owned BufferView) {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(1) (@owned BufferView, @owned BufferView) {
 func tupleLifetimeDependence(_ x: borrowing BufferView) -> (BufferView, BufferView) {
   return (BufferView(x.ptr, x.c), BufferView(x.ptr, x.c))
 }

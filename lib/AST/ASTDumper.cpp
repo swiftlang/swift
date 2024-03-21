@@ -3535,8 +3535,7 @@ public:
     for (auto &dep : T->getLifetimeDependencies()) {
       printFieldRaw(
           [&](raw_ostream &out) {
-            out << dep.getLifetimeDependenceKindString() << "(";
-            out << dep.getParamString() << ")";
+            out << " " << dep.getLifetimeDependenceSpecifierString() << " ";
           },
           "");
     }

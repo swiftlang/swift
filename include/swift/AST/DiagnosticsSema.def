@@ -7845,25 +7845,31 @@ ERROR(lifetime_dependence_invalid_param_name, none,
       "invalid parameter name specified %0", (Identifier))
 ERROR(lifetime_dependence_invalid_param_index, none,
       "invalid parameter index specified %0", (unsigned))
-ERROR(lifetime_dependence_invalid_self, none,
-      "invalid lifetime dependence specifier, self is valid in non-static "
-      "methods only", ())
+ERROR(lifetime_dependence_invalid_self_in_static, none,
+      "invalid lifetime dependence specifier on non-existent self", ())
+ERROR(lifetime_dependence_invalid_self_in_init, none,
+      "invalid lifetime dependence on self in an initializer", ())
 ERROR(lifetime_dependence_duplicate_param_id, none,
       "duplicate lifetime dependence specifier", ())
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
+ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
+      "invalid use of scoped lifetime dependence with consuming ownership",
+      ())
+ERROR(lifetime_dependence_cannot_use_inferred_scoped_consuming, none,
+      "invalid use of lifetime dependence on an Escapable parameter with "
+      "consuming ownership",
+      ())
+ERROR(lifetime_dependence_invalid_self_ownership, none,
+      "invalid scoped lifetime dependence on an Escapable self with consuming "
+      "ownership",
+      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
 ERROR(lifetime_dependence_invalid_return_type, none,
       "lifetime dependence can only be specified on ~Escapable results", ())
-ERROR(lifetime_dependence_missing_ownership_modifier, none,
-      "lifetime dependence can only be specified on parameters with ownership "
-      "modifiers (borrowing, consuming, inout)", ())
-ERROR(lifetime_dependence_cannot_infer_wo_ownership_modifier_on_method, none,
-      "cannot infer lifetime dependence, specify ownership modifier for the "
-       "method", ())
  ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
       "cannot infer lifetime dependence, multiple ~Escapable or ~Copyable "
       "parameters with ownership modifiers, specify explicit lifetime "
@@ -7874,9 +7880,6 @@ ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
 ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
       "expected nil or self as return values in an initializer with "
        "lifetime dependent specifiers", ())
-ERROR(lifetime_dependence_cannot_use_infer, none,
-       "invalid use of %0 lifetime dependence on Escapable type",
-       (StringRef))
 ERROR(lifetime_dependence_on_bitwise_copyable, none,
       "invalid lifetime dependence on bitwise copyable type", ())
 ERROR(lifetime_dependence_cannot_infer_implicit_init, none,

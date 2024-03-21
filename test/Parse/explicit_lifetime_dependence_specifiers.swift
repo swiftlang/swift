@@ -16,24 +16,24 @@ struct BufferView : ~Escapable {
     } 
     self.ptr = ptr
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> _borrow(a) Self {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> dependsOn(a) Self {
     self.ptr = ptr
     return self
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper) -> _consume(a) Self {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper) -> dependsOn(a) Self {
     self.ptr = ptr
     return self
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper, b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper, b: borrowing Array<Int>) -> dependsOn(a) dependsOn(scoped b) Self {
     self.ptr = ptr
     return self
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Double>, b: borrowing Array<Int>, c: Double) -> _consume(a) _borrow(b) Int { // expected-error{{expected Self return type for initializers with lifetime dependence specifiers}}
+  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Double>, b: borrowing Array<Int>, c: Double) -> dependsOn(scoped a) dependsOn(b) Int { // expected-error{{expected Self return type for initializers with lifetime dependence specifiers}}
     self.ptr = ptr
     return 0
   }
-  /* TODO: Enable this test once stdlib builds with NonescapableTypes support
-  init?(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>, _ i: Int) -> _borrow(a) Self {
+  /* TODO: Enable this test once Optional is ~Escapable
+  init?(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>, _ i: Int) -> dependsOn(a) Self? {
     if (i % 2 == 0) {
       self.ptr = ptr
       return self
@@ -62,95 +62,95 @@ func testBasic() {
   }
 }
 
-func derive(_ x: borrowing BufferView) -> _borrow(x) BufferView {
+func derive(_ x: borrowing BufferView) -> dependsOn(x) BufferView {
   return BufferView(x.ptr)
 }
 
-func consumeAndCreate(_ x: consuming BufferView) -> _copy(x) BufferView {
+func consumeAndCreate(_ x: consuming BufferView) -> dependsOn(x) BufferView {
   return BufferView(x.ptr)
 }
 
 func use(_ x: borrowing BufferView) {}
 
-func deriveMultiView1(_ x: borrowing BufferView, _ y: borrowing BufferView) -> _borrow(x, y) BufferView {
+func deriveMultiView1(_ x: borrowing BufferView, _ y: borrowing BufferView) -> dependsOn(x, y) BufferView {
   if (Int.random(in: 1..<100) % 2 == 0) {
     return BufferView(x.ptr)
   }
   return BufferView(y.ptr)
 }
 
-func deriveMultiView2(_ x: borrowing BufferView, _ y: borrowing BufferView) -> _borrow(x) _borrow(y) BufferView {
+func deriveMultiView2(_ x: borrowing BufferView, _ y: borrowing BufferView) -> dependsOn(x) dependsOn(y) BufferView {
   if (Int.random(in: 1..<100) % 2 == 0) {
     return BufferView(x.ptr)
   }
   return BufferView(y.ptr)
 }
 
-func consumeAndCreateMultiView1(_ x: consuming BufferView, _ y: consuming BufferView) -> _copy(x, y) BufferView {
+func consumeAndCreateMultiView1(_ x: consuming BufferView, _ y: consuming BufferView) -> dependsOn(x, y) BufferView {
   if (Int.random(in: 1..<100) % 2 == 0) {
     return BufferView(x.ptr)
   }
   return BufferView(y.ptr)
 }
 
-func consumeAndCreateMultiView2(_ x: consuming BufferView, _ y: consuming BufferView) -> _copy(x) _copy(y) BufferView {
+func consumeAndCreateMultiView2(_ x: consuming BufferView, _ y: consuming BufferView) -> dependsOn(x) dependsOn(y) BufferView {
   if (Int.random(in: 1..<100) % 2 == 0) {
     return BufferView(x.ptr)
   }
   return BufferView(y.ptr)
 }
 
-func mixedMultiView(_ x: consuming BufferView, _ y: borrowing BufferView) -> _copy(x) _borrow(y) BufferView {
+func mixedMultiView(_ x: consuming BufferView, _ y: borrowing BufferView) -> dependsOn(x) dependsOn(y) BufferView {
   if (Int.random(in: 1..<100) % 2 == 0) {
     return BufferView(x.ptr)
   }
   return BufferView(y.ptr)
 }
 
-func modifiedViewDependsOnInput(_ x: inout MutableBufferView) -> _mutate(x) MutableBufferView {
+func modifiedViewDependsOnInput(_ x: inout MutableBufferView) -> dependsOn(x) MutableBufferView {
   return MutableBufferView(x.ptr)
 }
 
-func modifiedViewDependsOnParent(_ x: inout MutableBufferView) -> _copy(x) MutableBufferView {
+func modifiedViewDependsOnParent(_ x: inout MutableBufferView) -> dependsOn(x) MutableBufferView {
   return MutableBufferView(x.ptr)
 }
 
-func invalidSpecifier1(_ x: borrowing BufferView) -> _borrow BufferView { // expected-error{{expected '(' after lifetime dependence specifier}}
+func invalidSpecifier1(_ x: borrowing BufferView) -> dependsOn BufferView { // expected-error{{expected '(' after lifetime dependence specifier}}
   return BufferView(x.ptr)
 }
 
-func invalidSpecifier2(_ x: borrowing BufferView) -> _borrow() BufferView {// expected-error{{expected identifier, index or self in lifetime dependence specifier}}
+func invalidSpecifier2(_ x: borrowing BufferView) -> dependsOn() BufferView {// expected-error{{expected identifier, index or self in lifetime dependence specifier}}
   return BufferView(x.ptr)
 }
 
-func invalidSpecifier3(_ x: borrowing BufferView) -> _borrow(*) BufferView { // expected-error{{expected identifier, index or self in lifetime dependence specifier}}
+func invalidSpecifier3(_ x: borrowing BufferView) -> dependsOn(*) BufferView { // expected-error{{expected identifier, index or self in lifetime dependence specifier}}
   return BufferView(x.ptr)
 } 
 
 // TODO: Diagnose using param indices on func decls in sema
-func invalidSpecifier4(_ x: borrowing BufferView) -> _borrow(0) BufferView { // expected-error{{invalid lifetime dependence specifier, self is valid in non-static methods only}}
+func invalidSpecifier4(_ x: borrowing BufferView) -> dependsOn(0) BufferView { // expected-error{{invalid lifetime dependence specifier on non-existent self}}
   return BufferView(x.ptr)
 }
 
 struct Wrapper : ~Escapable {
   let view: BufferView
-  init(_ view: consuming BufferView) -> _consume(view) Self {
+  init(_ view: consuming BufferView) -> dependsOn(view) Self {
     self.view = view
     return self
   }
-  borrowing func getView1() -> _borrow(self) BufferView {
+  borrowing func getView1() -> dependsOn(self) BufferView {
     return view
   }
 
-  consuming func getView2() -> _consume(self) BufferView {
+  consuming func getView2() -> dependsOn(self) BufferView {
     return view
   }
 
-  mutating func getView3() -> _copy(self) BufferView {
+  mutating func getView3() -> dependsOn(self) BufferView {
     return view
   }
 
-  borrowing func getView4() -> _copy(self) BufferView {
+  borrowing func getView4() -> dependsOn(self) BufferView {
     return view
   }
 }

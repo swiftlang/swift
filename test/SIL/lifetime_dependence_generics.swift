@@ -5,11 +5,11 @@
 
 protocol P {
   associatedtype E: ~Escapable
-  borrowing func getE() -> _borrow(self) E
+  borrowing func getE() -> dependsOn(self) E
 }
 
 extension P {
-  borrowing func getDefault() -> _borrow(self) E {
+  borrowing func getDefault() -> dependsOn(self) E {
     return getE()
   }
 }
@@ -20,10 +20,10 @@ public struct View: ~Escapable {
 }
 
 public struct PView: P {
-  borrowing func getE() -> _borrow(self) View { return View() }
+  borrowing func getE() -> dependsOn(self) View { return View() }
 }
 
-public func test(pview: borrowing PView) -> _borrow(pview) View {
+public func test(pview: borrowing PView) -> dependsOn(pview) View {
   return pview.getDefault()
 }
 
