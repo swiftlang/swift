@@ -291,10 +291,10 @@ public:
     llvm::dbgs() << '\n';
   }
 
-  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
-    printForDiagnostics(llvm::dbgs());
-    llvm::dbgs() << '\n';
-  }
+  // Defined out of line to prevent linker errors since libswiftBasic would
+  // include this header exascerbating a layering violation where libswiftBasic
+  // depends on libswiftAST.
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics());
 };
 
 /// Determine how the given value declaration is isolated.
