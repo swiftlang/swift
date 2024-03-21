@@ -253,10 +253,8 @@ Func Optional.==(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.==(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
 Func Optional.~=(_:_:) has parameter 1 changing from Default to Shared
-Func Result.flatMap(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
 Func Result.get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
 Func Result.get() has self access kind changing from NonMutating to Consuming
-Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
 Func Result.mapError(_:) has self access kind changing from NonMutating to Consuming
 Func UnsafeBufferPointer.deallocate() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeBufferPointer.distance(from:to:) has generic signature change from <Element> to <Element where Element : ~Copyable>
