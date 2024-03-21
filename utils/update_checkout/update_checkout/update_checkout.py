@@ -174,10 +174,10 @@ def update_single_repository(pool_args):
             if should_clean or should_stash:
                 if should_stash:
                     shell.run(['git', 'stash'],
-                            echo=True, prefix=prefix)
+                              echo=True, prefix=prefix)
                 elif should_clean:
                     shell.run(['git', 'clean', '-fdx'],
-                            echo=True, prefix=prefix)
+                              echo=True, prefix=prefix)
                 shell.run(['git', 'submodule', 'foreach', '--recursive',
                            'git', 'clean', '-fdx'],
                           echo=True, prefix=prefix)
