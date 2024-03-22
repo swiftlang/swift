@@ -399,10 +399,9 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
   // Handle tokens starting with a type cast
   bool castTypeIsId = false;
-  if (numTokens > 3 &&
-      tokenI[0].is(clang::tok::l_paren) &&
+  if (numTokens > 3 && tokenI[0].is(clang::tok::l_paren) &&
       (tokenI[1].is(clang::tok::identifier) ||
-        impl.getClangSema().isSimpleTypeSpecifier(tokenI[1].getKind())) &&
+       tokenI[1].isSimpleTypeSpecifier(impl.getClangSema().getLangOpts())) &&
       tokenI[2].is(clang::tok::r_paren)) {
     if (!castType.isNull()) {
       // this is a nested cast
