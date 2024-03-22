@@ -228,9 +228,19 @@ private:
   computeForValue(SILValue projectionFromRoot, SILValue rootValue);
 };
 
-/// Given a type T, this is the number of leaf field types in T's type tree. A
-/// leaf field type is a descendent field of T that does not have any
-/// descendent's itself.
+/// Counts the leaf fields aggregated together into a particular type.
+///
+/// Defined in such a way as to enable walking up the tree of aggregations
+/// node-by-node, visiting each type along the way.
+///
+/// The definition is given recursively as follows:
+/// a an atom  => count(a) := 1
+/// t a tuple  => count(t) := sum(t.elements, { elt in count(type(elt)) })
+/// s a struct => count(s) := sum(s.fields, { f in count(type(f)) })
+///                             + s.hasDeinit
+/// e an enum  => count(e) := sum(e.elements, { elt in count(type(elt)) })
+///                             + e.hasDeinit
+///                             + 1 // discriminator
 struct TypeSubElementCount {
   unsigned number;
 
@@ -267,6 +277,11 @@ struct TypeSubElementCount {
 
 class FieldSensitivePrunedLiveness;
 
+enum NeedsDestroy_t {
+  DoesNotNeedDestroy = false,
+  NeedsDestroy = true,
+};
+
 /// A span of leaf elements in the sub-element break down of the linearization
 /// of the type tree of a type T.
 struct TypeTreeLeafTypeRange {
@@ -291,30 +306,27 @@ struct TypeTreeLeafTypeRange {
   /// The leaf type sub-range of the type tree of \p rootAddress, consisting of
   /// \p projectedAddress and all of \p projectedAddress's descendent fields in
   /// the type tree.
-  ///
-  /// \returns None if we are unable to understand the path in between \p
-  /// projectedAddress and \p rootAddress.
-  static std::optional<TypeTreeLeafTypeRange> get(SILValue projectedValue,
-                                                  SILValue rootValue) {
+  static void get(SILValue projectedValue, SILValue rootValue,
+                  SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
     auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
     if (!startEltOffset)
-      return std::nullopt;
-    return {{*startEltOffset,
-             *startEltOffset + TypeSubElementCount(projectedValue)}};
+      return;
+    ranges.push_back({*startEltOffset,
+                      *startEltOffset + TypeSubElementCount(projectedValue)});
   }
 
   /// Which bits of \p rootValue are involved in \p op.
   ///
   /// This is a subset of (usually equal to) the bits of op->getType() in \p
   /// rootValue.
-  static std::optional<TypeTreeLeafTypeRange> get(Operand *op,
-                                                  SILValue rootValue);
+  static void get(Operand *op, SILValue rootValue,
+                  SmallVectorImpl<TypeTreeLeafTypeRange> &ranges);
 
   static void constructProjectionsForNeededElements(
-      SILValue rootValue, SILInstruction *insertPt,
+      SILValue rootValue, SILInstruction *insertPt, DominanceInfo *domTree,
       SmallBitVector &neededElements,
-      SmallVectorImpl<std::pair<SILValue, TypeTreeLeafTypeRange>>
-          &resultingProjections);
+      SmallVectorImpl<std::tuple<SILValue, TypeTreeLeafTypeRange,
+                                 NeedsDestroy_t>> &resultingProjections);
 
   static void visitContiguousRanges(
       SmallBitVector const &bits,
@@ -389,7 +401,9 @@ struct TypeTreeLeafTypeRange {
   /// common with filterBitVector.
   void constructFilteredProjections(
       SILValue value, SILInstruction *insertPt, SmallBitVector &filterBitVector,
-      llvm::function_ref<bool(SILValue, TypeTreeLeafTypeRange)> callback);
+      DominanceInfo *domTree,
+      llvm::function_ref<bool(SILValue, TypeTreeLeafTypeRange, NeedsDestroy_t)>
+          callback);
 
   void print(llvm::raw_ostream &os) const {
     os << "TypeTreeLeafTypeRange: (start: " << startEltOffset
