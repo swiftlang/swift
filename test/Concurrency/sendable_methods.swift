@@ -255,3 +255,25 @@ func test_initializer_ref() {
   test(initRef) // Ok
   test(Array<Int>.init) // Ok
 }
+
+// rdar://119593407 - incorrect errors when partially applied member is accessed with InferSendableFromCaptures
+do {
+  @MainActor struct ErrorHandler {
+    static func log(_ error: Error) {}
+  }
+
+  @MainActor final class Manager {
+    static var shared: Manager!
+
+    func test(_: @escaping @MainActor (Error) -> Void) {
+    }
+  }
+
+  @MainActor class Test {
+    func schedule() {
+      Task {
+        Manager.shared.test(ErrorHandler.log) // Ok (access is wrapped in an autoclosure)
+      }
+    }
+  }
+}
