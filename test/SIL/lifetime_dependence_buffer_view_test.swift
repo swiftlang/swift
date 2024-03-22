@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -disable-lifetime-dependence-diagnostics
