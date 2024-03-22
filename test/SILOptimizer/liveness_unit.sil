@@ -255,7 +255,9 @@ bb3(%phi : @guaranteed $D):
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: Incomplete liveness: Reborrowed inner scope
 // CHECK-NEXT: bb0: LiveWithin
-// CHECK-NEXT: dead def: %0 = argument of bb0 : $C
+// CHECK-NEXT: regular user: br bb1(
+// CHECK-NEXT: last user: br bb1(
+// CHECK-NEXT: end running
 sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   specify_test "ssa_liveness @argument[0]"
