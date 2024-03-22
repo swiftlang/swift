@@ -244,3 +244,14 @@ do {
 
   let _: () -> Void = forward(Test.fn) // Ok
 }
+
+
+func test_initializer_ref() {
+  func test<T>(_: @Sendable (T, T) -> Array<T>) {
+  }
+
+  let initRef: @Sendable (Int, Int) -> Array<Int> = Array<Int>.init // Ok
+
+  test(initRef) // Ok
+  test(Array<Int>.init) // Ok
+}

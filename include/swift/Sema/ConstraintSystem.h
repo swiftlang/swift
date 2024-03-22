@@ -4371,7 +4371,7 @@ public:
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
   FunctionType *adjustFunctionTypeForConcurrency(
-      FunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+      FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
       OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
 
