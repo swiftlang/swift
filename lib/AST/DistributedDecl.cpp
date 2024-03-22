@@ -1286,7 +1286,17 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
 /******************************************************************************/
 
 bool ValueDecl::isDistributed() const {
-    return getAttrs().hasAttribute<DistributedActorAttr>();
+  return getAttrs().hasAttribute<DistributedActorAttr>();
+}
+
+bool ValueDecl::isDistributedGetAccessor() const {
+  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+    if (accessor->getAccessorKind() == AccessorKind::DistributedGet) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 ConstructorDecl *

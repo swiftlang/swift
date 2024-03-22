@@ -326,13 +326,15 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   bool isObjC = storage->isObjC();
 
   switch (kind) {
-  case AccessorKind::DistributedGet:
   case AccessorKind::Get: {
     auto readImpl = storage->getReadImpl();
     if (!isObjC &&
         (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Address))
       return false;
     return storage->isDynamic();
+  }
+  case AccessorKind::DistributedGet: {
+    return false;
   }
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();

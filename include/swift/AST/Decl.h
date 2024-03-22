@@ -2785,6 +2785,12 @@ public:
   /// can be distributed.
   bool isDistributed() const;
 
+  /// Is this a '_distributed_get' accessor?
+  ///
+  /// These are special accessors used by distributed thunks, implementing
+  /// `distributed var get { }` accessors.
+  bool isDistributedGetAccessor() const;
+
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
