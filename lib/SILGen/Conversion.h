@@ -319,6 +319,21 @@ public:
     return getReabstractionOutputLoweredType();
   }
 
+  /// Given that this conversion is not one of the specialized bridging
+  /// conversion (i.e. it is either a reabstraction or a subtype conversion),
+  /// rebuild it with the given source type.
+  Conversion withSourceType(AbstractionPattern origSourceType,
+                            CanType sourceType,
+                            SILType loweredSourceTy) const;
+  Conversion withSourceType(SILGenFunction &SGF, CanType sourceType) const;
+
+  /// Given that this conversion is not one of the specialized bridging
+  /// conversion (i.e. it is either a reabstraction or a subtype conversion),
+  /// rebuild it with the given result type.
+  Conversion withResultType(AbstractionPattern origResultType,
+                            CanType sourceType,
+                            SILType loweredSourceTy) const;
+
   ManagedValue emit(SILGenFunction &SGF, SILLocation loc,
                     ManagedValue source, SGFContext ctxt) const;
 

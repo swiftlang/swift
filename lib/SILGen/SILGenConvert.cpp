@@ -1546,39 +1546,43 @@ static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
   return false;
 }
 
-static Conversion withNewInputType(const Conversion &conv,
-                                   AbstractionPattern origType,
-                                   CanType substType,
-                                   SILType loweredType) {
-  switch (conv.getKind()) {
-  case Conversion::Reabstract:
-    return Conversion::getReabstract(origType, substType, loweredType,
-                                     conv.getReabstractionOutputOrigType(),
-                                     conv.getReabstractionOutputSubstType(),
-                                     conv.getReabstractionOutputLoweredType());
-  case Conversion::Subtype:
-    return Conversion::getSubtype(substType, conv.getBridgingResultType(),
-                                  conv.getBridgingLoweredResultType());
+Conversion
+Conversion::withSourceType(SILGenFunction &SGF, CanType substType) const {
+  return withSourceType(AbstractionPattern(substType), substType,
+                        SGF.getLoweredType(substType));
+}
+
+Conversion
+Conversion::withSourceType(AbstractionPattern origType,
+                           CanType substType, SILType loweredType) const {
+  switch (getKind()) {
+  case Reabstract:
+    return getReabstract(origType, substType, loweredType,
+                         getReabstractionOutputOrigType(),
+                         getReabstractionOutputSubstType(),
+                         getReabstractionOutputLoweredType());
+  case Subtype:
+    return getSubtype(substType, getResultType(), getLoweredResultType());
   default:
-    llvm_unreachable("shouldn't be trying to combine these kinds");
+    llvm_unreachable("operation not supported on specialized bridging "
+                     "conversions");
   }
 }
 
-static Conversion withNewOutputType(const Conversion &conv,
-                                    AbstractionPattern origType,
-                                    CanType substType,
-                                    SILType loweredType) {
-  switch (conv.getKind()) {
-  case Conversion::Reabstract:
-    return Conversion::getReabstract(conv.getReabstractionInputOrigType(),
-                                     conv.getReabstractionInputSubstType(),
-                                     conv.getReabstractionInputLoweredType(),
-                                     origType, substType, loweredType);
-  case Conversion::Subtype:
-    return Conversion::getSubtype(conv.getBridgingSourceType(),
-                                  substType, loweredType);
+Conversion
+Conversion::withResultType(AbstractionPattern origType,
+                           CanType substType, SILType loweredType) const {
+  switch (getKind()) {
+  case Reabstract:
+    return getReabstract(getReabstractionInputOrigType(),
+                         getReabstractionInputSubstType(),
+                         getReabstractionInputLoweredType(),
+                         origType, substType, loweredType);
+  case Subtype:
+    return getSubtype(getSourceType(), substType, loweredType);
   default:
-    llvm_unreachable("shouldn't be trying to combine these kinds");
+    llvm_unreachable("operation not supported on specialized bridging "
+                     "conversions");
   }
 }
 
@@ -1743,12 +1747,10 @@ salvageUncombinableConversion(SILGenFunction &SGF,
 
       // Construct the new conversions with the new intermediate type.
       return CombinedConversions(
-               withNewOutputType(inner, newIntermediateOrigType,
-                                 newIntermediateSubstType,
-                                 newIntermediateLoweredType),
-               withNewInputType(outer, newIntermediateOrigType,
-                                newIntermediateSubstType,
-                                newIntermediateLoweredType));
+               inner.withResultType(newIntermediateOrigType,
+                                    newIntermediateSubstType,
+                                    newIntermediateLoweredType),
+               outer.withSourceType(SGF, newIntermediateSubstType));
     }
   }
 
