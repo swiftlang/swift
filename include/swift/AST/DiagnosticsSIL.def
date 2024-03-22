@@ -970,8 +970,8 @@ ERROR(regionbasedisolation_named_transfer_yields_race, none,
       (Identifier))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
-     "%0 is transferred from %1 caller to %2 callee. Later uses in caller could race with potential uses in callee",
-     (Identifier, ActorIsolation, ActorIsolation))
+     "transferring %1 %0 to %2 callee could cause races in between callee %2 and local %3 uses",
+     (Identifier, StringRef, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_named_transfer_non_transferrable, none,
       "transferring %1 %0 to %2 callee could cause races between %2 and %1 uses",
       (Identifier, StringRef, ActorIsolation))
