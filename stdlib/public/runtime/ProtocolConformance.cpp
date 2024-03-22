@@ -1633,15 +1633,95 @@ checkGenericPackRequirement(
 }
 
 static std::optional<TypeLookupError>
+checkSuppressibleRequirements(const Metadata *type,
+                              SuppressibleProtocolSet ignored);
+
+static std::optional<TypeLookupError>
 checkSuppressibleRequirementsStructural(const Metadata *type,
                                         SuppressibleProtocolSet ignored) {
-  // FIXME: Implement me!
+  switch (type->getKind()) {
+  case MetadataKind::Class:
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Optional:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignReferenceType:
+  case MetadataKind::ObjCClassWrapper:
+    // All handled via context descriptor in the caller.
+    return std::nullopt;
+
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Opaque:
+  case MetadataKind::HeapGenericLocalVariable:
+  case MetadataKind::ErrorObject:
+  case MetadataKind::Task:
+  case MetadataKind::Job:
+    // Not part of the user-visible type system; assumed to handle all
+    // suppressible requirements.
+    return std::nullopt;
+
+  case MetadataKind::Tuple: {
+    // Check every element type in the tuple.
+    auto tupleMetadata = cast<TupleTypeMetadata>(type);
+    for (unsigned i = 0, n = tupleMetadata->NumElements; i != n; ++i) {
+      if (auto error =
+              checkSuppressibleRequirements(&*tupleMetadata->getElement(i).Type,
+                                            ignored))
+        return error;
+    }
+    return std::nullopt;
+  }
+
+  case MetadataKind::Function: {
+    // FIXME: Implement me
+    return std::nullopt;
+  }
+
+  case MetadataKind::ExtendedExistential: {
+    auto existential = cast<ExtendedExistentialTypeMetadata>(type);
+    auto &shape = *existential->Shape;
+    llvm::ArrayRef<GenericRequirementDescriptor> reqs(
+        shape.getReqSigRequirements(), shape.getNumReqSigRequirements());
+    // Look for any suppressed protocol requirements. If the existential
+    // has suppressed a protocol that is not ignored, then the existential
+    // does not meet the specified requirements.
+    for (const auto& req : reqs) {
+      if (req.getKind() != GenericRequirementKind::SuppressedProtocols)
+        continue;
+
+      auto suppressed = req.getSuppressedProtocols();
+      auto missing = suppressed - ignored;
+      if (!missing.empty()) {
+        return TYPE_LOOKUP_ERROR_FMT(
+            "existential type missing suppresible protocols %x",
+            missing.rawBits());
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype:
+    // Metatypes themselves can't have suppressible protocols.
+    return std::nullopt;
+
+  case MetadataKind::Existential:
+    // The existential representation has no room for specifying any
+    // suppressed requirements, so it always succeeds.
+    return std::nullopt;
+
+  case MetadataKind::LastEnumerated:
+    break;
+  }
+
+  // Just accept any unknown types.
   return std::nullopt;
 }
 
 /// Check that the given `type` meets all suppressible protocol requirements
 /// that haven't been explicitly suppressed by `ignored`.
-static std::optional<TypeLookupError>
+std::optional<TypeLookupError>
 checkSuppressibleRequirements(const Metadata *type, 
                               SuppressibleProtocolSet ignored) {
   auto contextDescriptor = type->getTypeContextDescriptor();
@@ -1763,32 +1843,47 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     if (index < allSuppressed.size())
       suppressed = allSuppressed[index];
 
+    MetadataOrPack metadataOrPack(substGenericParamOrdinal(index));
     switch (genericParams[index].getKind()) {
-    case GenericParamKind::Type:
-      break;
+    case GenericParamKind::Type: {
+      if (!metadataOrPack || metadataOrPack.isMetadataPack()) {
+        return TYPE_LOOKUP_ERROR_FMT(
+            "unexpected pack for generic parameter %u", index);
+      }
 
-    case GenericParamKind::TypePack:
-      // FIXME: variadic generics
-      continue;
+      auto metadata = metadataOrPack.getMetadata();
+      if (auto error = checkSuppressibleRequirements(metadata, suppressed))
+        return error;
+
+      break;
+    }
+
+    case GenericParamKind::TypePack: {
+      // NULL can be used to indicate an empty pack.
+      if (!metadataOrPack)
+        break;
+
+      if (metadataOrPack.isMetadata()) {
+        return TYPE_LOOKUP_ERROR_FMT(
+            "unexpected metadata for generic pack parameter %u", index);
+      }
+
+      auto pack = metadataOrPack.getMetadataPack();
+      if (pack.getElements() != 0) {
+        llvm::ArrayRef<const Metadata *> elements(
+            pack.getElements(), pack.getNumElements());
+        for (auto element : elements) {
+          if (auto error = checkSuppressibleRequirements(element, suppressed))
+            return error;
+        }
+      }
+      break;
+    }
 
     default:
       return TYPE_LOOKUP_ERROR_FMT("unknown generic parameter kind %u",
                                    index);
     }
-
-    MetadataOrPack metadataOrPack(substGenericParamOrdinal(index));
-    if (!metadataOrPack)
-      return TYPE_LOOKUP_ERROR_FMT("unable to find generic argument %u",
-                                   index);
-
-    if (metadataOrPack.isMetadataPack()) {
-      // FIXME: variadic generics
-      continue;
-    }
-
-    auto metadata = metadataOrPack.getMetadata();
-    if (auto error = checkSuppressibleRequirements(metadata, suppressed))
-      return error;
   }
 
   // Success!

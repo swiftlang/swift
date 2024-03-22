@@ -28,6 +28,10 @@ struct ConditionallyCopyable<T: ~Copyable>: ~Copyable {
 }
 extension ConditionallyCopyable: Copyable where T: Copyable { }
 
+// FIXME: Not yet supported
+// struct VariadicCopyable<each T: ~Copyable>: Copyable { }
+// extension VariadicCopyable: P where repeat each T: Copyable { }
+
 func attemptCall(_ a: Any) {
   if let value = a as? P {
     value.speak()
@@ -55,6 +59,46 @@ func main() {
 
    // CHECK: failed to cast (attemptCall)
   attemptCall(Cat<Noncopyable, ConditionallyCopyable<Ordinary>>())
+
+  // CHECK-FIXME: hello
+  // attemptCall(VariadicCopyable<Ordinary, ConditionallyCopyable<Ordinary>>())
+
+  // CHECK-FIXME: failed to cast (attemptCall)
+  // attemptCall(VariadicCopyable<Ordinary, ConditionallyCopyable<Noncopyable>>())
+
+  // CHECK: tuple types
+  print("tuple types")
+
+  // CHECK: hello
+  attemptCall(Dog<(Ordinary, Ordinary)>())
+
+  // CHECK-FIXME: failed to cast (attemptCall)
+  // FIXME: Requires the ability to create such tuple types
+  // attemptCall(Dog<(Ordinary, Noncopyable)>())
+
+  // CHECK: metatype types
+  print("metatype types")
+
+  // CHECK: hello
+  attemptCall(Dog<Ordinary.Type>())
+
+  // CHECK: hello
+  attemptCall(Dog<Noncopyable.Type>())
+
+  // CHECK: function types
+  print("function types")
+
+  attemptCall(Dog<(Ordinary) -> Noncopyable>())
+
+  // CHECK: existential types
+  print("existential types")
+
+  // CHECK: hello
+  attemptCall(Dog<Any>())
+
+  // CHECK-FIXME: failed to cast (attemptCall)
+  typealias NoncopyableAny = ~Copyable
+  // FIXME crashes: attemptCall(Dog<any NoncopyableAny>())
 
   // CHECK: cast succeeded
   test_radar124171788(.nothing)

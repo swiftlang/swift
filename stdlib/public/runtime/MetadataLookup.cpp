@@ -3238,7 +3238,14 @@ SubstGenericParametersFromMetadata::getMetadata(
 
 MetadataOrPack
 SubstGenericParametersFromMetadata::getMetadataOrdinal(unsigned ordinal) const {
-  return MetadataOrPack(genericArgs[ordinal]);
+  // Don't attempt anything if we have no generic parameters.
+  if (genericArgs == nullptr)
+    return MetadataOrPack();
+
+  // On first access, compute the descriptor path.
+  setup();
+
+  return MetadataOrPack(genericArgs[numShapeClasses + ordinal]);
 }
 
 const WitnessTable *
