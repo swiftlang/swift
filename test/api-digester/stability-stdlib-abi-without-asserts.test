@@ -605,13 +605,7 @@ Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped w
 Func Optional.~=(_:_:) has mangled name changing from 'static Swift.Optional.~= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.~= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.~=(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.~=(_:_:) is now with @_preInverseGenerics
-Func Result.flatMap(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
-Func Result.flatMap(_:) has mangled name changing from 'Swift.Result.flatMap<A>((A) -> Swift.Result<A1, B>) -> Swift.Result<A1, B>' to 'Swift.Result.flatMap<A where A1: ~Swift.Copyable>((A) -> Swift.Result<A1, B>) -> Swift.Result<A1, B>'
-Func Result.flatMap(_:) is now with @_preInverseGenerics
 Func Result.get() has been removed
-Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
-Func Result.map(_:) has mangled name changing from 'Swift.Result.map<A>((A) -> A1) -> Swift.Result<A1, B>' to 'Swift.Result.map<A where A1: ~Swift.Copyable>((A) -> A1) -> Swift.Result<A1, B>'
-Func Result.map(_:) is now with @_preInverseGenerics
 Func Result.mapError(_:) has been removed
 Func UnsafeBufferPointer.deallocate() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeBufferPointer.deallocate() has mangled name changing from 'Swift.UnsafeBufferPointer.deallocate() -> ()' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.deallocate() -> ()'
