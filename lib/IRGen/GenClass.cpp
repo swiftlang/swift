@@ -1855,7 +1855,6 @@ namespace {
 
       switch (accessor->getAccessorKind()) {
       case AccessorKind::Get:
-      case AccessorKind::DistributedGet: // TODO: maybe dont do this?
         return emitObjCGetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
@@ -1866,6 +1865,7 @@ namespace {
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
       case AccessorKind::ID:
+      case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("shouldn't be trying to build this accessor");
       }
