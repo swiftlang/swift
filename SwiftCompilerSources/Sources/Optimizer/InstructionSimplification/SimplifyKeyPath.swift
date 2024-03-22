@@ -15,6 +15,14 @@ import SIL
 extension KeyPathInst : OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     if allUsesRemovable(instruction: self) {
+      if parentFunction.hasOwnership {
+        let builder = Builder(after: self, context)
+        for operand in self.operands {
+          if !operand.value.type.isTrivial(in: parentFunction) {
+            builder.createDestroyValue(operand: operand.value)
+          }
+        }
+      }
       context.erase(instructionIncludingAllUsers: self)
     }
   }
