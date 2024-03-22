@@ -410,12 +410,12 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   bool IgnoreAdjacentModules = Instance.hasASTContext() &&
                                Instance.getASTContext().IgnoreAdjacentModules;
 
-  // When caching is enabled, the explicit module build dependencies are
+  // When building explicit module dependencies, they are
   // discovered by dependency scanner and the swiftmodule is already rebuilt
   // ignoring candidate module. There is no need to serialized dependencies for
-  // validation purpose.
-  bool ShouldSerializeDeps =
-      !Instance.getInvocation().getCASOptions().EnableCaching;
+  // validation purpose because the build system (swift-driver) is then
+  // responsible for checking whether inputs are up-to-date.
+  bool ShouldSerializeDeps = !FEOpts.ExplicitInterfaceBuild;
 
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
