@@ -770,7 +770,13 @@ static StringRef getModuleName(const ValueDecl *VD,
 }
 
 struct DeclInfo {
-  const ValueDecl *VD;
+  ValueDecl *VD;
+  /// If not null, a solution-specific interface type of `VD`. This allows
+  /// us to produce results for declarations where the soluion has not been
+  /// applied to the AST, eg. because the declaration has an ambiguous type
+  /// or because it occurs inside a closure that has an error, which prevents
+  /// the constraint system solution to be applied to the AST.
+  Type SolutionSpecificInterfaceType;
   Type ContainerType;
   bool IsRef;
   bool IsDynamic;
@@ -785,11 +791,13 @@ struct DeclInfo {
   /// Whether the \c VD is in a synthesized extension of \c BaseType
   bool InSynthesizedExtension = false;
 
-  DeclInfo(const ValueDecl *VD, Type ContainerType, bool IsRef, bool IsDynamic,
+  DeclInfo(ValueDecl *VD, Type SolutionSpecificInterfaceType,
+           Type ContainerType, bool IsRef, bool IsDynamic,
            ArrayRef<NominalTypeDecl *> ReceiverTypes,
            const CompilerInvocation &Invoc)
-      : VD(VD), ContainerType(ContainerType), IsRef(IsRef),
-        IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
+      : VD(VD), SolutionSpecificInterfaceType(SolutionSpecificInterfaceType),
+        ContainerType(ContainerType), IsRef(IsRef), IsDynamic(IsDynamic),
+        ReceiverTypes(ReceiverTypes) {
     if (VD == nullptr)
       return;
 
@@ -939,6 +947,18 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                const CompilerInvocation &Invoc,
                ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
                llvm::BumpPtrAllocator &Allocator) {
+  // Override the type of `DInfo.VD` while retrieving symbol information.
+  // Ideally, we would pass a customizable `getInterfaceType` function to all
+  // functions that operate on VD but doing so is not viable - USR generation,
+  // AST printing, symbol graph and probably more have been designed with the
+  // assumption that VD->getInterfaceType() returns the fixed interface type
+  // of the declaration.
+  Type OriginalInterfaceType = DInfo.VD->getInterfaceType();
+  if (DInfo.SolutionSpecificInterfaceType) {
+    DInfo.VD->setInterfaceType(DInfo.SolutionSpecificInterfaceType);
+  }
+  SWIFT_DEFER { DInfo.VD->setInterfaceType(OriginalInterfaceType); };
+
   SmallString<256> Buffer;
   SmallVector<StringRef, 4> Strings;
   llvm::raw_svector_ostream OS(Buffer);
@@ -1199,7 +1219,7 @@ static bool addCursorInfoForLiteral(
   }
 
   auto &Symbol = Data.Symbols.emplace_back();
-  DeclInfo Info(Decl, nullptr, true, false, {}, CompInvoc);
+  DeclInfo Info(Decl, nullptr, nullptr, true, false, {}, CompInvoc);
   auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, Lang, CompInvoc,
                             PreviousSnaps, Data.Allocator);
 
@@ -1218,9 +1238,10 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
                      SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
                      std::string &Diagnostic,
                      ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps) {
-  DeclInfo OrigInfo(Info->getValueD(), Info->getContainerType(), Info->isRef(),
-                    Info->isDynamic(), Info->getReceiverTypes(), Invoc);
-  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false,
+  DeclInfo OrigInfo(Info->getValueD(), Info->getSolutionSpecificInterfaceType(),
+                    Info->getContainerType(), Info->isRef(), Info->isDynamic(),
+                    Info->getReceiverTypes(), Invoc);
+  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), Type(), true, false,
                         ArrayRef<NominalTypeDecl *>(), Invoc);
   DeclInfo &MainInfo = CtorTypeInfo.VD ? CtorTypeInfo : OrigInfo;
   if (MainInfo.Unavailable) {
@@ -1257,7 +1278,7 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
   if (!Info->isRef()) {
     for (auto D : Info->getShorthandShadowedDecls()) {
       CursorSymbolInfo &SymbolInfo = Data.Symbols.emplace_back();
-      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
+      DeclInfo DInfo(D, Type(), Type(), /*IsRef=*/true, /*IsDynamic=*/false,
                      ArrayRef<NominalTypeDecl *>(), Invoc);
       if (auto Err =
               fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
@@ -2082,7 +2103,7 @@ void SwiftLangSupport::getCursorInfo(
               const_cast<ValueDecl *>(Entity.Dcl),
               /*CtorTyRef=*/nullptr,
               /*ExtTyRef=*/nullptr, Entity.IsRef,
-              /*Ty=*/Type(),
+              /*SolutionSpecificInterfaceType=*/Type(),
               /*ContainerType=*/Type(),
               /*CustomAttrRef=*/std::nullopt,
               /*IsKeywordArgument=*/false,
@@ -2143,7 +2164,13 @@ void SwiftLangSupport::getCursorInfo(
     // AST based completion *always* produces a result
     bool NoResults = Res.isError();
     if (Res.isValue()) {
-      NoResults = Res.value().Symbols.empty();
+      NoResults |= Res.value().Symbols.empty();
+      bool AllResultsHaveErrorType =
+          llvm::all_of(Res.value().Symbols, [](const CursorSymbolInfo &Symbol) {
+            // USR of the AST's error type if no type could be resolved.
+            return Symbol.TypeUSR == "$sXeD";
+          });
+      NoResults |= AllResultsHaveErrorType;
     }
     if (!NoResults || !InputBuffer) {
       Receiver(Res);
@@ -2383,7 +2410,7 @@ static void resolveCursorFromUSR(
             /*CtorTyRef=*/nullptr,
             /*ExtTyRef=*/nullptr,
             /*IsRef=*/false,
-            /*Ty=*/Type(), ContainerType,
+            /*SolutionSpecificInterfaceType=*/Type(), ContainerType,
             /*CustomAttrRef=*/std::nullopt,
             /*IsKeywordArgument=*/false,
             /*IsDynamic=*/false,

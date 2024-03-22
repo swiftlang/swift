@@ -165,7 +165,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
   CursorInfo = new ResolvedValueRefCursorInfo(
       CursorInfo->getSourceFile(), CursorInfo->getLoc(), D, CtorTyRef, ExtTyRef,
-      IsRef, Ty, ContainerType, CustomAttrRef,
+      IsRef, /*SolutionSpecificInterfaceType=*/Type(), ContainerType,
+      CustomAttrRef,
       /*IsKeywordArgument=*/false, IsDynamic, ReceiverTypes,
       /*ShorthandShadowedDecls=*/{});
 
