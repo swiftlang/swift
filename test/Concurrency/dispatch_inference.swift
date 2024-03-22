@@ -17,6 +17,10 @@ func testMe() {
   DispatchQueue.main.async {
     onlyOnMainActor() // okay, due to inference of @MainActor-ness
   }
+
+  DispatchQueue.main.sync {
+    onlyOnMainActor()
+  }
 }
 
 func testUnsafeSendableInMainAsync() async {
