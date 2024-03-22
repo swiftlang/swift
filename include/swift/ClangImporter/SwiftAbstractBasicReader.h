@@ -94,6 +94,11 @@ public:
     llvm::report_fatal_error("Read BTFTypeTagAttr that should never have been"
                              " serialized");
   }
+
+  template<typename T>
+  T *readDeclAs() {
+    return asImpl().template readDeclAs<T>();
+  }
 };
 
 }
