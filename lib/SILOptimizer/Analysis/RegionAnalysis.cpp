@@ -2967,6 +2967,10 @@ bool BlockPartitionState::recomputeExitFromEntry(
         : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
           translator(translator) {}
 
+    SILIsolationInfo getIsolationRegionInfo(Element elt) const {
+      return translator.getValueMap().getIsolationRegion(elt);
+    }
+
     bool isClosureCaptured(Element elt, Operand *op) const {
       auto iter = translator.getValueForId(elt);
       if (!iter)

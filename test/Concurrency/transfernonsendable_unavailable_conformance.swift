@@ -22,7 +22,7 @@ actor Bar {
     _ = Bar(ns) // expected-warning {{transferring 'ns' may cause a race}}
     // TODO: This needs to be:
     // disconnected 'ns' is transferred to actor-isolated callee. Later local uses could race with uses in callee.
-    // expected-note @-3 {{'ns' is transferred from actor-isolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+    // expected-note @-3 {{transferring disconnected 'ns' to actor-isolated callee could cause races in between callee actor-isolated and local actor-isolated uses}}
     ns.foo() // expected-note {{access here could race}}
   }
 }
