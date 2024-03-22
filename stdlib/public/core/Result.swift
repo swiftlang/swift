@@ -49,8 +49,7 @@ extension Result {
   /// - Returns: A `Result` instance with the result of evaluating `transform`
   ///   as the new success value if this instance represents a success.
   @inlinable
-  @_preInverseGenerics
-  public func map<NewSuccess: ~Copyable>(
+  public func map<NewSuccess>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -175,8 +174,7 @@ extension Result {
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.failure`.
   @inlinable
-  @_preInverseGenerics
-  public func flatMap<NewSuccess: ~Copyable>(
+  public func flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
