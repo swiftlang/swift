@@ -1266,8 +1266,8 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   case AnyErasure:
   case BridgingSubtype:
   case Subtype:
-    return SGF.emitTransformedValue(loc, value, getBridgingSourceType(),
-                                    getBridgingResultType(), C);
+    return SGF.emitTransformedValue(loc, value, getSourceType(),
+                                    getResultType(), C);
 
   case ForceOptional: {
     auto &optTL = SGF.getTypeLowering(value.getType());
@@ -1278,32 +1278,30 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
 
   case BridgeToObjC:
     return SGF.emitNativeToBridgedValue(loc, value,
-                                        getBridgingSourceType(),
-                                        getBridgingResultType(),
-                                        getBridgingLoweredResultType(), C);
+                                        getSourceType(),
+                                        getResultType(),
+                                        getLoweredResultType(), C);
 
   case ForceAndBridgeToObjC: {
     auto &tl = SGF.getTypeLowering(value.getType());
-    auto sourceValueType = getBridgingSourceType().getOptionalObjectType();
+    auto sourceValueType = getSourceType().getOptionalObjectType();
     value = SGF.emitCheckedGetOptionalValueFrom(loc, value,
                                                 /*isImplicitUnwrap*/ true,
                                                 tl, SGFContext());
     return SGF.emitNativeToBridgedValue(loc, value, sourceValueType,
-                                        getBridgingResultType(),
-                                        getBridgingLoweredResultType(), C);
+                                        getResultType(),
+                                        getLoweredResultType(), C);
   }
 
   case BridgeFromObjC:
     return SGF.emitBridgedToNativeValue(loc, value,
-                                        getBridgingSourceType(),
-                                        getBridgingResultType(),
-                                        getBridgingLoweredResultType(), C);
+                                        getSourceType(), getResultType(),
+                                        getLoweredResultType(), C);
 
   case BridgeResultFromObjC:
     return SGF.emitBridgedToNativeValue(loc, value,
-                                        getBridgingSourceType(),
-                                        getBridgingResultType(),
-                                        getBridgingLoweredResultType(), C,
+                                        getSourceType(), getResultType(),
+                                        getLoweredResultType(), C,
                                         /*isResult*/ true);
 
   case Reabstract:
@@ -1336,9 +1334,9 @@ Conversion::adjustForInitialOptionalInjection() const {
   case Subtype:
     return OptionalInjectionConversion::forValue(
       getSubtype(
-        getBridgingSourceType().getOptionalObjectType(),
-        getBridgingResultType().getOptionalObjectType(),
-        getBridgingLoweredResultType().getOptionalObjectType())
+        getSourceType().getOptionalObjectType(),
+        getResultType().getOptionalObjectType(),
+        getLoweredResultType().getOptionalObjectType())
     );
 
   // TODO: can these actually happen?
@@ -1352,9 +1350,8 @@ Conversion::adjustForInitialOptionalInjection() const {
   case BridgeFromObjC:
   case BridgeResultFromObjC:
     return OptionalInjectionConversion::forInjection(
-      getBridging(getKind(), getBridgingSourceType().getOptionalObjectType(),
-                  getBridgingResultType(),
-                  getBridgingLoweredResultType(),
+      getBridging(getKind(), getSourceType().getOptionalObjectType(),
+                  getResultType(), getLoweredResultType(),
                   isBridgingExplicit())
     );
   }
@@ -1379,8 +1376,7 @@ Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   case BridgeFromObjC:
   case BridgeResultFromObjC:
     return Conversion::getBridging(getKind(), newSourceType,
-                                   getBridgingResultType(),
-                                   getBridgingLoweredResultType(),
+                                   getResultType(), getLoweredResultType(),
                                    isBridgingExplicit());
   }
   llvm_unreachable("bad kind");
@@ -1399,12 +1395,10 @@ std::optional<Conversion> Conversion::adjustForInitialForceValue() const {
     return std::nullopt;
 
   case BridgeToObjC: {
-    auto sourceOptType =
-      OptionalType::get(getBridgingSourceType())->getCanonicalType();
+    auto sourceOptType = getSourceType().wrapInOptionalType();
     return Conversion::getBridging(ForceAndBridgeToObjC,
-                                   sourceOptType,
-                                   getBridgingResultType(),
-                                   getBridgingLoweredResultType(),
+                                   sourceOptType, getResultType(),
+                                   getLoweredResultType(),
                                    isBridgingExplicit());
   }
   }
@@ -1436,9 +1430,9 @@ static void printReabstraction(const Conversion &conversion,
 static void printBridging(const Conversion &conversion, llvm::raw_ostream &out,
                           StringRef name) {
   out << name << "(from: ";
-  conversion.getBridgingSourceType().print(out);
+  conversion.getSourceType().print(out);
   out << ", to: ";
-  conversion.getBridgingResultType().print(out);
+  conversion.getResultType().print(out);
   out << ", explicit: " << conversion.isBridgingExplicit() << ')';
 }
 
@@ -1792,7 +1786,7 @@ combineSubtypeIntoReabstract(SILGenFunction &SGF,
   if (!isCombinableConversion(inner, outer))
     return salvageUncombinableConversion(SGF, inner, outer);
 
-  auto inputSubstType = inner.getBridgingSourceType();
+  auto inputSubstType = inner.getSourceType();
   auto inputOrigType = AbstractionPattern(inputSubstType);
   auto inputLoweredTy = SGF.getLoweredType(inputOrigType, inputSubstType);
 
@@ -1812,9 +1806,8 @@ combineSubtype(SILGenFunction &SGF,
     return salvageUncombinableConversion(SGF, inner, outer);
 
   return CombinedConversions(
-    Conversion::getSubtype(inner.getBridgingSourceType(),
-                           outer.getBridgingResultType(),
-                           outer.getBridgingLoweredResultType())
+    Conversion::getSubtype(inner.getSourceType(), outer.getResultType(),
+                           outer.getLoweredResultType())
   );
 }
 
@@ -1832,9 +1825,9 @@ combineBridging(SILGenFunction &SGF,
   // Otherwise, we can peephole if we understand the resulting conversion
   // and applying the peephole doesn't change semantics.
 
-  CanType sourceType = inner.getBridgingSourceType();
-  CanType intermediateType = inner.getBridgingResultType();
-  assert(intermediateType == outer.getBridgingSourceType());
+  CanType sourceType = inner.getSourceType();
+  CanType intermediateType = inner.getResultType();
+  assert(intermediateType == outer.getSourceType());
 
   // If we're doing a peephole involving a force, we want to propagate
   // the force to the source value.  If it's not in fact optional, that
@@ -1849,9 +1842,9 @@ combineBridging(SILGenFunction &SGF,
     assert(intermediateType);
   }
 
-  CanType resultType = outer.getBridgingResultType();
+  CanType resultType = outer.getResultType();
   SILType loweredSourceTy = SGF.getLoweredType(sourceType);
-  SILType loweredResultTy = outer.getBridgingLoweredResultType();
+  SILType loweredResultTy = outer.getLoweredResultType();
 
   auto applyPeephole = [&](const std::optional<Conversion> &conversion) {
     if (!forced) {
@@ -1862,7 +1855,7 @@ combineBridging(SILGenFunction &SGF,
 
     auto forceConversion =
       Conversion::getBridging(Conversion::ForceOptional,
-                              inner.getBridgingSourceType(), sourceType,
+                              inner.getSourceType(), sourceType,
                               loweredSourceTy);
     if (conversion)
       return CombinedConversions(forceConversion, *conversion);

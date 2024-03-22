@@ -2853,24 +2853,18 @@ wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
 static std::optional<FunctionTypeInfo>
 tryGetSpecializedClosureTypeFromContext(CanAnyFunctionType closureType,
                                         const Conversion &conv) {
-  if (conv.getKind() == Conversion::Reabstract) {
+  // Note that the kinds of conversion we work on here have to be kinds
+  // that we can call withSourceType on later.
+  if (conv.getKind() == Conversion::Reabstract ||
+      conv.getKind() == Conversion::Subtype) {
     // We don't care about the input type here; we'll be emitting that
     // based on the closure.
-    auto destType =
-      cast<AnyFunctionType>(conv.getReabstractionOutputSubstType());
+    auto destType = cast<AnyFunctionType>(conv.getResultType());
     auto origType =
-      conv.getReabstractionOutputOrigType();
-    auto expectedTy =
-      conv.getReabstractionOutputLoweredType().castTo<SILFunctionType>();
-    return FunctionTypeInfo{origType, destType, expectedTy};
-  }
-
-  if (conv.getKind() == Conversion::Subtype) {
-    assert(closureType == conv.getBridgingSourceType());
-    auto destType = cast<AnyFunctionType>(conv.getBridgingResultType());
-    auto origType = AbstractionPattern(destType);
-    auto expectedTy =
-      conv.getBridgingLoweredResultType().castTo<SILFunctionType>();
+      conv.getKind() == Conversion::Reabstract
+        ? conv.getReabstractionOutputOrigType()
+        : AbstractionPattern(destType);
+    auto expectedTy = conv.getLoweredResultType().castTo<SILFunctionType>();
     return FunctionTypeInfo{origType, destType, expectedTy};
   }
 

@@ -112,10 +112,7 @@ public:
 private:
   KindTy Kind;
 
-  struct BridgingTypes {
-    CanType OrigType;
-    CanType ResultType;
-    SILType LoweredResultType;
+  struct BridgingStorage {
     bool IsExplicit;
   };
 
@@ -129,16 +126,17 @@ private:
   /// elegantly perform a single (perhaps identity) reabstraction when
   /// receiving a function result or loading a value from abstracted
   /// storage.
-  struct ReabstractionTypes {
+  struct ReabstractionStorage {
     AbstractionPattern InputOrigType;
     AbstractionPattern OutputOrigType;
-    CanType InputSubstType;
-    CanType OutputSubstType;
     SILType InputLoweredTy;
-    SILType OutputLoweredTy;
   };
 
-  using Members = ExternalUnionMembers<BridgingTypes, ReabstractionTypes>;
+  CanType SourceType;
+  CanType ResultType;
+  SILType LoweredResultType;
+
+  using Members = ExternalUnionMembers<BridgingStorage, ReabstractionStorage>;
 
   static Members::Index getStorageIndexForKind(KindTy kind) {
     switch (kind) {
@@ -150,10 +148,10 @@ private:
     case AnyErasure:
     case BridgingSubtype:
     case Subtype:
-      return Members::indexOf<BridgingTypes>();
+      return Members::indexOf<BridgingStorage>();
 
     case Reabstract:
-      return Members::indexOf<ReabstractionTypes>();
+      return Members::indexOf<ReabstractionStorage>();
     }
     llvm_unreachable("bad kind");
   }
@@ -162,21 +160,23 @@ private:
   static_assert(decltype(Types)::union_is_trivially_copyable,
                 "define the special members if this changes");
 
-  Conversion(KindTy kind, CanType origType, CanType resultType,
+  Conversion(KindTy kind, CanType sourceType, CanType resultType,
              SILType loweredResultTy, bool isExplicit)
-      : Kind(kind) {
-    Types.emplaceAggregate<BridgingTypes>(kind, origType, resultType,
-                                          loweredResultTy, isExplicit);
+      : Kind(kind), SourceType(sourceType), ResultType(resultType),
+        LoweredResultType(loweredResultTy) {
+    Types.emplaceAggregate<BridgingStorage>(kind, isExplicit);
   }
 
   Conversion(AbstractionPattern inputOrigType, CanType inputSubstType,
              SILType inputLoweredTy,
              AbstractionPattern outputOrigType, CanType outputSubstType,
              SILType outputLoweredTy)
-      : Kind(Reabstract) {
-    Types.emplaceAggregate<ReabstractionTypes>(Kind, inputOrigType, outputOrigType,
-                                               inputSubstType, outputSubstType,
-                                               inputLoweredTy, outputLoweredTy);
+      : Kind(Reabstract), SourceType(inputSubstType),
+        ResultType(outputSubstType),
+        LoweredResultType(outputLoweredTy) {
+    Types.emplaceAggregate<ReabstractionStorage>(Kind, inputOrigType,
+                                                 outputOrigType,
+                                                 inputLoweredTy);
   }
 
   static bool isAllowedConversion(CanType inputType, CanType outputType) {
@@ -262,61 +262,43 @@ public:
   }
 
   AbstractionPattern getReabstractionInputOrigType() const {
-    return Types.get<ReabstractionTypes>(Kind).InputOrigType;
+    return Types.get<ReabstractionStorage>(Kind).InputOrigType;
   }
 
   CanType getReabstractionInputSubstType() const {
-    return Types.get<ReabstractionTypes>(Kind).InputSubstType;
+    return getSourceType();
   }
 
   SILType getReabstractionInputLoweredType() const {
-    return Types.get<ReabstractionTypes>(Kind).InputLoweredTy;
+    return Types.get<ReabstractionStorage>(Kind).InputLoweredTy;
   }
 
   AbstractionPattern getReabstractionOutputOrigType() const {
-    return Types.get<ReabstractionTypes>(Kind).OutputOrigType;
+    return Types.get<ReabstractionStorage>(Kind).OutputOrigType;
   }
 
   CanType getReabstractionOutputSubstType() const {
-    return Types.get<ReabstractionTypes>(Kind).OutputSubstType;
+    return getResultType();
   }
 
   SILType getReabstractionOutputLoweredType() const {
-    return Types.get<ReabstractionTypes>(Kind).OutputLoweredTy;
+    return getLoweredResultType();
   }
 
   bool isBridgingExplicit() const {
-    return Types.get<BridgingTypes>(Kind).IsExplicit;
-  }
-
-  CanType getBridgingSourceType() const {
-    return Types.get<BridgingTypes>(Kind).OrigType;
-  }
-
-  CanType getBridgingResultType() const {
-    return Types.get<BridgingTypes>(Kind).ResultType;
-  }
-
-  SILType getBridgingLoweredResultType() const {
-    return Types.get<BridgingTypes>(Kind).LoweredResultType;
+    return Types.get<BridgingStorage>(Kind).IsExplicit;
   }
 
   CanType getSourceType() const {
-    if (isBridging())
-      return getBridgingSourceType();
-    return getReabstractionInputSubstType();
+    return SourceType;
   }
 
   CanType getResultType() const {
-    if (isBridging())
-      return getBridgingResultType();
-    return getReabstractionOutputSubstType();
+    return ResultType;
   }
 
   SILType getLoweredResultType() const {
-    if (isBridging())
-      return getBridgingLoweredResultType();
-    return getReabstractionOutputLoweredType();
+    return LoweredResultType;
   }
 
   /// Given that this conversion is not one of the specialized bridging
