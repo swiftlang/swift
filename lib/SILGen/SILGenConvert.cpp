@@ -320,20 +320,40 @@ ManagedValue
 SILGenFunction::emitOptionalSome(SILLocation loc, SILType optTy,
                                  ValueProducerRef produceValue,
                                  SGFContext C) {
-  // If the conversion is a bridging conversion from an optional type,
-  // do a bridging conversion from the non-optional type instead.
-  // TODO: should this be a general thing for all conversions?
+  // If we're emitting into a conversion, try to peephole the
+  // injection into it.
   if (auto optInit = C.getAsConversion()) {
     const auto &optConversion = optInit->getConversion();
-    if (optConversion.isBridging()) {
-      auto sourceValueType =
-          optConversion.getBridgingSourceType().getOptionalObjectType();
-      assert(sourceValueType);
-      if (auto valueConversion =
-            optConversion.adjustForInitialOptionalConversions(sourceValueType)){
-        return optInit->emitWithAdjustedConversion(*this, loc, *valueConversion,
-                                                   produceValue);
-      }
+
+    auto adjustment = optConversion.adjustForInitialOptionalInjection();
+
+    // If the adjustment gives us a conversion that produces an optional
+    // value, that completely takes over emission.  This generally happens
+    // only because of bridging.
+    if (adjustment.isInjection()) {
+      return optInit->emitWithAdjustedConversion(*this, loc,
+                                      adjustment.getInjectionConversion(),
+                                                 produceValue);
+
+    // If the adjustment gives us a conversion that produces a non-optional
+    // value, we need to produce the value under that conversion and then
+    // inject that into an optional.  We can do that by recursing.  This
+    // will terminate because the recursive call to emitOptionalSome gets
+    // passed a strictly "smaller" context: the parent context of the
+    // converting context we were passed.
+    } else if (adjustment.isValue()) {
+      auto produceConvertedValue = [&](SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       SGFContext C) {
+        return SGF.emitConvertedRValue(loc, adjustment.getValueConversion(),
+                                       C, produceValue);
+      };
+      auto result = emitOptionalSome(loc, optConversion.getLoweredResultType(),
+                                     produceConvertedValue,
+                                     optInit->getFinalContext());
+      optInit->initWithConvertedValue(*this, loc, result);
+      optInit->finishInitialization(*this);
+      return ManagedValue::forInContext();
     }
   }
 
@@ -1133,20 +1153,6 @@ void ConvertingInitialization::
   });
 }
 
-namespace {
-struct CombinedConversions {
-  std::optional<Conversion> first;
-  std::optional<Conversion> second;
-
-  explicit CombinedConversions() {}
-  explicit CombinedConversions(const Conversion &first)
-    : first(first) {}
-  explicit CombinedConversions(const Conversion &first,
-                               const Conversion &second)
-    : first(first), second(second) {}
-  };
-}
-
 static std::optional<CombinedConversions>
 combineConversions(SILGenFunction &SGF, const Conversion &outer,
                    const Conversion &inner);
@@ -1250,6 +1256,7 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue value, SGFContext C) const {
   switch (getKind()) {
   case AnyErasure:
+  case BridgingSubtype:
   case Subtype:
     return SGF.emitTransformedValue(loc, value, getBridgingSourceType(),
                                     getBridgingResultType(), C);
@@ -1304,6 +1311,48 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   llvm_unreachable("bad kind");
 }
 
+OptionalInjectionConversion
+Conversion::adjustForInitialOptionalInjection() const {
+  switch (getKind()) {
+  case Reabstract:
+    return OptionalInjectionConversion::forValue(
+      getReabstract(
+        getReabstractionInputOrigType().getOptionalObjectType(),
+        getReabstractionInputSubstType().getOptionalObjectType(),
+        getReabstractionInputLoweredType().getOptionalObjectType(),
+        getReabstractionOutputOrigType().getOptionalObjectType(),
+        getReabstractionOutputSubstType().getOptionalObjectType(),
+        getReabstractionOutputLoweredType().getOptionalObjectType())
+    );
+
+  case Subtype:
+    return OptionalInjectionConversion::forValue(
+      getSubtype(
+        getBridgingSourceType().getOptionalObjectType(),
+        getBridgingResultType().getOptionalObjectType(),
+        getBridgingLoweredResultType().getOptionalObjectType())
+    );
+
+  // TODO: can these actually happen?
+  case ForceOptional:
+  case ForceAndBridgeToObjC:
+  case BridgingSubtype:
+    return OptionalInjectionConversion();
+
+  case AnyErasure:
+  case BridgeToObjC:
+  case BridgeFromObjC:
+  case BridgeResultFromObjC:
+    return OptionalInjectionConversion::forInjection(
+      getBridging(getKind(), getBridgingSourceType().getOptionalObjectType(),
+                  getBridgingResultType(),
+                  getBridgingLoweredResultType(),
+                  isBridgingExplicit())
+    );
+  }
+  llvm_unreachable("bad kind");
+}
+
 std::optional<Conversion>
 Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   switch (getKind()) {
@@ -1315,6 +1364,7 @@ Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   case ForceAndBridgeToObjC:
     return std::nullopt;
 
+  case BridgingSubtype:
   case Subtype:
   case AnyErasure:
   case BridgeToObjC:
@@ -1336,6 +1386,7 @@ std::optional<Conversion> Conversion::adjustForInitialForceValue() const {
   case BridgeResultFromObjC:
   case ForceOptional:
   case ForceAndBridgeToObjC:
+  case BridgingSubtype:
   case Subtype:
     return std::nullopt;
 
@@ -1389,6 +1440,8 @@ void Conversion::print(llvm::raw_ostream &out) const {
     return printReabstraction(*this, out, "Reabstract");
   case AnyErasure:
     return printBridging(*this, out, "AnyErasure");
+  case BridgingSubtype:
+    return printBridging(*this, out, "BridgingSubtype");
   case Subtype:
     return printBridging(*this, out, "Subtype");
   case ForceOptional:
@@ -1741,7 +1794,8 @@ combineBridging(SILGenFunction &SGF,
                                 sourceType, resultType, loweredResultTy));
     } else {
       return applyPeephole(
-        Conversion::getSubtype(sourceType, resultType, loweredResultTy));
+        Conversion::getBridging(Conversion::BridgingSubtype,
+                                sourceType, resultType, loweredResultTy));
     }
   }
 
@@ -1769,7 +1823,8 @@ combineBridging(SILGenFunction &SGF,
   // Look for a subtype relationship between the source and destination.
   if (areRelatedTypesForBridgingPeephole(sourceType, resultType)) {
     return applyPeephole(
-      Conversion::getSubtype(sourceType, resultType, loweredResultTy));
+      Conversion::getBridging(Conversion::BridgingSubtype,
+                              sourceType, resultType, loweredResultTy));
   }
 
   // If the inner conversion is a result conversion that removes
@@ -1784,7 +1839,8 @@ combineBridging(SILGenFunction &SGF,
         sourceType = sourceValueType;
         loweredSourceTy = loweredSourceTy.getOptionalObjectType();
         return applyPeephole(
-          Conversion::getSubtype(sourceValueType, resultType, loweredResultTy));
+          Conversion::getBridging(Conversion::BridgingSubtype,
+                                  sourceValueType, resultType, loweredResultTy));
       }
     }
   }
@@ -1816,6 +1872,7 @@ combineConversions(SILGenFunction &SGF, const Conversion &outer,
     return std::nullopt;
 
   case Conversion::AnyErasure:
+  case Conversion::BridgingSubtype:
   case Conversion::BridgeFromObjC:
   case Conversion::BridgeResultFromObjC:
     // TODO: maybe peephole bridging through a Swift type?
