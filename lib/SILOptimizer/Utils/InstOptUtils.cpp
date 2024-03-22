@@ -2009,3 +2009,21 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
   assert(!noUndef);
   return SILUndef::get(insertionPoint->getFunction(), ty);
 }
+
+bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
+                                       SILFunction *func) {
+  if (decl->hasUnreferenceableStorage()) {
+    return true;
+  }
+  // Check if any fields have unreferenceable stoage
+  for (auto *field : decl->getStoredProperties()) {
+    TypeExpansionContext tec = *func;
+    auto fieldTy = structType.getFieldType(field, func->getModule(), tec);
+    if (auto *fieldStructDecl = fieldTy.getStructOrBoundGenericStruct()) {
+      if (findUnreferenceableStorage(fieldStructDecl, fieldTy, func)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
