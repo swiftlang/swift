@@ -4480,14 +4480,14 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, hasSelfOrAssocTypeRequirements;
-    TypeID superclassID;
+    DeclID superclassDeclID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> dependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             hasSelfOrAssocTypeRequirements,
-                                            superclassID,
+                                            superclassDeclID,
                                             rawAccessLevel,
                                             dependencyIDs);
 
@@ -4512,8 +4512,10 @@ public:
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
-    proto->setSuperclass(MF.getType(superclassID));
+    auto *superclassDecl = dyn_cast_or_null<ClassDecl>(MF.getDecl(superclassDeclID));
 
+    ctx.evaluator.cacheOutput(SuperclassDeclRequest{proto},
+                              std::move(superclassDecl));
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
     ctx.evaluator.cacheOutput(HasSelfOrAssociatedTypeRequirementsRequest{proto},

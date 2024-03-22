@@ -4,6 +4,38 @@
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 6.0
+
+* Swift 5.10 missed a semantic check from [SE-0309][]. In type context, a reference to a
+  protocol `P` that has associated types or `Self` requirements should use
+  the `any` keyword, but this was not enforced in nested generic argument positions.
+  This is now an error as required by the proposal:
+
+  ```swift
+  protocol P { associatedtype A }
+  struct Outer<T> { struct Inner<U> { } }
+  let x = Outer<P>.Inner<P>()  // error
+  ```
+  To correct the error, add `any` where appropriate, for example
+  `Outer<any P>.Inner<any P>`.
+
+* Swift 5.10 accepted certain invalid opaque return types from [SE-0346][].
+  If a generic argument of a constrained opaque return type did not
+  satisfy the requirements on the primary associated type, the generic
+  argument was silently ignored and type checking would proceed as if it
+  weren't stated. This now results in a diagnostic:
+
+  ```swift
+  protocol P<A> { associatedtype A: Sequence }
+  struct G<A: Sequence>: P {}
+
+  func f() -> some P<Int> { return G<Array<Int>>() }  // error
+  ```
+
+  The return type above should be written as `some P<Array<Int>>` to match
+  the return statement. The old broken behavior in this situation can also
+  be restored, by removing the erroneous constraint and using the more general
+  upper bound `some P`.
+
 * [SE-0408][]:
   A `for`-`in` loop statement can now accept a pack expansion expression,
   enabling iteration over the elements of its respective value pack. This form

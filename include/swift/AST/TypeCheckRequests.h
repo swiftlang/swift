@@ -113,7 +113,7 @@ public:
 /// Request the superclass type for the given class.
 class SuperclassTypeRequest
     : public SimpleRequest<
-          SuperclassTypeRequest, Type(NominalTypeDecl *, TypeResolutionStage),
+          SuperclassTypeRequest, Type(ClassDecl *, TypeResolutionStage),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -123,7 +123,7 @@ private:
 
   // Evaluation.
   Type
-  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl,
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl,
            TypeResolutionStage stage) const;
 
 public:
