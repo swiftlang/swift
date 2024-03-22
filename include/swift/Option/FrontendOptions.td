@@ -1319,6 +1319,16 @@ def experimental_spi_only_imports :
 def enable_ossa_complete_lifetimes :
   Flag<["-"], "enable-ossa-complete-lifetimes">,
   HelpText<"Require linear OSSA lifetimes after SILGen">;
+def disable_ossa_complete_lifetimes :
+  Flag<["-"], "disable-ossa-complete-lifetimes">,
+  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
+
+def enable_ossa_verify_complete :
+  Flag<["-"], "enable-ossa-verify-complete">,
+  HelpText<"Verify linear OSSA lifetimes after SILGen">;
+def disable_ossa_verify_complete :
+  Flag<["-"], "disable-ossa-verify-complete">,
+  HelpText<"Do not verify linear OSSA lifetimes after SILGen">;
 
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,
