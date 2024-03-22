@@ -281,26 +281,33 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
   default:
     return false;
 
-  case SILInstructionKind::DropDeinitInst:
-    assert(memOper->get()->getType().isValueTypeWithDeinit());
-    return true;
-
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::BeginApplyInst:
+  case SILInstructionKind::TryApplyInst: {
+    FullApplySite applySite(memInst);
+    return applySite.getCaptureConvention(*memOper).isOwnedConvention();
+  }
+  case SILInstructionKind::BeginAccessInst:
+    return cast<BeginAccessInst>(memInst)->getAccessKind() ==
+           SILAccessKind::Deinit;
   case SILInstructionKind::CopyAddrInst: {
     auto *CAI = cast<CopyAddrInst>(memInst);
     return (CAI->getSrc() == address && CAI->isTakeOfSrc()) ||
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
+  case SILInstructionKind::DestroyAddrInst:
+    return true;
+  case SILInstructionKind::DropDeinitInst:
+    assert(memOper->get()->getType().isValueTypeWithDeinit());
+    return true;
   case SILInstructionKind::ExplicitCopyAddrInst: {
     auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return (CAI->getSrc() == address && CAI->isTakeOfSrc()) ||
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
-  case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::ApplyInst: {
-    FullApplySite applySite(memInst);
-    return applySite.getCaptureConvention(*memOper).isOwnedConvention();
-  }
+  case SILInstructionKind::LoadInst:
+    return cast<LoadInst>(memInst)->getOwnershipQualifier() ==
+           LoadOwnershipQualifier::Take;
   case SILInstructionKind::PartialApplyInst: {
     // If we are on the stack or have an inout convention, we do not
     // consume. Otherwise, we do.
@@ -311,13 +318,10 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
     auto convention = applySite.getArgumentConvention(*memOper);
     return !convention.isInoutConvention();
   }
-  case SILInstructionKind::DestroyAddrInst:
-    return true;
-  case SILInstructionKind::LoadInst:
-    return cast<LoadInst>(memInst)->getOwnershipQualifier() ==
-           LoadOwnershipQualifier::Take;
-  case SILInstructionKind::BeginAccessInst:
-    return cast<BeginAccessInst>(memInst)->getAccessKind() == SILAccessKind::Deinit;
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+    auto *utedai = cast<UncheckedTakeEnumDataAddrInst>(memInst);
+    return utedai->isDestructive();
+  }
   }
 }
 

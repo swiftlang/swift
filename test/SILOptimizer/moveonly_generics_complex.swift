@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend                               \
-// RUN:     -emit-sil -verify                                \
-// RUN:     %s                                               \
-// RUN:     -enable-experimental-feature BuiltinModule       \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
+// RUN: %target-swift-frontend                                      \
+// RUN:     -emit-sil -verify                                       \
+// RUN:     %s                                                      \
+// RUN:     -enable-experimental-feature BuiltinModule              \
+// RUN:     -enable-experimental-feature NoncopyableGenerics        \
+// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
 // RUN:     -sil-verify-all
 
 // REQUIRES: asserts
@@ -62,8 +63,7 @@ func _withUnprotectedUnsafeTemporaryAllocation<T: ~Copyable, R: ~Copyable>(
     Builtin.stackDealloc(stackAddress)
   }
   switch consume result {
-  // FIXME: This shouldn't be diagnosed.  But it's better than miscompiling.
-  case .success(let success): return success // expected-error{{cannot partially consume 'unknown'}}
+  case .success(let success): return success
   case .failure(let error): return try _rethrowsViaClosure { throw error }
   }
 }
