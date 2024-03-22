@@ -257,8 +257,6 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
       return Flags::Kind::Getter;
-    case AccessorKind::DistributedGet:
-      return Flags::Kind::Getter; // TODO: ???
     case AccessorKind::Set:
       return Flags::Kind::Setter;
     case AccessorKind::Read:
@@ -268,6 +266,7 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
+    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }

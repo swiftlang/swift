@@ -3835,12 +3835,12 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       switch (accessor->getAccessorKind()) {
       case AccessorKind::Get:
-      case AccessorKind::DistributedGet:
       case AccessorKind::Set:
         break;
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
       case AccessorKind::ID:
+      case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
