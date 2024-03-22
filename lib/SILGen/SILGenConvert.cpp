@@ -1546,9 +1546,45 @@ static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
   return false;
 }
 
+static Conversion withNewInputType(const Conversion &conv,
+                                   AbstractionPattern origType,
+                                   CanType substType,
+                                   SILType loweredType) {
+  switch (conv.getKind()) {
+  case Conversion::Reabstract:
+    return Conversion::getReabstract(origType, substType, loweredType,
+                                     conv.getReabstractionOutputOrigType(),
+                                     conv.getReabstractionOutputSubstType(),
+                                     conv.getReabstractionOutputLoweredType());
+  case Conversion::Subtype:
+    return Conversion::getSubtype(substType, conv.getBridgingResultType(),
+                                  conv.getBridgingLoweredResultType());
+  default:
+    llvm_unreachable("shouldn't be trying to combine these kinds");
+  }
+}
+
+static Conversion withNewOutputType(const Conversion &conv,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SILType loweredType) {
+  switch (conv.getKind()) {
+  case Conversion::Reabstract:
+    return Conversion::getReabstract(conv.getReabstractionInputOrigType(),
+                                     conv.getReabstractionInputSubstType(),
+                                     conv.getReabstractionInputLoweredType(),
+                                     origType, substType, loweredType);
+  case Conversion::Subtype:
+    return Conversion::getSubtype(conv.getBridgingSourceType(),
+                                  substType, loweredType);
+  default:
+    llvm_unreachable("shouldn't be trying to combine these kinds");
+  }
+}
+
 /// Can a sequence of conversions from type1 -> type2 -> type3 be represented
 /// as a conversion from type1 -> type3, or does that lose critical information?
-static bool isPeepholeableConversionImpl(CanType type1,
+static bool isCombinableConversionImpl(CanType type1,
                                          CanType type2,
                                          CanType type3) {
   if (type1 == type2 || type2 == type3) return true;
@@ -1563,12 +1599,12 @@ static bool isPeepholeableConversionImpl(CanType type1,
       // If we have optional -> optional conversions at both stages,
       // look through them all.
       if (auto object1 = type1.getOptionalObjectType()) {
-        return isPeepholeableConversionImpl(object1, object2, object3);
+        return isCombinableConversionImpl(object1, object2, object3);
 
       // If we have an injection in the first stage, we'll still know we have
       // an injection in the overall conversion.
       } else {
-        return isPeepholeableConversionImpl(type1, object2, object3);
+        return isCombinableConversionImpl(type1, object2, object3);
       }
 
     // We have an injection in the second stage.  If we lose optionality
@@ -1580,7 +1616,7 @@ static bool isPeepholeableConversionImpl(CanType type1,
 
     // Otherwise, we're preserving that we have an injection overall.
     } else {
-      return isPeepholeableConversionImpl(type1, type2, object3);
+      return isCombinableConversionImpl(type1, type2, object3);
     }
   }
 
@@ -1620,9 +1656,9 @@ static bool isPeepholeableConversionImpl(CanType type1,
     assert(tuple1->getNumElements() == tuple3->getNumElements());
     assert(tuple2->getNumElements() == tuple3->getNumElements());
     for (auto i : range(tuple3->getNumElements())) {
-      if (!isPeepholeableConversionImpl(tuple1.getElementType(i),
-                                        tuple2.getElementType(i),
-                                        tuple3.getElementType(i)))
+      if (!isCombinableConversionImpl(tuple1.getElementType(i),
+                                      tuple2.getElementType(i),
+                                      tuple3.getElementType(i)))
         return false;
     }
     return true;
@@ -1633,15 +1669,15 @@ static bool isPeepholeableConversionImpl(CanType type1,
     auto fn1 = cast<AnyFunctionType>(type1);
     assert(fn1->getNumParams() == fn3->getNumParams());
     assert(fn2->getNumParams() == fn3->getNumParams());
-    if (!isPeepholeableConversionImpl(fn1.getResult(),
-                                      fn2.getResult(),
-                                      fn3.getResult()))
+    if (!isCombinableConversionImpl(fn1.getResult(),
+                                    fn2.getResult(),
+                                    fn3.getResult()))
       return false;
     for (auto i : range(fn3->getNumParams())) {
       // Note the reversal for invariance.
-      if (!isPeepholeableConversionImpl(fn3.getParams()[i].getParameterType(),
-                                        fn2.getParams()[i].getParameterType(),
-                                        fn1.getParams()[i].getParameterType()))
+      if (!isCombinableConversionImpl(fn3.getParams()[i].getParameterType(),
+                                      fn2.getParams()[i].getParameterType(),
+                                      fn1.getParams()[i].getParameterType()))
         return false;
     }
     return true;
@@ -1650,9 +1686,9 @@ static bool isPeepholeableConversionImpl(CanType type1,
   if (auto exp3 = dyn_cast<PackExpansionType>(type3)) {
     auto exp2 = cast<PackExpansionType>(type2);
     auto exp1 = cast<PackExpansionType>(type1);
-    return isPeepholeableConversionImpl(exp1.getPatternType(),
-                                        exp2.getPatternType(),
-                                        exp3.getPatternType());
+    return isCombinableConversionImpl(exp1.getPatternType(),
+                                      exp2.getPatternType(),
+                                      exp3.getPatternType());
   }
 
   // The only remaining types that support subtyping are classes and
@@ -1662,12 +1698,61 @@ static bool isPeepholeableConversionImpl(CanType type1,
 
 /// Can we combine the given conversions so that we go straight from
 /// innerSrcType to outerDestType, or does that lose information?
-static bool isPeepholeableConversion(CanType innerSrcType, CanType innerDestType,
-                                     CanType outerSrcType, CanType outerDestType) {
-  assert(innerDestType == outerSrcType &&
+static bool isCombinableConversion(const Conversion &inner,
+                                   const Conversion &outer) {
+  assert(inner.getResultType() == outer.getSourceType() &&
          "unexpected intermediate conversion");
 
-  return isPeepholeableConversionImpl(innerSrcType, innerDestType, outerDestType);
+  return isCombinableConversionImpl(inner.getSourceType(),
+                                    inner.getResultType(),
+                                    outer.getResultType());
+}
+
+/// Given that we cannot combine the given conversions, at least
+/// "salvage" them to propagate semantically-critical contextual
+/// type information inward.
+static std::optional<CombinedConversions>
+salvageUncombinableConversion(SILGenFunction &SGF,
+                              const Conversion &inner,
+                              const Conversion &outer) {
+  // If the outer type is `@isolated(any)`, and the intermediate type
+  // is non-isolated, propagate the `@isolated(any)` conversion inwards.
+  // We don't want to do this if the intermediate function has some
+  // explicit isolation because we need to honor that conversion even
+  // if it's not the formal isolation of the source function (e.g. if
+  // the user coerces a nonisolated function to a @MainActor function
+  // type).  But if the intermediate function type is non-isolated, the
+  // actual closure might still be isolated, either because we're
+  // type-checking in some mode that doesn't propagate isolation in types
+  // or because the isolation isn't representable in the type system
+  // (e.g. it's isolated to some capture).
+  if (auto outerOutputFnType =
+        dyn_cast<AnyFunctionType>(outer.getResultType())) {
+    auto intermediateFnType = cast<AnyFunctionType>(outer.getSourceType());
+    if (outerOutputFnType->getIsolation().isErased() &&
+        intermediateFnType->getIsolation().isNonIsolated()) {
+      // Construct new intermediate orig/subst/lowered types that are
+      // just the old intermediate type with `@isolated(any)`.
+      auto newIntermediateSubstType = intermediateFnType.withExtInfo(
+        intermediateFnType->getExtInfo().withIsolation(
+          FunctionTypeIsolation::forErased()));
+      auto newIntermediateOrigType =
+        AbstractionPattern(newIntermediateSubstType);
+      auto newIntermediateLoweredType =
+        SGF.getLoweredType(newIntermediateSubstType);
+
+      // Construct the new conversions with the new intermediate type.
+      return CombinedConversions(
+               withNewOutputType(inner, newIntermediateOrigType,
+                                 newIntermediateSubstType,
+                                 newIntermediateLoweredType),
+               withNewInputType(outer, newIntermediateOrigType,
+                                newIntermediateSubstType,
+                                newIntermediateLoweredType));
+    }
+  }
+
+  return std::nullopt;
 }
 
 static std::optional<CombinedConversions>
@@ -1676,11 +1761,8 @@ combineReabstract(SILGenFunction &SGF,
                   const Conversion &inner) {
   // We can never combine conversions in a way that would lose information
   // about the intermediate types.
-  if (!isPeepholeableConversion(inner.getReabstractionInputSubstType(),
-                                inner.getReabstractionOutputSubstType(),
-                                outer.getReabstractionInputSubstType(),
-                                outer.getReabstractionOutputSubstType()))
-    return std::nullopt;
+  if (!isCombinableConversion(inner, outer))
+    return salvageUncombinableConversion(SGF, inner, outer);
 
   // Recognize when the whole conversion is an identity.
   if (inner.getReabstractionInputLoweredType().getObjectType() ==
@@ -1705,11 +1787,8 @@ combineSubtypeIntoReabstract(SILGenFunction &SGF,
                              const Conversion &inner) {
   // We can never combine conversions in a way that would lose information
   // about the intermediate types.
-  if (!isPeepholeableConversion(inner.getBridgingSourceType(),
-                                inner.getBridgingResultType(),
-                                outer.getReabstractionInputSubstType(),
-                                outer.getReabstractionOutputSubstType()))
-    return std::nullopt;
+  if (!isCombinableConversion(inner, outer))
+    return salvageUncombinableConversion(SGF, inner, outer);
 
   auto inputSubstType = inner.getBridgingSourceType();
   auto inputOrigType = AbstractionPattern(inputSubstType);
@@ -1727,11 +1806,8 @@ combineSubtypeIntoReabstract(SILGenFunction &SGF,
 static std::optional<CombinedConversions>
 combineSubtype(SILGenFunction &SGF,
                const Conversion &outer, const Conversion &inner) {
-  if (!isPeepholeableConversion(inner.getBridgingSourceType(),
-                                inner.getBridgingResultType(),
-                                outer.getBridgingSourceType(),
-                                outer.getBridgingResultType()))
-    return std::nullopt;
+  if (!isCombinableConversion(inner, outer))
+    return salvageUncombinableConversion(SGF, inner, outer);
 
   return CombinedConversions(
     Conversion::getSubtype(inner.getBridgingSourceType(),
