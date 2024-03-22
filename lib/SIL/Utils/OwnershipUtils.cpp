@@ -331,6 +331,11 @@ bool swift::findInnerTransitiveGuaranteedUses(
             if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
               foundPointerEscape = true;
             }
+            if (PhiOperand(endUse)) {
+              assert(endUse->getOperandOwnership() ==
+                     OperandOwnership::ForwardingConsume);
+              foundPointerEscape = true;
+            }
             leafUse(endUse);
             return true;
           })) {
@@ -385,10 +390,17 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
       break;
 
     case OperandOwnership::TrivialUse:
-    case OperandOwnership::ForwardingConsume:
     case OperandOwnership::DestroyingConsume:
       recordUse(use);
       break;
+
+    case OperandOwnership::ForwardingConsume: {
+      if (PhiOperand(use)) {
+        return false;
+      }
+      recordUse(use);
+      break;
+    }
 
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
@@ -466,6 +478,11 @@ bool swift::findUsesOfSimpleValue(SILValue value,
     case OperandOwnership::Borrow:
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        if (PhiOperand(use)) {
+          assert(use->getOperandOwnership() ==
+                 OperandOwnership::ForwardingConsume);
           return false;
         }
         usePoints->push_back(end);
@@ -970,6 +987,9 @@ bool BorrowedValue::visitExtendedScopeEndingUses(
           BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
       reborrows.insert(borrowedValue.value);
       return true;
+    }
+    if (auto phiOp = PhiOperand(scopeEndingUse)) {
+      return false;
     }
     return visitor(scopeEndingUse);
   };
