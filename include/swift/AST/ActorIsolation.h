@@ -245,10 +245,18 @@ public:
     return !(lhs == rhs);
   }
 
+  void Profile(llvm::FoldingSetNodeID &id) {
+    id.AddInteger(getKind());
+    id.AddPointer(pointer);
+    id.AddBoolean(isolatedByPreconcurrency);
+    id.AddBoolean(silParsed);
+    id.AddInteger(parameterIndex);
+  }
+
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
-    return llvm::hash_combine(
-        state.kind, state.pointer, state.isolatedByPreconcurrency,
-        state.parameterIndex);
+    return llvm::hash_combine(state.kind, state.pointer,
+                              state.isolatedByPreconcurrency, state.silParsed,
+                              state.parameterIndex);
   }
 
   void print(llvm::raw_ostream &os) const {
@@ -278,7 +286,15 @@ public:
   void printForDiagnostics(llvm::raw_ostream &os,
                            StringRef openingQuotationMark = "'") const;
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
+
+  // Defined out of line to prevent linker errors since libswiftBasic would
+  // include this header exascerbating a layering violation where libswiftBasic
+  // depends on libswiftAST.
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics());
 };
 
 /// Determine how the given value declaration is isolated.

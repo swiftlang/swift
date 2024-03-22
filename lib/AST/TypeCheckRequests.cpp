@@ -1716,6 +1716,11 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
   }
 }
 
+void ActorIsolation::dumpForDiagnostics() const {
+  printForDiagnostics(llvm::dbgs());
+  llvm::dbgs() << '\n';
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   if (state.preconcurrency())

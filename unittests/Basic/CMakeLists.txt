@@ -48,10 +48,6 @@ add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 target_link_libraries(SwiftBasicTests
   PRIVATE
   swiftBasic
-  # SwiftBasic can include symbols from swiftAST due to swiftBasic including
-  # headers from AST. Just include SwiftAST so that we do not have linker
-  # failures.
-  swiftAST
   swiftThreading
   clangBasic
   LLVMTestingSupport

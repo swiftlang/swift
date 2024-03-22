@@ -405,17 +405,17 @@ struct TransferredNonTransferrableInfo {
   ///
   /// This is equal to the merge of the IsolationRegionInfo from all elements in
   /// nonTransferrable's region when the error was diagnosed.
-  IsolationRegionInfo isolationRegionInfo;
+  SILIsolationInfo isolationRegionInfo;
 
   TransferredNonTransferrableInfo(Operand *transferredOperand,
                                   SILValue nonTransferrableValue,
-                                  IsolationRegionInfo isolationRegionInfo)
+                                  SILIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableValue),
         isolationRegionInfo(isolationRegionInfo) {}
   TransferredNonTransferrableInfo(Operand *transferredOperand,
                                   SILInstruction *nonTransferrableInst,
-                                  IsolationRegionInfo isolationRegionInfo)
+                                  SILIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableInst),
         isolationRegionInfo(isolationRegionInfo) {}
@@ -902,7 +902,7 @@ public:
   }
 
   /// Return the isolation region info for \p getNonTransferrableValue().
-  IsolationRegionInfo getIsolationRegionInfo() const {
+  SILIsolationInfo getIsolationRegionInfo() const {
     return info.isolationRegionInfo;
   }
 
@@ -1235,7 +1235,7 @@ struct DiagnosticEvaluator final
 
   void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
                                    TrackableValueID transferredVal,
-                                   TransferringOperand transferringOp) const {
+                                   TransferringOperand *transferringOp) const {
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and transferringOp was not set with closure
     // capture.
@@ -1244,7 +1244,7 @@ struct DiagnosticEvaluator final
       if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
           !regionanalysisimpl::isNonSendableType(svi->getType(),
                                                  svi->getFunction())) {
-        bool isCapture = transferringOp.isClosureCaptured();
+        bool isCapture = transferringOp->isClosureCaptured();
         if (!isCapture) {
           return;
         }
@@ -1254,20 +1254,21 @@ struct DiagnosticEvaluator final
     auto rep = info->getValueMap().getRepresentative(transferredVal);
     LLVM_DEBUG(llvm::dbgs()
                << "    Emitting Use After Transfer Error!\n"
-               << "        Transferring Inst: " << *transferringOp.getUser()
+               << "        Transferring Inst: " << *transferringOp->getUser()
                << "        Transferring Op Value: "
-               << transferringOp.getOperand()->get()
+               << transferringOp->getOperand()->get()
                << "        Require Inst: " << *partitionOp.getSourceInst()
                << "        ID:  %%" << transferredVal << "\n"
                << "        Rep: " << *rep << "        Transferring Op Num: "
-               << transferringOp.getOperand()->getOperandNumber() << '\n');
-    transferOpToRequireInstMultiMap.insert(transferringOp.getOperand(),
+               << transferringOp->getOperand()->getOperandNumber() << '\n');
+    transferOpToRequireInstMultiMap.insert(transferringOp->getOperand(),
                                            partitionOp.getSourceInst());
   }
 
-  void handleTransferNonTransferrable(
-      const PartitionOp &partitionOp, TrackableValueID transferredVal,
-      IsolationRegionInfo isolationRegionInfo) const {
+  void
+  handleTransferNonTransferrable(const PartitionOp &partitionOp,
+                                 TrackableValueID transferredVal,
+                                 SILIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1284,10 +1285,11 @@ struct DiagnosticEvaluator final
         partitionOp.getSourceOp(), nonTransferrableValue, isolationRegionInfo);
   }
 
-  void handleTransferNonTransferrable(
-      const PartitionOp &partitionOp, TrackableValueID transferredVal,
-      TrackableValueID actualNonTransferrableValue,
-      IsolationRegionInfo isolationRegionInfo) const {
+  void
+  handleTransferNonTransferrable(const PartitionOp &partitionOp,
+                                 TrackableValueID transferredVal,
+                                 TrackableValueID actualNonTransferrableValue,
+                                 SILIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1335,11 +1337,11 @@ struct DiagnosticEvaluator final
     return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
   }
 
-  IsolationRegionInfo::Kind hasSpecialDerivation(Element element) const {
+  SILIsolationInfo::Kind hasSpecialDerivation(Element element) const {
     return info->getValueMap().getIsolationRegion(element).getKind();
   }
 
-  IsolationRegionInfo getIsolationRegionInfo(Element element) const {
+  SILIsolationInfo getIsolationRegionInfo(Element element) const {
     return info->getValueMap().getIsolationRegion(element);
   }
 

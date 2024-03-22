@@ -52,6 +52,11 @@ inline bool isNonSendableType(SILType type, SILFunction *fn) {
   return !type.isSendable(fn);
 }
 
+/// Return the ApplyIsolationCrossing for a specific \p inst if it
+/// exists. Returns std::nullopt otherwise.
+std::optional<ApplyIsolationCrossing>
+getApplyIsolationCrossing(SILInstruction *inst);
+
 // This is our PImpl type that we use to hide all of the internal details of
 // the computation.
 class PartitionOpTranslator;
@@ -135,7 +140,7 @@ using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
 class regionanalysisimpl::TrackableValueState {
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
-  IsolationRegionInfo regionInfo = IsolationRegionInfo::getDisconnected();
+  SILIsolationInfo regionInfo = SILIsolationInfo::getDisconnected();
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
@@ -152,7 +157,7 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  IsolationRegionInfo::Kind getIsolationRegionInfoKind() const {
+  SILIsolationInfo::Kind getIsolationRegionInfoKind() const {
     return regionInfo.getKind();
   }
 
@@ -160,11 +165,11 @@ public:
     return regionInfo.getActorIsolation().value();
   }
 
-  void mergeIsolationRegionInfo(IsolationRegionInfo newRegionInfo) {
+  void mergeIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
     regionInfo = regionInfo.merge(newRegionInfo);
   }
 
-  IsolationRegionInfo getIsolationRegionInfo() const { return regionInfo; }
+  SILIsolationInfo getIsolationRegionInfo() const { return regionInfo; }
 
   TrackableValueID getID() const { return TrackableValueID(id); }
 
@@ -263,7 +268,7 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  IsolationRegionInfo getIsolationRegionInfo() const {
+  SILIsolationInfo getIsolationRegionInfo() const {
     return valueState.getIsolationRegionInfo();
   }
 
@@ -333,8 +338,8 @@ public:
   /// exists. Returns nullptr otherwise.
   SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
 
-  IsolationRegionInfo getIsolationRegion(Element trackableValueID) const;
-  IsolationRegionInfo getIsolationRegion(SILValue trackableValueID) const;
+  SILIsolationInfo getIsolationRegion(Element trackableValueID) const;
+  SILIsolationInfo getIsolationRegion(SILValue trackableValueID) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -357,8 +362,8 @@ private:
   std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
-                                    IsolationRegionInfo isolation) const;
-  bool mergeIsolationRegionInfo(SILValue value, IsolationRegionInfo isolation);
+                                    SILIsolationInfo isolation) const;
+  bool mergeIsolationRegionInfo(SILValue value, SILIsolationInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   TrackableValueID lookupValueID(SILValue value);
 };

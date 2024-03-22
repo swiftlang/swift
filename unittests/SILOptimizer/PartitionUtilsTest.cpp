@@ -533,7 +533,7 @@ namespace {
 struct PartitionOpEvaluatorWithFailureCallback final
     : PartitionOpEvaluatorBaseImpl<PartitionOpEvaluatorWithFailureCallback> {
   using FailureCallbackTy =
-      std::function<void(const PartitionOp &, unsigned, TransferringOperand)>;
+      std::function<void(const PartitionOp &, unsigned, TransferringOperand *)>;
   FailureCallbackTy failureCallback;
 
   PartitionOpEvaluatorWithFailureCallback(
@@ -543,7 +543,7 @@ struct PartitionOpEvaluatorWithFailureCallback final
         failureCallback(failureCallback) {}
 
   void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   TransferringOperand transferringOp) const {
+                                   TransferringOperand *transferringOp) const {
     failureCallback(op, elt, transferringOp);
   }
 };
@@ -591,13 +591,13 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (Element(11)))
 
-  auto never_called = [](const PartitionOp &, unsigned, TransferringOperand) {
+  auto never_called = [](const PartitionOp &, unsigned, TransferringOperand *) {
     EXPECT_TRUE(false);
   };
 
   int times_called = 0;
   auto increment_times_called = [&](const PartitionOp &, unsigned,
-                                    TransferringOperand) { times_called++; };
+                                    TransferringOperand *) { times_called++; };
 
   {
     PartitionOpEvaluatorWithFailureCallback eval(p, factory,
@@ -666,7 +666,7 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
   {
     bool failure = false;
     PartitionOpEvaluatorWithFailureCallback eval(
-        p1, factory, [&](const PartitionOp &, unsigned, TransferringOperand) {
+        p1, factory, [&](const PartitionOp &, unsigned, TransferringOperand *) {
           failure = true;
         });
     eval.apply(PartitionOp::Require(Element(0)));
@@ -675,7 +675,7 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
 
   {
     PartitionOpEvaluatorWithFailureCallback eval(
-        p2, factory, [](const PartitionOp &, unsigned, TransferringOperand) {
+        p2, factory, [](const PartitionOp &, unsigned, TransferringOperand *) {
           EXPECT_TRUE(false);
         });
     eval.apply(PartitionOp::Require(Element(0)));
@@ -688,7 +688,7 @@ TEST(PartitionUtilsTest, TestUndoTransfer) {
 
   Partition p;
   PartitionOpEvaluatorWithFailureCallback eval(
-      p, factory, [&](const PartitionOp &, unsigned, TransferringOperand) {
+      p, factory, [&](const PartitionOp &, unsigned, TransferringOperand *) {
         EXPECT_TRUE(false);
       });
 
