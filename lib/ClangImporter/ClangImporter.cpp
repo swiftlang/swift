@@ -5211,9 +5211,9 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
 
   // Returns the expression that accesses the base field from derived type.
   auto createFieldAccess = [&]() -> clang::Expr * {
-    auto *thisExpr = new (clangCtx)
-        clang::CXXThisExpr(clang::SourceLocation(), newMethod->getThisType(),
-                           /*IsImplicit=*/false);
+    auto *thisExpr = clang::CXXThisExpr::Create(
+        clangCtx, clang::SourceLocation(), newMethod->getThisType(),
+        /*IsImplicit=*/false);
     clang::QualType baseClassPtr = clangCtx.getRecordType(baseClass);
     baseClassPtr.addConst();
     baseClassPtr = clangCtx.getPointerType(baseClassPtr);

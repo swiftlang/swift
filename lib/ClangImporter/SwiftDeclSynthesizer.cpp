@@ -2114,8 +2114,9 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   auto diagState = clangSema.DelayedDiagnostics.push(diagPool);
 
   // Construct the method's body.
-  clang::Expr *thisExpr = new (clangCtx) clang::CXXThisExpr(
-      clang::SourceLocation(), newMethod->getThisType(), /*IsImplicit=*/false);
+  clang::Expr *thisExpr = clang::CXXThisExpr::Create(
+      clangCtx, clang::SourceLocation(), newMethod->getThisType(),
+      /*IsImplicit=*/false);
   if (castThisToNonConstThis) {
     auto baseClassPtr =
         clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));
