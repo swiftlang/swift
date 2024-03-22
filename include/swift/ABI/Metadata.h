@@ -2947,7 +2947,7 @@ struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
   /// that are suppressed here, but that information is recorded in the
   /// conditional suppressed protocols of the corresponding `GenericContext`.
   const SuppressibleProtocolSet *
-  getSuppresssedProtocols() const;
+  getSuppressedProtocols() const;
 
   /// Is this context part of a C-imported module?
   bool isCImportedContext() const;
@@ -3302,7 +3302,7 @@ public:
   /// that are suppressed here, but that information is recorded in the
   /// conditional suppressed protocols of the corresponding `GenericContext`.
   const SuppressibleProtocolSet &
-  getSuppresssedProtocols() const {
+  getSuppressedProtocols() const {
     assert(this->hasSuppressibleProtocols());
     return
       *this->template getTrailingObjects<SuppressibleProtocolSet>();
@@ -4458,7 +4458,7 @@ public:
   /// that are suppressed here, but that information is recorded in the
   /// conditional suppressed protocols of the corresponding `GenericContext`.
   const SuppressibleProtocolSet &
-  getSuppresssedProtocols() const {
+  getSuppressedProtocols() const {
     assert(this->hasSuppressibleProtocols());
     return
       *this->template getTrailingObjects<SuppressibleProtocolSet>();
@@ -4616,7 +4616,7 @@ public:
   /// that are suppressed here, but that information is recorded in the
   /// conditional suppressed protocols of the corresponding `GenericContext`.
   const SuppressibleProtocolSet &
-  getSuppresssedProtocols() const {
+  getSuppressedProtocols() const {
     assert(this->hasSuppressibleProtocols());
     return
       *this->template getTrailingObjects<SuppressibleProtocolSet>();
@@ -4777,7 +4777,7 @@ public:
   /// that are suppressed here, but that information is recorded in the
   /// conditional suppressed protocols of the corresponding `GenericContext`.
   const SuppressibleProtocolSet &
-  getSuppresssedProtocols() const {
+  getSuppressedProtocols() const {
     assert(this->hasSuppressibleProtocols());
     return
       *this->template getTrailingObjects<SuppressibleProtocolSet>();
@@ -4834,23 +4834,23 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
 
 template<typename Runtime>
 inline const SuppressibleProtocolSet *
-TargetContextDescriptor<Runtime>::getSuppresssedProtocols() const {
+TargetContextDescriptor<Runtime>::getSuppressedProtocols() const {
   if (!this->hasSuppressibleProtocols())
     return nullptr;
 
   switch (getKind()) {
   case ContextDescriptorKind::Class:
     return &llvm::cast<TargetClassDescriptor<Runtime>>(this)
-        ->getSuppresssedProtocols();
+        ->getSuppressedProtocols();
   case ContextDescriptorKind::Enum:
     return &llvm::cast<TargetEnumDescriptor<Runtime>>(this)
-        ->getSuppresssedProtocols();
+        ->getSuppressedProtocols();
   case ContextDescriptorKind::Struct:
     return &llvm::cast<TargetStructDescriptor<Runtime>>(this)
-        ->getSuppresssedProtocols();
+        ->getSuppressedProtocols();
   case ContextDescriptorKind::OpaqueType:
     return &llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
-        ->getSuppresssedProtocols();
+        ->getSuppressedProtocols();
   default:
     // We don't know about this kind of descriptor.
     return nullptr;

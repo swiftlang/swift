@@ -1729,7 +1729,7 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
       auto missing = suppressed - ignored;
       if (!missing.empty()) {
         return TYPE_LOOKUP_ERROR_FMT(
-            "existential type missing suppresible protocols %x",
+            "existential type missing suppressible protocols %x",
             missing.rawBits());
       }
     }
@@ -1771,7 +1771,7 @@ checkSuppressibleRequirements(const Metadata *type,
 
   // If this type has suppressed conformances, but we can't find them...
   // bail out.
-  auto suppressedProtocols = contextDescriptor->getSuppresssedProtocols();
+  auto suppressedProtocols = contextDescriptor->getSuppressedProtocols();
   if (!suppressedProtocols) {
     return TYPE_LOOKUP_ERROR_FMT("unable to find suppressed protocols");
   }
