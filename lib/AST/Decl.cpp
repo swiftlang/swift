@@ -996,8 +996,8 @@ std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     if (accessor->getAccessorKind() != AccessorKind::Get &&
         accessor->getAccessorKind() != AccessorKind::DistributedGet) {
-        return std::nullopt;
-        }
+      return std::nullopt;
+    }
   }
 
   Type interfaceType = getInterfaceType();

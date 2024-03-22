@@ -4287,11 +4287,12 @@ void ASTMangler::appendDistributedThunk(
     appendContextOf(thunk, base);
   }
 
-
   if (auto accessor = dyn_cast<AccessorDecl>(thunk)) {
     assert(accessor->getAccessorKind() == AccessorKind::DistributedGet &&
-      "Only accessors marked as _distributed_get are expected to be mangled as thunks");
-    // A distributed getter is mangled as the name of its storage (i.e. "the var")
+           "Only accessors marked as _distributed_get are expected to be "
+           "mangled as thunks");
+    // A distributed getter is mangled as the name of its storage (i.e. "the
+    // var")
     appendIdentifier(accessor->getStorage()->getBaseIdentifier().str());
   } else {
     appendIdentifier(thunk->getBaseIdentifier().str());
