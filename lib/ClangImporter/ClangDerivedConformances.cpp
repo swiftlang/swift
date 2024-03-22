@@ -264,8 +264,8 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
 
   clang::UnresolvedSet<1> ops;
   auto qualType = clang::QualType(classDecl->getTypeForDecl(), 0);
-  auto arg = new (clangCtx)
-      clang::CXXThisExpr(clang::SourceLocation(), qualType, false);
+  auto arg = clang::CXXThisExpr::Create(clangCtx, clang::SourceLocation(),
+                                        qualType, false);
   arg->setType(clang::QualType(classDecl->getTypeForDecl(), 0));
 
   clang::OverloadedOperatorKind opKind =
