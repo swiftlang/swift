@@ -898,7 +898,7 @@ tests.test("Strideable/Distance/UInt${suffix}/MinMinus1") {
   expectCrashLater()
   noop(f(UInt${suffix}(Int.max) + 2, UInt${suffix}.min))
 }
-%  end
+%   end
 % end
 
 tests.test("signum/generic") {
