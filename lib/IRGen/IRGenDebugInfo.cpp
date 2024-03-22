@@ -2661,12 +2661,18 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   else {
     std::string FuncName = "Swift runtime failure: ";
     FuncName += failureMsg;
-    llvm::DIFile *File = getOrCreateFile({}, {});
+    // CodeView consumers do not correctly handle an artificially generated
+    // file, thus use the original location's file as the file for the debug
+    // function, and prevent reuse of this debug function.
+    bool useCompilerGeneratedFile = !Opts.isDebugInfoCodeView();
+    llvm::DIFile *File =
+        useCompilerGeneratedFile ? getOrCreateFile({}, {}) : TrapLoc->getFile();
     TrapSP = DBuilder.createFunction(
         File, FuncName, StringRef(), File, 0,
         DIFnTy, 0, llvm::DINode::FlagArtificial,
         llvm::DISubprogram::SPFlagDefinition, nullptr, nullptr, nullptr);
-    RuntimeErrorFnCache.insert({failureMsg, llvm::TrackingMDNodeRef(TrapSP)});
+    if (useCompilerGeneratedFile)
+      RuntimeErrorFnCache.insert({failureMsg, llvm::TrackingMDNodeRef(TrapSP)});
   }
 
   ScopeCache[TrapSc] = llvm::TrackingMDNodeRef(TrapSP);
@@ -2675,7 +2681,11 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   assert(parentScopesAreSane(TrapSc) && "parent scope sanity check failed");
 
   // Wrap the existing TrapLoc into the failure function.
-  auto DL = llvm::DILocation::get(IGM.getLLVMContext(), 0, 0, TrapSP, TrapLoc);
+  // Line 0 is invalid in CodeView, so use the line and column from the original
+  // trap location.
+  auto DL = llvm::DILocation::get(
+      IGM.getLLVMContext(), Opts.isDebugInfoCodeView() ? TrapLoc.getLine() : 0,
+      Opts.isDebugInfoCodeView() ? TrapLoc.getCol() : 0, TrapSP, TrapLoc);
   Builder.SetCurrentDebugLocation(DL);
 }
 
