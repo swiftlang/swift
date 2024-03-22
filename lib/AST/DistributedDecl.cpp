@@ -1286,7 +1286,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
 /******************************************************************************/
 
 bool ValueDecl::isDistributed() const {
-  return getAttrs().hasAttribute<DistributedActorAttr>();
+    return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
 ConstructorDecl *
