@@ -8,6 +8,8 @@
 // RUN:     -move-only-address-checker-disable-lifetime-extension=true \
 // RUN: | %FileCheck %s
 
+import Builtin
+
 @_moveOnly
 struct M {
   deinit {}
@@ -177,6 +179,28 @@ entry(%m4_addr : $*M4):
   apply %take_addr_2(%s1, %s3) : $@convention(thin) (@in M, @in M) -> ()
   destroy_addr %s2 : $*M
   destroy_addr %s4 : $*M
+  %retval = tuple ()
+  return %retval : $()
+}
+
+struct S : ~Copyable {
+  var o: Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_copyable : {{.*}} {
+// CHECK:       bb0([[S:%[^,]+]] :
+// CHECK:         [[O_ADDR:%[^,]+]] = struct_element_addr [[S]] : $*S, #S.o
+// CHECK:         [[O:%[^,]+]] = load [take] [[O_ADDR]]
+// CHECK:         [[OM:%[^,]+]] = move_value [[O]]
+// CHECK:         destroy_value [[OM]]
+// CHECK-LABEL: } // end sil function 'load_take_copyable'
+sil [ossa] @load_take_copyable : $@convention(thin) (@in S) -> () {
+bb0(%s_addr : $*S):
+  %s = mark_unresolved_non_copyable_value [consumable_and_assignable] %s_addr : $*S
+  %o_addr = struct_element_addr %s : $*S, #S.o
+  %o = load [take] %o_addr : $*Builtin.NativeObject
+  %om = move_value %o : $Builtin.NativeObject
+  destroy_value %om : $Builtin.NativeObject
   %retval = tuple ()
   return %retval : $()
 }
