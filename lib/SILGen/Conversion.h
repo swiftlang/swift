@@ -24,8 +24,14 @@
 namespace swift {
 namespace Lowering {
 
+class OptionalInjectionConversion;
+
 /// An abstraction representing certain kinds of conversion that SILGen can
-/// do automatically in various situations.
+/// do automatically in various situations.  These are used primarily with
+/// ConvertingInitialization in order to guide the emission of an expression.
+/// Some of these conversions are semantically required, such as propagating
+/// @isolated(any) down to the emission of the function reference, or some of
+/// the bridging conversions.
 class Conversion {
 public:
   enum KindTy {
@@ -52,6 +58,13 @@ public:
     /// and that's easier.
     AnyErasure,
 
+    /// A subtype conversion, except it's allowed to do optional injections
+    /// and existential erasures.  This comes up with bridging peepholes
+    /// and is annoying to not have a way to represent.  The conversion
+    /// should always involve class references and so will be harmless
+    /// in terms of representations.
+    BridgingSubtype,
+
     /// A subtype conversion.
     Subtype,
 
@@ -68,6 +81,7 @@ public:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
+    case BridgingSubtype:
     case Subtype:
       return true;
 
@@ -88,6 +102,7 @@ public:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
+    case BridgingSubtype:
     case Subtype:
       return false;
     }
@@ -104,6 +119,16 @@ private:
     bool IsExplicit;
   };
 
+  /// The types we store for reabstracting contexts.  In general, when
+  /// we're just emitting an expression, it's expected that the input
+  /// abstraction type and lowered type will match the input formal type,
+  /// which will be the type of the expression we're emitting.  They can
+  /// therefore simply be replaced if we're e.g. prepending a subtype
+  /// conversion to the reabstraction.  But it's very useful to be able to
+  /// represent both sides of the conversion uniformly so that e.g. we can
+  /// elegantly perform a single (perhaps identity) reabstraction when
+  /// receiving a function result or loading a value from abstracted
+  /// storage.
   struct ReabstractionTypes {
     AbstractionPattern InputOrigType;
     AbstractionPattern OutputOrigType;
@@ -123,6 +148,7 @@ private:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
+    case BridgingSubtype:
     case Subtype:
       return Members::indexOf<BridgingTypes>();
 
@@ -153,6 +179,33 @@ private:
                                                inputLoweredTy, outputLoweredTy);
   }
 
+  static bool isAllowedConversion(CanType inputType, CanType outputType) {
+    // Allow all identity conversions.  (This should only happen with
+    // reabstraction.)
+    if (inputType == outputType) return true;
+
+    // Allow optional-to-optional conversions, but not injections
+    // into optional.  Emitters can be expected to just strip optionality
+    // from the result type when peepholing through an optional injection,
+    // and doing so avoids the need to handle injections specially in
+    // emitters, like those for function references and closures.
+    while (auto outputObjectType = outputType.getOptionalObjectType()) {
+      auto inputObjectType = inputType.getOptionalObjectType();
+      if (!inputObjectType) return false;
+      outputType = outputObjectType;
+      inputType = inputObjectType;
+    }
+
+    // Disallow existential erasures from being directly represented here
+    // because it may involve a representation change for the value.  Emitters
+    // shouldn't have to specially recognize those.
+    if (outputType.isExistentialType())
+      return inputType.isExistentialType();
+
+    assert(!inputType.getOptionalObjectType());
+    return true;
+  }
+
 public:
   static Conversion getOrigToSubst(AbstractionPattern origType,
                                    CanType substType,
@@ -176,6 +229,8 @@ public:
                                   AbstractionPattern outputOrigType,
                                   CanType outputSubstType,
                                   SILType outputLoweredTy) {
+    assert(isAllowedConversion(inputSubstType, outputSubstType) &&
+           "don't build subtype conversions that do existential erasures");
     return Conversion(inputOrigType, inputSubstType, inputLoweredTy,
                       outputOrigType, outputSubstType, outputLoweredTy);
   }
@@ -184,6 +239,8 @@ public:
                                 CanType resultType, SILType loweredResultTy,
                                 bool isExplicit = false) {
     assert(isBridgingKind(kind));
+    assert((kind != Subtype || isAllowedConversion(origType, resultType)) &&
+           "disallowed conversion for subtype relationship");
     return Conversion(kind, origType, resultType, loweredResultTy, isExplicit);
   }
 
@@ -274,6 +331,8 @@ public:
   /// this conversion.
   std::optional<Conversion> adjustForInitialForceValue() const;
 
+  OptionalInjectionConversion adjustForInitialOptionalInjection() const;
+
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &out) const;
 };
@@ -318,9 +377,66 @@ public:
   bool isForced() const { return Forced; }
 };
 
+struct CombinedConversions {
+  std::optional<Conversion> first;
+  std::optional<Conversion> second;
+
+  explicit CombinedConversions() {}
+  explicit CombinedConversions(const Conversion &first)
+    : first(first) {}
+  explicit CombinedConversions(const Conversion &first,
+                               const Conversion &second)
+    : first(first), second(second) {}
+};
+
 bool canPeepholeConversions(SILGenFunction &SGF,
                             const Conversion &outer,
                             const Conversion &inner);
+
+/// The result of trying to combine an optional injection with an existing
+/// conversion.
+class OptionalInjectionConversion {
+  enum Kind {
+    None,
+    Injection,
+    Value
+  };
+
+  std::optional<Conversion> conversion;
+  Kind kind;
+
+  OptionalInjectionConversion(Kind kind, const Conversion &conv)
+    : conversion(conv), kind(kind) {}
+
+public:
+  OptionalInjectionConversion() : kind(None) {}
+  static OptionalInjectionConversion forInjection(const Conversion &conv) {
+    return { Injection, conv };
+  }
+  static OptionalInjectionConversion forValue(const Conversion &conv) {
+    return { Value, conv };
+  }
+
+  /// Is the result of this combination a conversion that produces a
+  /// value of the original optional type?
+  bool isInjection() const {
+    return kind == Injection;
+  }
+  const Conversion &getInjectionConversion() const {
+    assert(isInjection());
+    return *conversion;
+  }
+
+  /// Is the result of this combination a conversion that produces a
+  /// value of the element of the original optional type?
+  bool isValue() const {
+    return kind == Value;
+  }
+  const Conversion &getValueConversion() const {
+    assert(isValue());
+    return *conversion;
+  }
+};
 
 /// An initialization where we ultimately want to apply a conversion to
 /// the value before completing the initialization.
