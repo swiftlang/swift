@@ -76,8 +76,8 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     return type;
   };
 
-  auto lookupSuperclassConformance = [&](ExistentialLayout &layout) {
-    if (auto superclass = layout.explicitSuperclass) {
+  auto lookupSuperclassConformance = [&](Type superclass) {
+    if (superclass) {
       if (auto result =
               lookupConformance(superclass, protocol, /*allowMissing=*/false)) {
         if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
@@ -101,7 +101,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
       auto layout = type->getExistentialLayout();
       if (llvm::all_of(layout.getProtocols(),
                        [](const auto *P) { return P->isMarkerProtocol(); })) {
-        if (auto conformance = lookupSuperclassConformance(layout)) {
+        if (auto conformance = lookupSuperclassConformance(layout.explicitSuperclass)) {
           return ProtocolConformanceRef(
               ctx.getInheritedConformance(type, conformance.getConcrete()));
         }
@@ -113,15 +113,12 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
   auto layout = type->getExistentialLayout();
 
-  // Due to an IRGen limitation, witness tables cannot be passed from an
-  // existential to an archetype parameter, so for now we restrict this to
-  // @objc protocols and marker protocols.
+  // If the existential contains non-@objc protocols and the protocol we're
+  // conforming to needs a witness table, the existential must have a
+  // self-conformance witness table. For now, Swift.Error is the only one.
   if (!layout.isObjC() && !protocol->isMarkerProtocol()) {
     auto constraint = getConstraintType();
-    // There's a specific exception for protocols with self-conforming
-    // witness tables, but the existential has to be *exactly* that type.
-    // TODO: synthesize witness tables on-demand for protocol compositions
-    // that can satisfy the requirement.
+    // The existential has to be *exactly* that type.
     if (protocol->requiresSelfConformanceWitnessTable() &&
         constraint->is<ProtocolType>() &&
         constraint->castTo<ProtocolType>()->getDecl() == protocol)
@@ -130,30 +127,22 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     return ProtocolConformanceRef::forInvalid();
   }
 
-  // If the existential is class-constrained, the class might conform
-  // concretely.
-  if (auto conformance = lookupSuperclassConformance(layout))
-    return conformance;
-
-  // Otherwise, the existential might conform abstractly.
+  // The existential might conform abstractly.
   for (auto protoDecl : layout.getProtocols()) {
-
     // If we found the protocol we're looking for, return an abstract
     // conformance to it.
     if (protoDecl == protocol)
       return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
-    // If the protocol has a superclass constraint, we might conform
-    // concretely.
-    if (auto superclass = protoDecl->getSuperclass()) {
-      if (auto result = lookupConformance(superclass, protocol))
-        return result;
-    }
-
     // Now check refined protocols.
     if (protoDecl->inheritsFrom(protocol))
       return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
   }
+
+  // If the existential is class-constrained, the class might conform
+  // concretely.
+  if (auto conformance = lookupSuperclassConformance(layout.getSuperclass()))
+    return conformance;
 
   // We didn't find our protocol in the existential's list; it doesn't
   // conform.

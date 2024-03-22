@@ -407,14 +407,9 @@ Type ExistentialLayout::getSuperclass() const {
     return explicitSuperclass;
 
   for (auto protoDecl : getProtocols()) {
-    // If we have a generic signature, check there, because it
-    // will pick up superclass constraints from protocols that we
-    // refine as well.
-    if (auto genericSig = protoDecl->getGenericSignature()) {
-      if (auto superclass = genericSig->getSuperclassBound(
-            protoDecl->getSelfInterfaceType()))
-        return superclass;
-    } else if (auto superclass = protoDecl->getSuperclass())
+    auto genericSig = protoDecl->getGenericSignature();
+    if (auto superclass = genericSig->getSuperclassBound(
+          protoDecl->getSelfInterfaceType()))
       return superclass;
   }
 

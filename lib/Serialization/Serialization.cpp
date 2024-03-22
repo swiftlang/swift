@@ -4353,7 +4353,7 @@ public:
                                  ->requiresClass(),
                                proto->isObjC(),
                                proto->hasSelfOrAssociatedTypeRequirements(),
-                               S.addTypeRef(proto->getSuperclass()),
+                               S.addDeclRef(proto->getSuperclassDecl()),
                                rawAccessLevel,
                                dependencyTypeIDs);
 

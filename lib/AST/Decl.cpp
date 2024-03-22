@@ -6436,6 +6436,8 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.KnownProtocol = 0;
   Bits.ProtocolDecl.HasAssociatedTypes = 0;
   Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
+  Bits.ProtocolDecl.HasRequirementSignature = 0;
+  Bits.ProtocolDecl.HasLazyRequirementSignature = 0;
   Bits.ProtocolDecl.ProtocolRequirementsValid = false;
   setTrailingWhereClause(TrailingWhere);
 }
@@ -6545,27 +6547,10 @@ AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
   return nullptr;
 }
 
-Type ProtocolDecl::getSuperclass() const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    SuperclassTypeRequest{const_cast<ProtocolDecl *>(this),
-                          TypeResolutionStage::Interface},
-    Type());
-}
-
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
     SuperclassDeclRequest{const_cast<ProtocolDecl *>(this)}, nullptr);
-}
-
-void ProtocolDecl::setSuperclass(Type superclass) {
-  assert((!superclass || !superclass->hasArchetype())
-         && "superclass must be interface type");
-  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
-  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
-    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
-    true);
 }
 
 bool ProtocolDecl::walkInheritedProtocols(
@@ -6699,12 +6684,13 @@ bool ProtocolDecl::isComputingRequirementSignature() const {
 
 void ProtocolDecl::setRequirementSignature(RequirementSignature requirementSig) {
   RequirementSig = requirementSig;
+  Bits.ProtocolDecl.HasRequirementSignature = 1;
 }
 
 void
 ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
                                           uint64_t requirementSignatureData) {
-  assert(!RequirementSig && "requirement signature already set");
+  assert(!isRequirementSignatureComputed() && "requirement signature already set");
 
   auto contextData = static_cast<LazyProtocolData *>(
       getASTContext().getOrCreateLazyContextData(this, lazyLoader));
