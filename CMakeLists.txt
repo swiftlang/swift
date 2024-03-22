@@ -222,10 +222,6 @@ option(SWIFT_BUILD_REMOTE_MIRROR
     "Build the Swift Remote Mirror Library"
     TRUE)
 
-option(SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER
-    "Build the Swift External Generic Metadata Builder Library"
-    TRUE)
-
 option(SWIFT_BUILD_DYNAMIC_STDLIB
     "Build dynamic variants of the Swift standard library"
     TRUE)
@@ -1298,11 +1294,6 @@ endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)
   message(STATUS "Building Swift Remote Mirror for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "")
-endif()
-
-if(SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
-  message(STATUS "Building Swift External Generic Metadata Builder for SDKs: ${SWIFT_SDKS}")
   message(STATUS "")
 endif()
 

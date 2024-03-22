@@ -403,18 +403,6 @@ namespace {
       return true;
     }
 
-    void verifyBuiltMetadata(const Metadata *original,
-                             const Metadata *candidate) {}
-
-    void verifyBuiltMetadata(const Metadata *original,
-                             const TypeContextDescriptor *description,
-                             const void *const *arguments) {
-      if (swift::runtime::environment::
-              SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER())
-        validateExternalGenericMetadataBuilder(original, description,
-                                               arguments);
-    }
-
     MetadataStateWithDependency tryInitialize(Metadata *metadata,
                                       PrivateMetadataState state,
                                PrivateMetadataCompletionContext *context) {

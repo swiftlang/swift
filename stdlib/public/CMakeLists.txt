@@ -88,7 +88,7 @@ endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR OR SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
+if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # TODO: due to the use of `add_swift_target_library` rather than `add_library`
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
