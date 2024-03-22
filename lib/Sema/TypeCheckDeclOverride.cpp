@@ -2270,7 +2270,6 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     switch (kind) {
     case AccessorKind::Get:
-    case AccessorKind::DistributedGet:
     case AccessorKind::Set:
     case AccessorKind::Read:
     case AccessorKind::Modify:
@@ -2278,6 +2277,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::Init:

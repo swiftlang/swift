@@ -993,6 +993,13 @@ namespace {
           }
         }
 
+        if (entry.isFunction() &&
+            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
+          // We avoid emitting _distributed_get accessors, as they cannot be
+          // referred to anyway
+          continue;
+        }
+
         if (entry.isAssociatedType()) {
           auto assocType = entry.getAssociatedType();
           // Define the associated type descriptor to point to the current

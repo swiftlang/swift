@@ -679,7 +679,6 @@ bool swift::isRepresentableInObjC(
     }
 
     case AccessorKind::Get:
-    case AccessorKind::DistributedGet:
       if (!storageIsObjC) {
         auto error = isa<VarDecl>(storage)
                        ? diag::objc_getter_for_nonobjc_property
@@ -691,6 +690,8 @@ bool swift::isRepresentableInObjC(
         return false;
       }
       return true;
+    case AccessorKind::DistributedGet:
+      return false;
 
     case AccessorKind::Set:
       if (!storageIsObjC) {
@@ -2030,11 +2031,11 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
+    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("Not an Objective-C entry point");
 
     case AccessorKind::Get:
-    case AccessorKind::DistributedGet:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 5, var->getName() };
 
