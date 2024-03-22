@@ -3742,7 +3742,7 @@ namespace {
               // this method would get sliced away, and an invocation would get
               // dispatched statically. This is fine because it matches the C++
               // behavior.
-              if (decl->isPure()) {
+              if (decl->isPureVirtual()) {
                 // If this is a pure virtual method, we won't have any
                 // implementation of it to invoke.
                 Impl.markUnavailable(
