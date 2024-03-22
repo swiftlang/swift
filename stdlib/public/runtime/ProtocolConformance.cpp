@@ -1673,7 +1673,43 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
   }
 
   case MetadataKind::Function: {
-    // FIXME: Implement me
+    auto functionMetadata = cast<FunctionTypeMetadata>(type);
+
+    // Determine the set of protocols that are suppressed by the function
+    // type.
+    SuppressibleProtocolSet suppressed;
+    if (functionMetadata->hasExtendedFlags()) {
+      suppressed = functionMetadata->getExtendedFlags()
+          .getSuppressedProtocols();
+    }
+
+    // Map the existing "noescape" bit as a suppressed protocol, when
+    // appropriate.
+    switch (functionMetadata->getConvention()) {
+    case FunctionMetadataConvention::Swift:
+      // Swift function types can be non-escaping, so honor the bit.
+      if (!functionMetadata->isEscaping())
+        suppressed.insert(SuppressibleProtocolKind::Escapable);
+      break;
+
+    case FunctionMetadataConvention::Block:
+      // Objective-C block types don't encode non-escaping-ness in metadata,
+      // so we assume that they are always escaping.
+      break;
+
+    case FunctionMetadataConvention::Thin:
+    case FunctionMetadataConvention::CFunctionPointer:
+      // Thin and C function pointers have no captures, so whether they
+      // escape is irrelevant.
+      break;
+    }
+
+    auto missing = suppressed - ignored;
+    if (!missing.empty()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+          "function type missing suppressible protocols %x", missing.rawBits());
+    }
+
     return std::nullopt;
   }
 
