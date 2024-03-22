@@ -3752,7 +3752,11 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
     llvm::errs() << "Cannot find sema token at the given location.\n";
     return 1;
   }
-  if (SemaT->getType().isNull()) {
+  Type Ty = SemaT->getSolutionSpecificInterfaceType();
+  if (Ty.isNull()) {
+    Ty = SemaT->getValueD()->getInterfaceType();
+  }
+  if (Ty.isNull()) {
     llvm::errs() << "Cannot get type of the sema token.\n";
     return 1;
   }
@@ -3760,8 +3764,8 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   std::string Error;
   std::string TypeName;
   if (printTypeInterface(
-          SemaT->getValueD()->getDeclContext()->getParentModule(),
-          SemaT->getType(), Printer, TypeName, Error)) {
+          SemaT->getValueD()->getDeclContext()->getParentModule(), Ty, Printer,
+          TypeName, Error)) {
     llvm::errs() << Error;
     return 1;
   }
