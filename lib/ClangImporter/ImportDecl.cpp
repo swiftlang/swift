@@ -5588,12 +5588,6 @@ namespace {
       return nullptr;
     }
 
-    Decl *VisitClassScopeFunctionSpecializationDecl(
-                 const clang::ClassScopeFunctionSpecializationDecl *decl) {
-      // Note: templates are not imported.
-      return nullptr;
-    }
-
     Decl *VisitImportDecl(const clang::ImportDecl *decl) {
       // Transitive module imports are not handled at the declaration level.
       // Rather, they are understood from the module itself.
