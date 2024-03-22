@@ -19,6 +19,7 @@
 #define SWIFT_ABI_SUPPRESSIBLEPROTOCOLS_H
 
 #include <cstdint>
+#include <iterator>
 
 namespace swift {
 

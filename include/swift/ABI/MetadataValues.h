@@ -25,6 +25,7 @@
 
 #include "swift/ABI/KeyPath.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
+#include "swift/ABI/SuppressibleProtocols.h"
 
 // FIXME: this include shouldn't be here, but removing it causes symbol
 // mangling mismatches on Windows for some reason?
@@ -1198,6 +1199,10 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values if we have a transferring result.
     HasTransferringResult  = 0x00000010U,
+
+    /// A SuppressibleProtocolSet in the high bits.
+    SuppressedProtocolShift = 16,
+    SuppressedProtocolMask = 0xFFFFU << SuppressedProtocolShift,
   };
   int_type Data;
 
@@ -1229,6 +1234,13 @@ public:
         (newValue ? HasTransferringResult : 0));
   }
 
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withSuppressedProtocols(SuppressibleProtocolSet suppressed) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~SuppressedProtocolMask) |
+        (suppressed.rawBits() << SuppressedProtocolShift));
+  }
+  
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
@@ -1241,6 +1253,10 @@ public:
 
   int_type getIntValue() const {
     return Data;
+  }
+
+  SuppressibleProtocolSet getSuppressedProtocols() const {
+    return SuppressibleProtocolSet(Data >> SuppressedProtocolShift);
   }
 
   static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
@@ -2003,7 +2019,7 @@ public:
 
   /// Whether this generic context has any conditional conformances to
   /// suppressed protocols, in which case the generic context will have a
-  /// trailing SuppressedProtocolSet and conditional requirements.
+  /// trailing SuppressibleProtocolSet and conditional requirements.
   constexpr bool hasConditionalSuppressedProtocols() const {
     return (Value & 0x2) != 0;
   }

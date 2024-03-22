@@ -40,6 +40,15 @@ func attemptCall(_ a: Any) {
   print("failed to cast (attemptCall)")
 }
 
+@_silgen_name("swift_getExtendedFunctionTypeMetadata")
+func _getExtendedFunctionTypeMetadata(
+    flags: UInt, differentiabilityKind: UInt,
+    parameterTypes: UnsafePointer<Any.Type>?,
+    parameterFlags: UnsafePointer<UInt32>?,
+    resultType: Any.Type, globalActorType: Any.Type? = nil,
+    extendedFlags: UInt32, thrownErrorType: Any.Type? = nil) -> Any.Type
+
+
 defer { main() }
 func main() {
   // CHECK: hello
@@ -89,6 +98,22 @@ func main() {
   print("function types")
 
   attemptCall(Dog<(Ordinary) -> Noncopyable>())
+
+  // This is a nonmovable function type, which cannot currently be
+  // expressed in the language.
+  let noncopyableFnType = _getExtendedFunctionTypeMetadata(
+    flags: 0x04000000 | 0x80000000,
+    differentiabilityKind: 0,
+    parameterTypes: nil,
+    parameterFlags: nil,
+    resultType: Void.self,
+    extendedFlags: 0x1 << 16)
+
+  // CHECK: failed to cast (attemptCall)
+  func doFuncCall<F>(_: F.Type) {
+    attemptCall(Dog<F>())
+  }
+  _openExistential(noncopyableFnType, do: doFuncCall)
 
   // CHECK: existential types
   print("existential types")
