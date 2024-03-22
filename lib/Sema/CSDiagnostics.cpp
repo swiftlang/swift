@@ -4993,10 +4993,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // If this is a reference to a static member by one of the key path
-    // components, let's provide a tailored diagnostic and return because
-    // that is unsupported so there is no fix-it.
+    // components, let's provide a tailored diagnostic with fix-it.
     if (locator->isInKeyPathComponent()) {
-      InvalidStaticMemberRefInKeyPath failure(getSolution(), Member, locator);
+      InvalidStaticMemberRefInKeyPath failure(getSolution(), BaseType, Member,
+                                              locator);
       return failure.diagnoseAsError();
     }
 
@@ -6335,8 +6335,19 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 }
 
 bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_static_member, getMember(),
-                 isForKeyPathDynamicMemberLookup());
+  auto *KPE = getAsExpr<KeyPathExpr>(getRawAnchor());
+  auto rootTyRepr = KPE->getExplicitRootType();
+  auto isProtocol = getBaseType()->isExistentialType();
+
+  if (rootTyRepr && !isProtocol) {
+    emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
+                   DeclNameRef(getMember()->getName()))
+        .fixItInsert(rootTyRepr->getEndLoc(), ".Type");
+  } else {
+    emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
+                   DeclNameRef(getMember()->getName()));
+  }
+
   return true;
 }
 
