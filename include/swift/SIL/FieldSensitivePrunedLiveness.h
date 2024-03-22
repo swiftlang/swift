@@ -1337,11 +1337,21 @@ public:
     defBlocks.insert(defBlock, span);
     initializeDefBlock(defBlock, span);
     
-    if (auto ta = dyn_cast<TryApplyInst>(node)) {
-      // The value becomes live on the success edge.
-      // Mark the basic block the try_apply terminates as a dead-to-live
-      // edge.
-      initializeDefBlock(ta->getParent(), span,
+    if (defBlock != node->getParentBlock()) {
+      // If the block the value becomes defined in is different from the
+      // defining instruction, then the def notionally occurs "on the edge"
+      // between the instruction (which must be a terminator) and the defined-in
+      // successor block. Mark the original block as a dead-to-live edge.
+      auto ti = cast<TermInst>(node);
+      
+      assert(std::find(ti->getSuccessorBlocks().begin(),
+                       ti->getSuccessorBlocks().end(),
+                       defBlock) != ti->getSuccessorBlocks().end()
+             && "defined-in block should be either the same block as the "
+                "defining instruction or a successor of the "
+                "defining terminator");
+
+      initializeDefBlock(ti->getParent(), span,
                          FieldSensitivePrunedLiveBlocks::DeadToLiveEdge);
     }
   }
