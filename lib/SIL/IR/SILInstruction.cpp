@@ -1796,13 +1796,15 @@ bool SILInstruction::maySuspend() const {
 }
 
 static bool
-visitRecursivelyLifetimeEndingUses(SILValue i, bool &noUsers,
-                                   llvm::function_ref<bool(Operand *)> func,
-                                   bool allowPhis) {
+visitRecursivelyLifetimeEndingUses(
+  SILValue i, bool &noUsers,
+  llvm::function_ref<bool(Operand *)> visitScopeEnd,
+  llvm::function_ref<bool(Operand *)> visitUnknownUse) {
+
   for (Operand *use : i->getConsumingUses()) {
     noUsers = false;
     if (isa<DestroyValueInst>(use->getUser())) {
-      if (!func(use)) {
+      if (!visitScopeEnd(use)) {
         return false;
       }
       continue;
@@ -1810,18 +1812,10 @@ visitRecursivelyLifetimeEndingUses(SILValue i, bool &noUsers,
     if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
       auto fnTy = ret->getFunction()->getLoweredFunctionType();
       assert(!fnTy->getLifetimeDependenceInfo().empty());
-      if (!func(use)) {
+      if (!visitScopeEnd(use)) {
         return false;
       }
       continue;
-    }
-    if (allowPhis) {
-      if (PhiOperand(use)) {
-        if (!func(use)) {
-          return false;
-        }
-        continue;
-      }
     }
     // FIXME: Handle store to indirect result
     
@@ -1836,17 +1830,11 @@ visitRecursivelyLifetimeEndingUses(SILValue i, bool &noUsers,
     // the structural requirements of on-stack partial_apply uses.
     auto *user = use->getUser();
     if (user->getNumResults() == 0) {
-      llvm::errs() << "partial_apply [on_stack] use:\n";
-      user->printInContext(llvm::errs());
-      if (isa<BranchInst>(user)) {
-        llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
-      }
-      llvm::report_fatal_error("partial_apply [on_stack] must be directly "
-                               "forwarded to a destroy_value");
+      return visitUnknownUse(use);
     }
     for (auto res : use->getUser()->getResults()) {
-      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, func,
-                                              allowPhis)) {
+      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, visitScopeEnd,
+                                              visitUnknownUse)) {
         return false;
       }
     }
@@ -1862,21 +1850,36 @@ PartialApplyInst::visitOnStackLifetimeEnds(
          && "only meaningful for OSSA stack closures");
   bool noUsers = true;
 
+  auto visitUnknownUse = [](Operand *unknownUse){
+    llvm::errs() << "partial_apply [on_stack] use:\n";
+    auto *user = unknownUse->getUser();
+    user->printInContext(llvm::errs());
+    if (isa<BranchInst>(user)) {
+      llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+    }
+    llvm::report_fatal_error("partial_apply [on_stack] must be directly "
+                             "forwarded to a destroy_value");
+    return false;
+  };
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
-                                          /*allowPhis*/ false)) {
+                                          visitUnknownUse)) {
     return false;
   }
   return !noUsers;
 }
 
-bool MarkDependenceInst::
-visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand *)> func) const {
+// FIXME: Rather than recursing through all results, this should only recurse
+// through ForwardingInstruction and OwnershipTransitionInstruction and the
+// client should prove that any other uses cannot be upstream from a consume of
+// the dependent value.
+bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
+  llvm::function_ref<bool (Operand *)> visitScopeEnd,
+  llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
   bool noUsers = true;
-
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
-                                          /*allowPhis*/ true)) {
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
+                                          visitUnknownUse)) {
     return false;
   }
   return !noUsers;

@@ -206,6 +206,11 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   /// incoming value dominates or is consumed by an outer adjacent
   /// phi. See InteriorLiveness.
   ///
+  /// FIXME: To generate conservatively correct liveness, this should return
+  /// .abortWalk if this is a mark_dependence and the scope-ending use is not
+  /// the last in the function (e.g. a store rather than a destroy or return).
+  /// The client needs to use LifetimeDependenceDefUseWalker to do better.
+  ///
   /// TODO: to hande reborrow-extended uses, migrate ExtendedLiveness
   /// to SwiftCompilerSources.
   ///

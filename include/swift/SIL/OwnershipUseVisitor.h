@@ -258,9 +258,13 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrow(Operand *borrowingOperand) {
     return false;
 
   return BorrowingOperand(borrowingOperand)
-    .visitScopeEndingUses([&](Operand *borrowEnd) {
-      return visitInnerBorrowScopeEnd(borrowEnd);
-    });
+    .visitScopeEndingUses(
+      [&](Operand *borrowEnd) {
+        return visitInnerBorrowScopeEnd(borrowEnd);
+      },
+      [&](Operand *unknownUse) {
+        return asImpl().handlePointerEscape(unknownUse);
+      });
 }
 
 template <typename Impl>
