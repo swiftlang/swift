@@ -413,6 +413,14 @@ void irgen::emitDeallocatePartialClassInstance(IRGenFunction &IGF,
                                                llvm::Value *metadata,
                                                llvm::Value *size,
                                                llvm::Value *alignMask) {
+  // In Embedded Swift, we never have Obj-C interop and thus no IVarDestroyers,
+  // so we can simply call swift_deallocClassInstance instead.
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    IGF.Builder.CreateCall(IGF.IGM.getDeallocClassInstanceFunctionPointer(),
+                           {object, size, alignMask});
+    return;
+  }
+
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
   IGF.Builder.CreateCall(
