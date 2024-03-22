@@ -86,8 +86,6 @@ class MinimalStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_BUILD_REMOTE_MIRROR:BOOL', 'FALSE')
         self.cmake_options.define(
-            'SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER:BOOL', 'FALSE')
-        self.cmake_options.define(
             'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', 'FALSE')

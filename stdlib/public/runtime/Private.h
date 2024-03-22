@@ -597,10 +597,6 @@ public:
   bool compareGenericMetadata(const Metadata *original,
                               const Metadata *newMetadata);
 
-  void validateExternalGenericMetadataBuilder(
-      const Metadata *original, const TypeContextDescriptor *description,
-      const void * const *arguments);
-
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
                              llvm::ArrayRef<NodePointer> demangledGenerics,
