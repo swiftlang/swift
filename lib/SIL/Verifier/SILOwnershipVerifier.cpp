@@ -902,7 +902,7 @@ void SILModule::verifyOwnership() const {
 
   for (const SILFunction &function : *this) {
     std::unique_ptr<DeadEndBlocks> deBlocks;
-    if (!getOptions().OSSACompleteLifetimes) {
+    if (!getOptions().OSSAVerifyComplete) {
       deBlocks =
         std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&function));
     }

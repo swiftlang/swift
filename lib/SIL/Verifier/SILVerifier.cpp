@@ -7070,7 +7070,7 @@ public:
   }
 
   void verify(bool isCompleteOSSA) {
-    if (!isCompleteOSSA || !F.getModule().getOptions().OSSACompleteLifetimes) {
+    if (!isCompleteOSSA || !F.getModule().getOptions().OSSAVerifyComplete) {
       DEBlocks = std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));
