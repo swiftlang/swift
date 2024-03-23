@@ -18,7 +18,7 @@
 ///
 /// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/InputIterator
 public protocol UnsafeCxxInputIterator: Equatable {
-  associatedtype Pointee: ~Copyable
+  associatedtype Pointee
 
   /// Returns the unwrapped result of C++ `operator*()`.
   ///
@@ -34,23 +34,19 @@ public protocol UnsafeCxxInputIterator: Equatable {
   func successor() -> Self
 }
 
-extension UnsafePointer: UnsafeCxxInputIterator
-where Pointee: ~Copyable {}
+extension UnsafePointer: UnsafeCxxInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxInputIterator
-where Pointee: ~Copyable {}
+extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
 
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
 
   @inlinable
   public var pointee: Pointee {
-    _read {
-      guard let value = self else {
-        fatalError("Could not dereference nullptr")
-      }
-      yield value.pointee
+    if let value = self {
+      return value.pointee
     }
+    fatalError("Could not dereference nullptr")
   }
 
   @inlinable
@@ -67,8 +63,7 @@ public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
   override var pointee: Pointee { get set }
 }
 
-extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator
-where Pointee: ~Copyable {}
+extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator {}
 
 /// Bridged C++ iterator that allows computing the distance between two of its
 /// instances, and advancing an instance by a given number of elements.
@@ -84,14 +79,11 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
-extension UnsafePointer: UnsafeCxxRandomAccessIterator
-where Pointee: ~Copyable {}
+extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator
-where Pointee: ~Copyable {}
+extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
 
 public protocol UnsafeCxxMutableRandomAccessIterator:
 UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator
-where Pointee: ~Copyable {}
+extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
