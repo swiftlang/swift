@@ -1637,8 +1637,18 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     CanType substParamType = fnArg.getSubstRValueType();
     auto loweredParamTy = SGF.getLoweredType(origParamType, substParamType);
 
+    // The main actor path doesn't give us a value that actually matches the
+    // formal type at all, so this is the best we can do.
+    SILType loweredSubstParamTy;
+    if (fnArg.isRValue()) {
+      loweredSubstParamTy = fnArg.peekRValue().getTypeOfSingleValue();
+    } else {
+      loweredSubstParamTy = SGF.getLoweredType(substParamType);
+    }
+
     auto conversion =
-      Conversion::getSubstToOrig(origParamType, substParamType, loweredParamTy);
+      Conversion::getSubstToOrig(origParamType, substParamType,
+                                 loweredSubstParamTy, loweredParamTy);
     return std::move(fnArg).getConverted(SGF, conversion);
   }();
 
