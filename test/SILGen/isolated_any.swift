@@ -383,6 +383,29 @@ extension MyActor {
   func asyncAction() async {}
 }
 
+func takeInheritingOptionalAsyncIsolatedAny(@_inheritActorContext fn: Optional<@isolated(any) () async -> ()>) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a20EraseInheritingAsyncC19ClosureIntoOptionalyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a20EraseInheritingAsyncC19ClosureIntoOptionalyyFyyYaYbcfU_ : $@convention(thin) @Sendable @async (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed MyActor) -> ()
+// CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $MyActor
+// CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $MyActor
+// CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $MyActor : $MyActor, $any Actor
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_OBJECT]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]], [[CAPTURE]])
+// CHECK-NEXT:    [[OPT_CLOSURE:%.*]] = enum $Optional<@isolated(any) @Sendable @async @callee_guaranteed () -> ()>, #Optional.some!enumelt, [[CLOSURE]] :
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test38takeInheritingOptionalAsyncIsolatedAny2fnyyyYaYbYAcSg_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[OPT_CLOSURE]])
+// CHECK-NEXT:    destroy_value [[OPT_CLOSURE]]
+extension MyActor {
+  func testEraseInheritingAsyncActorClosureIntoOptional() {
+    takeInheritingOptionalAsyncIsolatedAny {
+      await self.asyncAction()
+    }
+  }
+}
+
 func takeInheritingAsyncIsolatedAny_optionalResult(@_inheritActorContext fn: @escaping @isolated(any) () async -> Int?) {}
 
 // Test that we correctly handle isolation erasure from closures even when

@@ -679,7 +679,7 @@ static BridgingConversion getBridgingConversion(Expr *E) {
 
   // If we peeked through an opening, and we didn't recognize a specific
   // pattern above involving the opaque value, make sure we use the opening
-  // as the final expression instead of accidentally look through it.
+  // as the final expression instead of accidentally looking through it.
   if (open)
     return {open, std::nullopt, 0};
 
@@ -2840,51 +2840,23 @@ wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
 static std::optional<FunctionTypeInfo>
 tryGetSpecializedClosureTypeFromContext(CanAnyFunctionType closureType,
                                         const Conversion &conv) {
-  // NOTE: if you support new kinds of conversion here, make sure you can
-  // rewrite them in narrowClosureConvention below
-
-  if (conv.getKind() == Conversion::SubstToOrig) {
-    auto destType = cast<AnyFunctionType>(conv.getReabstractionSubstResultType());
-    auto origType = conv.getReabstractionOrigType();
-    auto expectedTy =
-      conv.getReabstractionLoweredResultType().castTo<SILFunctionType>();
-    return FunctionTypeInfo{origType, destType, expectedTy};
-  }
-
-  if (conv.getKind() == Conversion::Subtype) {
-    assert(closureType == conv.getBridgingSourceType());
-    auto destType = cast<AnyFunctionType>(conv.getBridgingResultType());
-    auto origType = AbstractionPattern(destType);
-    auto expectedTy =
-      conv.getBridgingLoweredResultType().castTo<SILFunctionType>();
+  // Note that the kinds of conversion we work on here have to be kinds
+  // that we can call withSourceType on later.
+  if (conv.getKind() == Conversion::Reabstract ||
+      conv.getKind() == Conversion::Subtype) {
+    // We don't care about the input type here; we'll be emitting that
+    // based on the closure.
+    auto destType = cast<AnyFunctionType>(conv.getResultType());
+    auto origType =
+      conv.getKind() == Conversion::Reabstract
+        ? conv.getReabstractionOutputOrigType()
+        : AbstractionPattern(destType);
+    auto expectedTy = conv.getLoweredResultType().castTo<SILFunctionType>();
     return FunctionTypeInfo{origType, destType, expectedTy};
   }
 
   // No other kinds of conversion.
   return std::nullopt;
-}
-
-/// Given that tryGetSpecializedClosureTypeFromContext was able to return
-/// specialized closure type information from the given contextual conversion,
-/// construct a new conversion that starts from the given type, which is a
-/// supertype of the previous closure type but a subtype of the final type.
-/// The conversion should end with the same type.
-static Conversion narrowClosureConversion(CanAnyFunctionType newClosureType,
-                                          const Conversion &conv) {
-  if (conv.getKind() == Conversion::SubstToOrig) {
-    return Conversion::getSubstToOrig(newClosureType,
-                                      conv.getReabstractionOrigType(),
-                                      conv.getReabstractionSubstResultType(),
-                                      conv.getReabstractionLoweredResultType());
-  }
-
-  if (conv.getKind() == Conversion::Subtype) {
-    return Conversion::getSubtype(newClosureType,
-                                  conv.getBridgingResultType(),
-                                  conv.getBridgingLoweredResultType());
-  }
-
-  llvm_unreachable("mismatch with tryGetSpecializedClosureTypeFromContext");
 }
 
 /// Whether the given abstraction pattern as an opaque thrown error.
@@ -2999,7 +2971,7 @@ RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
     auto erasedResult = emitClosureReference(e, erasureInfo);
 
     // Narrow the original conversion to start from the erased closure type.
-    auto convAfterErasure = narrowClosureConversion(erasedClosureType, conv);
+    auto convAfterErasure = conv.withSourceType(SGF, erasedClosureType);
 
     // Apply the narrowed conversion.
     return convAfterErasure.emit(SGF, e, erasedResult, SGFContext());

@@ -53,11 +53,14 @@ import API
 // CHECK-NEXT: [[TEST_FN:%.*]] = thin_to_thick_function [[TEST_REF]] : $@convention(thin) (Optional<Int>) -> () to $@callee_guaranteed (Optional<Int>) -> ()
 // CHECK: [[THUNK:%.*]] = function_ref @$sSiSgIegy_AAIegy_TRScMTU : $@convention(thin) (Optional<Int>, @guaranteed @callee_guaranteed (Optional<Int>) -> ()) -> ()
 // CHECK-NEXT: [[THUNKED_TEST_REF:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[TEST_FN]]) : $@convention(thin) (Optional<Int>, @guaranteed @callee_guaranteed (Optional<Int>) -> ()) -> ()
-// CHECK-NEXT: [[OPTIONAL_TEST:%.*]] = enum $Optional<@callee_guaranteed (Optional<Int>) -> ()>, #Optional.some!enumelt, [[THUNKED_TEST_REF]] : $@callee_guaranteed (Optional<Int>) -> ()
-// CHECK-NEXT: switch_enum [[OPTIONAL_TEST]] : $Optional<@callee_guaranteed (Optional<Int>) -> ()>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
-// CHECK: bb3([[UNWRAPPED_TEST_REF:%.*]] : @owned $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<Int>>>):
-// CHECK: [[COMPUTE_REF:%.*]] = function_ref @$s3API7computeyyyxcSglF : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
-// CHECK-NEXT: {{.*}} = apply [[COMPUTE_REF]]<Int?>([[UNWRAPPED_TEST_REF]]) : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
+// CHECK-NEXT: // function_ref thunk
+// CHECK-NEXT: [[REABSTRACTION_THUNK_REF:%.*]] = function_ref @$sSiSgIegy_AAIegn_TR :
+// CHECK-NEXT: [[REABSTRACTED_TEST_REF:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTION_THUNK_REF]]([[THUNKED_TEST_REF]]) : $@convention(thin) (@in_guaranteed Optional<Int>, @guaranteed @callee_guaranteed (Optional<Int>) -> ()) -> ()
+// CHECK-NEXT: [[CONVERTED_REABSTRACTED_TEST_REF:%.*]] = convert_function [[REABSTRACTED_TEST_REF]] : $@callee_guaranteed (@in_guaranteed Optional<Int>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<Int>>
+// CHECK-NEXT: [[OPTIONAL_TEST:%.*]] = enum $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<Int>>>, #Optional.some!enumelt, [[CONVERTED_REABSTRACTED_TEST_REF]] :
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: [[COMPUTE_REF:%.*]] = function_ref @$s3API7computeyyyxcSglF : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
+// CHECK-NEXT: {{.*}} = apply [[COMPUTE_REF]]<Int?>([[OPTIONAL_TEST]]) : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
 @MainActor
 func testMainActorContext() {
   compute(test) // no warning
@@ -80,7 +83,8 @@ func testComplexGlobal<U>(_ fn: @escaping @MainActor (U?) -> Void) {
   // CHECK: [[FN_THUNK:%.*]] = function_ref @$sxSgIegn_AAIegn_lTRScMTU : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<τ_0_0>) -> ()) -> ()
   // CHECK-NEXT: [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [[FN_THUNK]]<U>([[SUBST_FN]]) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<τ_0_0>) -> ()) -> ()
   // CHECK-NEXT: [[SUBST_THUNKED_FN:%.*]] = convert_function [[THUNKED_FN]] : $@callee_guaranteed (@in_guaranteed Optional<U>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> () for <U>
-  // CHECK-NEXT: {{.*}} = enum $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> () for <U>>, #Optional.some!enumelt, [[SUBST_THUNKED_FN]] : $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> () for <U>
+  // CHECK-NEXT: [[SUBST_THUNKED_FN_2:%.*]] = convert_function [[SUBST_THUNKED_FN]] : $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> () for <U> to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<U>>
+  // CHECK-NEXT: {{.*}} = enum $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<U>>>, #Optional.some!enumelt, [[SUBST_THUNKED_FN_2]] : $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<U>>
   compute(fn)
   // expected-warning@-1 {{converting function value of type '@MainActor (U?) -> Void' to '(U?) -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}
 
@@ -133,7 +137,7 @@ func testMembers<X>(v: X, s: S<X>, fn: @escaping @MainActor (X) -> Int) {
   // CHECK-NEXT: [[SUBST_THUNKED_CLOSURE:%.*]] = convert_function [[THUNKED_CLOSURE]] : $@callee_guaranteed () -> @out X to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <X>
   // CHECK-NEXT: [[THUNKED_CLOSURE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[SUBST_THUNKED_CLOSURE]] : $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <X> to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <X>
   // CHECK: [[SETTER_REF:%.*]] = function_ref @$s3API1SVyxxyXEcig : $@convention(method) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @in_guaranteed S<τ_0_0>) -> @out τ_0_0
-  // CHECK-NEXT: %41 = apply [[SETTER_REF]]<X>({{.*}}, [[THUNKED_CLOSURE]], {{.*}}) : $@convention(method) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @in_guaranteed S<τ_0_0>) -> @out τ_0_0
+  // CHECK-NEXT: {{.*}} = apply [[SETTER_REF]]<X>({{.*}}, [[THUNKED_CLOSURE]], {{.*}}) : $@convention(method) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @in_guaranteed S<τ_0_0>) -> @out τ_0_0
   _ = s[{ @MainActor in v }]
 
   // CHECK: [[TEST_REF:%.*]] = function_ref @$s6Client4testyySiSgF : $@convention(thin) (Optional<Int>) -> ()

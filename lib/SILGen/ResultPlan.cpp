@@ -306,7 +306,7 @@ public:
                                          loweredResultTy);
         } else {
           return Conversion::getOrigToSubst(origType, substType,
-                                            loweredResultTy);
+                                            value.getType(), loweredResultTy);
         }
       }();
 
