@@ -761,23 +761,19 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::ClassMethod: {
-      bool isDistributedThunkTarget = false;
       if (auto func = dyn_cast_or_null<AccessorDecl>(constant->getFuncDecl())) {
         if (func->getStorage()->isDistributed()) {
           // If we're calling cross-actor, we must always use a distributed thunk
           if (!isSameActorIsolated(func, SGF.FunctionDC)) {
             /// We must adjust the constant to use a distributed thunk.
             constant = constant->asDistributed();
-            isDistributedThunkTarget = true;
           }
         }
       }
 
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(
           SGF.getTypeExpansionContext(), *constant);
-      auto typeInfo = createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
-      typeInfo.isDistributedThunkTarget = isDistributedThunkTarget;
-      return typeInfo;
+      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::SuperMethod: {
       auto base = constant->getOverriddenVTableEntry();
@@ -786,24 +782,19 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::WitnessMethod: {
-      bool isDistributedThunkTarget = false;
       if (auto func = constant->getFuncDecl()) {
         if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
           // If we're calling cross-actor, we must always use a distributed thunk
           if (!isSameActorIsolated(func, SGF.FunctionDC)) {
             /// We must adjust the constant to use a distributed thunk.
             constant = constant->asDistributed();
-            isDistributedThunkTarget = true;
           }
         }
       }
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-      auto typeInfo =
-          createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
-      typeInfo.isDistributedThunkTarget = isDistributedThunkTarget;
-      return typeInfo;
+      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::DynamicMethod: {
       auto formalType = getDynamicMethodLoweredType(
@@ -5564,11 +5555,7 @@ RValue SILGenFunction::emitApply(
   resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);
 
   SILValue indirectErrorAddr;
-  if (substFnType->hasErrorResult() &&
-      F.isDistributed() /* caller is distributed thunk */ &&
-      calleeTypeInfo.isDistributedThunkTarget) {
-  } else
-      if (substFnType->hasErrorResult()) {
+  if (substFnType->hasErrorResult()) {
     auto errorResult = substFnType->getErrorResult();
     if (errorResult.getConvention() == ResultConvention::Indirect) {
       auto loweredErrorResultType = getSILType(errorResult, substFnType);

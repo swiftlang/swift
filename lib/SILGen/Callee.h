@@ -29,7 +29,6 @@ public:
   std::optional<AbstractionPattern> origResultType;
   CanType substResultType;
   ForeignInfo foreign;
-  bool isDistributedThunkTarget;
 
 private:
   std::optional<SILFunctionTypeRepresentation> overrideRep;
