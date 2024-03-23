@@ -52,6 +52,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     AbstractStorageDecl *storage = accessor->getStorage();
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::Read:
       return storage->getFormalAccess();

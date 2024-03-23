@@ -682,7 +682,13 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
+        auto isDistributedFuncOrAccessor =
+            func->isDistributed();
+        if (auto acc = dyn_cast<AccessorDecl>(func)) {
+          isDistributedFuncOrAccessor =
+              acc->getStorage()->isDistributed();
+        }
+        if (isa<ProtocolDecl>(func->getDeclContext()) && isDistributedFuncOrAccessor) {
           // If we're calling cross-actor, we must always use a distributed thunk
           if (!isSameActorIsolated(func, SGF.FunctionDC)) {
             // the protocol witness must always be a distributed thunk, as we
@@ -755,6 +761,16 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::ClassMethod: {
+      if (auto func = dyn_cast_or_null<AccessorDecl>(constant->getFuncDecl())) {
+        if (func->getStorage()->isDistributed()) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            /// We must adjust the constant to use a distributed thunk.
+            constant = constant->asDistributed();
+          }
+        }
+      }
+
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(
           SGF.getTypeExpansionContext(), *constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -2000,7 +2016,13 @@ static void emitRawApply(SILGenFunction &SGF,
     options -= ApplyFlags::DoesNotThrow;
 
   // If we don't have an error result, we can make a simple 'apply'.
-  if (!substFnType->hasErrorResult()) {
+  if (substFnType->hasErrorResult() &&
+      SGF.F.isDistributed() &&
+      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) ) {
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    rawResults.push_back(result);
+
+  } else if (!substFnType->hasErrorResult()) {
     auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
     rawResults.push_back(result);
 
@@ -2017,8 +2039,9 @@ static void emitRawApply(SILGenFunction &SGF,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
-    SGF.B.createTryApply(loc, fnValue, subs, argValues,
-                         normalBB, errorBB, options);
+    SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
+                         options);
+
     SGF.B.emitBlock(normalBB);
   }
 }
@@ -5528,7 +5551,7 @@ RValue SILGenFunction::emitApply(
     const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
     SGFContext evalContext,
     std::optional<ActorIsolation> implicitActorHopTarget) {
-  auto substFnType = calleeTypeInfo.substFnType;
+  auto substFnType = calleeTypeInfo.substFnType; // TODO: this has error but should not
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
@@ -6663,6 +6686,16 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          SubstitutionMap subs,
                                          bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
+
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    if (!isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (accessor->isGetter()) {
+        if (accessor->getStorage()->isDistributed()) {
+          return Callee::forDirect(SGF, constant, subs, loc);
+        }
+      }
+    }
+  }
 
   bool isObjCReplacementSelfCall = false;
   if (isOnSelfParameter &&

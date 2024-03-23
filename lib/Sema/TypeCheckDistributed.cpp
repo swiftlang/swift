@@ -512,7 +512,7 @@ bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
     auto *var = cast<VarDecl>(accessor->getStorage());
-    assert(var->isDistributed() && accessor->isGetter());
+    assert(var->isDistributed() && accessor->isDistributedGetter());
   } else {
     assert(func->isDistributed());
   }

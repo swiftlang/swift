@@ -250,6 +250,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
   // to the requirement.
   switch (requirementKind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     if (auto read = witness->getParsedAccessor(AccessorKind::Read))
       return read;
     if (auto addressor = witness->getParsedAccessor(AccessorKind::Address))
@@ -6405,6 +6406,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
       // These accessors are folded into the setter.
       return result;
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Set:
       // These are found relative to the main decl.
       name = accessor->getStorage()->getName();
