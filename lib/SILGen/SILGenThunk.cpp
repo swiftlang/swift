@@ -112,16 +112,8 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
 }
 
 void SILGenModule::emitDistributedThunkForDecl(
-    llvm::PointerUnion<AbstractFunctionDecl *, VarDecl *> varOrAFD) {
-  FuncDecl *thunkDecl = nullptr;
-
-  if (varOrAFD.is<VarDecl *>()) {
-    auto var = varOrAFD.get<VarDecl *>();
-    thunkDecl = var->getDistributedThunk();
-  } else if (varOrAFD.is<AbstractFunctionDecl *>()) {
-    auto afd = varOrAFD.get<AbstractFunctionDecl *>();
-    thunkDecl = afd->getDistributedThunk();
-  }
+    AbstractFunctionDecl *afd) {
+  FuncDecl *thunkDecl = afd->getDistributedThunk();
 
   if (!thunkDecl || !thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;
