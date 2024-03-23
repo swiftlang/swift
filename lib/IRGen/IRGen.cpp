@@ -326,7 +326,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
     PB.registerPipelineStartEPCallback(
         [options](ModulePassManager &MPM, OptimizationLevel level) {
-          MPM.addPass(InstrProfiling(options, false));
+           MPM.addPass(InstrProfilingLoweringPass(options, false));
         });
   }
 
