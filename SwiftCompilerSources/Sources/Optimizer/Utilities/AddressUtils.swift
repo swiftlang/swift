@@ -458,6 +458,8 @@ enum AddressOwnershipLiveRange : CustomStringConvertible {
       default:
         return nil
       }
+    case .storeBorrow(let sb):
+      return computeValueLiveRange(of: sb.source, context)
     case .pointer, .unidentified:
       return nil
     }

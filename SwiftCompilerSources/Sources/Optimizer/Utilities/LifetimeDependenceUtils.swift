@@ -307,22 +307,21 @@ extension LifetimeDependence.Scope {
   /// forwarded (via struct/tuple) from multiple guaranteed values.
   init?(base: Value, _ context: some Context) {
     if base.type.isAddress {
-      if let scope = Self(address: base, context) {
-        self = scope
-        return
+      guard let scope = Self(address: base, context) else {
+        return nil
       }
-      return nil
+      self = scope
+      return
     }
     switch base.ownership {
     case .owned:
       self = .owned(base)
       return
     case .guaranteed:
-      if let scope = Self(guaranteed: base, context) {
-        self = scope
-        return
+      guard let scope = Self(guaranteed: base, context) else {
+        return nil
       }
-      return nil
+      self = scope
     case .none:
       // lifetime dependence requires a nontrivial value"
       return nil
@@ -339,23 +338,23 @@ extension LifetimeDependence.Scope {
       switch accessBase {
       case let .box(projectBox):
         // Note: the box may be in a borrow scope.
-        if let scope = Self(base: projectBox.operand.value, context) {
-          self = scope
+        guard let scope = Self(base: projectBox.operand.value, context) else {
+          return nil
         }
-        return nil
+        self = scope
       case let .stack(allocStack):
-        if let scope = Self(allocation: allocStack, context) {
-          self = scope
+        guard let scope = Self(allocation: allocStack, context) else {
+          return nil
         }
-        return nil
+        self = scope
       case .global:
         self = .unknown(address)
       case .class, .tail:
         let refElt = address as! UnaryInstruction
-        if let scope = Self(guaranteed: refElt.operand.value, context) {
-          self = scope
+        guard let scope = Self(guaranteed: refElt.operand.value, context) else {
+          return nil
         }
-        return nil
+        self = scope
       case let .argument(arg):
         if arg.convention.isIndirectIn {
           self = .initialized(initialAddress: arg, initializingStore: nil)
@@ -370,6 +369,11 @@ extension LifetimeDependence.Scope {
         }
       case let .yield(result):
         self = Self(yield: result)
+      case .storeBorrow(let sb):
+        guard let scope = Self(base: sb.source, context) else {
+          return nil
+        }
+        self = scope
       case .pointer, .unidentified:
         self = .unknown(address)
       }
@@ -1085,7 +1089,8 @@ extension LifetimeDependenceDefUseWalker {
         return returnedDependence(address: arg, using: operand)
       }
       break
-    case .global, .class, .tail, .yield, .pointer, .unidentified:
+    case .global, .class, .tail, .yield, .storeBorrow, .pointer, .unidentified:
+      // An address produced by .storeBorrow should never be stored into.
       break
     }
     if let allocation = allocation {

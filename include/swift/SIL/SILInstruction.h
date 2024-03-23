@@ -8546,8 +8546,9 @@ public:
   }
 
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
-  bool visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand*)> func)
-    const;
+  bool visitNonEscapingLifetimeEnds(
+    llvm::function_ref<bool (Operand*)> visitScopeEnd,
+    llvm::function_ref<bool (Operand*)> visitUnknownUse) const;
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply

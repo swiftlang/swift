@@ -234,21 +234,23 @@ PrunedLiveRange<LivenessWithDefs>::updateForBorrowingOperand(Operand *operand) {
   //
   // Note: Ownership liveness should follow reborrows that are dominated by the
   // ownership definition.
-  if (!BorrowingOperand(operand).visitScopeEndingUses([this](Operand *end) {
-        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-          return false;
-        }
-        if (PhiOperand(end)) {
-          assert(end->getOperandOwnership() ==
-                 OperandOwnership::ForwardingConsume);
-          return false;
-        }
-        updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-        return true;
-      })) {
-    return InnerBorrowKind::Reborrowed;
+  auto innerBorrowKind = InnerBorrowKind::Contained;
+  if (!BorrowingOperand(operand).visitScopeEndingUses(
+        [&](Operand *end) {
+          if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+            innerBorrowKind = InnerBorrowKind::Reborrowed;
+          }
+          updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+          return true;
+        }, [&](Operand *unknownUse) {
+          updateForUse(unknownUse->getUser(), /*lifetimeEnding*/ false);
+          innerBorrowKind = InnerBorrowKind::Escaped;
+          return true;
+        })) {
+    // Handle dead borrows.
+    updateForUse(operand->getUser(), /*lifetimeEnding*/ false);
   }
-  return InnerBorrowKind::Contained;
+  return innerBorrowKind;
 }
 
 template <typename LivenessWithDefs>
