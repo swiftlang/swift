@@ -864,7 +864,7 @@ static void setLocationInfoForClangNode(ClangNode ClangNode,
   std::pair<clang::FileID, unsigned> Decomp =
       ClangSM.getDecomposedLoc(CharRange.getBegin());
   if (!Decomp.first.isInvalid()) {
-    if (auto FE = ClangSM.getFileEntryForID(Decomp.first)) {
+    if (auto FE = ClangSM.getFileEntryRefForID(Decomp.first)) {
       Location.Filename = FE->getName();
 
       std::pair<clang::FileID, unsigned> EndDecomp =

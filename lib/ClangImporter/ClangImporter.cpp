@@ -2228,9 +2228,9 @@ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
   if (moduleFile == PrebuiltModules.end())
     return nullptr;
 
-  if (!Instance->loadModuleFile(moduleFile->second))
+  clang::serialization::ModuleFile *Loaded = nullptr;
+  if (!Instance->loadModuleFile(moduleFile->second, Loaded))
     return nullptr; // error loading, return not found.
-  // Lookup again.
   return loadFromMM();
 }
 
@@ -2396,13 +2396,15 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   // instead, manually register all `.h` inputs of Clang module dependnecies.
   if (SwiftDependencyTracker &&
       !Instance->getInvocation().getLangOpts().ImplicitModules) {
-    auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
-        clangModule->getASTFile());
-    Instance->getASTReader()->visitInputFileInfos(
-        *moduleFile, /*IncludeSystem=*/true,
-        [&](const clang::serialization::InputFileInfo &IFI, bool isSystem) {
-          SwiftDependencyTracker->addDependency(IFI.Filename, isSystem);
-        });
+    if (auto moduleRef = clangModule->getASTFile()) {
+      auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
+          *moduleRef);
+      Instance->getASTReader()->visitInputFileInfos(
+          *moduleFile, /*IncludeSystem=*/true,
+          [&](const clang::serialization::InputFileInfo &IFI, bool isSystem) {
+            SwiftDependencyTracker->addDependency(IFI.Filename, isSystem);
+          });
+    }
   }
 
   if (clangModule->isSubModule()) {
@@ -4008,14 +4010,13 @@ StringRef ClangModuleUnit::getFilename() const {
     else
       return SinglePCH;
   }
-  if (const clang::FileEntry *F = clangModule->getASTFile())
-    if (!F->getName().empty())
-      return F->getName();
+  if (auto F = clangModule->getASTFile())
+    return F->getName();
   return StringRef();
 }
 
 StringRef ClangModuleUnit::getLoadedFilename() const {
-  if (const clang::FileEntry *F = clangModule->getASTFile())
+  if (auto F = clangModule->getASTFile())
     return F->getName();
   return StringRef();
 }

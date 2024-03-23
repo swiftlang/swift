@@ -3375,7 +3375,7 @@ namespace {
                    d->getName() == "cos" || d->getName() == "exit";
           return false;
         };
-        
+
         if (clang::Module *owningModule = decl->getOwningModule();
             owningModule && importer::isCxxStdModule(owningModule)) {
           if (isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
@@ -3383,7 +3383,7 @@ namespace {
           }
 
           auto &sourceManager = Impl.getClangPreprocessor().getSourceManager();
-          if (const auto file = sourceManager.getFileEntryForID(
+          if (auto file = sourceManager.getFileEntryRefForID(
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
             if ((file->getDir() == owningModule->Directory) &&
