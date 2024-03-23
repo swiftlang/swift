@@ -2027,8 +2027,7 @@ static void emitRawApply(SILGenFunction &SGF,
   // If we don't have an error result, we can make a simple 'apply'.
   if (substFnType->hasErrorResult() &&
       SGF.F.isDistributed() &&
-      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) &&
-      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext())->isDistributedActor()) {
+      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) ) {
     auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
     rawResults.push_back(result);
 
