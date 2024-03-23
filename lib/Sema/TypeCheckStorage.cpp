@@ -2670,8 +2670,9 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
-  case AccessorKind::DistributedGet:
     break;
+  case AccessorKind::DistributedGet:
+    return false;
 
   case AccessorKind::Set:
 
