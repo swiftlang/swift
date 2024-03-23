@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -module-name main -j2 -parse-as-library -I %t %s -o %t/a.out
+// RUN: %target-build-swift -module-name main -j2 -parse-as-library -I %t %s -plugin-path %swift-plugin-dir -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
@@ -11,15 +11,20 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// rdar://90373022
-// UNSUPPORTED: OS=watchos
-
 import Distributed
 
 @available(SwiftStdlib 6.0, *)
 distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable> {
-  distributed func hi(name: String) {
-    print("Hi, \(name)!")
+  distributed func distributedMethod() -> String {
+    "implemented method"
+  }
+
+  distributed var distributedVariable: String {
+    "implemented variable"
+  }
+
+  distributed func genericMethod<E: Codable>(_ value: E) async -> E {
+    return value
   }
 }
 
@@ -30,7 +35,16 @@ distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<
     let system = LocalTestingDistributedActorSystem()
 
     let actor = Worker(actorSystem: system)
-    try await actor.hi(name: "P") // local calls should still just work
-    // CHECK: Hi, P!
+
+    let m = try await actor.distributedMethod()
+    print("m = \(m)") // CHECK: m = implemented method
+
+    let v = try await actor.distributedVariable
+    print("v = \(v)") // CHECK: v = implemented variable
+
+    let e = try await actor.genericMethod("echo")
+    print("e = \(e)") // CHECK: e = echo
+
+
   }
 }

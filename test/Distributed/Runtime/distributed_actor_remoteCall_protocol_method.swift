@@ -15,9 +15,6 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: OS=windows-msvc
 
-// FIXME(distributed): pending adjustments in protocol macro to handle == in protocol
-// XFAIL: *
-
 import Distributed
 import FakeDistributedActorSystems
 
@@ -51,8 +48,8 @@ distributed actor GreeterImpl: GreeterDefinedSystemProtocol {
     let proxy: any GreeterDefinedSystemProtocol =
       try $GreeterDefinedSystemProtocol.resolve(id: real.id, using: roundtripSystem)
     let greeting = try await proxy.greet()
-    // CHECK: >> remoteCall: on:main.GreeterDefinedSystemProtocol_Stub, target:greet(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
-    // CHECK: > execute distributed target: greet(), identifier: $s4main28GreeterDefinedSystemProtocolP5greetSSyFTE
+    // CHECK: >> remoteCall: on:main.$GreeterDefinedSystemProtocol, target:main.$GreeterDefinedSystemProtocol.greet(), invocation:FakeInvocationEncoder(genericSubs: [main.$GreeterDefinedSystemProtocol], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: > execute distributed target: main.$GreeterDefinedSystemProtocol.greet(), identifier: $s4main29$GreeterDefinedSystemProtocolC5greetSSyYaKFTE
 
     // CHECK: << remoteCall return: [IMPL]:Hello from GreeterImpl
 

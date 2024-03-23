@@ -129,6 +129,8 @@ public:
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
+        addDistributedWitnessMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
       }
     });
   }
@@ -201,10 +203,13 @@ private:
 
   void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
-    if (!AFD || !AFD->isDistributed())
+    if (!AFD)
       return;
 
     auto thunk = AFD->getDistributedThunk();
+    if (!thunk)
+      return;
+
     SILDeclRef declRef(thunk, kind);
     asDerived().addMethod(declRef.asDistributed());
   }

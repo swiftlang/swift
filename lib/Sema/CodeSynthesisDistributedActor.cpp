@@ -374,80 +374,82 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   {
     auto recordArgumentName = DeclName(C, C.Id_recordArgument,
                                        /*labels=*/{Identifier()});
-    for (auto param : *thunk->getParameters()) {
-      auto argumentName = param->getArgumentName().str();
-      LiteralExpr *argumentLabelArg;
-      if (argumentName.empty()) {
-        argumentLabelArg = new (C) NilLiteralExpr(sloc, implicit);
-      } else {
-        argumentLabelArg =
-            new (C) StringLiteralExpr(argumentName, SourceRange(), implicit);
+    if (auto params = thunk->getParameters()) {
+      if (params->begin())
+      for (auto param : *params) {
+        auto argumentName = param->getArgumentName().str();
+        LiteralExpr *argumentLabelArg;
+        if (argumentName.empty()) {
+          argumentLabelArg = new (C) NilLiteralExpr(sloc, implicit);
+        } else {
+          argumentLabelArg =
+              new (C) StringLiteralExpr(argumentName, SourceRange(), implicit);
+        }
+        auto parameterName = param->getParameterName().str();
+
+
+        // --- Prepare the RemoteCallArgument<Value> for the argument
+        auto argumentVarName = C.getIdentifier("_" + parameterName.str());
+        StructDecl *RCA = C.getRemoteCallArgumentDecl();
+        VarDecl *callArgVar =
+            new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
+                            argumentVarName, thunk);
+        callArgVar->setImplicit();
+        callArgVar->setSynthesized();
+
+        Pattern *callArgPattern = NamedPattern::createImplicit(C, callArgVar);
+
+        auto remoteCallArgumentInitDecl =
+            RCA->getDistributedRemoteCallArgumentInitFunction();
+        auto boundRCAType = BoundGenericType::get(
+            RCA, Type(), {thunk->mapTypeIntoContext(param->getInterfaceType())});
+        auto remoteCallArgumentInitDeclRef =
+            TypeExpr::createImplicit(boundRCAType, C);
+
+        auto initCallArgArgs = ArgumentList::forImplicitCallTo(
+            DeclNameRef(remoteCallArgumentInitDecl->getEffectiveFullName()),
+            {
+             // label:
+             argumentLabelArg,
+             // name:
+             new (C) StringLiteralExpr(parameterName, SourceRange(), implicit),
+             // _ argument:
+             new (C) DeclRefExpr(
+                 ConcreteDeclRef(param), dloc, implicit,
+                 AccessSemantics::Ordinary,
+                 thunk->mapTypeIntoContext(param->getInterfaceType()))
+            },
+            C);
+
+        auto initCallArgCallExpr =
+            CallExpr::createImplicit(C, remoteCallArgumentInitDeclRef, initCallArgArgs);
+
+        auto callArgPB = PatternBindingDecl::createImplicit(
+            C, StaticSpellingKind::None, callArgPattern, initCallArgCallExpr, thunk);
+
+        remoteBranchStmts.push_back(callArgPB);
+        remoteBranchStmts.push_back(callArgVar);
+
+        /// --- Pass the argumentRepr to the recordArgument function
+        auto recordArgArgsList = ArgumentList::forImplicitCallTo(
+            DeclNameRef(recordArgumentName),
+            {new (C) DeclRefExpr(ConcreteDeclRef(callArgVar), dloc, implicit,
+                                 AccessSemantics::Ordinary)},
+            C);
+
+        auto tryRecordArgExpr = TryExpr::createImplicit(
+            C, sloc,
+            CallExpr::createImplicit(
+                C,
+                UnresolvedDotExpr::createImplicit(
+                    C,
+                    new (C) DeclRefExpr(ConcreteDeclRef(invocationVar), dloc,
+                                        implicit, AccessSemantics::Ordinary),
+                    recordArgumentName),
+                recordArgArgsList));
+
+        remoteBranchStmts.push_back(tryRecordArgExpr);
       }
-      auto parameterName = param->getParameterName().str();
-
-
-      // --- Prepare the RemoteCallArgument<Value> for the argument
-      auto argumentVarName = C.getIdentifier("_" + parameterName.str());
-      StructDecl *RCA = C.getRemoteCallArgumentDecl();
-      VarDecl *callArgVar =
-          new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                          argumentVarName, thunk);
-      callArgVar->setImplicit();
-      callArgVar->setSynthesized();
-
-      Pattern *callArgPattern = NamedPattern::createImplicit(C, callArgVar);
-
-      auto remoteCallArgumentInitDecl =
-          RCA->getDistributedRemoteCallArgumentInitFunction();
-      auto boundRCAType = BoundGenericType::get(
-          RCA, Type(), {thunk->mapTypeIntoContext(param->getInterfaceType())});
-      auto remoteCallArgumentInitDeclRef =
-          TypeExpr::createImplicit(boundRCAType, C);
-
-      auto initCallArgArgs = ArgumentList::forImplicitCallTo(
-          DeclNameRef(remoteCallArgumentInitDecl->getEffectiveFullName()),
-          {
-           // label:
-           argumentLabelArg,
-           // name:
-           new (C) StringLiteralExpr(parameterName, SourceRange(), implicit),
-           // _ argument:
-           new (C) DeclRefExpr(
-               ConcreteDeclRef(param), dloc, implicit,
-               AccessSemantics::Ordinary,
-               thunk->mapTypeIntoContext(param->getInterfaceType()))
-          },
-          C);
-
-      auto initCallArgCallExpr =
-          CallExpr::createImplicit(C, remoteCallArgumentInitDeclRef, initCallArgArgs);
-      initCallArgCallExpr->setImplicit();
-
-      auto callArgPB = PatternBindingDecl::createImplicit(
-          C, StaticSpellingKind::None, callArgPattern, initCallArgCallExpr, thunk);
-
-      remoteBranchStmts.push_back(callArgPB);
-      remoteBranchStmts.push_back(callArgVar);
-
-      /// --- Pass the argumentRepr to the recordArgument function
-      auto recordArgArgsList = ArgumentList::forImplicitCallTo(
-          DeclNameRef(recordArgumentName),
-          {new (C) DeclRefExpr(ConcreteDeclRef(callArgVar), dloc, implicit,
-                               AccessSemantics::Ordinary)},
-          C);
-
-      auto tryRecordArgExpr = TryExpr::createImplicit(
-          C, sloc,
-          CallExpr::createImplicit(
-              C,
-              UnresolvedDotExpr::createImplicit(
-                  C,
-                  new (C) DeclRefExpr(ConcreteDeclRef(invocationVar), dloc,
-                                      implicit, AccessSemantics::Ordinary),
-                  recordArgumentName),
-              recordArgArgsList));
-
-      remoteBranchStmts.push_back(tryRecordArgExpr);
     }
   }
 
@@ -659,10 +661,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 /// This is used both to create stub witnesses as well as distributed thunks.
 ///
 /// \param DC The declaration context of the newly created function
-static FuncDecl *
-createSameSignatureFunctionDecl(DeclContext *DC, FuncDecl *func,
-                                std::optional<DeclName> nameOverride,
-                                bool forceAsync, bool forceThrows) {
+static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
+                                                         FuncDecl *func) {
   auto &C = func->getASTContext();
 
   // --- Prepare generic parameters
@@ -698,54 +698,55 @@ createSameSignatureFunctionDecl(DeclContext *DC, FuncDecl *func,
 
     paramDecls.push_back(paramDecl);
   }
-  ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
+  ParameterList *params = ParameterList::create(C, paramDecls);
 
-  DeclName funcName = nameOverride.value_or(func->getName());
-
-  FuncDecl *copy = FuncDecl::createImplicit(
-      C, swift::StaticSpellingKind::None, funcName, SourceLoc(),
-      /*async=*/forceAsync || func->hasAsync(),
-      /*throws=*/forceThrows || func->hasThrows(),
-      /*thrownType=*/Type(), genericParamList, params,
-      func->getResultInterfaceType(), DC);
-
-  copy->setSynthesized(true);
-
-  if (isa<ClassDecl>(DC))
-    copy->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
-
-  copy->setGenericSignature(baseSignature);
-  copy->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
-
-  return copy;
-}
-
-static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
-  auto &C = func->getASTContext();
-  auto DC = func->getDeclContext();
-
-  DeclName thunkName;
-
-  // Since accessors don't have names, let's generate one based on
-  // the computed property.
-  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
-    auto *var = accessor->getStorage();
-    thunkName = DeclName(C, var->getBaseName(),
-                         /*argumentNames=*/ArrayRef<Identifier>());
+  FuncDecl *thunk;
+  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+    auto accessorThunk = AccessorDecl::createImplicit(
+        C, AccessorKind::DistributedGet,
+        /*storage=*/accessor->getStorage(),
+        /*async=*/true, /*throws=*/true, // since it's a distributed thunk
+        /*thrownType=*/TypeLoc::withoutLoc(Type()),
+        func->getResultInterfaceType(),
+        DC);
+    accessorThunk->setParameters(params);
+    // An accessor does not have a name; the `var` does though,
+    // and we'll be mangling the accessor based on the Storage name (the var)
+    thunk = accessorThunk;
   } else {
     // Let's use the name of a 'distributed func'
-    thunkName = func->getName();
-  }
+    DeclName thunkName = func->getName();
 
-  FuncDecl *thunk = createSameSignatureFunctionDecl(DC, func, thunkName,
-                                                    /*forceAsync=*/true,
-                                                    /*forceThrows=*/true);
-  assert(thunk && "couldn't create a distributed thunk");
+    thunk = FuncDecl::createImplicit(
+        C, swift::StaticSpellingKind::None,
+        thunkName, SourceLoc(),
+        /*async=*/true, /*throws=*/true, // since it's a distributed thunk
+        /*thrownType=*/Type(),
+        genericParamList,
+        params, func->getResultInterfaceType(), DC);
+  }
+  thunk->setSynthesized(true);
+
+  if (isa<ClassDecl>(DC))
+    thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
+
+  thunk->setGenericSignature(baseSignature);
+  thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
   thunk->getAttrs().add(
       new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+
+  return thunk;
+}
+
+static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
+  auto DC = func->getDeclContext();
+
+  FuncDecl *thunk =
+      createSameSignatureDistributedThunkDecl(DC, func);
+  assert(thunk && "couldn't create a distributed thunk");
 
   // Protocol requirements don't have bodies.
   if (func->hasBody())

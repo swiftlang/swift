@@ -327,6 +327,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Get:
       OS << "!getter";
       break;
+    case AccessorKind::DistributedGet:
+      OS << "!_distributed_getter";
+      break;
     case AccessorKind::Set:
       OS << "!setter";
       break;

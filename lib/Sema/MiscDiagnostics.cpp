@@ -4672,6 +4672,10 @@ public:
             out << "getter: ";
             name = bestAccessor->getStorage()->getName();
             break;
+          case AccessorKind::DistributedGet:
+            out << "_distributed_getter: ";
+            name = bestAccessor->getStorage()->getName();
+            break;
 
           case AccessorKind::Set:
           case AccessorKind::WillSet:

@@ -1680,6 +1680,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       bool isMutator = [&] {
         switch (accessor->getAccessorKind()) {
         case AccessorKind::Get:
+        case AccessorKind::DistributedGet:
         case AccessorKind::Read:
         case AccessorKind::Address:
           return false;
