@@ -1270,8 +1270,6 @@ public:
     }
 
     visitAbstractStorageDecl(vd);
-
-    SGM.emitDistributedThunkForDecl(vd);
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
@@ -1449,8 +1447,6 @@ public:
     }
 
     visitAbstractStorageDecl(vd);
-
-    SGM.emitDistributedThunkForDecl(vd);
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {

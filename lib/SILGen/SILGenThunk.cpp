@@ -120,13 +120,6 @@ void SILGenModule::emitDistributedThunkForDecl(
     thunkDecl = var->getDistributedThunk();
   } else if (varOrAFD.is<AbstractFunctionDecl *>()) {
     auto afd = varOrAFD.get<AbstractFunctionDecl *>();
-
-    if (isa<AccessorDecl>(afd)) {
-      // If it is an accessor, we'll end up visiting here from the `VarDecl`,
-      // and will emit the thunk for it at that time.
-      return;
-    }
-
     thunkDecl = afd->getDistributedThunk();
   }
 
