@@ -1268,17 +1268,33 @@ ASTBuilder::findDeclContext(NodePointer node) {
       return nullptr;
 
     CanGenericSignature genericSig;
-    if (node->getNumChildren() > 2)
+    bool genericSigMatchesNominal = false;
+    if (node->getNumChildren() > 2) {
       genericSig = demangleGenericSignature(nominalDecl, node->getChild(2));
+
+      // If the generic signature are equivalent to that of the nominal type,
+      // we're either in another module or the nominal type is generic and
+      // involves inverse requirements on its generic parameters.
+      genericSigMatchesNominal = genericSig &&
+        genericSig == nominalDecl->getGenericSignatureOfContext().getCanonicalSignature();
+
+      // If the generic signature is equivalent to that of the nominal type,
+      // and we're in the same module, it's due to inverse requirements.
+      // Just return the nominal declaration.
+      if (genericSigMatchesNominal &&
+          nominalDecl->getParentModule() == moduleDecl) {
+        return nominalDecl;
+      }
+    }
 
     for (auto *ext : nominalDecl->getExtensions()) {
       if (ext->getParentModule() != moduleDecl)
         continue;
 
       if (!ext->isConstrainedExtension()) {
-        if (!genericSig ||
-            genericSig->isEqual(nominalDecl->getGenericSignature()))
+        if (!genericSig || genericSigMatchesNominal)
           return ext;
+
         continue;
       }
 
