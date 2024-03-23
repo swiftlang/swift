@@ -1478,7 +1478,7 @@ public:
       if (isRelative)
         Table.addRelativeAddress(descriptor);
       else
-        Table.addBitCast(descriptor, IGM.Int8PtrTy);
+        Table.add(descriptor);
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
@@ -1514,7 +1514,7 @@ public:
         Table.addRelativeAddress(baseWitness);
         return;
       } else if (baseWitness) {
-        Table.addBitCast(baseWitness, IGM.Int8PtrTy);
+        Table.add(baseWitness);
         return;
       }
 
