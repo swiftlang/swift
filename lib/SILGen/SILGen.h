@@ -343,13 +343,9 @@ public:
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
 
-  /// Emits a thunk from an actor function to a potentially distributed call.
-  void emitDistributedThunk(SILDeclRef thunk);
-
   /// Emits the distributed actor thunk for the decl if there is one associated
   /// with it.
-  void emitDistributedThunkForDecl(
-      llvm::PointerUnion<AbstractFunctionDecl *, VarDecl *> varOrAFD);
+  void emitDistributedThunkForDecl(AbstractFunctionDecl * afd);
 
   /// Returns true if the given declaration must be referenced through a
   /// back deployment thunk in a context with the given resilience expansion.

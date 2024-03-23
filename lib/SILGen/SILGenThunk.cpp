@@ -112,26 +112,15 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
 }
 
 void SILGenModule::emitDistributedThunkForDecl(
-    llvm::PointerUnion<AbstractFunctionDecl *, VarDecl *> varOrAFD) {
-  FuncDecl *thunkDecl =
-      varOrAFD.is<AbstractFunctionDecl *>()
-          ? varOrAFD.get<AbstractFunctionDecl *>()->getDistributedThunk()
-          : varOrAFD.get<VarDecl *>()->getDistributedThunk();
-  if (!thunkDecl)
-    return;
+    AbstractFunctionDecl *afd) {
+  FuncDecl *thunkDecl = afd->getDistributedThunk();
 
-  if (!thunkDecl->hasBody() || thunkDecl->isBodySkipped())
+  if (!thunkDecl || !thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;
 
   auto thunk = SILDeclRef(thunkDecl).asDistributed();
   emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
                          getFunction(thunk, ForDefinition));
-}
-
-void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
-  // Thunks are always emitted by need, so don't need delayed emission.
-  assert(thunk.isDistributedThunk() && "distributed thunks only");
-  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
 void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {

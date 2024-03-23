@@ -8325,6 +8325,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
 bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
+
   if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
     return false;
 

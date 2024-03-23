@@ -690,6 +690,8 @@ bool swift::isRepresentableInObjC(
         return false;
       }
       return true;
+    case AccessorKind::DistributedGet:
+      return false;
 
     case AccessorKind::Set:
       if (!storageIsObjC) {
@@ -1413,6 +1415,7 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       case AccessorKind::Read:
       case AccessorKind::WillSet:
       case AccessorKind::Init:
+      case AccessorKind::DistributedGet:
         return false;
 
       case AccessorKind::MutableAddress:
@@ -2028,6 +2031,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
+    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("Not an Objective-C entry point");
 

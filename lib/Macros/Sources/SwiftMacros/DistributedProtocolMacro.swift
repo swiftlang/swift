@@ -47,13 +47,12 @@ extension DistributedProtocolMacro {
 
     let accessModifiers: String = proto.accessModifiersString
 
-    let requirements =
-      proto.memberBlock.members.map { member in
-        member.trimmed
-      }
-    let requirementStubs = requirements
-      .map { stubMethod(access: accessModifiers, $0) }
-      .joined(separator: "\n    ")
+    let requirementStubs =
+      proto.memberBlock.members // requirements
+        .map { member in
+          stubMethodDecl(access: accessModifiers, member.trimmed)
+        }
+        .joined(separator: "\n    ")
 
     let extensionDecl: DeclSyntax =
       """
@@ -64,12 +63,25 @@ extension DistributedProtocolMacro {
     return [extensionDecl.cast(ExtensionDeclSyntax.self)]
   }
 
-  static func stubMethod(access: String, _ requirementDeclaration: MemberBlockItemListSyntax.Element) -> String {
-    """
-    \(access)\(requirementDeclaration) {
-      \(stubFunctionBody())
+  static func stubMethodDecl(access: String, _ requirement: MemberBlockItemListSyntax.Element) -> String {
+    // do we need to stub a computed variable?
+    if let variable = requirement.decl.as(VariableDeclSyntax.self) {
+      // TODO(distributed): improve stubbing computed properties of all kinds
+      let name = variable.bindings.first!.pattern.trimmed
+      let typeAnnotation = variable.bindings.first?.typeAnnotation.map { "\($0.trimmed)" } ?? "Any"
+      return """
+             \(access)\(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
+               \(stubFunctionBody())
+             }
+             """
     }
-    """
+
+    // normal function stub
+    return """
+           \(access)\(requirement) {
+             \(stubFunctionBody())
+           }
+           """
   }
 
   static func stubFunctionBody() -> DeclSyntax {
