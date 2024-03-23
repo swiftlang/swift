@@ -841,10 +841,9 @@ bb4:
 //
 // CHECK-LABEL: sil hidden [ossa] @testDeadBorrow : {{.*}} {
 // CHECK: bb0:
-// CHECK:   copy_value %1 : $C
-// CHECK:   destroy_value
-// CHECK:   copy_value %1 : $C
+// CHECK-NOT: copy_value
 // CHECK:   begin_borrow
+// CHECK:   destroy_value
 // CHECK:   unreachable
 // CHECK-LABEL: } // end sil function 'testDeadBorrow'
 sil hidden [ossa] @testDeadBorrow : $@convention(thin) () -> () {

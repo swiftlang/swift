@@ -327,18 +327,19 @@ bool swift::findInnerTransitiveGuaranteedUses(
       //
       // FIXME: visit[Extended]ScopeEndingUses can't return false here once dead
       // borrows are disallowed.
-      if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *endUse) {
-            if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+      if (!BorrowingOperand(use).visitScopeEndingUses(
+            [&](Operand *endUse) {
+              if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+                foundPointerEscape = true;
+              }
+              leafUse(endUse);
+              return true;
+            },
+            [&](Operand *unknownUse) {
               foundPointerEscape = true;
-            }
-            if (PhiOperand(endUse)) {
-              assert(endUse->getOperandOwnership() ==
-                     OperandOwnership::ForwardingConsume);
-              foundPointerEscape = true;
-            }
-            leafUse(endUse);
-            return true;
-          })) {
+              leafUse(unknownUse);
+              return true;
+            })) {
         // Special case for dead borrows. This is dangerous because clients
         // don't expect a begin_borrow to be in the use list.
         leafUse(use);
@@ -451,16 +452,12 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
       break;
     }
     case OperandOwnership::Borrow:
-      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
-      // borrows are disallowed.
       if (!BorrowingOperand(use).visitExtendedScopeEndingUses(
             [&](Operand *endUse) {
               recordUse(endUse);
               return true;
             })) {
-        // Special case for dead borrows. This is dangerous because clients
-        // don't expect a begin_borrow to be in the use list.
-        recordUse(use);
+        return false;
       }
       break;
     }
@@ -478,11 +475,6 @@ bool swift::findUsesOfSimpleValue(SILValue value,
     case OperandOwnership::Borrow:
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-          return false;
-        }
-        if (PhiOperand(use)) {
-          assert(use->getOperandOwnership() ==
-                 OperandOwnership::ForwardingConsume);
           return false;
         }
         usePoints->push_back(end);
@@ -694,7 +686,8 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
 }
 
 bool BorrowingOperand::visitScopeEndingUses(
-    function_ref<bool(Operand *)> func) const {
+  function_ref<bool(Operand *)> visitScopeEnd,
+  function_ref<bool(Operand *)> visitUnknownUse) const {
   switch (kind) {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
@@ -703,7 +696,7 @@ bool BorrowingOperand::visitScopeEndingUses(
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
         deadBorrow = false;
-        if (!func(use))
+        if (!visitScopeEnd(use))
           return false;
       }
     }
@@ -717,7 +710,7 @@ bool BorrowingOperand::visitScopeEndingUses(
     for (auto *use : cast<StoreBorrowInst>(op->getUser())->getUses()) {
       if (isa<EndBorrowInst>(use->getUser())) {
         deadBorrow = false;
-        if (!func(use))
+        if (!visitScopeEnd(use))
           return false;
       }
     }
@@ -731,7 +724,7 @@ bool BorrowingOperand::visitScopeEndingUses(
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
       deadApply = false;
-      if (!func(use))
+      if (!visitScopeEnd(use))
         return false;
     }
     return !deadApply;
@@ -742,12 +735,12 @@ bool BorrowingOperand::visitScopeEndingUses(
     // The closure's borrow lifetimes end when the closure itself ends its
     // lifetime. That may happen transitively through conversions that forward
     // ownership of the closure.
-    return user->visitOnStackLifetimeEnds(func);
+    return user->visitOnStackLifetimeEnds(visitScopeEnd);
   }
   case BorrowingOperandKind::MarkDependenceNonEscaping: {
     auto *user = cast<MarkDependenceInst>(op->getUser());
     assert(user->isNonEscaping() && "escaping dependencies don't borrow");
-    return user->visitNonEscapingLifetimeEnds(func);
+    return user->visitNonEscapingLifetimeEnds(visitScopeEnd, visitUnknownUse);
   }
   case BorrowingOperandKind::BeginAsyncLet: {
     auto user = cast<BuiltinInst>(op->getUser());
@@ -760,7 +753,7 @@ bool BorrowingOperand::visitScopeEndingUses(
           || builtinUser->getBuiltinKind() != BuiltinValueKind::EndAsyncLetLifetime)
         continue;
 
-      if (!func(use)) {
+      if (!visitScopeEnd(use)) {
         return false;
       }
     }
@@ -778,7 +771,7 @@ bool BorrowingOperand::visitScopeEndingUses(
     for (auto *use : br->getArgForOperand(op)->getUses()) {
       if (use->isLifetimeEnding()) {
         deadBranch = false;
-        if (!func(use))
+        if (!visitScopeEnd(use))
           return false;
       }
     }
@@ -789,13 +782,14 @@ bool BorrowingOperand::visitScopeEndingUses(
 }
 
 bool BorrowingOperand::visitExtendedScopeEndingUses(
-    function_ref<bool(Operand *)> visitor) const {
+  function_ref<bool(Operand *)> visitor,
+  function_ref<bool(Operand *)> visitUnknownUse) const {
 
   if (hasBorrowIntroducingUser()) {
     auto borrowedValue = getBorrowIntroducingUserResult();
     return borrowedValue.visitExtendedScopeEndingUses(visitor);
   }
-  return visitScopeEndingUses(visitor);
+  return visitScopeEndingUses(visitor, visitUnknownUse);
 }
 
 BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
@@ -857,10 +851,11 @@ void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses) const {
   // FIXME: this visitScopeEndingUses should never return false once dead
   // borrows are disallowed.
-  if (!visitScopeEndingUses([&](Operand *endOp) {
+  auto handleUse = [&](Operand *endOp) {
     foundUses.push_back(endOp);
     return true;
-  })) {
+  };
+  if (!visitScopeEndingUses(handleUse, handleUse)) {
     // Special-case for dead borrows.
     foundUses.push_back(op);
   }
@@ -987,9 +982,6 @@ bool BorrowedValue::visitExtendedScopeEndingUses(
           BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
       reborrows.insert(borrowedValue.value);
       return true;
-    }
-    if (auto phiOp = PhiOperand(scopeEndingUse)) {
-      return false;
     }
     return visitor(scopeEndingUse);
   };

@@ -41,3 +41,8 @@ struct NE {
 func bv_derive(bv: consuming BV) -> _consume(bv) BV {
   bv.derive()
 }
+
+// Test lifetime inheritance through stored properties.
+func ne_extract_member(ne: consuming NE) -> _consume(ne) BV {
+  return ne.bv
+}
