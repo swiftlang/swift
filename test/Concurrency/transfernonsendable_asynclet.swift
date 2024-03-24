@@ -68,7 +68,7 @@ func asyncLet_Let_ActorIsolated_Simple1() async {
   async let y = transferToMainInt(x) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -78,7 +78,7 @@ func asyncLet_Let_ActorIsolated_Simple2() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   let _ = await y
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
 }
 
 func asyncLet_Let_ActorIsolated_Simple3() async {
@@ -95,9 +95,9 @@ func asyncLet_Let_ActorIsolated_Simple3() async {
   if await booleanFlag {
     let _ = await y
   } else {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
   }
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
 }
 
 func asyncLet_Let_ActorIsolated_Simple4() async {
@@ -106,10 +106,10 @@ func asyncLet_Let_ActorIsolated_Simple4() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   if await booleanFlag {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
     let _ = await y
   } else {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
   }
 }
 
@@ -120,9 +120,9 @@ func asyncLet_Let_ActorIsolated_Simple5() async {
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   if await booleanFlag {
     let _ = await y
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
   } else {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
   }
 }
 
@@ -133,7 +133,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsClass1() async {
   async let y = transferToMainInt(x.field) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass?' into main actor-isolated context may introduce data races}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -142,7 +142,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsClass2() async {
   async let y = transferToMainInt(x.field) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass?' into main actor-isolated context may introduce data races}}
-  useValue(x.field) // expected-tns-note {{access here could race}}
+  useValue(x.field) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -151,7 +151,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsClass3() async {
   async let y = transferToMainInt(x.field) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass?' into main actor-isolated context may introduce data races}}
-  useValue(x.field2) // expected-tns-note {{access here could race}}
+  useValue(x.field2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -162,7 +162,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsStruct1() async {
   async let y = transferToMainInt(x.k1) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -171,7 +171,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsStruct2() async {
   async let y = transferToMainInt(x.k1) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  useValue(x.k1) // expected-tns-note {{access here could race}}
+  useValue(x.k1) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -180,7 +180,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsStruct3() async {
   async let y = transferToMainInt(x.k1) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  useValue(x.k2) // expected-tns-note {{access here could race}}
+  useValue(x.k2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -189,7 +189,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsStruct4() async {
   async let y = transferToMainInt(x.k2.field2) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox' from nonisolated context to main actor-isolated context; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass?' into main actor-isolated context may introduce data races}}
-  useValue(x.k1.field) // expected-tns-note {{access here could race}}
+  useValue(x.k1.field) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -201,7 +201,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsTuple1() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -211,7 +211,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsTuple2() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
-  useValue(x.1) // expected-tns-note {{access here could race}}
+  useValue(x.1) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -221,7 +221,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsTuple3() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
-  useValue(x.1.k2) // expected-tns-note {{access here could race}}
+  useValue(x.1.k2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -231,7 +231,7 @@ func asyncLet_Let_ActorIsolated_AccessFieldsTuple4() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass?' into main actor-isolated context may introduce data races}}
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
-  useValue(x.0.k2.field) // expected-tns-note {{access here could race}}
+  useValue(x.0.k2.field) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -245,9 +245,9 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr1() async {
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   // expected-complete-warning @-4 {{capture of 'x2' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-5 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
 }
 
 func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr2() async {
@@ -260,9 +260,9 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr2() async {
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   // expected-complete-warning @-4 {{capture of 'x2' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-5 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await y
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
 }
 
 // Make sure we emit separate errors for x and x2.
@@ -280,8 +280,8 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr3() async {
 
   // We only error on the first value captured if multiple values are captured
   // since we track a single partial_apply as a transfer instruction.
-  useValue(x) // expected-tns-note {{access here could race}}
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -292,7 +292,7 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr4() async {
 
   async let y = useValue(transferToMainInt(x) + transferToMainInt(x)) // expected-tns-warning {{transferring 'x' may cause a race}}
   // expected-tns-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  // expected-tns-note @-2:67 {{access here could race}}
+  // expected-tns-note @-2:67 {{use here could race}}
 
   // expected-complete-warning @-4 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-5 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
@@ -307,7 +307,7 @@ func asyncLet_Let_ActorIsolated_MultipleAsyncLet1() async {
   let x = NonSendableKlass()
 
   async let y = useValue(transferToMainInt(x)), z = useValue(transferToMainInt(x)) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-tns-note @-1:53 {{access here could race}}
+  // expected-tns-note @-1:53 {{use here could race}}
 
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-4 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
@@ -345,7 +345,7 @@ func asyncLet_Let_ActorIsolated_MultipleAsyncLet3() async {
   // expected-complete-warning @-5 {{capture of 'x2' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-6 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await y
   let _ = await z
 }
@@ -364,8 +364,8 @@ func asyncLet_Let_ActorIsolated_MultipleAsyncLet4() async {
 
   let _ = await y
   let _ = await z
-  useValue(x) // expected-tns-note {{access here could race}}
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
 }
 
 func asyncLet_Let_ActorIsolated_MultipleAsyncLet5() async {
@@ -381,9 +381,9 @@ func asyncLet_Let_ActorIsolated_MultipleAsyncLet5() async {
   // expected-complete-warning @-6 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   let _ = await y
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await z
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
 }
 
 func asyncLet_Let_ActorIsolated_MultipleAsyncLet6() async {
@@ -400,8 +400,8 @@ func asyncLet_Let_ActorIsolated_MultipleAsyncLet6() async {
   // expected-complete-warning @-7 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   let _ = await y
-  useValue(x) // expected-tns-note {{access here could race}}
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await z
 }
 
@@ -414,7 +414,7 @@ func asyncLet_Let_NonIsolated_Simple1() async {
   async let y = transferToNonIsolatedInt(x) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
 
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -440,9 +440,9 @@ func asyncLet_Let_NonIsolated_Simple3() async {
   if await booleanFlag {
     let _ = await y
   } else {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
   }
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
 }
 
 func asyncLet_Let_NonIsolated_Simple4() async {
@@ -451,10 +451,10 @@ func asyncLet_Let_NonIsolated_Simple4() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
 
   if await booleanFlag {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
     let _ = await y
   } else {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
   }
 }
 
@@ -467,7 +467,7 @@ func asyncLet_Let_NonIsolated_Simple5() async {
     let _ = await y
     useValue(x)
   } else {
-    useValue(x) // expected-tns-note {{access here could race}}
+    useValue(x) // expected-tns-note {{use here could race}}
   }
 }
 
@@ -478,7 +478,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsClass1() async {
   async let y = transferToNonIsolatedInt(x.field) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
 
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -487,7 +487,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsClass2() async {
   async let y = transferToNonIsolatedInt(x.field) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
 
-  useValue(x.field) // expected-tns-note {{access here could race}}
+  useValue(x.field) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -496,7 +496,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsClass3() async {
   async let y = transferToNonIsolatedInt(x.field) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
 
-  useValue(x.field2) // expected-tns-note {{access here could race}}
+  useValue(x.field2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -507,7 +507,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsStruct1() async {
   async let y = transferToNonIsolatedInt(x.k1) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
 
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -516,7 +516,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsStruct2() async {
   async let y = transferToNonIsolatedInt(x.k1) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
 
-  useValue(x.k1) // expected-tns-note {{access here could race}}
+  useValue(x.k1) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -525,7 +525,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsStruct3() async {
   async let y = transferToNonIsolatedInt(x.k1) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
 
-  useValue(x.k2) // expected-tns-note {{access here could race}}
+  useValue(x.k2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -534,7 +534,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsStruct4() async {
   async let y = transferToNonIsolatedInt(x.k2.field2) // expected-tns-warning {{transferring value of non-Sendable type 'TwoFieldKlassBox'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'TwoFieldKlassBox' in 'async let' binding}}
 
-  useValue(x.k1.field) // expected-tns-note {{access here could race}}
+  useValue(x.k1.field) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -546,7 +546,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsTuple1() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
 
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -555,7 +555,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsTuple2() async {
   async let y = transferToNonIsolatedInt(x.0.k1) // expected-tns-warning {{transferring value of non-Sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
   // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
-  useValue(x.1) // expected-tns-note {{access here could race}}
+  useValue(x.1) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -565,7 +565,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsTuple3() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
   // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
 
-  useValue(x.1.k2) // expected-tns-note {{access here could race}}
+  useValue(x.1.k2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -574,7 +574,7 @@ func asyncLet_Let_NonIsolated_AccessFieldsTuple4() async {
   async let y = transferToNonIsolatedInt(x.1.k1.field2) // expected-tns-warning {{transferring value of non-Sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
   // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '(TwoFieldKlassBox, TwoFieldKlassBox)' in 'async let' binding}}
-  useValue(x.0.k2.field) // expected-tns-note {{access here could race}}
+  useValue(x.0.k2.field) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -585,7 +585,7 @@ func asyncLet_Let_NonIsolated_CallBuriedInOtherExpr1() async {
   async let y = useValue(transferToNonIsolatedInt(x) + transferToNonIsolatedInt(x2)) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{capture of 'x2' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
   useValue(x2)
 }
@@ -597,7 +597,7 @@ func asyncLet_Let_NonIsolated_CallBuriedInOtherExpr2() async {
   async let y = useValue(transferToNonIsolatedInt(x) + transferToNonIsolatedInt(x2)) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-2 {{capture of 'x2' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await y
   useValue(x)
 }
@@ -615,8 +615,8 @@ func asyncLet_Let_NonIsolated_CallBuriedInOtherExpr3() async {
 
   // We only error on the first value captured if multiple values are captured
   // since we track a single partial_apply as a transfer instruction.
-  useValue(x) // expected-tns-note {{access here could race}}
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await y
 }
 
@@ -637,7 +637,7 @@ func asyncLet_Let_NonIsolated_MultipleAsyncLet1() async {
   let x = NonSendableKlass()
 
   async let y = useValue(transferToNonIsolatedInt(x)), z = useValue(transferToNonIsolatedInt(x)) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
-  // expected-tns-note @-1:60 {{access here could race}}
+  // expected-tns-note @-1:60 {{use here could race}}
 
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-4 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
@@ -669,7 +669,7 @@ func asyncLet_Let_NonIsolated_MultipleAsyncLet3() async {
   // expected-complete-warning @-3 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-4 {{capture of 'x2' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
 
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await y
   let _ = await z
 }
@@ -714,7 +714,7 @@ func asyncLet_Let_NonIsolated_MultipleAsyncLet6() async {
 
   let _ = await y
   useValue(x)
-  useValue(x2) // expected-tns-note {{access here could race}}
+  useValue(x2) // expected-tns-note {{use here could race}}
   let _ = await z
 }
 
@@ -726,7 +726,7 @@ func asyncLet_Let_NormalUse_Simple1() async {
   let x = NonSendableKlass()
   async let y = x // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass'; later accesses could race}}
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x) // expected-tns-note {{use here could race}}
   let _ = await y
 
 }
@@ -749,5 +749,5 @@ func asyncLetWithoutCapture() async {
   await transferToMain(y) // expected-tns-warning {{transferring 'y' may cause a race}}
   // expected-tns-note @-1 {{transferring disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  useValue(y) // expected-tns-note {{access here could race}}
+  useValue(y) // expected-tns-note {{use here could race}}
 }

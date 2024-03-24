@@ -68,7 +68,7 @@ actor ProtectsNonSendable {
       isolatedSelf.ns = l // expected-warning {{actor-isolated closure captures value of non-Sendable type 'NonSendableKlass' from nonisolated context; later accesses to value could race}}
     }
 
-    useValue(l) // expected-note {{access here could race}}
+    useValue(l) // expected-note {{use here could race}}
   }
 }
 
@@ -84,7 +84,7 @@ func normalFunc_testLocal_2() {
   let _ = { @MainActor in
     useValue(x) // expected-warning {{main actor-isolated closure captures value of non-Sendable type 'NonSendableKlass' from nonisolated context; later accesses to value could race}}
   }
-  useValue(x) // expected-note {{access here could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
 
 // We error here since we are performing a double transfer.
@@ -95,7 +95,7 @@ func transferBeforeCaptureErrors() async {
   let x = NonSendableKlass()
   await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'x' to global actor 'CustomActor'-isolated callee could cause races in between callee global actor 'CustomActor'-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{access here could race}}
+  let _ = { @MainActor in // expected-note {{use here could race}}
     useValue(x)
   }
 }

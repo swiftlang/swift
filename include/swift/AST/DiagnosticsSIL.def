@@ -930,7 +930,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===----------------------------------------------------------------------===//
 
 NOTE(regionbasedisolation_maybe_race, none,
-     "access here could race", ())
+     "use here could race", ())
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
