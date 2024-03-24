@@ -160,7 +160,7 @@ bb0:
   // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
   %useIndirect = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %useIndirect<NonSendableKlass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-note @-1 {{access here could race}}
+  // expected-note @-1 {{use here could race}}
 
   destroy_addr %1 : $*NonSendableKlass
   dealloc_stack %1 : $*NonSendableKlass
