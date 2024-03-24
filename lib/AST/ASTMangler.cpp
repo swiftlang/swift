@@ -3263,20 +3263,14 @@ void ASTMangler::appendParameterTypeListElement(
 
 void ASTMangler::appendLifetimeDependenceKind(LifetimeDependenceKind kind,
                                               bool isSelfDependence) {
-  // If we converge on dependsOn(borrowed: paramName)/dependsOn(paramName)
-  // syntax, this can be a single case value check.
-  if (kind == LifetimeDependenceKind::Borrow ||
-      kind == LifetimeDependenceKind::Mutate) {
+  if (kind == LifetimeDependenceKind::Scope) {
     if (isSelfDependence) {
       appendOperator("YLs");
     } else {
       appendOperator("Yls");
     }
   } else {
-    // If we converge on dependsOn(borrowed: paramName)/dependsOn(paramName)
-    // syntax, this can be a single case value check.
-    assert(kind == LifetimeDependenceKind::Copy ||
-           kind == LifetimeDependenceKind::Consume);
+    assert(kind == LifetimeDependenceKind::Inherit);
     if (isSelfDependence) {
       appendOperator("YLi");
     } else {

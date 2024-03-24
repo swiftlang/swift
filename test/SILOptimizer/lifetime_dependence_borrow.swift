@@ -47,7 +47,7 @@ struct MBV : ~Copyable {
   }
 
   // Requires a borrow.
-  borrowing func getBV() -> _borrow(self) BV {
+  borrowing func getBV() -> dependsOn(self) BV {
     BV(p, i)
   }
 }
@@ -63,22 +63,22 @@ struct NEBV {
 }
 
 // Propagate a borrow.
-func bv_get_borrow(container: borrowing MBV) -> _borrow(container) BV {
+func bv_get_borrow(container: borrowing MBV) -> dependsOn(container) BV {
   container.getBV()
 }
 
 // Copy a borrow.
-func bv_get_copy(container: borrowing MBV) -> _copy(container) BV {
+func bv_get_copy(container: borrowing MBV) -> dependsOn(container) BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-func bv_get_mutate(container: inout MBV) -> _mutate(container) BV {
+func bv_get_mutate(container: inout MBV) -> dependsOn(container) BV {
   container.getBV()
 }
 
 // Create and decompose a nonescapable aggregate.
-func ne_wrap_and_extract_member(cn: borrowing CN) -> _borrow(cn) BV {
+func ne_wrap_and_extract_member(cn: borrowing CN) -> dependsOn(scoped cn) BV {
   let bv = BV(cn)
   let ne = NEBV(bv)
   return ne.bv

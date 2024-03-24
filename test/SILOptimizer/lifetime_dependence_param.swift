@@ -23,7 +23,7 @@ struct BV {
   public var isEmpty: Bool { i == 0 }
 
   // Test consuming `self`
-  consuming func derive() -> _consume(self) BV {
+  consuming func derive() -> dependsOn(self) BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
     return BV(self.p, self.i)
