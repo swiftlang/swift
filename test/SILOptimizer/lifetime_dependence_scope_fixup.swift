@@ -62,15 +62,15 @@ func consume(_ o : consuming View) {}
 func use(_ o : borrowing MutableView) {}
 func consume(_ o : consuming MutableView) {}
 
-func getConsumingView(_ x: consuming View) -> _consume(x) View {
+func getConsumingView(_ x: consuming View) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
-func getBorrowingView(_ x: borrowing View) -> _borrow(x) View {
+func getBorrowingView(_ x: borrowing View) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
-func getBorrowingView(_ x: borrowing NCContainer) -> _borrow(x) View {
+func getBorrowingView(_ x: borrowing NCContainer) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 

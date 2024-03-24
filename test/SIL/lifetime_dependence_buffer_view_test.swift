@@ -1,15 +1,10 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -enable-experimental-lifetime-dependence-inference \
 // RUN:   -disable-lifetime-dependence-diagnostics
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
-// REQUIRES: noncopyable_generics
-
-// FIXME(NCG): This requires nonescaping Optionals.
-// XFAIL: *
 
 // TODO: Use real Range
 public struct FakeRange<Bound> {
@@ -66,7 +61,7 @@ public struct BufferView<Element> : ~Escapable {
   private var baseAddress: UnsafeRawPointer { start._rawValue }
 // TODO: Enable diagnostics once this initializer's store to temporary is handled  
 // CHECK: sil @$s31lifetime_dependence_scope_fixup10BufferViewV11baseAddress5count9dependsOnACyxGSVYls_Siqd__htclufC : $@convention(method) <Element><Owner> (UnsafeRawPointer, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _scope(1) @owned BufferView<Element> {
-  public init<Owner>(
+  public init<Owner: ~Copyable & ~Escapable>(
       baseAddress: UnsafeRawPointer,
       count: Int,
       dependsOn owner: borrowing Owner
@@ -76,7 +71,7 @@ public struct BufferView<Element> : ~Escapable {
       )
   }
 // CHECK: sil hidden @$s31lifetime_dependence_scope_fixup10BufferViewV5start5count9dependsOnACyxGAA0eF5IndexVyxGYls_Siqd__htclufC : $@convention(method) <Element><Owner> (BufferViewIndex<Element>, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _scope(1) @owned BufferView<Element> {
-  init<Owner>(
+  init<Owner: ~Copyable & ~Escapable>(
     start index: BufferViewIndex<Element>,
     count: Int,
     dependsOn owner: borrowing Owner
@@ -112,6 +107,11 @@ extension BufferView {
 
   public var startIndex: Index { start }
   public var endIndex: Index { start.advanced(by: count) }  
+
+  @inlinable @inline(__always) 
+  public func distance(from start: Index, to end: Index) -> Int {
+    start.distance(to: end)
+  }
  
   public subscript(position: Index) -> Element {
     get {
@@ -133,30 +133,39 @@ extension BufferView {
       )
     }
   }
-}
 
-extension Array {
-  // var view: BufferView<Element> {
-  //   withUnsafeBufferPointer {
-  //     return BufferView(unsafeBuffer: $0, storage: self)
-  //   }
-  // }
-  // TODO: Implementation of getter should not need a temporary
-  // rdar://123071321
-// CHECK: sil hidden @$sSa31lifetime_dependence_scope_fixupE4viewAA10BufferViewVyxGvg : $@convention(method) <Element> (@guaranteed Array<Element>) -> _scope(0) @owned BufferView<Element> {
-  var view: BufferView<Element> {
-    var _view : BufferView<Element>? // FIXME(NCG): This is not a thing. How did this work?
-    withUnsafePointer(to:self) {
-      _view = BufferView(baseAddress: $0, count: self.count, dependsOn: self)
-    }
-    return _view!
+  borrowing public func prefix(upTo index: BufferViewIndex<Element>) -> dependsOn(self) Self {
+    index == startIndex
+    ? Self(start: start, count: 0, dependsOn: copy self)
+    : prefix(through: index.advanced(by: -1))
+  }
+
+  borrowing public func prefix(through index: Index) -> dependsOn(self) Self {
+    let nc = distance(from: startIndex, to: index) &+ 1
+    return Self(start: start, count: nc, dependsOn: copy self)
+  }
+
+  consuming public func prefix(_ maxLength: Int) -> dependsOn(self) Self {
+    precondition(maxLength >= 0, "Can't have a prefix of negative length.")
+    let nc = maxLength < count ? maxLength : count
+    return Self(start: start, count: nc, dependsOn: self)
   }
 }
 
-public func array_view_element(a: [Int] , i: BufferViewIndex<Int>) -> Int {
+extension ContiguousArray {
+  public var view: BufferView<Element> {
+    borrowing _read {
+      yield BufferView(
+        baseAddress: _baseAddressIfContiguous!, count: count, dependsOn: self
+      )
+    }
+  }
+}
+
+public func array_view_element(a: ContiguousArray<Int> , i: BufferViewIndex<Int>) -> Int {
   a.view[i]
 }
 
-public func array_view_slice_element(a: [Int] , sliceIdx: FakeRange<BufferViewIndex<Int>>, Idx: BufferViewIndex<Int>) -> Int {
+public func array_view_slice_element(a: ContiguousArray<Int> , sliceIdx: FakeRange<BufferViewIndex<Int>>, Idx: BufferViewIndex<Int>) -> Int {
   a.view[sliceIdx][Idx]
 }

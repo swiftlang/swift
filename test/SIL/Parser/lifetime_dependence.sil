@@ -10,12 +10,12 @@ import Swift
 struct BufferView : ~Escapable {
   @_hasStorage let ptr: UnsafeRawBufferPointer { get }
   @_unsafeNonescapableResult @inlinable init(_ ptr: UnsafeRawBufferPointer)
-  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> _borrow(a) Self
+  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> _scope(a) Self
 }
 
-func derive(_ x: borrowing BufferView) ->  _borrow(x) BufferView
+func derive(_ x: borrowing BufferView) -> _scope(x) BufferView
 
-func consumeAndCreate(_ x: consuming BufferView) ->  _copy(x) BufferView
+func consumeAndCreate(_ x: consuming BufferView) -> _inherit(x) BufferView
 
 sil hidden [unsafe_nonescapable_result] @bufferviewinit1 : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView {
 bb0(%0 : $UnsafeRawBufferPointer, %1 : $@thin BufferView.Type):
