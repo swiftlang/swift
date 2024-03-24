@@ -155,6 +155,8 @@ bool CheckerLivenessInfo::compute() {
             }
           }
         }
+        // FIXME: this ignores all other forms of Borrow ownership, such as
+        // partial_apply [onstack] and mark_dependence [nonescaping].
         break;
       }
       case OperandOwnership::GuaranteedForwarding:
