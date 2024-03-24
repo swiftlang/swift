@@ -69,14 +69,14 @@ func twoTransferArg(_ x: transferring Klass, _ y: transferring Klass) {}
 func testSimpleTransferLet() {
   let k = Klass()
   transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could race}}
-  useValue(k) // expected-note {{access here could race}}
+  useValue(k) // expected-note {{use here could race}}
 }
 
 func testSimpleTransferVar() {
   var k = Klass()
   k = Klass()
   transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could race}}
-  useValue(k) // expected-note {{access here could race}}
+  useValue(k) // expected-note {{use here could race}}
 }
 
 func testSimpleTransferUseOfOtherParamNoError() {
@@ -116,13 +116,13 @@ func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y:
   // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
 
   // TODO: We should not error on this since we are transferring to the same place.
-  await transferToMain(x) // expected-note {{access here could race}}
+  await transferToMain(x) // expected-note {{use here could race}}
 }
 
 func testTransferringParameter_cannotUseAfterTransfer(_ x: transferring Klass, _ y: Klass) async {
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  useValue(x) // expected-note {{access here could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
 
 actor MyActor {
@@ -137,13 +137,13 @@ actor MyActor {
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
     await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
     // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local actor-isolated uses}}
-    await transferToMain(x) // expected-note {{access here could race}}
+    await transferToMain(x) // expected-note {{use here could race}}
   }
 
   func getNormalErrorIfUseAfterTransfer(_ x: transferring Klass) async {
     await transferToMain(x)  // expected-warning {{transferring 'x' may cause a race}}
     // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local actor-isolated uses}}
-    useValue(x) // expected-note {{access here could race}}
+    useValue(x) // expected-note {{use here could race}}
   }
 
   // After assigning into the actor, we can still use x in the actor as long as
@@ -186,7 +186,7 @@ func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
   let _ = x
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  let _ = x // expected-note {{access here could race}}
+  let _ = x // expected-note {{use here could race}}
 }
 
 
@@ -213,7 +213,7 @@ func assigningIsAMergeError(_ x: transferring Klass) async {
   await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
 
-  useValue(x) // expected-note {{access here could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
 
 func assigningIsAMergeAny(_ x: transferring Any) async {
@@ -234,7 +234,7 @@ func assigningIsAMergeAnyError(_ x: transferring Any) async {
   await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
 
-  useValue(x) // expected-note {{access here could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
 
 func canTransferAfterAssign(_ x: transferring Any) async {
@@ -260,7 +260,7 @@ func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
 
-  useValue(x) // expected-note {{access here could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
 
 func assignToEntireValueEliminatesEarlierTransfer(_ x: transferring Any) async {
@@ -291,7 +291,7 @@ func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) a
   // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
 
   // y is assigned into a field of x.
-  x.first = y // expected-note {{access here could race}}
+  x.first = y // expected-note {{use here could race}}
 
   useValue(x)
 }
@@ -306,20 +306,20 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
 
-  x.first = y  // expected-note {{access here could race}}
+  x.first = y  // expected-note {{use here could race}}
 }
 
 func doubleArgument() async {
   let x = Klass()
   twoTransferArg(x, x) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred}}
-  // expected-note @-1 {{access here could race}}
+  // expected-note @-1 {{use here could race}}
 }
 
 func testTransferSrc(_ x: transferring Klass) async {
   let y = Klass()
   await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  x = y // expected-note {{access here could race}}
+  x = y // expected-note {{use here could race}}
 }
 
 func testTransferOtherParam(_ x: transferring Klass, y: Klass) async {
