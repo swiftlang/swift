@@ -6056,72 +6056,98 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     }
 
     auto proto = conformance->getProtocol();
-    if (proto->isSpecificProtocol(
-        KnownProtocolKind::StringInterpolationProtocol)) {
-      if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
-        diagnoseMissingAppendInterpolationMethod(typeDecl);
+    
+    if (auto kp = proto->getKnownProtocolKind()) {
+      switch (*kp) {
+      case KnownProtocolKind::StringInterpolationProtocol: {
+        if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
+          diagnoseMissingAppendInterpolationMethod(typeDecl);
+        }
+        break;
       }
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      SendableConformance = conformance;
+      case KnownProtocolKind::Sendable: {
+        SendableConformance = conformance;
 
-      if (auto normal = conformance->getRootNormalConformance()) {
-        if (isImpliedByConformancePredatingConcurrency(normal))
-          sendableConformancePreconcurrency = true;
+        if (auto normal = conformance->getRootNormalConformance()) {
+          if (isImpliedByConformancePredatingConcurrency(normal))
+            sendableConformancePreconcurrency = true;
+        }
+        break;
       }
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
-      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (!classDecl->isDistributedActor()) {
-          if (classDecl->isActor()) {
-            dc->getSelfNominalTypeDecl()
-                ->diagnose(diag::actor_cannot_inherit_distributed_actor_protocol,
-                           dc->getSelfNominalTypeDecl()->getName())
-                .fixItInsert(classDecl->getStartLoc(), "distributed ");
-          } else {
-            dc->getSelfNominalTypeDecl()
-                ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
-                           dc->getSelfNominalTypeDecl()->getName())
-                .fixItReplace(nominal->getStartLoc(), "distributed actor");
+      case KnownProtocolKind::DistributedActor: {
+        if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+          if (!classDecl->isDistributedActor()) {
+            if (classDecl->isActor()) {
+              dc->getSelfNominalTypeDecl()
+                  ->diagnose(diag::actor_cannot_inherit_distributed_actor_protocol,
+                             dc->getSelfNominalTypeDecl()->getName())
+                  .fixItInsert(classDecl->getStartLoc(), "distributed ");
+            } else {
+              dc->getSelfNominalTypeDecl()
+                  ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
+                             dc->getSelfNominalTypeDecl()->getName())
+                  .fixItReplace(nominal->getStartLoc(), "distributed actor");
+            }
           }
         }
+        break;
       }
-    } else if (proto->isSpecificProtocol(
-        KnownProtocolKind::DistributedActorSystem)) {
-      checkDistributedActorSystem(nominal);
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::Actor)) {
-      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (!classDecl->isExplicitActor()) {
-          dc->getSelfNominalTypeDecl()
-              ->diagnose(diag::actor_protocol_illegal_inheritance,
-                         dc->getSelfNominalTypeDecl()->getName(),
-                         proto->getName())
-              .fixItReplace(nominal->getStartLoc(), "actor");
+      case KnownProtocolKind::DistributedActorSystem: {
+        checkDistributedActorSystem(nominal);
+        break;
+      }
+      case KnownProtocolKind::Actor: {
+        if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+          if (!classDecl->isExplicitActor()) {
+            dc->getSelfNominalTypeDecl()
+                ->diagnose(diag::actor_protocol_illegal_inheritance,
+                           dc->getSelfNominalTypeDecl()->getName(),
+                           proto->getName())
+                .fixItReplace(nominal->getStartLoc(), "actor");
+          }
         }
+        break;
       }
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::AnyActor)) {
-      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (!classDecl->isExplicitActor() &&
-            !classDecl->isExplicitDistributedActor()) {
-          dc->getSelfNominalTypeDecl()
-              ->diagnose(diag::actor_protocol_illegal_inheritance,
-                         dc->getSelfNominalTypeDecl()->getName(),
-                         proto->getName())
-              .fixItReplace(nominal->getStartLoc(), "actor");
+      case KnownProtocolKind::AnyActor: {
+        if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+          if (!classDecl->isExplicitActor() &&
+              !classDecl->isExplicitDistributedActor()) {
+            dc->getSelfNominalTypeDecl()
+                ->diagnose(diag::actor_protocol_illegal_inheritance,
+                           dc->getSelfNominalTypeDecl()->getName(),
+                           proto->getName())
+                .fixItReplace(nominal->getStartLoc(), "actor");
+          }
         }
+        break;
       }
-    } else if (proto->isSpecificProtocol(
-                   KnownProtocolKind::UnsafeSendable)) {
-      hasDeprecatedUnsafeSendable = true;
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::Executor)) {
-      tryDiagnoseExecutorConformance(Context, nominal, proto);
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      checkCopyableConformance(dc, ProtocolConformanceRef(conformance));
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
-      checkEscapableConformance(dc, ProtocolConformanceRef(conformance));
-    } else if (Context.LangOpts.hasFeature(Feature::BitwiseCopyable) &&
-               proto->isSpecificProtocol(KnownProtocolKind::BitwiseCopyable)) {
-      checkBitwiseCopyableConformance(
-          conformance, /*isImplicit=*/conformance->getSourceKind() ==
-                           ConformanceEntryKind::Synthesized);
+      case KnownProtocolKind::UnsafeSendable: {
+        hasDeprecatedUnsafeSendable = true;
+        break;
+      }
+      case KnownProtocolKind::Executor: {
+        tryDiagnoseExecutorConformance(Context, nominal, proto);
+        break;
+      }
+      case KnownProtocolKind::Copyable: {
+        checkCopyableConformance(dc, ProtocolConformanceRef(conformance));
+        break;
+      }
+      case KnownProtocolKind::Escapable: {
+        checkEscapableConformance(dc, ProtocolConformanceRef(conformance));
+        break;
+      }
+      case KnownProtocolKind::BitwiseCopyable: {
+        if (Context.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+          checkBitwiseCopyableConformance(
+              conformance, /*isImplicit=*/conformance->getSourceKind() ==
+                               ConformanceEntryKind::Synthesized);
+        }
+        break;
+      }
+      default:
+        break;
+      }
     }
   }
 

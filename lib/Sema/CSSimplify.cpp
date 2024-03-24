@@ -4118,14 +4118,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   for (auto *protoDecl : layout.getProtocols()) {
-    if (auto superclass = protoDecl->getSuperclass()) {
-      auto subKind = std::min(ConstraintKind::Subtype, kind);
-      auto result = matchTypes(type1, superclass, subKind,
-                               subflags, locator);
-      if (result.isFailure())
-        return result;
-    }
-
     switch (simplifyConformsToConstraint(type1, protoDecl, kind, locator,
                                          subflags)) {
       case SolutionKind::Solved:
