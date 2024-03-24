@@ -25,8 +25,9 @@ func methodTestTransferringResult() async {
 func methodTestTransferringArg() async {
   let x = MyType()
   let s = NSObject()
-  let _ = x.getResultWithTransferringArgument(s)  // expected-error {{binding of non-Sendable type 'NSObject' accessed after being transferred}}
-  useValue(s) // expected-note {{access here could race}}
+  let _ = x.getResultWithTransferringArgument(s)  // expected-error {{transferring 's' may cause a race}}
+  // expected-note @-1 {{'s' used after being passed as a transferring parameter; Later uses could race}}
+  useValue(s) // expected-note {{use here could race}}
 }
 
 // Make sure we just ignore the swift_attr if it is applied to something like a
@@ -46,11 +47,12 @@ func funcTestTransferringResult() async {
   let y2 = returnNSObjectFromGlobalFunction(x2)
   await transferToMain(x2) // expected-error {{transferring 'x2' may cause a race}}
   // expected-note @-1 {{transferring disconnected 'x2' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  useValue(y2) // expected-note {{access here could race}}
+  useValue(y2) // expected-note {{use here could race}}
 }
 
 func funcTestTransferringArg() async {
   let x = NSObject()
-  transferNSObjectToGlobalFunction(x) // expected-error {{binding of non-Sendable type 'NSObject' accessed after being transferred}}
-  useValue(x) // expected-note {{access here could race}}
+  transferNSObjectToGlobalFunction(x) // expected-error {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{'x' used after being passed as a transferring parameter; Later uses could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
