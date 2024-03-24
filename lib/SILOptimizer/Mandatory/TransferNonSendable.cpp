@@ -657,7 +657,7 @@ class UseAfterTransferDiagnosticInferrer {
   SILLocation baseLoc = SILLocation::invalid();
   Type baseInferredType;
 
-  struct Walker;
+  struct AutoClosureWalker;
 
 public:
   UseAfterTransferDiagnosticInferrer(
@@ -750,14 +750,19 @@ void UseAfterTransferDiagnosticInferrer::initForApply(Operand *op,
                                                isolationCrossing);
 }
 
-struct UseAfterTransferDiagnosticInferrer::Walker : ASTWalker {
+/// This walker visits an AutoClosureExpr and looks for uses of a specific
+/// captured value. We want to error on the uses in the autoclosure.
+struct UseAfterTransferDiagnosticInferrer::AutoClosureWalker : ASTWalker {
   UseAfterTransferDiagnosticInferrer &foundTypeInfo;
   ValueDecl *targetDecl;
+  SILIsolationInfo targetDeclIsolationInfo;
   SmallPtrSet<Expr *, 8> visitedCallExprDeclRefExprs;
 
-  Walker(UseAfterTransferDiagnosticInferrer &foundTypeInfo,
-         ValueDecl *targetDecl)
-      : foundTypeInfo(foundTypeInfo), targetDecl(targetDecl) {}
+  AutoClosureWalker(UseAfterTransferDiagnosticInferrer &foundTypeInfo,
+                    ValueDecl *targetDecl,
+                    SILIsolationInfo targetDeclIsolationInfo)
+      : foundTypeInfo(foundTypeInfo), targetDecl(targetDecl),
+        targetDeclIsolationInfo(targetDeclIsolationInfo) {}
 
   Expr *lookThroughExpr(Expr *expr) {
     while (true) {
@@ -810,9 +815,9 @@ struct UseAfterTransferDiagnosticInferrer::Walker : ASTWalker {
             if (declRef->getDecl() == targetDecl) {
               // Found our target!
               visitedCallExprDeclRefExprs.insert(declRef);
-              foundTypeInfo.diagnosticEmitter.emitTypedIsolationCrossing(
-                  foundTypeInfo.baseLoc, declRef->findOriginalType(),
-                  *isolationCrossing);
+              foundTypeInfo.diagnosticEmitter.emitNamedIsolationCrossingError(
+                  foundTypeInfo.baseLoc, targetDecl->getBaseIdentifier(),
+                  targetDeclIsolationInfo, *isolationCrossing);
               return Action::Continue(expr);
             }
           }
@@ -890,7 +895,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   auto captureInfo =
       autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
   auto *captureDecl = captureInfo.getDecl();
-  Walker walker(*this, captureDecl);
+  AutoClosureWalker walker(*this, captureDecl, transferOp->getIsolationInfo());
   autoClosureExpr->walk(walker);
 }
 
