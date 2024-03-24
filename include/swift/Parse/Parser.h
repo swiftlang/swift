@@ -1212,7 +1212,7 @@ public:
       return true;
     if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
         (Tok.isContextualKeyword("_resultDependsOn") ||
-         Tok.isLifetimeDependenceToken(isInSILMode())))
+         isLifetimeDependenceToken()))
       return true;
     return false;
   }
@@ -1224,23 +1224,26 @@ public:
     consumeToken();
   }
 
+  bool isLifetimeDependenceToken() {
+    if (!isInSILMode()) {
+      return Tok.isContextualKeyword("dependsOn");
+    }
+    return Tok.isContextualKeyword("_inherit") ||
+           Tok.isContextualKeyword("_scope");
+  }
+
   bool canHaveParameterSpecifierContextualKeyword() {
     // The parameter specifiers like `isolated`, `consuming`, `borrowing` are
     // also valid identifiers and could be the name of a type. Check whether
     // the following token is something that can introduce a type. Thankfully
     // none of these tokens overlap with the set of tokens that can follow an
     // identifier in a type production.
-    return Tok.is(tok::identifier)
-      && peekToken().isAny(tok::at_sign,
-                           tok::kw_inout,
-                           tok::l_paren,
-                           tok::identifier,
-                           tok::l_square,
-                           tok::kw_Any,
-                           tok::kw_Self,
-                           tok::kw__,
-                           tok::kw_var,
-                           tok::kw_let);
+    return (Tok.is(tok::identifier) &&
+            peekToken().isAny(tok::at_sign, tok::kw_inout, tok::l_paren,
+                              tok::identifier, tok::l_square, tok::kw_Any,
+                              tok::kw_Self, tok::kw__, tok::kw_var,
+                              tok::kw_let)) ||
+           isLifetimeDependenceToken();
   }
 
   struct ParsedTypeAttributeList {

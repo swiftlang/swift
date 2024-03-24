@@ -4137,8 +4137,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(
                 decl->getResultTypeRepr())) {
           for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << " " << dep.getLifetimeDependenceKindString() << "(";
-            Printer << dep.getParamString() << ") ";
+            Printer << " " << dep.getLifetimeDependenceSpecifierString() << " ";
           }
         }
       }
@@ -4378,8 +4377,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
         auto *typeRepr =
             cast<LifetimeDependentReturnTypeRepr>(decl->getResultTypeRepr());
         for (auto &dep : typeRepr->getLifetimeDependencies()) {
-          Printer << dep.getLifetimeDependenceKindString() << "(";
-          Printer << dep.getParamString() << ") ";
+          Printer << dep.getLifetimeDependenceSpecifierString() << " ";
         }
         // TODO: Handle failable initializers with lifetime dependent returns
         Printer << "Self";

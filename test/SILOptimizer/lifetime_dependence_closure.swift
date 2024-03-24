@@ -19,7 +19,7 @@ struct NCInt: ~Copyable {
 struct NEInt /*: ~Escapable*/ {
   let value: Int
 
-  init(borrowed: borrowing NCInt) -> _borrow(borrowed) Self {
+  init(borrowed: borrowing NCInt) -> dependsOn(borrowed) Self {
     self.value = borrowed.value
     return self
   }

@@ -25,7 +25,7 @@ struct NC : ~Copyable {
   let i: Int
 
   // Requires a borrow.
-  borrowing func getBV() -> _borrow(self) BV {
+  borrowing func getBV() -> dependsOn(self) BV {
     BV(p, i)
   }
 }

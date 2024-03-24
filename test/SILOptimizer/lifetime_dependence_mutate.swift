@@ -37,7 +37,7 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  mutating func getMBV() -> _mutate(self) MBV {
+  mutating func getMBV() -> dependsOn(self) MBV {
     MBV(p, c)
   }
 }

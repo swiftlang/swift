@@ -5,32 +5,56 @@ struct Container {
   let ptr: UnsafeRawBufferPointer
 }
 
+struct AnotherBufferView : ~Escapable {
+  let ptr: UnsafeRawBufferPointer
+  @_unsafeNonescapableResult
+  init(_ ptr: UnsafeRawBufferPointer) {
+    self.ptr = ptr
+  }
+}
+
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Int>) -> _borrow(arr) Self {
+  init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Int>) -> dependsOn(arr) Self {
     self.ptr = ptr
     return self
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Double>) -> _borrow(arr) Self {
+  init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Double>) -> dependsOn(arr) Self {
     self.ptr = ptr
   }
   // TODO: Once Optional is ~Escapable, the error will go away
-  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Float>) -> _borrow(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Float>) -> dependsOn(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
     if (Int.random(in: 1..<100) == 0) {
       return nil
     }
     self.ptr = ptr
   }
-  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<String>) -> _borrow(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<String>) -> dependsOn(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
     if (Int.random(in: 1..<100) == 0) {
       return nil
     }
     self.ptr = ptr
     return self
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Character>) -> dependsOn(self) Self { // expected-error{{invalid lifetime dependence on self in an initializer}}
+    self.ptr = ptr
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ arr: Array<Bool>) -> dependsOn(scoped arr) Self { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
+    self.ptr = ptr
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ arr: Array<UInt>) -> dependsOn(arr) Self { // expected-error{{invalid use of lifetime dependence on an Escapable parameter with consuming ownership}}
+    self.ptr = ptr
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ abv: AnotherBufferView) -> dependsOn(abv) Self {
+    self.ptr = ptr
+  }
+
+  consuming func consume() -> dependsOn(scoped self) BufferView { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
+    return BufferView(self.ptr)
   }
 }
 
@@ -48,72 +72,64 @@ struct WrapperStruct {
   let k: Klass
 }
 
-func invalidLifetimeDependenceOnEscapableResult(_ w: borrowing WrapperStruct) -> _borrow(w) Klass { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+func invalidLifetimeDependenceOnEscapableResult(_ w: borrowing WrapperStruct) -> dependsOn(w) Klass { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
   return w.k
 }
 
-func incorrectSelfInvalidLifetimeDependence(_ x: borrowing BufferView) -> _borrow(self) BufferView { // expected-error{{invalid lifetime dependence specifier, self is valid in non-static methods only}}
+func incorrectSelfInvalidLifetimeDependence(_ x: borrowing BufferView) -> dependsOn(self) BufferView { // expected-error{{invalid lifetime dependence specifier on non-existent self}}
   return BufferView(x.ptr)
 }
 
-func incorrectParamNameInvalidLifetimeDependence(_ x: borrowing BufferView) -> _borrow(y) BufferView { // expected-error{{invalid parameter name specified 'y'}}
+func incorrectParamNameInvalidLifetimeDependence(_ x: borrowing BufferView) -> dependsOn(y) BufferView { // expected-error{{invalid parameter name specified 'y'}}
   return BufferView(x.ptr)
 }
 
-func duplicateParamInvalidLifetimeDependence1(_ x: borrowing BufferView) -> _borrow(x, x) BufferView { // expected-error{{duplicate lifetime dependence specifier}}
+func duplicateParamInvalidLifetimeDependence1(_ x: borrowing BufferView) -> dependsOn(x, x) BufferView { // expected-error{{duplicate lifetime dependence specifier}}
   return BufferView(x.ptr)
 }
 
-func duplicateParamInvalidLifetimeDependence2(_ x: borrowing BufferView) -> _borrow(x) _borrow(x) BufferView { // expected-error{{duplicate lifetime dependence specifier}}
+func duplicateParamInvalidLifetimeDependence2(_ x: borrowing BufferView) -> dependsOn(x) dependsOn(x) BufferView { // expected-error{{duplicate lifetime dependence specifier}}
   return BufferView(x.ptr)
 }
 
-func duplicateParamInvalidLifetimeDependence3(_ x: borrowing BufferView) -> _borrow(x) _copy(x) BufferView { // expected-error{{duplicate lifetime dependence specifier}}
+func duplicateParamInvalidLifetimeDependence3(_ x: borrowing BufferView) -> dependsOn(x) dependsOn(x) BufferView { // expected-error{{duplicate lifetime dependence specifier}}
   return BufferView(x.ptr)
 }
 
-func consumingParamInvalidLifetimeDependence1(_ x: consuming BufferView) -> _borrow(x) BufferView { // expected-error{{invalid use of borrow lifetime dependence for consuming ownership}}
+func consumingParamInvalidLifetimeDependence1(_ x: consuming BufferView) -> dependsOn(scoped x) BufferView { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
   return BufferView(x.ptr)
 }
 
-func consumingParamInvalidLifetimeDependence2(_ x: consuming BufferView) -> _mutate(x) BufferView { // expected-error{{invalid use of mutate lifetime dependence for consuming ownership}}
+func borrowingParamInvalidLifetimeDependence1(_ x: borrowing BufferView) -> dependsOn(x) BufferView {
   return BufferView(x.ptr)
 }
 
-func borrowingParamInvalidLifetimeDependence1(_ x: borrowing BufferView) -> _consume(x) BufferView { // expected-error{{invalid use of consume lifetime dependence for borrowing ownership}}
+func implicitBorrowingParamLifetimeDependence1(_ x: BufferView) -> dependsOn(x) BufferView {
   return BufferView(x.ptr)
 }
 
-func borrowingParamInvalidLifetimeDependence2(_ x: borrowing BufferView) -> _mutate(x) BufferView { // expected-error{{invalid use of mutate lifetime dependence for borrowing ownership}}
+func implicitBorrowingParamLifetimeDependence2(_ x: BufferView) -> dependsOn(scoped x) BufferView {
   return BufferView(x.ptr)
 }
 
-func implicitBorrowingParamInvalidLifetimeDependence1(_ x: BufferView) -> _consume(x) BufferView { // expected-error{{lifetime dependence can only be specified on parameters with ownership modifiers (borrowing, consuming, inout)}}
+func inoutParamLifetimeDependence1(_ x: inout BufferView) -> dependsOn(x) BufferView {
   return BufferView(x.ptr)
 }
 
-func implicitBorrowingParamInvalidLifetimeDependence2(_ x: BufferView) -> _mutate(x) BufferView {// expected-error{{lifetime dependence can only be specified on parameters with ownership modifiers (borrowing, consuming, inout)}}
+func inoutParamLifetimeDependence2(_ x: inout BufferView) -> dependsOn(scoped x) BufferView {
   return BufferView(x.ptr)
 }
 
-func inoutParamInvalidLifetimeDependence1(_ x: inout BufferView) -> _consume(x) BufferView { // expected-error{{invalid use of consume lifetime dependence for inout ownership}}
-  return BufferView(x.ptr)
-}
-
-func inoutParamInvalidLifetimeDependence2(_ x: inout BufferView) -> _borrow(x) BufferView { // expected-error{{invalid use of borrow lifetime dependence for inout ownership}}
-  return BufferView(x.ptr)
-}
-
-func invalidSpecifierPosition1(_ x: borrowing _borrow(x) BufferView) -> BufferView { // expected-error{{lifetime dependence specifiers may only be used on result of functions, methods, initializers}}
+func invalidSpecifierPosition1(_ x: borrowing dependsOn(x) BufferView) -> BufferView { // expected-error{{lifetime dependence specifiers may only be used on result of functions, methods, initializers}}
   return BufferView(x.ptr)
 }
 
 func invalidSpecifierPosition2(_ x: borrowing BufferView) -> BufferView { 
-  let y: _borrow(x) x // expected-error{{lifetime dependence specifiers may only be used on result of functions, methods, initializers}}
+  let y: dependsOn(x) x // expected-error{{lifetime dependence specifiers may only be used on result of functions, methods, initializers}}
   return BufferView(y.ptr)
 }
 
-func invalidTupleLifetimeDependence(_ x: inout BufferView) -> (_mutate(x) BufferView, BufferView) { // expected-error{{lifetime dependence specifiers cannot be applied to tuple elements}}
+func invalidTupleLifetimeDependence(_ x: inout BufferView) -> (dependsOn(x) BufferView, BufferView) { // expected-error{{lifetime dependence specifiers cannot be applied to tuple elements}}
   return (BufferView(x.ptr), BufferView(x.ptr))
 }
 
@@ -122,43 +138,43 @@ struct Wrapper : ~Escapable {
   init(_ view: consuming BufferView) {
     self.view = view
   }
-  borrowing func getView1() -> _borrow(self) BufferView {
+  borrowing func getView1() -> dependsOn(self) BufferView {
     return view
   }
 
-  consuming func getView2() -> _consume(self) BufferView {
+  consuming func getView2() -> dependsOn(self) BufferView {
     return view
   }
 
-  mutating func getView3() -> _copy(self) BufferView {
+  mutating func getView3() -> dependsOn(self) BufferView {
     return view
   }
 
-  borrowing func getView4() -> _copy(self) BufferView {
+  borrowing func getView4() -> dependsOn(self) BufferView {
     return view
   }
 
-  borrowing func borrowingMethodInvalidLifetimeDependence1() -> _consume(self) BufferView { // expected-error{{invalid use of consume lifetime dependence for borrowing ownership}}
+  borrowing func borrowingMethodLifetimeDependence1() -> dependsOn(self) BufferView { 
     return view
   }
 
-  borrowing func borrowingMethodInvalidLifetimeDependence2() -> _mutate(self) BufferView { // expected-error{{invalid use of mutate lifetime dependence for borrowing ownership}}
+  borrowing func borrowingMethodLifetimeDependence2() -> dependsOn(scoped self) BufferView {
     return view
   }
 
-  consuming func consumingMethodInvalidLifetimeDependence1() -> _borrow(self) BufferView { // expected-error{{invalid use of borrow lifetime dependence for consuming ownership}}
+  consuming func consumingMethodLifetimeDependence1() -> dependsOn(self) BufferView {
     return view
   }
 
-  consuming func consumingMethodInvalidLifetimeDependence2() -> _mutate(self) BufferView { // expected-error{{invalid use of mutate lifetime dependence for consuming ownership}}
+  consuming func consumingMethodInvalidLifetimeDependence1() -> dependsOn(scoped self) BufferView { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
     return view
   }
 
-  mutating func mutatingMethodInvalidLifetimeDependence1() -> _borrow(self) BufferView { // expected-error{{invalid use of borrow lifetime dependence for inout ownership}}
+  mutating func mutatingMethodLifetimeDependence1() -> dependsOn(self) BufferView {
     return view
   }
 
-  mutating func mutatingMethodInvalidLifetimeDependence2() -> _consume(self) BufferView { // expected-error{{invalid use of consume lifetime dependence for inout ownership}}
+  mutating func mutatingMethodLifetimeDependence2() -> dependsOn(scoped self) BufferView {
     return view
   } 
 }
@@ -172,7 +188,7 @@ public struct GenericBufferView<Element> : ~Escapable {
 
   public init<Storage>(unsafeBuffer: UnsafeBufferPointer<Element>,
                        storage: borrowing Storage)
-    -> _borrow(storage) Self {
+    -> dependsOn(storage) Self {
     let baseAddress = unsafeBuffer.baseAddress!
     self = GenericBufferView<Element>(baseAddress: baseAddress,
                                       count: unsafeBuffer.count)

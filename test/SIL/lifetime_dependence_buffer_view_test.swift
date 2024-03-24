@@ -134,18 +134,18 @@ extension BufferView {
     }
   }
 
-  borrowing public func prefix(upTo index: BufferViewIndex<Element>) -> _borrow(self) Self {
+  borrowing public func prefix(upTo index: BufferViewIndex<Element>) -> dependsOn(self) Self {
     index == startIndex
     ? Self(start: start, count: 0, dependsOn: copy self)
     : prefix(through: index.advanced(by: -1))
   }
 
-  borrowing public func prefix(through index: Index) -> _borrow(self) Self {
+  borrowing public func prefix(through index: Index) -> dependsOn(self) Self {
     let nc = distance(from: startIndex, to: index) &+ 1
     return Self(start: start, count: nc, dependsOn: copy self)
   }
 
-  consuming public func prefix(_ maxLength: Int) -> _consume(self) Self {
+  consuming public func prefix(_ maxLength: Int) -> dependsOn(self) Self {
     precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let nc = maxLength < count ? maxLength : count
     return Self(start: start, count: nc, dependsOn: self)
