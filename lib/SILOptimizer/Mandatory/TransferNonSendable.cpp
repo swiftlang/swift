@@ -493,8 +493,7 @@ public:
 
   void emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
                                        SILIsolationInfo namesIsolationInfo,
-                                       ApplyIsolationCrossing isolationCrossing,
-                                       SILLocation variableDefinedLoc) {
+                                       ApplyIsolationCrossing isolationCrossing) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
@@ -523,7 +522,24 @@ public:
     emitRequireInstDiagnostics();
   }
 
-  void emitUseOfStronglyTransferredValue(SILLocation loc, Type inferredType) {
+  void emitNamedUseOfStronglyTransferredValue(SILLocation loc,
+                                              Identifier name) {
+    // Emit the short error.
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
+        .highlight(loc.getSourceRange());
+
+    // Then emit the note with greater context.
+    diagnoseNote(
+        loc, diag::regionbasedisolation_named_stronglytransferred_binding, name)
+        .highlight(loc.getSourceRange());
+
+    // Finally the require points.
+    emitRequireInstDiagnostics();
+  }
+
+  void emitTypedUseOfStronglyTransferredValue(SILLocation loc,
+                                              Type inferredType) {
     diagnoseError(
         loc,
         diag::
@@ -783,7 +799,16 @@ void UseAfterTransferDiagnosticInferrer::infer() {
            "We should never transfer an indirect out parameter");
     if (fas.getArgumentParameterInfo(*transferOp->getOperand())
             .hasOption(SILParameterInfo::Transferring)) {
-      return diagnosticEmitter.emitUseOfStronglyTransferredValue(
+
+      // First try to do the named diagnostic if we can find a name.
+      if (auto rootValueAndName =
+              inferNameAndRootFromValue(transferOp->get())) {
+        return diagnosticEmitter.emitNamedUseOfStronglyTransferredValue(
+            baseLoc, rootValueAndName->first);
+      }
+
+      // Otherwise, emit the typed diagnostic.
+      return diagnosticEmitter.emitTypedUseOfStronglyTransferredValue(
           baseLoc, baseInferredType);
     }
   }
@@ -804,20 +829,9 @@ void UseAfterTransferDiagnosticInferrer::infer() {
     // Before we do anything further, see if we can find a name and emit a name
     // error.
     if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
-      if (auto *svi =
-              dyn_cast<SingleValueInstruction>(rootValueAndName->second)) {
-        return diagnosticEmitter.emitNamedIsolationCrossingError(
-            baseLoc, rootValueAndName->first, transferOp->getIsolationInfo(),
-            *sourceApply->getIsolationCrossing(), svi->getLoc());
-      }
-
-      if (auto *fArg =
-              dyn_cast<SILFunctionArgument>(rootValueAndName->second)) {
-        return diagnosticEmitter.emitNamedIsolationCrossingError(
-            baseLoc, rootValueAndName->first, transferOp->getIsolationInfo(),
-            *sourceApply->getIsolationCrossing(),
-            RegularLocation(fArg->getDecl()->getLoc()));
-      }
+      return diagnosticEmitter.emitNamedIsolationCrossingError(
+          baseLoc, rootValueAndName->first, transferOp->getIsolationInfo(),
+          *sourceApply->getIsolationCrossing());
     }
 
     // Otherwise, try to infer from the ApplyExpr.
