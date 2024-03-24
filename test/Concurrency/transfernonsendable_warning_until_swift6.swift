@@ -49,7 +49,8 @@ func testAssigningParameterIntoTransferringParameter(_ x: transferring NonSendab
 func testIsolationCrossingDueToCapture() async {
   let x = NonSendableType()
   let _ = { @MainActor in
-    print(x) // expected-error {{main actor-isolated closure captures value of non-Sendable type 'NonSendableType' from nonisolated context; later accesses to value could race}}
+    print(x) // expected-error {{transferring 'x' may cause a race}}
+    // expected-note @-1 {{disconnected 'x' is captured by main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
   useValue(x) // expected-note {{use here could race}}
 }

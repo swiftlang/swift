@@ -949,7 +949,7 @@ ERROR(regionbasedisolation_isolated_capture_yields_race, none,
       "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
       (Type, ActorIsolation, ActorIsolation))
 ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
-      "binding of non-Sendable type %0 accessed after being transferred; later accesses could race",
+      "value of non-Sendable type %0 accessed after being transferred; later accesses could race",
       (Type))
 ERROR(regionbasedisolation_arg_transferred, none,
       "%0 value of type %1 transferred to %2 context; later accesses to value could race",
@@ -981,6 +981,12 @@ NOTE(regionbasedisolation_named_transfer_into_transferring_param, none,
 NOTE(regionbasedisolation_named_notransfer_transfer_into_result, none,
      "%0 %1 cannot be a transferring result. %0 uses may race with caller uses",
      (StringRef, Identifier))
+NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
+      "%0 used after being passed as a transferring parameter; Later uses could race",
+      (Identifier))
+NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
+      "%0 %1 is captured by %2 closure. %2 uses in closure may race against later %3 uses",
+      (StringRef, Identifier, ActorIsolation, ActorIsolation))
 
 // Misc Error.
 ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,

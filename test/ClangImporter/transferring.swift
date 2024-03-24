@@ -28,11 +28,11 @@ func funcTestTransferringResult() async {
   let x2 = NonSendableCStruct()
   let y2 = returnUserDefinedFromGlobalFunction(x2)
   await transferToMain(x2) // expected-error {{transferring value of non-Sendable type 'NonSendableCStruct' from nonisolated context to main actor-isolated context}}
-  useValue(y2) // expected-note {{access here could race}}
+  useValue(y2) // expected-note {{use here could race}}
 }
 
 func funcTestTransferringArg() async {
   let x = NonSendableCStruct()
-  transferUserDefinedIntoGlobalFunction(x) // expected-error {{binding of non-Sendable type 'NonSendableCStruct' accessed after being transferred}}
-  useValue(x) // expected-note {{access here could race}}
+  transferUserDefinedIntoGlobalFunction(x) // expected-error {{value of non-Sendable type 'NonSendableCStruct' accessed after being transferred; later accesses could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
