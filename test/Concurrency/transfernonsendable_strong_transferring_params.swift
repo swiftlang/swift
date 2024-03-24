@@ -68,14 +68,16 @@ func twoTransferArg(_ x: transferring Klass, _ y: transferring Klass) {}
 
 func testSimpleTransferLet() {
   let k = Klass()
-  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could race}}
+  transferArg(k) // expected-warning {{transferring 'k' may cause a race}}
+  // expected-note @-1 {{'k' used after being passed as a transferring parameter}}
   useValue(k) // expected-note {{use here could race}}
 }
 
 func testSimpleTransferVar() {
   var k = Klass()
   k = Klass()
-  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could race}}
+  transferArg(k) // expected-warning {{transferring 'k' may cause a race}}
+  // expected-note @-1 {{'k' used after being passed as a transferring parameter}}
   useValue(k) // expected-note {{use here could race}}
 }
 
@@ -311,8 +313,9 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
 
 func doubleArgument() async {
   let x = Klass()
-  twoTransferArg(x, x) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred}}
-  // expected-note @-1 {{use here could race}}
+  twoTransferArg(x, x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{'x' used after being passed as a transferring parameter}}
+  // expected-note @-2 {{use here could race}}
 }
 
 func testTransferSrc(_ x: transferring Klass) async {

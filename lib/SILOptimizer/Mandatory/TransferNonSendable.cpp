@@ -491,10 +491,10 @@ public:
       emitUnknownPatternError();
   }
 
-  void emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
-                                       SILIsolationInfo namesIsolationInfo,
-                                       ApplyIsolationCrossing isolationCrossing,
-                                       SILLocation variableDefinedLoc) {
+  void
+  emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
+                                  SILIsolationInfo namedValuesIsolationInfo,
+                                  ApplyIsolationCrossing isolationCrossing) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
@@ -504,7 +504,7 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      namesIsolationInfo.printForDiagnostics(os);
+      namedValuesIsolationInfo.printForDiagnostics(os);
     }
     diagnoseNote(
         loc, diag::regionbasedisolation_named_info_transfer_yields_race, name,
@@ -523,7 +523,24 @@ public:
     emitRequireInstDiagnostics();
   }
 
-  void emitUseOfStronglyTransferredValue(SILLocation loc, Type inferredType) {
+  void emitNamedUseOfStronglyTransferredValue(SILLocation loc,
+                                              Identifier name) {
+    // Emit the short error.
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
+        .highlight(loc.getSourceRange());
+
+    // Then emit the note with greater context.
+    diagnoseNote(
+        loc, diag::regionbasedisolation_named_stronglytransferred_binding, name)
+        .highlight(loc.getSourceRange());
+
+    // Finally the require points.
+    emitRequireInstDiagnostics();
+  }
+
+  void emitTypedUseOfStronglyTransferredValue(SILLocation loc,
+                                              Type inferredType) {
     diagnoseError(
         loc,
         diag::
@@ -538,6 +555,29 @@ public:
     diagnoseError(loc,
                   diag::regionbasedisolation_transfer_yields_race_no_isolation,
                   inferredType)
+        .highlight(loc.getSourceRange());
+    emitRequireInstDiagnostics();
+  }
+
+  void emitNamedIsolationCrossingDueToCapture(
+      SILLocation loc, Identifier name,
+      SILIsolationInfo namedValuesIsolationInfo,
+      ApplyIsolationCrossing isolationCrossing) {
+    // Emit the short error.
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
+        .highlight(loc.getSourceRange());
+
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      namedValuesIsolationInfo.printForDiagnostics(os);
+    }
+
+    diagnoseNote(
+        loc, diag::regionbasedisolation_named_isolated_closure_yields_race,
+        descriptiveKindStr, name, isolationCrossing.getCalleeIsolation(),
+        isolationCrossing.getCallerIsolation())
         .highlight(loc.getSourceRange());
     emitRequireInstDiagnostics();
   }
@@ -617,7 +657,7 @@ class UseAfterTransferDiagnosticInferrer {
   SILLocation baseLoc = SILLocation::invalid();
   Type baseInferredType;
 
-  struct Walker;
+  struct AutoClosureWalker;
 
 public:
   UseAfterTransferDiagnosticInferrer(
@@ -671,16 +711,25 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
     return false;
 
   unsigned opIndex = ApplySite(op->getUser()).getAppliedArgIndex(*op);
+  bool emittedDiagnostic = false;
   for (auto &p : foundCapturedIsolationCrossing) {
-    if (std::get<1>(p) == opIndex) {
-      diagnosticEmitter.emitTypedIsolationCrossingDueToCapture(
-          RegularLocation(std::get<0>(p).getLoc()), baseInferredType,
-          std::get<2>(p));
-      return true;
+    if (std::get<1>(p) != opIndex)
+      continue;
+    emittedDiagnostic = true;
+
+    if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
+      diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
+          RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
+          transferOp->getIsolationInfo(), std::get<2>(p));
+      continue;
     }
+
+    diagnosticEmitter.emitTypedIsolationCrossingDueToCapture(
+        RegularLocation(std::get<0>(p).getLoc()), baseInferredType,
+        std::get<2>(p));
   }
 
-  return false;
+  return emittedDiagnostic;
 }
 
 void UseAfterTransferDiagnosticInferrer::initForApply(Operand *op,
@@ -701,14 +750,19 @@ void UseAfterTransferDiagnosticInferrer::initForApply(Operand *op,
                                                isolationCrossing);
 }
 
-struct UseAfterTransferDiagnosticInferrer::Walker : ASTWalker {
+/// This walker visits an AutoClosureExpr and looks for uses of a specific
+/// captured value. We want to error on the uses in the autoclosure.
+struct UseAfterTransferDiagnosticInferrer::AutoClosureWalker : ASTWalker {
   UseAfterTransferDiagnosticInferrer &foundTypeInfo;
   ValueDecl *targetDecl;
+  SILIsolationInfo targetDeclIsolationInfo;
   SmallPtrSet<Expr *, 8> visitedCallExprDeclRefExprs;
 
-  Walker(UseAfterTransferDiagnosticInferrer &foundTypeInfo,
-         ValueDecl *targetDecl)
-      : foundTypeInfo(foundTypeInfo), targetDecl(targetDecl) {}
+  AutoClosureWalker(UseAfterTransferDiagnosticInferrer &foundTypeInfo,
+                    ValueDecl *targetDecl,
+                    SILIsolationInfo targetDeclIsolationInfo)
+      : foundTypeInfo(foundTypeInfo), targetDecl(targetDecl),
+        targetDeclIsolationInfo(targetDeclIsolationInfo) {}
 
   Expr *lookThroughExpr(Expr *expr) {
     while (true) {
@@ -761,9 +815,9 @@ struct UseAfterTransferDiagnosticInferrer::Walker : ASTWalker {
             if (declRef->getDecl() == targetDecl) {
               // Found our target!
               visitedCallExprDeclRefExprs.insert(declRef);
-              foundTypeInfo.diagnosticEmitter.emitTypedIsolationCrossing(
-                  foundTypeInfo.baseLoc, declRef->findOriginalType(),
-                  *isolationCrossing);
+              foundTypeInfo.diagnosticEmitter.emitNamedIsolationCrossingError(
+                  foundTypeInfo.baseLoc, targetDecl->getBaseIdentifier(),
+                  targetDeclIsolationInfo, *isolationCrossing);
               return Action::Continue(expr);
             }
           }
@@ -783,7 +837,16 @@ void UseAfterTransferDiagnosticInferrer::infer() {
            "We should never transfer an indirect out parameter");
     if (fas.getArgumentParameterInfo(*transferOp->getOperand())
             .hasOption(SILParameterInfo::Transferring)) {
-      return diagnosticEmitter.emitUseOfStronglyTransferredValue(
+
+      // First try to do the named diagnostic if we can find a name.
+      if (auto rootValueAndName =
+              inferNameAndRootFromValue(transferOp->get())) {
+        return diagnosticEmitter.emitNamedUseOfStronglyTransferredValue(
+            baseLoc, rootValueAndName->first);
+      }
+
+      // Otherwise, emit the typed diagnostic.
+      return diagnosticEmitter.emitTypedUseOfStronglyTransferredValue(
           baseLoc, baseInferredType);
     }
   }
@@ -804,20 +867,9 @@ void UseAfterTransferDiagnosticInferrer::infer() {
     // Before we do anything further, see if we can find a name and emit a name
     // error.
     if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
-      if (auto *svi =
-              dyn_cast<SingleValueInstruction>(rootValueAndName->second)) {
-        return diagnosticEmitter.emitNamedIsolationCrossingError(
-            baseLoc, rootValueAndName->first, transferOp->getIsolationInfo(),
-            *sourceApply->getIsolationCrossing(), svi->getLoc());
-      }
-
-      if (auto *fArg =
-              dyn_cast<SILFunctionArgument>(rootValueAndName->second)) {
-        return diagnosticEmitter.emitNamedIsolationCrossingError(
-            baseLoc, rootValueAndName->first, transferOp->getIsolationInfo(),
-            *sourceApply->getIsolationCrossing(),
-            RegularLocation(fArg->getDecl()->getLoc()));
-      }
+      return diagnosticEmitter.emitNamedIsolationCrossingError(
+          baseLoc, rootValueAndName->first, transferOp->getIsolationInfo(),
+          *sourceApply->getIsolationCrossing());
     }
 
     // Otherwise, try to infer from the ApplyExpr.
@@ -843,7 +895,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   auto captureInfo =
       autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
   auto *captureDecl = captureInfo.getDecl();
-  Walker walker(*this, captureDecl);
+  AutoClosureWalker walker(*this, captureDecl, transferOp->getIsolationInfo());
   autoClosureExpr->walk(walker);
 }
 
