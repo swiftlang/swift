@@ -86,3 +86,16 @@ func useAtomicRepresentation() {
   let x = UnsafePointer<Int>.AtomicRepresentation()
   print(x)
 }
+
+struct Box<Wrapped: ~Copyable>: ~Copyable { }
+
+struct List<Element: ~Copyable>: ~Copyable {
+  // CHECK: $s4test4ListVAARiczrlE4NodeVwst
+  struct Node: ~Copyable {
+    var element: Element
+    var next: Link
+  }
+  typealias Link = Box<Node>?
+
+  var head: Link
+}
