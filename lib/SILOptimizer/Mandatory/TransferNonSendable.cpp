@@ -491,9 +491,10 @@ public:
       emitUnknownPatternError();
   }
 
-  void emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
-                                       SILIsolationInfo namesIsolationInfo,
-                                       ApplyIsolationCrossing isolationCrossing) {
+  void
+  emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
+                                  SILIsolationInfo namedValuesIsolationInfo,
+                                  ApplyIsolationCrossing isolationCrossing) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
@@ -503,7 +504,7 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      namesIsolationInfo.printForDiagnostics(os);
+      namedValuesIsolationInfo.printForDiagnostics(os);
     }
     diagnoseNote(
         loc, diag::regionbasedisolation_named_info_transfer_yields_race, name,
@@ -554,6 +555,29 @@ public:
     diagnoseError(loc,
                   diag::regionbasedisolation_transfer_yields_race_no_isolation,
                   inferredType)
+        .highlight(loc.getSourceRange());
+    emitRequireInstDiagnostics();
+  }
+
+  void emitNamedIsolationCrossingDueToCapture(
+      SILLocation loc, Identifier name,
+      SILIsolationInfo namedValuesIsolationInfo,
+      ApplyIsolationCrossing isolationCrossing) {
+    // Emit the short error.
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
+        .highlight(loc.getSourceRange());
+
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      namedValuesIsolationInfo.printForDiagnostics(os);
+    }
+
+    diagnoseNote(
+        loc, diag::regionbasedisolation_named_isolated_closure_yields_race,
+        descriptiveKindStr, name, isolationCrossing.getCalleeIsolation(),
+        isolationCrossing.getCallerIsolation())
         .highlight(loc.getSourceRange());
     emitRequireInstDiagnostics();
   }
@@ -687,16 +711,25 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
     return false;
 
   unsigned opIndex = ApplySite(op->getUser()).getAppliedArgIndex(*op);
+  bool emittedDiagnostic = false;
   for (auto &p : foundCapturedIsolationCrossing) {
-    if (std::get<1>(p) == opIndex) {
-      diagnosticEmitter.emitTypedIsolationCrossingDueToCapture(
-          RegularLocation(std::get<0>(p).getLoc()), baseInferredType,
-          std::get<2>(p));
-      return true;
+    if (std::get<1>(p) != opIndex)
+      continue;
+    emittedDiagnostic = true;
+
+    if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
+      diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
+          RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
+          transferOp->getIsolationInfo(), std::get<2>(p));
+      continue;
     }
+
+    diagnosticEmitter.emitTypedIsolationCrossingDueToCapture(
+        RegularLocation(std::get<0>(p).getLoc()), baseInferredType,
+        std::get<2>(p));
   }
 
-  return false;
+  return emittedDiagnostic;
 }
 
 void UseAfterTransferDiagnosticInferrer::initForApply(Operand *op,
