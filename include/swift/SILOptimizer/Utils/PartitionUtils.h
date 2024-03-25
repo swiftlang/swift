@@ -107,24 +107,26 @@ public:
 
 private:
   Kind kind;
-  // clang-format off
-  std::variant<
-    // Used for actor isolated when we have ActorIsolation info from the AST.
-    ActorIsolation,
-    // The task isolated parameter when we find a task isolated value.
-    SILValue
-  > data;
-  // clang-format on
 
-  SILIsolationInfo(ActorIsolation actorIsolation)
-      : kind(Actor), data(actorIsolation) {}
+  /// The actor isolation if this value has one. The default unspecified case
+  /// otherwise.
+  ActorIsolation actorIsolation;
 
-  SILIsolationInfo(Kind kind, SILValue value) : kind(kind), data(value) {}
+  /// This is the value that we got isolation from if we were able to find
+  /// one. Used for isolation history.
+  SILValue isolationSource;
 
-  SILIsolationInfo(Kind kind) : kind(kind), data() {}
+  SILIsolationInfo(ActorIsolation actorIsolation, SILValue isolationSource)
+      : kind(Actor), actorIsolation(actorIsolation),
+        isolationSource(isolationSource) {}
+
+  SILIsolationInfo(Kind kind, SILValue isolationSource)
+      : kind(kind), actorIsolation(), isolationSource(isolationSource) {}
+
+  SILIsolationInfo(Kind kind) : kind(kind), actorIsolation() {}
 
 public:
-  SILIsolationInfo() : kind(Kind::Unknown), data() {}
+  SILIsolationInfo() : kind(Kind::Unknown), actorIsolation() {}
 
   operator bool() const { return kind != Kind::Unknown; }
 
@@ -147,47 +149,50 @@ public:
 
   ActorIsolation getActorIsolation() const {
     assert(kind == Actor);
-    assert(std::holds_alternative<ActorIsolation>(data) &&
-           "Doesn't have an actor isolation?!");
-    return std::get<ActorIsolation>(data);
+    return actorIsolation;
   }
 
-  SILValue getTaskIsolatedValue() const {
-    assert(kind == Task);
-    assert(std::holds_alternative<SILValue>(data) &&
-           "Doesn't have a task isolated value");
-    return std::get<SILValue>(data);
+  // If we are actor or task isolated and could find a specific value that
+  // caused the isolation, put it here. Used for isolation history.
+  SILValue getIsolatedValue() const {
+    assert(kind == Task || kind == Actor);
+    return isolationSource;
   }
 
   bool hasActorIsolation() const { return kind == Actor; }
 
-  bool hasTaskIsolatedValue() const {
-    return kind == Task && std::holds_alternative<SILValue>(data);
+  bool hasIsolatedValue() const {
+    return (kind == Task || kind == Actor) && bool(isolationSource);
   }
 
   [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const;
 
-  SILIsolationInfo withActorIsolated(ActorIsolation isolation) {
-    return SILIsolationInfo::getActorIsolated(isolation);
+  SILIsolationInfo withActorIsolated(SILValue isolatedValue,
+                                     ActorIsolation isolation) {
+    return SILIsolationInfo::getActorIsolated(isolatedValue, isolation);
   }
 
   static SILIsolationInfo getDisconnected() { return {Kind::Disconnected}; }
 
-  static SILIsolationInfo getActorIsolated(ActorIsolation actorIsolation) {
-    return {actorIsolation};
+  static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
+                                           ActorIsolation actorIsolation) {
+    return {actorIsolation, isolatedValue};
   }
 
-  static SILIsolationInfo getActorIsolated(NominalTypeDecl *typeDecl) {
+  static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
+                                           NominalTypeDecl *typeDecl) {
     if (typeDecl->isActor())
-      return {ActorIsolation::forActorInstanceSelf(typeDecl)};
+      return {ActorIsolation::forActorInstanceSelf(typeDecl), isolatedValue};
     auto isolation = swift::getActorIsolation(typeDecl);
     if (isolation.isGlobalActor())
-      return {isolation};
+      return {isolation, isolatedValue};
     return {};
   }
 
-  static SILIsolationInfo getGlobalActorIsolated(Type globalActorType) {
-    return getActorIsolated(ActorIsolation::forGlobalActor(globalActorType));
+  static SILIsolationInfo getGlobalActorIsolated(SILValue value,
+                                                 Type globalActorType) {
+    return getActorIsolated(value,
+                            ActorIsolation::forGlobalActor(globalActorType));
   }
 
   static SILIsolationInfo getTaskIsolated(SILValue value) {
@@ -200,7 +205,19 @@ public:
   /// Attempt to infer the isolation region info for \p arg.
   static SILIsolationInfo get(SILFunctionArgument *arg);
 
-  bool operator==(const SILIsolationInfo &other) const;
+  bool hasSameIsolation(ActorIsolation actorIsolation) const;
+
+  /// Returns true if \p this and \p other have the same isolation. It allows
+  /// for the isolated values if any to not match.
+  ///
+  /// This is useful if one has two non-Sendable values projected from the same
+  /// actor or global actor isolated value. E.x.: two different ref_element_addr
+  /// from the same actor.
+  bool hasSameIsolation(const SILIsolationInfo &other) const;
+
+  /// Returns true if this SILIsolationInfo is deeply equal to other. This means
+  /// that the isolation and the isolated value match.
+  bool isEqual(const SILIsolationInfo &other) const;
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 };
@@ -444,20 +461,31 @@ class TransferringOperand {
   ValueType value;
 
   /// The dynamic isolation info of the region of value when we transferred.
+  ///
+  /// This will contain the isolated value if we found one.
   SILIsolationInfo isolationInfo;
 
-  TransferringOperand(ValueType newValue, SILIsolationInfo isolationRegionInfo)
-      : value(newValue), isolationInfo(isolationRegionInfo) {
+  /// The dynamic isolation history at this point.
+  IsolationHistory isolationHistory;
+
+  TransferringOperand(ValueType newValue, SILIsolationInfo isolationRegionInfo,
+                      IsolationHistory isolationHistory)
+      : value(newValue), isolationInfo(isolationRegionInfo),
+        isolationHistory(isolationHistory) {
     assert(isolationInfo && "Should never see unknown isolation info");
   }
 
 public:
   TransferringOperand(Operand *op, bool isClosureCaptured,
-                      SILIsolationInfo isolationRegionInfo)
-      : TransferringOperand({op, isClosureCaptured}, isolationRegionInfo) {}
+                      SILIsolationInfo isolationRegionInfo,
+                      IsolationHistory isolationHistory)
+      : TransferringOperand({op, isClosureCaptured}, isolationRegionInfo,
+                            isolationHistory) {}
   explicit TransferringOperand(Operand *op,
-                               SILIsolationInfo isolationRegionInfo)
-      : TransferringOperand({op, false}, isolationRegionInfo) {}
+                               SILIsolationInfo isolationRegionInfo,
+                               IsolationHistory isolationHistory)
+      : TransferringOperand({op, false}, isolationRegionInfo,
+                            isolationHistory) {}
 
   operator bool() const { return bool(value.getPointer()); }
 
@@ -471,6 +499,8 @@ public:
 
   SILIsolationInfo getIsolationInfo() const { return isolationInfo; }
 
+  IsolationHistory getIsolationHistory() const { return isolationHistory; }
+
   unsigned getOperandNumber() const { return getOperand()->getOperandNumber(); }
 
   void print(llvm::raw_ostream &os) const {
@@ -483,14 +513,17 @@ public:
 
   static void Profile(llvm::FoldingSetNodeID &id, Operand *op,
                       bool isClosureCaptured,
-                      SILIsolationInfo isolationRegionInfo) {
+                      SILIsolationInfo isolationRegionInfo,
+                      IsolationHistory isolationHistory) {
     id.AddPointer(op);
     id.AddBoolean(isClosureCaptured);
     isolationRegionInfo.Profile(id);
+    id.AddPointer(isolationHistory.getHead());
   }
 
   void Profile(llvm::FoldingSetNodeID &id) const {
-    Profile(id, getOperand(), isClosureCaptured(), isolationInfo);
+    Profile(id, getOperand(), isClosureCaptured(), isolationInfo,
+            isolationHistory);
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -1134,7 +1167,8 @@ public:
       if (transferredRegionIsolation.isActorIsolated()) {
         if (auto calleeIsolationInfo =
                 SILIsolationInfo::get(op.getSourceInst())) {
-          if (transferredRegionIsolation == calleeIsolationInfo) {
+          if (transferredRegionIsolation.hasSameIsolation(
+                  calleeIsolationInfo)) {
             return;
           }
         }
@@ -1151,7 +1185,8 @@ public:
 
       // Mark op.getOpArgs()[0] as transferred.
       auto *ptrSet = ptrSetFactory.emplace(
-          op.getSourceOp(), isClosureCapturedElt, transferredRegionIsolation);
+          op.getSourceOp(), isClosureCapturedElt, transferredRegionIsolation,
+          p.getIsolationHistory());
       p.markTransferred(op.getOpArgs()[0], ptrSet);
       return;
     }
@@ -1227,7 +1262,8 @@ private:
     if (shouldTryToSquelchErrors()) {
       if (auto isolationInfo = SILIsolationInfo::get(op.getSourceInst())) {
         if (isolationInfo.isActorIsolated() &&
-            isolationInfo == SILIsolationInfo::get(transferringOp->getUser()))
+            isolationInfo.hasSameIsolation(
+                SILIsolationInfo::get(transferringOp->getUser())))
           return;
       }
 
@@ -1237,8 +1273,8 @@ private:
       if (auto functionIsolation =
               transferringOp->getUser()->getFunction()->getActorIsolation()) {
         if (functionIsolation.isActorIsolated() &&
-            SILIsolationInfo::getActorIsolated(functionIsolation) ==
-                SILIsolationInfo::get(transferringOp->getUser()))
+            SILIsolationInfo::get(transferringOp->getUser())
+                .hasSameIsolation(functionIsolation))
           return;
       }
     }
