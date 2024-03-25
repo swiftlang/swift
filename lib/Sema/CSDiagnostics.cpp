@@ -455,8 +455,15 @@ bool RequirementFailure::diagnoseAsError() {
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
-    emitDiagnostic(diag::type_does_not_conform_in_opaque_return,
-                   namingDecl, lhs, rhs, rhs->isAnyObject());
+
+    auto &req = getRequirement();
+    if (req.getKind() == RequirementKind::SameType) {
+      emitDiagnostic(diag::type_is_not_equal_in_opaque_return, namingDecl, lhs,
+                     rhs);
+    } else {
+      emitDiagnostic(diag::type_does_not_conform_in_opaque_return, namingDecl,
+                     lhs, rhs, rhs->isAnyObject());
+    }
 
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
       emitDiagnosticAt(repr->getLoc(), diag::opaque_return_type_declared_here)

@@ -603,11 +603,11 @@ do {
 
   func test1() -> some P3<Int> { // expected-note {{opaque return type declared here}}
     return G<S>()
-    // expected-error@-1 {{type of local function 'test1()' requires that 'S' conform to 'Int'}}
+    // expected-error@-1 {{return type of local function 'test1()' requires the types 'S' and 'Int' be equivalent}}
   }
 
   func test2() -> some P3<G<S>> { // expected-note {{opaque return type declared here}}
     return G<S>()
-    // expected-error@-1 {{return type of local function 'test2()' requires that 'S' conform to 'G<S>'}}
+    // expected-error@-1 {{return type of local function 'test2()' requires the types 'S' and 'G<S>' be equivalent}}
   }
 }
