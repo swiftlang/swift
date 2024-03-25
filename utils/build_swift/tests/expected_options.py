@@ -161,6 +161,7 @@ EXPECTED_DEFAULTS = {
     'sccache': False,
     'dry_run': False,
     'dsymutil_jobs': defaults.DSYMUTIL_JOBS,
+    'extra_dsymutil_args': [],
     'enable_asan': False,
     'enable_experimental_differentiable_programming': True,
     'enable_experimental_concurrency': True,
@@ -786,6 +787,7 @@ EXPECTED_OPTIONS = [
     IntOption('-j', dest='build_jobs'),
     IntOption('--lit-jobs', dest='lit_jobs'),
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
+    AppendOption('--extra-dsymutil-args', dest='extra_dsymutil_args'),
 
     AppendOption('--cross-compile-hosts'),
     SetTrueOption('--infer-cross-compile-hosts-on-darwin'),

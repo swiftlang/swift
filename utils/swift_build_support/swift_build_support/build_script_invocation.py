@@ -512,6 +512,12 @@ class BuildScriptInvocation(object):
                 ' '.join(args.darwin_symroot_path_filters)
             ]
 
+        if args.extra_dsymutil_args:
+            impl_args += [
+                "--extra-dsymutil-args=%s" % ' '.join(
+                    shlex.quote(opt) for opt in args.extra_dsymutil_args)
+            ]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
