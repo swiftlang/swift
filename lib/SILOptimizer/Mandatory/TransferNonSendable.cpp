@@ -1021,16 +1021,19 @@ public:
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
   }
 
-  void emitFunctionArgumentClosure(SourceLoc loc, Type type,
-                                   ApplyIsolationCrossing crossing) {
+  void emitNamedFunctionArgumentClosure(SILLocation loc, Identifier name,
+                                        ApplyIsolationCrossing crossing) {
+    emitNamedOnlyError(loc, name);
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
       getIsolationRegionInfo().printForDiagnostics(os);
     }
-    diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
-                  descriptiveKindStr, type, crossing.getCalleeIsolation())
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_isolated_closure_yields_race,
+                 descriptiveKindStr, name, crossing.getCalleeIsolation(),
+                 crossing.getCallerIsolation())
+        .highlight(loc.getSourceRange());
   }
 
   void emitFunctionArgumentApplyStronglyTransferred(SILLocation loc,
@@ -1165,9 +1168,9 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
   unsigned opIndex = ApplySite(op->getUser()).getAppliedArgIndex(*op);
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) == opIndex) {
-      Type type = std::get<0>(p).getDecl()->getInterfaceType();
-      diagnosticEmitter.emitFunctionArgumentClosure(std::get<0>(p).getLoc(),
-                                                    type, std::get<2>(p));
+      auto loc = RegularLocation(std::get<0>(p).getLoc());
+      diagnosticEmitter.emitNamedFunctionArgumentClosure(
+          loc, std::get<0>(p).getDecl()->getBaseIdentifier(), std::get<2>(p));
       return true;
     }
   }

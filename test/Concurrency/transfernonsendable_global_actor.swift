@@ -177,8 +177,11 @@ struct Clock {
   let ns = customActorIsolatedGlobal
 
   let _ = { @MainActor in
-    print(ns) // expected-tns-warning {{global actor 'CustomActor'-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
-    // expected-complete-warning @-1 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in an isolated closure}}
+    // TODO: The type checker seems to think that the isolation here is
+    // nonisolated instead of custom actor isolated.
+    print(ns) // expected-tns-warning {{transferring 'ns' may cause a race}}
+    // expected-tns-note @-1 {{global actor 'CustomActor'-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-complete-warning @-2 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in an isolated closure}}
   }
 
   useValue(ns)
@@ -189,7 +192,8 @@ struct Clock {
 
   // TODO: We should not consider this to be a transfer.
   let _ = { @MainActor in
-    print(ns) // expected-tns-warning {{main actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    print(ns) // expected-tns-warning {{transferring 'ns' may cause a race}}
+    // expected-tns-note @-1 {{main actor-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 
   useValue(ns)
