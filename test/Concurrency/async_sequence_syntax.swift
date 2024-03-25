@@ -119,3 +119,15 @@ public struct ReaderSeq: AsyncSequence, Sendable {
 func test1() -> Error {
   return ReaderSeq.Failure.x
 }
+
+@available(SwiftStdlib 5.1, *)
+public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
+  public mutating func next() async -> Element? { nil }
+  public func makeAsyncIterator() -> Self { self }
+
+  @_implements(AsyncIteratorProtocol, Failure)
+  public typealias __AsyncIteratorProtocol_Failure = Never
+
+  @_implements(AsyncSequence, Failure)
+  public typealias __AsyncSequence_Failure = Never
+}
