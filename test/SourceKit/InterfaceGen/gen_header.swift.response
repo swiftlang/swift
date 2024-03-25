@@ -3,7 +3,6 @@ open class BaseInHead {
 
     open func doIt(_ arg: Int32)
 }
-
 /// Awesome name.
 /// �������
 /// Awesome name.
@@ -90,47 +89,47 @@ public protocol SameNameProtocol {
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 105,
+    key.offset: 104,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 123,
+    key.offset: 122,
     key.length: 26
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 149,
+    key.offset: 148,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 167,
+    key.offset: 166,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 172,
+    key.offset: 171,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 178,
+    key.offset: 177,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 191,
+    key.offset: 190,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 198,
+    key.offset: 197,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 207,
+    key.offset: 206,
     key.length: 16
   }
 ]
@@ -223,17 +222,17 @@ public protocol SameNameProtocol {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "SameName",
-    key.offset: 172,
+    key.offset: 171,
     key.length: 18,
-    key.nameoffset: 178,
+    key.nameoffset: 177,
     key.namelength: 8,
-    key.bodyoffset: 188,
+    key.bodyoffset: 187,
     key.bodylength: 1,
-    key.docoffset: 105,
+    key.docoffset: 104,
     key.doclength: 62,
     key.attributes: [
       {
-        key.offset: 167,
+        key.offset: 166,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -243,15 +242,15 @@ public protocol SameNameProtocol {
     key.kind: source.lang.swift.decl.protocol,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "SameNameProtocol",
-    key.offset: 198,
+    key.offset: 197,
     key.length: 29,
-    key.nameoffset: 207,
+    key.nameoffset: 206,
     key.namelength: 16,
-    key.bodyoffset: 225,
+    key.bodyoffset: 224,
     key.bodylength: 1,
     key.attributes: [
       {
-        key.offset: 191,
+        key.offset: 190,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

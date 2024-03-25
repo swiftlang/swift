@@ -5,7 +5,6 @@ class BaseInHead {
   class func doIt(_ arg: Int32)
   func doIt(_ arg: Int32)
 }
-
 /// Awesome name.
 class SameName {
 }

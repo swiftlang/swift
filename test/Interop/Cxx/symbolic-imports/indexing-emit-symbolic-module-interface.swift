@@ -158,5 +158,7 @@ import CxxModule
 // CHECK-EMPTY:
 // CHECK-NEXT:  static func freeFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK-NEXT: }
+// CHECK-EMPTY:
 // CHECK-NEXT: typealias MyType = ns.TemplateRecord
+// CHECK-EMPTY:
 // CHECK-NEXT: typealias MyType2 = TransitiveStruct

@@ -167,11 +167,13 @@ static bool printModuleInterfaceDecl(Decl *D,
       };
     }
   }
-  if (!LeadingComment.empty() && Options.shouldPrint(D))
-    Printer << LeadingComment << "\n";
+  if (!LeadingComment.empty() && Options.shouldPrint(D)) {
+    Printer << LeadingComment;
+    Printer.printNewline();
+  }
   if (D->print(Printer, Options)) {
     if (Options.BracketOptions.shouldCloseNominal(D))
-      Printer << "\n";
+      Printer.printNewline();
     Options.BracketOptions = BracketOptions();
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       std::queue<NominalTypeDecl *> SubDecls{{NTD}};
@@ -194,11 +196,13 @@ static bool printModuleInterfaceDecl(Decl *D,
             }
             if (extensionHasClangNode(Ext))
               continue; // will be printed in its source location, see above.
-            Printer << "\n";
-            if (!LeadingComment.empty())
-              Printer << LeadingComment << "\n";
+            Printer.printNewline();
+            if (!LeadingComment.empty()) {
+              Printer << LeadingComment;
+              Printer.printNewline();
+            }
             Ext->print(Printer, Options);
-            Printer << "\n";
+            Printer.printNewline();
           }
           for (auto Sub : Ext->getMembers())
             if (auto N = dyn_cast<NominalTypeDecl>(Sub))
@@ -226,7 +230,7 @@ static bool printModuleInterfaceDecl(Decl *D,
                 if (ET.IsSynthesized)
                   Options.clearSynthesizedExtension();
                 if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
-                  Printer << "\n";
+                  Printer.printNewline();
               }
             });
         }
@@ -250,9 +254,11 @@ static bool printModuleInterfaceDecl(Decl *D,
                 ET.Ext, !Opened, Decls.back().Ext == ET.Ext, true
               };
               if (Options.BracketOptions.shouldOpenExtension(ET.Ext)) {
-                Printer << "\n";
-                if (Options.shouldPrint(ET.Ext) && !LeadingComment.empty())
-                  Printer << LeadingComment << "\n";
+                Printer.printNewline();
+                if (Options.shouldPrint(ET.Ext) && !LeadingComment.empty()) {
+                  Printer << LeadingComment;
+                  Printer.printNewline();
+                }
               }
               if (ET.IsSynthesized) {
                 if (ET.EnablingExt)
@@ -265,7 +271,7 @@ static bool printModuleInterfaceDecl(Decl *D,
               if (ET.IsSynthesized)
                 Options.clearSynthesizedExtension();
               if (Options.BracketOptions.shouldCloseExtension(ET.Ext)) {
-                Printer << "\n";
+                Printer.printNewline();
               }
             }
           });
@@ -411,18 +417,22 @@ static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
       BystanderList += Bystanders[I].str();
     }
 
-    Printer << "\n// MARK: - " << BystanderList << " Additions\n\n";
+    Printer.printNewline();
+    Printer << "// MARK: - " << BystanderList << " Additions";
+    Printer.printNewline();
+    Printer.printNewline();
     for (auto *Import : DeclLists.first)
       PrintDecl(Import);
-    Printer << "\n";
+    if (!DeclLists.first.empty())
+      Printer.printNewline();
 
     std::string PerDeclComment = "// Available when " + BystanderList;
     PerDeclComment += Bystanders.size() == 1 ? " is" : " are";
     PerDeclComment += " imported with " + Declaring->getNameStr().str();
 
     for (auto *D : DeclLists.second) {
-      if (PrintDecl(D, PerDeclComment))
-        Printer << "\n";
+      if (PrintDecl(D, PerDeclComment) && Options.EmptyLineBetweenDecls)
+        Printer.printNewline();
     }
   }
 }
@@ -668,7 +678,7 @@ void swift::ide::printModuleInterface(
   if (!TargetMod->isStdlibModule()) {
     for (auto *D : ImportDecls)
       PrintDecl(D);
-    Printer << "\n";
+    Printer.printNewline();
   }
 
   {
@@ -686,14 +696,15 @@ void swift::ide::printModuleInterface(
 
     for (auto CM : ClangModules) {
       for (auto DeclAndLoc : ClangDecls[CM.first])
-        PrintDecl(DeclAndLoc.first);
+        if (PrintDecl(DeclAndLoc.first) && Options.EmptyLineBetweenDecls)
+          Printer.printNewline();
     }
   }
 
   if (!(TraversalOptions & ModuleTraversal::SkipOverlay) || !TargetClangMod) {
     for (auto *D : SwiftDecls) {
-      if (PrintDecl(D))
-        Printer << "\n";
+      if (PrintDecl(D) && Options.EmptyLineBetweenDecls)
+        Printer.printNewline();
     }
 
     // If we're printing the entire target module (not specific sub-groups),
@@ -704,6 +715,8 @@ void swift::ide::printModuleInterface(
                                AdjustedOptions, PrintSynthesizedExtensions);
     }
   }
+  // Flush pending newlines.
+  Printer.forceNewlines();
 }
 
 static SourceLoc getDeclStartPosition(SourceFile &File) {
@@ -813,8 +826,9 @@ void swift::ide::printHeaderInterface(
       continue;
     }
     if (D->print(Printer, AdjustedOptions))
-      Printer << "\n";
+      Printer.printNewline();
   }
+  Printer.forceNewlines();
 }
 
 void swift::ide::printSymbolicSwiftClangModuleInterface(
