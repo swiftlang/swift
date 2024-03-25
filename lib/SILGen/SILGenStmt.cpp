@@ -1595,7 +1595,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
             }, LookUpConformanceInModule(getModule().getSwiftModule()));
 
         // Generic errors are passed indirectly.
-        if (!exnMV.getType().isAddress()) {
+        if (!exnMV.getType().isAddress() && useLoweredAddresses()) {
           // Materialize the error so we can pass the address down to the
           // swift_willThrowTyped.
           exnMV = exnMV.materialize(*this, loc);
