@@ -1,14 +1,14 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
   @_unsafeNonescapableResult
