@@ -3022,6 +3022,9 @@ public:
   /// corresponds to it.
   static std::optional<TypeAttrKind> getAttrKindFromString(StringRef Str);
 
+  /// Returns true if type attributes of the given kind only appear in SIL.
+  static bool isSilOnly(TypeAttrKind TK);
+
   /// Return the name (like "autoclosure") for an attribute ID.
   static const char *getAttrName(TypeAttrKind kind);
 
