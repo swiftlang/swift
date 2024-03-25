@@ -3255,7 +3255,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // underlying object, use that. It is never wrong.
     if (info.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(*info.actorIsolation));
+          SILIsolationInfo::getActorIsolated(value, *info.actorIsolation));
     }
 
     auto storage = AccessStorageWithBase::compute(value);
@@ -3275,7 +3275,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         auto *nomDecl =
             rei->getOperand()->getType().getNominalOrBoundGenericNominal();
         iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(nomDecl));
+            SILIsolationInfo::getActorIsolated(rei, nomDecl));
       }
 
       // See if the memory base is a global_addr from a global actor protected global.
@@ -3285,7 +3285,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
             auto isolation = getActorIsolation(globalDecl);
             if (isolation.isGlobalActor()) {
               iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getActorIsolated(isolation));
+                  SILIsolationInfo::getActorIsolated(ga, isolation));
             }
           }
         }
@@ -3299,7 +3299,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
       auto isolation = fri->getReferencedFunction()->getActorIsolation();
       if (isolation.isActorIsolated()) {
         iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(isolation));
+            SILIsolationInfo::getActorIsolated(value, isolation));
         return {iter.first->first, iter.first->second};
       }
 
@@ -3311,8 +3311,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
             if (funcType->hasGlobalActor()) {
               iter.first->getSecond().mergeIsolationRegionInfo(
                   SILIsolationInfo::getActorIsolated(
-                      ActorIsolation::forGlobalActor(
-                          funcType->getGlobalActor())));
+                      fri, ActorIsolation::forGlobalActor(
+                               funcType->getGlobalActor())));
               return {iter.first->first, iter.first->second};
             }
           }
@@ -3322,8 +3322,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
             if (resultFType->hasGlobalActor()) {
               iter.first->getSecond().mergeIsolationRegionInfo(
                   SILIsolationInfo::getActorIsolated(
-                      ActorIsolation::forGlobalActor(
-                          resultFType->getGlobalActor())));
+                      fri, ActorIsolation::forGlobalActor(
+                               resultFType->getGlobalActor())));
               return {iter.first->first, iter.first->second};
             }
           }
@@ -3341,11 +3341,13 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         if (auto isolation = getActorIsolation(declRefExpr->getDecl())) {
           if (isolation.isActorIsolated()) {
             iter.first->getSecond().mergeIsolationRegionInfo(
-                SILIsolationInfo::getActorIsolated(isolation));
+                SILIsolationInfo::getActorIsolated(cmi->getOperand(),
+                                                   isolation));
             return {iter.first->first, iter.first->second};
           }
         }
       }
+
       iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
       return {iter.first->first, iter.first->second};
     }
@@ -3370,7 +3372,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     auto parentAddrInfo = getUnderlyingTrackedValue(svi);
     if (parentAddrInfo.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(*parentAddrInfo.actorIsolation));
+          SILIsolationInfo::getActorIsolated(svi,
+                                             *parentAddrInfo.actorIsolation));
     }
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
@@ -3380,7 +3383,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
                             ->getType()
                             .getNominalOrBoundGenericNominal();
         iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(nomDecl));
+            SILIsolationInfo::getActorIsolated(reai->getOperand(), nomDecl));
       }
     }
   }
@@ -3388,24 +3391,24 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   // See if we have a struct_extract from a global actor isolated type.
   if (auto *sei = dyn_cast<StructExtractInst>(iter.first->first.getValue())) {
     iter.first->getSecond().mergeIsolationRegionInfo(
-        SILIsolationInfo::getActorIsolated(sei->getStructDecl()));
+        SILIsolationInfo::getActorIsolated(sei, sei->getStructDecl()));
   }
 
   // See if we have an unchecked_enum_data from a global actor isolated type.
   if (auto *uedi =
           dyn_cast<UncheckedEnumDataInst>(iter.first->first.getValue())) {
     iter.first->getSecond().mergeIsolationRegionInfo(
-        SILIsolationInfo::getActorIsolated(uedi->getEnumDecl()));
+        SILIsolationInfo::getActorIsolated(uedi, uedi->getEnumDecl()));
   }
 
   // Handle a switch_enum from a global actor isolated type.
   if (auto *arg = dyn_cast<SILPhiArgument>(iter.first->first.getValue())) {
     if (auto *singleTerm = arg->getSingleTerminator()) {
-      if (auto *sei = dyn_cast<SwitchEnumInst>(singleTerm)) {
+      if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
-            sei->getOperand()->getType().getEnumOrBoundGenericEnum();
+            swi->getOperand()->getType().getEnumOrBoundGenericEnum();
         iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(enumDecl));
+            SILIsolationInfo::getActorIsolated(arg, enumDecl));
       }
     }
   }
@@ -3418,7 +3421,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         auto isolation = getGlobalActorInitIsolation(calleeFunction);
         if (isolation && isolation->isGlobalActor()) {
           iter.first->getSecond().mergeIsolationRegionInfo(
-              SILIsolationInfo::getActorIsolated(*isolation));
+              // TODO: What to do about this.
+              SILIsolationInfo::getActorIsolated(SILValue(), *isolation));
         }
       }
     }
@@ -3469,7 +3473,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
             if (callType->hasGlobalActor()) {
               iter.first->getSecond().mergeIsolationRegionInfo(
                   SILIsolationInfo::getGlobalActorIsolated(
-                      callType->getGlobalActor()));
+                      ai, callType->getGlobalActor()));
               return {iter.first->first, iter.first->second};
             }
           }
@@ -3481,7 +3485,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
                 fri->getReferencedFunction()->getActorIsolation()) {
           if (actorIsolation.isActorIsolated()) {
             iter.first->getSecond().mergeIsolationRegionInfo(
-                SILIsolationInfo::getActorIsolated(actorIsolation));
+                SILIsolationInfo::getActorIsolated(fri, actorIsolation));
             return {iter.first->first, iter.first->second};
           }
         }

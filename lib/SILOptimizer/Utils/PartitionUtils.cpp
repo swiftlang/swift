@@ -46,7 +46,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (auto crossing = apply->getIsolationCrossing()) {
       if (crossing->getCalleeIsolation().isActorIsolated())
         return SILIsolationInfo::getActorIsolated(
-            crossing->getCalleeIsolation());
+            SILValue(), crossing->getCalleeIsolation());
     }
   }
 
@@ -54,7 +54,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (auto crossing = fas.getIsolationCrossing()) {
       if (crossing->getCalleeIsolation().isActorIsolated()) {
         return SILIsolationInfo::getActorIsolated(
-            crossing->getCalleeIsolation());
+            SILValue(), crossing->getCalleeIsolation());
       }
     }
 
@@ -66,7 +66,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
                 self.get()->getType().getNominalOrBoundGenericNominal()) {
           // TODO: We should be doing this off of the instance... what if we
           // have two instances of the same class?
-          return SILIsolationInfo::getActorIsolated(nomDecl);
+          return SILIsolationInfo::getActorIsolated(SILValue(), nomDecl);
         }
       }
     }
@@ -76,7 +76,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
       auto actorIsolation = ace->getActorIsolation();
       if (actorIsolation.isActorIsolated()) {
-        return SILIsolationInfo::getActorIsolated(actorIsolation);
+        return SILIsolationInfo::getActorIsolated(pai, actorIsolation);
       }
     }
   }
@@ -93,7 +93,7 @@ SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
     if (auto functionIsolation = arg->getFunction()->getActorIsolation()) {
       if (functionIsolation.isActorIsolated()) {
         if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
-          return SILIsolationInfo::getActorIsolated(nomDecl);
+          return SILIsolationInfo::getActorIsolated(arg, nomDecl);
         }
       }
     }
@@ -108,7 +108,7 @@ SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
     }
 
     if (isolation.isActorIsolated()) {
-      return SILIsolationInfo::getActorIsolated(isolation);
+      return SILIsolationInfo::getActorIsolated(arg, isolation);
     }
   }
 
@@ -140,14 +140,21 @@ SILIsolationInfo SILIsolationInfo::merge(SILIsolationInfo other) const {
 
   // TODO: Make this failing mean that we emit an unknown SIL error instead of
   // asserting.
-  assert((!other.isActorIsolated() || !isActorIsolated() || *this == other) &&
+  assert((!other.isActorIsolated() || !isActorIsolated() ||
+          hasSameIsolation(other.getActorIsolation())) &&
          "Actor can only be merged with the same actor");
 
   // Otherwise, take the other value.
   return other;
 }
 
-bool SILIsolationInfo::operator==(const SILIsolationInfo &other) const {
+bool SILIsolationInfo::hasSameIsolation(ActorIsolation actorIsolation) const {
+  if (getKind() != Kind::Actor)
+    return false;
+  return getActorIsolation() == actorIsolation;
+}
+
+bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
   if (getKind() != other.getKind())
     return false;
 
@@ -156,13 +163,32 @@ bool SILIsolationInfo::operator==(const SILIsolationInfo &other) const {
   case Disconnected:
     return true;
   case Task:
-    return getTaskIsolatedValue() == other.getTaskIsolatedValue();
+    return getIsolatedValue() == other.getIsolatedValue();
   case Actor:
-    // First try to use actor isolation if we have them.
     auto lhsIsolation = getActorIsolation();
     auto rhsIsolation = other.getActorIsolation();
     return lhsIsolation == rhsIsolation;
   }
+}
+
+bool SILIsolationInfo::isEqual(const SILIsolationInfo &other) const {
+  // First check if the two types have the same isolation.
+  if (!hasSameIsolation(other))
+    return false;
+
+  // Then check if both have the same isolated value state. If they do not
+  // match, bail they cannot equal.
+  if (hasIsolatedValue() != other.hasIsolatedValue())
+    return false;
+
+  // Then actually check if we have an isolated value. If we do not, then both
+  // do not have an isolated value due to our earlier check, so we can just
+  // return true early.
+  if (!hasIsolatedValue())
+    return true;
+
+  // Otherwise, equality is determined by directly comparing the isolated value.
+  return getIsolatedValue() == other.getIsolatedValue();
 }
 
 void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
@@ -172,9 +198,10 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   case Disconnected:
     return;
   case Task:
-    id.AddPointer(getTaskIsolatedValue());
+    id.AddPointer(getIsolatedValue());
     return;
   case Actor:
+    id.AddPointer(getIsolatedValue());
     getActorIsolation().Profile(id);
     return;
   }
