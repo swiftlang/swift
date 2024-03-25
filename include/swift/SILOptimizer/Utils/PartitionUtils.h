@@ -204,7 +204,7 @@ public:
       return getActorIsolated(actorIsolation);
     if (nomDecl->isActor())
       return {Kind::Actor, nomDecl};
-    return {};
+    return SILIsolationInfo();
   }
 
   static SILIsolationInfo getTaskIsolated(SILValue value) {
@@ -788,6 +788,21 @@ public:
       SILIsolationInfo transferredRegionIsolation;
       std::tie(transferredRegionIsolation, isClosureCapturedElt) =
           getIsolationRegionInfo(transferredRegion, op.getSourceOp());
+
+      // Before we do anything, see if our dynamic isolation kind is the same as
+      // the isolation info for our partition op. If they match, this is not a
+      // real transfer operation.
+      //
+      // DISCUSSION: We couldn't not emit this earlier since we needed the
+      // dynamic isolation info of our value.
+      if (transferredRegionIsolation.isActorIsolated()) {
+        if (auto calleeIsolationInfo =
+                SILIsolationInfo::get(op.getSourceInst())) {
+          if (transferredRegionIsolation == calleeIsolationInfo) {
+            return;
+          }
+        }
+      }
 
       // If we merged anything, we need to handle a transfer
       // non-transferrable. We pass in the dynamic isolation region info of our
