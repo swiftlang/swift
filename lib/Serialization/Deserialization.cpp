@@ -3469,7 +3469,10 @@ public:
       }
     }
 
-    auto DC = MF.getDeclContext(contextID);
+    auto DCOrError = MF.getDeclContextChecked(contextID);
+    if (!DCOrError)
+      return DCOrError.takeError();
+    auto DC = DCOrError.get();
     if (declOrOffset.isComplete())
       return declOrOffset;
 
