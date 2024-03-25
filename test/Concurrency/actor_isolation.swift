@@ -2,8 +2,8 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-experimental-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature GlobalActorIsolatedTypesUsability %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -156,7 +156,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ anno: NoGlobalActorValueType) async {
   // these still do need an await in Swift 5
   _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
-  _ = await formance.counter
+  _ = formance.counter
   _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   _ = anno.counter // expected-warning {{non-sendable type 'NoGlobalActorValueType' passed in call to main actor-isolated property 'counter' cannot cross actor boundary}}
