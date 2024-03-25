@@ -430,13 +430,6 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   auto *dc = conformance->getDeclContext();
   auto &ctx = dc->getASTContext();
 
-  // Prior to Swift 6, don't look for a named type witness for
-  // AsyncSequence.Failure. We'll always infer it from
-  // AsyncIteratorProtocol.Failure.
-  if (isAsyncSequenceFailure(assocType) &&
-      !ctx.LangOpts.isSwiftVersionAtLeast(6))
-    return ResolveWitnessResult::Missing;
-
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
@@ -479,9 +472,17 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // Also skip candidates in protocol extensions, because they tend to cause
     // request cycles. We'll look at those during associated type inference.
     if (assocType->getName() != typeDecl->getName() &&
-        !(witnessHasImplementsAttrForRequiredName(typeDecl, assocType) &&
+        !(witnessHasImplementsAttrForExactRequirement(typeDecl, assocType) &&
           !typeDecl->getDeclContext()->getSelfProtocolDecl()))
       continue;
+
+    // Prior to Swift 6, ignore a member named Failure when matching
+    // AsyncSequence.Failure. We'll infer it from the AsyncIterator.Failure
+    // instead.
+    if (isAsyncSequenceFailure(assocType) &&
+        !ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+        assocType->getName() == typeDecl->getName())
+      continue;;
 
     auto *genericDecl = cast<GenericTypeDecl>(typeDecl);
 
