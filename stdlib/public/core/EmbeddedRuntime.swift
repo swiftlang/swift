@@ -146,6 +146,12 @@ func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object
 public func swift_setDeallocating(object: Builtin.RawPointer) {
 }
 
+@_cdecl("swift_isUniquelyReferenced_native")
+public func swift_isUniquelyReferenced_native(object: Builtin.RawPointer) -> Bool {
+  if Int(Builtin.ptrtoint_Word(object)) == 0 { return false }
+  return swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<HeapObject>(object))
+}
+
 @_cdecl("swift_isUniquelyReferenced_nonNull_native")
 public func swift_isUniquelyReferenced_nonNull_native(object: Builtin.RawPointer) -> Bool {
   return swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<HeapObject>(object))
