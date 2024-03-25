@@ -190,10 +190,21 @@ struct Clock {
 @MainActor func testGlobalAndGlobalIsolatedPartialApplyMatch() {
   let ns = mainActorIsolatedGlobal
 
-  // TODO: We should not consider this to be a transfer.
+  // This is not a transfer since ns is already main actor isolated.
   let _ = { @MainActor in
-    print(ns) // expected-tns-warning {{transferring 'ns' may cause a race}}
-    // expected-tns-note @-1 {{main actor-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    print(ns)
+  }
+
+  useValue(ns)
+}
+
+@MainActor func testGlobalAndGlobalIsolatedPartialApplyMatch2() {
+  var ns = (NonSendableKlass(), NonSendableKlass())
+  ns.0 = mainActorIsolatedGlobal
+
+  // This is not a transfer since ns is already main actor isolated.
+  let _ = { @MainActor in
+    print(ns)
   }
 
   useValue(ns)

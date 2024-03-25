@@ -41,7 +41,7 @@ actor ProtectsNonSendable {
     // isolated since this is nonisolated.
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = nsArg // expected-warning {{transferring 'nsArg' may cause a race}}
-      // expected-note @-1 {{actor-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
@@ -50,7 +50,7 @@ actor ProtectsNonSendable {
     doSomething(l, nsArg)
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a race}}
-      // expected-note @-1 {{actor-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
