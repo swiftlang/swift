@@ -170,6 +170,10 @@ extension MutatingContext {
     }
     return nil
   }
+  
+  func tryOptimizeKeypath(apply: FullApplySite) -> Bool {
+    return _bridged.tryOptimizeKeypath(apply.bridged)
+  }
 
   func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
     // This is only a best-effort attempt to notity the new cloned instructions as changed.

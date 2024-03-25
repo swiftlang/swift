@@ -1628,6 +1628,11 @@ BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(Bridge
   return {{nullptr}, false};
 }
 
+bool BridgedPassContext::tryOptimizeKeypath(BridgedInstruction apply) const {
+  SILBuilder builder(apply.unbridged());
+  return ::tryOptimizeKeypath(apply.getAs<ApplyInst>(), builder);
+}
+
 OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction builtin) const {
   auto bi = builtin.getAs<BuiltinInst>();
   std::optional<bool> resultsInError;
