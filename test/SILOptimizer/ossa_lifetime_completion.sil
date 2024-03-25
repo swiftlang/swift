@@ -395,3 +395,22 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil [ossa] @project_box_deadend : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK:         [[BOX:%[^,]+]] = alloc_box
+// CHECK:         [[BOX_BORROW:%[^,]+]] = begin_borrow [[BOX]]
+// CHECK:         [[ADDR:%[^,]+]] = project_box [[BOX_BORROW]]
+// CHECK:         store [[C]] to [init] [[ADDR]]
+// CHECK:         end_borrow [[BOX_BORROW]]
+// CHECK:         unreachable                                     
+// CHECK-LABEL: } // end sil function 'project_box_deadend'
+sil [ossa] @project_box_deadend : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = alloc_box ${ var C }
+  %3 = begin_borrow %2 : ${ var C }
+  specify_test "ossa-lifetime-completion %3"
+  %4 = project_box %3 : ${ var C }, 0
+  store %0 to [init] %4 : $*C
+  unreachable
+}
