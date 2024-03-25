@@ -50,14 +50,15 @@ func testIsolationCrossingDueToCapture() async {
   let x = NonSendableType()
   let _ = { @MainActor in
     print(x) // expected-error {{transferring 'x' may cause a race}}
-    // expected-note @-1 {{disconnected 'x' is captured by main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{disconnected 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
   useValue(x) // expected-note {{use here could race}}
 }
 
 func testIsolationCrossingDueToCaptureParameter(_ x: NonSendableType) async {
   let _ = { @MainActor in
-    print(x) // expected-error {{task-isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
+    print(x) // expected-error {{transferring 'x' may cause a race}}
+    // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
   useValue(x)
 }

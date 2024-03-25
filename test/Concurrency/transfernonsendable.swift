@@ -1502,6 +1502,7 @@ final actor FinalActorWithSetter {
 
 func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let _ = { @MainActor in
-    let _ = x // expected-tns-warning {{task-isolated value of type '() -> ()' transferred to main actor-isolated context}}
+    let _ = x // expected-tns-warning {{transferring 'x' may cause a race}}
+    // expected-tns-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }
