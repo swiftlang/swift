@@ -1,14 +1,7 @@
 import Foundation
 
-
 open class Foo : NSObject {
 }
-// ===-------------------------------------------------------------------------
-// class Payload
-// ===-------------------------------------------------------------------------
-
-// 3: Payload
-// 4: Namespace.Payload
 open class GlobalToMember_Class_Container : NSObject {
 }
 extension GlobalToMember_Class_Container {
@@ -16,16 +9,10 @@ extension GlobalToMember_Class_Container {
     open class Payload : NSObject {
     }
 }
-
-// 3: Namespace.Payload
-// 4: Payload
 open class MemberToGlobal_Class_Container : NSObject {
 }
 open class MemberToGlobal_Class_Payload : NSObject {
 }
-
-// 3: Namespace_Swift3.PayloadFor3
-// 4: Namespace_Swift4.PayloadFor4
 open class MemberToMember_Class_Swift3 : NSObject {
 }
 open class MemberToMember_Class_Swift4 : NSObject {
@@ -35,9 +22,6 @@ extension MemberToMember_Class_Swift4 {
     open class PayloadFor4 : NSObject {
     }
 }
-
-// 3: Namespace.PayloadFor3
-// 4: Namespace.PayloadFor4
 open class MemberToMember_SameContainer_Class_Container : NSObject {
 }
 extension MemberToMember_SameContainer_Class_Container {
@@ -45,9 +29,6 @@ extension MemberToMember_SameContainer_Class_Container {
     open class PayloadFor4 : NSObject {
     }
 }
-
-// 3: Namespace_Swift3.Payload
-// 4: Namespace_Swift4.Payload
 open class MemberToMember_SameName_Class_Swift3 : NSObject {
 }
 open class MemberToMember_SameName_Class_Swift4 : NSObject {
@@ -57,28 +38,15 @@ extension MemberToMember_SameName_Class_Swift4 {
     open class Payload : NSObject {
     }
 }
-
-// ===-------------------------------------------------------------------------
-// typealias Payload
-// ===-------------------------------------------------------------------------
-
-// 3: Payload
-// 4: Namespace.Payload
 open class GlobalToMember_Typedef_Container : NSObject {
 }
 extension GlobalToMember_Typedef_Container {
 
     public typealias Payload = Foo
 }
-
-// 3: Namespace.Payload
-// 4: Payload
 open class MemberToGlobal_Typedef_Container : NSObject {
 }
 public typealias MemberToGlobal_Typedef_Payload = Foo
-
-// 3: Namespace_Swift3.PayloadFor3
-// 4: Namespace_Swift4.PayloadFor4
 open class MemberToMember_Typedef_Swift3 : NSObject {
 }
 open class MemberToMember_Typedef_Swift4 : NSObject {
@@ -87,18 +55,12 @@ extension MemberToMember_Typedef_Swift4 {
 
     public typealias PayloadFor4 = Foo
 }
-
-// 3: Namespace.PayloadFor3
-// 4: Namespace.PayloadFor4
 open class MemberToMember_SameContainer_Typedef_Container : NSObject {
 }
 extension MemberToMember_SameContainer_Typedef_Container {
 
     public typealias PayloadFor4 = Foo
 }
-
-// 3: Namespace_Swift3.Payload
-// 4: Namespace_Swift4.Payload
 open class MemberToMember_SameName_Typedef_Swift3 : NSObject {
 }
 open class MemberToMember_SameName_Typedef_Swift4 : NSObject {
@@ -121,712 +83,582 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 20,
+    key.offset: 19,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 25,
+    key.offset: 24,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 31,
+    key.offset: 30,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 37,
+    key.offset: 36,
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 50,
-    key.length: 80
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 130,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 147,
-    key.length: 80
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 228,
-    key.length: 14
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 242,
-    key.length: 24
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 266,
+    key.offset: 49,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 271,
+    key.offset: 54,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 277,
+    key.offset: 60,
     key.length: 30
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 310,
+    key.offset: 93,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 323,
+    key.offset: 106,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 333,
+    key.offset: 116,
     key.length: 30
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 154,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 159,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 165,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 175,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 194,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 199,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 205,
+    key.length: 30
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 238,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 251,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 256,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 262,
+    key.length: 28
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 293,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 306,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 311,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 317,
+    key.length: 27
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 347,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 360,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 365,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 371,
+    key.length: 27
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 401,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 414,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 424,
+    key.length: 27
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 459,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 376,
+    key.offset: 464,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 382,
+    key.offset: 470,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 484,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 503,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 508,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 514,
+    key.length: 44
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 561,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 574,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 584,
+    key.length: 44
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 636,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 641,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 647,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 661,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 680,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 685,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 691,
+    key.length: 36
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 730,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 743,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 748,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 754,
+    key.length: 36
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 793,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 806,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 816,
+    key.length: 36
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 860,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 865,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 871,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 392,
+    key.offset: 881,
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 412,
-    key.length: 24
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 436,
-    key.length: 14
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 450,
+    key.offset: 900,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 455,
+    key.offset: 905,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 461,
+    key.offset: 911,
+    key.length: 32
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 946,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 959,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 969,
+    key.length: 32
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1009,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1016,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1026,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1036,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1042,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1047,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1053,
+    key.length: 32
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1088,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1101,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1108,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1118,
     key.length: 30
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 494,
-    key.length: 8
+    key.offset: 1151,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 507,
+    key.offset: 1155,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 512,
+    key.offset: 1160,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 518,
-    key.length: 28
+    key.offset: 1166,
+    key.length: 29
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 549,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 563,
-    key.length: 35
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 598,
-    key.length: 35
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 633,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 638,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 644,
-    key.length: 27
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 674,
+    key.offset: 1198,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 687,
+    key.offset: 1211,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 692,
+    key.offset: 1216,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 698,
-    key.length: 27
+    key.offset: 1222,
+    key.length: 29
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 728,
+    key.offset: 1254,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 741,
+    key.offset: 1267,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 751,
-    key.length: 27
+    key.offset: 1277,
+    key.length: 29
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 786,
-    key.length: 4
+    key.offset: 1314,
+    key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 791,
-    key.length: 5
+    key.offset: 1321,
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 797,
+    key.offset: 1331,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 811,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 831,
-    key.length: 28
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 859,
-    key.length: 28
+    key.offset: 1345,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 887,
+    key.offset: 1351,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 892,
+    key.offset: 1356,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 898,
-    key.length: 44
+    key.offset: 1362,
+    key.length: 46
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 945,
+    key.offset: 1411,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 958,
+    key.offset: 1424,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 968,
-    key.length: 44
+    key.offset: 1434,
+    key.length: 46
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1020,
-    key.length: 4
+    key.offset: 1488,
+    key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1025,
-    key.length: 5
+    key.offset: 1495,
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1031,
+    key.offset: 1505,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1045,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1065,
-    key.length: 31
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1096,
-    key.length: 31
+    key.offset: 1519,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1127,
+    key.offset: 1525,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1132,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1138,
-    key.length: 36
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1177,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1190,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1195,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1201,
-    key.length: 36
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1240,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1253,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1263,
-    key.length: 36
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1307,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1312,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1318,
-    key.length: 7
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1328,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1348,
-    key.length: 80
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1428,
-    key.length: 21
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1449,
-    key.length: 80
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 1530,
-    key.length: 14
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1544,
-    key.length: 24
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1568,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1573,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1579,
-    key.length: 32
+    key.offset: 1536,
+    key.length: 38
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1614,
+    key.offset: 1577,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1590,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1595,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1601,
+    key.length: 38
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1642,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1627,
+    key.offset: 1655,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1637,
-    key.length: 32
+    key.offset: 1665,
+    key.length: 38
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1677,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1684,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1694,
-    key.length: 7
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1704,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 1711,
-    key.length: 24
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1735,
-    key.length: 14
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1749,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1754,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1760,
-    key.length: 32
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1795,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1808,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1815,
+    key.offset: 1718,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1825,
-    key.length: 30
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1858,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1863,
-    key.length: 35
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 1898,
-    key.length: 35
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1933,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1938,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1944,
-    key.length: 29
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1976,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1989,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1994,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2000,
-    key.length: 29
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2032,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2045,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2055,
-    key.length: 29
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2092,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2099,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2109,
-    key.length: 11
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2123,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 2130,
-    key.length: 28
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 2158,
-    key.length: 28
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2186,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2191,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2197,
-    key.length: 46
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2246,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2259,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2269,
-    key.length: 46
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2323,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2330,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2340,
-    key.length: 11
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2354,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 2361,
-    key.length: 31
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 2392,
-    key.length: 31
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2423,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2428,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2434,
-    key.length: 38
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2475,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2488,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2493,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2499,
-    key.length: 38
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2540,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2553,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2563,
-    key.length: 38
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2609,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2616,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2626,
+    key.offset: 1728,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 2636,
+    key.offset: 1738,
     key.length: 3
   }
 ]
@@ -839,187 +671,187 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 37,
+    key.offset: 36,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 310,
+    key.offset: 93,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 333,
+    key.offset: 116,
     key.length: 30
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 392,
+    key.offset: 175,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 494,
+    key.offset: 238,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 549,
+    key.offset: 293,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 674,
+    key.offset: 347,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 728,
+    key.offset: 401,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 751,
+    key.offset: 424,
     key.length: 27
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 811,
+    key.offset: 484,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 945,
+    key.offset: 561,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 968,
+    key.offset: 584,
     key.length: 44
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1045,
+    key.offset: 661,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1177,
+    key.offset: 730,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1240,
+    key.offset: 793,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1263,
+    key.offset: 816,
     key.length: 36
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1328,
+    key.offset: 881,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1614,
+    key.offset: 946,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1637,
+    key.offset: 969,
     key.length: 32
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1704,
+    key.offset: 1036,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1795,
+    key.offset: 1088,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1858,
+    key.offset: 1151,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 1976,
+    key.offset: 1198,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2032,
+    key.offset: 1254,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2055,
+    key.offset: 1277,
     key.length: 29
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2123,
+    key.offset: 1345,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2246,
+    key.offset: 1411,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2269,
+    key.offset: 1434,
     key.length: 46
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2354,
+    key.offset: 1519,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2475,
+    key.offset: 1577,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2540,
+    key.offset: 1642,
     key.length: 8,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2563,
+    key.offset: 1665,
     key.length: 38
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 2636,
+    key.offset: 1738,
     key.length: 3
   }
 ]
@@ -1028,11 +860,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "Foo",
-    key.offset: 25,
+    key.offset: 24,
     key.length: 24,
-    key.nameoffset: 31,
+    key.nameoffset: 30,
     key.namelength: 3,
-    key.bodyoffset: 47,
+    key.bodyoffset: 46,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1041,7 +873,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 20,
+        key.offset: 19,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1049,7 +881,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 37,
+        key.offset: 36,
         key.length: 8
       }
     ]
@@ -1058,11 +890,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "GlobalToMember_Class_Container",
-    key.offset: 271,
+    key.offset: 54,
     key.length: 51,
-    key.nameoffset: 277,
+    key.nameoffset: 60,
     key.namelength: 30,
-    key.bodyoffset: 320,
+    key.bodyoffset: 103,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1071,7 +903,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 266,
+        key.offset: 49,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1079,7 +911,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 310,
+        key.offset: 93,
         key.length: 8
       }
     ]
@@ -1087,22 +919,22 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "GlobalToMember_Class_Container",
-    key.offset: 323,
+    key.offset: 106,
     key.length: 87,
-    key.nameoffset: 333,
+    key.nameoffset: 116,
     key.namelength: 30,
-    key.bodyoffset: 365,
+    key.bodyoffset: 148,
     key.bodylength: 44,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.class,
         key.accessibility: source.lang.swift.accessibility.open,
         key.name: "Payload",
-        key.offset: 376,
+        key.offset: 159,
         key.length: 32,
-        key.nameoffset: 382,
+        key.nameoffset: 165,
         key.namelength: 7,
-        key.bodyoffset: 402,
+        key.bodyoffset: 185,
         key.bodylength: 5,
         key.inheritedtypes: [
           {
@@ -1111,7 +943,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         ],
         key.attributes: [
           {
-            key.offset: 371,
+            key.offset: 154,
             key.length: 4,
             key.attribute: source.decl.attribute.open
           }
@@ -1119,7 +951,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         key.elements: [
           {
             key.kind: source.lang.swift.structure.elem.typeref,
-            key.offset: 392,
+            key.offset: 175,
             key.length: 8
           }
         ]
@@ -1130,11 +962,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToGlobal_Class_Container",
-    key.offset: 455,
+    key.offset: 199,
     key.length: 51,
-    key.nameoffset: 461,
+    key.nameoffset: 205,
     key.namelength: 30,
-    key.bodyoffset: 504,
+    key.bodyoffset: 248,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1143,7 +975,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 450,
+        key.offset: 194,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1151,7 +983,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 494,
+        key.offset: 238,
         key.length: 8
       }
     ]
@@ -1160,11 +992,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToGlobal_Class_Payload",
-    key.offset: 512,
+    key.offset: 256,
     key.length: 49,
-    key.nameoffset: 518,
+    key.nameoffset: 262,
     key.namelength: 28,
-    key.bodyoffset: 559,
+    key.bodyoffset: 303,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1173,7 +1005,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 507,
+        key.offset: 251,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1181,7 +1013,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 549,
+        key.offset: 293,
         key.length: 8
       }
     ]
@@ -1190,11 +1022,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_Class_Swift3",
-    key.offset: 638,
+    key.offset: 311,
     key.length: 48,
-    key.nameoffset: 644,
+    key.nameoffset: 317,
     key.namelength: 27,
-    key.bodyoffset: 684,
+    key.bodyoffset: 357,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1203,7 +1035,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 633,
+        key.offset: 306,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1211,7 +1043,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 674,
+        key.offset: 347,
         key.length: 8
       }
     ]
@@ -1220,11 +1052,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_Class_Swift4",
-    key.offset: 692,
+    key.offset: 365,
     key.length: 48,
-    key.nameoffset: 698,
+    key.nameoffset: 371,
     key.namelength: 27,
-    key.bodyoffset: 738,
+    key.bodyoffset: 411,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1233,7 +1065,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 687,
+        key.offset: 360,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1241,7 +1073,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 728,
+        key.offset: 401,
         key.length: 8
       }
     ]
@@ -1249,22 +1081,22 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "MemberToMember_Class_Swift4",
-    key.offset: 741,
+    key.offset: 414,
     key.length: 88,
-    key.nameoffset: 751,
+    key.nameoffset: 424,
     key.namelength: 27,
-    key.bodyoffset: 780,
+    key.bodyoffset: 453,
     key.bodylength: 48,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.class,
         key.accessibility: source.lang.swift.accessibility.open,
         key.name: "PayloadFor4",
-        key.offset: 791,
+        key.offset: 464,
         key.length: 36,
-        key.nameoffset: 797,
+        key.nameoffset: 470,
         key.namelength: 11,
-        key.bodyoffset: 821,
+        key.bodyoffset: 494,
         key.bodylength: 5,
         key.inheritedtypes: [
           {
@@ -1273,7 +1105,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         ],
         key.attributes: [
           {
-            key.offset: 786,
+            key.offset: 459,
             key.length: 4,
             key.attribute: source.decl.attribute.open
           }
@@ -1281,7 +1113,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         key.elements: [
           {
             key.kind: source.lang.swift.structure.elem.typeref,
-            key.offset: 811,
+            key.offset: 484,
             key.length: 8
           }
         ]
@@ -1292,11 +1124,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_SameContainer_Class_Container",
-    key.offset: 892,
+    key.offset: 508,
     key.length: 65,
-    key.nameoffset: 898,
+    key.nameoffset: 514,
     key.namelength: 44,
-    key.bodyoffset: 955,
+    key.bodyoffset: 571,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1305,7 +1137,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 887,
+        key.offset: 503,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1313,7 +1145,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 945,
+        key.offset: 561,
         key.length: 8
       }
     ]
@@ -1321,22 +1153,22 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "MemberToMember_SameContainer_Class_Container",
-    key.offset: 958,
+    key.offset: 574,
     key.length: 105,
-    key.nameoffset: 968,
+    key.nameoffset: 584,
     key.namelength: 44,
-    key.bodyoffset: 1014,
+    key.bodyoffset: 630,
     key.bodylength: 48,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.class,
         key.accessibility: source.lang.swift.accessibility.open,
         key.name: "PayloadFor4",
-        key.offset: 1025,
+        key.offset: 641,
         key.length: 36,
-        key.nameoffset: 1031,
+        key.nameoffset: 647,
         key.namelength: 11,
-        key.bodyoffset: 1055,
+        key.bodyoffset: 671,
         key.bodylength: 5,
         key.inheritedtypes: [
           {
@@ -1345,7 +1177,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         ],
         key.attributes: [
           {
-            key.offset: 1020,
+            key.offset: 636,
             key.length: 4,
             key.attribute: source.decl.attribute.open
           }
@@ -1353,7 +1185,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         key.elements: [
           {
             key.kind: source.lang.swift.structure.elem.typeref,
-            key.offset: 1045,
+            key.offset: 661,
             key.length: 8
           }
         ]
@@ -1364,11 +1196,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_SameName_Class_Swift3",
-    key.offset: 1132,
+    key.offset: 685,
     key.length: 57,
-    key.nameoffset: 1138,
+    key.nameoffset: 691,
     key.namelength: 36,
-    key.bodyoffset: 1187,
+    key.bodyoffset: 740,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1377,7 +1209,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 1127,
+        key.offset: 680,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1385,7 +1217,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 1177,
+        key.offset: 730,
         key.length: 8
       }
     ]
@@ -1394,11 +1226,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_SameName_Class_Swift4",
-    key.offset: 1195,
+    key.offset: 748,
     key.length: 57,
-    key.nameoffset: 1201,
+    key.nameoffset: 754,
     key.namelength: 36,
-    key.bodyoffset: 1250,
+    key.bodyoffset: 803,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1407,7 +1239,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 1190,
+        key.offset: 743,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1415,7 +1247,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 1240,
+        key.offset: 793,
         key.length: 8
       }
     ]
@@ -1423,22 +1255,22 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "MemberToMember_SameName_Class_Swift4",
-    key.offset: 1253,
+    key.offset: 806,
     key.length: 93,
-    key.nameoffset: 1263,
+    key.nameoffset: 816,
     key.namelength: 36,
-    key.bodyoffset: 1301,
+    key.bodyoffset: 854,
     key.bodylength: 44,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.class,
         key.accessibility: source.lang.swift.accessibility.open,
         key.name: "Payload",
-        key.offset: 1312,
+        key.offset: 865,
         key.length: 32,
-        key.nameoffset: 1318,
+        key.nameoffset: 871,
         key.namelength: 7,
-        key.bodyoffset: 1338,
+        key.bodyoffset: 891,
         key.bodylength: 5,
         key.inheritedtypes: [
           {
@@ -1447,7 +1279,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         ],
         key.attributes: [
           {
-            key.offset: 1307,
+            key.offset: 860,
             key.length: 4,
             key.attribute: source.decl.attribute.open
           }
@@ -1455,7 +1287,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
         key.elements: [
           {
             key.kind: source.lang.swift.structure.elem.typeref,
-            key.offset: 1328,
+            key.offset: 881,
             key.length: 8
           }
         ]
@@ -1466,11 +1298,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "GlobalToMember_Typedef_Container",
-    key.offset: 1573,
+    key.offset: 905,
     key.length: 53,
-    key.nameoffset: 1579,
+    key.nameoffset: 911,
     key.namelength: 32,
-    key.bodyoffset: 1624,
+    key.bodyoffset: 956,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1479,7 +1311,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 1568,
+        key.offset: 900,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1487,7 +1319,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 1614,
+        key.offset: 946,
         key.length: 8
       }
     ]
@@ -1495,24 +1327,24 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "GlobalToMember_Typedef_Container",
-    key.offset: 1627,
+    key.offset: 959,
     key.length: 82,
-    key.nameoffset: 1637,
+    key.nameoffset: 969,
     key.namelength: 32,
-    key.bodyoffset: 1671,
+    key.bodyoffset: 1003,
     key.bodylength: 37,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.typealias,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "Payload",
-        key.offset: 1684,
+        key.offset: 1016,
         key.length: 23,
-        key.nameoffset: 1694,
+        key.nameoffset: 1026,
         key.namelength: 7,
         key.attributes: [
           {
-            key.offset: 1677,
+            key.offset: 1009,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -1524,11 +1356,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToGlobal_Typedef_Container",
-    key.offset: 1754,
+    key.offset: 1047,
     key.length: 53,
-    key.nameoffset: 1760,
+    key.nameoffset: 1053,
     key.namelength: 32,
-    key.bodyoffset: 1805,
+    key.bodyoffset: 1098,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1537,7 +1369,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 1749,
+        key.offset: 1042,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1545,7 +1377,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 1795,
+        key.offset: 1088,
         key.length: 8
       }
     ]
@@ -1554,13 +1386,13 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.typealias,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "MemberToGlobal_Typedef_Payload",
-    key.offset: 1815,
+    key.offset: 1108,
     key.length: 46,
-    key.nameoffset: 1825,
+    key.nameoffset: 1118,
     key.namelength: 30,
     key.attributes: [
       {
-        key.offset: 1808,
+        key.offset: 1101,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -1570,11 +1402,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_Typedef_Swift3",
-    key.offset: 1938,
+    key.offset: 1160,
     key.length: 50,
-    key.nameoffset: 1944,
+    key.nameoffset: 1166,
     key.namelength: 29,
-    key.bodyoffset: 1986,
+    key.bodyoffset: 1208,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1583,7 +1415,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 1933,
+        key.offset: 1155,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1591,7 +1423,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 1976,
+        key.offset: 1198,
         key.length: 8
       }
     ]
@@ -1600,11 +1432,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_Typedef_Swift4",
-    key.offset: 1994,
+    key.offset: 1216,
     key.length: 50,
-    key.nameoffset: 2000,
+    key.nameoffset: 1222,
     key.namelength: 29,
-    key.bodyoffset: 2042,
+    key.bodyoffset: 1264,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1613,7 +1445,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 1989,
+        key.offset: 1211,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1621,7 +1453,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 2032,
+        key.offset: 1254,
         key.length: 8
       }
     ]
@@ -1629,24 +1461,24 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "MemberToMember_Typedef_Swift4",
-    key.offset: 2045,
+    key.offset: 1267,
     key.length: 83,
-    key.nameoffset: 2055,
+    key.nameoffset: 1277,
     key.namelength: 29,
-    key.bodyoffset: 2086,
+    key.bodyoffset: 1308,
     key.bodylength: 41,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.typealias,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "PayloadFor4",
-        key.offset: 2099,
+        key.offset: 1321,
         key.length: 27,
-        key.nameoffset: 2109,
+        key.nameoffset: 1331,
         key.namelength: 11,
         key.attributes: [
           {
-            key.offset: 2092,
+            key.offset: 1314,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -1658,11 +1490,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_SameContainer_Typedef_Container",
-    key.offset: 2191,
+    key.offset: 1356,
     key.length: 67,
-    key.nameoffset: 2197,
+    key.nameoffset: 1362,
     key.namelength: 46,
-    key.bodyoffset: 2256,
+    key.bodyoffset: 1421,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1671,7 +1503,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 2186,
+        key.offset: 1351,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1679,7 +1511,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 2246,
+        key.offset: 1411,
         key.length: 8
       }
     ]
@@ -1687,24 +1519,24 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "MemberToMember_SameContainer_Typedef_Container",
-    key.offset: 2259,
+    key.offset: 1424,
     key.length: 100,
-    key.nameoffset: 2269,
+    key.nameoffset: 1434,
     key.namelength: 46,
-    key.bodyoffset: 2317,
+    key.bodyoffset: 1482,
     key.bodylength: 41,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.typealias,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "PayloadFor4",
-        key.offset: 2330,
+        key.offset: 1495,
         key.length: 27,
-        key.nameoffset: 2340,
+        key.nameoffset: 1505,
         key.namelength: 11,
         key.attributes: [
           {
-            key.offset: 2323,
+            key.offset: 1488,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -1716,11 +1548,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_SameName_Typedef_Swift3",
-    key.offset: 2428,
+    key.offset: 1530,
     key.length: 59,
-    key.nameoffset: 2434,
+    key.nameoffset: 1536,
     key.namelength: 38,
-    key.bodyoffset: 2485,
+    key.bodyoffset: 1587,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1729,7 +1561,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 2423,
+        key.offset: 1525,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1737,7 +1569,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 2475,
+        key.offset: 1577,
         key.length: 8
       }
     ]
@@ -1746,11 +1578,11 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "MemberToMember_SameName_Typedef_Swift4",
-    key.offset: 2493,
+    key.offset: 1595,
     key.length: 59,
-    key.nameoffset: 2499,
+    key.nameoffset: 1601,
     key.namelength: 38,
-    key.bodyoffset: 2550,
+    key.bodyoffset: 1652,
     key.bodylength: 1,
     key.inheritedtypes: [
       {
@@ -1759,7 +1591,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     ],
     key.attributes: [
       {
-        key.offset: 2488,
+        key.offset: 1590,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -1767,7 +1599,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 2540,
+        key.offset: 1642,
         key.length: 8
       }
     ]
@@ -1775,24 +1607,24 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "MemberToMember_SameName_Typedef_Swift4",
-    key.offset: 2553,
+    key.offset: 1655,
     key.length: 88,
-    key.nameoffset: 2563,
+    key.nameoffset: 1665,
     key.namelength: 38,
-    key.bodyoffset: 2603,
+    key.bodyoffset: 1705,
     key.bodylength: 37,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.typealias,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "Payload",
-        key.offset: 2616,
+        key.offset: 1718,
         key.length: 23,
-        key.nameoffset: 2626,
+        key.nameoffset: 1728,
         key.namelength: 7,
         key.attributes: [
           {
-            key.offset: 2609,
+            key.offset: 1711,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }

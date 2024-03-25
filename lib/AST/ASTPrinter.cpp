@@ -1138,9 +1138,7 @@ public:
     // handles this, but we need to insert it for clang doc comments when not
     // printing other clang comments. Do it now so the printDeclPre callback
     // happens after the newline.
-    if (Options.PrintDocumentationComments &&
-        !Options.PrintRegularClangComments &&
-        D->hasClangNode()) {
+    if (Options.PrintDocumentationComments && D->hasClangNode()) {
       auto clangNode = D->getClangNode();
       auto clangDecl = clangNode.getAsDecl();
       if (clangDecl &&
@@ -1149,7 +1147,6 @@ public:
         indent();
       }
     }
-
 
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
