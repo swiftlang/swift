@@ -11,16 +11,16 @@
 class NonSendableKlass {}
 final class SendableKlass : Sendable {}
 
-actor GlobalActorInstance {}
+actor CustomActorInstance {}
 
 @globalActor
-struct GlobalActor {
-  static let shared = GlobalActorInstance()
+struct CustomActor {
+  static let shared = CustomActorInstance()
 }
 
 func transferToNonIsolated<T>(_ t: T) async {}
 @MainActor func transferToMainActor<T>(_ t: T) async {}
-@GlobalActor func transferToGlobalActor<T>(_ t: T) async {}
+@CustomActor func transferToCustomActor<T>(_ t: T) async {}
 func useValue<T>(_ t: T) {}
 
 var booleanFlag: Bool { false }
@@ -42,24 +42,24 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
   init() { next = nil }
 }
 
-@GlobalActor private var firstList = NonSendableLinkedList<Int>()
-@GlobalActor private var secondList = NonSendableLinkedList<Int>()
+@CustomActor private var firstList = NonSendableLinkedList<Int>()
+@CustomActor private var secondList = NonSendableLinkedList<Int>()
 
-@GlobalActor func useGlobalActor1() async {
+@CustomActor func useCustomActor1() async {
   let x = firstList
 
   await transferToMainActor(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'GlobalActor'-isolated uses}}
+  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedList<Int>' into main actor-isolated context may introduce data races}}
 
   let y = secondList.listHead!.next!
 
   await transferToMainActor(y) // expected-tns-warning {{transferring 'y' may cause a race}}
-  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'y' to main actor-isolated callee could cause races between main actor-isolated and global actor 'GlobalActor'-isolated uses}}
+  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'y' to main actor-isolated callee could cause races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
 
-@GlobalActor func useGlobalActor2() async {
+@CustomActor func useCustomActor2() async {
   var x = NonSendableLinkedListNode<Int>()
 
   if booleanFlag {
@@ -67,34 +67,34 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
   }
 
   await transferToMainActor(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'GlobalActor'-isolated uses}}
+  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
 
-@GlobalActor func useGlobalActor3() async {
+@CustomActor func useCustomActor3() async {
   var x = NonSendableLinkedListNode<Int>()
 
   if booleanFlag {
     x = secondList.listHead!.next!
   }
 
-  await transferToGlobalActor(x)
+  await transferToCustomActor(x)
 }
 
-@GlobalActor func useGlobalActor4() async {
+@CustomActor func useCustomActor4() async {
   let x = NonSendableLinkedListNode<Int>()
 
-  await transferToGlobalActor(x)
+  await transferToCustomActor(x)
 
   useValue(x)
 }
 
-@GlobalActor func useGlobalActor5() async {
+@CustomActor func useCustomActor5() async {
   let x = NonSendableLinkedListNode<Int>()
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'GlobalActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{use here could race}}
 }
@@ -104,49 +104,49 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var y = SendableKlass()
 }
 
-@GlobalActor func useGlobalActor6() async {
+@CustomActor func useCustomActor6() async {
   var x = StructContainingValue()
   x = StructContainingValue()
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'GlobalActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{use here could race}}
 }
 
-@GlobalActor func useGlobalActor7() async {
+@CustomActor func useCustomActor7() async {
   var x = StructContainingValue()
   x.x = firstList
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'GlobalActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
   useValue(x)
 }
 
-@GlobalActor func useGlobalActor8() async {
+@CustomActor func useCustomActor8() async {
   var x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
   x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'GlobalActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
-  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
+  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{use here could race}}
 }
 
-@GlobalActor func useGlobalActor9() async {
+@CustomActor func useCustomActor9() async {
   var x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
 
   x.1 = firstList
 
   await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
-  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'GlobalActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
-  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
+  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
   useValue(x)
 }
