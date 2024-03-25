@@ -36,18 +36,19 @@ func doSomething(_ x: NonSendableKlass, _ y: NonSendableKlass) { }
 actor ProtectsNonSendable {
   var ns: NonSendableKlass = .init()
 
-  nonisolated func testParameter(_ ns: NonSendableKlass) async {
+  nonisolated func testParameter(_ nsArg: NonSendableKlass) async {
+    // TODO: This is wrong, we should get an error saying that nsArg is task
+    // isolated since this is nonisolated.
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = ns // expected-warning {{task-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+      isolatedSelf.ns = nsArg // expected-warning {{actor-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
     }
   }
 
-  // This should get the note since l is different from 'ns'.
-  nonisolated func testParameterMergedIntoLocal(_ ns: NonSendableKlass) async {
+  nonisolated func testParameterMergedIntoLocal(_ nsArg: NonSendableKlass) async {
     let l = NonSendableKlass()
-    doSomething(l, ns)
+    doSomething(l, nsArg)
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = l // expected-warning {{task-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+      isolatedSelf.ns = l // expected-warning {{actor-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
     }
   }
 

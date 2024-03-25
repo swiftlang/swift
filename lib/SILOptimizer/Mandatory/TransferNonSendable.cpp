@@ -1023,8 +1023,13 @@ public:
 
   void emitFunctionArgumentClosure(SourceLoc loc, Type type,
                                    ApplyIsolationCrossing crossing) {
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
     diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
-                  "task-isolated", type, crossing.getCalleeIsolation())
+                  descriptiveKindStr, type, crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange());
   }
 
