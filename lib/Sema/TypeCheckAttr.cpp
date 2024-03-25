@@ -7043,20 +7043,25 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
   if (!proto)
     return;
 
-  // A marker protocol cannot inherit a non-marker protocol.
-  for (auto inheritedProto : proto->getInheritedProtocols()) {
-    if (!inheritedProto->isMarkerProtocol()) {
-      proto->diagnose(
-          diag::marker_protocol_inherit_nonmarker,
-          proto->getName(), inheritedProto->getName());
-      inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
-    }
-  }
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
+    if (!req.getFirstType()->isEqual(proto->getSelfInterfaceType()))
+      continue;
 
-  if (Type superclass = proto->getSuperclass()) {
-    proto->diagnose(
+    if (req.getKind() == RequirementKind::Superclass) {
+      // A marker protocol cannot have a superclass requirement.
+      proto->diagnose(
         diag::marker_protocol_inherit_class,
-        proto->getName(), superclass);
+        proto->getName(), req.getSecondType());
+    } else if (req.getKind() == RequirementKind::Conformance) {
+      // A marker protocol cannot inherit a non-marker protocol.
+      auto inheritedProto = req.getProtocolDecl();
+      if (!inheritedProto->isMarkerProtocol()) {
+        proto->diagnose(
+            diag::marker_protocol_inherit_nonmarker,
+            proto->getName(), inheritedProto->getName());
+        inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
+      }
+    }
   }
 
   // A marker protocol cannot have any requirements.

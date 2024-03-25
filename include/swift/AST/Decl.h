@@ -32,7 +32,6 @@
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -96,7 +95,6 @@ namespace swift {
   class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
-  struct InverseMarking;
   class ParameterList;
   class ParameterTypeFlags;
   class Pattern;
@@ -600,7 +598,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -626,6 +624,9 @@ protected:
 
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
+
+    /// Whether we have computed a requirement signature.
+    HasRequirementSignature : 1,
 
     /// Whether we have a lazy-loaded requirement signature.
     HasLazyRequirementSignature : 1,
@@ -5130,15 +5131,11 @@ class ProtocolDecl final : public NominalTypeDecl {
     /// The superclass decl and a bit to indicate whether the
     /// superclass was computed yet or not.
     llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
-
-    /// The superclass type and a bit to indicate whether the
-    /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  std::optional<RequirementSignature> RequirementSig;
+  RequirementSignature RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
@@ -5225,15 +5222,9 @@ public:
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
-  /// Retrieve the superclass of this protocol, or null if there is no superclass.
-  Type getSuperclass() const;
-
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
-
-  /// Set the superclass of this protocol.
-  void setSuperclass(Type superclass);
 
   /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
   /// saves loading the set of members in cases where there's no possibility of
@@ -5453,7 +5444,7 @@ public:
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSig.has_value();
+    return Bits.ProtocolDecl.HasRequirementSignature;
   }
 
   void setRequirementSignature(RequirementSignature requirementSig);

@@ -29,7 +29,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -7768,7 +7767,9 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
                                           llvm::SmallVectorImpl<InheritedEntry> &Results) {
   auto &ctx = proto->getASTContext();
 
-  if (auto superclassTy = proto->getSuperclass()) {
+  auto genericSig = proto->getGenericSignature();
+  if (auto superclassTy = genericSig->getSuperclassBound(
+        proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
                          /*isUnchecked=*/false,
                          /*isRetroactive=*/false,

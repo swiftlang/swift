@@ -1536,7 +1536,7 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
-    TypeIDField,            // superclass
+    DeclIDField,            // superclass decl
     AccessLevelField,       // access level
     BCArray<TypeIDField>    // dependency types
     // Trailed by the inherited protocols, the generic parameters (if any),

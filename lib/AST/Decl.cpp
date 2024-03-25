@@ -32,7 +32,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
@@ -6441,6 +6440,8 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.KnownProtocol = 0;
   Bits.ProtocolDecl.HasAssociatedTypes = 0;
   Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
+  Bits.ProtocolDecl.HasRequirementSignature = 0;
+  Bits.ProtocolDecl.HasLazyRequirementSignature = 0;
   Bits.ProtocolDecl.ProtocolRequirementsValid = false;
   setTrailingWhereClause(TrailingWhere);
 }
@@ -6550,27 +6551,10 @@ AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
   return nullptr;
 }
 
-Type ProtocolDecl::getSuperclass() const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    SuperclassTypeRequest{const_cast<ProtocolDecl *>(this),
-                          TypeResolutionStage::Interface},
-    Type());
-}
-
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
     SuperclassDeclRequest{const_cast<ProtocolDecl *>(this)}, nullptr);
-}
-
-void ProtocolDecl::setSuperclass(Type superclass) {
-  assert((!superclass || !superclass->hasArchetype())
-         && "superclass must be interface type");
-  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
-  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
-    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
-    true);
 }
 
 bool ProtocolDecl::walkInheritedProtocols(
@@ -6617,42 +6601,6 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 
   auto allInherited = getAllInheritedProtocols();
   return (llvm::find(allInherited, super) != allInherited.end());
-}
-
-static void findInheritedType(
-    InheritedTypes inherited,
-    llvm::function_ref<bool(Type, NullablePtr<TypeRepr>)> isMatch) {
-  for (size_t i = 0; i < inherited.size(); i++) {
-    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
-    if (!type)
-      continue;
-
-    if (isMatch(type, inherited.getTypeRepr(i)))
-      break;
-  }
-}
-
-static InverseMarking::Mark
-findInverseInInheritance(InheritedTypes inherited,
-                         InvertibleProtocolKind target) {
-  auto isInverseOfTarget = [&](Type t) {
-    if (auto pct = t->getAs<ProtocolCompositionType>())
-      return pct->getInverses().contains(target);
-    return false;
-  };
-
-  InverseMarking::Mark inverse;
-  findInheritedType(inherited,
-                    [&](Type inheritedTy, NullablePtr<TypeRepr> repr) {
-                      if (!isInverseOfTarget(inheritedTy))
-                        return false;
-
-                      inverse = InverseMarking::Mark(
-                          InverseMarking::Kind::Explicit,
-                          repr.isNull() ? SourceLoc() : repr.get()->getLoc());
-                      return true;
-                    });
-  return inverse;
 }
 
 bool ProtocolDecl::requiresClass() const {
@@ -6740,12 +6688,13 @@ bool ProtocolDecl::isComputingRequirementSignature() const {
 
 void ProtocolDecl::setRequirementSignature(RequirementSignature requirementSig) {
   RequirementSig = requirementSig;
+  Bits.ProtocolDecl.HasRequirementSignature = 1;
 }
 
 void
 ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
                                           uint64_t requirementSignatureData) {
-  assert(!RequirementSig && "requirement signature already set");
+  assert(!isRequirementSignatureComputed() && "requirement signature already set");
 
   auto contextData = static_cast<LazyProtocolData *>(
       getASTContext().getOrCreateLazyContextData(this, lazyLoader));
