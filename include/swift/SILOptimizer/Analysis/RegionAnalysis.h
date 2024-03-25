@@ -288,6 +288,13 @@ public:
   void print(llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
     valueState.print(os);
+    os << "\n    Rep Value: ";
+    getRepresentative().print(os);
+  }
+
+  void printVerbose(llvm::raw_ostream &os) const {
+    os << "TrackableValue. State: ";
+    valueState.print(os);
     os << "\n    Rep Value: " << getRepresentative();
   }
 
