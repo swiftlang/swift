@@ -78,6 +78,19 @@ Protocol SerialExecutor has added inherited protocol Copyable
 Protocol SerialExecutor has added inherited protocol Escapable
 Protocol AsyncSequence is now without @rethrows
 
+// #isolated adoption in with...Continuation
+// api-digester is not aware of silgen_name trickery we do to keep this ABI compatible
+Func withCheckedContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
+Func withCheckedContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, Swift.Never>) -> () to Swift.String
+Func withCheckedThrowingContinuation(function:_:) has been renamed to Func withCheckedThrowingContinuation(isolation:function:_:)
+Func withCheckedThrowingContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedThrowingContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A' to '_Concurrency.withCheckedThrowingContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A'
+Func withCheckedThrowingContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
+Func withCheckedThrowingContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>) -> () to Swift.String
+
+// #isolated was adopted and the old methods kept: $ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF
+Func withCheckedContinuation(function:_:) has been renamed to Func withCheckedContinuation(isolation:function:_:)
+Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency.withCheckedContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
+
 // SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations
 Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 

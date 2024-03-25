@@ -270,6 +270,14 @@ Added: _swift_task_getPreferredTaskExecutor
 Added: _swift_task_popTaskExecutorPreference
 Added: _swift_task_pushTaskExecutorPreference
 
+// Adopt #isolation in with...Continuation APIs
+// Swift.withCheckedThrowingContinuation<A>(isolation: isolated Swift.Actor?, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A
+Added: _$ss31withCheckedThrowingContinuation9isolation8function_xScA_pSgYi_SSyScCyxs5Error_pGXEtYaKlF
+Added: _$ss31withCheckedThrowingContinuation9isolation8function_xScA_pSgYi_SSyScCyxs5Error_pGXEtYaKlFTu
+// Swift.withCheckedContinuation<A>(isolation: isolated Swift.Actor?, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A
+Added: _$ss23withCheckedContinuation9isolation8function_xScA_pSgYi_SSyScCyxs5NeverOGXEtYalF
+Added: _$ss23withCheckedContinuation9isolation8function_xScA_pSgYi_SSyScCyxs5NeverOGXEtYalFTu
+
 // Updated signature for withTaskExecutorPreference to used typed throws and #isolation
 // Swift.withTaskExecutorPreference<A, B where B: Swift.Error>(_: Swift.TaskExecutor?, isolation: isolated Swift.Actor?, operation: () async throws(B) -> A) async throws(B) -> A
 Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEtYaq_YKs5ErrorR_r0_lF
