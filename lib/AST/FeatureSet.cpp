@@ -676,6 +676,10 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
+static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
