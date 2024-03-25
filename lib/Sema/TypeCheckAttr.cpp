@@ -5115,6 +5115,7 @@ static IndexSubset *computeDifferentiabilityParameters(
 static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return DescriptiveDeclKind::Getter;
   case AccessorKind::Set:
     return DescriptiveDeclKind::Setter;

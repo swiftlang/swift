@@ -400,6 +400,14 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
+    // TODO: here the requirement is thunk_decl of the protocol; it is a FUNC
+    // detect here that it is a func dec + thunk.
+    // walk up to DC, and find storage.
+    // e  requirementRef->getDecl()->dump()
+    //(func_decl implicit "distributedVariable()" interface type="<Self where Self : WorkerProtocol> (Self) -> () async throws -> String" access=internal nonisolated distributed_thunk
+    //  (parameter "self")
+    //  (parameter_list))
+
     auto reqDecl = requirementRef.getDecl();
 
     // Static functions can be witnessed by enum cases with payload
@@ -415,32 +423,37 @@ public:
     }
 
     auto reqAccessor = dyn_cast<AccessorDecl>(reqDecl);
+    /// If it is an accessor, or distributed_thunk that is witnessing an
+    /// accessor, we need to use the storage to get the witness.
+    ValueDecl *storage = nullptr;
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (auto witness = asDerived().getWitness(reqDecl)) {
-        auto newDecl = requirementRef.withDecl(witness.getDecl());
-        // Only import C++ methods as foreign. If the following
-        // Objective-C function is imported as foreign:
-        //   () -> String
-        // It will be imported as the following type:
-        //   () -> NSString
-        // But the first is correct, so make sure we don't mark this witness
-        // as foreign.
-        if (dyn_cast_or_null<clang::CXXMethodDecl>(
-                witness.getDecl()->getClangDecl()))
-          newDecl = newDecl.asForeign();
-        return addMethodImplementation(
-            requirementRef, getWitnessRef(newDecl, witness),
-            witness);
-      }
-
-      return asDerived().addMissingMethod(requirementRef);
+      if (!storage) {
+        if (auto witness = asDerived().getWitness(reqDecl)) {
+          auto newDecl = requirementRef.withDecl(witness.getDecl());
+          // Only import C++ methods as foreign. If the following
+          // Objective-C function is imported as foreign:
+          //   () -> String
+          // It will be imported as the following type:
+          //   () -> NSString
+          // But the first is correct, so make sure we don't mark this witness
+          // as foreign.
+          if (dyn_cast_or_null<clang::CXXMethodDecl>(
+                  witness.getDecl()->getClangDecl()))
+            newDecl = newDecl.asForeign();
+          return addMethodImplementation(
+              requirementRef, getWitnessRef(newDecl, witness), witness);
+        }
+        return asDerived().addMissingMethod(requirementRef);
+      } // else, fallthrough to the usual accessor handling!
+    } else {
+      // Otherwise, we need to map the storage declaration and then get
+      // the appropriate accessor for it.
+      storage = reqAccessor->getStorage();
     }
 
-    // Otherwise, we need to map the storage declaration and then get
-    // the appropriate accessor for it.
-    auto witness = asDerived().getWitness(reqAccessor->getStorage());
+    auto witness = asDerived().getWitness(storage);
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
@@ -452,8 +465,18 @@ public:
     }
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
-    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
+    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation()) {
       return asDerived().addMissingMethod(requirementRef);
+    }
+
+    // Here we notice a `distributed var` thunk requirement,
+    // and witness it with the distributed thunk -- the "getter thunk".
+    if (requirementRef.isDistributedThunk()) {
+
+      return addMethodImplementation(
+          requirementRef, getWitnessRef(requirementRef, witnessStorage->getDistributedThunk()),
+          witness);
+    }
 
     auto witnessAccessor =
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
@@ -1246,7 +1269,6 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
-    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
@@ -1424,7 +1446,6 @@ public:
       }
     }
 
-    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 

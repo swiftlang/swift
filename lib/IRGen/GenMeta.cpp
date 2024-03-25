@@ -266,6 +266,7 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
+    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
@@ -919,7 +920,7 @@ namespace {
       {
         auto *requirement = cast<AbstractFunctionDecl>(func.getDecl());
         if (requirement->isDistributedThunk()) {
-          // when thunk, because in protocol we want accessof for the thunk
+          // when thunk, because in protocol we want access of for the thunk
           IGM.emitDistributedTargetAccessor(requirement);
         }
       }
@@ -990,6 +991,13 @@ namespace {
             IGM.defineMethodDescriptor(func, Proto, descriptor,
                                        IGM.ProtocolRequirementStructTy);
           }
+        }
+
+        if (entry.isFunction() &&
+            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
+          // We avoid emitting _distributed_get accessors, as they cannot be
+          // referred to anyway
+          continue;
         }
 
         if (entry.isAssociatedType()) {

@@ -3374,7 +3374,7 @@ private:
     }
 
     // Check throwing calls.
-    MaxThrowingKind = std::max(MaxThrowingKind, throwsKind);
+    MaxThrowingKind = std::max(MaxThrowingKind, throwsKind); // FIXME: why is the left Never for property?
 
     switch (throwsKind) {
     // Completely ignores sites that don't throw.

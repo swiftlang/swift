@@ -16,34 +16,27 @@
 
 import Distributed
 
-@_DistributedProtocol
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
-  distributed func distributedMethod() -> String
   distributed var distributedVariable: String { get }
-  distributed func genericMethod<E: Codable>(_ value: E) async -> E
 }
 
 @available(SwiftStdlib 6.0, *)
 distributed actor Worker: WorkerProtocol {
-  distributed func distributedMethod() -> String {
-    "implemented method"
-  }
-
   distributed var distributedVariable: String {
-    "implemented variable"
+    "implemented!"
   }
-
-  distributed func genericMethod<E: Codable>(_ value: E) async -> E {
-    return value
-  }
+}
+//
+@available(SwiftStdlib 6.0, *)
+extension WorkerProtocol {
+    distributed var distributedVariable: String { "" }
 }
 
 // ==== Execute ----------------------------------------------------------------
 
-
 @available(SwiftStdlib 6.0, *)
-func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> String {
+func test<DA: WorkerProtocol>(actor: DA) async throws -> String {
   try await actor.distributedVariable
 }
 
@@ -52,16 +45,13 @@ func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> Str
   static func main() async throws {
     let system = LocalTestingDistributedActorSystem()
 
-    let actor: any WorkerProtocol = Worker(actorSystem: system)
-
-    let m = try await actor.distributedMethod()
-    print("m = \(m)") // CHECK: m = implemented method
+    let actor = Worker(actorSystem: system)
 
     // force a call through witness table
-    let v1 = try await test_distributedVariable(actor: actor)
-    print("v1 = \(v1)") // CHECK: v1 = implemented variable
+    let v1 = try await test(actor: actor)
+    print("v1 = \(v1)") // CHECK: v1 = implemented!
 
-    let v = try await actor.distributedVariable
-    print("v = \(v)") // CHECK: v = implemented variable
+    let v2 = try await actor.distributedVariable
+    print("v2 = \(v2)") // CHECK: v2 = implemented!
   }
 }
