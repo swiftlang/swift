@@ -8,7 +8,7 @@
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass {}
+class NonSendableKlass {} // expected-complete-note {{}}
 final class SendableKlass : Sendable {}
 
 actor CustomActorInstance {}
@@ -24,6 +24,8 @@ func transferToNonIsolated<T>(_ t: T) async {}
 func useValue<T>(_ t: T) {}
 
 var booleanFlag: Bool { false }
+@MainActor var mainActorIsolatedGlobal = NonSendableKlass()
+@CustomActor var customActorIsolatedGlobal = NonSendableKlass()
 
 /////////////////
 // MARK: Tests //
@@ -169,4 +171,26 @@ struct Clock {
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     try! await c.sleep()
   }
+}
+
+@CustomActor func testGlobalAndGlobalIsolatedPartialApplyMismatch() {
+  let ns = customActorIsolatedGlobal
+
+  let _ = { @MainActor in
+    print(ns) // expected-tns-warning {{global actor 'CustomActor'-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+    // expected-complete-warning @-1 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in an isolated closure}}
+  }
+
+  useValue(ns)
+}
+
+@MainActor func testGlobalAndGlobalIsolatedPartialApplyMatch() {
+  let ns = mainActorIsolatedGlobal
+
+  // TODO: We should not consider this to be a transfer.
+  let _ = { @MainActor in
+    print(ns) // expected-tns-warning {{main actor-isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+  }
+
+  useValue(ns)
 }
