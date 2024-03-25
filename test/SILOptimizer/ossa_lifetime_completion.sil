@@ -266,12 +266,12 @@ exit:
 }
 
 // CHECK-LABEL: sil [ossa] @availability_boundary_2_after_loop : {{.*}} {
-// CHECK:         [[REGISTER_1:%[^,]+]] = move_value [lexical]
+// CHECK:         [[LEXICAL:%[^,]+]] = move_value [lexical]
 // CHECK:         br [[CONDITION_1:bb[0-9]+]]
 // CHECK:       [[CONDITION_1]]:
 // CHECK:         cond_br undef, [[CONDITION_2:bb[0-9]+]], [[PREHEADER:bb[0-9]+]]
 // CHECK:       [[CONDITION_2]]:
-// CHECK:         destroy_value [[REGISTER_1]]
+// CHECK:         destroy_value [[LEXICAL]]
 // CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[TO_DIE_2:bb[0-9]+]]
 // CHECK:       [[PREHEADER]]:
 // CHECK:         br [[HEADER:bb[0-9]+]]
@@ -282,7 +282,7 @@ exit:
 // CHECK:       [[BACKEDGE]]:
 // CHECK:         br [[HEADER]]
 // CHECK:       [[TO_DIE_1]]:
-// CHECK:         destroy_value [[REGISTER_1]]
+// CHECK:         destroy_value [[LEXICAL]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[TO_DIE_2]]:
 // CHECK:         br [[DIE]]
