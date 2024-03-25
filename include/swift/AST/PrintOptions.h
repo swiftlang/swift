@@ -447,7 +447,7 @@ struct PrintOptions {
   bool PrintInSILBody = false;
 
   /// Whether to use an empty line to separate two members in a single decl.
-  bool EmptyLineBetweenMembers = false;
+  bool EmptyLineBetweenDecls = false;
 
   /// Whether to print empty members of a declaration on a single line, e.g.:
   /// ```
@@ -692,7 +692,7 @@ struct PrintOptions {
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipUnsafeCXXMethods = true;
     result.SkipDeinit = true;
-    result.EmptyLineBetweenMembers = true;
+    result.EmptyLineBetweenDecls = true;
     result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
@@ -755,7 +755,7 @@ struct PrintOptions {
   static PrintOptions printSwiftFileInterface(bool printFullConvention) {
     PrintOptions result = printInterface(printFullConvention);
     result.AccessFilter = AccessLevel::Internal;
-    result.EmptyLineBetweenMembers = true;
+    result.EmptyLineBetweenDecls = true;
     return result;
   }
 

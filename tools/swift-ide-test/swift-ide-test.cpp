@@ -4754,7 +4754,7 @@ int main(int argc, char *argv[]) {
       ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
     else {
       if (options::NoEmptyLineBetweenMembers.getNumOccurrences() > 0)
-        PrintOpts.EmptyLineBetweenMembers = !options::NoEmptyLineBetweenMembers;
+        PrintOpts.EmptyLineBetweenDecls = !options::NoEmptyLineBetweenMembers;
       ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,

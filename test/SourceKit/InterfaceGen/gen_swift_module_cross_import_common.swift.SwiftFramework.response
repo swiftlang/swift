@@ -5,7 +5,6 @@ public func fromSwiftFramework()
 
 // MARK: - BystandingLibrary Additions
 
-
 // Available when BystandingLibrary is imported with SwiftFramework
 public func fromSwiftFrameworkCrossImport()
 
@@ -48,22 +47,22 @@ public func fromSwiftFrameworkCrossImport()
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 102,
+    key.offset: 101,
     key.length: 68
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 170,
+    key.offset: 169,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 177,
+    key.offset: 176,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 182,
+    key.offset: 181,
     key.length: 29
   }
 ]
@@ -96,13 +95,13 @@ public func fromSwiftFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fromSwiftFrameworkCrossImport()",
-    key.offset: 177,
+    key.offset: 176,
     key.length: 36,
-    key.nameoffset: 182,
+    key.nameoffset: 181,
     key.namelength: 31,
     key.attributes: [
       {
-        key.offset: 170,
+        key.offset: 169,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
