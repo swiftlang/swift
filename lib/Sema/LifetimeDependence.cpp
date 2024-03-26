@@ -481,15 +481,6 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   }
 
   if (!candidateParam && !hasParamError) {
-    // Explicitly turn off error messages for builtins, since some of are
-    // ~Escapable currently.
-    // TODO: rdar://123555720: Remove this check after another round of
-    // surveying builtins
-    if (auto *fd = dyn_cast<FuncDecl>(afd)) {
-      if (fd->isImplicit() && fd->getModuleContext()->isBuiltinModule()) {
-        return std::nullopt;
-      }
-    }
     diags.diagnose(returnLoc,
                    diag::lifetime_dependence_cannot_infer_no_candidates);
     return std::nullopt;
