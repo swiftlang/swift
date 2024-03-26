@@ -53,7 +53,7 @@ class G<T> {
   // expected-note@-1 {{missing constraint for 'T' in '_specialize' attribute}}
   @_specialize(where T == S<T>)
   // expected-error@-1 {{cannot build rewrite system for generic signature; concrete nesting limit exceeded}}
-  // expected-note@-2 {{failed rewrite rule is τ_0_0.[concrete: S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<τ_0_0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => τ_0_0}}
+  // expected-note@-2 {{failed rewrite rule is τ_0_0.[concrete: S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<τ_0_0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => τ_0_0}}
   // expected-error@-3 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
   // expected-note@-4 {{missing constraint for 'T' in '_specialize' attribute}}
   @_specialize(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}}
@@ -80,8 +80,6 @@ struct AThing : Thing {}
 // CHECK: @_specialize(exported: false, kind: full, where T == AThing)
 @_specialize(where T == AThing)
 @_specialize(where T == Int) // expected-error{{no type for 'T' can satisfy both 'T == Int' and 'T : Thing'}}
-// expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
-// expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
 
 func oneRequirement<T : Thing>(_ t: T) {}
 
@@ -169,10 +167,8 @@ func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
 @_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject)
-// expected-error@-1{{no type for 'T' can satisfy both 'T : _RefCountedObject' and 'T : _Trivial(32)'}}
+// expected-error@-1{{no type for 'T' can satisfy both 'T : _RefCountedObject' and 'T : _Trivial(64)'}}
 // expected-error@-2{{no type for 'T' can satisfy both 'T : _Trivial(64)' and 'T : _Trivial(32)'}}
-// expected-error@-3 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
-// expected-note@-4 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: _Trivial, T: _Trivial(64))
 @_specialize(where T: _RefCountedObject, T: _NativeRefCountedObject)
 @_specialize(where Array<T> == Int) // expected-error{{generic signature requires types 'Array<T>' and 'Int' to be the same}}

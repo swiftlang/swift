@@ -266,6 +266,7 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
+    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
@@ -479,7 +480,7 @@ namespace {
     ConstantInitBuilder InitBuilder;
   protected:
     ConstantStructBuilder B;
-    llvm::Optional<GenericSignatureHeaderBuilder> SignatureHeader;
+    std::optional<GenericSignatureHeaderBuilder> SignatureHeader;
 
     ContextDescriptorBuilderBase(IRGenModule &IGM)
       : IGM(IGM), InitBuilder(IGM), B(InitBuilder.beginStruct()) {
@@ -787,7 +788,7 @@ namespace {
     ProtocolDecl *Proto;
     SILDefaultWitnessTable *DefaultWitnesses;
 
-    llvm::Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
+    std::optional<ConstantAggregateBuilderBase::PlaceholderPosition>
         NumRequirementsInSignature, NumRequirements;
 
     bool Resilient;
@@ -916,6 +917,14 @@ namespace {
       if (Resilient || IGM.getOptions().WitnessMethodElimination)
         IGM.emitDispatchThunk(func);
 
+      {
+        auto *requirement = cast<AbstractFunctionDecl>(func.getDecl());
+        if (requirement->isDistributedThunk()) {
+          // when thunk, because in protocol we want access of for the thunk
+          IGM.emitDistributedTargetAccessor(requirement);
+        }
+      }
+
       // Classify the function.
       auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
 
@@ -982,6 +991,13 @@ namespace {
             IGM.defineMethodDescriptor(func, Proto, descriptor,
                                        IGM.ProtocolRequirementStructTy);
           }
+        }
+
+        if (entry.isFunction() &&
+            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
+          // We avoid emitting _distributed_get accessors, as they cannot be
+          // referred to anyway
+          continue;
         }
 
         if (entry.isAssociatedType()) {
@@ -1189,7 +1205,7 @@ namespace {
       MetadataInitialization;
 
     StringRef UserFacingName;
-    llvm::Optional<TypeImportInfo<std::string>> ImportInfo;
+    std::optional<TypeImportInfo<std::string>> ImportInfo;
 
     using super::IGM;
     using super::B;
@@ -1695,7 +1711,7 @@ namespace {
     // Non-null unless the type is foreign.
     ClassMetadataLayout *MetadataLayout = nullptr;
 
-    llvm::Optional<TypeEntityReference> ResilientSuperClassRef;
+    std::optional<TypeEntityReference> ResilientSuperClassRef;
 
     SILVTable *VTable;
     bool Resilient;
@@ -1883,7 +1899,7 @@ namespace {
       // Emit method dispatch thunk if the class is resilient.
       auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
 
-      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Public) ||
+      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Package) ||
           IGM.getOptions().VirtualFunctionElimination) {
         IGM.emitDispatchThunk(fn);
       }
@@ -2131,6 +2147,8 @@ namespace {
                 .getLinkage(NotForDefinition)) {
       case SILLinkage::Public:
       case SILLinkage::PublicExternal:
+      case SILLinkage::Package:
+      case SILLinkage::PackageExternal:
       case SILLinkage::Hidden:
       case SILLinkage::HiddenExternal:
       case SILLinkage::Private:
@@ -2138,6 +2156,7 @@ namespace {
         
       case SILLinkage::Shared:
       case SILLinkage::PublicNonABI:
+      case SILLinkage::PackageNonABI:
         return false;
       }
       llvm_unreachable("covered switch");
@@ -2282,7 +2301,7 @@ namespace {
       emit(ArrayRef<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
                substitutionSet) {
         auto getInt32Constant =
-            [&](llvm::Optional<unsigned> value) -> llvm::ConstantInt * {
+            [&](std::optional<unsigned> value) -> llvm::ConstantInt * {
           return llvm::ConstantInt::get(IGM.Int32Ty, value.value_or(0));
         };
 
@@ -2587,8 +2606,7 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   auto &ti = IGM.getTypeInfo(lowered);
   auto *typeLayoutEntry =
       ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-      IGM.getOptions().EnableLayoutStringValueWitnesses) {
+  if (layoutStringsEnabled(IGM)) {
 
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
@@ -2719,8 +2737,11 @@ IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
       // at runtime.
       auto mangledName = entity.mangleAsString();
       if (auto otherDefinition = Module.getGlobalVariable(mangledName)) {
-        GlobalVars.insert({entity, otherDefinition});
-        return otherDefinition;
+        if (!otherDefinition->isDeclaration() ||
+            !entity.isAlwaysSharedLinkage()) {
+          GlobalVars.insert({entity, otherDefinition});
+          return otherDefinition;
+        }
       }
       
       // Otherwise, emit the descriptor.
@@ -3112,11 +3133,11 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   auto loweredTy = IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
-  bool useLayoutStrings = IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.Context.LangOpts.hasFeature(
-            Feature::LayoutStringValueWitnessesInstantiation) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses &&
-        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
+  bool useLayoutStrings =
+      layoutStringsEnabled(IGM) &&
+      IGM.Context.LangOpts.hasFeature(
+          Feature::LayoutStringValueWitnessesInstantiation) &&
+      IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
 
   if (auto sd = dyn_cast<StructDecl>(nominalDecl)) {
     auto &fixedTI = IGM.getTypeInfo(loweredTy);
@@ -3267,8 +3288,7 @@ namespace {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -3349,9 +3369,7 @@ namespace {
         if (HasDependentMetadata)
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
 
-        if (IGM.Context.LangOpts.hasFeature(
-                Feature::LayoutStringValueWitnesses) &&
-            IGM.getOptions().EnableLayoutStringValueWitnesses) {
+        if (layoutStringsEnabled(IGM)) {
           if (auto *layoutString = getLayoutString()) {
             auto layoutStringCast = IGF.Builder.CreateBitCast(layoutString,
                                                               IGM.Int8PtrTy);
@@ -3633,12 +3651,13 @@ static void emitClassMetadataBaseOffset(IRGenModule &IGM,
   offsetVar->setConstant(true);
 }
 
-static llvm::Optional<llvm::Function *>
+static std::optional<llvm::Function *>
 getAddrOfDestructorFunction(IRGenModule &IGM, ClassDecl *classDecl) {
   auto dtorRef = SILDeclRef(classDecl->getDestructor(),
                             SILDeclRef::Kind::Deallocator);
   SILFunction *dtorFunc = IGM.getSILModule().lookUpFunction(dtorRef);
-  if (!dtorFunc) return llvm::None;
+  if (!dtorFunc)
+    return std::nullopt;
   return IGM.getAddrOfSILFunction(dtorFunc, NotForDefinition);
 }
 
@@ -3945,8 +3964,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -4431,7 +4449,7 @@ namespace {
 
     const ClassLayout &FieldLayout;
 
-    llvm::Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
+    std::optional<ConstantAggregateBuilderBase::PlaceholderPosition>
         ClassRODataOffset, MetaclassObjectOffset, MetaclassRODataOffset;
 
   public:
@@ -4666,7 +4684,7 @@ namespace {
     SILType getLoweredType() { return SILType::getPrimitiveObjectType(type); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredType();
       auto &ti = IGM.getTypeInfo(lowered);
@@ -4693,7 +4711,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5276,8 +5294,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5321,8 +5338,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -5469,9 +5485,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
       return !!getLayoutString() ||
@@ -5686,11 +5700,11 @@ void irgen::emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type,
 
 // Enums
 
-static llvm::Optional<Size>
+static std::optional<Size>
 getConstantPayloadSize(IRGenModule &IGM, EnumDecl *enumDecl, CanType enumTy) {
   auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
   if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   assert((!enumTI.isFixedSize(ResilienceExpansion::Minimal) || enumDecl->isGenericContext()) &&
@@ -5699,8 +5713,8 @@ getConstantPayloadSize(IRGenModule &IGM, EnumDecl *enumDecl, CanType enumTy) {
   return Size(strategy.getPayloadSizeForMetadata());
 }
 
-static llvm::Optional<Size> getConstantPayloadSize(IRGenModule &IGM,
-                                                   EnumDecl *enumDecl) {
+static std::optional<Size> getConstantPayloadSize(IRGenModule &IGM,
+                                                  EnumDecl *enumDecl) {
   auto enumTy = enumDecl->getDeclaredTypeInContext()->getCanonicalType();
   return getConstantPayloadSize(IGM, enumDecl, enumTy);
 }
@@ -5753,9 +5767,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5763,8 +5775,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -5829,7 +5840,7 @@ namespace {
       return flags;
     }
 
-    llvm::Optional<Size> getPayloadSize() {
+    std::optional<Size> getPayloadSize() {
       return getConstantPayloadSize(IGM, Target);
     }
 
@@ -5883,7 +5894,7 @@ namespace {
                                           ConstantStructBuilder &B)
         : super(IGM, type, decl, B), type(type){};
 
-    llvm::Optional<Size> getPayloadSize() {
+    std::optional<Size> getPayloadSize() {
       return getConstantPayloadSize(IGM, Target, type);
     }
   };
@@ -5990,9 +6001,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -6571,7 +6580,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator:
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
-  case KnownProtocolKind::_TaskExecutor:
+  case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
@@ -6887,7 +6896,7 @@ void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
 bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                                              const SILVTable *vtable,
                                              SILDeclRef method) {
-  llvm::Optional<SILVTable::Entry> entry =
+  std::optional<SILVTable::Entry> entry =
       vtable->getEntry(IGM.getSILModule(), method);
   LLVM_DEBUG(llvm::dbgs() << "looking at vtable:\n";
              vtable->print(llvm::dbgs()));
@@ -6922,7 +6931,7 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
   auto originatingClass =
     cast<ClassDecl>(method.getOverriddenVTableEntry().getDecl()->getDeclContext());
 
-  if (originatingClass->getEffectiveAccess() >= AccessLevel::Public) {
+  if (originatingClass->getEffectiveAccess() >= AccessLevel::Package) {
     // If the class is public,
     // and it's either marked fragile or part of a non-resilient module, then
     // other modules will directly address vtable offsets and we can't remove
@@ -6932,7 +6941,7 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                               << vtable->getClass()->getName()
                               << " for ";
                  method.print(llvm::dbgs());
-                 llvm::dbgs() << " originates from a public fragile class\n");
+                 llvm::dbgs() << " originates from a public/package fragile class\n");
       return true;
     }
   }
@@ -7014,7 +7023,7 @@ ExtendedExistentialTypeShapeInfo::get(
                                    .getCanonicalSignature();
 
   auto linkage = getExistentialShapeLinkage(genSig, shapeType);
-  assert(linkage != FormalLinkage::PublicUnique);
+  assert(linkage != FormalLinkage::PublicUnique && linkage != FormalLinkage::PackageUnique);
 
   return { genSig, shapeType, SubstitutionMap(), linkage };
 }
@@ -7104,7 +7113,7 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     auto reqHeader = addSignatureHeader(reqSig);
 
     // GenericContextDescriptorHeader GenSigHeader; // optional
-    llvm::Optional<GenericSignatureHeaderBuilder> genHeader;
+    std::optional<GenericSignatureHeaderBuilder> genHeader;
     if (genSig)
       genHeader.emplace(addSignatureHeader(genSig));
 

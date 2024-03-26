@@ -362,14 +362,55 @@ extension DistributedActor {
   /// state.
   ///
   /// When the actor is remote, the closure won't be executed and this function will return nil.
-  public nonisolated func whenLocal<T: Sendable>(
-    _ body: @Sendable (isolated Self) async throws -> T
-  ) async rethrows -> T? {
+  public nonisolated func whenLocal<T: Sendable, E>(
+    _ body: @Sendable (isolated Self) async throws(E) -> T
+  ) async throws(E) -> T? {
     if __isLocalActor(self) {
-       return try await body(self)
+       _local let localSelf = self
+       return try await body(localSelf)
     } else {
       return nil
     }
+  }
+
+  // ABI: Historical whenLocal, rethrows was changed to typed throws `throws(E)`
+  @_silgen_name("$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbKXEYaKs8SendableRd__lF")
+  @usableFromInline
+  nonisolated func __abi_whenLocal<T: Sendable>(
+    _ body: @Sendable (isolated Self) async throws -> T
+  ) async rethrows -> T? {
+    try await whenLocal(body)
+  }
+}
+
+/// Supports the operation to produce an any Actor instance from a local
+/// distributed actor
+@available(SwiftStdlib 5.7, *)
+extension DistributedActor {
+  @_alwaysEmitIntoClient
+  @_implements(Actor, unownedExecutor)
+  public nonisolated var __actorUnownedExecutor: UnownedSerialExecutor {
+    if #available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *) {
+      return unownedExecutor
+    } else {
+      // On older platforms, all distributed actors are default actors.
+      return UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
+    }
+  }
+
+  /// Produces an erased `any Actor` reference to this known to be local distributed actor.
+  ///
+  /// Since this method is not distributed, it can only be invoked when the underlying
+  /// distributed actor is known to be local, e.g. from a context that is isolated
+  /// to this actor.
+  ///
+  /// Such reference can be used to work with APIs accepting `isolated any Actor`,
+  /// as only a local distributed actor can be isolated on and may be automatically
+  /// erased to such `any Actor` when calling methods implicitly accepting the
+  /// caller's actor isolation, e.g. by using the `#isolation` macro.
+  @backDeployed(before: SwiftStdlib 6.0)
+  public var asLocalActor: any Actor {
+    Builtin.distributedActorAsAnyActor(self)
   }
 }
 
@@ -398,3 +439,13 @@ public func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
+
+// ==== Distributed Actor Stubs ------------------------------------------------
+
+@available(SwiftStdlib 6.0, *)
+public protocol _DistributedActorStub where Self: DistributedActor {}
+
+@available(SwiftStdlib 6.0, *)
+public func _distributedStubFatalError(function: String = #function) -> Never {
+  fatalError("Unexpected invocation of distributed method '\(function)' stub!")
+}

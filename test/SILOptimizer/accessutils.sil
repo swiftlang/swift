@@ -27,6 +27,10 @@ struct Ptr {
   var p: Int64
 }
 
+class C {}
+
+sil @_getC : $@convention(thin) () -> @owned C
+
 // CHECK-LABEL: Accesses for readIdentifiedArg
 // CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Scope: base
@@ -521,4 +525,25 @@ bb0(%twoInts: $*TwoInts):
 
   %200 = tuple ()
   return %200 : $()
+}
+
+// CHECK-LABEL: Accesses for storeBorrow
+// CHECK: Value:   [[SB:%.*]] = store_borrow %0 to [[DEST:%.*]] : $*C
+// CHECK:   Scope: base
+// CHECK:   Base: storeBorrow -   [[SB]] = store_borrow %0 to [[DEST]] : $*C
+// CHECK:   Path: ""
+// CHECK:    no Storage paths
+// CHECK-LABEL: End accesses for storeBorrow
+sil [ossa] @storeBorrow : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1 : $*C
+  %3 = function_ref @_getC : $@convention(thin) () -> @owned C
+  %4 = apply %3() : $@convention(thin) () -> @owned C
+  %5 = mark_dependence [unresolved] %4 : $C on %2 : $*C
+  %6 = load [copy] %2 : $*C
+  destroy_value %5 : $C
+  end_borrow %2 : $*C
+  dealloc_stack %1 : $*C
+  return %6 : $C
 }

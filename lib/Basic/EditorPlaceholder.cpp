@@ -16,8 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/EditorPlaceholder.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/None.h"
+#include <optional>
 
 using namespace swift;
 
@@ -37,18 +36,18 @@ using namespace swift;
 // or type-string. If this ends up not the case for some reason, we can consider
 // adding escaping for '##'.
 
-llvm::Optional<EditorPlaceholderData>
+std::optional<EditorPlaceholderData>
 swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
-  if (!PlaceholderText.startswith("<#") ||
+  if (!PlaceholderText.starts_with("<#") ||
       !PlaceholderText.endswith("#>"))
-    return llvm::None;
+    return std::nullopt;
 
   PlaceholderText = PlaceholderText.drop_front(2).drop_back(2);
   EditorPlaceholderData PHDataBasic;
   PHDataBasic.Kind = EditorPlaceholderKind::Basic;
   PHDataBasic.Display = PlaceholderText;
 
-  if (!PlaceholderText.startswith("T##")) {
+  if (!PlaceholderText.starts_with("T##")) {
     // Basic.
     return PHDataBasic;
   }
@@ -57,7 +56,7 @@ swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
   EditorPlaceholderData PHDataTyped;
   PHDataTyped.Kind = EditorPlaceholderKind::Typed;
 
-  assert(PlaceholderText.startswith("T##"));
+  assert(PlaceholderText.starts_with("T##"));
   PlaceholderText = PlaceholderText.drop_front(3);
   size_t Pos = PlaceholderText.find("##");
   if (Pos == llvm::StringRef::npos) {
@@ -80,5 +79,5 @@ swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
 }
 
 bool swift::isEditorPlaceholder(llvm::StringRef IdentifierText) {
-  return IdentifierText.startswith("<#");
+  return IdentifierText.starts_with("<#");
 }

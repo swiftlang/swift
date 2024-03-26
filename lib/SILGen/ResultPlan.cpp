@@ -119,7 +119,8 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
   }
 
   const auto mappedSubs = SubstitutionMap::get(
-      swift::buildGenericSignature(ctx, nullptr, params, requirements),
+      swift::buildGenericSignature(ctx, nullptr, params, requirements,
+                                   /*allowInverses=*/false),
       [&](SubstitutableType *t) -> Type {
         return openedTypes[cast<GenericTypeParamType>(t)->getIndex()];
       },
@@ -137,7 +138,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
                 archTy->getInterfaceType()->getAs<DependentMemberType>()) {
           return dmt->substRootParam(params[index],
                                      MakeAbstractConformanceForGenericType(),
-                                     llvm::None);
+                                     std::nullopt);
         }
 
         return params[index];
@@ -199,7 +200,7 @@ public:
                       boxLayout,
                       layoutSubs));
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      resultBox = SGF.B.createBeginBorrow(loc, resultBox, /*isLexical=*/true);
+      resultBox = SGF.B.createBeginBorrow(loc, resultBox, IsLexical);
     }
 
     // Complete the cleanup to deallocate this buffer later, after we're
@@ -305,7 +306,7 @@ public:
                                          loweredResultTy);
         } else {
           return Conversion::getOrigToSubst(origType, substType,
-                                            loweredResultTy);
+                                            value.getType(), loweredResultTy);
         }
       }();
 
@@ -430,7 +431,7 @@ class PackExpansionResultPlan : public ResultPlan {
 
 public:
   PackExpansionResultPlan(ResultPlanBuilder &builder, SILValue packAddr,
-                          llvm::Optional<ArrayRef<Initialization *>> inits,
+                          std::optional<ArrayRef<Initialization *>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
@@ -598,7 +599,7 @@ public:
           builder.build(nullptr, origEltType, substEltTypes[0]));
       } else {
         origEltPlans.push_back(builder.buildForPackExpansion(
-            llvm::None, origEltType, substEltTypes));
+            std::nullopt, origEltType, substEltTypes));
       }
     });
   }
@@ -672,8 +673,8 @@ public:
         eltPlans.push_back(builder.build(eltInit, origEltType,
                                          substEltTypes[0]));
       } else {
-        auto componentInits = llvm::makeArrayRef(eltInits)
-               .slice(elt.getSubstIndex(), substEltTypes.size());
+        auto componentInits = llvm::ArrayRef(eltInits).slice(
+            elt.getSubstIndex(), substEltTypes.size());
         eltPlans.push_back(builder.buildForPackExpansion(componentInits,
                                                          origEltType,
                                                          substEltTypes));
@@ -782,16 +783,19 @@ public:
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
 
+      auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+          continuationTy, ctx.TheAnyType);
+
       // In this case block storage captures `Any` which would be initialized
       // with an checked continuation.
       auto underlyingContinuationAddr =
           SGF.B.createInitExistentialAddr(loc, continuationAddr, continuationTy,
                                           SGF.getLoweredType(continuationTy),
-                                          /*conformances=*/{});
+                                          conformances);
 
       auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
                                        {calleeTypeInfo.substResultType},
-                                       ArrayRef<ProtocolConformanceRef>{});
+                                       conformances);
 
       InitializationPtr underlyingInit(
           new KnownAddressInitialization(underlyingContinuationAddr));
@@ -968,7 +972,7 @@ public:
             SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
+                         LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
 
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,
@@ -1073,9 +1077,8 @@ public:
     // Allocate a temporary.
     // It's flagged with "hasDynamicLifetime" because it's not possible to
     // statically verify the lifetime of the value.
-    SILValue errorTemp =
-        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType(),
-                                    /*hasDynamicLifetime*/ true);
+    SILValue errorTemp = SGF.emitTemporaryAllocation(
+        loc, errorTL.getLoweredType(), HasDynamicLifetime);
 
     // Nil-initialize it.
     SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
@@ -1086,7 +1089,7 @@ public:
     // Create the appropriate pointer type.
     lvalue = LValue::forAddress(SGFAccessKind::ReadWrite,
                                 ManagedValue::forLValue(errorTemp),
-                                /*TODO: enforcement*/ llvm::None,
+                                /*TODO: enforcement*/ std::nullopt,
                                 AbstractionPattern(errorType), errorType);
   }
 
@@ -1113,7 +1116,7 @@ public:
     return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
   }
 
-  llvm::Optional<std::pair<ManagedValue, ManagedValue>>
+  std::optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
     SILGenFunction::PointerAccessInfo pointerInfo = {
       unwrappedPtrType, ptrKind, SGFAccessKind::ReadWrite
@@ -1273,7 +1276,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
 }
 
 ResultPlanPtr ResultPlanBuilder::buildForPackExpansion(
-    llvm::Optional<ArrayRef<Initialization *>> inits,
+    std::optional<ArrayRef<Initialization *>> inits,
     AbstractionPattern origExpansionType, CanTupleEltTypeArrayRef substTypes) {
   assert(!inits || inits->size() == substTypes.size());
 

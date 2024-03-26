@@ -355,7 +355,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
         target.write(")")
       case .enum:
         if let cString = _getEnumCaseName(value),
-            let caseName = String(validatingUTF8: cString) {
+            let caseName = String(validatingCString: cString) {
           // Write the qualified type name in debugPrint.
           if isDebugPrint {
             printTypeName(mirror.subjectType)
@@ -390,7 +390,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
   } else {
     // Fall back to the type or an opaque summary of the kind
     if let cString = _opaqueSummary(mirror.subjectType),
-        let opaqueSummary = String(validatingUTF8: cString) {
+        let opaqueSummary = String(validatingCString: cString) {
       target.write(opaqueSummary)
     } else {
       target.write(_typeName(mirror.subjectType, qualified: true))
@@ -532,7 +532,7 @@ internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
     case .`enum`:
       target.write(_typeName(mirror.subjectType, qualified: true))
       if let cString = _getEnumCaseName(value),
-          let caseName = String(validatingUTF8: cString) {
+          let caseName = String(validatingCString: cString) {
         target.write(".")
         target.write(caseName)
       }

@@ -54,6 +54,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 SILType SILBuilder::getPartialApplyResultType(
     TypeExpansionContext context, SILType origTy, unsigned argCount,
     SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
+    SILFunctionTypeIsolation resultIsolation,
     PartialApplyInst::OnStackKind onStack) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
@@ -68,6 +69,7 @@ SILType SILBuilder::getPartialApplyResultType(
       FTI->getExtInfo()
           .intoBuilder()
           .withRepresentation(SILFunctionType::Representation::Thick)
+          .withIsolation(resultIsolation)
           .withIsPseudogeneric(false);
   if (onStack)
     extInfoBuilder = extInfoBuilder.withNoEscape();
@@ -254,9 +256,9 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   return NewBB;
 }
 
-llvm::Optional<SILDebugVariable>
+std::optional<SILDebugVariable>
 SILBuilder::substituteAnonymousArgs(llvm::SmallString<4> Name,
-                                    llvm::Optional<SILDebugVariable> Var,
+                                    std::optional<SILDebugVariable> Var,
                                     SILLocation Loc) {
   if (Var && shouldDropVariable(*Var, Loc))
     return {};
@@ -629,7 +631,7 @@ void SILBuilder::emitDestructureValueOperation(
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              bool poisonRefs,
-                                             bool operandWasMoved,
+                                             UsesMoveableValueDebugInfo_t moved,
                                              bool trace) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
@@ -637,26 +639,25 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
   llvm::SmallString<4> Name;
 
   // Debug location overrides cannot apply to debug value instructions.
-  DebugLocOverrideRAII LocOverride{*this, llvm::None};
-  return insert(DebugValueInst::create(getSILDebugLocation(Loc, true), src,
-                                       getModule(),
-                                       *substituteAnonymousArgs(Name, Var, Loc),
-                                       poisonRefs, operandWasMoved, trace));
+  DebugLocOverrideRAII LocOverride{*this, std::nullopt};
+  return insert(DebugValueInst::create(
+      getSILDebugLocation(Loc, true), src, getModule(),
+      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, moved, trace));
 }
 
-DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
-                                                 SILDebugVariable Var,
-                                                 bool wasMoved, bool trace) {
+DebugValueInst *SILBuilder::createDebugValueAddr(
+    SILLocation Loc, SILValue src, SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t moved, bool trace) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
 
   llvm::SmallString<4> Name;
 
   // Debug location overrides cannot apply to debug addr instructions.
-  DebugLocOverrideRAII LocOverride{*this, llvm::None};
+  DebugLocOverrideRAII LocOverride{*this, std::nullopt};
   return insert(DebugValueInst::createAddr(
       getSILDebugLocation(Loc, true), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), wasMoved, trace));
+      *substituteAnonymousArgs(Name, Var, Loc), moved, trace));
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
@@ -724,7 +725,7 @@ static ValueOwnershipKind deriveForwardingOwnership(SILValue operand,
 SwitchEnumInst *SILBuilder::createSwitchEnum(
     SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    std::optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount) {
   // Consider the operand's type to be the target's type since a switch
   // covers all cases including the default argument.

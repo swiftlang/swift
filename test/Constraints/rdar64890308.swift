@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -parse-stdlib
+// RUN: %target-typecheck-verify-swift -enable-builtin-module
 
 // rdar://64890308: Make sure we don't leave one-way constraints unsolved.
 
-import Swift
+import Builtin
 
 @resultBuilder
 class ArrayBuilder<Element> {

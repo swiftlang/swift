@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
+// rdar://121214563
+// REQUIRES: rdar121214563
+
 protocol Q {}
 
 protocol P {

@@ -51,6 +51,10 @@ extension ASTGenVisitor {
       return self.generate(whileStmt: node).asStmt
     case .yieldStmt(let node):
       return self.generate(yieldStmt: node).asStmt
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     return self.generateWithLegacy(node)
   }
@@ -64,6 +68,10 @@ extension ASTGenVisitor {
       return .stmt(self.generate(stmt: node))
     case .expr(let node):
       return .expr(self.generate(expr: node))
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
   }
 
@@ -145,6 +153,10 @@ extension ASTGenVisitor {
         pattern: pat,
         initializer: initializer
       )
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
   }
 
@@ -306,6 +318,10 @@ extension ASTGenVisitor {
           return self.generate(codeBlock: node).asStmt
         case .ifExpr(let node):
           return self.generateIfStmt(ifExpr: node).asStmt
+#if RESILIENT_SWIFT_SYNTAX
+        @unknown default:
+          fatalError()
+#endif
         }
       }.asNullable
     )
@@ -423,6 +439,10 @@ extension ASTGenVisitor {
       )
       items = CollectionOfOne(item).bridgedArray(in: self)
       terminatorLoc = self.generateSourceLoc(node.colon)
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
@@ -446,8 +466,12 @@ extension ASTGenVisitor {
       switch node {
       case .switchCase(let node):
         return ASTNode.stmt(self.generate(switchCase: node).asStmt).bridged
-      case .ifConfigDecl(let node):
+      case .ifConfigDecl(_):
         fatalError("unimplemented")
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
     }).bridgedArray(in: self)
   }
@@ -501,6 +525,10 @@ extension ASTGenVisitor {
       lParenLoc = nil
       rParenLoc = nil
       yields = CollectionOfOne(self.generate(expr: node)).bridgedArray(in: self)
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     return .createParsed(
       self.ctx,

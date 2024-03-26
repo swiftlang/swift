@@ -16,9 +16,13 @@
 // RUN: %lldb-moduleimport-test -verbose -dump-module %t/a.out \
 // RUN:    -dummy-dwarfimporter | %FileCheck %s --check-prefix=SWIFTONLY
 
-// CHECK: Importing basic... ok!
-// FAIL: Importing basic... ok!
-// SWIFTONLY: Importing basic... ok!
+// CHECK: Importing basic...
+// CHECK: Import successful!
+// FAIL: Importing basic... 
+// FAIL: Import successful!
+// SWIFTONLY: Importing basic...
+// SWIFTONLY: Import successful!
+
 import ObjCModule
 
 let pureSwift = Int32(42)

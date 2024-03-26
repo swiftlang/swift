@@ -161,6 +161,17 @@ public:
   }
 };
 
+static bool isVisible(SILLinkage linkage, SILOptions options) {
+  if (options.EnableSerializePackage)
+    return linkage == SILLinkage::Public || linkage == SILLinkage::Package;
+  return linkage == SILLinkage::Public;
+}
+static bool isVisible(AccessLevel accessLevel, SILOptions options) {
+  if (options.EnableSerializePackage)
+    return accessLevel == AccessLevel::Package || accessLevel == AccessLevel::Public;
+  return accessLevel == AccessLevel::Public;
+}
+
 /// Select functions in the module which should be serialized.
 void CrossModuleOptimization::serializeFunctionsInModule() {
 
@@ -168,7 +179,8 @@ void CrossModuleOptimization::serializeFunctionsInModule() {
 
   // Start with public functions.
   for (SILFunction &F : M) {
-    if (F.getLinkage() == SILLinkage::Public || everything) {
+    if (isVisible(F.getLinkage(), M.getOptions()) ||
+        everything) {
       if (canSerializeFunction(&F, canSerializeFlags, /*maxDepth*/ 64)) {
         serializeFunction(&F, canSerializeFlags);
       }
@@ -185,7 +197,6 @@ bool CrossModuleOptimization::canSerializeFunction(
                                FunctionFlags &canSerializeFlags,
                                int maxDepth) {
   auto iter = canSerializeFlags.find(function);
-  
   // Avoid infinite recursion in case it's a cycle in the call graph.
   if (iter != canSerializeFlags.end())
     return iter->second;
@@ -270,7 +281,7 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     // function is completely inlined afterwards.
     // Also, when emitting TBD files, we cannot introduce a new public symbol.
     if ((conservative || M.getOptions().emitTBD) &&
-        !hasPublicVisibility(callee->getLinkage())) {
+        !hasPublicOrPackageVisibility(callee->getLinkage(), M.getOptions().EnableSerializePackage)) {
       return false;
     }
 
@@ -290,13 +301,12 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     // inline.
     if (!canUseFromInline(callee))
       return false;
-  
     return true;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
     SILGlobalVariable *global = GAI->getReferencedGlobal();
     if ((conservative || M.getOptions().emitTBD) &&
-        !hasPublicVisibility(global->getLinkage())) {
+        !hasPublicOrPackageVisibility(global->getLinkage(), M.getOptions().EnableSerializePackage)) {
       return false;
     }
 
@@ -328,7 +338,7 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     // properties, because that would require to make the field decl public -
     // which keeps more metadata alive.
     return !conservative ||
-           REAI->getField()->getEffectiveAccess() >= AccessLevel::Public;
+           REAI->getField()->getEffectiveAccess() >= AccessLevel::Package;
   }
   return true;
 }
@@ -344,7 +354,7 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
       // function is completely inlined afterwards.
       // Also, when emitting TBD files, we cannot introduce a new public symbol.
       if ((conservative || M.getOptions().emitTBD) &&
-          !hasPublicVisibility(referencedFunc->getLinkage())) {
+          !hasPublicOrPackageVisibility(referencedFunc->getLinkage(), M.getOptions().EnableSerializePackage)) {
         return false;
       }
 
@@ -365,10 +375,10 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
       CanType subType = rawSubType->getCanonicalType();
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
       
-        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Public) {
+        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Package) {
           return true;
         }
-      
+
         // Exclude types which are defined in an @_implementationOnly imported
         // module. Such modules are not transitively available.
         if (!canUseFromInline(subNT)) {
@@ -433,6 +443,7 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
+  case SILLinkage::PackageNonABI:
   case SILLinkage::HiddenExternal:
     return false;
   case SILLinkage::Shared:
@@ -441,9 +452,11 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
       return true;
     return false;
   case SILLinkage::Public:
+  case SILLinkage::Package:
   case SILLinkage::Hidden:
   case SILLinkage::Private:
   case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
     break;
   }
   return true;
@@ -539,7 +552,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
       }
     }
     serializeFunction(callee, canSerializeFlags);
-    assert(callee->isSerialized() || callee->getLinkage() == SILLinkage::Public);
+    assert(callee->isSerialized() || isVisible(callee->getLinkage(), M.getOptions()));
     return;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
@@ -547,7 +560,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     if (canSerializeGlobal(global)) {
       serializeGlobal(global);
     }
-    if (!hasPublicVisibility(global->getLinkage())) {
+    if (!hasPublicOrPackageVisibility(global->getLinkage(), M.getOptions().EnableSerializePackage)) {
       global->setLinkage(SILLinkage::Public);
     }
     return;
@@ -596,14 +609,14 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
 
 /// Make a nominal type, including it's context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
-  if (decl->getEffectiveAccess() >= AccessLevel::Public)
+  if (decl->getEffectiveAccess() >= AccessLevel::Package)
     return;
 
   // We must not modify decls which are defined in other modules.
   if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
     return;
 
-  if (decl->getFormalAccess() < AccessLevel::Public &&
+  if (!isVisible(decl->getFormalAccess(), M.getOptions()) &&
       !decl->isUsableFromInline()) {
     // Mark the nominal type as "usableFromInline".
     // TODO: find a way to do this without modifying the AST. The AST should be

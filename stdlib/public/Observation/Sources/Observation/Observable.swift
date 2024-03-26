@@ -50,7 +50,7 @@ public macro Observable() =
 /// The ``Observation`` module uses this macro. Its use outside of the
 /// framework isn't necessary.
 @available(SwiftStdlib 5.9, *)
-@attached(accessor, names: named(init), named(get), named(set))
+@attached(accessor, names: named(init), named(get), named(set), named(_modify))
 @attached(peer, names: prefixed(_))
 public macro ObservationTracked() =
   #externalMacro(module: "ObservationMacros", type: "ObservationTrackedMacro")

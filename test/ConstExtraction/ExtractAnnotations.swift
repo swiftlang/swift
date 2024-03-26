@@ -171,3 +171,4 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+

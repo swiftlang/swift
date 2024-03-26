@@ -32,13 +32,11 @@ struct MyStruct: Sendable {
   let value: any MyObjCProtocol // Ok
 }
 
-extension Sendable {
-  func compute() {}
-}
+func compute<T: Sendable>(_ t: T) {}
 
 extension MyObjCProtocol {
   func test() {
-    compute() // Ok
+    compute(self) // Ok
   }
 }
 

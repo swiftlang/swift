@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete %s -verify-additional-prefix complete-and-tns-
-// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation %s -verify-additional-prefix complete-and-tns-
+// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s -verify-additional-prefix complete-and-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -112,8 +112,13 @@ enum E {
 struct SomeStruct {
   @MainActor init(asyncMainActor: Int) async {}
   @MainActor init(mainActor: Int) {} // expected-note {{calls to initializer 'init(mainActor:)' from outside of its actor context are implicitly asynchronous}}
+
+  // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
   @MainActor(unsafe) init(asyncMainActorUnsafe: Int) async {}
-  @MainActor(unsafe) init(mainActorUnsafe: Int) {} // expected-complete-and-tns-note {{calls to initializer 'init(mainActorUnsafe:)' from outside of its actor context are implicitly asynchronous}}
+
+  // expected-warning@+2 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
+  // expected-complete-and-tns-note@+1 {{calls to initializer 'init(mainActorUnsafe:)' from outside of its actor context are implicitly asynchronous}}
+  @MainActor(unsafe) init(mainActorUnsafe: Int) {}
 }
 
 // expected-complete-and-tns-note @+3 {{add '@MainActor' to make global function 'globActorTest1()' part of global actor 'MainActor'}}
@@ -126,7 +131,7 @@ func globActorTest1() {
 
   _ = SomeStruct(asyncMainActorUnsafe: 0) // expected-error {{'async' call in a function that does not support concurrency}}
 
-  _ = SomeStruct(mainActorUnsafe: 0) // expected-complete-and-tns-error {{call to main actor-isolated initializer 'init(mainActorUnsafe:)' in a synchronous nonisolated context}}
+  _ = SomeStruct(mainActorUnsafe: 0) // expected-complete-and-tns-warning {{call to main actor-isolated initializer 'init(mainActorUnsafe:)' in a synchronous nonisolated context}}
 }
 
 func globActorTestAsyncEdition() async {

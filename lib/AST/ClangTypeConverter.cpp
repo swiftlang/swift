@@ -158,7 +158,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
 
 const clang::Type *
 ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
-                                    llvm::Optional<SILResultInfo> result,
+                                    std::optional<SILResultInfo> result,
                                     SILFunctionType::Representation repr) {
 
   // Using the interface type is sufficient as type parameters get mapped to
@@ -269,7 +269,7 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
 
   // Map vector types to the corresponding C vectors.
 #define MAP_SIMD_TYPE(TYPE_NAME, _, BUILTIN_KIND)                      \
-  if (name.startswith(#TYPE_NAME)) {                                   \
+  if (name.starts_with(#TYPE_NAME)) {                                   \
     return getClangVectorType(ctx, clang::BuiltinType::BUILTIN_KIND,   \
                               clang::VectorType::GenericVector,        \
                               name.drop_front(sizeof(#TYPE_NAME)-1));  \
@@ -674,8 +674,8 @@ clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) 
                         : repr);
     auto results = type->getResults();
     auto optionalResult = results.empty()
-                              ? llvm::None
-                              : llvm::Optional<SILResultInfo>(results[0]);
+                              ? std::nullopt
+                              : std::optional<SILResultInfo>(results[0]);
     clangTy = getFunctionType(type->getParameters(), optionalResult, newRepr);
   }
   return clang::QualType(clangTy, 0);
@@ -906,7 +906,7 @@ ClangTypeConverter::getClangTemplateArguments(
   }
   if (failedTypes.empty())
     return nullptr;
-  // Clear "templateArgs" to prevent the clients from accidently reading a
+  // Clear "templateArgs" to prevent the clients from accidentally reading a
   // partially converted set of template arguments.
   templateArgs.clear();
   auto errorInfo = std::make_unique<TemplateInstantiationError>();

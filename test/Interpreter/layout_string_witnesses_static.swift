@@ -308,6 +308,12 @@ struct StructWithSomeProtocolInline: SomeProtocol {
     let x: SimpleClass
 }
 
+struct StructWithSomeProtocolInlineShifted: SomeProtocol {
+    let y: Int = 0
+    let y2: Int = 0
+    let x: SimpleClass
+}
+
 func testExistentialStructInline() {
     let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
 
@@ -395,6 +401,47 @@ func testExistentialStructBox() {
 }
 
 testExistentialStructBox()
+
+func testExistentialStructTypeChange() {
+    let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = StructWithSomeProtocolInline(x: SimpleClass(x: 23))
+        testInit(ptr, to: createExistentialWrapper(x))
+    }
+
+    do {
+        let y = StructWithSomeProtocolInlineShifted(x: SimpleClass(x: 32))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(y)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
+    do {
+        let z = StructWithSomeProtocolBox(x: SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(z)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testExistentialStructTypeChange()
 
 func testAnyWrapper() {
     let ptr = UnsafeMutablePointer<AnyWrapper>.allocate(capacity: 1)
@@ -1055,6 +1102,83 @@ func testNotBitwiseTakableBridge() {
 }
 
 testNotBitwiseTakableBridge()
+
+// Regression test for rdar://121868127
+func testMultiPayloadEnumNested() {
+    let ptr = UnsafeMutablePointer<NestedMultiPayloadOuter>.allocate(capacity: 1)
+
+    do {
+        testInit(ptr, to: .b(.b(SimpleClass(x: 23))))
+    }
+
+    do {
+        let y = NestedMultiPayloadOuter.b(.b(SimpleClass(x: 23)))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadEnumNested()
+
+struct MyError: Error {
+    let x: SimpleClass
+}
+
+// Regression test for rdar://122911427
+func testMultiPayloadError() {
+    let ptr = UnsafeMutablePointer<MultiPayloadError>.allocate(capacity: 1)
+
+    // initWithTake
+    do {
+        let x = MultiPayloadError.error2(0, MyError(x: SimpleClass(x: 23)))
+        testInitTake(ptr, to: consume x)
+    }
+
+    // assignWithTake
+    do {
+        let y = MultiPayloadError.error2(1, MyError(x: SimpleClass(x: 32)))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = MultiPayloadError.error2(2, MyError(x: SimpleClass(x: 41)))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadError()
 
 #if os(macOS)
 func testObjc() {

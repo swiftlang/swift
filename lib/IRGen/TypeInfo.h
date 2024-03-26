@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "Outlining.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -569,12 +570,25 @@ public:
   virtual void verify(IRGenTypeVerifierFunction &IGF,
                       llvm::Value *typeMetadata,
                       SILType T) const;
+  /// Perform \p invocation with the appropriate metadata collector for use in
+  /// emitting an outlined value function of a value operation that can be
+  /// performed with a value witness.
+  ///
+  /// Returns whether there was an appropriate emitter (and whether \p
+  /// invocation was called).
+  bool withWitnessableMetadataCollector(
+      IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+      DeinitIsNeeded_t needsDeinit,
+      llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const;
 
   void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, IsInitialization_t isInit,
                         IsTake_t isTake) const;
 
   void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+
+  void callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
+                           Atomicity atomicity) const;
 };
 
 } // end namespace irgen

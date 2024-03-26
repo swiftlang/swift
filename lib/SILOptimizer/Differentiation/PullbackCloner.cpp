@@ -227,7 +227,7 @@ private:
     return getPullback().mapTypeIntoContext(remappedSILType);
   }
 
-  llvm::Optional<TangentSpace> getTangentSpace(CanType type) {
+  std::optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
     type =
         getWitness()->getDerivativeGenericSignature().getReducedType(
@@ -725,7 +725,7 @@ private:
   /// Helper for `getAdjointBuffer`.
   AllocStackInst *createFunctionLocalAllocation(
       SILType type, SILLocation loc, bool zeroInitialize = false,
-      llvm::Optional<SILDebugVariable> varInfo = llvm::None) {
+      std::optional<SILDebugVariable> varInfo = std::nullopt) {
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the pullback function's entry if no local
     // allocations exist yet.
@@ -1552,8 +1552,11 @@ public:
       auto adjVal = materializeAdjointDirect(getAdjointValue(bb, inst), loc);
       // Allocate a local buffer and store the adjoint value. This buffer will
       // be used for accumulation into the adjoint buffer.
-      auto adjBuf = builder.createAllocStack(
-          loc, adjVal->getType(), SILDebugVariable());
+      auto adjBuf = builder.createAllocStack(loc, adjVal->getType(), {},
+                                             DoesNotHaveDynamicLifetime,
+                                             IsNotLexical, IsNotFromVarDecl,
+                                             DoesNotUseMoveableValueDebugInfo,
+                                             /* skipVarDeclAssert = */ true);
       auto copy = builder.emitCopyValueOperation(loc, adjVal);
       builder.emitStoreValueOperation(loc, copy, adjBuf,
                                       StoreOwnershipQualifier::Init);
@@ -2087,7 +2090,10 @@ bool PullbackCloner::Implementation::run() {
       originalBlocks.push_back(BB);
 
       for (auto *nextBB : BB->getPredecessorBlocks()) {
-        workqueue.pushIfNotVisited(nextBB);
+        // If there is no linear map tuple for predecessor BB, then BB is
+        // unreachable from function entry. Do not run pullback cloner on it.
+        if (getPullbackInfo().getLinearMapTupleType(nextBB))
+          workqueue.pushIfNotVisited(nextBB);
       }
     }
   }
@@ -2803,6 +2809,11 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   SmallDenseMap<SILValue, TrampolineBlockSet> pullbackTrampolineBlockMap;
   SmallDenseMap<SILBasicBlock *, SILBasicBlock *> origPredpullbackSuccBBMap;
   for (auto *predBB : bb->getPredecessorBlocks()) {
+    // If there is no linear map tuple for predecessor BB, then BB is
+    // unreachable from function entry. There is no branch tracing enum for it
+    // as well, so we should not create any branching to it in the pullback.
+    if (!getPullbackInfo().getLinearMapTupleType(predBB))
+      continue;
     auto *pullbackSuccBB =
         buildPullbackSuccessor(bb, predBB, pullbackTrampolineBlockMap);
     origPredpullbackSuccBBMap[predBB] = pullbackSuccBB;
@@ -2834,8 +2845,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   // Branch to pullback successor blocks.
   assert(pullbackSuccessorCases.size() == predEnum->getNumElements());
   builder.createSwitchEnum(pbLoc, predEnumVal, /*DefaultBB*/ nullptr,
-                           pullbackSuccessorCases, llvm::None, ProfileCounter(),
-                           OwnershipKind::Owned);
+                           pullbackSuccessorCases, std::nullopt,
+                           ProfileCounter(), OwnershipKind::Owned);
 }
 
 //--------------------------------------------------------------------------//
@@ -2847,6 +2858,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberAccessor() {
   auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return runForSemanticMemberGetter();
   case AccessorKind::Set:
     return runForSemanticMemberSetter();

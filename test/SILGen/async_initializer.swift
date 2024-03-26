@@ -56,7 +56,7 @@ enum MyEnum {
 }
 
 actor MyActor {
-  // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@owned MyActor) -> @owned MyActor
+  // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned MyActor) -> @owned MyActor
   init() async {}
 }
 
@@ -166,7 +166,7 @@ actor SomeActor {
   // The implicit check-not covers that for us. The hops are inserted later.
   init() async {}
 
-  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@guaranteed SomeActor) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@sil_isolated @guaranteed SomeActor) -> () {
   // CHECK:           hop_to_executor {{%[0-9]+}} : $SomeActor
   // CHECK: } // end sil function '$s12initializers9SomeActorC10someMethodyyYaF'
   func someMethod() async {}
@@ -205,7 +205,7 @@ func callActorMethodFromGeneric(a: SomeActor) async {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply
-// CHECK-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> @out τ_0_0 for <SomeActor> {
+// CHECK-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>) -> @out τ_0_0 for <SomeActor> {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply
@@ -219,7 +219,7 @@ func makeActorInTask() async {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply
-// CHECK-LABEL: sil private [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaFyyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed SomeActor) -> @out τ_0_0 for <()> {
+// CHECK-LABEL: sil private [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaFyyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>, @guaranteed SomeActor) -> @out τ_0_0 for <()> {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply

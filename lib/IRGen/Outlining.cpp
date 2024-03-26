@@ -19,6 +19,7 @@
 #include "Explosion.h"
 #include "GenOpaque.h"
 #include "GenProto.h"
+#include "GenericRequirement.h"
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -27,23 +28,56 @@
 #include "MetadataRequest.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
 using namespace irgen;
 
-void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
+static GenericEnvironment *digOutGenericEnvironment(CanType loweredType) {
+  // Find a non-local, non-opaque archetype in the type and pull out
+  // its generic environment.
+  // TODO: we ought to be able to usefully minimize this
+
+  GenericEnvironment *env = nullptr;
+  loweredType.findIf([&env](CanType t) -> bool {
+    if (auto arch = dyn_cast<ArchetypeType>(t)) {
+      if (!isa<PrimaryArchetypeType>(arch) && !isa<PackArchetypeType>(arch))
+        return false;
+      env = arch->getGenericEnvironment();
+      return true;
+    }
+    return false;
+  });
+
+  return env;
+}
+
+OutliningMetadataCollector::OutliningMetadataCollector(
+    SILType T, IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
+    DeinitIsNeeded_t needsDeinitTypes)
+    : T(T), IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
+
+void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
+  assert(state != OutliningMetadataCollector::State::Kind::Collected);
   // If the type has no archetypes, we can emit it from scratch in the callee.
-  if (!type.hasArchetype()) {
+  if (!ty.hasArchetype()) {
     return;
   }
 
   // Substitute opaque types if allowed.
-  type =
-      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(type, CanGenericSignature());
+  ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty, CanGenericSignature());
 
-  auto formalType = type.getASTType();
-  auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
+  collectTypeMetadataForLayout(ty);
+  collectTypeMetadataForDeinit(ty);
+}
+
+void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
+  if (!needsLayout)
+    return;
+
+  auto astType = ty.getASTType();
+  auto &ti = IGF.IGM.getTypeInfoForLowered(astType);
 
   // We don't need the metadata for fixed size types or types that are not ABI
   // accessible. Outlining will call the value witness of the enclosing type of
@@ -55,58 +89,173 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
   // If the type is a legal formal type, add it as a formal type.
   // FIXME: does this force us to emit a more expensive metadata than we need
   // to?
-  if (formalType->isLegalFormalType()) {
-    return collectFormalTypeMetadata(formalType);
+  if (astType->isLegalFormalType()) {
+    return state.getCollecting().addFormalTypeMetadata(astType);
   }
 
-  auto key = LocalTypeDataKey(type.getASTType(),
-                            LocalTypeDataKind::forRepresentationTypeMetadata());
-  if (Values.count(key)) return;
-
-  auto metadata = IGF.emitTypeMetadataRefForLayout(type);
-  Values.insert({key, metadata});
+  state.getCollecting().addRepresentationTypeMetadata(ty);
 }
 
-void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
+void OutliningMetadataCollector::collectTypeMetadataForDeinit(SILType ty) {
+  if (!needsDeinit)
+    return;
+
+  auto *nominal = ty.getASTType()->getAnyNominal();
+  if (!nominal)
+    return;
+  if (!nominal->getValueTypeDestructor())
+    return;
+  assert(ty.isMoveOnly());
+
+  state.getCollecting().addValueTypeWithDeinit(ty);
+}
+
+void OutliningMetadataCollector::materializeFormalTypeMetadata(
+    CanType ty, State::Collected::Elements &into) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
-  assert(type->hasArchetype());
+  assert(ty->hasArchetype());
 
-  auto key = LocalTypeDataKey(type, LocalTypeDataKind::forFormalTypeMetadata());
-  if (Values.count(key)) return;
+  auto key = LocalTypeDataKey(ty, LocalTypeDataKind::forFormalTypeMetadata());
+  if (into.Values.count(key))
+    return;
 
-  auto metadata = IGF.emitTypeMetadataRef(type);
-  Values.insert({key, metadata});
+  auto metadata = IGF.emitTypeMetadataRef(ty);
+  into.Values.insert({key, metadata});
+
+  assert(into.Values.count(key));
 }
 
+void OutliningMetadataCollector::materializeRepresentationTypeMetadata(
+    SILType ty, State::Collected::Elements &into) {
+  auto key = LocalTypeDataKey(
+      ty.getASTType(), LocalTypeDataKind::forRepresentationTypeMetadata());
+  if (into.Values.count(key))
+    return;
 
-void OutliningMetadataCollector::addMetadataArguments(
-                                    SmallVectorImpl<llvm::Value*> &args) const {
-  for (auto &pair : Values) {
-    auto metadata = pair.second;
-    assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
-    args.push_back(metadata);
+  auto metadata = IGF.emitTypeMetadataRefForLayout(ty);
+  into.Values.insert({key, metadata});
+}
+
+void OutliningMetadataCollector::materialize() {
+  if (state == State::Kind::Collected)
+    return;
+
+  auto collection = std::move(state.getCollecting());
+  switch (collection) {
+  case State::CollectionKind::Elements: {
+    auto &elements = collection.getElements();
+    auto &collected = state.setCollectedElements();
+    for (auto &element : elements.elements) {
+      switch (element) {
+      case State::ElementKind::MetadataForFormal: {
+        auto ty = element.getFormalType();
+        materializeFormalTypeMetadata(ty, /*into=*/collected);
+        break;
+      }
+      case State::ElementKind::MetadataForRepresentation: {
+        auto ty = element.getRepresentationType();
+        materializeRepresentationTypeMetadata(ty, /*into=*/collected);
+        break;
+      }
+      }
+    }
+    return;
+  }
+  case State::CollectionKind::Environment: {
+    auto pair = getTypeAndGenericSignatureForManglingOutlineFunction(T);
+    auto sig = pair.second;
+    auto subs = digOutGenericEnvironment(T.getASTType())
+                    ->getForwardingSubstitutionMap();
+    auto &collected = state.setCollectedEnvironment(subs);
+
+    GenericTypeRequirements requirements(IGF.IGM, sig);
+    for (auto requirement : requirements.getRequirements()) {
+      auto *value = emitGenericRequirementFromSubstitutions(
+          IGF, requirement, MetadataState::Complete, subs);
+      collected.Requirements.insert({requirement, value});
+    }
+    return;
+  }
   }
 }
 
-void OutliningMetadataCollector::addMetadataParameterTypes(
-                                 SmallVectorImpl<llvm::Type*> &paramTys) const {
-  for (auto &pair : Values) {
-    auto *metadata = pair.second;
-    paramTys.push_back(metadata->getType());
+void OutliningMetadataCollector::addPolymorphicArguments(
+    SmallVectorImpl<llvm::Value *> &args) const {
+  assert(hasFinished());
+  if (state == State::Kind::Empty)
+    return;
+  auto &collected = state.getCollected();
+  switch (collected) {
+  case State::CollectionKind::Elements: {
+    for (auto &pair : collected.getElements().Values) {
+      auto metadata = pair.second;
+      assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
+      args.push_back(metadata);
+    }
+    return;
+  }
+  case State::CollectionKind::Environment: {
+    for (auto &pair : collected.getEnvironment().Requirements) {
+      auto *value = pair.second;
+      args.push_back(value);
+    }
+    return;
+  }
   }
 }
 
-void OutliningMetadataCollector::bindMetadataParameters(IRGenFunction &IGF,
-                                                      Explosion &params) const {
-  // Note that our parameter IGF intentionally shadows the IGF that this
-  // collector was built with.
-  for (auto &pair : Values) {
-    llvm::Value *arg = params.claimNext();
+void OutliningMetadataCollector::addPolymorphicParameterTypes(
+    SmallVectorImpl<llvm::Type *> &paramTys) const {
+  assert(hasFinished());
+  if (state == State::Kind::Empty)
+    return;
+  auto &collected = state.getCollected();
+  switch (collected) {
+  case State::CollectionKind::Elements: {
+    for (auto &pair : collected.getElements().Values) {
+      auto *metadata = pair.second;
+      paramTys.push_back(metadata->getType());
+    }
+    return;
+  }
+  case State::CollectionKind::Environment: {
+    for (auto &pair : collected.getEnvironment().Requirements) {
+      auto *value = pair.second;
+      paramTys.push_back(value->getType());
+    }
+    return;
+  }
+  }
+}
 
-    auto key = pair.first;
-    assert(key.Kind.isAnyTypeMetadata());
-    setTypeMetadataName(IGF.IGM, arg, key.Type);
-    IGF.setUnscopedLocalTypeData(key, MetadataResponse::forComplete(arg));
+void OutliningMetadataCollector::bindPolymorphicParameters(
+    IRGenFunction &IGF, Explosion &params) const {
+  assert(hasFinished());
+  if (state == State::Kind::Empty)
+    return;
+  auto &collected = state.getCollected();
+  switch (collected) {
+  case State::CollectionKind::Elements: {
+    // Note that our parameter IGF intentionally shadows the IGF that this
+    // collector was built with.
+    for (auto &pair : collected.getElements().Values) {
+      llvm::Value *arg = params.claimNext();
+
+      auto key = pair.first;
+      assert(key.Kind.isAnyTypeMetadata());
+      setTypeMetadataName(IGF.IGM, arg, key.Type);
+      IGF.setUnscopedLocalTypeData(key, MetadataResponse::forComplete(arg));
+    }
+    return;
+  }
+  case State::CollectionKind::Environment: {
+    auto &environment = collected.getEnvironment();
+    for (auto &pair : environment.Requirements) {
+      bindGenericRequirement(IGF, pair.first, params.claimNext(),
+                             MetadataState::Complete, environment.Subs);
+    }
+    return;
+  }
   }
 }
 
@@ -115,44 +264,53 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
   auto loweredType = type.getASTType();
   if (!loweredType->hasArchetype()) return {loweredType, nullptr};
 
-  // Find a non-local, non-opaque archetype in the type and pull out
-  // its generic environment.
-  // TODO: we ought to be able to usefully minimize this
+  GenericEnvironment *env = digOutGenericEnvironment(loweredType);
 
-  GenericEnvironment *env = nullptr;
-  loweredType.findIf([&env](CanType t) -> bool {
-      if (auto arch = dyn_cast<ArchetypeType>(t)) {
-        if (!isa<PrimaryArchetypeType>(arch) &&
-            !isa<PackArchetypeType>(arch))
-          return false;
-        env = arch->getGenericEnvironment();
-        return true;
-      }
-      return false;
-    });
   assert(env && "has archetype but no archetype?!");
   return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
           env->getGenericSignature().getCanonicalSignature()};
 }
 
+bool TypeInfo::withWitnessableMetadataCollector(
+    IRGenFunction &IGF, SILType T, LayoutIsNeeded_t mayNeedLayout,
+    DeinitIsNeeded_t needsDeinit,
+    llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const {
+  bool needsCollector = false;
+  LayoutIsNeeded_t needsLayout = LayoutIsNotNeeded;
+  if (!T.hasLocalArchetype() &&
+      !IGF.outliningCanCallValueWitnesses()) {
+    needsCollector = true;
+    if (T.hasArchetype()) {
+      needsLayout = LayoutIsNeeded;
+    }
+  } else if (!T.hasArchetype()) {
+    needsCollector = true;
+    // The implementation will call vwt in this case.
+    needsLayout = LayoutIsNotNeeded;
+  }
+
+  if (needsCollector) {
+    OutliningMetadataCollector collector(T, IGF, needsLayout, needsDeinit);
+    if (needsDeinit || needsLayout) {
+      // Only collect if anything would be collected.
+      collectMetadataForOutlining(collector, T);
+    }
+    collector.materialize();
+    invocation(collector);
+    return true;
+  }
+
+  return false;
+}
+
 void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                                 SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
-  if (!T.hasLocalArchetype() &&
-      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
+  if (withWitnessableMetadataCollector(
+          IGF, T, LayoutIsNeeded, DeinitIsNotNeeded, [&](auto collector) {
+            collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit,
+                                             isTake);
+          })) {
     return;
   }
 
@@ -169,15 +327,16 @@ void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
 }
 
 void OutliningMetadataCollector::emitCallToOutlinedCopy(
-                            Address dest, Address src,
-                            SILType T, const TypeInfo &ti, 
-                            IsInitialization_t isInit, IsTake_t isTake) const {
+    Address dest, Address src, SILType T, const TypeInfo &ti,
+    IsInitialization_t isInit, IsTake_t isTake) const {
+  assert(hasFinished());
+  assert(!needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(src, ti.getStorageType())
                             .getAddress());
   args.push_back(IGF.Builder.CreateElementBitCast(dest, ti.getStorageType())
                             .getAddress());
-  addMetadataArguments(args);
+  addPolymorphicArguments(args);
 
   llvm::Constant *outlinedFn;
   if (isInit && isTake) {
@@ -235,13 +394,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
-                                                           manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
          const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.initializeWithTake(IGF, dest, src, T, true);
         } else {
@@ -256,13 +415,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
-                                                           manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
          const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.initializeWithCopy(IGF, dest, src, T, true);
         } else {
@@ -277,13 +436,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedAssignWithTakeFunction(manglingBits.first,
-                                                        manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
          const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.assignWithTake(IGF, dest, src, T, true);
         } else {
@@ -298,13 +457,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedAssignWithCopyFunction(manglingBits.first,
-                                                        manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
              const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.assignWithCopy(IGF, dest, src, T, true);
         } else {
@@ -318,23 +477,26 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
                               const OutliningMetadataCollector &collector,
                               StringRef funcName,
                               CopyAddrHelperGenerator generator) {
+  assert(collector.hasFinished());
   auto ptrTy = ti.getStorageType()->getPointerTo();
 
   llvm::SmallVector<llvm::Type *, 4> paramTys;
   paramTys.push_back(ptrTy);
   paramTys.push_back(ptrTy);
-  collector.addMetadataParameterTypes(paramTys);
+  collector.addPolymorphicParameterTypes(paramTys);
 
   return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
       [&](IRGenFunction &IGF) {
         auto params = IGF.collectParameters();
         Address src = ti.getAddressForPointer(params.claimNext());
         Address dest = ti.getAddressForPointer(params.claimNext());
-        collector.bindMetadataParameters(IGF, params);
+        collector.bindPolymorphicParameters(IGF, params);
         generator(IGF, dest, src, T, ti);
         IGF.Builder.CreateRet(dest.getAddress());
       },
-      true /*setIsNoInline*/);
+      true /*setIsNoInline*/,
+      false /*forPrologue*/,
+      collector.IGF.isPerformanceConstraint);
 }
 
 void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
@@ -343,21 +505,10 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
   if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
-  if (!T.hasLocalArchetype() &&
-      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedDestroy(addr, T, *this);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedDestroy(addr, T, *this);
+  if (withWitnessableMetadataCollector(
+          IGF, T, LayoutIsNeeded, DeinitIsNeeded, [&](auto collector) {
+            collector.emitCallToOutlinedDestroy(addr, T, *this);
+          })) {
     return;
   }
 
@@ -365,11 +516,13 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
 }
 
 void OutliningMetadataCollector::emitCallToOutlinedDestroy(
-                      Address addr, SILType T, const TypeInfo &ti) const {
+    Address addr, SILType T, const TypeInfo &ti) const {
+  assert(hasFinished());
+  assert(needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(addr, ti.getStorageType())
                             .getAddress());
-  addMetadataArguments(args);
+  addPolymorphicArguments(args);
 
   auto outlinedFn =
     IGF.IGM.getOrCreateOutlinedDestroyFunction(T, ti, *this);
@@ -385,19 +538,19 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
   IRGenMangler mangler;
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName = mangler.mangleOutlinedDestroyFunction(manglingBits.first,
-                                                        manglingBits.second);
+                     manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
   paramTys.push_back(ptrTy);
-  collector.addMetadataParameterTypes(paramTys);
+  collector.addPolymorphicParameterTypes(paramTys);
 
   return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
       [&](IRGenFunction &IGF) {
         Explosion params = IGF.collectParameters();
         Address addr = ti.getAddressForPointer(params.claimNext());
-        collector.bindMetadataParameters(IGF, params);
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        collector.bindPolymorphicParameters(IGF, params);
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.destroy(IGF, addr, T, true);
         } else {
@@ -406,7 +559,9 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
 
         IGF.Builder.CreateRet(addr.getAddress());
       },
-      true /*setIsNoInline*/);
+      true /*setIsNoInline*/,
+      false /*forPrologue*/,
+      collector.IGF.isPerformanceConstraint);
 }
 
 llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
@@ -436,24 +591,49 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
       true /*setIsNoInline*/);
 }
 
-llvm::Constant *
-IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
-                                        SILType t,
-                                        llvm::Type *llvmType,
-                                        Atomicity atomicity) {
+void TypeInfo::callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
+                                   Atomicity atomicity) const {
+  OutliningMetadataCollector collector(T, IGF, LayoutIsNotNeeded,
+                                       DeinitIsNeeded);
+  collectMetadataForOutlining(collector, T);
+  collector.materialize();
+  collector.emitCallToOutlinedRelease(addr, T, *this, atomicity);
+}
+
+void OutliningMetadataCollector::emitCallToOutlinedRelease(
+    Address addr, SILType T, const TypeInfo &ti, Atomicity atomicity) const {
+  assert(hasFinished());
+  assert(!needsLayout);
+  assert(needsDeinit);
+  llvm::SmallVector<llvm::Value *, 4> args;
+  args.push_back(addr.getAddress());
+  addPolymorphicArguments(args);
+  auto *outlinedF = cast<llvm::Function>(IGF.IGM.getOrCreateReleaseFunction(
+      ti, T, addr.getAddress()->getType(), atomicity, *this));
+  llvm::CallInst *call =
+      IGF.Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
+  call->setCallingConv(IGF.IGM.DefaultCC);
+}
+
+llvm::Constant *IRGenModule::getOrCreateReleaseFunction(
+    const TypeInfo &ti, SILType t, llvm::Type *ptrTy, Atomicity atomicity,
+    const OutliningMetadataCollector &collector) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
   IRGenMangler mangler;
   auto manglingBits =
     getTypeAndGenericSignatureForManglingOutlineFunction(t);
   auto funcName = mangler.mangleOutlinedReleaseFunction(manglingBits.first,
                                                         manglingBits.second);
-  llvm::Type *argTys[] = {llvmType};
+  llvm::SmallVector<llvm::Type *, 4> argTys;
+  argTys.push_back(ptrTy);
+  collector.addPolymorphicParameterTypes(argTys);
   return getOrCreateHelperFunction(
-      funcName, llvmType, argTys,
+      funcName, ptrTy, argTys,
       [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, loadableTI->getStorageType(),
+        Explosion params = IGF.collectParameters();
+        Address addr(params.claimNext(), loadableTI->getStorageType(),
                      loadableTI->getFixedAlignment());
+        collector.bindPolymorphicParameters(IGF, params);
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
         loadableTI->consume(IGF, loaded, atomicity, t);

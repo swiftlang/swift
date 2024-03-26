@@ -283,7 +283,7 @@ public:
     switch (Walker.walkToTypePre(ty)) {
     case TypeWalker::Action::Continue:
       break;
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       return false;
     case TypeWalker::Action::Stop:
       return true;
@@ -297,7 +297,7 @@ public:
     switch (Walker.walkToTypePost(ty)) {
     case TypeWalker::Action::Continue:
       return false;
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       llvm_unreachable("SkipChildren is not valid for a post-visit check");
     case TypeWalker::Action::Stop:
       return true;

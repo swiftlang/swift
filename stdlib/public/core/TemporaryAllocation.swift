@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,7 +26,7 @@ import SwiftShims
 /// - Returns: Whether or not there is sufficient space on the stack to allocate
 ///   `byteCount` bytes of memory.
 @_alwaysEmitIntoClient @_transparent
-internal func _byteCountForTemporaryAllocation<T>(
+internal func _byteCountForTemporaryAllocation<T: ~Copyable>(
   of type: T.Type,
   capacity: Int
 ) -> Int {
@@ -124,7 +124,8 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
 /// This function encapsulates the various calls to builtins required by
 /// `withUnsafeTemporaryAllocation()`.
 @_alwaysEmitIntoClient @_transparent
-internal func _withUnsafeTemporaryAllocation<T, R>(
+// FIXME(NCG): R needs to be ~Copyable too, but that leads to lifetime failures (rdar://124571365).
+internal func _withUnsafeTemporaryAllocation<T: ~Copyable, R>(
   of type: T.Type,
   capacity: Int,
   alignment: Int,
@@ -167,7 +168,10 @@ internal func _withUnsafeTemporaryAllocation<T, R>(
 }
 
 @_alwaysEmitIntoClient @_transparent
-internal func _withUnprotectedUnsafeTemporaryAllocation<T, R>(
+internal func _withUnprotectedUnsafeTemporaryAllocation<
+  // FIXME(NCG): R needs to be ~Copyable too, but that leads to lifetime failures (rdar://124571365).
+  T: ~Copyable, R
+>(
   of type: T.Type,
   capacity: Int,
   alignment: Int,
@@ -214,7 +218,7 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<T, R>(
 }
 
 @_alwaysEmitIntoClient @_transparent
-internal func _fallBackToHeapAllocation<R>(
+internal func _fallBackToHeapAllocation<R: ~Copyable>(
   byteCount: Int,
   alignment: Int,
   _ body: (Builtin.RawPointer) throws -> R
@@ -263,6 +267,7 @@ internal func _fallBackToHeapAllocation<R>(
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
+// FIXME(NCG): R needs to be ~Copyable, but that leads to lifetime failures (rdar://124571365).
 public func withUnsafeTemporaryAllocation<R>(
   byteCount: Int,
   alignment: Int,
@@ -287,6 +292,7 @@ public func withUnsafeTemporaryAllocation<R>(
 /// This function is similar to `withUnsafeTemporaryAllocation`, except that it
 /// doesn't trigger stack protection for the stack allocated memory.
 @_alwaysEmitIntoClient @_transparent
+// FIXME(NCG): R needs to be ~Copyable, but that leads to lifetime failures (rdar://124571365).
 public func _withUnprotectedUnsafeTemporaryAllocation<R>(
   byteCount: Int,
   alignment: Int,
@@ -337,7 +343,8 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R>(
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
-public func withUnsafeTemporaryAllocation<T, R>(
+// FIXME(NCG): R needs to be ~Copyable too, but that leads to lifetime failures (rdar://124571365).
+public func withUnsafeTemporaryAllocation<T: ~Copyable, R>(
   of type: T.Type,
   capacity: Int,
   _ body: (UnsafeMutableBufferPointer<T>) throws -> R
@@ -362,7 +369,8 @@ public func withUnsafeTemporaryAllocation<T, R>(
 /// This function is similar to `withUnsafeTemporaryAllocation`, except that it
 /// doesn't trigger stack protection for the stack allocated memory.
 @_alwaysEmitIntoClient @_transparent
-public func _withUnprotectedUnsafeTemporaryAllocation<T, R>(
+// FIXME(NCG): R needs to be ~Copyable too, but that leads to lifetime failures (rdar://124571365).
+public func _withUnprotectedUnsafeTemporaryAllocation<T: ~Copyable, R>(
   of type: T.Type,
   capacity: Int,
   _ body: (UnsafeMutableBufferPointer<T>) throws -> R

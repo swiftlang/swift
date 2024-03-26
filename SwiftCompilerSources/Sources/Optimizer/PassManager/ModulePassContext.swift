@@ -123,8 +123,46 @@ struct ModulePassContext : Context, CustomStringConvertible {
     _bridged.endTransformFunction();
   }
 
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
+  }
+
+  func createEmptyFunction(
+    name: String,
+    parameters: [ParameterInfo],
+    hasSelfParameter: Bool,
+    fromOriginal originalFunction: Function
+  ) -> Function {
+    return name._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = parameters.map { $0._bridged }
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+        _bridged.createEmptyFunction(nameRef, paramBuf.baseAddress, paramBuf.count,
+                                     hasSelfParameter, originalFunction.bridged).function
+      }
+    }
+  }
+
+  func moveFunctionBody(from sourceFunc: Function, to destFunc: Function) {
+    precondition(!destFunc.isDefinition, "cannot move body to non-empty function")
+    _bridged.moveFunctionBody(sourceFunc.bridged, destFunc.bridged)
+  }
+
   func mangleAsyncRemoved(from function: Function) -> String {
     return String(taking: _bridged.mangleAsyncRemoved(function.bridged))
+  }
+
+  func mangle(withDeadArguments: [Int], from function: Function) -> String {
+    withDeadArguments.withUnsafeBufferPointer { bufPtr in
+      bufPtr.withMemoryRebound(to: Int.self) { valPtr in
+        String(taking: _bridged.mangleWithDeadArgs(valPtr.baseAddress,
+                                                   withDeadArguments.count,
+                                                   function.bridged))
+      }
+    }
   }
 }
 

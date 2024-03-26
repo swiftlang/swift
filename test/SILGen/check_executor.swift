@@ -47,7 +47,7 @@ public actor MyActor {
     }
   }
 
-  // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC0A13LocalFunctionyyF5localL_SiyF : $@convention(thin) (@guaranteed MyActor) -> Int
+  // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC0A13LocalFunctionyyF5localL_SiyF : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> Int
   // CHECK-CANONICAL: [[CAPTURE:%.*]] = copy_value %0 : $MyActor
   // CHECK-CANONICAL-NEXT: [[BORROWED_CAPTURE:%.*]] = begin_borrow [[CAPTURE]] : $MyActor
   // CHECK-CANONICAL-NEXT: [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>([[BORROWED_CAPTURE]] : $MyActor) : $Builtin.Executor

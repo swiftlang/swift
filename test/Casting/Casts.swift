@@ -1065,13 +1065,24 @@ CastsTests.test("Don't put AnyHashable inside AnyObject") {
 }
 
 #if _runtime(_ObjC)
-CastsTests.test("__SwiftValue should not be obvious to `is`") {
+// We currently (as of Jan 2024) bridge NSSet to Swift with `x as!
+// Set<NSObject>`, which in turn demands that __SwiftValue successfully cast to
+// NSObject.
+// So this nonsensical behavior can probably never be fixed.
+// (It's nonsense because it implies that every Swift object is derived
+// from NSObject.)  See PR #68952 for an early attempt to change it which
+// had to be reverted.
+CastsTests.test("__SwiftValue should not be obvious to `is`")
+.xfail(.always("Probably can never be fixed"))
+.code {
   struct S {}
   let s = S() as AnyObject
   expectFalse(s is NSObject)
 }
 #endif
 
+// See above for reasons why this might need to remain broken forever,
+// though I do have some hope for it.
 CastsTests.test("type(of:) should look through __SwiftValue")
 .xfail(.always("Known to be broken"))
 .code {
@@ -1080,24 +1091,5 @@ CastsTests.test("type(of:) should look through __SwiftValue")
   let t = "\(type(of: s))"
   expectEqual(t, "S")  // Fails: currently says `__SwiftValue`
 }
-
-#if _runtime(_ObjC)
-@objc protocol P106973771 {
-  func sayHello()
-}
-CastsTests.test("Class metatype values should not cast to Obj-C existentials") {
-  class C106973771: NSObject, P106973771 {
-    func sayHello() { print("Hello") }
-  }
-  // A class instance clearly conforms to the protocol
-  expectTrue(C106973771() is any P106973771)
-  // But the metatype definitely does not
-  expectFalse(C106973771.self is any P106973771)
-  // The cast should not succeed
-  expectNil(C106973771.self as? any P106973771)
-  // The following will crash if the cast succeeds
-  (C106973771.self as? any P106973771)?.sayHello()
-}
-#endif
 
 runAllTests()

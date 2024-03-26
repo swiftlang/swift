@@ -17,7 +17,6 @@
 #ifndef LLVM_SUPPORT_ALLOCATOR_H
 #define LLVM_SUPPORT_ALLOCATOR_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/AllocatorBase.h"
@@ -31,6 +30,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iterator>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -225,7 +225,7 @@ public:
   /// The returned value is negative iff the object is inside a custom-size
   /// slab.
   /// Returns an empty optional if the pointer is not found in the allocator.
-  llvm::Optional<int64_t> identifyObject(const void *Ptr) {
+  std::optional<int64_t> identifyObject(const void *Ptr) {
     const char *P = static_cast<const char *>(Ptr);
     int64_t InSlabIdx = 0;
     for (size_t Idx = 0, E = Slabs.size(); Idx < E; Idx++) {
@@ -244,7 +244,7 @@ public:
         return InCustomSizedSlabIdx - static_cast<int64_t>(P - S);
       InCustomSizedSlabIdx -= static_cast<int64_t>(Size);
     }
-    return None;
+    return std::nullopt;
   }
 
   /// A wrapper around identifyObject that additionally asserts that
@@ -252,7 +252,7 @@ public:
   /// \return An index uniquely and reproducibly identifying
   /// an input pointer \p Ptr in the given allocator.
   int64_t identifyKnownObject(const void *Ptr) {
-    Optional<int64_t> Out = identifyObject(Ptr);
+    std::optional<int64_t> Out = identifyObject(Ptr);
     assert(Out && "Wrong allocator used");
     return *Out;
   }

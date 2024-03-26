@@ -41,6 +41,12 @@
     },
     {
       "name": "compilation-caching"
+    },
+    {
+       "name": "emit-package-module-interface-path"
+    },
+    {
+       "name": "experimental-package-interface-load"
     }
   ]
 }

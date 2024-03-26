@@ -945,7 +945,7 @@ struct RelativeAccessStorageWithBase {
   AccessStorageWithBase storageWithBase;
   /// The most transformative cast that was seen between when walking from
   /// address to storage.base;
-  llvm::Optional<AccessStorageCast> cast;
+  std::optional<AccessStorageCast> cast;
 
   AccessStorage getStorage() const { return storageWithBase.storage; }
 };
@@ -1271,7 +1271,9 @@ struct AccessPathWithBase {
 //
 // The "product leaves" are the leaves obtained by only looking through type
 // products (structs and tuples) and NOT type sums (enums).
-void visitProductLeafAccessPathNodes(
+//
+// Returns false if the access path couldn't be computed.
+bool visitProductLeafAccessPathNodes(
     SILValue address, TypeExpansionContext tec, SILModule &module,
     std::function<void(AccessPath::PathNode, SILType)> visitor);
 

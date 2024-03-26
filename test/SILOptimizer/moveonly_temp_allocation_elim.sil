@@ -2,6 +2,8 @@
 
 sil_stage raw
 
+import Swift
+
 public class Klass {}
 
 public struct Empty : ~Copyable {}

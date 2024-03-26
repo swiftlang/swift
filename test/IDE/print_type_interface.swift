@@ -54,12 +54,12 @@ extension D {
   public func unconditionalFunc2(t : T) -> T {return t}
 }
 
-// TYPE2: public class D<print_type_interface.T1> {
+// TYPE2: public class D<T1> {
 // TYPE2:    public func foo()
 // TYPE2:    public func conditionalFunc1()
-// TYPE2:    public func conditionalFunc2(t: print_type_interface.T1) -> print_type_interface.T1
+// TYPE2:    public func conditionalFunc2(t: T1) -> T1
 // TYPE2:    public func unconditionalFunc1()
-// TYPE2:    public func unconditionalFunc2(t: print_type_interface.T1) -> print_type_interface.T1
+// TYPE2:    public func unconditionalFunc2(t: T1) -> T1
 // TYPE2: }
 
 // TYPE3: public class D<Int> {

@@ -73,6 +73,11 @@ fileprivate func emitDiagnosticParts(
       replaceStartLoc = bridgedSourceLoc(at: oldToken.endPositionBeforeTrailingTrivia)
       replaceEndLoc = bridgedSourceLoc(at: oldToken.endPosition)
       newText = newTrivia.description
+
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
 
     newText.withBridgedString { bridgedMessage in
@@ -136,7 +141,9 @@ extension DiagnosticSeverity {
     case .note: return .note
     case .warning: return .warning
     case .remark: return .remark
+#if RESILIENT_SWIFT_SYNTAX
     @unknown default: return .error
+#endif
     }
   }
 }
@@ -208,6 +215,11 @@ extension SourceManager {
           at: oldToken.endPosition
         )
         newText = newTrivia.description
+
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
 
       newText.withBridgedString { bridgedMessage in
@@ -351,6 +363,7 @@ public func addQueuedSourceFile(
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
   let sourceFileID = queuedDiagnostics.pointee.grouped.addSourceFile(
     tree: sourceFile.pointee.syntax,
+    sourceLocationConverter: sourceFile.pointee.sourceLocationConverter,
     displayName: displayName,
     parent: parent
   )

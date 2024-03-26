@@ -33,7 +33,7 @@ public struct ExportedSourceFile {
   public let syntax: SourceFileSyntax
 
   /// A source location converter to convert `AbsolutePosition`s in `syntax` to line/column locations.
-  /// 
+  ///
   /// Cached so we don't need to re-build the line table every time we need to convert a position.
   let sourceLocationConverter: SourceLocationConverter
 
@@ -60,6 +60,21 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TransferringArgsAndResults, to: .transferringArgsAndResults)
+    mapFeature(.BorrowingSwitch, to: .borrowingSwitch)
+  }
+}
+
+extension Parser.SwiftVersion {
+  init?(from context: BridgedASTContext?) {
+    guard let context else {
+      return nil
+    }
+    switch context.majorLanguageVersion {
+    case 1, 2, 3, 4: self = .v4
+    case 5: self = .v5
+    case 6: self = .v6
+    default: self = .v6
+    }
   }
 }
 
@@ -76,7 +91,11 @@ public func parseSourceFile(
   let buffer = UnsafeBufferPointer(start: buffer, count: bufferLength)
 
   let ctx = ctxPtr.map { BridgedASTContext(raw: $0) }
-  let sourceFile = Parser.parse(source: buffer, experimentalFeatures: .init(from: ctx))
+  let sourceFile = Parser.parse(
+    source: buffer,
+    swiftVersion: Parser.SwiftVersion(from: ctx),
+    experimentalFeatures: .init(from: ctx)
+  )
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
   let moduleName = String(cString: moduleName)

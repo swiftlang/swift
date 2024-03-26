@@ -159,11 +159,22 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
   return c()
 }
 
-/// This marker protocol represents types that support copying.
+// Helper function that exploits a bug in rethrows checking to
+// allow us to call rethrows functions from generic typed-throws functions
+// and vice-versa.
+@usableFromInline
+@_alwaysEmitIntoClient
+@inline(__always)
+func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
+  try fn()
+}
+
 @_marker public protocol Copyable {}
 
 @_marker public protocol Escapable {}
 
-#if $BitwiseCopyable
-@_marker public protocol _BitwiseCopyable {}
+#if $NoncopyableGenerics && $NonescapableTypes
+@_marker public protocol _BitwiseCopyable: ~Escapable { }
+#else
+@_marker public protocol _BitwiseCopyable { }
 #endif

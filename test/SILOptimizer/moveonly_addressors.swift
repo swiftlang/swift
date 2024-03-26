@@ -5,6 +5,7 @@
 
 // REQUIRES: asserts
 
+
 // TODO: Use the real stdlib types once `UnsafePointer` supports noncopyable
 // types.
 

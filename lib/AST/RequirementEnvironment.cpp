@@ -131,7 +131,8 @@ RequirementEnvironment::RequirementEnvironment(
             substConcreteType->getContextSubstitutionMap(
               conformanceDC->getParentModule(), conformanceDC);
           specialized =
-            ctx.getSpecializedConformance(substConcreteType, conformance,
+            ctx.getSpecializedConformance(substConcreteType,
+                                          cast<NormalProtocolConformance>(conformance),
                                           concreteSubs);
         }
 
@@ -218,5 +219,6 @@ RequirementEnvironment::RequirementEnvironment(
 
   witnessThunkSig = buildGenericSignature(ctx, GenericSignature(),
                                           std::move(genericParamTypes),
-                                          std::move(requirements));
+                                          std::move(requirements),
+                                          /*allowInverses=*/false);
 }

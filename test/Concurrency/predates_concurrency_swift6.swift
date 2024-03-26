@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 @preconcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
 
@@ -26,12 +25,12 @@ struct X {
 @MainActor func onMainActor() { }
 
 func testInAsync(x: X) async {
-  let _: Int = unsafelySendableClosure // expected-error{{type '(@Sendable () -> Void) -> ()'}}
-  let _: Int = unsafelyMainActorClosure // expected-error{{type '(@MainActor () -> Void) -> ()'}}
-  let _: Int = unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = unsafelySendableClosure // expected-error{{type '@Sendable (@Sendable () -> Void) -> ()'}}
+  let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor () -> Void) -> ()'}}
+  let _: Int = unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '(X) -> (@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
 
   let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
@@ -41,12 +40,12 @@ func testInAsync(x: X) async {
 }
 
 func testElsewhere(x: X) {
-  let _: Int = unsafelySendableClosure // expected-error{{type '(@Sendable () -> Void) -> ()'}}
-  let _: Int = unsafelyMainActorClosure // expected-error{{type '(@MainActor () -> Void) -> ()'}}
-  let _: Int = unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = unsafelySendableClosure // expected-error{{type '@Sendable (@Sendable () -> Void) -> ()'}}
+  let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor () -> Void) -> ()'}}
+  let _: Int = unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '(X) -> (@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
 
   let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
@@ -59,18 +58,18 @@ func testElsewhere(x: X) {
 // expected-note@-1{{are implicitly asynchronous}}
 
 @preconcurrency @MainActor class MyModelClass {
- // expected-note@-1{{are implicitly asynchronous}}
  func f() { }
   // expected-note@-1{{are implicitly asynchronous}}
 }
 
 func testCalls(x: X) {
-  // expected-note@-1 3{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
+  // expected-note@-1 2{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
   onMainActorAlways() // expected-error{{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
 
-  let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
+  let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-error{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
+  let c = MyModelClass() // okay, synthesized init() is 'nonisolated'
+
   c.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
 }
 
@@ -78,10 +77,10 @@ func testCallsWithAsync() async {
   onMainActorAlways() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
 
-  let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
+  let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  let c = MyModelClass() // okay, synthesized init() is 'nonisolated'
+
   c.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }

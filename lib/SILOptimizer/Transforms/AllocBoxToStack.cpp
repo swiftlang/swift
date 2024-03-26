@@ -567,7 +567,8 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
       }
     }
 
-    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(nextUser)) {
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(nextUser);
+        mmci && !mmci->isStrict()) {
       targets.push_back(mmci);
     }
   }
@@ -587,7 +588,7 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
     loc = RegularLocation::getDiagnosticsOnlyLocation(loc, next->getModule());
   SILBuilderWithScope builder(next);
 
-  auto *undef = SILUndef::get(stackBox->getType(), *stackBox->getModule());
+  auto *undef = SILUndef::get(stackBox);
 
   auto *mmci =
       builder.createMarkUnresolvedNonCopyableValueInst(loc, undef, checkKind);
@@ -603,7 +604,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   SILValue HeapBox = ABI;
-  llvm::Optional<MarkUninitializedInst::Kind> Kind;
+  std::optional<MarkUninitializedInst::Kind> Kind;
   if (HeapBox->hasOneUse()) {
     auto *User = HeapBox->getSingleUse()->getUser();
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {
@@ -623,12 +624,16 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
          && "rewriting multi-field box not implemented");
   auto ty = getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
                                ABI->getBoxType(), ABI->getModule().Types, 0);
-  auto isLexical = [&]() -> bool {
+  struct Flags {
+    IsLexical_t isLexical;
+    IsFromVarDecl_t isVarDecl;
+  };
+  auto getFlags = [&]() -> Flags {
     auto &mod = ABI->getFunction()->getModule();
     bool lexicalLifetimesEnabled =
         mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
-    if (!lexicalLifetimesEnabled)
-      return false;
+    bool sawLexical = false;
+    bool sawVarDecl = false;
     // Look for lexical borrows of the alloc_box.
     GraphNodeWorklist<Operand *, 4> worklist;
     worklist.initializeRange(ABI->getUses());
@@ -641,21 +646,25 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
           worklist.insert(use);
       } else if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
         if (bbi->isLexical())
-          return true;
+          sawLexical = true;
+        if (bbi->isFromVarDecl())
+          sawVarDecl = true;
         for (auto *use : bbi->getUses())
           worklist.insert(use);
       }
     }
-    return false;
+    return Flags{IsLexical_t(lexicalLifetimesEnabled && sawLexical),
+                 IsFromVarDecl_t(sawVarDecl)};
   };
-  auto *ASI =
-      Builder.createAllocStack(ABI->getLoc(), ty, ABI->getVarInfo(),
-                               ABI->hasDynamicLifetime(), isLexical(), false
+  auto flags = getFlags();
+  auto *ASI = Builder.createAllocStack(
+      ABI->getLoc(), ty, ABI->getVarInfo(), ABI->hasDynamicLifetime(),
+      flags.isLexical, flags.isVarDecl, DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
-                               ,
-                               true
+      ,
+      true
 #endif
-      );
+  );
 
   // Transfer a mark_uninitialized if we have one.
   SingleValueInstruction *StackBox = ASI;
@@ -1056,7 +1065,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
 
     // Set the moveonly delete-if-unused flag so we do not emit an error on the
     // original once we promote all its current uses.
-    F->addSemanticsAttr(semantics::MOVEONLY_DELETE_IF_UNUSED);
+    F->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
     // If any of our promoted callee arg indices were originally noncopyable let
     // boxes, convert them from having escaping to having non-escaping
@@ -1162,8 +1171,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     auto *PAI = cast<PartialApplyInst>(ApplyInst);
     return Builder.createPartialApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
-        PAI->isOnStack(),
+        PAI->getCalleeConvention(), PAI->getResultIsolation(), PAI->isOnStack(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
   }
   case ApplySiteKind::ApplyInst:

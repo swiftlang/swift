@@ -210,7 +210,7 @@ void ClangSyntaxPrinter::printInlineForHelperFunction() const {
 }
 
 void ClangSyntaxPrinter::printNullability(
-    llvm::Optional<OptionalTypeKind> kind,
+    std::optional<OptionalTypeKind> kind,
     NullabilityPrintKind printKind) const {
   if (!kind)
     return;
@@ -312,7 +312,7 @@ void ClangSyntaxPrinter::printGenericTypeParamTypeName(
 }
 
 void ClangSyntaxPrinter::printGenericSignature(
-    const CanGenericSignature &signature) {
+    GenericSignature signature) {
   os << "template<";
   llvm::interleaveComma(signature.getInnermostGenericParams(), os,
                         [&](const GenericTypeParamType *genericParamType) {
@@ -334,7 +334,7 @@ void ClangSyntaxPrinter::printGenericSignature(
 }
 
 void ClangSyntaxPrinter::printGenericSignatureInnerStaticAsserts(
-    const CanGenericSignature &signature) {
+    GenericSignature signature) {
   os << "#ifndef __cpp_concepts\n";
   llvm::interleave(
       signature.getInnermostGenericParams(), os,
@@ -348,7 +348,7 @@ void ClangSyntaxPrinter::printGenericSignatureInnerStaticAsserts(
 }
 
 void ClangSyntaxPrinter::printGenericSignatureParams(
-    const CanGenericSignature &signature) {
+    GenericSignature signature) {
   os << '<';
   llvm::interleaveComma(signature.getInnermostGenericParams(), os,
                         [&](const GenericTypeParamType *genericParamType) {

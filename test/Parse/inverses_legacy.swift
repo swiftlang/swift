@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift
 
-protocol Sando { func make() } // expected-note 2{{protocol requires function 'make()'}}
+// XFAIL: noncopyable_generics
+
+protocol Sando { func make() } // expected-note {{protocol requires function 'make()'}}
+                               // expected-note@-1 {{type 'U' does not conform to inherited protocol 'Copyable'}}
 
 struct BuggerView: ~Escapable {} // expected-error {{can only suppress 'Copyable'}}
 
@@ -8,8 +11,7 @@ struct S: ~U, // expected-error {{can only suppress 'Copyable'}}
               // expected-error@-1 {{inheritance from non-protocol type 'U'}}
           ~Copyable {}
 
-struct U: // expected-error {{noncopyable struct 'U' cannot conform to 'Sando'}}
-          // expected-error@-1 {{type 'U' does not conform to protocol 'Sando'}}
+struct U:  // expected-error {{type 'U' does not conform to protocol 'Copyable'}}
           ~Copyable,
           Sando,
           ~Copyable // expected-error {{duplicate suppression of 'Copyable'}}
@@ -32,7 +34,7 @@ protocol Rope<Element>: ~Copyable { // expected-error {{cannot suppress conforma
 }
 
 extension S: ~Copyable {} // expected-error {{cannot suppress conformances here}}
-                          // expected-error@-1 {{noncopyable struct 'S' cannot conform to 'Copyable'}}
+                          // expected-error@-1 {{struct 'S' required to be 'Copyable' but is marked with '~Copyable'}}
 
 func takeNoncopyableGeneric<T: ~Copyable>(_ t: T) {} // expected-error {{cannot suppress conformances here}}
 

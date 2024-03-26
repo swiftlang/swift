@@ -50,10 +50,6 @@ struct RequirementError {
     ConflictingInverseRequirement,
     /// A recursive requirement, e.g. T == G<T.A>.
     RecursiveRequirement,
-    /// A redundant requirement, e.g. T == T.
-    RedundantRequirement,
-    /// A redundant requirement, e.g. T : ~Copyable, T : ~Copyable.
-    RedundantInverseRequirement,
     /// A not-yet-supported same-element requirement, e.g. each T == Int.
     UnsupportedSameElement,
   } kind;
@@ -68,18 +64,18 @@ public:
 
   /// A requirement that conflicts with \c requirement. Both
   /// requirements will have the same subject type.
-  llvm::Optional<Requirement> conflictingRequirement;
+  std::optional<Requirement> conflictingRequirement;
 
   SourceLoc loc;
 
 private:
   RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
       : kind(kind), requirement(requirement),
-        conflictingRequirement(llvm::None), loc(loc) {}
+        conflictingRequirement(std::nullopt), loc(loc) {}
 
   RequirementError(Kind kind, InverseRequirement inverse, SourceLoc loc)
-      : kind(kind), inverse(inverse),
-        conflictingRequirement(llvm::None), loc(loc) {}
+      : kind(kind), inverse(inverse), conflictingRequirement(std::nullopt),
+        loc(loc) {}
 
   RequirementError(Kind kind, Requirement requirement,
                    Requirement conflict,
@@ -89,14 +85,12 @@ private:
 public:
   Requirement getRequirement() const {
     assert(!(kind == Kind::InvalidInverseOuterSubject ||
-             kind == Kind::RedundantInverseRequirement ||
              kind == Kind::ConflictingInverseRequirement));
     return requirement;
   }
 
   InverseRequirement getInverse() const {
     assert(kind == Kind::InvalidInverseOuterSubject ||
-           kind == Kind::RedundantInverseRequirement ||
            kind == Kind::ConflictingInverseRequirement);
     return inverse;
   }
@@ -143,16 +137,6 @@ public:
                                                     Requirement second,
                                                     SourceLoc loc) {
     return {Kind::ConflictingRequirement, first, second, loc};
-  }
-
-  static RequirementError forRedundantRequirement(Requirement req,
-                                                  SourceLoc loc) {
-    return {Kind::RedundantRequirement, req, loc};
-  }
-
-  static
-  RequirementError forRedundantInverseRequirement(InverseRequirement req) {
-    return {Kind::RedundantInverseRequirement, req, req.loc};
   }
 
   static RequirementError forRecursiveRequirement(Requirement req,

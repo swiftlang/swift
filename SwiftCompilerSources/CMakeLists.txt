@@ -98,15 +98,28 @@ function(add_swift_compiler_modules_library name)
                         "DEPENDS"
                         ${ARGN})
 
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    set(cxx_interop_flag "-enable-experimental-cxx-interop")
+  else()
+    set(cxx_interop_flag "-cxx-interoperability-mode=default")
+  endif()
+
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "-Xfrontend" "-enable-experimental-cxx-interop"
+      "${cxx_interop_flag}"
       "-Xfrontend" "-disable-target-os-checking"
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    if(SWIFT_MIN_RUNTIME_VERSION)
+      list(APPEND swift_compile_options
+        "-Xfrontend" "-min-runtime-version"
+        "-Xfrontend" "${SWIFT_MIN_RUNTIME_VERSION}")
+    endif()
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
   endif()
 
@@ -142,10 +155,9 @@ function(add_swift_compiler_modules_library name)
       list(APPEND sdk_option "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
     endif()
   elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
-    get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
     # NOTE: prepending allows SWIFT_COMPILER_SOURCES_SDK_FLAGS to override the
     # resource directory if needed.
-    list(PREPEND sdk_option "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
+    list(PREPEND sdk_option "-resource-dir" "${SWIFTLIB_DIR}")
   endif()
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
@@ -219,6 +231,9 @@ function(add_swift_compiler_modules_library name)
         importedHeaderDependencies
       COMMENT "Building swift module ${module}")
 
+    if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+      add_dependencies(${dep_target} swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+    endif()
     set("${module}_dep_target" ${dep_target})
     set(all_module_targets ${all_module_targets} ${dep_target})
   endforeach()
@@ -264,40 +279,6 @@ else()
 
   add_subdirectory(Sources)
 
-  # TODO: generate this dynamically through the modulemap; this cannot use `sed`
-  # as that is not available on all platforms (e.g. Windows).
-  #
-  # step 1: generate a dummy source file, which just includes all headers
-  # defined in include/swift/module.modulemap
-  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
-       "
-#define COMPILED_WITH_SWIFT
-
-#include \"swift/Basic/BasicBridging.h\"
-#include \"swift/SIL/SILBridging.h\"
-#include \"swift/SILOptimizer/OptimizerBridging.h\"
-")
-  add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
-      "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
-  )
-
-  # step 2: build a library containing that source file. This library depends on all the included header files.
-  #         The swift modules can now depend on that target.
-  #         Note that this library is unused, i.e. not linked to anything.
-  add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
-
-  # When building unified, we need to make sure all the Clang headers are
-  # generated before we try to use them.
-  # When building Swift against an already compiled LLVM/Clang, like
-  # build-script does, this target does not exist, but the headers
-  # are already completely generated at that point.
-  if(TARGET clang-tablegen-targets)
-    add_dependencies(importedHeaderDependencies clang-tablegen-targets)
-  endif()
 
   if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
 

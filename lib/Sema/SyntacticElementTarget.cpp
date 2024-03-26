@@ -51,6 +51,7 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.dc = dc;
   expression.contextualInfo = contextualInfo;
   expression.pattern = nullptr;
+  expression.parentReturnStmt = nullptr;
   expression.propertyWrapper.wrappedVar = nullptr;
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
   expression.propertyWrapper.hasInitialWrappedValue = false;
@@ -165,9 +166,12 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
 }
 
 SyntacticElementTarget SyntacticElementTarget::forInitialization(
-    Expr *initializer, DeclContext *dc, Type patternType,
-    PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
-    bool bindPatternVarsOneWay) {
+    Expr *initializer, Type patternType, PatternBindingDecl *patternBinding,
+    unsigned patternBindingIndex, bool bindPatternVarsOneWay) {
+  auto *dc = patternBinding->getDeclContext();
+  if (auto *initContext = patternBinding->getInitContext(patternBindingIndex))
+    dc = initContext;
+
   auto result = forInitialization(
       initializer, dc, patternType,
       patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
@@ -177,9 +181,22 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 }
 
 SyntacticElementTarget
-SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
-                                       bool ignoreWhereClause) {
-  SyntacticElementTarget target(stmt, dc, ignoreWhereClause);
+SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
+                                  DeclContext *dc) {
+  assert(contextTy);
+  assert(returnStmt->hasResult() && "Must have result to be type-checked");
+  ContextualTypeInfo contextInfo(contextTy, CTP_ReturnStmt);
+  SyntacticElementTarget target(returnStmt->getResult(), dc, contextInfo,
+                                /*isDiscarded*/ false);
+  target.expression.parentReturnStmt = returnStmt;
+  return target;
+}
+
+SyntacticElementTarget
+SyntacticElementTarget::forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
+                                           bool ignoreWhereClause,
+                                           GenericEnvironment *packElementEnv) {
+  SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
   return target;
 }
 
@@ -218,7 +235,7 @@ ContextualPattern SyntacticElementTarget::getContextualPattern() const {
                                                     uninitializedVar.index);
   }
 
-  if (isForEachStmt()) {
+  if (isForEachPreamble()) {
     return ContextualPattern::forRawPattern(forEachStmt.pattern,
                                             forEachStmt.dc);
   }
@@ -239,7 +256,6 @@ bool SyntacticElementTarget::infersOpaqueReturnType() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
   case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
     if (Type convertType = getExprContextualType())
       return convertType->hasOpaqueArchetype();
     return false;
@@ -257,7 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
     return true;
   case CTP_Unused:
   case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
   case CTP_YieldByValue:
   case CTP_YieldByReference:
   case CTP_CaseStmt:
@@ -286,7 +301,31 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   llvm_unreachable("invalid contextual type");
 }
 
-llvm::Optional<SyntacticElementTarget>
+void SyntacticElementTarget::markInvalid() const {
+  class InvalidationWalker : public ASTWalker {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // TODO: We ought to fill in ErrorTypes for expressions here; ultimately
+      // type-checking should always produce typed AST.
+      return Action::Continue(E);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      // Mark any VarDecls and PatternBindingDecls as invalid.
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        // Only set invalid if we don't already have an interface type computed.
+        if (!VD->hasInterfaceType())
+          D->setInvalid();
+      } else if (isa<PatternBindingDecl>(D)) {
+        D->setInvalid();
+      }
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+    }
+  };
+  InvalidationWalker walker;
+  walk(walker);
+}
+
+std::optional<SyntacticElementTarget>
 SyntacticElementTarget::walk(ASTWalker &walker) const {
   SyntacticElementTarget result = *this;
   switch (kind) {
@@ -295,13 +334,13 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
       if (auto *newPattern = getInitializationPattern()->walk(walker)) {
         result.setPattern(newPattern);
       } else {
-        return llvm::None;
+        return std::nullopt;
       }
     }
     if (auto *newExpr = getAsExpr()->walk(walker)) {
       result.setExpr(newExpr);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
@@ -309,7 +348,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     if (auto *newClosure = closure.closure->walk(walker)) {
       result.closure.closure = cast<ClosureExpr>(newClosure);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
@@ -317,7 +356,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     if (auto *newBody = getFunctionBody()->walk(walker)) {
       result.function.body = cast<BraceStmt>(newBody);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
@@ -332,35 +371,92 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     if (auto *newPattern = item->getPattern()->walk(walker)) {
       item->setPattern(newPattern, item->isPatternResolved());
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     if (auto guardExpr = item->getGuardExpr()) {
       if (auto newGuardExpr = guardExpr->walk(walker)) {
         item->setGuardExpr(newGuardExpr);
       } else {
-        return llvm::None;
+        return std::nullopt;
       }
     }
     break;
   }
   case Kind::patternBinding: {
     if (getAsPatternBinding()->walk(walker))
-      return llvm::None;
+      return std::nullopt;
     break;
   }
   case Kind::uninitializedVar: {
     if (auto *P = getAsUninitializedVar()->walk(walker)) {
       result.setPattern(P);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
-  case Kind::forEachStmt: {
-    if (auto *newStmt = getAsForEachStmt()->walk(walker)) {
+  case Kind::forEachPreamble: {
+    // We need to skip the where clause if requested, and we currently do not
+    // type-check a for loop's BraceStmt as part of the SyntacticElementTarget,
+    // so we need to skip it here.
+    // TODO: We ought to be able to fold BraceStmt checking into the constraint
+    // system eventually.
+    class ForEachWalker : public ASTWalker {
+      ASTWalker &Walker;
+      SyntacticElementTarget Target;
+      ForEachStmt *ForStmt;
+
+    public:
+      ForEachWalker(ASTWalker &walker, SyntacticElementTarget target)
+        : Walker(walker), Target(target), ForStmt(target.getAsForEachStmt()) {}
+
+      PreWalkAction walkToDeclPre(Decl *D) override {
+        if (D->walk(Walker))
+          return Action::Stop();
+        return Action::SkipNode();
+      }
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        // Ignore where clause if needed.
+        if (Target.ignoreForEachWhereClause() && E == ForStmt->getWhere())
+          return Action::SkipNode(E);
+
+        E = E->walk(Walker);
+
+        if (!E)
+          return Action::Stop();
+        return Action::SkipNode(E);
+      }
+
+      PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+        // We only want to visit the children of the ForEachStmt.
+        if (S == ForStmt)
+          return Action::Continue(S);
+
+        // But not its body.
+        if (S != ForStmt->getBody())
+          S = S->walk(Walker);
+
+        if (!S)
+          return Action::Stop();
+
+        return Action::SkipNode(S);
+      }
+
+      PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+        P = P->walk(Walker);
+        if (!P)
+          return Action::Stop();
+        return Action::SkipNode(P);
+      }
+    };
+
+    ForEachWalker forEachWalker(walker, *this);
+
+    if (auto *newStmt = getAsForEachStmt()->walk(forEachWalker)) {
       result.forEachStmt.stmt = cast<ForEachStmt>(newStmt);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }

@@ -203,13 +203,19 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
            LookUpConformanceInSubstitutionMap(substitutions));
 }
 
-/// Build an interface type substitution map for the given generic signature
-/// from a type substitution function and conformance lookup function.
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      TypeSubstitutionFn subs,
                                      LookupConformanceFn lookupConformance) {
-  InFlightSubstitution IFS(subs, lookupConformance, llvm::None);
+  InFlightSubstitution IFS(subs, lookupConformance, std::nullopt);
   return get(genericSig, IFS);
+}
+
+SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
+                                     ArrayRef<Type> types,
+                                     LookupConformanceFn lookupConformance) {
+  return get(genericSig,
+             QueryReplacementTypeArray{genericSig, types},
+             lookupConformance);
 }
 
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
@@ -349,11 +355,21 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!type->isTypeParameter())
     return ProtocolConformanceRef::forInvalid();
 
+  // If the protocol is invertible, just do a global lookup. This avoids an
+  // infinite substitution issue by recognizing that these protocols are
+  // very simple (see rdar://119950540 for the general issue).
+  if (proto->getInvertibleProtocolKind()) {
+    auto substType = type.subst(*this);
+    if (!substType->isTypeParameter())
+      return proto->getModuleContext()->lookupConformance(substType, proto);
+    return ProtocolConformanceRef(proto);
+  }
+
   auto genericSig = getGenericSignature();
 
   auto getSignatureConformance =
       [&](Type type,
-          ProtocolDecl *proto) -> llvm::Optional<ProtocolConformanceRef> {
+          ProtocolDecl *proto) -> std::optional<ProtocolConformanceRef> {
     unsigned index = 0;
     for (auto reqt : genericSig.getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance) {
@@ -365,7 +381,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       }
     }
 
-    return llvm::None;
+    return std::nullopt;
   };
 
   // Fast path -- check if the generic signature directly states the
@@ -436,10 +452,13 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     if (!normal->hasComputedAssociatedConformances()) {
       // If we're in the process of checking the type witnesses, fail
       // gracefully.
-      // FIXME: Seems like we should be able to get at the intermediate state
-      // to use that.
-      if (normal->getState() == ProtocolConformanceState::CheckingTypeWitnesses)
+      //
+      // FIXME: This is unsound, because we may not have diagnosed anything but
+      // still end up with an ErrorType in the AST.
+      if (proto->getASTContext().evaluator.hasActiveRequest(
+            ResolveTypeWitnessesRequest{normal})) {
         return ProtocolConformanceRef::forInvalid();
+      }
     }
 
     // Get the associated conformance.
@@ -518,9 +537,8 @@ SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {
-  return get(protocol->getGenericSignature(),
-             llvm::makeArrayRef<Type>(selfType),
-             llvm::makeArrayRef<ProtocolConformanceRef>(conformance));
+  return get(protocol->getGenericSignature(), llvm::ArrayRef<Type>(selfType),
+             llvm::ArrayRef<ProtocolConformanceRef>(conformance));
 }
 
 SubstitutionMap

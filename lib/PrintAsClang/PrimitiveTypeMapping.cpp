@@ -22,16 +22,16 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   assert(mappedTypeNames.empty() && "expected empty type map");
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                         \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      CLANG_REPR, llvm::Optional<StringRef>(CLANG_REPR),                       \
-      llvm::Optional<StringRef>(CLANG_REPR), NEEDS_NULLABILITY}
+      CLANG_REPR, std::optional<StringRef>(CLANG_REPR),                        \
+      std::optional<StringRef>(CLANG_REPR), NEEDS_NULLABILITY}
 #define MAP_C(SWIFT_NAME, OBJC_REPR, C_REPR, NEEDS_NULLABILITY)                \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, llvm::Optional<StringRef>(C_REPR),                            \
-      llvm::Optional<StringRef>(C_REPR), NEEDS_NULLABILITY}
+      OBJC_REPR, std::optional<StringRef>(C_REPR),                             \
+      std::optional<StringRef>(C_REPR), NEEDS_NULLABILITY}
 #define MAP_CXX(SWIFT_NAME, OBJC_REPR, C_REPR, CXX_REPR, NEEDS_NULLABILITY)    \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, llvm::Optional<StringRef>(C_REPR),                            \
-      llvm::Optional<StringRef>(CXX_REPR), NEEDS_NULLABILITY}
+      OBJC_REPR, std::optional<StringRef>(C_REPR),                             \
+      std::optional<StringRef>(CXX_REPR), NEEDS_NULLABILITY}
 
   MAP(CBool, "bool", false);
 
@@ -79,21 +79,21 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
 
   Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
   mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = {
-      "BOOL", llvm::None, llvm::None, false};
+      "BOOL", std::nullopt, std::nullopt, false};
   mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = {
-      "SEL", llvm::None, llvm::None, true};
+      "SEL", std::nullopt, std::nullopt, true};
   mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier(swift::getSwiftName(
                                       KnownFoundationEntity::NSZone))}] = {
-      "struct _NSZone *", llvm::None, llvm::None, true};
+      "struct _NSZone *", std::nullopt, std::nullopt, true};
 
   mappedTypeNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}] = {
-      "Boolean", llvm::None, llvm::None, false};
+      "Boolean", std::nullopt, std::nullopt, false};
 
   mappedTypeNames[{ctx.Id_CoreGraphics, ctx.Id_CGFloat}] = {
-      "CGFloat", llvm::None, llvm::None, false};
+      "CGFloat", std::nullopt, std::nullopt, false};
 
   mappedTypeNames[{ctx.Id_CoreFoundation, ctx.Id_CGFloat}] = {
-      "CGFloat", llvm::None, llvm::None, false};
+      "CGFloat", std::nullopt, std::nullopt, false};
 
   // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
@@ -125,27 +125,27 @@ PrimitiveTypeMapping::getMappedTypeInfoOrNull(const TypeDecl *typeDecl) {
   return &iter->second;
 }
 
-llvm::Optional<PrimitiveTypeMapping::ClangTypeInfo>
+std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownObjCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl))
     return ClangTypeInfo{typeInfo->objcName, typeInfo->canBeNullable};
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<PrimitiveTypeMapping::ClangTypeInfo>
+std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cName)
       return ClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable};
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<PrimitiveTypeMapping::ClangTypeInfo>
+std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCxxTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cxxName)
       return ClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable};
   }
-  return llvm::None;
+  return std::nullopt;
 }

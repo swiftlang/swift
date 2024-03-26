@@ -26,10 +26,9 @@
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -38,6 +37,7 @@
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -172,6 +172,10 @@ public:
   /// The cache key for the produced module.
   std::string moduleCacheKey;
 
+  /// Auxiliary files that help to construct other dependencies (e.g.
+  /// command-line), no need to be saved to reconstruct from cache.
+  std::vector<std::string> auxiliaryFiles;
+
   /// The direct dependency of the module is resolved by scanner.
   bool resolved;
   /// ModuleDependencyInfo is finalized (with all transitive dependencies
@@ -193,7 +197,7 @@ struct CommonSwiftTextualModuleDependencyDetails {
   const std::vector<std::string> extraPCMArgs;
 
   /// Bridging header file, if there is one.
-  llvm::Optional<std::string> bridgingHeaderFile;
+  std::optional<std::string> bridgingHeaderFile;
 
   /// Source files on which the bridging header depends.
   std::vector<std::string> bridgingSourceFiles;
@@ -326,13 +330,13 @@ public:
                                      const std::string &sourceInfoPath,
                                      const std::vector<std::string> &moduleImports,
                                      const std::vector<std::string> &optionalModuleImports,
-                                     const std::vector<std::string> &headerImports,
+                                     const std::string &headerImport,
                                      const bool isFramework,
                                      const std::string &moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
-        sourceInfoPath(sourceInfoPath), preCompiledBridgingHeaderPaths(headerImports),
+        sourceInfoPath(sourceInfoPath), headerImport(headerImport),
         isFramework(isFramework) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -348,8 +352,14 @@ public:
   /// The path to the .swiftSourceInfo file.
   const std::string sourceInfoPath;
 
-  /// The paths of all the .pch dependencies of this module.
-  const std::vector<std::string> preCompiledBridgingHeaderPaths;
+  /// The path of the .h dependency of this module.
+  const std::string headerImport;
+
+  /// Source files on which the header inputs depend.
+  std::vector<std::string> headerSourceFiles;
+
+  /// (Clang) modules on which the header inputs depend.
+  std::vector<std::string> headerModuleDependencies;
 
   /// A flag that indicates this dependency is a framework
   const bool isFramework;
@@ -366,7 +376,11 @@ class ClangModuleDependencyStorage : public ModuleDependencyInfoStorageBase {
 public:
   /// Destination output path
   const std::string pcmOutputPath;
-  
+
+  /// Same as \c pcmOutputPath, but possibly prefix-mapped using clang's prefix
+  /// mapper.
+  const std::string mappedPCMPath;
+
   /// The module map file used to generate the Clang module.
   const std::string moduleMapFile;
 
@@ -390,6 +404,7 @@ public:
   std::string CASClangIncludeTreeRootID;
 
   ClangModuleDependencyStorage(const std::string &pcmOutputPath,
+                               const std::string &mappedPCMPath,
                                const std::string &moduleMapFile,
                                const std::string &contextHash,
                                const std::vector<std::string> &buildCommandLine,
@@ -400,9 +415,10 @@ public:
                                const std::string &moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::Clang,
                                         moduleCacheKey),
-        pcmOutputPath(pcmOutputPath), moduleMapFile(moduleMapFile),
-        contextHash(contextHash), buildCommandLine(buildCommandLine),
-        fileDependencies(fileDependencies), capturedPCMArgs(capturedPCMArgs),
+        pcmOutputPath(pcmOutputPath), mappedPCMPath(mappedPCMPath),
+        moduleMapFile(moduleMapFile), contextHash(contextHash),
+        buildCommandLine(buildCommandLine), fileDependencies(fileDependencies),
+        capturedPCMArgs(capturedPCMArgs),
         CASFileSystemRootID(CASFileSystemRootID),
         CASClangIncludeTreeRootID(clangIncludeTreeRoot) {}
 
@@ -502,13 +518,13 @@ public:
       const std::string &sourceInfoPath,
       const std::vector<std::string> &moduleImports,
       const std::vector<std::string> &optionalModuleImports,
-      const std::vector<std::string> &headerImports,
+      const std::string &headerImport,
       bool isFramework, const std::string &moduleCacheKey) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
           compiledModulePath, moduleDocPath, sourceInfoPath,
           moduleImports, optionalModuleImports,
-          headerImports, isFramework, moduleCacheKey));
+          headerImport, isFramework, moduleCacheKey));
   }
 
   /// Describe the main Swift module.
@@ -526,20 +542,18 @@ public:
   /// Describe the module dependencies for a Clang module that can be
   /// built from a module map and headers.
   static ModuleDependencyInfo forClangModule(
-      const std::string &pcmOutputPath,
-      const std::string &moduleMapFile,
-      const std::string &contextHash,
+      const std::string &pcmOutputPath, const std::string &mappedPCMPath,
+      const std::string &moduleMapFile, const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies,
       const std::vector<std::string> &capturedPCMArgs,
       const std::string &CASFileSystemRootID,
       const std::string &clangIncludeTreeRoot,
       const std::string &moduleCacheKey) {
-    return ModuleDependencyInfo(
-        std::make_unique<ClangModuleDependencyStorage>(
-          pcmOutputPath, moduleMapFile, contextHash,
-          nonPathCommandLine, fileDependencies, capturedPCMArgs,
-          CASFileSystemRootID, clangIncludeTreeRoot,  moduleCacheKey));
+    return ModuleDependencyInfo(std::make_unique<ClangModuleDependencyStorage>(
+        pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
+        nonPathCommandLine, fileDependencies, capturedPCMArgs,
+        CASFileSystemRootID, clangIncludeTreeRoot, moduleCacheKey));
   }
 
   /// Describe a placeholder dependency swift module.
@@ -594,6 +608,26 @@ public:
     return storage->swiftOverlayDependencies;
   }
 
+  const ArrayRef<std::string> getHeaderInputSourceFiles() const {
+    if (auto *detail = getAsSwiftInterfaceModule())
+      return detail->textualModuleDetails.bridgingSourceFiles;
+    else if (auto *detail = getAsSwiftSourceModule())
+      return detail->textualModuleDetails.bridgingSourceFiles;
+    else if (auto *detail = getAsSwiftBinaryModule())
+      return detail->headerSourceFiles;
+    return {};
+  }
+
+  const ArrayRef<std::string> getHeaderDependencies() const {
+    if (auto *detail = getAsSwiftInterfaceModule())
+      return detail->textualModuleDetails.bridgingModuleDependencies;
+    else if (auto *detail = getAsSwiftSourceModule())
+      return detail->textualModuleDetails.bridgingModuleDependencies;
+    else if (auto *detail = getAsSwiftBinaryModule())
+      return detail->headerModuleDependencies;
+    return {};
+  }
+
   std::vector<std::string> getCommandline() const {
     if (auto *detail = getAsClangModule())
       return detail->buildCommandLine;
@@ -629,6 +663,24 @@ public:
       return cast<SwiftSourceModuleDependenciesStorage>(storage.get())
           ->updateBridgingHeaderCommandLine(newCommandLine);
     llvm_unreachable("Unexpected type");
+  }
+
+  void addAuxiliaryFile(const std::string &file) {
+    storage->auxiliaryFiles.emplace_back(file);
+  }
+
+  void updateCASFileSystemRootID(const std::string &rootID) {
+    if (isSwiftInterfaceModule())
+      cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())
+          ->textualModuleDetails.CASFileSystemRootID = rootID;
+    else if (isSwiftSourceModule())
+      cast<SwiftSourceModuleDependenciesStorage>(storage.get())
+          ->textualModuleDetails.CASFileSystemRootID = rootID;
+    else if (isClangModule())
+      cast<ClangModuleDependencyStorage>(storage.get())->CASFileSystemRootID =
+          rootID;
+    else
+      llvm_unreachable("Unexpected type");
   }
 
   bool isResolved() const {
@@ -727,16 +779,16 @@ public:
   void addModuleDependency(ModuleDependencyID dependencyID);
 
   /// Get the bridging header.
-  llvm::Optional<std::string> getBridgingHeader() const;
+  std::optional<std::string> getBridgingHeader() const;
 
   /// Get CAS Filesystem RootID.
-  llvm::Optional<std::string> getCASFSRootID() const;
+  std::optional<std::string> getCASFSRootID() const;
 
   /// Get Clang Include Tree ID.
-  llvm::Optional<std::string> getClangIncludeTree() const;
+  std::optional<std::string> getClangIncludeTree() const;
 
   /// Get bridging header Include Tree ID.
-  llvm::Optional<std::string> getBridgingHeaderIncludeTree() const;
+  std::optional<std::string> getBridgingHeaderIncludeTree() const;
 
   /// Get module output path.
   std::string getModuleOutputPath() const;
@@ -747,12 +799,12 @@ public:
   /// Add source files
   void addSourceFile(StringRef sourceFile);
 
-  /// Add source files that the bridging header depends on.
-  void addBridgingSourceFile(StringRef bridgingSourceFile);
+  /// Add source files that the header input depends on.
+  void addHeaderSourceFile(StringRef bridgingSourceFile);
 
-  /// Add (Clang) module on which the bridging header depends.
-  void addBridgingModuleDependency(StringRef module,
-                                   llvm::StringSet<> &alreadyAddedModules);
+  /// Add (Clang) modules on which a non-bridging header input depends.
+  void addHeaderInputModuleDependency(StringRef module,
+                                      llvm::StringSet<> &alreadyAddedModules);
 
   /// Add bridging header include tree.
   void addBridgingHeaderIncludeTree(StringRef ID);
@@ -760,7 +812,8 @@ public:
   /// Collect a map from a secondary module name to a list of cross-import
   /// overlays, when this current module serves as the primary module.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
-  collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName) const;
+  collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName,
+                                 std::vector<std::string> &overlayFiles) const;
 };
 
 using ModuleDependencyVector = llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>;
@@ -812,10 +865,10 @@ class SwiftDependencyScanningService {
   };
 
   /// The CASOption created the Scanning Service if used.
-  llvm::Optional<clang::CASOptions> CASOpts;
+  std::optional<clang::CASOptions> CASOpts;
 
   /// The persistent Clang dependency scanner service
-  llvm::Optional<clang::tooling::dependencies::DependencyScanningService>
+  std::optional<clang::tooling::dependencies::DependencyScanningService>
       ClangScanningService;
 
   /// CachingOnDiskFileSystem for dependency tracking.
@@ -834,7 +887,7 @@ class SwiftDependencyScanningService {
   std::unique_ptr<llvm::TreePathPrefixMapper> Mapper;
 
   /// The global file system cache.
-  llvm::Optional<
+  std::optional<
       clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
       SharedFilesystemCache;
 
@@ -887,9 +940,9 @@ public:
     return *CacheFS;
   }
 
-  llvm::Optional<SwiftDependencyTracker> createSwiftDependencyTracker() {
+  std::optional<SwiftDependencyTracker> createSwiftDependencyTracker() {
     if (!CacheFS)
-      return llvm::None;
+      return std::nullopt;
 
     return SwiftDependencyTracker(*CacheFS, Mapper.get());
   }
@@ -938,7 +991,7 @@ private:
 
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
-                     llvm::Optional<ModuleDependencyKind> kind,
+                     std::optional<ModuleDependencyKind> kind,
                      StringRef scanContextHash) const;
 
   /// Return a pointer to the cache state of the specified context hash.
@@ -948,9 +1001,8 @@ private:
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  llvm::Optional<const ModuleDependencyInfo *>
-  findDependency(StringRef moduleName,
-                 llvm::Optional<ModuleDependencyKind> kind,
+  std::optional<const ModuleDependencyInfo *>
+  findDependency(StringRef moduleName, std::optional<ModuleDependencyKind> kind,
                  StringRef scanContextHash) const;
 
   /// Record dependencies for the given module.
@@ -1012,7 +1064,7 @@ public:
   bool hasDependency(const ModuleDependencyID &moduleID) const;
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
-                     llvm::Optional<ModuleDependencyKind> kind) const;
+                     std::optional<ModuleDependencyKind> kind) const;
   /// Whether we have cached dependency information for the given module Name.
   bool hasDependency(StringRef moduleName) const;
 
@@ -1036,23 +1088,31 @@ public:
   std::vector<ModuleDependencyID>
   getAllDependencies(const ModuleDependencyID &moduleID) const;
 
+  /// Query only direct import dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getOnlyDirectDependencies(const ModuleDependencyID &moduleID) const;
+
+  /// Query only Swift overlay dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getOnlyOverlayDependencies(const ModuleDependencyID &moduleID) const;
+
   /// Look for module dependencies for a module with the given ID
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  llvm::Optional<const ModuleDependencyInfo *>
+  std::optional<const ModuleDependencyInfo *>
   findDependency(const ModuleDependencyID moduleID) const;
 
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  llvm::Optional<const ModuleDependencyInfo *>
+  std::optional<const ModuleDependencyInfo *>
   findDependency(StringRef moduleName,
-                 llvm::Optional<ModuleDependencyKind> kind) const;
+                 std::optional<ModuleDependencyKind> kind) const;
 
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
-  llvm::Optional<const ModuleDependencyInfo *>
+  std::optional<const ModuleDependencyInfo *>
   findDependency(StringRef moduleName) const;
 
   /// Record dependencies for the given module.

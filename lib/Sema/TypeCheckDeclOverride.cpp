@@ -496,9 +496,9 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
     return computeFixitsForOverriddenDeclaration(
-        decl, base, [&](bool HasNotes) -> llvm::Optional<InFlightDiagnostic> {
+        decl, base, [&](bool HasNotes) -> std::optional<InFlightDiagnostic> {
           if (!HasNotes)
-            return llvm::None;
+            return std::nullopt;
           return diags.diagnose(decl, diagKind,
                                 /*plural*/ std::min(numArgs, 2U), argTy);
         });
@@ -507,9 +507,9 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
       baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
     return computeFixitsForOverriddenDeclaration(
-        decl, base, [&](bool HasNotes) -> llvm::Optional<InFlightDiagnostic> {
+        decl, base, [&](bool HasNotes) -> std::optional<InFlightDiagnostic> {
           if (!HasNotes)
-            return llvm::None;
+            return std::nullopt;
           return diags.diagnose(decl, diag::override_type_mismatch_with_fixits,
                                 base->getDescriptiveKind(), baseTy);
         });
@@ -560,7 +560,8 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
                                     [&](DiagnosticBehavior limit) {
       diags.diagnose(decl, diag::override_sendability_mismatch, decl->getName())
-          .limitBehavior(limit);
+          .limitBehaviorUntilSwiftVersion(limit, 6)
+          .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
       return false;
     });
     break;
@@ -1301,9 +1302,9 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                     [&](DiagnosticBehavior limit) {
       diags.diagnose(decl, diag::override_sendability_mismatch,
                      decl->getName())
-        .limitBehavior(limit);
-      diags.diagnose(baseDecl, diag::overridden_here)
-        .limitBehavior(limit);
+        .limitBehaviorUntilSwiftVersion(limit, 6)
+        .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
+      diags.diagnose(baseDecl, diag::overridden_here);
       return false;
     });
   }
@@ -1535,7 +1536,6 @@ namespace  {
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(RawLayout)
-    UNINTERESTING_ATTR(ResultDependsOn)
     UNINTERESTING_ATTR(ResultDependsOnSelf)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
@@ -1559,6 +1559,7 @@ namespace  {
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
     UNINTERESTING_ATTR(Preconcurrency)
+    UNINTERESTING_ATTR(AllowFeatureSuppression)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1613,7 +1614,6 @@ namespace  {
     UNINTERESTING_ATTR(Nonisolated)
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
-    UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(NoImplicitCopy)
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
@@ -1636,6 +1636,7 @@ namespace  {
     UNINTERESTING_ATTR(NonEscapable)
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
     UNINTERESTING_ATTR(StaticExclusiveOnly)
+    UNINTERESTING_ATTR(PreInverseGenerics)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1665,39 +1666,7 @@ namespace  {
       }
     }
 
-    void visitObjCAttr(ObjCAttr *attr) {
-      // Checking for overrides of declarations that are implicitly @objc
-      // and occur in class extensions, because overriding will no longer be
-      // possible under the Swift 4 rules.
-
-      // We only care about the storage declaration.
-      if (isa<AccessorDecl>(Override)) return;
-
-      // If @objc was explicit or handled elsewhere, nothing to do.
-      if (!attr->isSwift3Inferred()) return;
-
-      // If we aren't warning about Swift 3 @objc inference, we're done.
-      if (Override->getASTContext().LangOpts.WarnSwift3ObjCInference ==
-            Swift3ObjCInferenceWarnings::None)
-        return;
-
-      // If 'dynamic' was implicit, we'll already have warned about this.
-      if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>()) {
-        if (!dynamicAttr->isImplicit()) return;
-      }
-
-      // The overridden declaration needs to be in an extension.
-      if (!isa<ExtensionDecl>(Base->getDeclContext())) return;
-
-      // Complain.
-      Diags.diagnose(Override, diag::override_swift3_objc_inference,
-                     Override, Base->getDeclContext()
-                                 ->getSelfNominalTypeDecl()
-                                 ->getName());
-      Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
-        .fixItInsert(Base->getAttributeInsertionLoc(false),
-                     "@objc ");
-    }
+    void visitObjCAttr(ObjCAttr *attr) {}
   };
 } // end anonymous namespace
 
@@ -1788,6 +1757,7 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
   // the getter and the setter.
   switch (overrideFn->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
   case AccessorKind::Set:
     break;
 
@@ -2253,7 +2223,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
       foundAny = true;
     }
 
-    return foundAny ? TypeWalker::Action::SkipChildren
+    return foundAny ? TypeWalker::Action::SkipNode
                     : TypeWalker::Action::Continue;
   });
 
@@ -2307,6 +2277,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::Init:
@@ -2337,6 +2308,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
       switch (kind) {
       case AccessorKind::Get:
+      case AccessorKind::DistributedGet:
       case AccessorKind::Read:
         break;
 

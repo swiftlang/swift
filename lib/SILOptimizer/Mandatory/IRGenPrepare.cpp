@@ -87,6 +87,15 @@ class IRGenPrepare : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
 
+    if (getOptions().EmbeddedSwift) {
+      // In embedded swift all the code is generated in the top-level module.
+      // Even de-serialized functions must be code-gen'd.
+      SILLinkage linkage = F->getLinkage();
+      if (isAvailableExternally(linkage)) {
+        F->setLinkage(stripExternalFromLinkage(linkage));
+      }
+    }
+
     bool shouldInvalidate = cleanFunction(*F);
 
     if (shouldInvalidate)

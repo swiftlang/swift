@@ -60,7 +60,7 @@ struct RenameInfo {
   RefactorAvailabilityInfo Availability;
 };
 
-llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
+std::optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
 
 /// An array of \c RenameLoc that also keeps the underlying string storage of
 /// the \c StringRef inside the \c RenameLoc alive.
@@ -126,7 +126,7 @@ struct RefactoringOptions {
 struct RenameRangeDetail {
   CharSourceRange Range;
   RefactoringRangeKind RangeKind;
-  llvm::Optional<unsigned> Index;
+  std::optional<unsigned> Index;
 };
 
 StringRef getDescriptiveRefactoringKindName(RefactoringKind Kind);

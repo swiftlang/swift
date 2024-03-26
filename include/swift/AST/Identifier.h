@@ -174,7 +174,11 @@ public:
   }
 
   bool hasDollarPrefix() const {
-    return str().startswith("$") && !(getLength() == 1);
+    return str().starts_with("$") && !(getLength() == 1);
+  }
+  
+  bool hasUnderscoredNaming() const {
+    return str().starts_with("_");
   }
   
   const void *getAsOpaquePointer() const {
@@ -322,6 +326,8 @@ public:
   bool isSpecial() const { return getKind() != Kind::Normal; }
 
   bool isSubscript() const { return getKind() == Kind::Subscript; }
+
+  bool isConstructor() const { return getKind() == Kind::Constructor; }
 
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
@@ -844,7 +850,7 @@ public:
   /// This should not be used to parse selectors written directly in Swift
   /// source code (e.g. the argument of an @objc attribute). Use the
   /// parser for that.
-  static llvm::Optional<ObjCSelector> parse(ASTContext &ctx, StringRef string);
+  static std::optional<ObjCSelector> parse(ASTContext &ctx, StringRef string);
 
   /// Convert to true if the decl name is valid.
   explicit operator bool() const { return (bool)Storage; }

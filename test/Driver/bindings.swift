@@ -29,12 +29,6 @@
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -emit-ir %S/Inputs/empty.sil 2>&1 | %FileCheck %s -check-prefix=SIL-INPUT
 // SIL-INPUT: # "x86_64-apple-macosx10.9" - "swift{{(-frontend|c)?(\.exe)?}}", inputs: ["{{.*}}empty.sil"], output: {llvm-ir: "-"}
 
-// RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -c -incremental %/s 2>&1 | %FileCheck %s -check-prefix=OBJ-AND-DEPS
-// OBJ-AND-DEPS: # "x86_64-apple-macosx10.9" - "swift{{(-frontend|c)?(\.exe)?}}", inputs: ["{{.*}}bindings.swift"], output: {
-// OBJ-AND-DEPS-DAG: swift-dependencies: "bindings.swiftdeps"
-// OBJ-AND-DEPS-DAG: object: "bindings.o"
-// OBJ-AND-DEPS: }
-
 // RUN: echo '{"%/s": {"object": "objroot/bindings.o"}}' > %t/map.json
 // RUN: %swiftc_driver -driver-print-bindings -output-file-map %t/map.json -target x86_64-apple-macosx10.9 %/s 2>&1 | %FileCheck %s -check-prefix=MAP
 // MAP: # "x86_64-apple-macosx10.9" - "swift{{(-frontend|c)?(\.exe)?}}", inputs: ["{{.*}}bindings.swift"], output: {object: "objroot/bindings.o"}

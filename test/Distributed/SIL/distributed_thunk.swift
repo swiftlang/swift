@@ -13,7 +13,7 @@ extension DA {
   // CHECK: function_ref @swift_distributed_actor_is_remote
 
   // Call the actor function
-  // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@guaranteed DA) -> ()
+  // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@sil_isolated @guaranteed DA) -> ()
 
   distributed func f() { }
 }
@@ -82,6 +82,6 @@ distributed actor DA5: Server2 {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA5CAA7Server2A2aDP8sayHelloyyFTW
   // CHECK: function_ref @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyF
 
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA5CAA7Server2A2aDP8sayHelloyyFTWTE
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA5CAA7Server2A2aDP8sayHelloyyYaKFTWTE
   // CHECK: function_ref @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyYaKFTE
 }

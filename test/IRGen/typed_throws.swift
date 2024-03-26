@@ -7,7 +7,7 @@
 // XFAIL: CPU=arm64e
 // REQUIRES: PTRSIZE=64
 
-enum MyBigError: Error {
+public enum MyBigError: Error {
   case epicFail
 }
 
@@ -21,6 +21,10 @@ func requiresP<T: P>(_: T.Type) { }
 func createsP() {
   requiresP(X.self)
 }
+
+// This is for TypeH.method
+// CHECK-NOMANGLE: @"$s12typed_throws5TypeHV6methodySSSiAA10MyBigErrorOYKcvpMV" =
+
 
 // CHECK-LABEL: define {{.*}}hidden swiftcc ptr @"$s12typed_throws13buildMetatypeypXpyF"()
 func buildMetatype() -> Any.Type {
@@ -77,4 +81,9 @@ func callee() throws (S) {
 // This used to crash at compile time.
 func testit() throws (S) {
   try callee()
+}
+
+// Used to crash in abstract pattern creation.
+public struct TypeH {
+  public var method: (Int) throws(MyBigError) -> String
 }

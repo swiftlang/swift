@@ -258,9 +258,13 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrow(Operand *borrowingOperand) {
     return false;
 
   return BorrowingOperand(borrowingOperand)
-    .visitScopeEndingUses([&](Operand *borrowEnd) {
-      return visitInnerBorrowScopeEnd(borrowEnd);
-    });
+    .visitScopeEndingUses(
+      [&](Operand *borrowEnd) {
+        return visitInnerBorrowScopeEnd(borrowEnd);
+      },
+      [&](Operand *unknownUse) {
+        return asImpl().handlePointerEscape(unknownUse);
+      });
 }
 
 template <typename Impl>
@@ -289,18 +293,16 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
 
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
   }
-  case OperandOwnership::DestroyingConsume: {
-    // partial_apply [on_stack] can introduce borrowing operand and can have
-    // destroy_value consumes.
-    auto *pai = dyn_cast<PartialApplyInst>(borrowEnd->get());
-    // TODO: When we have ForwardingInstruction abstraction, walk the use-def
-    // chain to ensure we have a partial_apply [on_stack] def.
-    assert(pai && pai->isOnStack() ||
-           ForwardingInstruction::get(
-               cast<SingleValueInstruction>(borrowEnd->get())));
+  case OperandOwnership::DestroyingConsume:
+  case OperandOwnership::ForwardingConsume: {
+    // partial_apply [on_stack] and mark_dependence [nonescaping] can introduce
+    // borrowing operand and can have destroy_value, return, or store consumes.
+    //
+    // TODO: When we have a C++ ForwardingUseDefWalker, walk the def-use
+    // chain to ensure we have a partial_apply [on_stack] or mark_dependence
+    // [nonescaping] def.
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
   }
-
   default:
     llvm_unreachable("expected borrow scope end");
   }
@@ -389,6 +391,11 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
     return true;
 
   case OperandOwnership::PointerEscape:
+    // TODO: Change ProjectBox ownership to InteriorPointer and allow them to
+    // take owned values.
+    if (isa<ProjectBoxInst>(use->getUser())) {
+      return visitInteriorPointerUses(use);
+    }
     if (!asImpl().handlePointerEscape(use))
       return false;
 
@@ -441,7 +448,8 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
 
 template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitInteriorPointerUses(Operand *use) {
-  assert(use->getOperandOwnership() == OperandOwnership::InteriorPointer);
+  assert(use->getOperandOwnership() == OperandOwnership::InteriorPointer ||
+         isa<ProjectBoxInst>(use->getUser()));
 
   if (auto scopedAddress = ScopedAddressValue::forUse(use)) {
     // e.g. client may need to insert end_borrow if scopedAddress is a store_borrow.

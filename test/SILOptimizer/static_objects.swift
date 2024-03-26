@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
@@ -8,7 +8,6 @@
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: CPU=arm64 || CPU=x86_64
 // REQUIRES: swift_in_compiler
-
 
 public class C {
   var x: Int
@@ -44,6 +43,12 @@ public let c = C(x: 27)
 public func testit() -> C {
   return c
 }
+
+// Cannot allocate a ManagedBuffer in a data section, because it calls malloc_size on the class instance.
+// CHECK-LABEL: sil private [global_init_once_fn] @$s4test10managedBuf_WZ :
+// CHECK:         alloc_ref [tail_elems $UInt8 * %{{[0-9]*}} : $Builtin.Word] $ManagedBuffer<(), UInt8>
+// CHECK:       } // end sil function '$s4test10managedBuf_WZ'
+public let managedBuf = ManagedBuffer<Void, UInt8>.create(minimumCapacity: 0, makingHeaderWith: { _ in })
 
 @main struct Main {
   static func main() {

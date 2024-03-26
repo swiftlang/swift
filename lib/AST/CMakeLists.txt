@@ -33,6 +33,7 @@ add_swift_host_library(swiftAST STATIC
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
   ConcreteDeclRef.cpp
+  ConformanceLookup.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
@@ -47,6 +48,7 @@ add_swift_host_library(swiftAST STATIC
   ExistentialGeneralization.cpp
   Expr.cpp
   ExtInfo.cpp
+  FeatureSet.cpp
   FineGrainedDependencies.cpp
   FineGrainedDependencyFormat.cpp
   FreestandingMacroExpansion.cpp

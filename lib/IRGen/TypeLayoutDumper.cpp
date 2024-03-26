@@ -83,7 +83,7 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
                                 IRGenModule &IGM,
                                 std::vector<YAMLTypeInfoNode> &Result) {
   // We only care about public and @usableFromInline declarations.
-  if (NTD->getEffectiveAccess() < AccessLevel::Public)
+  if (NTD->getEffectiveAccess() < AccessLevel::Package)
     return;
 
   // We don't care about protocols or classes.
@@ -115,8 +115,8 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
   Result.push_back(createYAMLTypeInfoNode(NTD, IGM, fixedTI));
 }
 
-static llvm::Optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
-                                                           IRGenModule &IGM) {
+static std::optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
+                                                          IRGenModule &IGM) {
   std::vector<NominalTypeDecl *> Decls;
   NominalTypeWalker Walker(Decls);
 
@@ -137,7 +137,7 @@ static llvm::Optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
   }
 
   if (Nodes.empty())
-    return llvm::None;
+    return std::nullopt;
 
   std::sort(Nodes.begin(), Nodes.end());
 

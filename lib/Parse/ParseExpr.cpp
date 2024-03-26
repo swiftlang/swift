@@ -14,21 +14,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/EditorPlaceholder.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
+#include "swift/Parse/Parser.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include <utility>
 
 using namespace swift;
 
@@ -516,7 +517,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
-  llvm::Optional<Token> trySuffix;
+  std::optional<Token> trySuffix;
   if (hadTry && Tok.isAny(tok::exclaim_postfix, tok::question_postfix)) {
     trySuffix = Tok;
     consumeToken();
@@ -995,7 +996,7 @@ void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
 
   CancellableBacktrackingScope backtrack(*this);
   {
-    llvm::Optional<Lexer::ForwardSlashRegexRAII> regexScope;
+    std::optional<Lexer::ForwardSlashRegexRAII> regexScope;
     regexScope.emplace(*L, mustBeRegex);
 
     // Try re-lex as a `/.../` regex literal, this will split an operator if
@@ -1452,8 +1453,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       // it as a "postfix ifconfig expression".
       bool isPostfixIfConfigExpr = false;
       {
-        llvm::SaveAndRestore<llvm::Optional<StableHasher>> H(CurrentTokenHash,
-                                                             llvm::None);
+        llvm::SaveAndRestore<std::optional<StableHasher>> H(CurrentTokenHash,
+                                                            std::nullopt);
         Parser::BacktrackingScope Backtrack(*this);
         // Skip to the first body. We may need to skip multiple '#if' directives
         // since we support nested '#if's. e.g.
@@ -1755,8 +1756,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     LLVM_FALLTHROUGH;
   }
+  case tok::kw_init:
   case tok::kw_Self:     // Self
-    return parseExprIdentifier();
+    return parseExprIdentifier(/*allowKeyword=*/true);
 
   case tok::kw_Any: { // Any
     auto TyR = parseAnyType();
@@ -1910,7 +1912,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     }
     if (peekToken().is(tok::code_complete) &&
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-      return parseExprPoundCodeCompletion(/*ParentKind*/ llvm::None);
+      return parseExprPoundCodeCompletion(/*ParentKind*/ std::nullopt);
     }
 
     return parseExprMacroExpansion(isExprBasic);
@@ -2009,11 +2011,6 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       consumeExtraToken(Token(tok::string_literal,
                               CharSourceRange(SourceMgr, TokenLoc, TokEnd).str(),
                               CommentLength));
-
-      // Make an unknown token to encapsulate the entire string segment and add
-      // such token to the context.
-      Token content(tok::string_segment,
-                    CharSourceRange(Segment.Loc, Segment.Length).str());
       break;
     }
         
@@ -2105,30 +2102,10 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
 
-  StringRef OpenDelimiterStr, OpenQuoteStr, CloseQuoteStr, CloseDelimiterStr;
-  unsigned DelimiterLength = Tok.getCustomDelimiterLen();
-  unsigned QuoteLength;
-  tok QuoteKind;
-  std::tie(QuoteLength, QuoteKind) =
-    Tok.isMultilineString() ? std::make_tuple(3, tok::multiline_string_quote)
-                            : std::make_tuple(1, Tok.getText().startswith("\'") ?
-                                          tok::single_quote: tok::string_quote);
-  unsigned CloseQuoteBegin = Tok.getLength() - DelimiterLength - QuoteLength;
-
-  OpenDelimiterStr = Tok.getRawText().take_front(DelimiterLength);
-  OpenQuoteStr = Tok.getRawText().substr(DelimiterLength, QuoteLength);
-  CloseQuoteStr = Tok.getRawText().substr(CloseQuoteBegin, QuoteLength);
-  CloseDelimiterStr = Tok.getRawText().take_back(DelimiterLength);
-
-  // Make unknown tokens to represent the open and close quote.
-  Token OpenQuote(QuoteKind, OpenQuoteStr);
-  Token CloseQuote(QuoteKind, CloseQuoteStr);
-
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
-    consumeExtraToken(Tok);
-    consumeTokenWithoutFeedingReceiver();
+    consumeToken();
 
     return makeParserResult(
         createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
@@ -2154,19 +2131,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     // Make the variable which will contain our temporary value.
     auto InterpolationVar =
-      new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
-                            /*NameLoc=*/SourceLoc(),
-                            Context.Id_dollarInterpolation, CurDeclContext);
-    InterpolationVar->setImplicit(true);
-    InterpolationVar->setUserAccessible(false);
-    
+        VarDecl::createImplicitStringInterpolationVar(CurDeclContext);
+
     Stmts.push_back(InterpolationVar);
 
     // Collect all string segments.
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
-    auto Body = BraceStmt::create(Context, Loc, Stmts, /*endLoc=*/Loc,
+    auto Body = BraceStmt::create(Context, /*LBLoc=*/SourceLoc(), Stmts,
+                                  /*RBLoc=*/SourceLoc(),
                                   /*implicit=*/true);
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }
@@ -2177,8 +2151,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   }
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
-                                      Loc, Loc.getAdvancedLoc(CloseQuoteBegin),
-                                      LiteralCapacity, InterpolationCount,
+                                      Loc, LiteralCapacity, InterpolationCount,
                                       AppendingExpr));
 }
 
@@ -2202,6 +2175,9 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
     }
 
     loc = consumeArgumentLabel(name, /*diagnoseDollarPrefix=*/false);
+    consumeToken(tok::colon);
+  } else if (Tok.is(tok::colon)) {
+    diagnose(Tok, diag::expected_label_before_colon);
     consumeToken(tok::colon);
   }
 }
@@ -2271,7 +2247,7 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
 }
 
 DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
-                                     const Diagnostic &diag,
+                                     DiagRef diag,
                                      DeclNameOptions flags) {
   // Consume the base name.
   DeclBaseName baseName;
@@ -2334,7 +2310,7 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
     SourceLoc &poundLoc, DeclNameLoc &macroNameLoc, DeclNameRef &macroNameRef,
     SourceLoc &leftAngleLoc, SmallVectorImpl<TypeRepr *> &genericArgs,
     SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
-    const Diagnostic &diag) {
+    DiagRef diag) {
   SourceLoc poundEndLoc = Tok.getRange().getEnd();
   poundLoc = consumeToken(tok::pound);
 
@@ -2390,17 +2366,20 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
-ParserResult<Expr> Parser::parseExprIdentifier() {
+ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
   ParserStatus status;
-  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self) ||
+         (allowKeyword && Tok.isKeyword()));
   Token IdentTok = Tok;
 
+  auto declNameFlags = DeclNameFlag::AllowCompoundNames |
+                       DeclNameFlag::AllowLowercaseAndUppercaseSelf;
+  if (allowKeyword) {
+    declNameFlags |= DeclNameFlag::AllowKeywords;
+  }
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclNameRef name =
-      parseDeclNameRef(loc, diag::expected_expr,
-                       DeclNameFlag::AllowCompoundNames |
-                           DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr, declNameFlags);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -2443,7 +2422,7 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
   assert(PlaceholderId.isEditorPlaceholder());
 
   auto parseTypeForPlaceholder = [&]() -> std::pair<TypeRepr *, TypeRepr *> {
-    llvm::Optional<EditorPlaceholderData> DataOpt =
+    std::optional<EditorPlaceholderData> DataOpt =
         swift::parseEditorPlaceholder(PlaceholderTok.getText());
     if (!DataOpt)
       return {nullptr, nullptr};
@@ -2572,8 +2551,16 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     BacktrackingScope backtrack(*this);
 
     // Consume attributes.
-    while (Tok.is(tok::at_sign)) {
-      skipAnyAttribute();
+    auto parsingNonisolated = [this] {
+      return Context.LangOpts.hasFeature(Feature::ClosureIsolation) &&
+             Tok.isContextualKeyword("nonisolated");
+    };
+    while (Tok.is(tok::at_sign) || parsingNonisolated()) {
+      if (parsingNonisolated()) {
+        consumeToken();
+      } else {
+        skipAnyAttribute();
+      }
     }
 
     // Skip by a closure capture list if present.
@@ -2637,7 +2624,12 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     return makeParserSuccess();
   }
   ParserStatus status;
-  (void)parseDeclAttributeList(attributes);
+  // 'nonisolated' cannot be parameterized in a closure due to ambiguity with
+  // closure parameters.
+  const auto entryNonisolatedState =
+      std::exchange(EnableParameterizedNonisolated, false);
+  (void)parseClosureDeclAttributeList(attributes);
+  EnableParameterizedNonisolated = entryNonisolatedState;
 
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     SourceLoc lBracketLoc = consumeToken(tok::l_square);
@@ -2701,7 +2693,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // the expression to capture.
         if (!Tok.is(tok::code_complete)) {
           name = Context.getIdentifier(Tok.getText());
-          auto initializerResult = parseExprIdentifier();
+          auto initializerResult = parseExprIdentifier(/*allowKeyword=*/false);
           status |= initializerResult;
           initializer = initializerResult.get();
         } else {
@@ -2807,6 +2799,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     } else {
       // Parse identifier (',' identifier)*
       SmallVector<ParamDecl*, 4> elements;
+      const auto parameterListLoc = Tok.getLoc();
       bool HasNext;
       do {
         if (Tok.isNot(tok::identifier, tok::kw__, tok::code_complete)) {
@@ -2836,6 +2829,15 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       } while (HasNext);
 
       params = ParameterList::create(Context, elements);
+
+      if (Context.LangOpts.hasFeature(Feature::ClosureIsolation) && params &&
+          (params->size() > 0) && attributes.hasAttribute<NonisolatedAttr>()) {
+        diagnose(parameterListLoc,
+                 diag::nonisolated_closure_parameter_parentheses)
+            .fixItInsert(parameterListLoc, "(")
+            .fixItInsert(Tok.getLoc(), ")");
+        status.setIsParseError();
+      }
     }
 
     TypeRepr *thrownTypeRepr = nullptr;
@@ -2966,13 +2968,13 @@ ParserResult<Expr> Parser::parseExprClosure() {
   DeclAttributes attributes;
   SourceRange bracketRange;
   SmallVector<CaptureListEntry, 2> captureList;
-  VarDecl *capturedSelfDecl;
+  VarDecl *capturedSelfDecl = nullptr;
   ParameterList *params = nullptr;
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
-  TypeExpr *thrownType;
+  TypeExpr *thrownType = nullptr;
   SourceLoc arrowLoc;
-  TypeExpr *explicitResultType;
+  TypeExpr *explicitResultType = nullptr;
   SourceLoc inLoc;
   Status |= parseClosureSignatureIfPresent(
       attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,
@@ -3043,35 +3045,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
     closure->setHasAnonymousClosureVars();
   }
 
-  auto *BS = BraceStmt::create(Context, leftBrace, bodyElements, rightBrace);
-
-  // If the body consists of a single expression, turn it into a return
-  // statement.
-  bool hasSingleExpressionBody = false;
-  if (!missingRBrace) {
-    if (auto Element = BS->getSingleActiveElement()) {
-      if (Element.is<Stmt *>()) {
-        if (auto returnStmt = dyn_cast<ReturnStmt>(Element.get<Stmt *>())) {
-          hasSingleExpressionBody = true;
-          if (!returnStmt->hasResult()) {
-            auto returnExpr = TupleExpr::createEmpty(Context,
-                                                     SourceLoc(),
-                                                     SourceLoc(),
-                                                     /*implicit*/true);
-            returnStmt->setResult(returnExpr);
-          }
-        }
-      } else if (Element.is<Expr *>()) {
-        // Create the wrapping return.
-        hasSingleExpressionBody = true;
-        auto returnExpr = Element.get<Expr*>();
-        BS->setLastElement(new (Context) ReturnStmt(SourceLoc(), returnExpr));
-      }
-    }
-  }
-
   // Set the body of the closure.
-  closure->setBody(BS, hasSingleExpressionBody);
+  auto *BS = BraceStmt::create(Context, leftBrace, bodyElements, rightBrace);
+  closure->setBody(BS);
 
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;
@@ -3215,7 +3191,7 @@ Parser::parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
     args.emplace_back(elt.LabelLoc, elt.Label, elt.E);
 
   auto numNonTrailing = args.size();
-  llvm::Optional<unsigned> trailingClosureIndex;
+  std::optional<unsigned> trailingClosureIndex;
 
   // If we can parse trailing closures, do so.
   if (allowTrailingClosure && Tok.is(tok::l_brace) &&
@@ -3228,6 +3204,78 @@ Parser::parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
   auto *argList = ArgumentList::createParsed(Context, leftLoc, args, rightLoc,
                                              trailingClosureIndex);
   return makeParserResult(status, argList);
+}
+
+ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, SourceLoc leftLoc, SmallVectorImpl<ExprListElt> &elts) {
+  Identifier FieldName;
+  SourceLoc FieldNameLoc;
+  parseOptionalArgumentLabel(FieldName, FieldNameLoc);
+
+  // See if we have an operator decl ref '(<op>)'. The operator token in
+  // this case lexes as a binary operator because it neither leads nor
+  // follows a proper subexpression.
+  auto isUnappliedOperator = [&]() {
+    return Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma);
+  };
+
+  if (isUnappliedOperator()) {
+    // Check to see if we have the start of a regex literal `/.../`. We need
+    // to do this for an unapplied operator reference, as e.g `(/, /)` might
+    // be a regex literal.
+    tryLexRegexLiteral(/*forUnappliedOperator*/ true);
+  }
+
+  ParserStatus Status;
+  Expr *SubExpr = nullptr;
+  if (isUnappliedOperator()) {
+    DeclNameLoc Loc;
+    auto OperName =
+        parseDeclNameRef(Loc, diag::expected_operator_ref,
+                         DeclNameFlag::AllowOperators |
+                             DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+    if (!OperName) {
+      return makeParserError();
+    }
+    // Bypass local lookup. Use an 'Ordinary' reference kind so that the
+    // reference may resolve to any unary or binary operator based on
+    // context.
+    SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
+                                                 DeclRefKind::Ordinary, Loc);
+  } else if (isArgumentList && Tok.is(tok::code_complete)) {
+    // Handle call arguments specially because it may need argument labels.
+    auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
+    if (this->CodeCompletionCallbacks)
+      this->CodeCompletionCallbacks->completeCallArg(CCExpr);
+    consumeIf(tok::code_complete);
+    elts.push_back({FieldNameLoc, FieldName, CCExpr});
+    Status.setHasCodeCompletionAndIsError();
+
+    if (Tok.isNot(rightTok, tok::eof, tok::comma)) {
+      // If we aren't at the end of the list yet and don't have a comma
+      // separating the code completion token from the next token, we are in a
+      // situation like the following:
+      // foo(#^COMPLETE^# argLabel: 1)
+      // `parseList` would stop here because the code completion token isn't
+      // followed by a comma and the parser status has an error. But we want to
+      // assume that the code completion expression and the next label are
+      // separate arguments. To do so, invoke `parseExprListElement` manually,
+      // which parses the next element. Afterwards, we go back to parsing in the
+      // `parseList` loop.
+      Status |= parseExprListElement(rightTok, isArgumentList, leftLoc, elts);
+    }
+
+    return Status;
+  } else {
+    auto ParsedSubExpr = parseExpr(diag::expected_expr_in_expr_list);
+    SubExpr = ParsedSubExpr.getPtrOrNull();
+    Status = ParsedSubExpr;
+  }
+
+  // If we got a subexpression, add it.
+  if (SubExpr)
+    elts.push_back({FieldNameLoc, FieldName, SubExpr});
+
+  return Status;
 }
 
 /// parseExprList - Parse a list of expressions.
@@ -3250,60 +3298,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                    rightTok == tok::r_paren ? diag::expected_rparen_expr_list
                                             : diag::expected_rsquare_expr_list,
                    [&] () -> ParserStatus {
-    Identifier FieldName;
-    SourceLoc FieldNameLoc;
-    parseOptionalArgumentLabel(FieldName, FieldNameLoc);
-
-    // See if we have an operator decl ref '(<op>)'. The operator token in
-    // this case lexes as a binary operator because it neither leads nor
-    // follows a proper subexpression.
-    auto isUnappliedOperator = [&]() {
-      return Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma);
-    };
-
-    if (isUnappliedOperator()) {
-      // Check to see if we have the start of a regex literal `/.../`. We need
-      // to do this for an unapplied operator reference, as e.g `(/, /)` might
-      // be a regex literal.
-      tryLexRegexLiteral(/*forUnappliedOperator*/ true);
-    }
-
-    ParserStatus Status;
-    Expr *SubExpr = nullptr;
-    if (isUnappliedOperator()) {
-      DeclNameLoc Loc;
-      auto OperName =
-          parseDeclNameRef(Loc, diag::expected_operator_ref,
-                           DeclNameFlag::AllowOperators |
-                               DeclNameFlag::AllowLowercaseAndUppercaseSelf);
-      if (!OperName) {
-        return makeParserError();
-      }
-      // Bypass local lookup. Use an 'Ordinary' reference kind so that the
-      // reference may resolve to any unary or binary operator based on
-      // context.
-      SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
-                                                   DeclRefKind::Ordinary, Loc);
-    } else if (isArgumentList && Tok.is(tok::code_complete)) {
-      // Handle call arguments specially because it may need argument labels.
-      auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
-      if (this->CodeCompletionCallbacks)
-        this->CodeCompletionCallbacks->completeCallArg(CCExpr,
-                                                       PreviousLoc == leftLoc);
-      consumeIf(tok::code_complete);
-      SubExpr = CCExpr;
-      Status.setHasCodeCompletionAndIsError();
-    } else {
-      auto ParsedSubExpr = parseExpr(diag::expected_expr_in_expr_list);
-      SubExpr = ParsedSubExpr.getPtrOrNull();
-      Status = ParsedSubExpr;
-    }
-
-    // If we got a subexpression, add it.
-    if (SubExpr)
-      elts.push_back({FieldNameLoc, FieldName, SubExpr});
-
-    return Status;
+    return parseExprListElement(rightTok, isArgumentList, leftLoc, elts);
   });
 }
 
@@ -3440,7 +3435,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
 /// expr-pound-codecompletion:
 ///   '#' code-completion-token
 ParserResult<Expr>
-Parser::parseExprPoundCodeCompletion(llvm::Optional<StmtKind> ParentKind) {
+Parser::parseExprPoundCodeCompletion(std::optional<StmtKind> ParentKind) {
   assert(Tok.is(tok::pound) && peekToken().is(tok::code_complete) &&
          Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc());
   consumeToken(); // '#' token.
@@ -3460,24 +3455,6 @@ Parser::parseExprPoundCodeCompletion(llvm::Optional<StmtKind> ParentKind) {
 ParserResult<Expr>
 Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   assert(Tok.isFollowingLParen() && "Not a call suffix?");
-
-  // If there is a code completion token right after the '(', do a special case
-  // callback.
-  if (peekToken().is(tok::code_complete) && CodeCompletionCallbacks) {
-    auto lParenLoc = consumeToken(tok::l_paren);
-    auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-    auto rParenLoc = Tok.getLoc();
-    auto *argList = ArgumentList::createParsed(
-        Context, lParenLoc, {Argument::unlabeled(CCE)}, rParenLoc,
-        /*trailingClosureIdx*/ llvm::None);
-    auto Result = makeParserResult(
-        fn, CallExpr::create(Context, fn.get(), argList, /*implicit*/ false));
-    CodeCompletionCallbacks->completePostfixExprParen(fn.get(), CCE);
-    // Eat the code completion token because we handled it.
-    consumeToken(tok::code_complete);
-    Result.setHasCodeCompletionAndIsError();
-    return Result;
-  }
 
   // Parse the argument list.
   auto argList = parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic);
@@ -3546,7 +3523,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   }
 
   ParserStatus Status;
-  llvm::Optional<bool> isDictionary;
+  std::optional<bool> isDictionary;
   SmallVector<Expr *, 8> ElementExprs;
   SmallVector<SourceLoc, 8> CommaLocs;
 
@@ -3623,10 +3600,10 @@ ParserResult<Expr> Parser::parseExprCollection() {
 
 /// parseExprCollectionElement - Parse an element for collection expr.
 ///
-/// If \p isDictionary is \c llvm::None, it's set to \c true if the element is
+/// If \p isDictionary is \c std::nullopt, it's set to \c true if the element is
 /// for dictionary literal, or \c false otherwise.
 ParserResult<Expr>
-Parser::parseExprCollectionElement(llvm::Optional<bool> &isDictionary) {
+Parser::parseExprCollectionElement(std::optional<bool> &isDictionary) {
   auto Element = parseExpr(isDictionary.has_value() && *isDictionary
                                ? diag::expected_key_in_dictionary_literal
                                : diag::expected_expr_in_collection_literal);
@@ -3737,7 +3714,7 @@ ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
 Parser::parsePlatformAgnosticVersionConstraintSpec() {
   SourceLoc PlatformAgnosticNameLoc;
   llvm::VersionTuple Version;
-  llvm::Optional<AvailabilitySpecKind> Kind;
+  std::optional<AvailabilitySpecKind> Kind;
   SourceRange VersionRange;
 
   if (Tok.isIdentifierOrUnderscore()) {
@@ -3797,7 +3774,7 @@ Parser::parsePlatformVersionConstraintSpec() {
     return nullptr;
   }
 
-  llvm::Optional<PlatformKind> Platform =
+  std::optional<PlatformKind> Platform =
       platformFromString(PlatformIdentifier.str());
 
   if (!Platform.has_value() || Platform.value() == PlatformKind::none) {

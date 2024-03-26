@@ -102,10 +102,10 @@ extension _SwiftStdlibVersion {
   @_alwaysEmitIntoClient
   public static var v5_10_0: Self { Self(_value: 0x050A00) }
   @_alwaysEmitIntoClient
-  public static var v5_11_0: Self { Self(_value: 0x050B00) }
+  public static var v6_0_0: Self { Self(_value: 0x060000) }
 
   @available(SwiftStdlib 5.7, *)
-  public static var current: Self { .v5_11_0 }
+  public static var current: Self { .v6_0_0 }
 }
 
 @available(SwiftStdlib 5.7, *)

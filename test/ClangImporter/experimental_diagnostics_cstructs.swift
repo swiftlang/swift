@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s 2>&1 | %FileCheck %s --strict-whitespace
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -diagnostic-style llvm 2>&1 | %FileCheck %s --strict-whitespace
 
 import ctypes
 

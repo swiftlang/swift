@@ -6,6 +6,11 @@ package enum SimpleShape {
   case Triangle(Size)
 }
 
+public enum PublicSimpleShape {
+  case pbKleinBottle
+  case pbTriangle(PublicSize)
+}
+
 // Fixed-layout enum with resilient members
 package enum Shape {
   case Point
@@ -17,6 +22,11 @@ package enum Shape {
 package enum FunnyShape {
   indirect case Parallelogram(Size)
   indirect case Trapezoid(Size)
+}
+
+public enum PublicFunnyShape {
+  indirect case Parallelogram(PublicSize)
+  indirect case Trapezoid(PublicSize)
 }
 
 package enum FullyFixedLayout {
@@ -52,6 +62,18 @@ package enum Medium {
 
   // Case with resilient payload
   case Postcard(Size)             // -2
+
+  // Empty cases
+  case Paper                      // 0
+  case Canvas                     // 1
+}
+
+public enum PublicMedium {
+  // Indirect case
+  indirect case Pamphlet(PublicMedium)  // -1
+
+  // Case with resilient payload
+  case Postcard(PublicSize)             // -2
 
   // Empty cases
   case Paper                      // 0

@@ -193,13 +193,13 @@ public:
   ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POTA,
                  ProgramTerminationFunctionInfo *PTFI);
 
-  llvm::Optional<ARCBBStateInfoHandle> getBottomUpBBHandle(SILBasicBlock *BB);
-  llvm::Optional<ARCBBStateInfoHandle> getTopDownBBHandle(SILBasicBlock *BB);
+  std::optional<ARCBBStateInfoHandle> getBottomUpBBHandle(SILBasicBlock *BB);
+  std::optional<ARCBBStateInfoHandle> getTopDownBBHandle(SILBasicBlock *BB);
 
   void clear();
 
 private:
-  llvm::Optional<unsigned> getBBID(SILBasicBlock *BB) const;
+  std::optional<unsigned> getBBID(SILBasicBlock *BB) const;
 };
 
 } // end swift namespace

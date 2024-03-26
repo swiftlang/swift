@@ -310,6 +310,14 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<BeginAccessInst>(Inst) || isa<EndAccessInst>(Inst))
     return true;
 
+  // The value form of zero init is not a user of any operand. The address
+  // form however is easily zappable because it's always a trivial store.
+  if (auto bi = dyn_cast<BuiltinInst>(Inst)) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+      return true;
+    }
+  }
+
   // If Inst does not read or write to memory, have side effects, and is not a
   // terminator, we can zap it.
   if (!Inst->mayHaveSideEffects() && !Inst->mayReadFromMemory() &&
@@ -724,7 +732,8 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   assert(!Stores.empty());
   SILValue StVal = Stores.front()->getSrc();
 
-  SSAUp.initialize(StVal->getType(), StVal->getOwnershipKind());
+  SSAUp.initialize(StVal->getFunction(), StVal->getType(),
+                   StVal->getOwnershipKind());
 
   for (auto *Store : Stores)
     SSAUp.addAvailableValue(Store->getParent(), Store->getSrc());

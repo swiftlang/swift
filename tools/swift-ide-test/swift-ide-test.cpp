@@ -407,17 +407,6 @@ static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     llvm::cl::desc(
         "Include initializers when completing a postfix expression"),
     llvm::cl::cat(Category));
-static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
-    "code-complete-call-pattern-heuristics",
-    llvm::cl::desc(
-        "Use heuristics to guess whether we want call pattern completions"),
-    llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-EnableSwift3ObjCInference("enable-swift3-objc-inference",
-    llvm::cl::desc("Enable Swift 3's @objc inference rules"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
@@ -710,12 +699,6 @@ SkipDocumentationComments("skip-print-doc-comments",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-PrintRegularComments("print-regular-comments",
-    llvm::cl::desc("Print regular comments from clang module headers"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 PrintOriginalSourceText("print-original-source",
     llvm::cl::desc("print the original source text for applicable declarations"),
     llvm::cl::cat(Category),
@@ -897,8 +880,8 @@ struct CompletionTestToken {
   SmallVector<StringRef, 1> CheckPrefixes;
   StringRef Skip;
   StringRef Xfail;
-  llvm::Optional<bool> IncludeKeywords = llvm::None;
-  llvm::Optional<bool> IncludeComments = llvm::None;
+  std::optional<bool> IncludeKeywords = std::nullopt;
+  std::optional<bool> IncludeComments = std::nullopt;
 
   CompletionTestToken(unsigned Line, unsigned Column, unsigned Offset)
       : Line(Line), Column(Column), Offset(Offset){};
@@ -1383,9 +1366,17 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
   if (names.empty())
     return;
 
+  SmallVector<NullTerminatedStringRef, 2> sortedNames;
+  sortedNames.append(names.begin(), names.end());
+  llvm::sort(sortedNames,
+     [](NullTerminatedStringRef a, NullTerminatedStringRef b) {
+        return a.compare(b) <= 0;
+  });
+
   OS << "LookedupTypeNames: [";
   llvm::interleave(
-      names.begin(), names.end(), [&](auto name) { OS << "'" << name << "'"; },
+      sortedNames.begin(), sortedNames.end(),
+      [&](auto name) { OS << "'" << name << "'"; },
       [&]() { OS << ", "; });
   OS << "]\n";
 }
@@ -1414,7 +1405,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionComments,
                  bool CodeCompletionAnnotateResults,
                  bool CodeCompletionAddInitsToTopLevel,
-                 bool CodeCompletionCallPatternHeuristics,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
                  bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
@@ -1426,7 +1416,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-  CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
   CompletionContext.setAddCallWithNoDefaultArgs(
       CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -1457,7 +1446,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
-                                 bool CodeCompletionCallPatternHeuristics,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
@@ -1494,7 +1482,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     // If `-code-completion-token` is specified, test only that token.
     // TODO: Multiple tokens.
     StringRef TargetTokName = options::CodeCompletionToken;
-    llvm::Optional<CompletionTestToken> FoundTok;
+    std::optional<CompletionTestToken> FoundTok;
     for (auto Tok : CCTokens) {
       if (Tok.Name == TargetTokName) {
         FoundTok = Tok;
@@ -1586,8 +1574,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     ide::CodeCompletionContext CompletionContext(CompletionCache);
     CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-    CompletionContext.setCallPatternHeuristics(
-        CodeCompletionCallPatternHeuristics);
     CompletionContext.setAddCallWithNoDefaultArgs(
         CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -1678,7 +1664,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
       int result =
           llvm::sys::ExecuteAndWait(options::FileCheckPath, FileCheckArgs,
-                                    /*Env=*/llvm::None,
+                                    /*Env=*/std::nullopt,
                                     /*Redirects=*/{},
                                     /*SecondsToWait=*/0,
                                     /*MemoryLimit=*/0,
@@ -1774,7 +1760,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
                                ctx, importInfo);
   auto *SF =
-      new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ llvm::None);
+      new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ std::nullopt);
   M->addFile(*SF);
   performImportResolution(*SF);
 
@@ -1854,7 +1840,7 @@ public:
     const char *LocPtr = getPtr(Node.Range.getStart());
     if (Node.Kind == SyntaxNodeKind::CommentLine && !TerminalOutput) {
       // Ignore CHECK lines.
-      if (StringRef(LocPtr, BufEnd - LocPtr).startswith("// CHECK"))
+      if (StringRef(LocPtr, BufEnd - LocPtr).starts_with("// CHECK"))
         return true;
     }
     return false;
@@ -2800,7 +2786,7 @@ public:
   using StreamPrinter::StreamPrinter;
 
   void printDeclPre(const Decl *D,
-                    llvm::Optional<BracketOptions> Bracket) override {
+                    std::optional<BracketOptions> Bracket) override {
     StringRef HasDefault = "";
     if (isa<ProtocolDecl>(D)) {
       InProtocol = true;
@@ -2826,7 +2812,7 @@ public:
     OS << "</loc>";
   }
   void printDeclPost(const Decl *D,
-                     llvm::Optional<BracketOptions> Bracket) override {
+                     std::optional<BracketOptions> Bracket) override {
     if (isa<ProtocolDecl>(D)) {
       InProtocol = false;
     }
@@ -2834,16 +2820,17 @@ public:
   }
   void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
     if (D)
-      printDeclPre(D, llvm::None);
+      printDeclPre(D, std::nullopt);
   }
   void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
     if (D)
-      printDeclPost(D, llvm::None);
+      printDeclPost(D, std::nullopt);
   }
 
-  void printSynthesizedExtensionPre(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     if (Bracket.has_value() && !Bracket.value().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
@@ -2851,7 +2838,7 @@ public:
 
   void printSynthesizedExtensionPost(
       const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+      std::optional<BracketOptions> Bracket) override {
     if (Bracket.has_value() && !Bracket.value().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";
@@ -3412,6 +3399,9 @@ public:
       case AccessorKind::Get:
         OS << "<getter for ";
         break;
+      case AccessorKind::DistributedGet:
+        OS << "<_distributed_getter for ";
+        break;
       case AccessorKind::Set:
         OS << "<setter for ";
         break;
@@ -3759,7 +3749,11 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
     llvm::errs() << "Cannot find sema token at the given location.\n";
     return 1;
   }
-  if (SemaT->getType().isNull()) {
+  Type Ty = SemaT->getSolutionSpecificInterfaceType();
+  if (Ty.isNull()) {
+    Ty = SemaT->getValueD()->getInterfaceType();
+  }
+  if (Ty.isNull()) {
     llvm::errs() << "Cannot get type of the sema token.\n";
     return 1;
   }
@@ -3767,8 +3761,8 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   std::string Error;
   std::string TypeName;
   if (printTypeInterface(
-          SemaT->getValueD()->getDeclContext()->getParentModule(),
-          SemaT->getType(), Printer, TypeName, Error)) {
+          SemaT->getValueD()->getDeclContext()->getParentModule(), Ty, Printer,
+          TypeName, Error)) {
     llvm::errs() << Error;
     return 1;
   }
@@ -4271,7 +4265,7 @@ int main(int argc, char *argv[]) {
   ArrayRef<const char *> CCArgs;
   for (int i = 1; i < argc; ++i) {
     if (StringRef(argv[i]) == "--cc-args") {
-      CCArgs = llvm::makeArrayRef(argv+i+1, argc-i-1);
+      CCArgs = llvm::ArrayRef(argv + i + 1, argc - i - 1);
       argc = i;
     }
   }
@@ -4407,6 +4401,12 @@ int main(int argc, char *argv[]) {
     if (options::CxxInteropVersion == "upcoming-swift")
       InitInvok.getLangOptions().cxxInteropCompatVersion =
           version::Version({version::getUpcomingCxxInteropCompatVersion()});
+    else if (options::CxxInteropVersion == "swift-6")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({6});
+    else if (options::CxxInteropVersion == "swift-5.9")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({5, 9});
     else
       llvm::errs() << "invalid CxxInteropVersion\n";
   }
@@ -4494,8 +4494,6 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().EnableDeserializationSafety =
     options::EnableDeserializationSafety;
-  InitInvok.getLangOptions().EnableSwift3ObjCInference =
-    options::EnableSwift3ObjCInference;
   // The manner in which swift-ide-test constructs its CompilerInvocation does
   // not hit the codepath in arg parsing that would normally construct
   // ClangImporter options based on enabled language features etc. Explicitly
@@ -4602,7 +4600,6 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintAccess = options::PrintAccess;
     PrintOpts.AccessFilter = options::AccessFilter;
     PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
-    PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
     PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
     PrintOpts.SkipUnsafeCXXMethods = options::SkipUnsafeCXXMethods;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
@@ -4648,7 +4645,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;
@@ -4664,7 +4660,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;
@@ -4759,7 +4754,7 @@ int main(int argc, char *argv[]) {
       ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
     else {
       if (options::NoEmptyLineBetweenMembers.getNumOccurrences() > 0)
-        PrintOpts.EmptyLineBetweenMembers = !options::NoEmptyLineBetweenMembers;
+        PrintOpts.EmptyLineBetweenDecls = !options::NoEmptyLineBetweenMembers;
       ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,

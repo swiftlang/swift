@@ -17,7 +17,7 @@ import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacroExpansion
+@_spi(ExperimentalLanguageFeature) @_spi(Compiler) import SwiftSyntaxMacroExpansion
 @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
 /// Describes a macro that has been "exported" to the C++ part of the
@@ -179,6 +179,53 @@ fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
   return stringSegment.content.text
 }
 
+/// Checks if the macro expression used as an default argument has any issues.
+///
+/// - Returns: `true` if all restrictions are satisfied, `false` if diagnostics
+/// are emitted.
+@_cdecl("swift_ASTGen_checkDefaultArgumentMacroExpression")
+func checkDefaultArgumentMacroExpression(
+  diagEnginePtr: UnsafeMutableRawPointer,
+  sourceFilePtr: UnsafeRawPointer,
+  macroLocationPtr: UnsafePointer<UInt8>
+) -> Bool {
+  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+
+  // Find the macro expression.
+  guard
+    let macroExpr = findSyntaxNodeInSourceFile(
+      sourceFilePtr: sourceFilePtr,
+      sourceLocationPtr: macroLocationPtr,
+      type: MacroExpansionExprSyntax.self
+    )
+  else {
+    // FIXME: Produce an error
+    return false
+  }
+
+  do {
+    try macroExpr.checkDefaultArgumentMacroExpression()
+    return true
+  } catch let errDiags as DiagnosticsError {
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(sourceFilePtr)
+    for diag in errDiags.diagnostics {
+      srcMgr.diagnose(diagnostic: diag)
+    }
+    return false
+  } catch let error {
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(sourceFilePtr)
+    srcMgr.diagnose(
+      diagnostic: .init(
+        node: macroExpr,
+        message: ASTGenMacroDiagnostic.thrownError(error)
+      )
+    )
+    return false
+  }
+}
+
 /// Check a macro definition, producing a description of that macro definition
 /// for use in macro expansion.
 ///
@@ -200,7 +247,9 @@ func checkMacroDefinition(
   macroLocationPtr: UnsafePointer<UInt8>,
   externalMacroOutPtr: UnsafeMutablePointer<BridgedStringRef>,
   replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
-  numReplacementsPtr: UnsafeMutablePointer<Int>
+  numReplacementsPtr: UnsafeMutablePointer<Int>,
+  genericReplacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
+  numGenericReplacementsPtr: UnsafeMutablePointer<Int>
 ) -> Int {
   // Assert "out" parameters are initialized.
   assert(externalMacroOutPtr.pointee.isEmptyInitialized)
@@ -230,6 +279,9 @@ func checkMacroDefinition(
         switch type {
         case "ExternalMacro":
           return Int(BridgedMacroDefinitionKind.builtinExternalMacro.rawValue)
+
+        case "IsolationMacro":
+          return Int(BridgedMacroDefinitionKind.builtinIsolationMacro.rawValue)
 
         // These builtins don't exist, but are put into the standard library at
         // least for documentation purposes right now. Don't emit a warning for
@@ -290,7 +342,7 @@ func checkMacroDefinition(
       )
       return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
-    case let .expansion(expansionSyntax, replacements: _)
+    case let .expansion(expansionSyntax, replacements: _, genericReplacements: _)
     where expansionSyntax.macroName.text == "externalMacro":
       // Extract the identifier from the "module" argument.
       guard let firstArg = expansionSyntax.arguments.first,
@@ -331,13 +383,15 @@ func checkMacroDefinition(
         allocateBridgedString("\(module).\(type)")
       return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
-    case let .expansion(expansionSyntax, replacements: replacements):
+    case let .expansion(expansionSyntax,
+      replacements: replacements, genericReplacements: genericReplacements):
       // Provide the expansion syntax.
       externalMacroOutPtr.pointee =
         allocateBridgedString(expansionSyntax.trimmedDescription)
 
       // If there are no replacements, we're done.
-      if replacements.isEmpty {
+      let totalReplacementsCount = replacements.count + genericReplacements.count
+      guard totalReplacementsCount > 0 else {
         return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
       }
 
@@ -352,10 +406,29 @@ func checkMacroDefinition(
           replacement.reference.endPositionBeforeTrailingTrivia.utf8Offset - expansionStart
         replacementBuffer[index * 3 + 2] = replacement.parameterIndex
       }
-
       replacementsPtr.pointee = replacementBuffer.baseAddress
       numReplacementsPtr.pointee = replacements.count
+
+      // The replacements are triples: (startOffset, endOffset, parameter index).
+      let genericReplacementBuffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 3 * genericReplacements.count)
+      for (index, genericReplacement) in genericReplacements.enumerated() {
+        let expansionStart = expansionSyntax.positionAfterSkippingLeadingTrivia.utf8Offset
+
+        genericReplacementBuffer[index * 3] =
+          genericReplacement.reference.positionAfterSkippingLeadingTrivia.utf8Offset - expansionStart
+        genericReplacementBuffer[index * 3 + 1] =
+          genericReplacement.reference.endPositionBeforeTrailingTrivia.utf8Offset - expansionStart
+        genericReplacementBuffer[index * 3 + 2] =
+          genericReplacement.parameterIndex
+      }
+      genericReplacementsPtr.pointee = genericReplacementBuffer.baseAddress
+      numGenericReplacementsPtr.pointee = genericReplacements.count
+
       return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
   } catch let errDiags as DiagnosticsError {
     let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
@@ -390,7 +463,7 @@ func makeExpansionOutputResult(
   expandedSource: String?,
   outputPointer: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
-  guard var expandedSource = expandedSource else {
+  guard let expandedSource = expandedSource else {
     outputPointer.pointee = BridgedStringRef()
     return -1
   }
@@ -498,6 +571,9 @@ func expandFreestandingMacroIPC(
   case .expression: pluginMacroRole = .expression
   case .declaration: pluginMacroRole = .declaration
   case .codeItem: pluginMacroRole = .codeItem
+#if RESILIENT_SWIFT_SYNTAX
+  @unknown default: fatalError()
+#endif
   }
 
   // Send the message.
@@ -505,7 +581,8 @@ func expandFreestandingMacroIPC(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     macroRole: pluginMacroRole,
     discriminator: discriminator,
-    syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!
+    syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!,
+    lexicalContext: pluginLexicalContext(of: expansionSyntax)
   )
   do {
     let result = try macro.plugin.sendMessageAndWait(message)
@@ -561,10 +638,11 @@ func expandFreestandingMacroInProcess(
   sourceManager.insert(sourceFilePtr)
 
   let context = sourceManager.createMacroExpansionContext(
+    lexicalContext: lexicalContext(of: expansionSyntax),
     discriminator: discriminator
   )
 
-  let macroName = expansionSyntax.macro.text
+  let macroName = expansionSyntax.macroName.text
 
   // Make sure we emit all of the diagnostics from the context.
   defer {
@@ -754,6 +832,20 @@ func expandAttachedMacro(
   )
 }
 
+/// Produce the full lexical context of the given node to pass along to
+/// macro expansion.
+private func lexicalContext(of node: some SyntaxProtocol) -> [Syntax] {
+  // FIXME: Should we query the source manager to get the macro expansion
+  // information?
+  node.allMacroLexicalContexts()
+}
+
+/// Produce the full lexical context of the given node to pass along to
+/// macro expansion.
+private func pluginLexicalContext(of node: some SyntaxProtocol) -> [PluginMessage.Syntax] {
+  lexicalContext(of: node).compactMap { .init(syntax: $0) }
+}
+
 func expandAttachedMacroIPC(
   diagEnginePtr: UnsafeMutableRawPointer,
   macroPtr: UnsafeRawPointer,
@@ -787,6 +879,11 @@ func expandAttachedMacroIPC(
     .declaration,
     .codeItem:
     preconditionFailure("unhandled macro role for attached macro")
+
+#if RESILIENT_SWIFT_SYNTAX
+  @unknown default:
+    fatalError()
+#endif
   }
 
   // Prepare syntax nodes to transfer.
@@ -826,6 +923,7 @@ func expandAttachedMacroIPC(
     conformanceListSyntax = .init(syntax: Syntax(placeholderDecl))!
   }
 
+
   // Send the message.
   let message = HostToPluginMessage.expandAttachedMacro(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
@@ -835,7 +933,8 @@ func expandAttachedMacroIPC(
     declSyntax: declSyntax,
     parentDeclSyntax: parentDeclSyntax,
     extendedTypeSyntax: extendedTypeSyntax,
-    conformanceListSyntax: conformanceListSyntax
+    conformanceListSyntax: conformanceListSyntax,
+    lexicalContext: pluginLexicalContext(of: declarationNode)
   )
   do {
     let expandedSource: String?
@@ -923,6 +1022,7 @@ func expandAttachedMacroInProcess(
 
   // Create an expansion context
   let context = sourceManager.createMacroExpansionContext(
+    lexicalContext: lexicalContext(of: declarationNode),
     discriminator: discriminator
   )
 
@@ -987,6 +1087,10 @@ fileprivate extension SyntaxProtocol {
       formatted = self.formatted()
     case .disabled:
       formatted = Syntax(self)
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     return formatted.trimmedDescription(matching: { $0.isWhitespace })
   }

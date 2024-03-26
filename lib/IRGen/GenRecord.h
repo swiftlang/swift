@@ -124,8 +124,8 @@ private:
   const unsigned NumFields;
   const unsigned AreFieldsABIAccessible : 1;
 
-  mutable llvm::Optional<const FieldImpl *> ExtraInhabitantProvidingField;
-  mutable llvm::Optional<bool> MayHaveExtraInhabitants;
+  mutable std::optional<const FieldImpl *> ExtraInhabitantProvidingField;
+  mutable std::optional<bool> MayHaveExtraInhabitants;
 
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
@@ -487,12 +487,10 @@ public:
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     for (auto &field : getFields()) {
-      if (field.isEmpty())
-        continue;
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
-    collector.collectTypeMetadataForLayout(T);
+    collector.collectTypeMetadata(T);
   }
 };
 

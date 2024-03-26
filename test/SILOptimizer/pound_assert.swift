@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 //===----------------------------------------------------------------------===//
 // Basic function calls and control flow
@@ -43,10 +44,8 @@ func loops2(a: Int) -> Int {
 }
 
 func infiniteLoop() -> Int {
-  // expected-note @+2 {{condition always evaluates to true}}
   // expected-note @+1 {{found loop here}}
   while true {}
-  // expected-warning @+1 {{will never be executed}}
   return 1
 }
 

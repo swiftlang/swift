@@ -12,28 +12,14 @@
 
 #define DEBUG_TYPE "sil-memory-locations"
 #include "swift/SIL/MemoryLocations.h"
+#include "swift/Basic/SmallBitVector.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
-
-/// Debug dump a location bit vector.
-void swift::printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits) {
-  const char *separator = "";
-  OS << '[';
-  for (int idx = bits.find_first(); idx >= 0; idx = bits.find_next(idx)) {
-    OS << separator << idx;
-    separator = ",";
-  }
-  OS << ']';
-}
-
-void swift::dumpBits(const SmallBitVector &bits) {
-  llvm::dbgs() << bits << '\n';
-}
 
 namespace swift {
 namespace {

@@ -556,6 +556,12 @@ def create_argument_parser():
            help='the maximum number of parallel dsymutil jobs to use when '
                 'extracting symbols. Tweak with caution, since dsymutil '
                 'is memory intensive.')
+    option('--extra-dsymutil-args', append,
+           type=argparse.ShellSplitType(),
+           help='Pass through extra options to dsymutil when extracting '
+                'symbols, in the form of comma separated options '
+                'like "--verbose,--verify-dwarf=none". Can '
+                'be called multiple times to add multiple such options.')
 
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
@@ -571,6 +577,9 @@ def create_argument_parser():
            default='-sv',
            metavar='LITARGS',
            help='lit args to use when testing')
+
+    option('--color-in-tests', toggle_true, default=True,
+           help='Enable color output in lit tests')
 
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
@@ -750,6 +759,8 @@ def create_argument_parser():
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
+    option(['--wasmkit'], toggle_true('build_wasmkit'),
+           help='build WasmKit')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1088,6 +1099,10 @@ def create_argument_parser():
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
 
+    option('--build-swift-clang-overlays', toggle_true,
+           default=True,
+           help='Build Swift overlays for the clang builtin modules')
+
     option('--build-swift-remote-mirror', toggle_true,
            default=True,
            help='Build Remote Mirror')
@@ -1334,6 +1349,10 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift distributed actors.')
 
+    option('--enable-experimental-nonescapable-types', toggle_true,
+           default=False,
+           help='Enable experimental NonescapableTypes.')
+
     option('--enable-experimental-string-processing', toggle_true,
            default=True,
            help='Enable experimental Swift string processing.')
@@ -1341,6 +1360,10 @@ def create_argument_parser():
     option('--enable-experimental-observation', toggle_true,
            default=True,
            help='Enable experimental Swift observation.')
+
+    option('--enable-synchronization', toggle_true,
+           default=True,
+           help='Enable Swift Synchronization.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

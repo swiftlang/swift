@@ -331,10 +331,10 @@ class FindBorrowScopeUses {
 public:
   FindBorrowScopeUses(CanonicalizeBorrowScope &scope) : scope(scope) {}
 
-  llvm::Optional<OuterUsers> findUses() && {
+  std::optional<OuterUsers> findUses() && {
     scope.beginVisitBorrowScopeUses();
     if (!scope.visitBorrowScopeUses(scope.getBorrowedValue().value, *this))
-      return llvm::None;
+      return std::nullopt;
 
     return std::move(useInsts);
   }
@@ -352,9 +352,6 @@ public:
       // For borrows, record the scope-ending instructions to outer use
       // points. Note: The logic in filterOuterBorrowUseInsts that checks
       // whether a borrow scope is an outer use must visit the same set of uses.
-      //
-      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
-      // borrows are disallowed.
       if (!borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
         auto *endInst = endBorrow->getUser();
         if (!isUserInLiveOutBlock(endInst)) {
@@ -362,7 +359,8 @@ public:
         }
         return true;
       })) {
-        useInsts.insert(user);
+        // Bail out on dead borrow scopes and scopes with unknown uses.
+        return false;
       }
     }
     return true;
@@ -781,7 +779,7 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
 
     // Gather all potential outer uses before rewriting any to avoid scanning
     // any basic block more than once.
-    llvm::Optional<OuterUsers> outerUsers =
+    std::optional<OuterUsers> outerUsers =
         FindBorrowScopeUses(*this).findUses();
     if (!outerUsers)
       return false;

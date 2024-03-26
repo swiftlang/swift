@@ -376,6 +376,11 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 }
 
 - (NSUInteger)hash {
+  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+    // Legacy behavior: Don't proxy to Swift Hashable
+    return (NSUInteger)self;
+  }
+
   auto selfMetadata = _swift_getClassOfAllocated(self);
 
   // If it's Hashable, use that
@@ -423,6 +428,11 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
   if (self == other) {
     return YES;
   }
+  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+    // Legacy behavior: Don't proxy to Swift Hashable or Equatable
+    return NO; // We know the ids are different
+  }
+
 
   // Get Swift type for self and other
   auto selfMetadata = _swift_getClassOfAllocated(self);
@@ -1171,22 +1181,6 @@ swift_dynamicCastObjCClassImpl(const void *object,
   if (object == nullptr)
     return nullptr;
 
-  if ([id_const_cast(object) isKindOfClass:[__SwiftValue class]]) {
-    // Source is a `__SwiftValue` container
-    // Unwrap, then use the most general casting machine to do the heavy lifting
-    auto typeValue = getValueFromSwiftValue(reinterpret_cast<__SwiftValue *>(object));
-    const void *result = nullptr;
-    if (swift_dynamicCast(reinterpret_cast<OpaqueValue *>(&result),
-			  const_cast<OpaqueValue *>(typeValue.second),
-			  typeValue.first,
-			  targetType,
-			  DynamicCastFlags::TakeOnSuccess)) {
-      return result;
-    } else {
-      return nullptr;
-    }
-  }
-
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
   }
@@ -1350,15 +1344,6 @@ id swift_dynamicCastObjCProtocolUnconditional(id object,
                                               Protocol * const *protocols,
                                               const char *filename,
                                               unsigned line, unsigned column) {
-  if (numProtocols == 0) {
-    return object;
-  }
-  if (object_isClass(object)) {
-    // ObjC classes never conform to protocols
-    Class sourceType = object_getClass(object);
-    swift_dynamicCastFailure(sourceType, class_getName(sourceType),
-	                     protocols[0], protocol_getName(protocols[0]));
-  }
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       Class sourceType = object_getClass(object);
@@ -1379,10 +1364,6 @@ id swift_dynamicCastObjCProtocolConditional(id object,
       // SwiftValue wrapper never holds a class object
       return nil;
     }
-  }
-  if (object_isClass(object)) {
-    // ObjC classes never conform to protocols
-    return nil;
   }
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {

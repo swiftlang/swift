@@ -49,7 +49,11 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
   }
 #endif
+#if $TypedThrows
   return source.map { $0 as! TargetElement }
+#else
+  return try! source.__rethrows_map { $0 as! TargetElement }
+#endif
 }
 
 /// Called by the casting machinery.

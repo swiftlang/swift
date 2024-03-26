@@ -3,6 +3,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 struct FileDescriptor: ~Copyable {
   var fd: Builtin.Int64

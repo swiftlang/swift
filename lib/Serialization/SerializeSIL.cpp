@@ -53,6 +53,7 @@ static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   case StringLiteralInst::Encoding::Bytes: return SIL_BYTES;
   case StringLiteralInst::Encoding::UTF8: return SIL_UTF8;
   case StringLiteralInst::Encoding::ObjCSelector: return SIL_OBJC_SELECTOR;
+  case StringLiteralInst::Encoding::UTF8_OSLOG: return SIL_UTF8_OSLOG;
   }
   llvm_unreachable("bad string encoding");
 }
@@ -61,10 +62,13 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return SIL_LINKAGE_PUBLIC;
   case SILLinkage::PublicNonABI: return SIL_LINKAGE_PUBLIC_NON_ABI;
+  case SILLinkage::Package: return SIL_LINKAGE_PACKAGE;
+  case SILLinkage::PackageNonABI: return SIL_LINKAGE_PACKAGE_NON_ABI;
   case SILLinkage::Hidden: return SIL_LINKAGE_HIDDEN;
   case SILLinkage::Shared: return SIL_LINKAGE_SHARED;
   case SILLinkage::Private: return SIL_LINKAGE_PRIVATE;
   case SILLinkage::PublicExternal: return SIL_LINKAGE_PUBLIC_EXTERNAL;
+  case SILLinkage::PackageExternal: return SIL_LINKAGE_PACKAGE_EXTERNAL;
   case SILLinkage::HiddenExternal: return SIL_LINKAGE_HIDDEN_EXTERNAL;
   }
   llvm_unreachable("bad linkage");
@@ -498,7 +502,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       numAttrs++;
     });
 
-  llvm::Optional<llvm::VersionTuple> available;
+  std::optional<llvm::VersionTuple> available;
   auto availability = F.getAvailabilityForLinkage();
   if (!availability.isAlwaysAvailable()) {
     available = availability.getOSVersion().getLowerEndpoint();
@@ -935,7 +939,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // sense to write those instructions at all.
     // TODO: decide if we want to serialize those instructions.
     return;
-  case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::SpecifyTestInst:
     // Instruction exists only for tests.  Ignore it.
     return;
   case SILInstructionKind::AllocPackMetadataInst:
@@ -1059,7 +1063,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned flags = 0;
     flags |= unsigned(ABI->hasDynamicLifetime());
     flags |= unsigned(ABI->emitReflectionMetadata()) << 1;
-    flags |= unsigned(ABI->getUsesMoveableValueDebugInfo()) << 2;
+    flags |= unsigned(ABI->usesMoveableValueDebugInfo()) << 2;
     flags |= unsigned(ABI->hasPointerEscape()) << 3;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
@@ -1105,7 +1109,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attr = 0;
     attr |= unsigned(ASI->hasDynamicLifetime());
     attr |= unsigned(ASI->isLexical()) << 1;
-    attr |= unsigned(ASI->getUsesMoveableValueDebugInfo()) << 2;
+    attr |= unsigned(ASI->isFromVarDecl()) << 2;
+    attr |= unsigned(ASI->usesMoveableValueDebugInfo()) << 3;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }
@@ -1543,6 +1548,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:
@@ -1573,7 +1579,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
       Attr = unsigned(BBI->isLexical()) |
              (unsigned(BBI->hasPointerEscape() << 1)) |
-             (unsigned(BBI->isFromVarDecl() << 2));
+             (unsigned(BBI->isFromVarDecl() << 2)) |
+             (unsigned(BBI->isFixed() << 3));
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
       Attr = unsigned(MVI->getAllowDiagnostics()) |
              (unsigned(MVI->isLexical() << 1)) |
@@ -1581,6 +1588,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              (unsigned(MVI->isFromVarDecl() << 3));
     } else if (auto *I = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
+      assert(Attr < (1 << 3));
+      Attr |= unsigned(I->isStrict()) << 3;
     } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {
       Attr = unsigned(I->getKind());
     } else if (auto *I = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(&SI)) {
@@ -1690,7 +1699,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const MarkDependenceInst *MDI = cast<MarkDependenceInst>(&SI);
       operand = MDI->getValue();
       operand2 = MDI->getBase();
-      Attr = (MDI->isNonEscaping() ? 1 : 0);
+      Attr = unsigned(MDI->dependenceKind());
     } else {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();
@@ -2037,7 +2046,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
         (unsigned)CI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
@@ -2055,7 +2064,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
         (unsigned)CI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
@@ -2073,7 +2082,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
         (unsigned)CI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
 
@@ -2553,7 +2562,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), ownershipField,
         S.addTypeRef(CBI->getTargetLoweredType().getRawASTType()),
         (unsigned)CBI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
@@ -2574,7 +2583,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CBI->getTargetLoweredType().getRawASTType()),
         (unsigned)CBI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::InitBlockStorageHeaderInst: {
@@ -2880,7 +2889,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
   // Do not emit vtables for non-public classes unless everything has to be
   // serialized.
   if (!ShouldSerializeAll &&
-      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
+      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Package)
     return;
 
   if (vt.isSpecialized())
@@ -2924,7 +2933,7 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
   // Do not emit deinit for non-public nominal types unless everything has to be
   // serialized.
   if (!ShouldSerializeAll && deinit.getNominalDecl()->getEffectiveAccess() <
-                                 swift::AccessLevel::Public)
+                                 swift::AccessLevel::Package)
     return;
 
   SILFunction *impl = deinit.getImplementation();

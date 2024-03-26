@@ -290,21 +290,27 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
 
-    // Type-check macro-generated or implicitly-synthesized extensions.
+    // Type-check macro-generated or implicitly-synthesized decls.
     if (auto *synthesizedSF = SF->getSynthesizedFile()) {
       for (auto *decl : synthesizedSF->getTopLevelDecls()) {
-        auto extension = cast<ExtensionDecl>(decl);
+        assert(isa<ExtensionDecl>(decl) || isa<ProtocolDecl>(decl));
 
-        // Limit typechecking of synthesized _impicit_ extensions to conformance
-        // checking. This is done because a conditional conformance to Copyable
-        // is synthesized as an extension, based on the markings of `~Copyable`
-        // in a value type. This call to `checkConformancesInContext` will
-        // the actual check to verify that the conditional extension is correct,
-        // as it may be an invalid conformance.
-        if (extension->isImplicit())
-          TypeChecker::checkConformancesInContext(extension);
-        else
-          TypeChecker::typeCheckDecl(extension);
+        // Limit typechecking of synthesized _implicit_ extensions to
+        // conformance checking. This is done because a conditional
+        // conformance to Copyable is synthesized as an extension, based on
+        // the markings of ~Copyable in a value type. This call to
+        // checkConformancesInContext will the actual check to verify that
+        // the conditional extension is correct, as it may be an invalid
+        // conformance.
+        if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+          if (extension->isImplicit()) {
+            TypeChecker::checkConformancesInContext(extension);
+            continue;
+          }
+        }
+
+        // For other kinds of decls, do normal typechecking.
+        TypeChecker::typeCheckDecl(decl);
       }
     }
     SF->typeCheckDelayedFunctions();
@@ -366,6 +372,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
@@ -412,6 +419,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   };
 
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
@@ -441,14 +449,14 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
                                   GenericSignature GenericSig,
                                   SILTypeResolutionContext *SILContext,
                                   DeclContext *DC, bool ProduceDiagnostics) {
-  TypeResolutionOptions options = llvm::None;
+  TypeResolutionOptions options = std::nullopt;
   if (SILContext) {
     options |= TypeResolutionFlags::SILMode;
     if (SILContext->IsSILType)
       options |= TypeResolutionFlags::SILType;
   }
 
-  llvm::Optional<DiagnosticSuppression> suppression;
+  std::optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
@@ -481,14 +489,14 @@ namespace {
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(declRefTR->getBaseComponent())) {
-        auto name = identBase->getNameRef().getBaseIdentifier();
-        if (auto *paramDecl = params->lookUpGenericParam(name))
-          identBase->setValue(paramDecl, dc);
+      // Only unqualified identifiers can reference generic parameters.
+      auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(T);
+      if (unqualIdentTR && !unqualIdentTR->hasGenericArgList()) {
+        auto name = unqualIdentTR->getNameRef().getBaseIdentifier();
+        if (auto *paramDecl = params->lookUpGenericParam(name)) {
+          unqualIdentTR->setValue(paramDecl, dc);
+        }
       }
-    }
 
       return Action::Continue();
     }
@@ -498,7 +506,7 @@ namespace {
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature
 swift::handleSILGenericParams(GenericParamList *genericParams,
-                              DeclContext *DC) {
+                              DeclContext *DC, bool allowInverses) {
   if (genericParams == nullptr)
     return nullptr;
 
@@ -523,7 +531,9 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
   auto request = InferredGenericSignatureRequest{
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
-      {}, {}, /*allowConcreteGenericParams=*/true};
+      {}, {}, genericParams->getLAngleLoc(),
+      /*isExtension=*/false,
+      allowInverses};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }
@@ -571,7 +581,7 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
 
   StringRef Str = Name.getIdentifier().str();
   for (auto forbiddenPrefix : C.TypeCheckerOpts.DebugForbidTypecheckPrefixes) {
-    if (Str.startswith(forbiddenPrefix)) {
+    if (Str.starts_with(forbiddenPrefix)) {
       llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
     }
   }
@@ -593,7 +603,7 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 
 bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
-                                   llvm::Optional<TypeResolutionStage> stage) {
+                                   std::optional<TypeResolutionStage> stage) {
   if (stage)
     type = dc->mapTypeIntoContext(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
@@ -608,8 +618,8 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
 }
 
 bool TypeChecker::diagnoseInvalidFunctionType(
-    FunctionType *fnTy, SourceLoc loc, llvm::Optional<FunctionTypeRepr *> repr,
-    DeclContext *dc, llvm::Optional<TypeResolutionStage> stage) {
+    FunctionType *fnTy, SourceLoc loc, std::optional<FunctionTypeRepr *> repr,
+    DeclContext *dc, std::optional<TypeResolutionStage> stage) {
   // Some of the below checks trigger cycles if we don't have a generic
   // signature yet; we'll run the checks again in
   // TypeResolutionStage::Interface.

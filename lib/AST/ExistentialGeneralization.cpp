@@ -56,7 +56,8 @@ public:
     // Finish the signature.
     auto sig = buildGenericSignature(ctx, GenericSignature(),
                                      addedParameters,
-                                     addedRequirements);
+                                     addedRequirements,
+                                     /*allowInverses=*/false);
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.
@@ -107,6 +108,7 @@ private:
       newMembers.push_back(generalizeStructure(origMember));
     }
     return ProtocolCompositionType::get(ctx, newMembers,
+                                        origType->getInverses(),
                                         origType->hasExplicitAnyObject());
   }
 
@@ -232,10 +234,10 @@ private:
   /// but generalizing its component types.
   Type generalizeComponentTypes(CanType type) {
     return type.transformRec(
-        [&](TypeBase *componentType) -> llvm::Optional<Type> {
+        [&](TypeBase *componentType) -> std::optional<Type> {
           // Ignore the top level.
           if (componentType == type.getPointer())
-            return llvm::None;
+            return std::nullopt;
 
           return generalizeComponentType(CanType(componentType));
         });

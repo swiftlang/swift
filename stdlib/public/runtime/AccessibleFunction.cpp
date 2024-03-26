@@ -119,6 +119,27 @@ void swift::addImageAccessibleFunctionsBlockCallback(
   addImageAccessibleFunctionsBlockCallbackUnsafe(baseAddress, functions, size);
 }
 
+// TODO(distributed): expose dumping records via a flag
+LLVM_ATTRIBUTE_UNUSED
+static void _dumpAccessibleFunctionRecords() {
+  auto &S = Functions.get();
+
+  fprintf(stderr, "==== Accessible Function Records ====\n");
+  int count = 0;
+  for (const auto &section : S.SectionsToScan.snapshot()) {
+    for (auto &record : section) {
+      auto recordName =
+          swift::Demangle::makeSymbolicMangledNameStringRef(record.Name.get());
+      fprintf(stderr, "Record name: %s\n", recordName.data());
+      fprintf(stderr, "    Function Ptr: %p\n", record.Function.get());
+      fprintf(stderr, "    Flags.IsDistributed: %d\n", record.Flags.isDistributed());
+      ++count;
+    }
+  }
+  fprintf(stderr, "Record count: %d\n", count);
+  fprintf(stderr, "==== End of Accessible Function Records ====\n");
+}
+
 static const AccessibleFunctionRecord *
 _searchForFunctionRecord(AccessibleFunctionsState &S, llvm::StringRef name) {
   auto traceState = runtime::trace::accessible_function_scan_begin(name);
@@ -141,7 +162,6 @@ swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
   auto &S = Functions.get();
 
   llvm::StringRef name{targetNameStart, targetNameLength};
-
   // Look for an existing entry.
   {
     auto snapshot = S.Cache.snapshot();

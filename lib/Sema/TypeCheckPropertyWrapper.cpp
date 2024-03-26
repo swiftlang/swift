@@ -95,8 +95,10 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
         nominal->getName());
     return nullptr;
 
+  case ActorIsolation::Erased:
+    llvm_unreachable("variable cannot have erased isolation");
+
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
@@ -653,7 +655,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 }
 
 Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
-                                    llvm::Optional<unsigned> limit) {
+                                    std::optional<unsigned> limit) {
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   unsigned realLimit = var->hasImplicitPropertyWrapper() ? 1 : wrapperAttrs.size();
   if (limit)

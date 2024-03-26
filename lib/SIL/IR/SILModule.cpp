@@ -75,12 +75,19 @@ class SILModule::SerializationCallback final
       // translation units in the same Swift module.
       decl->setLinkage(SILLinkage::Shared);
       return;
+    case SILLinkage::Package:
+      decl->setLinkage(SILLinkage::PackageExternal);
+      return;
+    case SILLinkage::PackageNonABI: // Same as PublicNonABI
+      decl->setLinkage(SILLinkage::Shared);
+      return;
     case SILLinkage::Hidden:
       decl->setLinkage(SILLinkage::HiddenExternal);
       return;
     case SILLinkage::Private:
       llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::Shared:
       return;
@@ -119,8 +126,6 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
 
 SILModule::~SILModule() {
 #ifndef NDEBUG
-  checkForLeaks();
-
   NumSlabsAllocated += numAllocatedSlabs;
   assert(numAllocatedSlabs == freeSlabs.size() && "leaking slabs in SILModule");
 #endif
@@ -155,65 +160,6 @@ SILModule::~SILModule() {
     F.eraseAllBlocks();
   }
   flushDeletedInsts();
-}
-
-void SILModule::checkForLeaks() const {
-
-  /// Leak checking is not thread safe, because the instruction counters are
-  /// global non-atomic variables. Leak checking can only be done in case there
-  /// is a single SILModule in a single thread.
-  if (!getOptions().checkSILModuleLeaks)
-    return;
-
-  int instsInModule = scheduledForDeletion.size();
-
-  for (const SILFunction &F : *this) {
-    const SILFunction *sn = &F;
-    do {
-      for (const SILBasicBlock &block : *sn) {
-        instsInModule += std::distance(block.begin(), block.end());
-      }
-    } while ((sn = sn->snapshots) != nullptr);
-  }
-  for (const SILFunction &F : zombieFunctions) {
-    const SILFunction *sn = &F;
-    do {
-      for (const SILBasicBlock &block : F) {
-        instsInModule += std::distance(block.begin(), block.end());
-      }
-    } while ((sn = sn->snapshots) != nullptr);
-  }
-  for (const SILGlobalVariable &global : getSILGlobals()) {
-      instsInModule += std::distance(global.StaticInitializerBlock.begin(),
-                                     global.StaticInitializerBlock.end());
-  }
-  
-  int numAllocated = SILInstruction::getNumCreatedInstructions() -
-                       SILInstruction::getNumDeletedInstructions();
-                       
-  if (numAllocated != instsInModule) {
-    llvm::errs() << "Leaking instructions!\n";
-    llvm::errs() << "Allocated instructions: " << numAllocated << '\n';
-    llvm::errs() << "Instructions in module: " << instsInModule << '\n';
-    llvm_unreachable("leaking instructions");
-  }
-  
-  assert(PlaceholderValue::getNumPlaceholderValuesAlive() == 0 &&
-         "leaking placeholders");
-}
-
-void SILModule::checkForLeaksAfterDestruction() {
-// Disabled in release (non-assert) builds because this check fails in rare
-// cases in lldb, causing crashes. rdar://70826934
-#ifndef NDEBUG
-  int numAllocated = SILInstruction::getNumCreatedInstructions() -
-                     SILInstruction::getNumDeletedInstructions();
-
-  if (numAllocated != 0) {
-    llvm::errs() << "Leaking " << numAllocated << " instructions!\n";
-    llvm_unreachable("leaking instructions");
-  }
-#endif
 }
 
 std::unique_ptr<SILModule> SILModule::createEmptyModule(
@@ -369,23 +315,23 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 
   // Several operation names have suffixes and don't match the name from
   // Builtins.def, so handle those first.
-  if (OperationName.startswith("fence_"))
+  if (OperationName.starts_with("fence_"))
     Info.ID = BuiltinValueKind::Fence;
-  else if (OperationName.startswith("ifdef_"))
+  else if (OperationName.starts_with("ifdef_"))
     Info.ID = BuiltinValueKind::Ifdef;
-  else if (OperationName.startswith("cmpxchg_"))
+  else if (OperationName.starts_with("cmpxchg_"))
     Info.ID = BuiltinValueKind::CmpXChg;
-  else if (OperationName.startswith("atomicrmw_"))
+  else if (OperationName.starts_with("atomicrmw_"))
     Info.ID = BuiltinValueKind::AtomicRMW;
-  else if (OperationName.startswith("atomicload_"))
+  else if (OperationName.starts_with("atomicload_"))
     Info.ID = BuiltinValueKind::AtomicLoad;
-  else if (OperationName.startswith("atomicstore_"))
+  else if (OperationName.starts_with("atomicstore_"))
     Info.ID = BuiltinValueKind::AtomicStore;
-  else if (OperationName.startswith("allocWithTailElems_"))
+  else if (OperationName.starts_with("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
-  else if (OperationName.startswith("applyDerivative_"))
+  else if (OperationName.starts_with("applyDerivative_"))
     Info.ID = BuiltinValueKind::ApplyDerivative;
-  else if (OperationName.startswith("applyTranspose_"))
+  else if (OperationName.starts_with("applyTranspose_"))
     Info.ID = BuiltinValueKind::ApplyTranspose;
   else
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
@@ -414,7 +360,7 @@ bool SILModule::loadFunction(SILFunction *F, LinkingMode LinkMode) {
 }
 
 SILFunction *SILModule::loadFunction(StringRef name, LinkingMode LinkMode,
-                                     llvm::Optional<SILLinkage> linkage) {
+                                     std::optional<SILLinkage> linkage) {
   SILFunction *func = lookUpFunction(name);
   if (!func)
     func = getSILLoader()->lookupSILFunction(name, linkage);
@@ -680,7 +626,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
 SILFunction *
 SILModule::lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl) {
-  assert(nomDecl->canBeNoncopyable());
+  assert(!nomDecl->canBeCopyable());
 
   auto *tbl = lookUpMoveOnlyDeinit(nomDecl);
 
@@ -734,7 +680,8 @@ SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
   SILValue &def = RootLocalArchetypeDefs[{archetype, inFunction}];
   if (!def) {
     numUnresolvedLocalArchetypes++;
-    def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
+    def = ::new PlaceholderValue(inFunction,
+                                 SILType::getPrimitiveAddressType(archetype));
   }
 
   return def;
@@ -814,6 +761,12 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
+  for (auto &op : inst->getAllOperands()) {
+    if (auto *undef = dyn_cast<SILUndef>(op.get())) {
+      op.set(SILUndef::get(inst->getFunction(), undef->getType()));
+    }
+  }
+
   inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
                                          SILValue dependency) {
     LocalArchetypeKey key = {archeTy, fromFunction};
@@ -960,7 +913,7 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
 
 SILProperty *
 SILProperty::create(SILModule &M, bool Serialized, AbstractStorageDecl *Decl,
-                    llvm::Optional<KeyPathPatternComponent> Component) {
+                    std::optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);
   return prop;
@@ -979,6 +932,8 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
     linkage = SILLinkage::Hidden;
     break;
   case AccessLevel::Package:
+    linkage = SILLinkage::Package;
+    break;
   case AccessLevel::Public:
   case AccessLevel::Open:
     linkage = SILLinkage::Public;

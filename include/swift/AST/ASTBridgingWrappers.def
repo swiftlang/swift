@@ -60,6 +60,12 @@
 #endif
 #include "swift/AST/PatternNodes.def"
 
+#ifndef DECL_ATTR
+#define SIMPLE_DECL_ATTR(...)
+#define DECL_ATTR(_, Id, ...) AST_BRIDGING_WRAPPER_NONNULL(Id##Attr)
+#endif
+#include "swift/AST/DeclAttr.def"
+
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
 AST_BRIDGING_WRAPPER_NONNULL(Decl)
@@ -69,6 +75,8 @@ AST_BRIDGING_WRAPPER_NULLABLE(Stmt)
 AST_BRIDGING_WRAPPER_NULLABLE(Expr)
 AST_BRIDGING_WRAPPER_NULLABLE(Pattern)
 AST_BRIDGING_WRAPPER_NULLABLE(TypeRepr)
+AST_BRIDGING_WRAPPER_NULLABLE(DeclAttribute)
+AST_BRIDGING_WRAPPER_NULLABLE(TypeAttribute)
 
 // Misc AST types to generate wrappers for.
 AST_BRIDGING_WRAPPER_NULLABLE(GenericParamList)
@@ -77,6 +85,7 @@ AST_BRIDGING_WRAPPER_NULLABLE(ParameterList)
 AST_BRIDGING_WRAPPER_NULLABLE(PatternBindingInitializer)
 AST_BRIDGING_WRAPPER_NONNULL(TypeAttributes)
 AST_BRIDGING_WRAPPER_NONNULL(CustomAttribute)
+AST_BRIDGING_WRAPPER_NONNULL(ArgumentList)
 
 // Non-AST types to generate wrappers for.
 AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)

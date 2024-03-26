@@ -30,7 +30,8 @@ void swift::_swift_setWillThrowHandler(void (* handler)(SwiftError *error)) {
   _swift_willThrow.store(handler, std::memory_order_release);
 }
 
-/// Breakpoint hook for debuggers, and calls _swift_willThrow if set.
+/// Breakpoint hook for debuggers that is called for untyped throws, and
+/// calls _swift_willThrow if set.
 SWIFT_CC(swift) void
 swift::swift_willThrow(SWIFT_CONTEXT void *unused,
                        SWIFT_ERROR_RESULT SwiftError **error) {
@@ -39,5 +40,40 @@ swift::swift_willThrow(SWIFT_CONTEXT void *unused,
   auto handler = _swift_willThrow.load(std::memory_order_acquire);
   if (SWIFT_UNLIKELY(handler)) {
     (* handler)(*error);
+  }
+}
+
+std::atomic<void (*)(
+  OpaqueValue *value,
+  const Metadata *type,
+  const WitnessTable *errorConformance
+)> swift::_swift_willThrowTypedImpl;
+
+/// Breakpoint hook for debuggers that is called for typed throws, and calls
+/// _swift_willThrowTypedImpl if set. If not set and _swift_willThrow is set, this calls
+/// that hook instead and implicitly boxes the typed error in an any Error for that call.
+SWIFT_CC(swift) void
+swift::swift_willThrowTypedImpl(OpaqueValue *value,
+                                const Metadata *type,
+                                const WitnessTable *errorConformance) {
+  // Cheap check to bail out early, since we expect there to be no callbacks
+  // the vast majority of the time.
+  auto handler = _swift_willThrowTypedImpl.load(std::memory_order_acquire);
+  if (SWIFT_UNLIKELY(handler)) {
+    (* handler)(value, type, errorConformance);
+  } else {
+    auto fallbackHandler = _swift_willThrow.load(std::memory_order_acquire);
+    if (SWIFT_UNLIKELY(fallbackHandler)) {
+      // Form an error box containing the error.
+      BoxPair boxedError = swift_allocError(
+        type, errorConformance, value, /*isTake=*/false);
+
+      // Hand the boxed error off to the handler.
+      auto errorBox = reinterpret_cast<SwiftError *>(boxedError.object);
+      (* fallbackHandler)(errorBox);
+
+      // Release the error box.
+      swift_errorRelease(errorBox);
+    }
   }
 }

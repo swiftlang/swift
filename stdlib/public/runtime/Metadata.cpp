@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/LibPrespecialized.h"
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -24,6 +25,7 @@
 #include "MetadataCache.h"
 #include "BytecodeLayouts.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -365,6 +367,10 @@ namespace {
 
     AllocationResult allocate(const TypeContextDescriptor *description,
                               const void * const *arguments) {
+      if (auto *prespecialized =
+              getLibPrespecializedMetadata(description, arguments))
+        return {prespecialized, PrivateMetadataState::Complete};
+
       // Find a pattern.  Currently we always use the default pattern.
       auto &generics = description->getFullGenericContextHeader();
       auto pattern = generics.DefaultInstantiationPattern.get();
@@ -811,7 +817,6 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
          (extraDataSize == (pattern->getExtraDataPattern()->OffsetInWords +
                             pattern->getExtraDataPattern()->SizeInWords) *
                                sizeof(void *)));
-
   size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
 
   auto bytes = (char*) MetadataAllocator(GenericValueMetadataTag)
@@ -2117,10 +2122,6 @@ static constexpr TypeLayout getInitialLayoutForHeapObject() {
           0};
 }
 
-static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
-  return (size + alignMask) & ~alignMask;
-}
-
 /// Perform basic sequential layout given a vector of metadata pointers,
 /// calling a functor with the offset of each field, and returning the
 /// final layout characteristics of the type.
@@ -2594,8 +2595,9 @@ static constexpr Out pointer_function_cast(In *function) {
   return pointer_function_cast_impl<Out>::perform(function);
 }
 
-static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_indirect_initializeBufferWithCopyOfBuffer(
+    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
   auto wtable = self->getValueWitnesses();
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
@@ -2609,19 +2611,21 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
 }
 
-static void pod_destroy(OpaqueValue *object, const Metadata *self) {}
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_pod_destroy(OpaqueValue *object, const Metadata *self) {}
 
-static OpaqueValue *pod_copy(OpaqueValue *dest, OpaqueValue *src,
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_copy(OpaqueValue *dest, OpaqueValue *src,
                              const Metadata *self) {
   memcpy(dest, src, self->getValueWitnesses()->size);
   return dest;
 }
 
-static OpaqueValue *pod_direct_initializeBufferWithCopyOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-  return pod_copy(reinterpret_cast<OpaqueValue*>(dest),
-                  reinterpret_cast<OpaqueValue*>(src),
-                  self);
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_direct_initializeBufferWithCopyOfBuffer(
+    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+  return _swift_pod_copy(reinterpret_cast<OpaqueValue *>(dest),
+                         reinterpret_cast<OpaqueValue *>(src), self);
 }
 
 static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
@@ -2646,16 +2650,16 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
       // size and alignment.
       if (flags.isInlineStorage()) {
         vwtable->initializeBufferWithCopyOfBuffer =
-          pod_direct_initializeBufferWithCopyOfBuffer;
+            _swift_pod_direct_initializeBufferWithCopyOfBuffer;
       } else {
         vwtable->initializeBufferWithCopyOfBuffer =
-          pod_indirect_initializeBufferWithCopyOfBuffer;
+            _swift_pod_indirect_initializeBufferWithCopyOfBuffer;
       }
-      vwtable->destroy = pod_destroy;
-      vwtable->initializeWithCopy = pod_copy;
-      vwtable->initializeWithTake = pod_copy;
-      vwtable->assignWithCopy = pod_copy;
-      vwtable->assignWithTake = pod_copy;
+      vwtable->destroy = _swift_pod_destroy;
+      vwtable->initializeWithCopy = _swift_pod_copy;
+      vwtable->initializeWithTake = _swift_pod_copy;
+      vwtable->assignWithCopy = _swift_pod_copy;
+      vwtable->assignWithTake = _swift_pod_copy;
       // getEnumTagSinglePayload and storeEnumTagSinglePayload are not
       // interestingly optimizable based on POD-ness.
       return;
@@ -2694,7 +2698,7 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
   
   if (flags.isBitwiseTakable()) {
     // Use POD value witnesses for operations that do an initializeWithTake.
-    vwtable->initializeWithTake = pod_copy;
+    vwtable->initializeWithTake = _swift_pod_copy;
     return;
   }
 
@@ -3245,7 +3249,7 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   // name. The old and new Swift libraries must be able to coexist in
   // the same process, and this avoids warnings due to the ObjC names
   // colliding.
-  bool addSuffix = string.startswith("_TtGCs");
+  bool addSuffix = string.starts_with("_TtGCs");
 
   size_t allocationSize = string.size() + 1;
   if (addSuffix)
@@ -3498,9 +3502,14 @@ static void initClassFieldOffsetVector(ClassMetadata *self,
   //
   // The rodata may be in read-only memory if the compiler knows that the size
   // it generates is already definitely correct. Don't write to this value
-  // unless it's necessary.
-  if (rodata->InstanceStart != size)
+  // unless it's necessary. We'll grow the space for the superclass if needed,
+  // but not shrink it, as the compiler may write an unaligned size that's less
+  // than our aligned InstanceStart.
+  if (rodata->InstanceStart < size)
     rodata->InstanceStart = size;
+  else
+    size = rodata->InstanceStart;
+
 #endif
 
   // Okay, now do layout.

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-reuse 2>&1 | %FileCheck %s
 
@@ -17,7 +17,6 @@ public protocol NonEmptyProtocol: Collection
 public protocol MultiPoint {
   associatedtype C: CoordinateSystem
   associatedtype P: Point where Self.P == Self.C.P
-  // expected-warning@-1 {{redundant conformance constraint 'Self.P' : 'Point'}}
 
   associatedtype X: NonEmptyProtocol
     where X.C: NonEmptyProtocol,

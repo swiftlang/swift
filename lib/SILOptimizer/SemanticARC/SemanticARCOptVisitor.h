@@ -96,7 +96,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   /// worklist.
   void drainVisitedSinceLastMutationIntoWorklist() {
     while (!visitedSinceLastMutation.empty()) {
-      llvm::Optional<SILValue> nextValue =
+      std::optional<SILValue> nextValue =
           visitedSinceLastMutation.pop_back_val();
       if (!nextValue.has_value()) {
         continue;
@@ -196,6 +196,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(LinearFunction)
   FORWARDING_INST(DifferentiableFunctionExtract)
   FORWARDING_INST(LinearFunctionExtract)
+  FORWARDING_INST(FunctionExtractIsolation)
 #undef FORWARDING_INST
 
   bool processWorklist();

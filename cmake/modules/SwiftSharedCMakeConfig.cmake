@@ -272,27 +272,11 @@ macro(swift_common_unified_build_config product)
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
+  set(CLANG_INCLUDE_DIRS
+    "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include"
+    "${CMAKE_BINARY_DIR}/tools/clang/include")
 
-  include_directories(${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include
-    ${CMAKE_BINARY_DIR}/tools/clang/include)
-
-  # If cmark was checked out into tools/cmark, expect to build it as
-  # part of the unified build.
-  if(EXISTS "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
-    set(${product}_PATH_TO_CMARK_SOURCE "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
-    set(${product}_PATH_TO_CMARK_BUILD "${CMAKE_BINARY_DIR}/tools/cmark")
-    set(${product}_CMARK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/lib")
-
-    get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
-      ABSOLUTE)
-    get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-      ABSOLUTE)
-    get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
-      ABSOLUTE)
-
-    include_directories(${PATH_TO_CMARK_BUILD}/src
-      ${CMARK_MAIN_SRC_DIR}/src/include)
-  endif()
+  include_directories(${CLANG_INCLUDE_DIRS})
 
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
 endmacro()
@@ -337,7 +321,7 @@ macro(swift_common_cxx_warnings)
 
   check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
   if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wnested-anon-types>)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types>)
   endif()
 
   # Check for '-fapplication-extension'.  On OS X/iOS we wish to link all

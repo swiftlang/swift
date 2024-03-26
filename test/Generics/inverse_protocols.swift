@@ -1,13 +1,13 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
-// REQUIRES: asserts
+
 
 protocol Eq: ~Copyable {
   func same(as: borrowing Self) -> Bool
   func different(from: borrowing Self) -> Bool
 }
 
-extension Eq {
+extension Eq where Self: ~Copyable {
   func different(from other: borrowing Self) -> Bool { !same(as: other) }
 }
 

@@ -246,6 +246,91 @@ int Requirement::compare(const Requirement &other) const {
   return compareProtos;
 }
 
+static std::optional<CheckRequirementsResult>
+checkRequirementsImpl(ArrayRef<Requirement> requirements,
+                      bool allowTypeParameters) {
+  SmallVector<Requirement, 4> worklist(requirements.begin(), requirements.end());
+
+  bool hadSubstFailure = false;
+
+  while (!worklist.empty()) {
+    auto req = worklist.pop_back_val();
+
+  // Check preconditions.
+#ifndef NDEBUG
+  {
+    auto firstType = req.getFirstType();
+    assert((allowTypeParameters || !firstType->hasTypeParameter())
+           && "must take a contextual type. if you really are ok with an "
+            "indefinite answer (and usually YOU ARE NOT), then consider whether "
+            "you really, definitely are ok with an indefinite answer, and "
+            "use `checkRequirementsWithoutContext` instead");
+    assert(!firstType->hasTypeVariable());
+
+    if (req.getKind() != RequirementKind::Layout) {
+      auto secondType = req.getSecondType();
+      assert((allowTypeParameters || !secondType->hasTypeParameter())
+             && "must take a contextual type. if you really are ok with an "
+              "indefinite answer (and usually YOU ARE NOT), then consider whether "
+              "you really, definitely are ok with an indefinite answer, and "
+              "use `checkRequirementsWithoutContext` instead");
+      assert(!secondType->hasTypeVariable());
+    }
+  }
+#endif
+
+    switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::ConditionalConformance:
+    case CheckRequirementResult::PackRequirement:
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
+      // If a requirement failure was caused by a context-free type parameter,
+      // then we can't definitely know whether it would have satisfied the
+      // requirement without context.
+      if (req.getFirstType()->isTypeParameter()) {
+        return std::nullopt;
+      }
+      return CheckRequirementsResult::RequirementFailure;
+
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
+    }
+  }
+
+  if (hadSubstFailure)
+    return CheckRequirementsResult::SubstitutionFailure;
+
+  return CheckRequirementsResult::Success;
+}
+
+CheckRequirementsResult
+swift::checkRequirements(ArrayRef<Requirement> requirements) {
+  // This entry point requires that there are no type parameters in any of the
+  // requirements, so the underlying check should always produce a result.
+  return checkRequirementsImpl(requirements, /*allow type parameters*/ false)
+    .value();
+}
+
+std::optional<CheckRequirementsResult>
+swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
+  return checkRequirementsImpl(requirements, /*allow type parameters*/ true);
+}
+
+CheckRequirementsResult swift::checkRequirements(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions, SubstOptions options) {
+  SmallVector<Requirement, 4> substReqs;
+  for (auto req : requirements) {
+    substReqs.push_back(req.subst(substitutions,
+                              LookUpConformanceInModule(module), options));
+  }
+
+  return checkRequirements(substReqs);
+}
+
 InverseRequirement::InverseRequirement(Type subject,
                                        ProtocolDecl *protocol,
                                        SourceLoc loc)
@@ -260,57 +345,31 @@ InvertibleProtocolKind InverseRequirement::getKind() const {
   return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
 }
 
-void InverseRequirement::enumerateDefaultedParams(
-    GenericContext *genericContext,
-    SmallVectorImpl<Type> &result) {
-
-  auto add = [&](Type t) {
-    assert(t->isTypeParameter());
-    result.push_back(t);
-  };
-
-  // Nothing to enumerate if it's not generic.
-  if (!genericContext->isGeneric())
-    return;
-
-  if (auto proto = dyn_cast<ProtocolDecl>(genericContext)) {
-    add(proto->getSelfInterfaceType());
-
-    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
-      add(assocTypeDecl->getDeclaredInterfaceType());
-
-    return;
-  }
-
-  for (GenericTypeParamDecl *gtpd : *genericContext->getGenericParams())
-    add(gtpd->getDeclaredInterfaceType());
-}
-
-InvertibleProtocolSet InverseRequirement::expandDefault(Type gp) {
-  assert(gp->isTypeParameter());
-  return InvertibleProtocolSet::full();
-}
-
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return;
-
   for (auto gp : gps) {
-    auto protos = InverseRequirement::expandDefault(gp);
-    for (auto ip : protos) {
+    for (auto ip : InvertibleProtocolSet::full()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-      if (!proto)
-        llvm_unreachable("failed to load Copyable/Escapable/etc from stdlib!");
-      
-      auto protoTy = proto->getDeclaredInterfaceType();
-      result.push_back({{RequirementKind::Conformance, gp, protoTy},
-                        SourceLoc(),
-                        /*inferred=*/true,
-                        /*default=*/true,
-                       });
+      result.push_back({{RequirementKind::Conformance, gp,
+                         proto->getDeclaredInterfaceType()},
+                         SourceLoc()});
     }
   }
+}
+
+/// Linear order on inverse requirements in a generic signature.
+int InverseRequirement::compare(const InverseRequirement &other) const {
+  int compareLHS =
+      compareDependentTypes(subject, other.subject);
+
+  if (compareLHS != 0)
+    return compareLHS;
+
+  int compareProtos =
+      TypeDecl::compare(protocol, other.protocol);
+  assert(compareProtos != 0 && "Duplicate conformance requirements");
+
+  return compareProtos;
 }

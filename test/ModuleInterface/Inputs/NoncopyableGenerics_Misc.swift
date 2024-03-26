@@ -55,9 +55,12 @@ public struct _Toys {
 public struct ExplicitHello<T: ~Copyable>: ~Copyable {
   let thing: T
 }
-extension ExplicitHello: Copyable where T: Copyable {}
+extension ExplicitHello: Copyable {}
 
-public struct Hello<T: ~Copyable> where T: ~Escapable {}
+public struct Hello<T: ~Copyable>: ~Copyable, ~Escapable where T: ~Escapable {}
+
+extension Hello: Escapable where T: ~Copyable {}
+extension Hello: Copyable where T: ~Escapable {}
 
 public protocol TestAssocTypes {
   associatedtype A: ~Copyable, _NoCopyP = Int
@@ -68,3 +71,38 @@ public typealias SomeAlias<G> = Hello<G>
 public typealias AliasWithInverse<G> = Hello<G> where G: ~Copyable, G: ~Escapable
 
 public struct RudePointer<T: ~Copyable>: Copyable {}
+
+public class C {}
+
+public func noInversesSTART() {}
+public func checkAny<Result>(_ t: Result) where Result: Any {}
+public func usingClassConstraint<Result>(arg: Result) -> Result? where Result: C { return arg }
+public func withAnyObject<Result>(_ t: Result) where Result: AnyObject {}
+public func noInversesEND() {}
+
+public func checkAnyInv1<Result>(_ t: borrowing Result) where Result: Any & ~Copyable {}
+public func checkAnyInv2<Result: Any>(_ t: borrowing Result) where Result: ~Copyable & ~Escapable {}
+public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {}
+
+// coverage for rdar://123281976
+public struct Outer<A: ~Copyable>: ~Copyable {
+  public func innerFn<B: ~Copyable>(_ b: borrowing B) {}
+  public struct InnerStruct<C: ~Copyable>: ~Copyable {
+    public func g<D>(_ d: borrowing D) where D: ~Copyable {}
+  }
+  public struct InnerVariation1<D: ~Copyable>: ~Copyable, ~Escapable {}
+  public struct InnerVariation2<D: ~Escapable>: ~Copyable, ~Escapable {}
+}
+
+extension Outer: Copyable {}
+extension Outer.InnerStruct: Copyable {}
+
+extension Outer.InnerVariation1: Copyable {}
+extension Outer.InnerVariation2: Escapable {}
+
+extension Outer.InnerStruct {
+    public func hello<T: ~Escapable>(_ t: T) {}
+}
+
+@_preInverseGenerics
+public func old_swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {}

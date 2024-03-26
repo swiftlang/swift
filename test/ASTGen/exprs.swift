@@ -91,3 +91,41 @@ func testUnaryExprs() async throws {
 func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)
 }
+
+func acceptClosures(x: () -> Void) {}
+func acceptClosures(x: () -> Void, y: () -> Int) {}
+func acceptClosures(x: () -> Void, y: () -> Int, _ z: () -> Void) {}
+func testTrailingClsure() {
+  acceptClosures {}
+  acceptClosures() {}
+  acceptClosures(x: {}) { 42 }
+  acceptClosures(x: {}) { 12 } _: {}
+  acceptClosures {} y: { 42 }
+  acceptClosures(x: {}, y: { 12 }) {}
+}
+
+func testStringLiteral(arg: Int) {
+  _ = "test"
+  _ = "foo\(arg)bar"
+  _ = "\(arg)"
+  _ = """
+    foo
+    bar\
+    baz
+    """
+  _ = """
+    foo\(arg)
+    \(arg)bar
+    """
+  _ = "\n\r\u{1234}"
+  _ = """
+    foo
+    \(
+      ("bar", """
+         \tbaz\u{0d}
+         """
+      )
+    )
+    baz
+    """
+}

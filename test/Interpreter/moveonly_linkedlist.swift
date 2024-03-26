@@ -1,5 +1,10 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all)
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -enable-ossa-modules)
+
+// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -Xfrontend -sil-verify-all)
+// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -O -Xfrontend -sil-verify-all)
+// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -O -Xfrontend -sil-verify-all -Xfrontend -enable-ossa-modules)
 
 // REQUIRES: executable_test
 

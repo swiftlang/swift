@@ -1164,7 +1164,7 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
   //
   // NotifyWillBeDeleted will not work because copy rewriting removes operands
   // before deleting instructions. Also prohibit setUse callbacks just because
-  // that would simply be insane.
+  // that would simply be unsound.
   assert(!getCallbacks().notifyWillBeDeletedFunc
          && !getCallbacks().setUseValueFunc && "unsupported");
 

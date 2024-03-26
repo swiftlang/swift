@@ -182,17 +182,6 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   return getConcrete()->getWitnessDeclRef(requirement);
 }
 
-llvm::Optional<ArrayRef<Requirement>>
-ProtocolConformanceRef::getConditionalRequirementsIfAvailable() const {
-  if (isConcrete())
-    return getConcrete()->getConditionalRequirementsIfAvailable();
-  else
-    // An abstract conformance is never conditional: any conditionality in the
-    // concrete types that will eventually pass through this at runtime is
-    // completely pre-checked and packaged up.
-    return ArrayRef<Requirement>();
-}
-
 ArrayRef<Requirement>
 ProtocolConformanceRef::getConditionalRequirements() const {
   if (isConcrete())
@@ -312,22 +301,21 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
   return false;
 }
 
-bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
-  return forEachMissingConformance(module,
+bool ProtocolConformanceRef::hasMissingConformance() const {
+  return forEachMissingConformance(
       [](BuiltinProtocolConformance *builtin) {
         return true;
       });
 }
 
 bool ProtocolConformanceRef::forEachMissingConformance(
-    ModuleDecl *module,
     llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const {
   if (isInvalid() || isAbstract())
     return false;
 
   if (isPack()) {
     for (auto conformance : getPack()->getPatternConformances()) {
-      if (conformance.forEachMissingConformance(module, fn))
+      if (conformance.forEachMissingConformance(fn))
         return true;
     }
 
@@ -345,7 +333,7 @@ bool ProtocolConformanceRef::forEachMissingConformance(
   // Check conformances that are part of this conformance.
   auto subMap = concreteConf->getSubstitutionMap();
   for (auto conformance : subMap.getConformances()) {
-    if (conformance.forEachMissingConformance(module, fn))
+    if (conformance.forEachMissingConformance(fn))
       return true;
   }
 

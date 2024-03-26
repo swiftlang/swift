@@ -23,8 +23,10 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -885,9 +887,26 @@ void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
 }
 } // end anonymous namespace
 
+bool irgen::layoutStringsEnabled(IRGenModule &IGM, bool diagnose) {
+  auto moduleName = IGM.getSwiftModule()->getRealName().str();
+  if (IGM.Context.blockListConfig.hasBlockListAction(
+          moduleName, BlockListKeyKind::ModuleName,
+          BlockListAction::ShouldUseLayoutStringValueWitnesses)) {
+    if (diagnose) {
+      IGM.Context.Diags.diagnose(SourceLoc(), diag::layout_strings_blocked,
+                                 moduleName);
+    }
+    return false;
+  }
+
+  return IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+         IGM.getOptions().EnableLayoutStringValueWitnesses;
+}
+
 static bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
                                        const TypeLayoutEntry *typeLayoutEntry) {
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+
+  if (layoutStringsEnabled(IGM) &&
       IGM.Context.LangOpts.hasFeature(
           Feature::LayoutStringValueWitnessesInstantiation) &&
       IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
@@ -1000,12 +1019,12 @@ valueWitnessRequiresCopyability(ValueWitness index) {
 
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
-static void
-addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
-                FixedPacking packing, CanType abstractType,
-                SILType concreteType, const TypeInfo &concreteTI,
-                const llvm::Optional<BoundGenericTypeCharacteristics>
-                    boundGenericCharacteristics = llvm::None) {
+static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
+                            ValueWitness index, FixedPacking packing,
+                            CanType abstractType, SILType concreteType,
+                            const TypeInfo &concreteTI,
+                            const std::optional<BoundGenericTypeCharacteristics>
+                                boundGenericCharacteristics = std::nullopt) {
   auto addFunction = [&](llvm::Constant *fn) {
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
@@ -1028,8 +1047,7 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getDestroyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1053,8 +1071,7 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       }
     }
 
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1077,8 +1094,7 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
   case ValueWitness::InitializeWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1098,8 +1114,7 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithCopyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1119,8 +1134,7 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithTakeStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1140,8 +1154,7 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getInitWithCopyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1293,8 +1306,8 @@ static void
 addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
                   FixedPacking packing, CanType abstractType,
                   SILType concreteType, const TypeInfo &concreteTI,
-                  const llvm::Optional<BoundGenericTypeCharacteristics>
-                      boundGenericCharacteristics = llvm::None) {
+                  const std::optional<BoundGenericTypeCharacteristics>
+                      boundGenericCharacteristics = std::nullopt) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     addValueWitness(IGM, B, ValueWitness(i), packing, abstractType,
                     concreteType, concreteTI, boundGenericCharacteristics);
@@ -1321,7 +1334,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                              ConstantStructBuilder &B,
                                              CanType abstractType,
                                              bool &canBeConstant) {
-  llvm::Optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
+  std::optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
   if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
     CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 

@@ -459,6 +459,20 @@ number of ways:
   - Other function type conventions are described in ``Properties of Types`` and
     ``Calling Convention``.
 
+- SIL function types do not directly carry most of the actor-isolation
+  information available in the Swift type system.  Actor isolation is mostly
+  simply erased from the SIL type system and treated as a dynamic property
+  in SIL functions.
+
+  However, ``@isolated(any)`` requires some additional ABI support and
+  therefore must be carried on SIL function types.  ``@isolated(any)`` is
+  only allowed in combination with ``@convention(thick)``; in particular,
+  this precludes SIL function declarations from having ``@isolated(any)``
+  type.  Instead, ``@isolated(any)`` function values are constructed with
+  ``partial_apply [isolated_any]``, which has additional requirements.
+  The isolation of an ``@isolated(any)`` function can be read with the
+  ``function_extract_isolation`` instruction.
+
 - A SIL function type declares the conventions for its parameters.
   The parameters are written as an unlabeled tuple; the elements of that
   tuple must be legal SIL types, optionally decorated with one of the
@@ -1280,7 +1294,14 @@ The clang node owner.
 
 Specifies the performance constraints for the function, which defines which type
 of runtime functions are allowed to be called from the function.
+::
 
+  sil-function-attribute ::= '[perf_constraint]'
+
+Specifies that the optimizer and IRGen must not add runtime calls which are not
+in the function originally. This attribute is set for functions with performance
+constraints or functions which are called from functions with performance
+constraints.
 
 Argument Effects
 ````````````````
@@ -1587,6 +1608,7 @@ VTables
 
   decl ::= sil-vtable
   sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
+  sil-vtable ::= 'sil_vtable' sil-type '{' sil-vtable-entry* '}'
 
   sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
@@ -1648,6 +1670,13 @@ class (such as ``C.bas`` in ``C``'s vtable).
 
 In case the SIL function is a thunk, the function name is preceded with the
 linkage of the original implementing function.
+
+If the vtable refers to a specialized class, a SIL type specifies the bound
+generic class type::
+
+  sil_vtable $G<Int> {
+    // ...
+  }
 
 Witness Tables
 ~~~~~~~~~~~~~~
@@ -3757,6 +3786,7 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' alloc-stack-option* sil-type (',' debug-var-attr)*
   alloc-stack-option ::= '[dynamic_lifetime]'
   alloc-stack-option ::= '[lexical]'
+  alloc-stack-option ::= '[var_decl]'
   alloc-stack-option ::= '[moveable_value_debuginfo]'
 
   %1 = alloc_stack $T
@@ -3776,7 +3806,12 @@ The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
 
-The optional ``lexical`` attribute specifies that the storage corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
+local variable with a lexical lifetime in the Swift source, so special care
+must be taken when hoisting ``destroy_addr``s.  Compare to the ``var_decl``
+attribute.
+
+The optional ``var_decl`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
 
 The optional ``moveable_value_debuginfo`` attribute specifies that when emitting
@@ -4296,6 +4331,7 @@ from that of source variable.
   debug-info-expr   ::= di-expr-operand (':' di-expr-operand)*
   di-expr-operand   ::= di-expr-operator (':' sil-operand)*
   di-expr-operator  ::= 'op_fragment'
+  di-expr-operator  ::= 'op_tuple_fragment'
   di-expr-operator  ::= 'op_deref'
 
 SIL debug info expression (SIL DIExpression) is a powerful method to connect SSA
@@ -4342,6 +4378,10 @@ a field declaration -- which references the desired sub-field in source variable
 
 In the snippet above, source variable "the_struct" has an aggregate type ``$MyStruct`` and we use a SIL DIExpression with ``op_fragment`` operator to associate ``%1`` to the ``y`` member variable (via the ``#MyStruct.y`` directive) inside "the_struct".
 Note that the extra source location directive follows right after ``name "the_struct"`` indicate that "the_struct" was originally declared in line 8, but not until line 9 -- the current ``debug_value`` instruction's source location -- does member ``y`` got updated with SSA value ``%1``.
+
+For tuples, it works similarly, except we use ``op_tuple_fragment``, which takes two arguments: the tuple type and the index. If our struct was instead a tuple, we would have:
+
+  debug_value %1 : $Int, var, (name "the_tuple", loc "file.swift":8:7), type $(x: Int, y: Int), expr op_tuple_fragment:$(x: Int, y: Int):1, loc "file.swift":9:4
 
 It is worth noting that a SIL DIExpression is similar to
 `!DIExpression <https://www.llvm.org/docs/LangRef.html#diexpression>`_ in LLVM debug
@@ -5151,7 +5191,7 @@ end_unpaired_access
   sil-enforcement ::= static
   sil-enforcement ::= dynamic
   sil-enforcement ::= unsafe
-  %1 = end_unpaired_access [dynamic] %0 : $*Builtin.UnsafeValueBuffer
+  end_unpaired_access [dynamic] %0 : $*Builtin.UnsafeValueBuffer
 
 Ends an access. This has the same semantics and constraints as ``end_access`` with the following exceptions:
 
@@ -5523,15 +5563,14 @@ the dependency is on the current value stored in the address.
 The optional ``nonescaping`` attribute indicates that no value derived
 from ``%value`` escapes the lifetime of ``%base``. As with escaping
 ``mark_dependence``, all values transitively forwarded from ``%value``
-must be destroyed within the lifetime of ``%base``. Unlike escaping
+must be destroyed within the lifetime of ` `%base``. Unlike escaping
 ``mark_dependence``, this must be statically verifiable. Additionally,
 unlike escaping ``mark_dependence``, derived values include copies of
 ``%value`` and values transitively forwarded from those copies. If
-``%base`` is identical to ``%value`` this simply means that copies of
-``%value`` do not outlive the original OSSA lifetime of
-``%value``. Furthermore, unlike escaping ``mark_dependence``, no value
-derived from ``%value`` may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use).
+``%base`` must not be identical to ``%value``. Unlike escaping
+``mark_dependence``, no value derived from ``%value`` may have a
+bitwise escape (conversion to UnsafePointer) or pointer escape
+(unknown use).
 
 is_unique
 `````````
@@ -6112,12 +6151,13 @@ partial_apply
 `````````````
 ::
 
-  sil-instruction ::= 'partial_apply' callee-ownership-attr? on-stack-attr? sil-value
+  sil-instruction ::= 'partial_apply' partial-apply-attr* sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
-  callee-ownership-attr ::= '[callee_guaranteed]'
-  on-stack-attr ::= '[on_stack]'
+  partial-apply-attr ::= '[callee_guaranteed]'
+  partial-apply-attr ::= '[isolated_any]'
+  partial-apply-attr ::= '[on_stack]'
 
   %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
@@ -6173,13 +6213,24 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     return %ret : $Int
   }
 
+**Erased Isolation**: If the ``partial_apply`` is marked with the flag
+``[isolated_any]``, the first applied argument must have type
+``Optional<any Actor>``.  In addition to being provided as an argument to
+the partially-applied function, this value will be stored in a special
+place in the context and can be recovered with ``function_extract_isolation``.
+The result type of the ``partial_apply`` will be an ``@isolated(any)``
+function type.
+
 **Ownership Semantics of Closure Context during Invocation**: By default, an
 escaping ``partial_apply`` (``partial_apply`` without ``[on_stack]]`` creates a
 closure whose invocation takes ownership of the context, meaning that a call
-implicitly releases the closure. If the ``partial_apply`` is marked with the
-flag ``[callee_guaranteed]`` the invocation instead uses a caller-guaranteed
-model, where the caller promises not to release the closure while the function
-is being called.
+implicitly releases the closure.
+
+If the ``partial_apply`` is marked with the flag ``[callee_guaranteed]``,
+the invocation instead uses a caller-guaranteed model, where the caller
+promises not to release the closure while the function is being called.
+The result type of the ``partial_apply`` will be a ``@callee_guaranteed``
+function type.
 
 **Captured Value Ownership Semantics**: In the instruction syntax, the type of
 the callee is specified after the argument list; the types of the argument and
@@ -6574,6 +6625,17 @@ autorelease_value
   autorelease_value %0 : $A
 
 *TODO* Complete this section.
+
+function_extract_isolation
+``````````````````````````
+
+::
+  sil-instruction ::= function_extract_isolation sil-operand
+
+Reads the isolation of a `@isolated(any)` function value.  The result is
+always a borrowed value of type `$Optional<any Actor>`.  It is exactly
+the value that was originally used to construct the function with
+`partial_apply [isolated_any]`.
 
 tuple
 `````
@@ -6975,18 +7037,25 @@ unchecked_take_enum_data_addr
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
 
-Invalidates an enum value, and takes the address of the payload for the given
-enum ``case`` in-place in memory. The referenced enum value is no longer valid,
-but the payload value referenced by the result address is valid and must be
-destroyed. It is undefined behavior if the referenced enum does not contain a
-value of the given ``case``. The result shares memory with the original enum
-value; the enum memory cannot be reinitialized as an enum until the payload has
-also been invalidated.
+Takes the address of the payload for the given enum ``case`` in-place in
+memory. It is undefined behavior if the referenced enum does not contain a
+value of the given ``case``. 
 
-(1.0 only)
+The result shares memory with the original enum value.  If an enum declaration
+is unconditionally loadable (meaning it's loadable regardless of any generic
+parameters), and it has more than one case with an associated value, then it
+may embed the enum tag within the payload area. If this is the case, then
+`unchecked_take_enum_data_addr` will clear the tag from the payload,
+invalidating the referenced enum value, but leaving the
+payload value referenced by the result address valid. In these cases,
+the enum memory cannot be reinitialized as an enum until the payload has also
+been invalidated.
 
-For the first payloaded case of an enum, ``unchecked_take_enum_data_addr``
-is guaranteed to have no side effects; the enum value will not be invalidated.
+If an enum has no more than one payload case, or if the declaration is ever
+address-only, then `unchecked_take_enum_data_addr` is guaranteed to be
+nondestructive, and the payload address can be accessed without invalidating
+the enum in these cases. The payload can be invalidated to invalidate the
+enum (assuming the enum does not have a `deinit` at the type level).
 
 select_enum
 ```````````
@@ -7455,6 +7524,8 @@ scalar_pack_index
 
   sil-instruction ::= 'scalar_pack_index' int-literal 'of' sil-type
 
+  %index = scalar_pack_index 0 of $Pack{Int, repeat each T, Int}
+
 Produce the dynamic pack index of a scalar (non-pack-expansion)
 component of a pack.  The type operand is the indexed pack type.  The
 integer operand is an index into the components of this pack type; it
@@ -7574,6 +7645,8 @@ pack_element_get
 
   sil-instruction ::= 'pack_element_get' sil-value 'of' sil-operand 'as' sil-type
 
+  %addr = pack_element_get %index of %pack : $*Pack{Int, repeat each T} as $*Int
+
 Extracts the value previously stored in a pack at a particular index.
 If the pack element is uninitialized, this has undefined behavior.
 
@@ -7591,6 +7664,8 @@ pack_element_set
 ::
 
   sil-instruction ::= 'pack_element_set' sil-operand 'into' sil-value 'of' sil-operand
+
+  pack_element_set %addr : $*@pack_element("...") each U into %index of %pack : $*Pack{Int, repeat each T}
 
 Places a value in a pack at a particular index.
 

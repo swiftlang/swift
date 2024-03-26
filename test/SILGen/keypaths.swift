@@ -637,3 +637,43 @@ struct TestKeyPathWithSomeType : DefineSomeType {
 
   }
 }
+
+// apple/swift#71423
+protocol CodingKey {}
+
+struct URICoderCodingKey : CodingKey {}
+
+struct CodingStackEntry {
+   var key: URICoderCodingKey
+}
+
+struct Test {
+  var codingStack: [CodingStackEntry]
+  // CHECK-LABEL: sil hidden [ossa] @{{.*}}codingPathAny
+  var codingPathAny: [any CodingKey] { codingStack.map(\.key) }
+  // CHECK: keypath $KeyPath<CodingStackEntry, URICoderCodingKey>, (root $CodingStackEntry; stored_property #CodingStackEntry.key : $URICoderCodingKey)
+
+  // CHECK-LABEL: sil hidden [ossa] @{{.*}}codingPathOpt
+  var codingPathOpt: [URICoderCodingKey?] { codingStack.map(\.key) }
+  // CHECK: keypath $KeyPath<CodingStackEntry, URICoderCodingKey>, (root $CodingStackEntry; stored_property #CodingStackEntry.key : $URICoderCodingKey)
+}
+
+// rdar://123638701 - Make sure that optional chaining forces loads.
+func test_optional_chaining_with_function_conversion() {
+  class Storage {}
+
+  class Elements {
+    var db: Storage = Storage()
+  }
+
+  class Source {
+    var elements: Elements? = nil
+  }
+
+  func test(data: [Source]) {
+    // CHECK: {{.*}} = keypath $KeyPath<Source, Optional<Storage>>
+    _ = data.compactMap(\.elements?.db)
+    // CHECK: {{.*}} = keypath $KeyPath<Source, Storage>
+    _ = data.compactMap(\.elements!.db)
+  }
+}

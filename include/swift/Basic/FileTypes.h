@@ -39,6 +39,11 @@ StringRef getExtension(ID Id);
 /// the invalid type \c TY_INVALID.
 ID lookupTypeForExtension(StringRef Ext);
 
+/// Lookup the type to use for the file name \p Filename.
+/// If the filename is empty or type cannot be recognoized, return
+/// the invalid type \c TY_INVALID.
+ID lookupTypeFromFilename(StringRef Filename);
+
 /// Lookup the type to use for the name \p Name.
 ID lookupTypeForName(StringRef Name);
 

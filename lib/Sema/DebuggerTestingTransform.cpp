@@ -58,7 +58,7 @@ unsigned DiscriminatorFinder::getNextDiscriminator() {
 
 namespace {
 
-/// Instrument decls with sanity-checks which the debugger can evaluate.
+/// Instrument decls with soundness-checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
   DiscriminatorFinder &DF;
@@ -83,18 +83,18 @@ public:
     // Skip implicit decls, because the debugger isn't used to step through
     // these.
     if (D->isImplicit())
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     // Whitelist the kinds of decls to transform.
     // TODO: Expand the set of decls visited here.
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(D))
-      return Action::VisitChildrenIf(FD->getTypecheckedBody());
+      return Action::VisitNodeIf(FD->getTypecheckedBody());
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      return Action::VisitChildrenIf(TLCD->getBody());
+      return Action::VisitNodeIf(TLCD->getBody());
     if (isa<NominalTypeDecl>(D))
       return Action::Continue();
 
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
@@ -279,7 +279,7 @@ private:
     ASTNode ClosureElements[] = {OriginalExpr, CheckExpectExpr};
     auto *ClosureBody = BraceStmt::create(Ctx, SourceLoc(), ClosureElements,
                                           SourceLoc(), /*Implicit=*/true);
-    Closure->setBody(ClosureBody, /*isSingleExpression=*/false);
+    Closure->setBody(ClosureBody);
 
     // Call the closure.
     auto *ClosureCall = CallExpr::createImplicitEmpty(Ctx, Closure);
@@ -296,7 +296,7 @@ private:
     // ensures that the type checker can infer <noescape> for captured values.
     TypeChecker::computeCaptures(Closure);
 
-    return Action::SkipChildren(FinalExpr);
+    return Action::SkipNode(FinalExpr);
   }
 };
 
@@ -309,7 +309,7 @@ void swift::performDebuggerTestingTransform(SourceFile &SF) {
   for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
-  // Instrument the decls with checkExpect() sanity-checks.
+  // Instrument the decls with checkExpect() soundness-checks.
   for (Decl *D : SF.getTopLevelDecls()) {
     DebuggerTestingTransform Transform{D->getASTContext(), DF};
     D->walk(Transform);

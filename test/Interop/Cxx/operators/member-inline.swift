@@ -1,3 +1,4 @@
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
 //
 // REQUIRES: executable_test
@@ -411,6 +412,12 @@ OperatorsTestSuite.test("DerivedFromLoadableIntWrapperWithUsingDecl") {
   d1.value = 543
   d += d1
   expectEqual(666, d.getValue())
+}
+
+OperatorsTestSuite.test("HasOperatorCallWithDefaultArg.call") {
+  let h = HasOperatorCallWithDefaultArg(value: 321)
+  let res = h(123)
+  expectEqual(444, res)
 }
 
 runAllTests()

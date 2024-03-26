@@ -13,7 +13,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -DIMPORT_MACRO_LIBRARY -swift-version 5  %S/Inputs/top_level_freestanding_other.swift -I %t
 
 // Check diagnostic buffer names
-// RUN: not %target-swift-frontend -typecheck -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 %s %S/Inputs/top_level_freestanding_other.swift 2> %t.diags
+// RUN: not %target-swift-frontend -typecheck -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 %s %S/Inputs/top_level_freestanding_other.swift -diagnostic-style llvm 2> %t.diags
 // RUN: %FileCheck -check-prefix DIAG_BUFFERS %s < %t.diags
 
 // Execution testing
@@ -35,6 +35,16 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 @freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(declaration, names: named(value)) macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+@freestanding(expression) macro checkGeneric_root<A>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression) macro checkGeneric<A>() = #checkGeneric_root<A>()
+
+@freestanding(expression) macro checkGeneric2_root<A, B>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression) macro checkGeneric2<A, B>() = #checkGeneric2_root<A, B>()
+
+@freestanding(expression) macro checkGenericHashableCodable_root<A: Hashable, B: Codable>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression) macro checkGenericHashableCodable<A: Hashable, B: Codable>() = #checkGenericHashableCodable_root<A, B>()
+
 #endif
 
 // Test unqualified lookup from within a macro expansion
@@ -97,8 +107,8 @@ func testGlobalVariable() {
 
 // expected-note @+1 6 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes(causeErrors: true) { "foo" }
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser33{{.*}}anonymousTypesfMf2_{{.*}}error: use of protocol 'Equatable' as a type must be written 'any Equatable'
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser03{{.*}}anonymousTypes{{.*}}introduceTypeCheckingErrorsfMf0_{{.*}}error: use of protocol 'Hashable' as a type must be written 'any Hashable'
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser33{{.*}}anonymousTypesfMf0_{{.*}}error: use of protocol 'Equatable' as a type must be written 'any Equatable'
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser03{{.*}}anonymousTypes{{.*}}introduceTypeCheckingErrorsfMf_{{.*}}error: use of protocol 'Hashable' as a type must be written 'any Hashable'
 
 // expected-note @+1 2 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes { () -> String in
@@ -128,3 +138,10 @@ protocol Initializable {
 struct S {
   init(a: Int, b: Int) {}
 }
+
+// Check that generic type arguments are passed along in expansions,
+// when macro is implemented using another macro.
+
+#checkGeneric<String>()
+#checkGeneric2<String, Int>()
+#checkGenericHashableCodable<String, Int>()

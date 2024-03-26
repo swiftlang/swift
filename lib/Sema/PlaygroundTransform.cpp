@@ -429,7 +429,7 @@ public:
                 ++EI;
               }
             }
-          } else {
+          } else if (shouldLog(AE->getSrc())) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(AE->getSrc());
             DeclRefExpr *DRE = new (Context)
@@ -521,7 +521,7 @@ public:
             }
             Handled = true; // Never log ()
           }
-          if (!Handled) {
+          if (!Handled && shouldLog(E)) {
             // do the same as for all other expressions
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(E);
@@ -539,7 +539,7 @@ public:
             }
           }
         } else {
-          if (E->getType()->getCanonicalType() != Context.TheEmptyTupleType) {
+          if (E->getType()->getCanonicalType() != Context.TheEmptyTupleType && shouldLog(E)) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(E);
             Added<Stmt *> Log = buildLoggerCall(
@@ -559,15 +559,14 @@ public:
       } else if (auto *S = Element.dyn_cast<Stmt *>()) {
         S->walk(CF);
         if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-          if (RS->hasResult()) {
+          if (RS->hasResult() && shouldLog(RS->getResult())) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(RS->getResult());
             DeclRefExpr *DRE = new (Context) DeclRefExpr(
                 ConcreteDeclRef(PV.second), DeclNameLoc(),
                 true, // implicit
                 AccessSemantics::Ordinary, RS->getResult()->getType());
-            ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(), DRE,
-                                                       true); // implicit
+            ReturnStmt *NRS = ReturnStmt::createImplicit(Context, DRE);
             Added<Stmt *> Log = buildLoggerCall(
                 new (Context) DeclRefExpr(
                     ConcreteDeclRef(PV.second), DeclNameLoc(),
@@ -621,7 +620,7 @@ public:
     if (PL && Options.LogFunctionParameters) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
-        if (PD->hasName()) {
+        if (PD->hasName() && shouldLog(PD)) {
           DeclBaseName Name = PD->getName();
           Expr *PVVarRef = new (Context)
               DeclRefExpr(PD, DeclNameLoc(), /*implicit=*/true,
@@ -658,6 +657,10 @@ public:
   // after or instead of the expression they're looking at.  Only call this
   // if the variable has an initializer.
   Added<Stmt *> logVarDecl(VarDecl *VD) {
+    if (!shouldLog(VD)) {
+      return nullptr;
+    }
+
     if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
       // Don't log "self" in a constructor
       return nullptr;
@@ -674,6 +677,10 @@ public:
     if (auto *DRE = dyn_cast<DeclRefExpr>(*RE)) {
       VarDecl *VD = cast<VarDecl>(DRE->getDecl());
 
+      if (!shouldLog(VD)) {
+        return nullptr;
+      }
+
       if (isa<ConstructorDecl>(TypeCheckDC) && VD->getBaseName() == "self") {
         // Don't log "self" in a constructor
         return nullptr;
@@ -686,6 +693,10 @@ public:
     } else if (auto *MRE = dyn_cast<MemberRefExpr>(*RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
+
+      if (!shouldLog(M.getDecl())) {
+        return nullptr;
+      }
 
       if (isa<ConstructorDecl>(TypeCheckDC) && digForName(B) == "self") {
         // Don't log attributes of "self" in a constructor
@@ -784,6 +795,19 @@ public:
         Context, StaticSpellingKind::None, NP, MaybeLoadInitExpr, TypeCheckDC);
 
     return std::make_pair(PBD, VD);
+  }
+
+  bool shouldLog(ASTNode node) {
+    // Don't try to log ~Copyable types, as we can't pass them to the generic logging functions yet.
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(node.dyn_cast<Decl *>())) {
+      auto interfaceTy = VD->getInterfaceType();
+      auto contextualTy = VD->getInnermostDeclContext()->mapTypeIntoContext(interfaceTy);
+      return !contextualTy->isNoncopyable();
+    } else if (auto *E = node.dyn_cast<Expr *>()) {
+      return !E->getType()->isNoncopyable();
+    } else {
+      return true;
+    }
   }
 
   Added<Stmt *> buildLoggerCall(Added<Expr *> E, SourceRange SR,
@@ -925,7 +949,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
-        if (!FD->isImplicit()) {
+        if (!FD->isImplicit() && !FD->isBodySkipped()) {
           if (BraceStmt *Body = FD->getBody()) {
             const ParameterList *PL = FD->getParameters();
             Instrumenter I(ctx, FD, RNG, Options, TmpNameIndex);
@@ -934,7 +958,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
               FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
               TypeChecker::checkFunctionEffects(FD);
             }
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -946,7 +970,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelEffects(TLCD);
             }
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       }

@@ -42,6 +42,7 @@ extension Dictionary {
 ///   protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
 ///   respectively.
 @inlinable
+@_unavailableInEmbedded
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
@@ -58,6 +59,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_dictionaryDownCastIndirect")
+@_unavailableInEmbedded
 internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
                                           TargetKey, TargetValue>(
   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
@@ -73,6 +75,7 @@ internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
 /// - Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 ///   a subtype of `BaseValue`, and all of these types are reference types.
 @inlinable
+@_unavailableInEmbedded
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
@@ -111,6 +114,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_dictionaryDownCastConditionalIndirect")
+@_unavailableInEmbedded
 internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
                                                      TargetKey, TargetValue>(
   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
@@ -132,6 +136,7 @@ internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
 /// - Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 ///   a subtype of `BaseValue`, and all of these types are reference types.
 @inlinable
+@_unavailableInEmbedded
 public func _dictionaryDownCastConditional<
   BaseKey, BaseValue, DerivedKey, DerivedValue
 >(

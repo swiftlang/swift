@@ -58,7 +58,8 @@ function(get_test_dependencies SDK result_var_name)
       swift-ide-test
       swift-refactor
       swift-reflection-dump
-      swift-remoteast-test)
+      swift-remoteast-test
+      swift-scan-test)
 
     if(SWIFT_BUILD_SOURCEKIT)
       list(APPEND deps_binaries sourcekitd-test complete-test)
@@ -191,6 +192,7 @@ normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
@@ -209,6 +211,7 @@ normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
+normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 # Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
@@ -231,7 +234,6 @@ set(TEST_SUBSETS
     only_validation
     only_long
     only_stress
-    only_early_swiftdriver
 )
 
 if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -311,8 +313,19 @@ foreach(SDK ${SWIFT_SDKS})
         endif()
       endif()
 
-      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET "embedded-stdlib")
-        list(APPEND test_dependencies "embedded-stdlib")
+      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+        if(TARGET "embedded-stdlib")
+          list(APPEND test_dependencies "embedded-stdlib")
+        endif()
+       if(TARGET "embedded-darwin")
+          list(APPEND test_dependencies "embedded-darwin")
+        endif()
+        if(TARGET "embedded-concurrency")
+          list(APPEND test_dependencies "embedded-concurrency")
+        endif()
+        if(TARGET "embedded-synchronization")
+          list(APPEND test_dependencies "embedded-synchronization")
+        endif()
       endif()
 
       if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -393,6 +406,10 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "distributed")
         endif()
 
+        if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
+          list(APPEND LIT_ARGS "--param" "nonescapable_types")
+        endif()
+
         if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
           list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
@@ -403,6 +420,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
           list(APPEND LIT_ARGS "--param" "observation")
+        endif()
+
+        if(SWIFT_ENABLE_SYNCHRONIZATION)
+          list(APPEND LIT_ARGS "--param" "synchronization")
         endif()
 
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
@@ -421,7 +442,6 @@ foreach(SDK ${SWIFT_SDKS})
              (test_subset STREQUAL "validation") OR
              (test_subset STREQUAL "only_long") OR
              (test_subset STREQUAL "only_stress") OR
-             (test_subset STREQUAL "only_early_swiftdriver") OR
              (test_subset STREQUAL "all"))
             list(APPEND directories "${test_bin_dir}")
           endif()

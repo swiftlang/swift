@@ -193,7 +193,7 @@ FUNCTION(UnexpectedError, swift_unexpectedError, SwiftCC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind, NoReturn),
-         EFFECT(NoEffect),
+         EFFECT(NoEffect, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_copyPOD(void *dest, void *src, Metadata *self);
@@ -2805,6 +2805,24 @@ FUNCTION(InitRawStructMetadata,
          ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy->getPointerTo(0), Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
+         UNKNOWN_MEMEFFECTS)
+
+// _Unwind_Reason_Code _swift_exceptionPersonality(int version,
+//                                                 _Unwind_Action actions,
+//                                                 uint64 exceptionClass,
+//                                                 struct _Unwind_Exception *exceptionObject,
+//                                                 struct _Unwind_Context *context);
+FUNCTION(ExceptionPersonality,
+         _swift_exceptionPersonality,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int32Ty,
+              Int32Ty,
+              Int64Ty,
+              Int8PtrTy,
+              Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
 #undef RETURNS

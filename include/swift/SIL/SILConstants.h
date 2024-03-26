@@ -576,7 +576,7 @@ public:
   /// symbolic value.
   static SymbolicValue
   makeClosure(SILFunction *target,
-              ArrayRef<std::pair<SILValue, llvm::Optional<SymbolicValue>>>
+              ArrayRef<std::pair<SILValue, std::optional<SymbolicValue>>>
                   capturedArguments,
               SubstitutionMap substMap, SingleValueInstruction *closureInst,
               SymbolicValueAllocator &allocator);
@@ -672,7 +672,7 @@ private:
 };
 
 using SymbolicClosureArgument =
-    std::pair<SILValue, llvm::Optional<SymbolicValue>>;
+    std::pair<SILValue, std::optional<SymbolicValue>>;
 
 /// Representation of a symbolic closure. A symbolic closure consists of a
 /// SILFunction and an array of SIL values, corresponding to the captured

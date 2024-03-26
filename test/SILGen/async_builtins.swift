@@ -17,55 +17,183 @@ public struct X {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV12launchFutureyyxlF : $@convention(method) <T> (@in_guaranteed T, X) -> ()
+  // CHECK: [[FLAGS:%.*]] = apply
+  // CHECK: [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+  // CHECK: [[TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s4test1XV12launchFutureyyxlFxyYaYbKcfU_ :
+  // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>({{.*}}) : $@convention(thin) @Sendable @async <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error)
+  // CHECK: [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+  // CHECK: builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[GROUP]] : $Optional<Builtin.RawPointer>, [[TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   func launchFuture<T>(_ value: T) {
-    // CHECK: builtin "createAsyncTask"<T>([[ZERO:%.*]] : $Int, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
     _ = Builtin.createAsyncTask(0) { () async throws -> T in
       return value
     }
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV16launchGroupChild_5groupyx_BptlF : $@convention(method) <T> (@in_guaranteed T, Builtin.RawPointer, X) -> () {
+  // CHECK: [[FLAGS:%.*]] = apply
+  // CHECK: [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %1 : $Builtin.RawPointer
+  // CHECK: [[TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s4test1XV16launchGroupChild_5groupyx_BptlFxyYaYbKcfU_ :
+  // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>({{.*}}) : $@convention(thin) @Sendable @async <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error)
+  // CHECK: [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+  // CHECK: builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[GROUP]] : $Optional<Builtin.RawPointer>, [[TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   func launchGroupChild<T>(_ value: T, group: Builtin.RawPointer) {
-    // CHECK: builtin "createAsyncTaskInGroup"<T>([[ZERO:%.*]] : $Int, [[GROUP:%.*]] : $Builtin.RawPointer, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
-    _ = Builtin.createAsyncTaskInGroup(0, group) { () async throws -> T in
+     _ = Builtin.createAsyncTaskInGroup(0, group) { () async throws -> T in
       return value
     }
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV26launchDiscardingGroupChild5groupyBp_tF : $@convention(method) (Builtin.RawPointer, X) -> () {
+  // CHECK: [[FLAGS:%.*]] = apply
+  // CHECK: [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %0 : $Builtin.RawPointer
+  // CHECK: [[TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s4test1XV26launchDiscardingGroupChild5groupyBp_tFyyYaYbKcfU_ :
+  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
+  // CHECK: builtin "createAsyncTask"([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[GROUP]] : $Optional<Builtin.RawPointer>, [[TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
   func launchDiscardingGroupChild(group: Builtin.RawPointer) {
-    // CHECK: [[VOID:%.*]] = metatype $@thick ().Type
-    // CHECK: [[VOID_THICK:%.*]] = init_existential_metatype [[VOID]] : $@thick ().Type, $@thick any Any.Type
-    // CHECK: builtin "createAsyncDiscardingTaskInGroup"([[ZERO:%.*]] : $Int, [[GROUP:%.*]] : $Builtin.RawPointer, [[VOID_THICK]] : $@thick any Any.Type, [[FN:%.*]] : $@async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
     _ = Builtin.createAsyncDiscardingTaskInGroup(0, group) { () async throws in
       return
     }
   }
 
-  public func launchRocker<T>(closure: @escaping () async throws -> T) {
+  public func launchRocker<T>(closure: @Sendable @escaping () async throws -> T) {
     _ = Builtin.createAsyncTask(0, closure)
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV24launchFutureWithExecutor_8executoryx_BetlF : $@convention(method) <T> (@in_guaranteed T, Builtin.Executor, X) -> () {
+  // CHECK: [[FLAGS:%.*]] = apply
+  // CHECK: [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+  // CHECK: [[TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, %1 : $Builtin.Executor
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s4test1XV24launchFutureWithExecutor_8executoryx_BetlFxyYaYbKcfU_ :
+  // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>({{.*}}) : $@convention(thin) @Sendable @async <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error)
+  // CHECK: [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+  // CHECK: builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[GROUP]] : $Optional<Builtin.RawPointer>, [[TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   func launchFutureWithExecutor<T>(_ value: T, executor: Builtin.Executor) {
-    // CHECK: bb0([[ZERO:%[0-9]+]] : $*T, [[EXECUTOR:%[0-9]+]] : $Builtin.Executor, [[TWO:%[0-9]+]] : $X):
-    // CHECK: [[TASK:%[0-9]+]] = builtin "createAsyncTaskWithExecutor"<T>([[NINE:%[0-9]+]] : $Int, [[EXECUTOR]] : $Builtin.Executor, [[TYPE:%[0-9]+]] : $@thick any Any.Type, [[FN:%[0-9]+]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
     _ = Builtin.createAsyncTaskWithExecutor(0, executor) { () async throws -> T in
       return value
     }
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV34launchDiscardingFutureWithExecutor5group8executoryBp_BetF : $@convention(method) (Builtin.RawPointer, Builtin.Executor, X) -> () {
+  // CHECK: [[FLAGS:%.*]] = apply
+  // CHECK: [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: [[GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %0 : $Builtin.RawPointer
+  // CHECK: [[TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, %1 : $Builtin.Executor
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s4test1XV34launchDiscardingFutureWithExecutor5group8executoryBp_BetFyyYaYbKcfU_ :
+  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
+  // CHECK: builtin "createAsyncTask"([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[GROUP]] : $Optional<Builtin.RawPointer>, [[TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
   func launchDiscardingFutureWithExecutor(group: Builtin.RawPointer, executor: Builtin.Executor) {
-    // CHECK: [[VOID:%.*]] = metatype $@thick ().Type
-    // CHECK: [[VOID_THICK:%.*]] = init_existential_metatype [[VOID]] : $@thick ().Type, $@thick any Any.Type
-    // CHECK: builtin "createAsyncTaskInGroupWithExecutor"([[ZERO:%.*]] : $Int, [[GROUP:%.*]] : $Builtin.RawPointer, [[EXECUTOR:%[0-9]+]] : $Builtin.Executor, [[VOID_THICK]] : $@thick any Any.Type, [[FN:%.*]] : $@async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(0, group, executor) { () async throws in
       return
     }
   }
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A10CreateTask5valueyx_tlF
+// CHECK:         [[FLAGS:%.*]] = apply
+// CHECK-NEXT:    [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK-NEXT:    [[OPT_GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK-NEXT:    [[OPT_TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NEXT:    [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+// CHECK-NEXT:    builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[OPT_GROUP]] : $Optional<Builtin.RawPointer>, [[OPT_TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+func testCreateTask<T>(value: T) {
+  _ = Builtin.createTask(flags: 0) {
+    value
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A10CreateTask5group5valueyBp_xtlF
+// CHECK:         [[FLAGS:%.*]] = apply
+// CHECK-NEXT:    [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[OPT_GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %0 : $Builtin.RawPointer
+// CHECK-NEXT:    [[OPT_TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NEXT:    [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+// CHECK-NEXT:    builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[OPT_GROUP]] : $Optional<Builtin.RawPointer>, [[OPT_TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+func testCreateTask<T>(group: Builtin.RawPointer, value: T) {
+  _ = Builtin.createTask(flags: 0, taskGroup: group) {
+    value
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A10CreateTask12taskExecutor5valueyBe_xtlF
+// CHECK:         [[FLAGS:%.*]] = apply
+// CHECK-NEXT:    [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[OPT_GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK-NEXT:    [[OPT_TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, %0 : $Builtin.Executor
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NEXT:    [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+// CHECK-NEXT:    builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[OPT_GROUP]] : $Optional<Builtin.RawPointer>, [[OPT_TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+func testCreateTask<T>(taskExecutor: Builtin.Executor, value: T) {
+  _ = Builtin.createTask(flags: 0, initialTaskExecutor: taskExecutor) {
+    value
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A10CreateTask14serialExecutor5valueyBe_xtlF
+// CHECK:         [[FLAGS:%.*]] = apply
+// CHECK-NEXT:    [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, %0 : $Builtin.Executor
+// CHECK-NEXT:    [[OPT_GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK-NEXT:    [[OPT_TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NEXT:    [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+// CHECK-NEXT:    builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[OPT_GROUP]] : $Optional<Builtin.RawPointer>, [[OPT_TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+func testCreateTask<T>(serialExecutor: Builtin.Executor, value: T) {
+  _ = Builtin.createTask(flags: 0, initialSerialExecutor: serialExecutor) {
+    value
+  }
+}
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A10CreateTask5group8executor5valueyBp_BextlF
+// CHECK:         [[FLAGS:%.*]] = apply
+// CHECK-NEXT:    [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[OPT_GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %0 : $Builtin.RawPointer
+// CHECK-NEXT:    [[OPT_TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, %1 : $Builtin.Executor
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NEXT:    [[CONVERTED_CLOSURE:%.*]] = convert_function [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out T, @error any Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>
+// CHECK-NEXT:    builtin "createAsyncTask"<T>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[OPT_GROUP]] : $Optional<Builtin.RawPointer>, [[OPT_TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CONVERTED_CLOSURE]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+func testCreateTask<T>(group: Builtin.RawPointer, executor: Builtin.Executor, value: T) {
+  _ = Builtin.createTask(flags: 0, taskGroup: group, initialTaskExecutor: executor) {
+    value
+  }
+}
+
+//   A discarding task without a group is not currently a legal
+//   combination; if we start enforcing that, feel free to change this
+//   as needed.
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A20CreateDiscardingTask5valueyx_tlF
+// CHECK:         [[FLAGS:%.*]] = apply
+// CHECK-NEXT:    [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[OPT_GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK-NEXT:    [[OPT_TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NEXT:    builtin "createAsyncTask"([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[OPT_GROUP]] : $Optional<Builtin.RawPointer>, [[OPT_TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+func testCreateDiscardingTask<T>(value: T) {
+  _ = Builtin.createDiscardingTask(flags: 0) {
+    _ = value
+  }
+}
+
+//   A discarding task without a group is not currently a legal
+//   combination; if we start enforcing that, feel free to change this
+//   as needed.
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A20CreateDiscardingTask5group8executor5valueyBp_BextlF
+// CHECK:         [[FLAGS:%.*]] = apply
+// CHECK-NEXT:    [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[OPT_GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %0 : $Builtin.RawPointer
+// CHECK-NEXT:    [[OPT_TASK_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, %1 : $Builtin.Executor
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NEXT:    builtin "createAsyncTask"([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[OPT_GROUP]] : $Optional<Builtin.RawPointer>, [[OPT_TASK_EXECUTOR]] : $Optional<Builtin.Executor>, [[CLOSURE]] : $@Sendable @async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+func testCreateDiscardingTask<T>(group: Builtin.RawPointer, executor: Builtin.Executor, value: T) {
+  _ = Builtin.createDiscardingTask(flags: 0, taskGroup: group, initialTaskExecutor: executor) {
+    _ = value
+  }
+}
 // CHECK-LABEL: sil [ossa] @$s4test26usesWithUnsafeContinuationyyYaF : $@convention(thin) @async () -> () {
 public func usesWithUnsafeContinuation() async {
   // trivial resume type

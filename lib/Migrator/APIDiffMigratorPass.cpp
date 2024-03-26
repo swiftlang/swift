@@ -92,8 +92,8 @@ private:
   }
 
   bool isUserTypeAlias(TypeRepr *T) const {
-    if (auto Ident = dyn_cast<IdentTypeRepr>(T)) {
-      if (auto Bound = Ident->getBoundDecl()) {
+    if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
+      if (auto *Bound = DeclRefTR->getBoundDecl()) {
         return isa<TypeAliasDecl>(Bound) &&
           !Bound->getModuleContext()->isSystemModule();
       }
@@ -128,13 +128,12 @@ public:
                            TypeRepr *SecondChild, bool Optional = false,
                            bool Suffixable = true) {
     TypeRepr *Children[] = {FirstChild, SecondChild};
-    return handleParent(Parent, llvm::makeArrayRef(Children), Optional,
-                        Suffixable);
+    return handleParent(Parent, llvm::ArrayRef(Children), Optional, Suffixable);
   }
 
   FoundResult handleParent(TypeRepr *Parent, TypeRepr *Base,
                            bool Optional = false, bool Suffixable = true) {
-    return handleParent(Parent, llvm::makeArrayRef(Base), Optional, Suffixable);
+    return handleParent(Parent, llvm::ArrayRef(Base), Optional, Suffixable);
   }
 
   FoundResult visitTypeRepr(TypeRepr *T) {
@@ -154,6 +153,10 @@ public:
   }
 
   FoundResult visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
+    return visit(T->getBase());
+  }
+
+  FoundResult visitTransferringTypeRepr(TransferringTypeRepr *T) {
     return visit(T->getBase());
   }
 
@@ -189,16 +192,8 @@ public:
                         /*Suffixable=*/false);
   }
 
-  FoundResult visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
-    return handleParent(T, ArrayRef<TypeRepr*>());
-  }
-
-  FoundResult visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
+  FoundResult visitDeclRefTypeRepr(DeclRefTypeRepr *T) {
     return handleParent(T, T->getGenericArgs());
-  }
-
-  FoundResult visitMemberTypeRepr(MemberTypeRepr *T) {
-    return visit(T->getLastComponent());
   }
 
   FoundResult visitOptionalTypeRepr(OptionalTypeRepr *T) {
@@ -251,7 +246,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   bool isDotMember(CharSourceRange Range) {
     auto S = Range.str();
-    return S.startswith(".") && S.substr(1).find(".") == StringRef::npos;
+    return S.starts_with(".") && S.substr(1).find(".") == StringRef::npos;
   }
 
   bool isDotMember(SourceRange Range) {
@@ -843,7 +838,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
 
     std::string Rename;
-    llvm::Optional<NodeAnnotation> Kind;
+    std::optional<NodeAnnotation> Kind;
     StringRef LeftComment;
     StringRef RightComment;
     for (auto *Item: getRelatedDiffItems(RD)) {
@@ -1062,7 +1057,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
   void handleResultTypeChange(ValueDecl *FD, Expr *Call) {
-    llvm::Optional<NodeAnnotation> ChangeKind;
+    std::optional<NodeAnnotation> ChangeKind;
 
     // look for related change item for the function decl.
     for (auto Item: getRelatedDiffItems(FD)) {
@@ -1401,7 +1396,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 	}
       }
       // We only handle top-level expressions, so avoid visiting further.
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
   };
 

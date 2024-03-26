@@ -19,10 +19,9 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/None.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <optional>
 
 #include <string>
 #include <vector>
@@ -364,10 +363,10 @@ private:
                            FrameworkSearchPaths.size() - 1);
   }
 
-  llvm::Optional<StringRef> WinSDKRoot = llvm::None;
-  llvm::Optional<StringRef> WinSDKVersion = llvm::None;
-  llvm::Optional<StringRef> VCToolsRoot = llvm::None;
-  llvm::Optional<StringRef> VCToolsVersion = llvm::None;
+  std::optional<StringRef> WinSDKRoot = std::nullopt;
+  std::optional<StringRef> WinSDKVersion = std::nullopt;
+  std::optional<StringRef> VCToolsRoot = std::nullopt;
+  std::optional<StringRef> VCToolsVersion = std::nullopt;
 
 public:
   StringRef getSDKPath() const { return SDKPath; }
@@ -387,22 +386,22 @@ public:
     Lookup.searchPathsDidChange();
   }
 
-  llvm::Optional<StringRef> getWinSDKRoot() const { return WinSDKRoot; }
+  std::optional<StringRef> getWinSDKRoot() const { return WinSDKRoot; }
   void setWinSDKRoot(StringRef root) {
     WinSDKRoot = root;
   }
 
-  llvm::Optional<StringRef> getWinSDKVersion() const { return WinSDKVersion; }
+  std::optional<StringRef> getWinSDKVersion() const { return WinSDKVersion; }
   void setWinSDKVersion(StringRef version) {
     WinSDKVersion = version;
   }
 
-  llvm::Optional<StringRef> getVCToolsRoot() const { return VCToolsRoot; }
+  std::optional<StringRef> getVCToolsRoot() const { return VCToolsRoot; }
   void setVCToolsRoot(StringRef root) {
     VCToolsRoot = root;
   }
 
-  llvm::Optional<StringRef> getVCToolsVersion() const { return VCToolsVersion; }
+  std::optional<StringRef> getVCToolsVersion() const { return VCToolsVersion; }
   void setVCToolsVersion(StringRef version) {
     VCToolsVersion = version;
   }

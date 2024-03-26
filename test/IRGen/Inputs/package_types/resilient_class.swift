@@ -65,6 +65,22 @@ package class ResilientGenericOutsideParent<A> {
   }
 }
 
+public class PublicGenericOutsideParent<A> {
+  public var property: A
+  public init(property: A) {
+    self.property = property
+    print("PublicGenericOutsideParent.init()")
+  }
+
+  public func method() {
+    print("PublicGenericOutsideParent.method()")
+  }
+
+  public class func classMethod() {
+    print("PublicGenericOutsideParent.classMethod()")
+  }
+}
+
 
 // Resilient generic subclass
 

@@ -46,7 +46,7 @@ class StringSwitch {
 
   /// The pointer to the result of this switch statement, once known,
   /// null before that.
-  Optional<T> Result;
+  std::optional<T> Result;
 
 public:
   explicit StringSwitch(StringRef S)
@@ -80,7 +80,7 @@ public:
   }
 
   StringSwitch& StartsWith(StringLiteral S, T Value) {
-    if (!Result && Str.startswith(S)) {
+    if (!Result && Str.starts_with(S)) {
       Result = std::move(Value);
     }
     return *this;
@@ -153,7 +153,7 @@ public:
   }
 
   StringSwitch &StartsWithLower(StringLiteral S, T Value) {
-    if (!Result && Str.startswith_insensitive(S))
+    if (!Result && Str.starts_with_insensitive(S))
       Result = std::move(Value);
 
     return *this;

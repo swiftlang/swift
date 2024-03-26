@@ -36,14 +36,14 @@
 
 // Standard Library Symbols
 
-// Swift._getRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss15_getRetainCountySuyXlF
+// Swift.String.init<A, B where A: Swift._UnicodeEncoding, B: Swift.Sequence, A.CodeUnit == B.Element>(validating: B, as: A.Type) -> Swift.String?
+Added: _$sSS10validating2asSSSgq__xmtcs16_UnicodeEncodingRzSTR_7ElementQy_8CodeUnitRtzr0_lufC
 
-// Swift._getWeakRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss19_getWeakRetainCountySuyXlF
+// Swift.String.init<A, B where A: Swift._UnicodeEncoding, B: Swift.Sequence, A.CodeUnit == Swift.UInt8, B.Element == Swift.Int8>(validating: B, as: A.Type) -> Swift.String?
+Added: _$sSS10validating2asSSSgq__xmtcs16_UnicodeEncodingRzSTR_s5UInt8V8CodeUnitRtzs4Int8V7ElementRt_r0_lufC
 
-// Swift._getUnownedRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss22_getUnownedRetainCountySuyXlF
+// static Swift.String._validate<A where A: Swift._UnicodeEncoding>(_: Swift.UnsafeBufferPointer<A.CodeUnit>, as: A.Type) -> Swift.String?
+Added: _$sSS9_validate_2asSSSgSRy8CodeUnitQzG_xmts16_UnicodeEncodingRzlFZ
 
 // class __StaticArrayStorage
 Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfC
@@ -239,4 +239,19 @@ Added: _$sSMsSmRzrlE15removeSubrangesyys8RangeSetVy5IndexSlQzGF
 // (extension in Swift):Swift.MutableCollection.moveSubranges(_: Swift.RangeSet<A.Index>, to: A.Index) -> Swift.Range<A.Index>
 Added: _$sSMsE13moveSubranges_2toSny5IndexQzGs8RangeSetVyADG_ADtF
 
+// `isEmpty` is a newly explicit property on Unsafe[Mutable]BufferPointer
+// property descriptor for Swift.UnsafeBufferPointer.isEmpty : Swift.Bool
+Added: _$sSR7isEmptySbvpMV
+// property descriptor for Swift.UnsafeMutableBufferPointer.isEmpty : Swift.Bool
+Added: _$sSr7isEmptySbvpMV
+
 // Runtime Symbols
+Added: __swift_pod_copy
+Added: __swift_pod_destroy
+Added: __swift_pod_direct_initializeBufferWithCopyOfBuffer
+Added: __swift_pod_indirect_initializeBufferWithCopyOfBuffer
+Added: __swift_validatePrespecializedMetadata
+Added: __swift_exceptionPersonality
+Added: _swift_willThrowTypedImpl
+Added: __swift_willThrowTypedImpl
+Added: __swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly

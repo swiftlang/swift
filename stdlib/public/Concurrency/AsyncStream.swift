@@ -330,8 +330,20 @@ public struct AsyncStream<Element> {
   ///     }
   ///
   ///
+  @_alwaysEmitIntoClient
   public init(
-    unfolding produce: @escaping () async -> Element?, 
+    unfolding produce: @escaping @Sendable () async -> Element?,
+    onCancel: (@Sendable () -> Void)? = nil
+  ) {
+    self.init(
+      unfolding: produce as () async -> Element?,
+      onCancel: onCancel
+    )
+  }
+
+  @usableFromInline
+  internal init(
+    unfolding produce: @escaping () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
@@ -375,6 +387,24 @@ extension AsyncStream: AsyncSequence {
     /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
     /// might return `nil` immediately, or return `nil` on subsequent calls.
     public mutating func next() async -> Element? {
+      await context.produce()
+    }
+
+    /// The next value from the asynchronous stream.
+    ///
+    /// When `next()` returns `nil`, this signifies the end of the
+    /// `AsyncStream`.
+    ///
+    /// It is a programmer error to invoke `next()` from a concurrent
+    /// context that contends with another such call, which results in a call to
+    /// `fatalError()`.
+    ///
+    /// If you cancel the task this iterator is running in while `next()`
+    /// is awaiting a value, the `AsyncStream` terminates. In this case,
+    /// `next()` might return `nil` immediately, or return `nil` on
+    /// subsequent calls.
+    @available(SwiftStdlib 6.0, *)
+    public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {
       await context.produce()
     }
   }
@@ -528,6 +558,12 @@ extension AsyncStream {
     @available(SwiftStdlib 5.1, *)
     @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
     public mutating func next() async -> Element? {
+      fatalError("Unavailable in task-to-thread concurrency model")
+    }
+    
+    @available(SwiftStdlib 6.0, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {
       fatalError("Unavailable in task-to-thread concurrency model")
     }
   }

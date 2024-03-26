@@ -19,6 +19,19 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-sil-based-debuginfo")
 endif()
 
+option(SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE
+       "On Darwin platforms, link the standard library in a way that
+       allows inclusion in the dyld shared cache"
+       FALSE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
+   LLVM_LINKER_IS_APPLE AND
+   NOT SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE)
+  set(shared_cache_link_flags "LINKER:-not_for_dyld_shared_cache")
+  list(APPEND SWIFT_RUNTIME_LINK_FLAGS ${shared_cache_link_flags})
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
+endif()
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -35,9 +48,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-xc++")
 endif()
-
-# Use the new diagnostic formatter.
-list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-diagnostic-style" "swift")
 
 # We should avoid non-literals in format strings, or appropriately mark
 # functions.
@@ -174,7 +184,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
-      "armv6m   armv6m-none-none-eabi     armv6-none-none-eabi"
+      "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
       "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
       "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
     )
@@ -188,6 +198,16 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
       "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
+    )
+  endif()
+  if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "i686    i686-unknown-none-elf       i686-unknown-none-elf"
+      "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+      # Without specifying the `windows` component LLVM refuses to
+      # generate valid COFF object files.
+      "i686    i686-unknown-windows-msvc   i686-unknown-windows-msvc"
+      "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
     )
   endif()
 
@@ -221,6 +241,10 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+
+  if(SWIFT_BUILD_CLANG_OVERLAYS)
+    add_subdirectory(ClangOverlays)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
@@ -251,6 +275,10 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
 
   if(SWIFT_ENABLE_BACKTRACING)
     add_subdirectory(Backtracing)
+  endif()
+
+  if(SWIFT_ENABLE_SYNCHRONIZATION)
+    add_subdirectory(Synchronization)
   endif()
 endif()
 

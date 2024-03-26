@@ -25,7 +25,7 @@
 
 #include "chrono_utils.h"
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include "swift/Threading/Errors.h"
 
@@ -64,7 +64,7 @@ inline bool threads_same(thread_id a, thread_id b) {
   return ::pthread_equal(a, b);
 }
 
-llvm::Optional<stack_bounds> thread_get_current_stack_bounds();
+std::optional<stack_bounds> thread_get_current_stack_bounds();
 
 // .. Mutex support ..........................................................
 
@@ -107,9 +107,8 @@ using lazy_mutex_handle = ::pthread_mutex_t;
 
 // We don't actually need to be lazy here because pthreads has
 // PTHREAD_MUTEX_INITIALIZER.
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return PTHREAD_MUTEX_INITIALIZER;
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_destroy(&handle));
 }

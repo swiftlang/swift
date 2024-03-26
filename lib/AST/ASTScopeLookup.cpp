@@ -274,22 +274,24 @@ bool Portion::lookupMembersOf(const GenericTypeOrExtensionScope *,
   return false;
 }
 
-bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  if (scope->getCorrespondingNominalTypeDecl().isNull())
+    return false;
+
+  if (!scope->areMembersVisibleFromWhereClause())
+    return false;
+
+  return consumer.lookInMembers(scope->getGenericContext());
+}
+
+bool IterableTypeBodyPortion::lookupMembersOf(
     const GenericTypeOrExtensionScope *scope,
     ASTScopeImpl::DeclConsumer consumer) const {
   if (scope->getCorrespondingNominalTypeDecl().isNull())
     return false;
   return consumer.lookInMembers(scope->getGenericContext());
-}
-
-bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
-    const GenericTypeOrExtensionScope *scope,
-    ASTScopeImpl::DeclConsumer consumer) const {
-  if (!scope->areMembersVisibleFromWhereClause())
-    return false;
-
-  return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
-    scope, consumer);
 }
 
 bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
@@ -437,9 +439,7 @@ bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
-  auto *initContext = dyn_cast_or_null<PatternBindingInitializer>(
-      decl->getInitContext(0));
-  if (initContext) {
+  if (auto *initContext = decl->getInitContext(0)) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
       return consumer.consume({selfParam});
     }
@@ -704,6 +704,21 @@ getCatchNode(const ASTScopeImpl *scope) {
   return { CatchNode(), nullptr };
 }
 
+/// Check whether the given location precedes the start of the catch location
+/// despite being technically within the catch node's source range.
+static bool locationIsPriorToStartOfCatchScope(SourceLoc loc, CatchNode node) {
+  auto closure = node.dyn_cast<ClosureExpr *>();
+  if (!closure)
+    return false;
+
+  SourceManager &sourceMgr = closure->getASTContext().SourceMgr;
+  SourceLoc inLoc = closure->getInLoc();
+  if (inLoc.isValid())
+    return sourceMgr.isBefore(loc, inLoc);
+
+  return sourceMgr.isAtOrBefore(loc, closure->getStartLoc());
+}
+
 CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   auto sourceFile = module->getSourceFileContainingLocation(loc);
   if (!sourceFile)
@@ -721,7 +736,8 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
     // If we are at a catch node and in the body of the region from which that
     // node catches thrown errors, we have our result.
     auto caught = getCatchNode(scope);
-    if (caught.first && caught.second == innerBodyScope) {
+    if (caught.first && caught.second == innerBodyScope &&
+        !locationIsPriorToStartOfCatchScope(loc, caught.first)) {
       return caught.first;
     }
 

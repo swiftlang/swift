@@ -342,7 +342,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
-      SourceText = llvm::None;
+      SourceText = std::nullopt;
       Inputs.push_back(InputArg->getValue());
       break;
 

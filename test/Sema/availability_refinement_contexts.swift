@@ -73,8 +73,9 @@ protocol SomeProtocol {
   var protoProperty: Int { get }
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[10.51,+Inf) decl=extension.SomeClass
-// CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someExtensionFunction()
+// CHECK-NEXT: {{^}}  (decl_implicit versions=[10.13,+Inf) decl=extension.SomeClass
+// CHECK-NEXT: {{^}}    (decl versions=[10.51,+Inf) decl=extension.SomeClass
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someExtensionFunction()
 @available(OSX 10.51, *)
 extension SomeClass {
   @available(OSX 10.52, *)
@@ -207,15 +208,16 @@ func functionWithWhile() {
   }
 }
 
-// CHECK-NEXT: {{^}}  (decl versions=[10.51,+Inf) decl=extension.SomeClass
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someStaticPropertyWithClosureInit
-// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someStaticPropertyWithClosureInit
-// CHECK-NEXT: {{^}}        (condition_following_availability versions=[10.54,+Inf)
-// CHECK-NEXT: {{^}}        (if_then versions=[10.54,+Inf)
-// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someStaticPropertyWithClosureInitInferred
-// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someStaticPropertyWithClosureInitInferred
-// CHECK-NEXT: {{^}}        (condition_following_availability versions=[10.54,+Inf)
-// CHECK-NEXT: {{^}}        (if_then versions=[10.54,+Inf)
+// CHECK-NEXT: {{^}}  (decl_implicit versions=[10.13,+Inf) decl=extension.SomeClass
+// CHECK-NEXT: {{^}}    (decl versions=[10.51,+Inf) decl=extension.SomeClass
+// CHECK-NEXT: {{^}}      (decl_implicit versions=[10.51,+Inf) decl=someStaticPropertyWithClosureInit
+// CHECK-NEXT: {{^}}        (decl versions=[10.52,+Inf) decl=someStaticPropertyWithClosureInit
+// CHECK-NEXT: {{^}}          (condition_following_availability versions=[10.54,+Inf)
+// CHECK-NEXT: {{^}}          (if_then versions=[10.54,+Inf)
+// CHECK-NEXT: {{^}}      (decl_implicit versions=[10.51,+Inf) decl=someStaticPropertyWithClosureInitInferred
+// CHECK-NEXT: {{^}}        (decl versions=[10.52,+Inf) decl=someStaticPropertyWithClosureInitInferred
+// CHECK-NEXT: {{^}}          (condition_following_availability versions=[10.54,+Inf)
+// CHECK-NEXT: {{^}}          (if_then versions=[10.54,+Inf)
 @available(OSX 10.51, *)
 extension SomeClass {
   @available(OSX 10.52, *)

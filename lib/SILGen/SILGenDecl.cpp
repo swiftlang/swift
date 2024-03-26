@@ -502,7 +502,7 @@ public:
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl,
-                              llvm::Optional<MarkUninitializedInst::Kind> kind,
+                              std::optional<MarkUninitializedInst::Kind> kind,
                               uint16_t ArgNo, bool generateDebugInfo,
                               SILGenFunction &SGF)
       : decl(decl) {
@@ -515,11 +515,14 @@ public:
     auto instanceType = SGF.SGM.Types.getLoweredRValueType(
         TypeExpansionContext::minimal(), decl->getTypeInContext());
 
-    // If we have a no implicit copy param decl, make our instance type
-    // @moveOnly.
-    if (!instanceType->isNoncopyable()) {
+
+    bool isNoImplicitCopy = instanceType->is<SILMoveOnlyWrappedType>();
+
+    // If our instance type is not already @moveOnly wrapped, and it's a
+    // no-implicit-copy parameter, wrap it.
+    if (!isNoImplicitCopy && !instanceType->isNoncopyable()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
-        bool isNoImplicitCopy = pd->isNoImplicitCopy();
+        isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
         if (pd->isSelfParameter()) {
           auto *dc = pd->getDeclContext();
@@ -533,19 +536,21 @@ public:
       }
     }
 
+    const bool isCopyable = isNoImplicitCopy || !instanceType->isNoncopyable();
+
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
         decl, instanceType, SGF.F.getGenericEnvironment(),
-        /*mutable*/ !instanceType->isNoncopyable() || !decl->isLet());
+        /*mutable=*/ isCopyable || !decl->isLet());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
 
-    llvm::Optional<SILDebugVariable> DbgVar;
+    std::optional<SILDebugVariable> DbgVar;
     if (generateDebugInfo)
       DbgVar = SILDebugVariable(decl->isLet(), ArgNo);
     Box = SGF.B.createAllocBox(
-        decl, boxType, DbgVar, /*hasDynamicLifetime*/ false,
-        /*reflection*/ false, /*usesMoveableValueDebugInfo*/ false,
+        decl, boxType, DbgVar, DoesNotHaveDynamicLifetime,
+        /*reflection*/ false, DoesNotUseMoveableValueDebugInfo,
         !generateDebugInfo);
 
     // Mark the memory as uninitialized, so DI will track it for us.
@@ -564,11 +569,11 @@ public:
       // pointer to a box can be formed; and the box doesn't synchronize on
       // deinit.
       //
-      // Only add a lexical lifetime to the box if the the variable it stores
+      // Only add a lexical lifetime to the box if the variable it stores
       // requires one.
-      Box = SGF.B.createBeginBorrow(
-          decl, Box, /*isLexical=*/lifetime.isLexical(),
-          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
+      Box =
+          SGF.B.createBeginBorrow(decl, Box, IsLexical_t(lifetime.isLexical()),
+                                  DoesNotHavePointerEscape, IsFromVarDecl);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -689,7 +694,7 @@ public:
       // For noncopyable types, we always need to box them.
       needsTemporaryBuffer =
           (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
-              lowering->getLoweredType().getASTType()->isNoncopyable();
+              lowering->getLoweredType().isMoveOnly(/*orWrapped=*/false);
     }
 
     // Make sure that we have a non-address only type when binding a
@@ -703,10 +708,11 @@ public:
       bool lexicalLifetimesEnabled =
           SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule());
       auto lifetime = SGF.F.getLifetime(vd, lowering->getLoweredType());
-      auto isLexical = lexicalLifetimesEnabled && lifetime.isLexical();
-      address =
-          SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
-                                      /*hasDynamicLifetime=*/false, isLexical);
+      auto isLexical =
+          IsLexical_t(lexicalLifetimesEnabled && lifetime.isLexical());
+      address = SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
+                                            DoesNotHaveDynamicLifetime,
+                                            isLexical, IsFromVarDecl);
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
@@ -774,28 +780,34 @@ public:
     if (value->getOwnershipKind() == OwnershipKind::None) {
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
-      if (value->getType().getASTType()->isNoncopyable()) {
-        value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+      if (value->getType().isMoveOnly(/*orWrapped=*/false)) {
+        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
         return SGF.B.createMarkUnresolvedNonCopyableValueInst(
             PrologueLoc, value,
             MarkUnresolvedNonCopyableValueInst::CheckKind::
                 ConsumableAndAssignable);
       }
 
-      // Otherwise, if we don't have a no implicit copy trivial type, just
-      // return value.
-      if (!vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
-        return value;
+      // If we have a no implicit copy trivial type, wrap it in the move only
+      // wrapper and mark it as needing checking by the move checker.
+      if (vd->isNoImplicitCopy() && value->getType().isTrivial(SGF.F)) {
+        value =
+            SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
+        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
+        return SGF.B.createMarkUnresolvedNonCopyableValueInst(
+            PrologueLoc, value,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
+      }
 
-      // Otherwise, we have a no implicit copy trivial type, so wrap it in the
-      // move only wrapper and mark it as needing checking by the move cherk.
-      value =
-          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
-      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-          PrologueLoc, value,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
+      if (!value->getType().isTrivial(SGF.F)) {
+        // A value without ownership of non-trivial type, e.g. Optional<K>.none.
+        // Mark that it is from a VarDecl.
+        return SGF.B.createMoveValue(PrologueLoc, value, IsNotLexical,
+                                     DoesNotHavePointerEscape, IsFromVarDecl);
+      }
+
+      return value;
     }
 
     // Otherwise, we need to perform some additional processing. First, if we
@@ -824,8 +836,8 @@ public:
     // We do this before the begin_borrow "normal" path below since move only
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
-        value->getType().getASTType()->isNoncopyable()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
+        value->getType().isMoveOnly(/*orWrapped=*/false)) {
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -835,9 +847,8 @@ public:
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
     if (vd->isNoImplicitCopy()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true,
-                                    /*hasPointerEscape=*/false,
-                                    /*fromVarDecl=*/true);
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical,
+                                    DoesNotHavePointerEscape, IsFromVarDecl);
       value =
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
@@ -849,16 +860,15 @@ public:
     // Otherwise, if we do not have a no implicit copy variable, just follow
     // the "normal path".
 
-    auto isLexical = SGF.F.getLifetime(vd, value->getType()).isLexical();
+    auto isLexical =
+        IsLexical_t(SGF.F.getLifetime(vd, value->getType()).isLexical());
 
     if (value->getOwnershipKind() == OwnershipKind::Owned)
-      return SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ isLexical,
-                                   /*hasPointerEscape=*/false,
-                                   /*fromVarDecl=*/true);
+      return SGF.B.createMoveValue(PrologueLoc, value, isLexical,
+                                   DoesNotHavePointerEscape, IsFromVarDecl);
 
-    return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ isLexical,
-                                   /*hasPointerEscape=*/false,
-                                   /*fromVarDecl=*/true);
+    return SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
+                                   DoesNotHavePointerEscape, IsFromVarDecl);
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
@@ -1487,7 +1497,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
     Result = InitializationPtr(new KnownAddressInitialization(addr));
   } else {
-    llvm::Optional<MarkUninitializedInst::Kind> uninitKind;
+    std::optional<MarkUninitializedInst::Kind> uninitKind;
     if (isUninitialized) {
       uninitKind = MarkUninitializedInst::Kind::Var;
     }
@@ -1721,8 +1731,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           // Begin a new binding scope, which is popped when the next innermost debug
           // scope ends. The cleanup location loc isn't the perfect source location
           // but it's close enough.
-          B.getSILGenFunction().enterDebugScope(loc,
-                                                      /*isBindingScope=*/true);
+          B.getSILGenFunction().enterDebugScope(loc, /*isBindingScope=*/true);
         InitializationPtr initialization =
           emitPatternBindingInitialization(elt.getPattern(), FalseDest);
 
@@ -1993,7 +2002,7 @@ CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet,
 
 /// Create a LocalVariableInitialization for the uninitialized var.
 InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
-    VarDecl *vd, llvm::Optional<MarkUninitializedInst::Kind> kind,
+    VarDecl *vd, std::optional<MarkUninitializedInst::Kind> kind,
     unsigned ArgNo, bool generateDebugInfo) {
   return InitializationPtr(new LocalVariableInitialization(
       vd, kind, ArgNo, generateDebugInfo, *this));

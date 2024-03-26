@@ -320,7 +320,7 @@ void GenericEnvironment::addMapping(GenericParamKey key,
   getContextTypes()[index] = contextType;
 }
 
-llvm::Optional<Type>
+std::optional<Type>
 GenericEnvironment::getMappingIfPresent(GenericParamKey key) const {
   // Find the index into the parallel arrays of generic parameters and
   // context types.
@@ -331,7 +331,7 @@ GenericEnvironment::getMappingIfPresent(GenericParamKey key) const {
   if (auto type = getContextTypes()[index])
     return type;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 namespace {
@@ -404,7 +404,7 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
 
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
-  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+  assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
          "already have a contextual type");
   assert((env || !type->hasTypeParameter()) &&
          "no generic environment provided for type with type parameters");
@@ -677,14 +677,14 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
     findElementArchetype(this, getOpenedPackParams());
 
   return type.transformTypeParameterPacks(
-      [&](SubstitutableType *ty) -> llvm::Optional<Type> {
+      [&](SubstitutableType *ty) -> std::optional<Type> {
         if (auto *packArchetype = dyn_cast<PackArchetypeType>(ty)) {
           auto interfaceType = packArchetype->getInterfaceType();
           if (sig->haveSameShape(interfaceType, shapeClass))
             return Type(findElementArchetype(interfaceType));
         }
 
-        return llvm::None;
+        return std::nullopt;
       });
 }
 
@@ -734,10 +734,11 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
 
   type = type->mapTypeOutOfContext();
 
+  auto interfaceType = element->getInterfaceType();
+
   llvm::SmallDenseMap<GenericParamKey, GenericTypeParamType *>
       packParamForElement;
-  auto elementDepth =
-      sig.getInnermostGenericParams().front()->getDepth() + 1;
+  auto elementDepth = interfaceType->getRootGenericParam()->getDepth();
 
   for (auto *genericParam : sig.getGenericParams()) {
     if (!genericParam->isParameterPack())
@@ -791,6 +792,8 @@ Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
   if (auto resultType = Query(type)) {
     auto param = type->castTo<GenericTypeParamType>();
     if (!param->isParameterPack())
+      return resultType;
+    if (resultType->is<PackType>())
       return resultType;
     return PackType::getSingletonPackExpansion(resultType);
   }

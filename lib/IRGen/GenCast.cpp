@@ -160,7 +160,7 @@ getDynamicCastArguments(IRGenFunction &IGF,
     return argsBuf;
       
   case CheckedCastMode::Conditional:
-    return llvm::makeArrayRef(argsBuf, n-3);
+    return llvm::ArrayRef(argsBuf, n - 3);
     break;
   }
   llvm_unreachable("covered switch");
@@ -532,7 +532,7 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
 /// Emit a checked cast to a protocol or protocol composition.
 void irgen::emitScalarExistentialDowncast(
     IRGenFunction &IGF, llvm::Value *value, SILType srcType, SILType destType,
-    CheckedCastMode mode, llvm::Optional<MetatypeRepresentation> metatypeKind,
+    CheckedCastMode mode, std::optional<MetatypeRepresentation> metatypeKind,
     GenericSignature fnSig, Explosion &ex) {
   auto srcInstanceType = srcType.getASTType();
   auto destInstanceType = destType.getASTType();
@@ -726,7 +726,7 @@ void irgen::emitScalarExistentialDowncast(
 
   // If we're doing a conditional cast, and the ObjC protocol checks failed,
   // then the cast is done.
-  llvm::Optional<ConditionalDominanceScope> condition;
+  std::optional<ConditionalDominanceScope> condition;
   llvm::BasicBlock *origBB = nullptr, *successBB = nullptr, *contBB = nullptr;
   if (!objcProtos.empty()) {
     switch (mode) {
@@ -883,7 +883,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   bool sourceWrappedInOptional = false;
 
-  llvm::Optional<ConditionalDominanceScope> domScope;
+  std::optional<ConditionalDominanceScope> domScope;
   if (auto sourceOptObjectType = sourceLoweredType.getOptionalObjectType()) {
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
@@ -1013,9 +1013,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   if (targetFormalType.isExistentialType()) {
     Explosion outRes;
-    emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
-                                  targetLoweredType, mode,
-                                  /*not a metatype*/ llvm::None, fnSig, outRes);
+    emitScalarExistentialDowncast(
+        IGF, instance, sourceLoweredType, targetLoweredType, mode,
+        /*not a metatype*/ std::nullopt, fnSig, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }

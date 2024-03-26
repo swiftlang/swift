@@ -48,15 +48,6 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
       .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr,
       .unresolvedIsExpr, .unresolvedTernaryExpr:
-
-      // `generate(stringLiteralExpr:)` doesn't support interpolations.
-      if let str = current.as(StringLiteralExprSyntax.self) {
-        if str.segments.count != 1 {
-          return false
-        }
-        assert(str.segments.first!.is(StringSegmentSyntax.self))
-      }
-
       break
 
     // Known unimplemented kinds.
@@ -176,7 +167,7 @@ extension ASTGenVisitor {
     case .simpleStringLiteralExpr:
       break
     case .stringLiteralExpr(let node):
-      return self.generate(stringLiteralExpr: node).asExpr
+      return self.generate(stringLiteralExpr: node)
     case .subscriptCallExpr:
       break
     case .superExpr:
@@ -197,6 +188,10 @@ extension ASTGenVisitor {
       preconditionFailure("should be handled in generate(sequenceExpr:)")
     case .unresolvedTernaryExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     preconditionFailure("isExprMigrated() mismatch")
   }
@@ -258,6 +253,22 @@ extension ASTGenVisitor {
   }
 
   func generate(closureExpr node: ClosureExprSyntax) -> BridgedClosureExpr {
+    let params: BridgedParameterList
+
+    if let signature = node.signature {
+      // FIXME: Translate the signature, capture list, 'in' location, etc.
+      _ = signature
+      fatalError("unimplmented")
+    } else {
+      let lBraceLoc = self.generateSourceLoc(node.leftBrace)
+      params = BridgedParameterList.createParsed(
+        self.ctx,
+        leftParenLoc: lBraceLoc,
+        parameters: .init(),
+        rightParenLoc: lBraceLoc
+      )
+    }
+
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: self.generateSourceLoc(node.leftBrace),
@@ -265,8 +276,12 @@ extension ASTGenVisitor {
       rBraceLoc: self.generateSourceLoc(node.rightBrace)
     )
 
-    // FIXME: Translate the signature, capture list, 'in' location, etc.
-    return .createParsed(self.ctx, declContext: self.declContext, body: body)
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      parameterList: params,
+      body: body
+    )
   }
 
   func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
@@ -285,6 +300,71 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateArgumentList(
+    leftParen: TokenSyntax?,
+    labeledExprList: LabeledExprListSyntax,
+    rightParen: TokenSyntax?,
+    trailingClosure: ClosureExprSyntax?,
+    additionalTrailingClosures: MultipleTrailingClosureElementListSyntax?
+  ) -> BridgedArgumentList {
+
+    let bridgedArgs: BridgedArrayRef = {
+      // Arguments before ')'
+      let normalArgs = labeledExprList.lazy.map({ elem in
+        let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
+        return BridgedCallArgument(
+          labelLoc: labelInfo?.sourceLoc ?? BridgedSourceLoc(),
+          label: labelInfo?.identifier ?? BridgedIdentifier(),
+          argExpr: self.generate(expr: elem.expression)
+        )
+      })
+      guard let trailingClosure else {
+        // FIXME: Diagnose, instead of precondition.
+        precondition(
+          additionalTrailingClosures == nil || additionalTrailingClosures!.isEmpty,
+          "multiple trailing closures without the first trailing closure"
+        )
+        return normalArgs.bridgedArray(in: self)
+      }
+
+      // The first trailing closure.
+      let bridgedTrailingClosureArg = BridgedCallArgument(
+        labelLoc: nil,
+        label: nil,
+        argExpr: self.generate(closureExpr: trailingClosure).asExpr
+      )
+      let normalArgsAndClosure = ConcatCollection(normalArgs, CollectionOfOne(bridgedTrailingClosureArg))
+      guard let additionalTrailingClosures else {
+        return normalArgsAndClosure.bridgedArray(in: self)
+      }
+
+      // Remaining trailing closures.
+      let additions = additionalTrailingClosures.lazy.map { argNode in
+        return BridgedCallArgument(
+          labelLoc: self.generateSourceLoc(argNode.label),
+          label: self.generateIdentifier(argNode.label),
+          argExpr: self.generate(closureExpr: argNode.closure).asExpr
+        )
+      }
+      let allArgs = ConcatCollection(normalArgsAndClosure, additions)
+      return allArgs.bridgedArray(in: self)
+    }()
+
+    // This should be "nil" value if there's no trailing closure. Passing the number
+    // of the normal arguments because we don't have a convenient way to pass
+    // Optional to ASTBridging,  ASTBridging can know it's "nil" if
+    // bridgedArgs.count == firstTrailingClosureIndex
+    let firstTrailingClosureIndex = labeledExprList.count
+
+    return BridgedArgumentList.createParsed(
+      self.ctx,
+      lParenLoc: self.generateSourceLoc(leftParen),
+      args: bridgedArgs,
+      rParenLoc: self.generateSourceLoc(rightParen),
+      firstTrailingClosureIndex: firstTrailingClosureIndex
+    )
+  }
+
   func generate(functionCallExpr node: FunctionCallExprSyntax) -> BridgedCallExpr {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
@@ -299,32 +379,19 @@ extension ASTGenVisitor {
       }
     }
 
-    var node = node
-
-    // Transform the trailing closure into an argument.
-    if let trailingClosure = node.trailingClosure {
-      let tupleElement = LabeledExprSyntax(
-        label: nil,
-        colon: nil,
-        expression: ExprSyntax(trailingClosure),
-        trailingComma: nil
-      )
-
-      node.arguments.append(tupleElement)
-      node.trailingClosure = nil
-    }
-
-    let argumentTuple = self.generate(
-      labeledExprList: node.arguments,
-      leftParen: node.leftParen,
-      rightParen: node.rightParen
-    )
     let callee = generate(expr: node.calledExpression)
+    let arguments = generateArgumentList(
+      leftParen: node.leftParen,
+      labeledExprList: node.arguments,
+      rightParen: node.rightParen,
+      trailingClosure: node.trailingClosure,
+      additionalTrailingClosures: node.additionalTrailingClosures
+    )
 
-    return .createParsed(self.ctx, fn: callee, args: argumentTuple)
+    return .createParsed(self.ctx, fn: callee, args: arguments)
   }
 
-  func createDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
+  func generateDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
     name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
   ) {
     let baseName: BridgedDeclBaseName
@@ -370,7 +437,7 @@ extension ASTGenVisitor {
   }
 
   func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedUnresolvedDeclRefExpr {
-    let nameAndLoc = createDeclNameRef(declReferenceExpr: node)
+    let nameAndLoc = generateDeclNameRef(declReferenceExpr: node)
     return .createParsed(
       self.ctx,
       name: nameAndLoc.name,
@@ -385,7 +452,7 @@ extension ASTGenVisitor {
 
   func generate(memberAccessExpr node: MemberAccessExprSyntax) -> BridgedExpr {
     let dotLoc = self.generateSourceLoc(node.period)
-    let nameAndLoc = createDeclNameRef(declReferenceExpr: node.declName)
+    let nameAndLoc = generateDeclNameRef(declReferenceExpr: node.declName)
 
     if let base = node.base {
       if node.declName.baseName.keywordKind == .`self` {
@@ -561,7 +628,28 @@ extension ASTGenVisitor {
   }
 
   func generate(tupleExpr node: TupleExprSyntax) -> BridgedTupleExpr {
-    return self.generate(labeledExprList: node.elements, leftParen: node.leftParen, rightParen: node.rightParen)
+    let expressions = node.elements.lazy.map {
+      self.generate(expr: $0.expression)
+    }
+    let labels = node.elements.lazy.map {
+      self.generateIdentifier($0.label)
+    }
+    let labelLocations = node.elements.lazy.map {
+      if let label = $0.label {
+        return self.generateSourceLoc(label)
+      }
+
+      return self.generateSourceLoc($0)
+    }
+
+    return BridgedTupleExpr.createParsed(
+      self.ctx,
+      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      exprs: expressions.bridgedArray(in: self),
+      labels: labels.bridgedArray(in: self),
+      labelLocs: labelLocations.bridgedArray(in: self),
+      rightParenLoc: self.generateSourceLoc(node.rightParen)
+    )
   }
 
   func generate(typeExpr node: TypeExprSyntax) -> BridgedTypeExpr {
@@ -634,35 +722,5 @@ extension ASTGenVisitor {
       kind: kind,
       loc: .createParsed(nameLoc)
     );
-  }
-
-  /// Generate a tuple expression from a ``LabeledExprListSyntax`` and parentheses.
-  func generate(
-    labeledExprList node: LabeledExprListSyntax,
-    leftParen: TokenSyntax?,
-    rightParen: TokenSyntax?
-  ) -> BridgedTupleExpr {
-    let expressions = node.lazy.map {
-      self.generate(expr: $0.expression)
-    }
-    let labels = node.lazy.map {
-      self.generateIdentifier($0.label)
-    }
-    let labelLocations = node.lazy.map {
-      if let label = $0.label {
-        return self.generateSourceLoc(label)
-      }
-
-      return self.generateSourceLoc($0)
-    }
-
-    return BridgedTupleExpr.createParsed(
-      self.ctx,
-      leftParenLoc: self.generateSourceLoc(leftParen),
-      exprs: expressions.bridgedArray(in: self),
-      labels: labels.bridgedArray(in: self),
-      labelLocs: labelLocations.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(rightParen)
-    )
   }
 }

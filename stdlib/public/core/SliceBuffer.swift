@@ -324,7 +324,7 @@ internal struct _SliceBuffer<Element>
   /// Returns `true` if this buffer's storage is uniquely-referenced;
   /// otherwise, returns `false`.
   ///
-  /// This function should only be used for internal sanity checks and for
+  /// This function should only be used for internal soundness checks and for
   /// backward compatibility.
   /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
@@ -464,6 +464,9 @@ internal struct _SliceBuffer<Element>
       endIndexAndFlags: self.endIndexAndFlags)
   }
 }
+
+@available(*, unavailable)
+extension _SliceBuffer: Sendable {}
 
 extension _SliceBuffer {
   @inlinable

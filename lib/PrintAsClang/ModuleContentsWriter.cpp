@@ -61,7 +61,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
 
   Action visitNominalType(NominalType *nominal) override {
     Callback(*this, nominal->getDecl());
-    return Action::SkipChildren;
+    return Action::SkipNode;
   }
 
   Action visitTypeAliasType(TypeAliasType *aliasTy) override {
@@ -71,17 +71,15 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     } else {
       Type(aliasTy->getSinglyDesugaredType()).walk(*this);
     }
-    return Action::SkipChildren;
+    return Action::SkipNode;
   }
 
   /// Returns true if \p paramTy has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
   static bool isConstrained(GenericSignature sig,
                             GenericTypeParamType *paramTy) {
-    if (sig->getSuperclassBound(paramTy))
-      return true;
-
-    return !sig->getRequiredProtocols(paramTy).empty();
+    auto existentialTy = sig->getExistentialType(paramTy);
+    return !(existentialTy->isAny() || existentialTy->isAnyObject());
   }
 
   Action visitBoundGenericType(BoundGenericType *boundGeneric) override {
@@ -103,7 +101,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
       argTy.walk(*this);
       NeedsDefinition = false;
     });
-    return Action::SkipChildren;
+    return Action::SkipNode;
   }
 
 public:
@@ -130,7 +128,7 @@ class ModuleWriter {
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   llvm::DenseSet<const clang::Type *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
-  DelayedMemberSet delayedMembers;
+  DelayedMemberSet objcDelayedMembers;
   CxxDeclEmissionScope topLevelEmissionScope;
   PrimitiveTypeMapping typeMapping;
   std::string outOfLineDefinitions;
@@ -147,7 +145,7 @@ public:
                OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
         outOfLineDefinitionsOS(outOfLineDefinitions),
-        printer(M, os, prologueOS, outOfLineDefinitionsOS, delayedMembers,
+        printer(M, os, prologueOS, outOfLineDefinitionsOS, objcDelayedMembers,
                 topLevelEmissionScope, typeMapping, interopContext, access,
                 requiresExposedAttribute, exposedModules, outputLang),
         outputLangMode(outputLang) {}
@@ -440,7 +438,7 @@ public:
 
       if (needsToBeIndividuallyDelayed) {
         assert(isa<ClassDecl>(container));
-        delayedMembers.insert(VD);
+        objcDelayedMembers.insert(VD);
       }
     }
 
@@ -752,7 +750,7 @@ public:
       for (const Decl *D : declsToWrite) {
         if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
           const auto *type = ED->getExtendedNominal();
-          if (isa<StructDecl>(type))
+          if (isa<StructDecl>(type) || isa<EnumDecl>(type))
             printer.getInteropContext().recordExtensions(type, ED);
         }
       }
@@ -796,16 +794,18 @@ public:
       }
     }
 
-    if (!delayedMembers.empty()) {
-      auto groupBegin = delayedMembers.begin();
-      for (auto i = groupBegin, e = delayedMembers.end(); i != e; ++i) {
-        if ((*i)->getDeclContext() != (*groupBegin)->getDeclContext()) {
-          printer.printAdHocCategory(make_range(groupBegin, i));
-          groupBegin = i;
+    if (outputLangMode == OutputLanguageMode::ObjC)
+      if (!objcDelayedMembers.empty()) {
+        auto groupBegin = objcDelayedMembers.begin();
+        for (auto i = groupBegin, e = objcDelayedMembers.end(); i != e; ++i) {
+          if ((*i)->getDeclContext() != (*groupBegin)->getDeclContext()) {
+            printer.printAdHocCategory(make_range(groupBegin, i));
+            groupBegin = i;
+          }
         }
+        printer.printAdHocCategory(
+            make_range(groupBegin, objcDelayedMembers.end()));
       }
-      printer.printAdHocCategory(make_range(groupBegin, delayedMembers.end()));
-    }
 
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
@@ -834,7 +834,7 @@ public:
             [&](const ValueDecl *vd) {
               return !printer.isVisible(vd) || vd->isObjC() ||
                      (vd->isStdlibDecl() && !vd->getName().isSpecial() &&
-                      vd->getBaseIdentifier().str().startswith("_")) ||
+                      vd->getBaseIdentifier().hasUnderscoredNaming()) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
                       vd->getASTContext().getErrorDecl() == vd);

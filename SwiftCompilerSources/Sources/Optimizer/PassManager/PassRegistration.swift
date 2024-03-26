@@ -17,6 +17,7 @@ import OptimizerBridging
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftAnalyses()
+  registerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
@@ -67,6 +68,7 @@ private func registerSwiftPasses() {
   // Function passes
   registerPass(allocVectorLowering, { allocVectorLowering.run($0) })
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
+  registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
   registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
@@ -88,7 +90,9 @@ private func registerSwiftPasses() {
   registerPass(redundantLoadElimination, { redundantLoadElimination.run($0) })
   registerPass(earlyRedundantLoadElimination, { earlyRedundantLoadElimination.run($0) })
   registerPass(deinitDevirtualizer, { deinitDevirtualizer.run($0) })
-
+  registerPass(lifetimeDependenceDiagnosticsPass, { lifetimeDependenceDiagnosticsPass.run($0) })
+  registerPass(lifetimeDependenceInsertionPass, { lifetimeDependenceInsertionPass.run($0) })
+  registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
   // Instruction passes
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
@@ -99,6 +103,8 @@ private func registerSwiftPasses() {
   registerForSILCombine(LoadInst.self,             { run(LoadInst.self, $0) })
   registerForSILCombine(CopyValueInst.self,        { run(CopyValueInst.self, $0) })
   registerForSILCombine(DestroyValueInst.self,     { run(DestroyValueInst.self, $0) })
+  registerForSILCombine(DestructureStructInst.self, { run(DestructureStructInst.self, $0) })
+  registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
 
   // Test passes
   registerPass(functionUsesDumper, { functionUsesDumper.run($0) })
@@ -116,4 +122,8 @@ private func registerSwiftPasses() {
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
+}
+
+private func registerUtilities() {
+  registerVerifier()
 }

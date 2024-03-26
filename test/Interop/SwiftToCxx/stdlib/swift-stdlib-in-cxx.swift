@@ -5,6 +5,9 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi)
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi -DDEBUG=1)
 
+// FIXME(NCG): This test requires NoncopyableGenerics to be a "suppressible" compiler feature.
+// XFAIL: !noncopyable_generics
+
 // CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 
 // CHECK: template<class T_0_0>
@@ -66,7 +69,8 @@
 // CHECK-NEXT: };
 // CHECK: SWIFT_INLINE_THUNK bool isSome() const;
 // CHECK: SWIFT_INLINE_THUNK bool isNone() const;
-// CHECK: SWIFT_INLINE_THUNK T_0_0 getUnsafelyUnwrapped() const SWIFT_SYMBOL({{.*}});
+// CHECK-DAG: SWIFT_INLINE_THUNK T_0_0 getUnsafelyUnwrapped() const SWIFT_SYMBOL({{.*}});
+// CHECK-DAG: SWIFT_INLINE_THUNK String getDebugDescription() const SWIFT_SYMBOL("s:Sq16debugDescriptionSSvp");
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) String final {
 // CHECK-NEXT: public:

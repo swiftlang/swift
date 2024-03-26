@@ -47,6 +47,9 @@ SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
 SWIFT_REQUEST(NameLookup, InheritedProtocolsRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(NameLookup, AllInheritedProtocolsRequest,
+              ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ProtocolRequirementsRequest,
               ArrayRef<ValueDecl *>(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)
@@ -111,3 +114,5 @@ SWIFT_REQUEST(NameLookup, PotentialMacroExpansionsInContextRequest,
               PotentialMacroExpansions(TypeOrExtension), Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ImplementsAttrProtocolRequest,
               ProtocolDecl *(const ImplementsAttr *, DeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupIntrinsicRequest,
+              FuncDecl *(ModuleDecl *, Identifier), Cached, NoLocationInfo)

@@ -453,7 +453,7 @@ public protocol Sequence<Element> {
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.
 extension Sequence where Self: IteratorProtocol {
-  // @_implements(Sequence, Iterator)
+  @_implements(Sequence, Iterator)
   public typealias _Default_Iterator = Self
 }
 
@@ -486,6 +486,8 @@ public struct DropFirstSequence<Base: Sequence> {
     _limit = limit
   }
 }
+
+extension DropFirstSequence: Sendable where Base: Sendable {}
 
 extension DropFirstSequence: Sequence {
   public typealias Element = Base.Element
@@ -530,6 +532,8 @@ public struct PrefixSequence<Base: Sequence> {
   }
 }
 
+extension PrefixSequence: Sendable where Base: Sendable {}
+
 extension PrefixSequence {
   @frozen
   public struct Iterator {
@@ -545,6 +549,8 @@ extension PrefixSequence {
     }
   }  
 }
+
+extension PrefixSequence.Iterator: Sendable where Base.Iterator: Sendable {}
 
 extension PrefixSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element
@@ -603,6 +609,9 @@ public struct DropWhileSequence<Base: Sequence> {
   }
 }
 
+extension DropWhileSequence: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
+
 extension DropWhileSequence {
   @frozen
   public struct Iterator {
@@ -618,6 +627,9 @@ extension DropWhileSequence {
     }
   }
 }
+
+extension DropWhileSequence.Iterator: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
 
 extension DropWhileSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element
@@ -670,9 +682,10 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
     let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
@@ -688,6 +701,17 @@ extension Sequence {
       result.append(try transform(element))
     }
     return Array(result)
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @usableFromInline
+  @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
+  func __rethrows_map<T>(
+    _ transform: (Element) throws -> T
+  ) throws -> [T] {
+    try map(transform)
   }
 
   /// Returns an array containing, in order, the elements of the sequence

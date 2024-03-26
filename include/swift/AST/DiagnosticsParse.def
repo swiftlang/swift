@@ -413,8 +413,6 @@ ERROR(subscript_without_get,none,
       "subscript declarations must have a getter", ())
 
 // initializer
-ERROR(invalid_nested_init,none,
-      "missing '%select{super.|self.}0' at initializer invocation", (bool))
 ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
@@ -998,6 +996,8 @@ ERROR(extra_var_in_multiple_pattern_list,none,
       "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern cannot appear nested in an already immutable context", ())
+ERROR(borrowing_subpattern_unsupported,none,
+      "'_borrowing' pattern modifier must be directly applied to pattern variable name", ())
 ERROR(specifier_must_have_type,none,
       "%0 arguments must have a type specified", (StringRef))
 ERROR(expected_rparen_parameter,PointsToFirstBadToken,
@@ -1296,6 +1296,8 @@ ERROR(anon_closure_tuple_param_destructuring,none,
       "closure tuple parameter does not support destructuring", ())
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
+ERROR(nonisolated_closure_parameter_parentheses,none,
+      "the parameter list of a 'nonisolated' closure requires parentheses", ())
 ERROR(expected_capture_specifier,none,
       "expected 'weak', 'unowned', or no specifier in capture list", ())
 ERROR(expected_capture_specifier_name,none,
@@ -1365,6 +1367,8 @@ ERROR(expected_rparen_expr_list,none,
       "expected ')' in expression list", ())
 ERROR(expected_rsquare_expr_list,none,
       "expected ']' in expression list", ())
+
+ERROR(expected_label_before_colon,none, "expected argument label before colon", ())
 
 // Array literal expressions
 ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
@@ -1509,6 +1513,13 @@ ERROR(type_attribute_applied_to_decl,none,
       "attribute can only be applied to types, not declarations", ())
 ERROR(decl_attribute_applied_to_type,none,
       "attribute can only be applied to declarations, not types", ())
+
+
+ERROR(attr_extra_whitespace_after_at,PointsToFirstBadToken,
+      "extraneous whitespace between '@' and attribute name", ())
+
+ERROR(attr_extra_whitespace_before_lparen,PointsToFirstBadToken,
+      "extraneous whitespace between attribute name and '('", ())
 
 ERROR(attr_expected_lparen,none,
 "expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
@@ -1700,6 +1711,14 @@ ERROR(expected_rparen_after_thrown_error_type,none,
 ERROR(rethrows_with_thrown_error,none,
       "'rethrows' cannot be combined with a specific thrown error type", ())
 
+ERROR(attr_isolated_expected_lparen,none,
+      "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",
+      ())
+ERROR(attr_isolated_expected_rparen,none,
+      "expected ')' after isolation kind", ())
+ERROR(attr_isolated_expected_kind,none,
+      "expected 'any' as the isolation kind", ())
+
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
 ERROR(attr_private_import_expected_sourcefile, none,
@@ -1872,6 +1891,10 @@ ERROR(attr_rawlayout_expected_params,none,
 
 ERROR(attr_extern_expected_label,none,
       "expected %0 argument to @_extern attribute", (StringRef))
+
+ERROR(attr_expected_feature_name,none,
+      "expected feature name in @%0 attribute", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1922,7 +1945,7 @@ ERROR(platform_condition_expected_argument,none,
       "expected argument to platform condition",
       ())
 ERROR(platform_condition_expected_one_argument,none,
-      "expected only one argument to platform condition",
+      "expected only one unlabeled argument to platform condition",
       ())
 ERROR(unsupported_platform_runtime_condition_argument,none,
       "unexpected argument for the '_runtime' condition; "
@@ -2167,6 +2190,34 @@ ERROR(requires_experimental_feature, none,
       "'%0' %select{attribute|parameter specifier}1 is only valid when experimental feature "
       "%2 is enabled",
       (StringRef, bool, StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Lifetime dependence
+//------------------------------------------------------------------------------
+
+ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected '(' after lifetime dependence specifier", ())
+
+ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
+      PointsToFirstBadToken,
+      "expected identifier, index or self in lifetime dependence specifier",
+      ())
+
+ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected ')' after parameter list in lifetime dependence specifier", ())
+
+ERROR(expected_param_index_lifetime_dependence, PointsToFirstBadToken,
+      "expected unsigned parameter index in lifetime dependence specifier", ())
+
+ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
+      "expected Self return type for initializers with lifetime dependence "
+      "specifiers",
+      ())
+
+ERROR(transferring_after_parameter_specifier,none,
+      "'transferring' must be placed before specifier '%0'", (StringRef))
+ERROR(transferring_repeated,none,
+      "parameter may have at most one 'transferring' specifier", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

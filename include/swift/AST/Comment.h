@@ -14,7 +14,7 @@
 #define SWIFT_AST_COMMENT_H
 
 #include "swift/Markup/Markup.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 class Decl;
@@ -46,18 +46,18 @@ public:
   }
 
   ArrayRef<StringRef> getTags() const {
-    return llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end());
+    return llvm::ArrayRef(Parts.Tags.begin(), Parts.Tags.end());
   }
 
-  llvm::Optional<const swift::markup::Paragraph *> getBrief() const {
+  std::optional<const swift::markup::Paragraph *> getBrief() const {
     return Parts.Brief;
   }
 
-  llvm::Optional<const swift::markup::ReturnsField *> getReturnsField() const {
+  std::optional<const swift::markup::ReturnsField *> getReturnsField() const {
     return Parts.ReturnsField;
   }
 
-  llvm::Optional<const swift::markup::ThrowsField *> getThrowsField() const {
+  std::optional<const swift::markup::ThrowsField *> getThrowsField() const {
     return Parts.ThrowsField;
   }
 
@@ -69,7 +69,7 @@ public:
     return Parts.BodyNodes;
   }
 
-  llvm::Optional<const markup::LocalizationKeyField *>
+  std::optional<const markup::LocalizationKeyField *>
   getLocalizationKeyField() const {
     return Parts.LocalizationKeyField;
   }

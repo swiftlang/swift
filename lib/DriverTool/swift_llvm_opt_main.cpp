@@ -56,7 +56,6 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/PluginLoader.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -66,6 +65,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 
 using namespace swift;
@@ -136,8 +136,7 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
 
   return TheTarget->createTargetMachine(
       TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
-      llvm::Optional<llvm::Reloc::Model>(
-          llvm::codegen::getExplicitRelocModel()),
+      std::optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
       llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
 }
 

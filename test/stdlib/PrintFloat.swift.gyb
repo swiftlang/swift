@@ -575,7 +575,7 @@ PrintTests.test("CustomDebugStringConvertible") {
 
 PrintTests.test("Printable_CFloat") {
   // Basic check for CFloat: Since it's a synonym for Float, we don't
-  // need more detailed verification, just basic sanity.
+  // need more detailed verification, just basic soundness.
   expectDescription("1.0", CFloat(1.0))
   expectDescription("1.1", CFloat(1.1))
   expectDescription("-1.0", CFloat(-1.0))
@@ -593,7 +593,7 @@ if #available(SwiftStdlib 5.3, *) {
 PrintTests.test("Printable_Float16") {
   func asFloat16(_ f: Float16) -> Float16 { return f }
 
-  // Basic sanity checks:
+  // Basic soundness checks:
   let f = 100.125 as Float16
   expectEqual("f = 100.1", "f = \(f)")
 
@@ -737,7 +737,7 @@ PrintTests.test("Printable_Float16") {
 PrintTests.test("Printable_Float") {
   func asFloat32(_ f: Float32) -> Float32 { return f }
 
-  // Basic sanity checks:
+  // Basic soundness checks:
   let f = 100.125 as Float
   expectEqual("f = 100.125", "f = \(f)")
 
@@ -864,7 +864,7 @@ PrintTests.test("Printable_Float") {
 PrintTests.test("Printable_Double") {
   func asFloat64(_ f: Float64) -> Float64 { return f }
 
-  // Sanity check
+  // Soundness check
   let f = 100.125 as Double
   expectEqual("f = 100.125", "f = \(f)")
 
@@ -988,7 +988,7 @@ PrintTests.test("Printable_Float80") {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
   func asFloat80(_ f: Swift.Float80) -> Swift.Float80 { return f }
 
-  // Sanity
+  // Soundness
   let f = 100.125 as Float80
   expectEqual("f = 100.125", "f = \(f)")
 

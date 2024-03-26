@@ -68,6 +68,10 @@ extension ASTGenVisitor {
       return self.generate(typeAliasDecl: node).asDecl
     case .variableDecl(let node):
       return self.generate(variableDecl: node).asDecl
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     return self.generateWithLegacy(node)
   }
@@ -78,9 +82,10 @@ extension ASTGenVisitor {
   }
 
   func generate(typeAliasDecl node: TypeAliasDeclSyntax) -> BridgedTypeAliasDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
-    return .createParsed(
+    let decl = BridgedTypeAliasDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       typealiasKeywordLoc: self.generateSourceLoc(node.typealiasKeyword),
@@ -91,9 +96,12 @@ extension ASTGenVisitor {
       underlyingType: self.generate(type: node.initializer.value),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    decl.asDecl.setAttrs(attrs.attributes)
+    return decl
   }
 
   func generate(enumDecl node: EnumDeclSyntax) -> BridgedNominalTypeDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedEnumDecl.createParsed(
@@ -110,6 +118,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
       decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
@@ -119,6 +128,7 @@ extension ASTGenVisitor {
   }
 
   func generate(structDecl node: StructDeclSyntax) -> BridgedNominalTypeDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedStructDecl.createParsed(
@@ -135,6 +145,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
       decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
@@ -144,6 +155,7 @@ extension ASTGenVisitor {
   }
 
   func generate(classDecl node: ClassDeclSyntax) -> BridgedNominalTypeDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedClassDecl.createParsed(
@@ -161,6 +173,7 @@ extension ASTGenVisitor {
       ),
       isActor: false
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
       decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
@@ -170,6 +183,7 @@ extension ASTGenVisitor {
   }
 
   func generate(actorDecl node: ActorDeclSyntax) -> BridgedNominalTypeDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedClassDecl.createParsed(
@@ -187,6 +201,7 @@ extension ASTGenVisitor {
       ),
       isActor: true
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
       decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
@@ -196,6 +211,7 @@ extension ASTGenVisitor {
   }
 
   func generate(protocolDecl node: ProtocolDeclSyntax) -> BridgedNominalTypeDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
     let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
       self.generateLocatedIdentifier($0.name)
@@ -215,6 +231,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
       decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
@@ -224,9 +241,10 @@ extension ASTGenVisitor {
   }
 
   func generate(associatedTypeDecl node: AssociatedTypeDeclSyntax) -> BridgedAssociatedTypeDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
-    return .createParsed(
+    let decl = BridgedAssociatedTypeDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       associatedtypeKeywordLoc: self.generateSourceLoc(node.associatedtypeKeyword),
@@ -236,6 +254,8 @@ extension ASTGenVisitor {
       defaultType: self.generate(type: node.initializer?.value),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    decl.asDecl.setAttrs(attrs.attributes)
+    return decl
   }
 }
 
@@ -243,6 +263,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   func generate(extensionDecl node: ExtensionDeclSyntax) -> BridgedExtensionDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let decl = BridgedExtensionDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -255,6 +276,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
       decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
@@ -282,10 +304,18 @@ extension ASTGenVisitor {
   }
 
   func generate(enumCaseDecl node: EnumCaseDeclSyntax) -> BridgedEnumCaseDecl {
-    .createParsed(
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+
+    // All attributes goes to each element.
+    let elements = node.elements.lazy.map({ elem -> BridgedEnumElementDecl in
+      let elemDecl = self.generate(enumCaseElement: elem)
+      elemDecl.asDecl.setAttrs(attrs.attributes)
+      return elemDecl
+    })
+    return .createParsed(
       declContext: self.declContext,
       caseKeywordLoc: self.generateSourceLoc(node.caseKeyword),
-      elements: node.elements.lazy.map(self.generate).bridgedArray(in: self)
+      elements: elements.bridgedArray(in: self)
     )
   }
 }
@@ -323,6 +353,8 @@ extension ASTGenVisitor {
     accessorDecl node: AccessorDeclSyntax,
     for storage: BridgedAbstractStorageDecl
   ) -> BridgedAccessorDecl? {
+    // TODO: Attributes and modifier.
+
     guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier) else {
       // TODO: We could potentially recover if this is the first accessor by treating
       // it as an implicit getter.
@@ -393,6 +425,10 @@ extension ASTGenVisitor {
         accessors: CollectionOfOne(accessor).bridgedArray(in: self),
         rBraceLoc: rightBrace
       )
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
   }
 
@@ -472,6 +508,7 @@ extension ASTGenVisitor {
   }
 
   func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
+    // TODO: Attributes and modifiers
     let isStatic = false  // TODO: compute this
     let isLet = node.bindingSpecifier.keywordKind == .let
 
@@ -486,21 +523,21 @@ extension ASTGenVisitor {
   }
 
   func generate(subscriptDecl node: SubscriptDeclSyntax) -> BridgedSubscriptDecl {
-    // FIXME: Compute static
-    let staticLoc: BridgedSourceLoc = nil
-    let staticSpelling = BridgedStaticSpelling.none
+    let attrs = generateDeclAttributes(node, allowStatic: true)
 
     let subscriptDecl = BridgedSubscriptDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
-      staticLoc: staticLoc,
-      staticSpelling: staticSpelling,
+      staticLoc: attrs.staticLoc,
+      staticSpelling: attrs.staticSpelling,
       subscriptKeywordLoc: self.generateSourceLoc(node.subscriptKeyword),
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.parameterClause, forSubscript: true),
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
       returnType: self.generate(type: node.returnClause.type)
     )
+    subscriptDecl.asDecl.setAttrs(attrs.attributes)
+
     if let accessors = node.accessorBlock {
       let storage = subscriptDecl.asAbstractStorageDecl
       storage.setAccessors(generate(accessorBlock: accessors, for: storage))
@@ -513,26 +550,27 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl {
-    // FIXME: Compute this location
-    let staticLoc: BridgedSourceLoc = nil
+    let attrs = self.generateDeclAttributes(node, allowStatic: true)
 
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedFuncDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
-      staticLoc: staticLoc,
+      staticLoc: attrs.staticLoc,
+      staticSpelling: attrs.staticSpelling,
       funcKeywordLoc: self.generateSourceLoc(node.funcKeyword),
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
       asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsSpecifier),
+      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
       returnType: self.generate(type: node.signature.returnClause?.type),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
@@ -544,6 +582,8 @@ extension ASTGenVisitor {
   }
 
   func generate(initializerDecl node: InitializerDeclSyntax) -> BridgedConstructorDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+
     let decl = BridgedConstructorDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -553,10 +593,11 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
       asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsSpecifier),
+      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
@@ -568,11 +609,14 @@ extension ASTGenVisitor {
   }
 
   func generate(deinitializerDecl node: DeinitializerDeclSyntax) -> BridgedDestructorDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+
     let decl = BridgedDestructorDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       deinitKeywordLoc: self.generateSourceLoc(node.deinitKeyword)
     )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
@@ -642,6 +686,7 @@ extension BridgedAssociativity {
 
 extension ASTGenVisitor {
   func generate(precedenceGroupDecl node: PrecedenceGroupDeclSyntax) -> BridgedPrecedenceGroupDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     struct PrecedenceGroupBody {
@@ -689,6 +734,10 @@ extension ASTGenVisitor {
         } else {
           body.associativity = associativity
         }
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
     }
 
@@ -716,7 +765,7 @@ extension ASTGenVisitor {
       assignmentValue = false
     }
 
-    return .createParsed(
+    let decl = BridgedPrecedenceGroupDecl.createParsed(
       declContext: self.declContext,
       precedencegroupKeywordLoc: self.generateSourceLoc(node.precedencegroupKeyword),
       name: name,
@@ -734,6 +783,8 @@ extension ASTGenVisitor {
       lowerThanNames: self.generate(precedenceGroupNameList: body.lowerThanRelation?.precedenceGroups),
       rightBraceLoc: self.generateSourceLoc(node.rightBrace)
     )
+    decl.asDecl.setAttrs(attrs.attributes)
+    return decl
   }
 }
 
@@ -756,6 +807,7 @@ extension BridgedImportKind {
 
 extension ASTGenVisitor {
   func generate(importDecl node: ImportDeclSyntax) -> BridgedImportDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let importKind: BridgedImportKind
     if let specifier = node.importKindSpecifier {
       if let value = BridgedImportKind(from: specifier.keywordKind) {
@@ -768,7 +820,7 @@ extension ASTGenVisitor {
       importKind = .module
     }
 
-    return .createParsed(
+    let decl = BridgedImportDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       importKeywordLoc: self.generateSourceLoc(node.importKeyword),
@@ -778,6 +830,8 @@ extension ASTGenVisitor {
         self.generateLocatedIdentifier($0.name)
       }.bridgedArray(in: self)
     )
+    decl.asDecl.setAttrs(attrs.attributes)
+    return decl
   }
 }
 

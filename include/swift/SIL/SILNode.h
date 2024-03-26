@@ -124,6 +124,10 @@ public:
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
+  enum { NumMarkDependenceKindBits = 2 };
+
+  enum { numCustomBits = 20 };
+  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
 
 protected:
   friend class SILInstruction;
@@ -134,11 +138,7 @@ protected:
 
   uint8_t kind;
 
-  // Used by `NodeBitfield`.
-  enum { numCustomBits = 8 };
-
-  // Used by `NodeBitfield`.
-  uint8_t customBits;
+  bool deleted = false;
 
   // Part of SILInstruction's debug location. Together with
   // `SILInstruction::locationStorage` this forms the SILLocation.
@@ -224,6 +224,7 @@ protected:
     SHARED_FIELD(AllocStackInst, uint8_t
                  dynamicLifetime : 1,
                  lexical : 1,
+                 fromVarDecl : 1,
                  usesMoveableValueDebugInfo : 1,
                  hasInvalidatedVarInfo : 1);
 
@@ -242,7 +243,8 @@ protected:
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,
                  pointerEscape : 1,
-                 fromVarDecl : 1);
+                 fromVarDecl : 1,
+                 fixed : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
@@ -277,7 +279,7 @@ protected:
                  fromVarDecl : 1);
 
     SHARED_FIELD(MarkDependenceInst, uint8_t
-                 nonEscaping : 1);
+                 dependenceKind : NumMarkDependenceKindBits);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
@@ -361,6 +363,9 @@ protected:
 
   //===---------------------- end of shared fields ------------------------===//
 
+  // Used by `NodeBitfield`.
+  uint64_t customBits : numCustomBits;
+
   /// The NodeBitfield ID of the last initialized bitfield in `customBits`.
   /// Example:
   ///
@@ -374,20 +379,19 @@ protected:
   /// -> AAA, BB and C are initialized,
   ///    DD and EEE are uninitialized
   ///
-  /// If the ID is negative, it means that the node (in case it's an instruction)
-  /// is deleted, i.e. it does not belong to the function anymore. Conceptually
-  /// this results in setting all bitfields to zero, which e.g. "removes" the
-  /// node from all NodeSets.
+  /// The size of lastInitializedBitfieldID should be more than 32 bits to
+  /// absolutely avoid an overflow.
   ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  int64_t lastInitializedBitfieldID = 0;
+  uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
 
 private:
   SwiftMetatype getSILNodeMetatype(SILNodeKind kind);
 
 protected:
   SILNode(SILNodeKind kind) : SwiftObjectHeader(getSILNodeMetatype(kind)),
-                              kind((uint8_t)kind) {
+                              kind((uint8_t)kind),
+                              customBits(0), lastInitializedBitfieldID(0) {
     _sharedUInt8_private.opaque = 0;
     _sharedUInt32_private.opaque = 0;
   }
@@ -407,12 +411,13 @@ public:
   /// otherwise return null.
   SILBasicBlock *getParentBlock() const;
 
-  /// If this is a SILArgument or a SILInstruction get its parent function,
-  /// otherwise return null.
+  /// Returns the parent function of this value.
+  ///
+  /// Only returns nullptr if the given value's parent is a sil global variable
+  /// initializer.
   SILFunction *getFunction() const;
 
-  /// If this is a SILArgument or a SILInstruction get its parent module,
-  /// otherwise return null.
+  /// Return the parent module of this value.
   SILModule *getModule() const;
   
   /// Pretty-print the node.  If the node is an instruction, the output
@@ -438,11 +443,8 @@ public:
     lastInitializedBitfieldID = 0;
   }
 
-  void markAsDeleted() {
-    lastInitializedBitfieldID = -1;
-  }
-
-  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
+  void markAsDeleted() { deleted = true; }
+  bool isMarkedAsDeleted() const { return deleted; }
 
   static SILNode *instAsNode(SILInstruction *inst);
   static const SILNode *instAsNode(const SILInstruction *inst);

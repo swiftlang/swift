@@ -36,6 +36,8 @@ public struct LazyPrefixWhileSequence<Base: Sequence> {
   }
 }
 
+@available(*, unavailable)
+extension LazyPrefixWhileSequence: Sendable {}
 
 extension LazyPrefixWhileSequence {
   /// An iterator over the initial elements traversed by a base iterator that
@@ -62,6 +64,9 @@ extension LazyPrefixWhileSequence {
     }
   }
 }
+
+@available(*, unavailable)
+extension LazyPrefixWhileSequence.Iterator: Sendable {}
 
 extension LazyPrefixWhileSequence.Iterator: IteratorProtocol, Sequence {
   @inlinable // lazy-performance
@@ -148,6 +153,12 @@ extension LazyPrefixWhileCollection {
     }
   }
 }
+
+extension LazyPrefixWhileSequence._IndexRepresentation: Sendable
+  where Base.Index: Sendable {}
+
+extension LazyPrefixWhileSequence.Index: Sendable
+  where Base.Index: Sendable {}
 
 // FIXME: should work on the typealias
 extension LazyPrefixWhileSequence.Index: Comparable where Base: Collection {

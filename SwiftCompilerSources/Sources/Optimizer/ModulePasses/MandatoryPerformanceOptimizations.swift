@@ -50,8 +50,21 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
         return
       }
 
-      optimize(function: f, context, &worklist)
+      // It's not required to set the perf_constraint flag on all functions in embedded mode.
+      // Embedded mode already implies that flag.
+      if !moduleContext.options.enableEmbeddedSwift {
+        f.set(isPerformanceConstraint: true, context)
+      }
+
+      optimize(function: f, context, moduleContext, &worklist)
     }
+
+    // Generic specialization takes care of removing metatype arguments of generic functions.
+    // But sometimes non-generic functions have metatype arguments which must be removed.
+    // We need handle this case with a function signature optimization.
+    removeMetatypeArgumentsInCallees(of: f, moduleContext)
+
+    worklist.addCallees(of: f)
   }
 }
 
@@ -60,7 +73,7 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
   
   var changed = true
@@ -79,11 +92,11 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
       // Embedded Swift specific transformations
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, &worklist)
+          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, moduleContext, &worklist)
         }
       case let metatype as MetatypeInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, &worklist)
+          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, moduleContext, &worklist)
         }
       case let classMethod as ClassMethodInst:
         if context.options.enableEmbeddedSwift {
@@ -100,6 +113,11 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
           context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
         }
 
+      case let iem as InitExistentialMetatypeInst:
+        if iem.uses.ignoreDebugUses.isEmpty {
+          context.erase(instructionIncludingDebugUses: iem)
+        }
+
       default:
         break
       }
@@ -111,19 +129,25 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
     changed = context.optimizeMemoryAccesses(in: function) || changed
-    _ = context.eliminateDeadAllocations(in: function)
+    changed = context.eliminateDeadAllocations(in: function) || changed
   }
-
-  worklist.add(calleesOf: function)
 }
 
-private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
-  guard let vtable = context.specializeVTable(for: type, in: function) else {
+private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function,
+                                                     _ context: FunctionPassContext, _ moduleContext: ModulePassContext,
+                                                     _ worklist: inout FunctionWorklist) {
+  let vTablesCountBefore = moduleContext.vTables.count
+
+  guard context.specializeVTable(for: type, in: function) != nil else {
     return
   }
 
-  for entry in vtable.entries {
-    worklist.pushIfNotVisited(entry.function)
+  // More than one new vtable might have been created (superclasses), process them all
+  let vTables = moduleContext.vTables
+  for i in vTablesCountBefore ..< vTables.count {
+    for entry in vTables[i].entries {
+      worklist.pushIfNotVisited(entry.function)
+    }
   }
 }
 
@@ -153,6 +177,14 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
   }
 }
 
+private func removeMetatypeArgumentsInCallees(of function: Function, _ context: ModulePassContext) {
+  for inst in function.instructions {
+    if let apply = inst as? FullApplySite {
+      specializeByRemovingMetatypeArguments(apply: apply, context)
+    }
+  }
+}
+
 private func removeUnusedMetatypeInstructions(in function: Function, _ context: FunctionPassContext) {
   for inst in function.instructions {
     if let mt = inst as? MetatypeInst,
@@ -165,11 +197,6 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
 private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
   if callee.isTransparent {
     return true
-  }
-
-  if apply.parentFunction.hasOwnership && !callee.hasOwnership {
-    // Cannot inline a non-ossa function into an ossa function
-    return false
   }
 
   if apply is BeginApplyInst {
@@ -356,7 +383,7 @@ fileprivate struct FunctionWorklist {
   }
 
   mutating func addAllNonGenericFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where !f.isGenericFunction {
+    for f in moduleContext.functions where !f.isGeneric {
       pushIfNotVisited(f)
     }
     return
@@ -371,7 +398,7 @@ fileprivate struct FunctionWorklist {
     }
   }
 
-  mutating func add(calleesOf function: Function) {
+  mutating func addCallees(of function: Function) {
     for inst in function.instructions {
       switch inst {
       case let apply as ApplySite:

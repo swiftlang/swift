@@ -73,12 +73,6 @@ public:
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
-  /// Check whether code completion expression is located inside of a
-  /// multi-statement closure.
-  bool locatedInMultiStmtClosure() const {
-    return hasContext(ContextKind::MultiStmtClosure);
-  }
-
   bool locatedInStringInterpolation() const {
     return hasContext(ContextKind::StringInterpolation);
   }
@@ -121,7 +115,7 @@ public:
   /// code completion expression directly but instead add some
   /// of the enclosing context e.g. when completion is an argument
   /// to a call.
-  llvm::Optional<Fallback> getFallbackCompletionExpr() const;
+  std::optional<Fallback> getFallbackCompletionExpr() const;
 
 private:
   bool hasContext(ContextKind kind) const {

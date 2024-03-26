@@ -224,7 +224,7 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
   SmallVector<ManagedValue, 4> indirectErrorResults;
   collectThunkParams(loc, params, &indirectParams, &indirectErrorResults);
 
-  // Build up the list of arguments that we're going to invoke the the real
+  // Build up the list of arguments that we're going to invoke the real
   // function with.
   SmallVector<SILValue, 8> paramsForForwarding;
   for (auto indirectParam : indirectParams) {

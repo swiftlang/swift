@@ -196,6 +196,9 @@ class ActiveTask {
 public:
   static void set(AsyncTask *task) { Value.set(task); }
   static AsyncTask *get() { return Value.get(); }
+  static AsyncTask *swap(AsyncTask *newTask) {
+    return Value.swap(newTask);
+  }
 };
 
 /// Define the thread-locals.
@@ -217,7 +220,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
     // Update the active task in the current thread.
-    ActiveTask::set(task);
+    auto oldTask = ActiveTask::swap(task);
 
     // Update the task status to say that it's running on the
     // current thread.  If the task suspends somewhere, it should
@@ -231,6 +234,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before suspending?");
+    if (oldTask) ActiveTask::set(oldTask);
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
@@ -259,15 +263,11 @@ AsyncTask *swift::swift_task_getCurrent() {
 }
 
 AsyncTask *swift::_swift_task_clearCurrent() {
-  auto task = ActiveTask::get();
-  ActiveTask::set(nullptr);
-  return task;
+  return ActiveTask::swap(nullptr);
 }
 
 AsyncTask *swift::_swift_task_setCurrent(AsyncTask *new_task) {
-  auto task = ActiveTask::get();
-  ActiveTask::set(new_task);
-  return task;
+  return ActiveTask::swap(new_task);
 }
 
 SWIFT_CC(swift)
@@ -353,7 +353,7 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef executor) {
 /// 0 - no logging
 /// 1 - warn on each instance
 /// 2 - fatal error
-static unsigned unexpectedExecutorLogLevel = 1;
+static unsigned unexpectedExecutorLogLevel = 2;
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
 #if SWIFT_STDLIB_HAS_ENVIRON
@@ -426,7 +426,10 @@ void swift::swift_task_reportUnexpectedExecutor(
   fflush(stderr);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#pragma clang diagnostic pop
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
@@ -1447,8 +1450,8 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
   ExecutorTrackingInfo trackingInfo;
   trackingInfo.enterAndShadow(
       SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
-      /*taskExecutor, will be replaced per each job. */ TaskExecutorRef::
-          undefined());
+      /*taskExecutor, will be replaced per each job. */
+      TaskExecutorRef::undefined());
 
   while (true) {
     if (shouldYieldThread()) {

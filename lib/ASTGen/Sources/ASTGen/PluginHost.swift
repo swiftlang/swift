@@ -31,7 +31,6 @@ public func _initializePlugin(
   cxxDiagnosticEngine: UnsafeMutableRawPointer?
 ) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
-  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
 
   do {
     try plugin.initialize()
@@ -81,7 +80,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
       assert(diagnostics.isEmpty)
       return true
     }
-    var errorMsgs = diagnostics.map({ $0.message }).joined(separator: ", ");
+    let errorMsgs = diagnostics.map({ $0.message }).joined(separator: ", ");
     errorOut?.pointee = allocateBridgedString(errorMsgs);
     return false
   } catch {
@@ -271,7 +270,9 @@ class PluginDiagnosticsEngine {
     case .note: bridgedSeverity = .note
     case .warning: bridgedSeverity = .warning
     case .remark: bridgedSeverity = .remark
+#if RESILIENT_SWIFT_SYNTAX
     @unknown default: bridgedSeverity = .error
+#endif
     }
 
     // Emit the diagnostic

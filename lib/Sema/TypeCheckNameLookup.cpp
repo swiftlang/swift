@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
 
@@ -496,13 +497,15 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
 
       // Use the type witness.
-      auto concrete = conformance.getConcrete();
+      auto *concrete = conformance.getConcrete();
+      auto *normal = concrete->getRootNormalConformance();
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
-      if (concrete->getState() ==
-          ProtocolConformanceState::CheckingTypeWitnesses)
+      if (dc->getASTContext().evaluator.hasActiveRequest(
+            ResolveTypeWitnessesRequest{normal})) {
         continue;
+      }
 
       auto *typeDecl =
         concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
@@ -542,7 +545,7 @@ unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
 
   // Don't typo-correct to a name with a leading underscore unless the typed
   // name also begins with an underscore.
-  if (correctedBase.startswith("_") && !writtenBase.startswith("_")) {
+  if (correctedBase.starts_with("_") && !writtenBase.starts_with("_")) {
     return UnreasonableCallEditDistance;
   }
 
@@ -581,6 +584,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         TypoCorrectionResults &corrections,
                                         GenericSignature genericSig,
                                         unsigned maxResults) {
+  // Even when typo correction is disabled, we want to make sure people are
+  // calling into it the right way.
+  assert(!baseTypeOrNull || !baseTypeOrNull->hasTypeParameter() || genericSig);
+
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
   auto &Ctx = DC->getASTContext();
@@ -623,8 +630,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                              /*includeProtocolExtensionMembers*/true,
                              genericSig);
   } else {
-    lookupVisibleDecls(consumer, DC, /*top level*/ true,
-                       corrections.Loc.getBaseNameLoc());
+    lookupVisibleDecls(consumer, corrections.Loc.getBaseNameLoc(), DC,
+                       /*top level*/ true);
   }
 
   // Impose a maximum distance from the best score.
@@ -709,7 +716,7 @@ void SyntacticTypoCorrection::addFixits(InFlightDiagnostic &diagnostic) const {
   // because of the reordering rules.
 }
 
-llvm::Optional<SyntacticTypoCorrection>
+std::optional<SyntacticTypoCorrection>
 TypoCorrectionResults::claimUniqueCorrection() {
   // Look for a unique base name.  We ignore the rest of the name for now
   // because we don't actually typo-correct any of that.
@@ -724,17 +731,17 @@ TypoCorrectionResults::claimUniqueCorrection() {
     // If this is a different name from the last candidate, we don't have
     // a unique correction.
     else if (uniqueCorrectedName != candidateName)
-      return llvm::None;
+      return std::nullopt;
   }
 
   // If we didn't find any candidates, we're done.
   if (uniqueCorrectedName.empty())
-    return llvm::None;
+    return std::nullopt;
 
   // If the corrected name doesn't differ from the written name in its base
   // name, it's not simple enough for this (for now).
   if (WrittenName.getBaseName() == uniqueCorrectedName)
-    return llvm::None;
+    return std::nullopt;
 
   // Flag that we've claimed the correction.
   ClaimedCorrection = true;

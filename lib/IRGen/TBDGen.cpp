@@ -61,7 +61,7 @@ using namespace swift::irgen;
 using namespace swift::tbdgen;
 using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
-using SymbolKind = llvm::MachO::SymbolKind;
+using EncodeKind = llvm::MachO::EncodeKind;
 using SymbolFlags = llvm::MachO::SymbolFlags;
 
 TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
@@ -69,13 +69,13 @@ TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
     : TBDGenVisitor(desc.getTarget(), desc.getDataLayoutString(),
                     desc.getParentModule(), desc.getOptions(), recorder) {}
 
-void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
+void TBDGenVisitor::addSymbolInternal(StringRef name, EncodeKind kind,
                                       SymbolSource source, SymbolFlags flags) {
   if (!source.isLinkerDirective() && Opts.LinkerDirectivesOnly)
     return;
 
 #ifndef NDEBUG
-  if (kind == SymbolKind::GlobalSymbol) {
+  if (kind == EncodeKind::GlobalSymbol) {
     if (!DuplicateSymbolChecker.insert(name).second) {
       llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
       assert(false && "TBDGen symbol appears twice");
@@ -100,24 +100,23 @@ getAllMovedPlatformVersions(Decl *D) {
   return Results;
 }
 
-static StringRef getLinkerPlatformName(uint8_t Id) {
+static StringRef getLinkerPlatformName(LinkerPlatformId Id) {
   switch (Id) {
-#define LD_PLATFORM(Name, Id) case Id: return #Name;
+#define LD_PLATFORM(Name, Id) case LinkerPlatformId::Name: return #Name;
 #include "ldPlatformKinds.def"
-  default:
-    llvm_unreachable("unrecognized platform id");
   }
+  llvm_unreachable("unrecognized platform id");
 }
 
-static llvm::Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
-  return llvm::StringSwitch<llvm::Optional<uint8_t>>(Platform)
-#define LD_PLATFORM(Name, Id) .Case(#Name, Id)
+static std::optional<LinkerPlatformId> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<std::optional<LinkerPlatformId>>(Platform)
+#define LD_PLATFORM(Name, Id) .Case(#Name, LinkerPlatformId::Name)
 #include "ldPlatformKinds.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
-  auto It = PlatformInstallName.find((uint8_t)Id);
+  auto It = PlatformInstallName.find(Id);
   if (It == PlatformInstallName.end())
     return InstallName;
   else
@@ -129,8 +128,9 @@ static std::string getScalaNodeText(Node *N) {
   return cast<ScalarNode>(N)->getValue(Buffer).str();
 }
 
-static std::set<int8_t> getSequenceNodePlatformList(ASTContext &Ctx, Node *N) {
-  std::set<int8_t> Results;
+static std::set<LinkerPlatformId> getSequenceNodePlatformList(ASTContext &Ctx,
+                                                              Node *N) {
+  std::set<LinkerPlatformId> Results;
   for (auto &E: *cast<SequenceNode>(N)) {
     auto Platform = getScalaNodeText(&E);
     auto Id = getLinkerPlatformId(Platform);
@@ -158,7 +158,7 @@ parseEntry(ASTContext &Ctx,
       auto *MN = cast<MappingNode>(&*It);
       std::string ModuleName;
       std::string InstallName;
-      llvm::Optional<std::set<int8_t>> Platforms;
+      std::optional<std::set<LinkerPlatformId>> Platforms;
       for (auto &Pair: *MN) {
         auto Key = getScalaNodeText(Pair.getKey());
         auto* Value = Pair.getValue();
@@ -233,7 +233,12 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
 }
 
 static LinkerPlatformId
-getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
+getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
+                    ASTContext &Ctx) {
+  auto target =
+      Ver.ForTargetVariant ? Ctx.LangOpts.TargetVariant : Ctx.LangOpts.Target;
+  bool isSimulator = target ? target->isSimulatorEnvironment() : false;
+
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
@@ -243,16 +248,16 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::iOS:
   case swift::PlatformKind::iOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::iOS_sim:
-                             LinkerPlatformId::iOS;
+    if (target && target->isMacCatalystEnvironment())
+      return LinkerPlatformId::macCatalyst;
+    return isSimulator ? LinkerPlatformId::iOS_sim : LinkerPlatformId::iOS;
   case swift::PlatformKind::tvOS:
   case swift::PlatformKind::tvOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::tvOS_sim:
-                             LinkerPlatformId::tvOS;
+    return isSimulator ? LinkerPlatformId::tvOS_sim : LinkerPlatformId::tvOS;
   case swift::PlatformKind::watchOS:
   case swift::PlatformKind::watchOSApplicationExtension:
-    return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
-                             LinkerPlatformId::watchOS;
+    return isSimulator ? LinkerPlatformId::watchOS_sim
+                       : LinkerPlatformId::watchOS;
   case swift::PlatformKind::macOS:
   case swift::PlatformKind::macOSApplicationExtension:
     return LinkerPlatformId::macOS;
@@ -264,19 +269,20 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
 }
 
 static StringRef
-getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
-  return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
+getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver,
+                      ASTContext &Ctx) {
+  return getLinkerPlatformName(getLinkerPlatformId(Ver, Ctx));
 }
 
 /// Find the most relevant introducing version of the decl stack we have visited
 /// so far.
-static llvm::Optional<llvm::VersionTuple>
+static std::optional<llvm::VersionTuple>
 getInnermostIntroVersion(ArrayRef<Decl *> DeclStack, PlatformKind Platform) {
   for (auto It = DeclStack.rbegin(); It != DeclStack.rend(); ++ It) {
     if (auto Result = (*It)->getIntroducedOSVersion(Platform))
       return Result;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Using the introducing version of a symbol as the start version to redirect
@@ -291,9 +297,9 @@ static llvm::VersionTuple calculateLdPreviousVersionStart(ASTContext &ctx,
   return introVer;
 }
 
-void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
-                                                llvm::MachO::SymbolKind kind) {
-  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
+    StringRef name, llvm::MachO::EncodeKind kind) {
+  if (kind != llvm::MachO::EncodeKind::GlobalSymbol)
     return;
   if(DeclStack.empty())
     return;
@@ -313,17 +319,17 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
     // so we don't need the linker directives.
     if (*IntroVer >= Ver.Version)
       continue;
-    auto PlatformNumber = getLinkerPlatformId(Ver);
+    auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
     auto It = previousInstallNameMap->find(Ver.ModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver));
+                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver));
+                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;
@@ -333,22 +339,22 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
     OS << "$ld$previous$";
     OS << InstallName << "$";
     OS << ComptibleVersion << "$";
-    OS << std::to_string((uint8_t)PlatformNumber) << "$";
-    static auto getMinor = [](llvm::Optional<unsigned> Minor) {
+    OS << std::to_string(static_cast<uint8_t>(PlatformNumber)) << "$";
+    static auto getMinor = [](std::optional<unsigned> Minor) {
       return Minor.has_value() ? *Minor : 0;
     };
     auto verStart = calculateLdPreviousVersionStart(Ctx, *IntroVer);
     OS << verStart.getMajor() << "." << getMinor(verStart.getMinor()) << "$";
     OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
     OS << name << "$";
-    addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
+    addSymbolInternal(OS.str(), EncodeKind::GlobalSymbol,
                       SymbolSource::forLinkerDirective(), SymbolFlags::Data);
   }
 }
 
-void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
-                                                    llvm::MachO::SymbolKind kind) {
-  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(
+    StringRef name, llvm::MachO::EncodeKind kind) {
+  if (kind != llvm::MachO::EncodeKind::GlobalSymbol)
     return;
   if (DeclStack.empty())
     return;
@@ -387,19 +393,19 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
       OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
-      addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
+      addSymbolInternal(OS.str(), EncodeKind::GlobalSymbol,
                         SymbolSource::forLinkerDirective(), SymbolFlags::Data);
     }
   }
 }
 
 void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
-                              SymbolFlags flags, SymbolKind kind) {
+                              SymbolFlags flags, EncodeKind kind) {
   // The linker expects to see mangled symbol names in TBD files,
   // except when being passed objective c classes,
   // so make sure to mangle before inserting the symbol.
   SmallString<32> mangled;
-  if (kind == SymbolKind::ObjectiveCClass) {
+  if (kind == EncodeKind::ObjectiveCClass) {
     mangled = name;
   } else {
     if (!DataLayout)
@@ -461,7 +467,7 @@ void TBDGenVisitor::addObjCInterface(ClassDecl *CD) {
   // FIXME: We ought to have a symbol source for this.
   SmallString<128> buffer;
   addSymbol(CD->getObjCRuntimeName(buffer), SymbolSource::forUnknown(),
-            SymbolFlags::Data, SymbolKind::ObjectiveCClass);
+            SymbolFlags::Data, EncodeKind::ObjectiveCClass);
   recorder.addObjCInterface(CD);
 }
 
@@ -502,9 +508,10 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   SILSymbolVisitorOptions opts;
   opts.VisitMembers = true;
   opts.LinkerDirectivesOnly = Opts.LinkerDirectivesOnly;
-  opts.PublicSymbolsOnly = Opts.PublicSymbolsOnly;
+  opts.PublicOrPackageSymbolsOnly = Opts.PublicOrPackageSymbolsOnly;
   opts.WitnessMethodElimination = Opts.WitnessMethodElimination;
   opts.VirtualFunctionElimination = Opts.VirtualFunctionElimination;
+  opts.FragileResilientProtocols = Opts.FragileResilientProtocols;
 
   auto silVisitorCtx = SILSymbolVisitorContext(SwiftModule, opts);
   auto visitorCtx = IRSymbolVisitorContext{UniversalLinkInfo, silVisitorCtx};
@@ -559,18 +566,18 @@ enum DylibVersionKind_t: unsigned {
 /// If an individual component is greater than the highest number that can be
 /// represented in its alloted space, it will be truncated to the maximum value
 /// that fits in the alloted space, which matches the behavior of the linker.
-static llvm::Optional<llvm::MachO::PackedVersion>
+static std::optional<llvm::MachO::PackedVersion>
 parsePackedVersion(DylibVersionKind_t kind, StringRef versionString,
                    ASTContext &ctx) {
   if (versionString.empty())
-    return llvm::None;
+    return std::nullopt;
 
   llvm::MachO::PackedVersion version;
   auto result = version.parse64(versionString);
   if (!result.first) {
     ctx.Diags.diagnose(SourceLoc(), diag::tbd_err_invalid_version,
                        (unsigned)kind, versionString);
-    return llvm::None;
+    return std::nullopt;
   }
   if (result.second) {
     ctx.Diags.diagnose(SourceLoc(), diag::tbd_warn_truncating_version,
@@ -619,7 +626,7 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
     targets.push_back(targetVar);
   }
 
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+  auto addSymbol = [&](StringRef symbol, EncodeKind kind, SymbolSource source,
                        Decl *decl, SymbolFlags flags) {
     file.addSymbol(kind, symbol, targets, flags);
   };
@@ -633,12 +640,12 @@ std::vector<std::string>
 PublicSymbolsRequest::evaluate(Evaluator &evaluator,
                                TBDGenDescriptor desc) const {
   std::vector<std::string> symbols;
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+  auto addSymbol = [&](StringRef symbol, EncodeKind kind, SymbolSource source,
                        Decl *decl, SymbolFlags flags) {
-    if (kind == SymbolKind::GlobalSymbol)
+    if (kind == EncodeKind::GlobalSymbol)
       symbols.push_back(symbol.str());
     // TextAPI ObjC Class Kinds represents two symbols.
-    else if (kind == SymbolKind::ObjectiveCClass) {
+    else if (kind == EncodeKind::ObjectiveCClass) {
       symbols.push_back((llvm::MachO::ObjC2ClassNamePrefix + symbol).str());
       symbols.push_back((llvm::MachO::ObjC2MetaClassNamePrefix + symbol).str());
     }
@@ -651,13 +658,13 @@ PublicSymbolsRequest::evaluate(Evaluator &evaluator,
 
 std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
   auto &evaluator = desc.getParentModule()->getASTContext().evaluator;
-  return llvm::cantFail(evaluator(PublicSymbolsRequest{desc}));
+  return evaluateOrFatal(evaluator, PublicSymbolsRequest{desc});
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          const TBDGenOptions &opts) {
   auto &evaluator = M->getASTContext().evaluator;
   auto desc = TBDGenDescriptor::forModule(M, opts);
-  auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
+  auto file = evaluateOrFatal(evaluator, GenerateTBDRequest{desc});
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
                  "TBD writing should be error-free");
 }
@@ -681,9 +688,9 @@ public:
   }
   ~APIGenRecorder() {}
 
-  void addSymbol(StringRef symbol, SymbolKind kind, SymbolSource source,
+  void addSymbol(StringRef symbol, EncodeKind kind, SymbolSource source,
                  Decl *decl, SymbolFlags flags) override {
-    if (kind != SymbolKind::GlobalSymbol)
+    if (kind != EncodeKind::GlobalSymbol)
       return;
 
     apigen::APIAvailability availability;
@@ -870,7 +877,7 @@ void swift::writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os,
   TBDGenOptions opts;
   auto &evaluator = M->getASTContext().evaluator;
   auto desc = TBDGenDescriptor::forModule(M, opts);
-  auto api = llvm::cantFail(evaluator(APIGenRequest{desc}));
+  auto api = evaluateOrFatal(evaluator, APIGenRequest{desc});
   api.writeAPIJSONFile(os, PrettyPrint);
 }
 
@@ -885,7 +892,7 @@ SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
   auto &Ctx = desc.getParentModule()->getASTContext();
   auto *SymbolSources = Ctx.Allocate<SymbolSourceMap>();
 
-  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source,
+  auto addSymbol = [=](StringRef symbol, EncodeKind kind, SymbolSource source,
                        Decl *decl, SymbolFlags flags) {
     SymbolSources->insert({symbol, source});
   };

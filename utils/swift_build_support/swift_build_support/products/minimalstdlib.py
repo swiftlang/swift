@@ -169,10 +169,12 @@ class MinimalStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
         self.cmake_options.define(
             'SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE:BOOL', 'FALSE')
+        self.cmake_options.define(
+            'SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY:BOOL', 'TRUE')
 
         # Build!
         self.build_with_cmake(["swift-stdlib-freestanding"], build_variant, [],
-                              prefer_just_built_toolchain=True)
+                              prefer_native_toolchain=True)
 
     def should_test(self, host_target):
         return False

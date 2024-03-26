@@ -62,7 +62,7 @@ void ValueBase::replaceAllUsesWithUndef() {
   }
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get()->getType(), *F));
+    Op->set(SILUndef::get(F, Op->get()->getType()));
   }
 }
 
@@ -107,13 +107,13 @@ SILInstruction *ValueBase::getNextInstruction() {
   return nullptr;
 }
 
-llvm::Optional<ValueBase::DefiningInstructionResult>
+std::optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
     return DefiningInstructionResult{inst, 0};
   if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
     return DefiningInstructionResult{result->getParent(), result->getIndex()};
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool SILPhiArgument::isLexical() const {
@@ -209,20 +209,32 @@ SILBasicBlock *SILNode::getParentBlock() const {
   if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
     return MVR->getParent()->getParent();
   }
+  if (auto *undef = dyn_cast<SILUndef>(this)) {
+    // By convention, undefs are considered to be defined at the entry of the function.
+    return undef->getParent()->getEntryBlock();
+  }
   return nullptr;
 }
 
 SILFunction *SILNode::getFunction() const {
-  if (auto *parentBlock = getParentBlock())
-    return parentBlock->getParent();
+  if (auto *parentBlock = getParentBlock()) {
+    // This can return nullptr if the block's parent is a global variable
+    // initializer.
+    if (auto *parentFunction = parentBlock->getParent()) {
+      return parentFunction;
+    }
+  }
+
+  if (auto *undef = dyn_cast<SILUndef>(this))
+    return undef->getParent();
+
+  if (auto *placeHolder = dyn_cast<PlaceholderValue>(this))
+    return placeHolder->getParent();
+
   return nullptr;
 }
 
-SILModule *SILNode::getModule() const {
-  if (SILFunction *func = getFunction())
-    return &func->getModule();
-  return nullptr;
-}
+SILModule *SILNode::getModule() const { return &getFunction()->getModule(); }
 
 /// Get a location for this value.
 SILLocation SILValue::getLoc() const {
@@ -331,12 +343,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 ValueOwnershipKind::ValueOwnershipKind(StringRef S)
     : value(OwnershipKind::Any) {
-  auto Result = llvm::StringSwitch<llvm::Optional<OwnershipKind::innerty>>(S)
+  auto Result = llvm::StringSwitch<std::optional<OwnershipKind::innerty>>(S)
                     .Case("unowned", OwnershipKind::Unowned)
                     .Case("owned", OwnershipKind::Owned)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
                     .Case("none", OwnershipKind::None)
-                    .Default(llvm::None);
+                    .Default(std::nullopt);
   if (!Result.has_value())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
   value = Result.value();
@@ -535,8 +547,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 int PlaceholderValue::numPlaceholderValuesAlive = 0;
 
-PlaceholderValue::PlaceholderValue(SILType type)
-      : ValueBase(ValueKind::PlaceholderValue, type) {
+PlaceholderValue::PlaceholderValue(SILFunction *fn, SILType type)
+    : ValueBase(ValueKind::PlaceholderValue, type), parentFunction(fn) {
   numPlaceholderValuesAlive++;
 }
 

@@ -1,6 +1,5 @@
 /// Swift 6 variant to imports.swift. Both can be reintegrated once
 /// -swift-version 6 is accepted by release compilers.
-// REQUIRES: asserts
 
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
@@ -18,7 +17,7 @@
 //--- empty.swift
 
 //--- main.swift
-@_exported public import resilient // expected-warning {{public import of 'resilient' was not used in public declarations or inlinable code}}
+@_exported public import resilient
 public import B.B2 // expected-warning {{public import of 'B' was not used in public declarations or inlinable code}}
 
 public import func C.c // expected-warning {{public import of 'C' was not used in public declarations or inlinable code}}
@@ -40,7 +39,6 @@ public import NotSoSecret // expected-warning {{'NotSoSecret' inconsistently imp
 @_implementationOnly import NotSoSecret2 // expected-note {{imported as implementation-only here}}
 //--- clientWithError.swift
 @_exported public import nonResilient // expected-error {{module 'nonResilient' was not compiled with library evolution support; using it means binary compatibility for 'clientWithError' can't be guaranteed}}
-// expected-warning @-1 {{public import of 'nonResilient' was not used in public declarations or inlinable code}}
 
 // CHECK-6-NOT: import
 // CHECK-6: {{^}}public import A{{$}}

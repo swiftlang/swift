@@ -34,7 +34,6 @@
 #include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
@@ -43,6 +42,7 @@
 #include <functional>
 #include <list>
 #include <new>
+#include <optional>
 #include <vector>
 
 using namespace swift;
@@ -221,7 +221,7 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
   switch (kind) {
   case SymbolicReferenceKind::Context:
     return _buildDemanglingForContext(
-      (const ContextDescriptor *)resolvedReference, {}, Dem);
+        (const ContextDescriptor *)resolvedReference, {}, Dem);
 
   case SymbolicReferenceKind::AccessorFunctionReference:
 #if SWIFT_PTRAUTH
@@ -656,7 +656,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
-        llvm::Optional<ParsedTypeIdentity> _identity;
+        std::optional<ParsedTypeIdentity> _identity;
         auto getIdentity = [&]() -> const ParsedTypeIdentity & {
           if (_identity) return *_identity;
           _identity = ParsedTypeIdentity::parse(type);
@@ -1087,19 +1087,19 @@ public:
 
 #pragma mark Metadata lookup via mangled name
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
                               llvm::ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
   if (depth >= paramCounts.size())
-    return llvm::None;
+    return std::nullopt;
 
   // Compute the flat index.
   unsigned flatIndex = index + (depth == 0 ? 0 : paramCounts[depth - 1]);
 
   // Out-of-bounds index.
   if (flatIndex >= paramCounts[depth])
-    return llvm::None;
+    return std::nullopt;
 
   return flatIndex;
 }
@@ -1196,7 +1196,7 @@ public:
 
 }  // end anonymous namespace
 
-static llvm::Optional<TypeLookupError>
+static std::optional<TypeLookupError>
 _gatherGenericParameters(const ContextDescriptor *context,
                          llvm::ArrayRef<MetadataOrPack> genericArgs,
                          const Metadata *parent,
@@ -1429,19 +1429,19 @@ _gatherGenericParameters(const ContextDescriptor *context,
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 namespace {
 
 /// Find the offset of the protocol requirement for an associated type with
 /// the given name in the given protocol descriptor.
-llvm::Optional<const ProtocolRequirement *>
+std::optional<const ProtocolRequirement *>
 findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr)
-    return llvm::None;
+    return std::nullopt;
 
   // Look through the list of associated type names.
   StringRef associatedTypeNames(associatedTypeNamesPtr);
@@ -1461,7 +1461,7 @@ findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   }
 
   if (!found)
-    return llvm::None;
+    return std::nullopt;
 
   // We have a match on the Nth associated type; go find the Nth associated
   // type requirement.
@@ -1625,6 +1625,11 @@ public:
       assert(getKind() == RequirementKind::Layout);
       return SecondLayout;
     }
+  };
+
+  struct BuiltInverseRequirement {
+    BuiltType SubjectType;
+    InvertibleProtocolKind Kind;
   };
 
   DecodedMetadataBuilder(Demangler &demangler,
@@ -1859,8 +1864,8 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createMetatypeType(BuiltType instance,
-                     llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
-                         llvm::None) const {
+                     std::optional<Demangle::ImplMetatypeRepresentation> repr =
+                         std::nullopt) const {
     if (!instance.isMetadata())
       return TYPE_LOOKUP_ERROR_FMT("Tried to build a metatype from a pack");
     return BuiltType(swift_getMetatypeMetadata(instance.getMetadata()));
@@ -1868,8 +1873,8 @@ public:
 
   TypeLookupErrorOr<BuiltType> createExistentialMetatypeType(
       BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
-          llvm::None) const {
+      std::optional<Demangle::ImplMetatypeRepresentation> repr =
+          std::nullopt) const {
     if (!instance.isMetadata()) {
       return TYPE_LOOKUP_ERROR_FMT("Tried to build an existential metatype "
                                    "from a pack");
@@ -1912,8 +1917,10 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType>
-  createConstrainedExistentialType(BuiltType base,
-                                   llvm::ArrayRef<BuiltRequirement> rs) const {
+  createConstrainedExistentialType(
+      BuiltType base,
+      llvm::ArrayRef<BuiltRequirement> rs,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) const {
     // FIXME: Runtime plumbing.
     return BuiltType();
   }
@@ -1957,6 +1964,7 @@ public:
   createFunctionType(
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
+      ExtendedFunctionTypeFlags extFlags,
       FunctionMetadataDifferentiabilityKind diffKind,
       BuiltType globalActorType, BuiltType thrownError) const {
     assert(
@@ -1993,12 +2001,6 @@ public:
       flags = flags.withGlobalActor(true);
     }
 
-    ExtendedFunctionTypeFlags extFlags;
-    if (thrownError) {
-      flags = flags.withExtendedFlags(true);
-      extFlags = extFlags.withTypedThrows(true);
-    }
-
     return BuiltType(
         swift_getExtendedFunctionTypeMetadata(
             flags, diffKind, paramTypes.data(),
@@ -2011,7 +2013,7 @@ public:
       Demangle::ImplParameterConvention calleeConvention,
       llvm::ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
       llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
-      llvm::Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+      std::optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
       ImplFunctionTypeFlags flags) {
     // We can't realize the metadata for a SILFunctionType.
     return BuiltType();
@@ -2203,10 +2205,16 @@ public:
     return {};
   }
 
+  BuiltInverseRequirement createInverseRequirement(
+      BuiltType subjectType, InvertibleProtocolKind kind) {
+    return BuiltInverseRequirement{subjectType, kind};
+  }
+
   TypeLookupErrorOr<BuiltType> createSILBoxTypeWithLayout(
       llvm::ArrayRef<BuiltSILBoxField> Fields,
       llvm::ArrayRef<BuiltSubstitution> Substitutions,
-      llvm::ArrayRef<BuiltRequirement> Requirements) const {
+      llvm::ArrayRef<BuiltRequirement> Requirements,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) const {
     // FIXME: Implement.
     return BuiltType();
   }
@@ -2264,7 +2272,7 @@ swift_getTypeByMangledNodeImpl(MetadataRequest request, Demangler &demangler,
     return TypeInfo{MetadataResponse{type, MetadataState::Complete},
                     TypeReferenceOwnership()};
   }
-  
+    
   // TODO: propagate the request down to the builder instead of calling
   // swift_checkMetadataState after the fact.
   DecodedMetadataBuilder builder(demangler, substGenericParam,
@@ -2578,12 +2586,12 @@ swift::getTypePackByMangledName(StringRef typeName,
 
 // ==== Function metadata functions ----------------------------------------------
 
-static llvm::Optional<llvm::StringRef>
-cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
+static std::optional<llvm::StringRef> cstrToStringRef(const char *typeNameStart,
+                                                      size_t typeNameLength) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   for (char c : typeName) {
     if (c >= '\x01' && c <= '\x1F')
-      return llvm::None;
+      return std::nullopt;
   }
   return typeName;
 }
@@ -2593,7 +2601,7 @@ cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
 static NodePointer extractFunctionTypeFromMethod(Demangler &demangler,
                                                  const char *typeNameStart,
                                                  size_t typeNameLength) {
-  llvm::Optional<llvm::StringRef> typeName =
+  std::optional<llvm::StringRef> typeName =
       cstrToStringRef(typeNameStart, typeNameLength);
   if (!typeName)
     return nullptr;
@@ -2919,8 +2927,8 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
                                          genericParamCounts, allGenericArgs,
                                          demangler);
 
-  // _gatherGenericParameters returns llvm::None on success.
-  if (result.hasValue()) {
+  // _gatherGenericParameters returns std::nullopt on success.
+  if (result.has_value()) {
     return nullptr;
   }
 
@@ -2966,7 +2974,7 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   // ObjC metadata.
   StringRef typeStr(typeName);
   const Metadata *metadata = nullptr;
-  if (typeStr.startswith("_Tt")) {
+  if (typeStr.starts_with("_Tt")) {
     Demangler demangler;
     auto node = demangler.demangleSymbol(typeName);
     if (!node)
@@ -3246,18 +3254,18 @@ SubstGenericParametersFromWrittenArgs::getWitnessTable(const Metadata *type,
 
 /// Demangle the given type name to a generic parameter reference, which
 /// will be returned as (depth, index).
-static llvm::Optional<std::pair<unsigned, unsigned>>
+static std::optional<std::pair<unsigned, unsigned>>
 demangleToGenericParamRef(StringRef typeName) {
   StackAllocatedDemangler<1024> demangler;
   NodePointer node = demangler.demangleType(typeName);
   if (!node)
-    return llvm::None;
+    return std::nullopt;
 
   // Find the flat index that the right-hand side refers to.
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
   if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return llvm::None;
+    return std::nullopt;
 
   return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
                                        node->getChild(1)->getIndex());

@@ -1135,7 +1135,7 @@ doing a textual search.
 
 Like `@available`, this attribute indicates a decl is available only as an SPI.
 This implies several behavioral changes comparing to regular `@available`:
-1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+1. Type checker diagnoses when a client accidentally exposes such a symbol in library APIs.
 2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
 3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.
 

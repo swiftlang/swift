@@ -192,6 +192,25 @@ public:
   }
 };
 
+class TypeRefInverseRequirement {
+  llvm::PointerIntPair<const TypeRef *, 3, InvertibleProtocolKind> Storage;
+
+public:
+  TypeRefInverseRequirement(const TypeRef *first, InvertibleProtocolKind proto)
+      : Storage(first, proto) {
+    assert(first);
+  }
+
+  /// Retrieve the first type.
+  const TypeRef *getFirstType() const {
+    return Storage.getPointer();
+  }
+
+  /// Determine the kind of requirement.
+  InvertibleProtocolKind getKind() const { return Storage.getInt(); }
+};
+
+
 // On 32-bit systems this needs more than just pointer alignment to fit the
 // extra bits needed by TypeRefRequirement.
 class alignas(8) TypeRef {
@@ -211,7 +230,7 @@ public:
   Demangle::NodePointer getDemangling(Demangle::Demangler &Dem) const;
 
   /// Build the mangled name from this TypeRef.
-  llvm::Optional<std::string> mangle(Demangle::Demangler &Dem) const;
+  std::optional<std::string> mangle(Demangle::Demangler &Dem) const;
 
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
@@ -223,7 +242,7 @@ public:
                        const GenericArgumentMap &Subs,
                        bool &DidSubstitute) const;
 
-  llvm::Optional<GenericArgumentMap> getSubstMap() const;
+  std::optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;
 
@@ -483,12 +502,14 @@ class FunctionTypeRef final : public TypeRef {
   std::vector<Param> Parameters;
   const TypeRef *Result;
   FunctionTypeFlags Flags;
+  ExtendedFunctionTypeFlags ExtFlags;
   FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
   const TypeRef *GlobalActor;
   const TypeRef *ThrownError;
 
   static TypeRefID Profile(const std::vector<Param> &Parameters,
                            const TypeRef *Result, FunctionTypeFlags Flags,
+                           ExtendedFunctionTypeFlags ExtFlags,
                            FunctionMetadataDifferentiabilityKind DiffKind,
                            const TypeRef *GlobalActor,
                            const TypeRef *ThrownError) {
@@ -500,6 +521,7 @@ class FunctionTypeRef final : public TypeRef {
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
+    ID.addInteger(static_cast<uint64_t>(ExtFlags.getIntValue()));
     ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
     ID.addPointer(GlobalActor);
     ID.addPointer(ThrownError);
@@ -510,21 +532,23 @@ class FunctionTypeRef final : public TypeRef {
 public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
                   FunctionTypeFlags Flags,
+                  ExtendedFunctionTypeFlags ExtFlags,
                   FunctionMetadataDifferentiabilityKind DiffKind,
                   const TypeRef *GlobalActor,
                   const TypeRef *ThrownError)
       : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
-        Flags(Flags), DifferentiabilityKind(DiffKind),
+        Flags(Flags), ExtFlags(ExtFlags), DifferentiabilityKind(DiffKind),
         GlobalActor(GlobalActor), ThrownError(ThrownError) {}
 
   template <typename Allocator>
   static const FunctionTypeRef *create(
       Allocator &A, std::vector<Param> Params, const TypeRef *Result,
-      FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind,
+      FunctionTypeFlags Flags, ExtendedFunctionTypeFlags ExtFlags,
+      FunctionMetadataDifferentiabilityKind DiffKind,
       const TypeRef *GlobalActor, const TypeRef *ThrownError) {
     FIND_OR_CREATE_TYPEREF(
-        A, FunctionTypeRef, Params, Result, Flags, DiffKind, GlobalActor,
-        ThrownError);
+        A, FunctionTypeRef, Params, Result, Flags, ExtFlags, DiffKind,
+        GlobalActor, ThrownError);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -535,6 +559,10 @@ public:
 
   FunctionTypeFlags getFlags() const {
     return Flags;
+  }
+
+  ExtendedFunctionTypeFlags getExtFlags() const {
+    return ExtFlags;
   }
 
   FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {

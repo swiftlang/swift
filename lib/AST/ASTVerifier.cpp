@@ -125,7 +125,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -141,7 +141,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -157,7 +157,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -170,7 +170,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 namespace {
@@ -401,7 +401,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue();
       cleanup(node);
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -419,7 +419,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -430,7 +430,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching post-visitation.
@@ -1075,17 +1075,21 @@ public:
         resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
+      } else if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
+        resultType = TupleType::getEmpty(Ctx);
       } else {
         resultType = TupleType::getEmpty(Ctx);
       }
-      
+
       if (S->hasResult()) {
-        if (isa<ConstructorDecl>(func)) {
-          Out << "Expected ReturnStmt not to have a result. A constructor "
-                 "should not return a result. Returned expression: ";
-          S->getResult()->dump(Out);
-          Out << "\n";
-          abort();
+        if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
+          if (!CD->hasLifetimeDependentReturn()) {
+            Out << "Expected ReturnStmt not to have a result. A constructor "
+                   "should not return a result. Returned expression: ";
+            S->getResult()->dump(Out);
+            Out << "\n";
+            abort();
+          }
         }
 
         auto result = S->getResult();
@@ -1784,6 +1788,14 @@ public:
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(UnreachableExpr *E) {
+      if (!E->getSubExpr()->getType()->isStructurallyUninhabited()) {
+        Out << "UnreachableExpr must have an uninhabited sub-expression: ";
+        E->getSubExpr()->dump(Out);
+        abort();
+      }
+    }
+
     void verifyChecked(TupleElementExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying TupleElementExpr", E);
 
@@ -2472,6 +2484,10 @@ public:
     }
 
     void verifyChecked(MacroExpansionExpr *expansion) {
+      // If there is a substitute decl, we'll end up checking that instead.
+      if (expansion->getSubstituteDecl())
+        return;
+
       MacroExpansionDiscriminatorKey key{
         MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
         expansion->getMacroName().getBaseName().getIdentifier()
@@ -2631,6 +2647,11 @@ public:
 
     void verifyChecked(VarDecl *var) {
       if (!var->hasInterfaceType())
+        return;
+
+      // The types for imported vars are produced lazily and
+      // could fail to import.
+      if (var->getClangDecl() && var->isInvalid())
         return;
 
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
@@ -2799,7 +2820,6 @@ public:
         // Ignore incomplete conformances; we didn't need them.
         return;
 
-      case ProtocolConformanceState::CheckingTypeWitnesses:
       case ProtocolConformanceState::Checking:
         dumpRef(decl);
         Out << " has a protocol conformance that is still being checked "
@@ -3284,7 +3304,7 @@ public:
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       auto *ND = DD->getDeclContext()->getSelfNominalTypeDecl();
-      if (!isa<ClassDecl>(ND) && !ND->canBeNoncopyable() && !DD->isInvalid()) {
+      if (!isa<ClassDecl>(ND) && ND->canBeCopyable() && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes/move only types should be "
                "marked invalid\n";
         abort();

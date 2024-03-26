@@ -804,6 +804,11 @@ bool tryCheckedCastBrJumpThreading(
     SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist,
     bool EnableOSSARewriteTerminator) {
 
+  // TODO: Disable for OSSA temporarily
+  if (Fn->hasOwnership()) {
+    return false;
+  }
+
   CheckedCastBrJumpThreading CCBJumpThreading(Fn, DT, deBlocks,
                                               BlocksForWorklist,
                                               EnableOSSARewriteTerminator);

@@ -286,6 +286,30 @@ static void printImports(raw_ostream &out,
     allImportFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
   }
 
+  // Collect the public imports as a subset so that we can mark them with
+  // '@_exported'.
+  SmallVector<ImportedModule, 8> exportedImports;
+  M->getImportedModules(exportedImports, ModuleDecl::ImportFilterKind::Exported);
+  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> exportedImportSet;
+  exportedImportSet.insert(exportedImports.begin(), exportedImports.end());
+
+  // All of the above are considered `public` including `@_spiOnly public import`
+  // and `@_spi(name) public import`, and should override `package import`.
+  // Track the `public` imports here to determine whether to override.
+  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> publicImportSet;
+  SmallVector<ImportedModule, 8> publicImports;
+  M->getImportedModules(publicImports, allImportFilter);
+  publicImportSet.insert(publicImports.begin(), publicImports.end());
+
+  // Used to determine whether `package import` should be overriden below.
+  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> packageOnlyImportSet;
+  if (Opts.printPackageInterface()) {
+    SmallVector<ImportedModule, 8> packageOnlyImports;
+    M->getImportedModules(packageOnlyImports, ModuleDecl::ImportFilterKind::PackageOnly);
+    packageOnlyImportSet.insert(packageOnlyImports.begin(), packageOnlyImports.end());
+    allImportFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
+  }
+
   SmallVector<ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
 
@@ -294,13 +318,6 @@ static void printImports(raw_ostream &out,
 
   ImportedModule::removeDuplicates(allImports);
   diagnoseScopedImports(ctx.Diags, allImports);
-
-  // Collect the public imports as a subset so that we can mark them with
-  // '@_exported'.
-  SmallVector<ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Exported);
-  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> publicImportSet;
-  publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
@@ -332,7 +349,7 @@ static void printImports(raw_ostream &out,
       out << "@_implementationOnly ";
     }
 
-    if (publicImportSet.count(import))
+    if (exportedImportSet.count(import))
       out << "@_exported ";
 
     if (!Opts.printPublicInterface()) {
@@ -351,7 +368,11 @@ static void printImports(raw_ostream &out,
         out << "@_spi(" << spiName << ") ";
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
+    if (Opts.printPackageInterface() &&
+        !publicImportSet.count(import) &&
+        packageOnlyImportSet.count(import))
+      out << "package ";
+    else if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
       out << "public ";
     }
 
@@ -432,8 +453,7 @@ class InheritedProtocolCollector {
 
   /// Helper to extract the `@available` attributes on a decl.
   static AvailableAttrList
-  getAvailabilityAttrs(const Decl *D,
-                       llvm::Optional<AvailableAttrList> &cache) {
+  getAvailabilityAttrs(const Decl *D, std::optional<AvailableAttrList> &cache) {
     if (cache.has_value())
       return cache.value();
 
@@ -474,7 +494,7 @@ class InheritedProtocolCollector {
   }
 
   static bool isUncheckedConformance(ProtocolConformance *conformance) {
-    if (auto normal = conformance->getRootNormalConformance())
+    if (auto normal = dyn_cast<NormalProtocolConformance>(conformance->getRootConformance()))
       return normal->isUnchecked();
     return false;
   }
@@ -488,7 +508,7 @@ class InheritedProtocolCollector {
   /// protocols.
   void recordProtocols(InheritedTypes directlyInherited, const Decl *D,
                        bool skipExtra = false) {
-    llvm::Optional<AvailableAttrList> availableAttrs;
+    std::optional<AvailableAttrList> availableAttrs;
 
     for (int i : directlyInherited.getIndices()) {
       Type inheritedTy = directlyInherited.getResolvedType(i);
@@ -507,7 +527,7 @@ class InheritedProtocolCollector {
         else
           ExtraProtocols.push_back(ProtocolAndAvailability(
               protoDecl, getAvailabilityAttrs(D, availableAttrs),
-              inherited.isUnchecked, getOriginallyDefinedInAttrList(D)));
+              inherited.isUnchecked(), getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -670,11 +690,9 @@ public:
 
     // First record all protocols that have already been handled.
     for (ProtocolDecl *proto : IncludedProtocols) {
-      proto->walkInheritedProtocols(
-          [&handledProtocols](ProtocolDecl *inherited) -> TypeWalker::Action {
-        handledProtocols.insert(inherited);
-        return TypeWalker::Action::Continue;
-      });
+      handledProtocols.insert(proto);
+      auto allInherited = proto->getAllInheritedProtocols();
+      handledProtocols.insert(allInherited.begin(), allInherited.end());
     }
 
     // Preserve the behavior of previous implementations which formatted of
@@ -693,7 +711,7 @@ public:
       proto->walkInheritedProtocols(
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
         // If 'nominal' is an actor, we do not synthesize its conformance
         // to the Actor protocol through a dummy extension.
@@ -702,14 +720,14 @@ public:
         // not extensions of that 'actor'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
         // Do not synthesize an extension to print a conformance to an
         // invertible protocol, as their conformances are always re-inferred
         // using the interface itself.
         if (auto kp = inherited->getKnownProtocolKind())
           if (getInvertibleProtocolKind(*kp))
-            return TypeWalker::Action::SkipChildren;
+            return TypeWalker::Action::SkipNode;
 
         if (inherited->isSPI() && printOptions.printPublicInterface())
           return TypeWalker::Action::Continue;
@@ -721,7 +739,7 @@ public:
               inherited, availability, isUnchecked, otherAttrs);
           printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
                                     protoAndAvailability);
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
         }
 
         return TypeWalker::Action::Continue;
@@ -744,9 +762,10 @@ public:
 
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
-    auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
+    auto inherits = ctx.AllocateCopy(llvm::ArrayRef(InheritedEntry(
         TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
-        /*isRetroactive=*/false)));
+        /*isRetroactive=*/false,
+        /*isPreconcurrency=*/false)));
     auto extension =
         ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
                               nominal->getModuleScopeContext(), nullptr);

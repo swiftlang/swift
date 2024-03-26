@@ -100,10 +100,17 @@ include(FetchContent)
 # optional until we have a bootstrap story.
 check_language(Swift)
 if(CMAKE_Swift_COMPILER)
+  # we are not interested in logging any Swift module used
+  # when configuring the build system -- those are not useful
+  # since they will not contribute to the build of the compiler itself
+  unset(ENV{SWIFT_LOADED_MODULE_TRACE_FILE})
+
   enable_language(Swift)
+  set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION "${CMAKE_Swift_COMPILER_VERSION}")
 else()
   message(STATUS "WARNING! Did not find a host compiler swift?! Can not build
                   any compiler host sources written in Swift")
+  set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION)
 endif()
 
 # A convenience pattern to match Darwin platforms. Example:
@@ -222,15 +229,19 @@ option(SWIFT_BUILD_DYNAMIC_STDLIB
 option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library"
     FALSE)
-    
+
 option(SWIFT_STDLIB_STATIC_PRINT
     "Build compile-time evaluated vprintf()"
     FALSE)
-    
+
 option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     "Include Unicode data files in the standard library.
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
+
+option(SWIFT_BUILD_CLANG_OVERLAYS
+  "Build Swift overlays for the clang builtin modules"
+  TRUE)
 
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
@@ -350,9 +361,11 @@ How swift-C++ bridging code is compiled:
 ]=] DEFAULT)
 
 option(SWIFT_USE_SYMLINKS "Use symlinks instead of copying binaries" ${CMAKE_HOST_UNIX})
-set(SWIFT_COPY_OR_SYMLINK "copy")
+set(SWIFT_COPY_OR_SYMLINK "copy_if_different")
+set(SWIFT_COPY_OR_SYMLINK_DIR "copy_directory")
 if(SWIFT_USE_SYMLINKS)
   set(SWIFT_COPY_OR_SYMLINK "create_symlink")
+  set(SWIFT_COPY_OR_SYMLINK_DIR "create_symlink")
 endif()
 
 # The following only works with the Ninja generator in CMake >= 3.0.
@@ -460,6 +473,10 @@ set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
 targets on Darwin platforms. These targets are in addition to the full \
 library targets.")
 
+set(SWIFT_MIN_RUNTIME_VERSION "${DEFAULT_SWIFT_MIN_RUNTIME_VERSION}" CACHE STRING
+  "Specify the minimum version of the runtime that we target when building \
+the compiler itself. This is used on non-Darwin platforms to ensure \
+that it's possible to build the compiler using host tools.")
 
 #
 # User-configurable Android specific options.
@@ -472,6 +489,14 @@ set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
+
+#
+# User-configurable WebAssembly specific options.
+#
+
+option(SWIFT_ENABLE_WASI_THREADS
+  "Build the Standard Library with WASI threads support"
+  FALSE)
 
 #
 # User-configurable Darwin-specific options.
@@ -639,12 +664,24 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
 
+option(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES
+  "Enable experimental NonescapableTypes"
+  FALSE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
   "Enable experimental string processing"
   FALSE)
 
 option(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION
   "Enable build of the Swift observation module"
+  FALSE)
+
+option(SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE
+  "Build the stdlib with -strict-concurrency=complete"
+  FALSE)
+
+option(SWIFT_ENABLE_SYNCHRONIZATION
+  "Enable build of the Swift Synchronization module"
   FALSE)
 
 option(SWIFT_ENABLE_DISPATCH
@@ -780,11 +817,17 @@ if (CMAKE_Swift_COMPILER)
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
+
+set(THREADS_PREFER_PTHREAD_FLAG YES)
+include(FindThreads)
+
 if(SWIFT_PATH_TO_CMARK_BUILD)
   execute_process(COMMAND ${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark --version
     OUTPUT_VARIABLE _CMARK_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
+elseif(SWIFT_INCLUDE_TOOLS)
+  find_package(cmark-gfm CONFIG REQUIRED)
 endif()
 message(STATUS "")
 
@@ -866,7 +909,7 @@ elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_BUILD_SWIFT_SYNTAX)
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
 endif()
 
-if(SWIFT_BUILD_SWIFT_SYNTAX)
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
@@ -932,6 +975,18 @@ else()
 endif()
 set(SWIFT_USE_LINKER ${SWIFT_USE_LINKER_default} CACHE STRING
     "Build Swift with a non-default linker")
+
+include(CheckLinkerFlag)
+
+# Apple's linker complains about duplicate libraries, which CMake likes to do
+# to support ELF platforms. To silence that warning, we can use
+# -no_warn_duplicate_libraries, but only in versions of the linker that
+# support that flag.
+if(NOT LLVM_USE_LINKER AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  check_linker_flag(C "-Wl,-no_warn_duplicate_libraries" SWIFT_LINKER_SUPPORTS_NO_WARN_DUPLICATE_LIBRARIES)
+else()
+  set(SWIFT_LINKER_SUPPORTS_NO_WARN_DUPLICATE_LIBRARIES OFF CACHE INTERNAL "")
+endif()
 
 #
 # Enable additional warnings.
@@ -1220,10 +1275,12 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
+  message(STATUS "NonEscapableTypes Support:          ${SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Backtracing Support:                ${SWIFT_ENABLE_BACKTRACING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
+  message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1346,47 +1403,6 @@ endif()
 add_subdirectory(include)
 
 if(SWIFT_INCLUDE_TOOLS)
-
-  # TODO Remove this once release/5.9 is done and we can finish migrating Swift
-  #      off of `llvm::None`/`llvm::Optional`, and `llvm::makeArrayRef`.
-  # This is to silence the avalanche of deprecation warnings from LLVM headers
-  # until we can actually do something about them. This is nasty, but it's
-  # better than losing context due to the sheer number in-actionable deprecation
-  # warnings or the massive number of merge-conflicts we would get otherwise.
-  add_definitions(-DSWIFT_TARGET)
-
-  # Include 'swift-syntax'.
-  # This is a function because we want to set some 'CMAKE_*' variables temporarily.'
-  # TODO: Replace this with 'block()' after CMake 3.25
-  function(include_swift_syntax)
-    if(NOT SWIFT_BUILD_SWIFT_SYNTAX)
-      return()
-    endif()
-    if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
-      message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
-      return()
-    endif()
-
-    set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
-    set(BUILD_SHARED_LIBS ON)
-    # All libraries in 'swift-syntax' goes to 'lib/swift/host'.
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
-    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
-      set(SWIFT_HOST_LIBRARIES_RPATH "$ORIGIN;$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-    endif()
-    # Add unique ABI prefix to swift-syntax libraries so that compiler libraries (e.g. sourcekitdInProc)
-    # can be used from tools that has its own swift-syntax libraries as SwiftPM dependencies.
-    set(SWIFT_MODULE_ABI_NAME_PREFIX "Compiler")
-
-    file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
-    FetchContent_Declare(SwiftSyntax
-      SOURCE_DIR "${swift_syntax_path}"
-    )
-    FetchContent_MakeAvailable(SwiftSyntax)
-  endfunction()
-  include_swift_syntax()
-
   add_subdirectory(lib)
 
   add_subdirectory(SwiftCompilerSources)

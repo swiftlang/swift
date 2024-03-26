@@ -15,6 +15,12 @@ set(swift_string_processing_link_libraries
   swift_RegexParser)
 
 set(swift_string_processing_compile_flags)
+
+# Pass a flag to the build indicating that _StringProcessing's dependencies
+# will be built with library evolution.
+list(APPEND swift_string_processing_compile_flags
+  "-DRESILIENT_LIBRARIES")
+
 if(SWIFT_BUILD_STATIC_STDLIB)
   # Explicitly autolink swift_RegexParser because it's imported with @_implementationOnly
   list(APPEND swift_string_processing_compile_flags

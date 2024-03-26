@@ -22,7 +22,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 
@@ -92,6 +92,17 @@ bool addNonIsolatedToSynthesized(NominalTypeDecl *nominal, ValueDecl *value);
 /// Adds the `@_spi` groups from \p inferredFromDecl to \p decl.
 void applyInferredSPIAccessControlAttr(Decl *decl, const Decl *inferredFromDecl,
                                        ASTContext &ctx);
+
+/// Asserts that the synthesized fields appear in the expected order.
+///
+/// The `id` and `actorSystem` MUST be the first two fields of a distributed
+/// actor, because we assume their location in IRGen, and also when we allocate
+/// a distributed remote actor, we're able to allocate memory ONLY for those and
+/// without allocating any of the storage for the actor's properties.
+///         [id, actorSystem, unownedExecutor]
+/// followed by the executor fields for a default distributed actor.
+void assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
+                                            NominalTypeDecl *nominal);
 
 } // end namespace swift
 

@@ -128,7 +128,7 @@ static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
     if (Callee->isIntrinsic())
       return false;
     // objc_msgSend stubs must be called, and can't have their address taken.
-    if (Callee->getName().startswith("objc_msgSend$"))
+    if (Callee->getName().starts_with("objc_msgSend$"))
       return false;
   }
   if (isCalleeOperand(CI, opIdx) &&
@@ -463,7 +463,7 @@ private:
   }
 
   /// Checks the rules of order relation introduced among functions set.
-  /// Returns true, if sanity check has been passed, and false if failed.
+  /// Returns true, if soundness check has been passed, and false if failed.
   bool doSanityCheck(std::vector<WeakTrackingVH> &Worklist);
 
   /// Updates the numUnhandledCallees of all user functions of the equivalence
@@ -638,7 +638,7 @@ static bool mayMergeCallsToFunction(Function &F) {
   StringRef Name = F.getName();
 
   // Calls to dtrace probes must generate unique patchpoints.
-  if (Name.startswith("__dtrace"))
+  if (Name.starts_with("__dtrace"))
     return false;
 
   return true;
@@ -1195,12 +1195,11 @@ static Value *createCast(IRBuilder<> &Builder, Value *V, Type *DestTy) {
     assert(SrcTy->getStructNumElements() == DestTy->getStructNumElements());
     Value *Result = UndefValue::get(DestTy);
     for (unsigned int I = 0, E = SrcTy->getStructNumElements(); I < E; ++I) {
-      Value *Element = createCast(
-          Builder, Builder.CreateExtractValue(V, makeArrayRef(I)),
-          DestTy->getStructElementType(I));
+      Value *Element =
+          createCast(Builder, Builder.CreateExtractValue(V, llvm::ArrayRef(I)),
+                     DestTy->getStructElementType(I));
 
-      Result =
-          Builder.CreateInsertValue(Result, Element, makeArrayRef(I));
+      Result = Builder.CreateInsertValue(Result, Element, llvm::ArrayRef(I));
     }
     return Result;
   }
@@ -1261,29 +1260,6 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   ++NumSwiftThunksWritten;
 }
 
-static llvm::AttributeList
-fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
-                                        llvm::AttributeList attrList) {
-  auto &context = fnType->getContext();
-  if (!context.supportsTypedPointers())
-    return attrList;
-
-  for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
-    auto paramTy = fnType->getParamType(i);
-    auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
-    if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamStructRetType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::StructRet,
-          paramTy->getNonOpaquePointerElementType());
-    if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamByValType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::ByVal,
-          paramTy->getNonOpaquePointerElementType());
-  }
-  return attrList;
-}
 /// Replace direct callers of Old with New. Also add parameters to the call to
 /// \p New, which are defined by the FuncIdx's value in \p Params.
 bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
@@ -1356,7 +1332,6 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     auto newAttrList = AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
                                             NewPAL.getRetAttrs(),
                                             NewArgAttrs);
-    newAttrList = fixUpTypesInByValAndStructRetAttributes(FType, newAttrList);
     NewCI->setAttributes(newAttrList);
     Value *retVal = createCast(Builder, NewCI, CI->getType());
     CI->replaceAllUsesWith(retVal);

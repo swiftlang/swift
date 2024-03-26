@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -681,6 +681,8 @@ final internal class __SharedStringStorage
 
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
 
+  internal var immortal = false
+
   internal var count: Int { _countAndFlags.count }
 
   internal init(
@@ -689,6 +691,7 @@ final internal class __SharedStringStorage
   ) {
     self._owner = nil
     self.start = ptr
+    self.immortal = true
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags
 #elseif _pointerBitWidth(_32)
@@ -707,6 +710,32 @@ final internal class __SharedStringStorage
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
       return String(_StringGuts(self))
+    }
+  }
+
+  internal init(
+    _mortal ptr: UnsafePointer<UInt8>,
+    countAndFlags: _StringObject.CountAndFlags
+  ) {
+    // ptr *must* be the start of an allocation
+    self._owner = nil
+    self.start = ptr
+    self.immortal = false
+#if _pointerBitWidth(_64)
+    self._countAndFlags = countAndFlags
+#elseif _pointerBitWidth(_32)
+    self._count = countAndFlags.count
+    self._countFlags = countAndFlags.flags
+#else
+#error("Unknown platform")
+#endif
+    super.init()
+    self._invariantCheck()
+  }
+
+  deinit {
+    if (_owner == nil) && !immortal {
+      start.deallocate()
     }
   }
 }

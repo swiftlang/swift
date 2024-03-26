@@ -263,8 +263,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   ...
 ///   load/store %addr
-bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
-                                          SILFunction *callee) {
+bool swift::tryOptimizeKeypathApplication(ApplyInst *AI,
+                                          SILFunction *callee, SILBuilder Builder) {
   if (AI->getNumArguments() != 3)
     return false;
 
@@ -303,7 +303,6 @@ bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
     }
   });
   
-  eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
 }
@@ -329,9 +328,9 @@ bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
 ///   %offset_builtin_int = unchecked_trivial_bit_cast %offset_ptr
 ///   %offset_int = struct $Int (%offset_builtin_int)
 ///   %offset = enum $Optional<Int>, #Optional.some!enumelt, %offset_int
-bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
+bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
                                              FuncDecl *calleeFn,
-                                             KeyPathInst *kp) {
+                                             KeyPathInst *kp, SILBuilder Builder) {
   auto *accessor = dyn_cast<AccessorDecl>(calleeFn);
   if (!accessor || !accessor->isGetter())
     return false;
@@ -432,7 +431,6 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     result = Builder.createOptionalNone(loc, AI->getType());
   }
   AI->replaceAllUsesWith(result);
-  eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
 }
@@ -444,9 +442,9 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
 ///   %string = apply %keypath_kvcString_method(%kp)
 /// With:
 ///   %string = string_literal "blah"
-bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
+bool swift::tryOptimizeKeypathKVCString(ApplyInst *AI,
                                               FuncDecl *calleeFn,
-                                              KeyPathInst *kp) {
+                                              KeyPathInst *kp, SILBuilder Builder) {
   if (!calleeFn->getAttrs()
         .hasSemanticsAttr(semantics::KEYPATH_KVC_KEY_PATH_STRING))
     return false;
@@ -499,14 +497,13 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
   }
 
   AI->replaceAllUsesWith(literalValue);
-  eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
 }
 
-bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
+bool swift::tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder) {
   if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
-    return tryOptimizeKeypathApplication(AI, callee);
+    return tryOptimizeKeypathApplication(AI, callee, Builder);
   }
   
   // Try optimize keypath method calls.
@@ -530,10 +527,10 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
   if (!kp || !kp->hasPattern())
     return false;
   
-  if (tryOptimizeKeypathOffsetOf(AI, calleeFn, kp))
+  if (tryOptimizeKeypathOffsetOf(AI, calleeFn, kp, Builder))
     return true;
 
-  if (tryOptimizeKeypathKVCString(AI, calleeFn, kp))
+  if (tryOptimizeKeypathKVCString(AI, calleeFn, kp, Builder))
     return true;
 
   return false;
@@ -722,7 +719,7 @@ void SILCombiner::replaceWitnessMethodInst(
 // If some ConcreteOpenedExistentialInfo is returned, then new cast instructions
 // have already been added to Builder's tracking list. If the caller can't make
 // real progress then it must reset the Builder.
-llvm::Optional<ConcreteOpenedExistentialInfo>
+std::optional<ConcreteOpenedExistentialInfo>
 SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     Operand &ArgOperand) {
   SILInstruction *AI = ArgOperand.getUser();
@@ -731,7 +728,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
 
   // SoleConformingType is only applicable in whole-module compilation.
   if (!M.isWholeModule())
-    return llvm::None;
+    return std::nullopt;
 
   // Determine the protocol.
   ProtocolDecl *PD = nullptr;
@@ -744,7 +741,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     // FIXME: Remove this out-dated check for mutating self. canReplaceCopiedArg
     // is supposed to handle this case.
     if (FAS.getOrigCalleeType()->getSelfParameter().isIndirectMutating())
-      return llvm::None;
+      return std::nullopt;
     PD = WMI->getLookupProtocol();
   } else {
     auto ArgType = ArgOperand.get()->getType();
@@ -764,17 +761,17 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
   }
 
   if (!PD)
-    return llvm::None;
+    return std::nullopt;
 
   // Determine the sole conforming type.
   CanType ConcreteType;
   if (!PCA->getSoleConformingType(PD, CHA, ConcreteType))
-    return llvm::None;
+    return std::nullopt;
 
   // Determine OpenedArchetypeDef and SubstitutionMap.
   ConcreteOpenedExistentialInfo COAI(ArgOperand, ConcreteType, PD);
   if (!COAI.CEI)
-    return llvm::None;
+    return std::nullopt;
 
   const OpenedArchetypeInfo &OAI = COAI.OAI;
   ConcreteExistentialInfo &SoleCEI = *COAI.CEI;
@@ -803,7 +800,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
 
     auto *consumingUse = OER->getSingleConsumingUse();
     if (!consumingUse || !isa<DestroyValueInst>(consumingUse->getUser())) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     // We use std::next(OER) as the insertion point so that we can reuse the
@@ -822,7 +819,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     auto abstractionPattern = Lowering::AbstractionPattern::getOpaque();
     auto abstractTy = F->getLoweredType(abstractionPattern, ConcreteType);
     if (abstractTy != concreteSILType)
-      return llvm::None;
+      return std::nullopt;
 
     SoleCEI.ConcreteValue =
       Builder.createUncheckedAddrCast(
@@ -832,13 +829,13 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
   // Bail if OpenArchetypeInfo recognizes any additional opened archetype
   // producers. This shouldn't be hit currently because metatypes don't
   // conform to protocols.
-  return llvm::None;
+  return std::nullopt;
 }
 
 // This function builds a ConcreteExistentialInfo by first following the data
 // flow chain from the ArgOperand. Otherwise, we check if the operand is of
 // protocol type that conforms to a single concrete type.
-llvm::Optional<ConcreteOpenedExistentialInfo>
+std::optional<ConcreteOpenedExistentialInfo>
 SILCombiner::buildConcreteOpenedExistentialInfo(Operand &ArgOperand) {
   // Build a ConcreteOpenedExistentialInfo following the data flow chain of the
   // ArgOperand through the open_existential backward to an init_existential.
@@ -1015,7 +1012,7 @@ struct ConcreteArgumentCopy {
     assert(origArg->getType().isAddress());
   }
 
-  static llvm::Optional<ConcreteArgumentCopy>
+  static std::optional<ConcreteArgumentCopy>
   generate(const ConcreteExistentialInfo &existentialInfo, ApplySite apply,
            unsigned argIdx, SILBuilderContext &builderCtx) {
     SILParameterInfo paramInfo =
@@ -1025,7 +1022,7 @@ struct ConcreteArgumentCopy {
            && "A mutated opened existential value can't be replaced");
 
     if (!paramInfo.isConsumed())
-      return llvm::None;
+      return std::nullopt;
 
     SILValue origArg = apply.getArgument(argIdx);
     // TODO_sil_opaque: With SIL opaque values, a formally indirect argument
@@ -1045,7 +1042,7 @@ struct ConcreteArgumentCopy {
     // destroy_value of the existential, which is no longer consumed by the
     // call.
     if (!paramInfo.isFormalIndirect())
-      return llvm::None;
+      return std::nullopt;
 
     SILBuilderWithScope builder(apply.getInstruction(), builderCtx);
     auto loc = apply.getLoc();
@@ -1465,8 +1462,10 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
-  if (tryOptimizeKeypath(AI))
+  if (tryOptimizeKeypath(AI, Builder)) {
+    eraseInstFromFunction(*AI);
     return nullptr;
+  }
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunctionOrNull();

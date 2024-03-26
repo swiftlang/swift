@@ -39,9 +39,6 @@ class AbstractClosureExpr;
 /// to avoid having to include Types.h.
 bool areTypesEqual(Type type1, Type type2);
 
-/// Determine whether the given type is suitable as a concurrent value type.
-bool isSendableType(ModuleDecl *module, Type type);
-
 /// Determines if the 'let' can be read from anywhere within the given module,
 /// regardless of the isolation or async-ness of the context in which
 /// the var is read.
@@ -69,15 +66,14 @@ public:
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
-    /// The declaration is isolated to a global actor but with the "unsafe"
-    /// annotation, which means that we only enforce the isolation if we're
-    /// coming from something with specific isolation.
-    GlobalActorUnsafe,
+    /// The actor isolation iss statically erased, as for a call to
+    /// an isolated(any) function.  This is not possible for declarations.
+    Erased,
   };
 
 private:
   union {
-    llvm::PointerUnion<NominalTypeDecl *, VarDecl *> actorInstance;
+    llvm::PointerUnion<NominalTypeDecl *, VarDecl *, Expr *> actorInstance;
     Type globalActor;
     void *pointer;
   };
@@ -91,7 +87,9 @@ private:
 
   ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
 
-  ActorIsolation(Kind kind, VarDecl *capturedActor);
+  ActorIsolation(Kind kind, VarDecl *actor, unsigned parameterIndex);
+
+  ActorIsolation(Kind kind, Expr *actor, unsigned parameterIndex);
 
   ActorIsolation(Kind kind, Type globalActor)
       : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
@@ -111,22 +109,31 @@ public:
     return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
   }
 
-  static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
-    return ActorIsolation(ActorInstance, actor, 0);
-  }
+  static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
 
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
     return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
   }
 
-  static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
-    return ActorIsolation(ActorInstance, capturedActor);
+  static ActorIsolation forActorInstanceParameter(VarDecl *actor,
+                                                  unsigned parameterIndex) {
+    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
   }
 
-  static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
-    return ActorIsolation(
-        unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
+  static ActorIsolation forActorInstanceParameter(Expr *actor,
+                                                  unsigned parameterIndex);
+
+  static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
+    return ActorIsolation(ActorInstance, capturedActor, 0);
+  }
+
+  static ActorIsolation forGlobalActor(Type globalActor) {
+    return ActorIsolation(GlobalActor, globalActor);
+  }
+
+  static ActorIsolation forErased() {
+    return ActorIsolation(Erased);
   }
 
   static std::optional<ActorIsolation> forSILString(StringRef string) {
@@ -143,7 +150,7 @@ public:
             .Case("global_actor",
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
             .Case("global_actor_unsafe", std::optional<ActorIsolation>(
-                                             ActorIsolation::GlobalActorUnsafe))
+                                             ActorIsolation::GlobalActor))
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
@@ -174,7 +181,7 @@ public:
     switch (getKind()) {
     case ActorInstance:
     case GlobalActor:
-    case GlobalActorUnsafe:
+    case Erased:
       return true;
 
     case Unspecified:
@@ -185,11 +192,14 @@ public:
   }
 
   NominalTypeDecl *getActor() const;
+  NominalTypeDecl *getActorOrNullPtr() const;
 
   VarDecl *getActorInstance() const;
 
+  Expr *getActorInstanceExpr() const;
+
   bool isGlobalActor() const {
-    return getKind() == GlobalActor || getKind() == GlobalActorUnsafe;
+    return getKind() == GlobalActor;
   }
 
   bool isMainActor() const;
@@ -222,28 +232,12 @@ public:
   /// Substitute into types within the actor isolation.
   ActorIsolation subst(SubstitutionMap subs) const;
 
+  static bool isEqual(const ActorIsolation &lhs,
+               const ActorIsolation &rhs);
+
   friend bool operator==(const ActorIsolation &lhs,
                          const ActorIsolation &rhs) {
-    if (lhs.isGlobalActor() && rhs.isGlobalActor())
-      return areTypesEqual(lhs.globalActor, rhs.globalActor);
-
-    if (lhs.getKind() != rhs.getKind())
-      return false;
-
-    switch (lhs.getKind()) {
-    case Nonisolated:
-    case NonisolatedUnsafe:
-    case Unspecified:
-      return true;
-
-    case ActorInstance:
-      return (lhs.getActor() == rhs.getActor() &&
-              lhs.parameterIndex == rhs.parameterIndex);
-
-    case GlobalActor:
-    case GlobalActorUnsafe:
-      llvm_unreachable("Global actors handled above");
-    }
+    return ActorIsolation::isEqual(lhs, rhs);
   }
 
   friend bool operator!=(const ActorIsolation &lhs,
@@ -251,10 +245,18 @@ public:
     return !(lhs == rhs);
   }
 
+  void Profile(llvm::FoldingSetNodeID &id) {
+    id.AddInteger(getKind());
+    id.AddPointer(pointer);
+    id.AddBoolean(isolatedByPreconcurrency);
+    id.AddBoolean(silParsed);
+    id.AddInteger(parameterIndex);
+  }
+
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
-    return llvm::hash_combine(
-        state.kind, state.pointer, state.isolatedByPreconcurrency,
-        state.parameterIndex);
+    return llvm::hash_combine(state.kind, state.pointer,
+                              state.isolatedByPreconcurrency, state.silParsed,
+                              state.parameterIndex);
   }
 
   void print(llvm::raw_ostream &os) const {
@@ -274,14 +276,25 @@ public:
     case GlobalActor:
       os << "global_actor";
       return;
-    case GlobalActorUnsafe:
-      os << "global_actor_unsafe";
+    case Erased:
+      os << "erased";
       return;
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  void printForDiagnostics(llvm::raw_ostream &os,
+                           StringRef openingQuotationMark = "'") const;
+
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
+
+  // Defined out of line to prevent linker errors since libswiftBasic would
+  // include this header exascerbating a layering violation where libswiftBasic
+  // depends on libswiftAST.
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics());
 };
 
 /// Determine how the given value declaration is isolated.

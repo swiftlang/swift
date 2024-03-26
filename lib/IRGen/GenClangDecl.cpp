@@ -13,7 +13,9 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Stmt.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclGroup.h"
@@ -32,9 +34,12 @@ namespace {
 class ClangDeclFinder
     : public clang::RecursiveASTVisitor<ClangDeclFinder> {
   std::function<void(const clang::Decl *)> callback;
+  ClangModuleLoader *clangModuleLoader;
+
 public:
   template <typename Fn>
-  explicit ClangDeclFinder(Fn fn) : callback(fn) {}
+  explicit ClangDeclFinder(Fn fn, ClangModuleLoader *clangModuleLoader)
+      : callback(fn), clangModuleLoader(clangModuleLoader) {}
 
   bool VisitDeclRefExpr(clang::DeclRefExpr *DRE) {
     if (isa<clang::FunctionDecl>(DRE->getDecl()) ||
@@ -51,6 +56,29 @@ public:
         isa<clang::FieldDecl>(ME->getMemberDecl())) {
       callback(ME->getMemberDecl());
     }
+    return true;
+  }
+
+  bool VisitFunctionDecl(clang::FunctionDecl *functionDecl) {
+    for (auto paramDecl : functionDecl->parameters()) {
+      if (paramDecl->hasDefaultArg()) {
+        if (FuncDecl *defaultArgGenerator =
+                clangModuleLoader->getDefaultArgGenerator(paramDecl)) {
+          // Deconstruct the Swift function that was created in
+          // SwiftDeclSynthesizer::makeDefaultArgument and extract the
+          // underlying Clang function that was also synthesized.
+          BraceStmt *body = defaultArgGenerator->getTypecheckedBody();
+          auto returnStmt =
+              cast<ReturnStmt>(body->getSingleActiveElement().get<Stmt *>());
+          auto callExpr = cast<CallExpr>(returnStmt->getResult());
+          auto calledFuncDecl = cast<FuncDecl>(callExpr->getCalledValue());
+          auto calledClangFuncDecl =
+              cast<clang::FunctionDecl>(calledFuncDecl->getClangDecl());
+          callback(calledClangFuncDecl);
+        }
+      }
+    }
+
     return true;
   }
 
@@ -201,9 +229,10 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     stack.push_back(D);
   };
 
-  ClangDeclFinder refFinder(callback);
+  ClangModuleLoader *clangModuleLoader = Context.getClangModuleLoader();
+  ClangDeclFinder refFinder(callback, clangModuleLoader);
 
-  auto &clangSema = Context.getClangModuleLoader()->getClangSema();
+  auto &clangSema = clangModuleLoader->getClangSema();
 
   while (!stack.empty()) {
     auto *next = const_cast<clang::Decl *>(stack.pop_back_val());

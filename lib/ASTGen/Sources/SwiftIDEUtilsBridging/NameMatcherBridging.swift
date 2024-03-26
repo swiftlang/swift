@@ -52,6 +52,9 @@ fileprivate extension IDEBridging.LabelRangeType {
     case .parameters: self = .Param
     case .noncollapsibleParameters: self = .NoncollapsibleParam
     case .selector: self = .CompoundName
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default: fatalError()
+#endif
     }
   }
 }
@@ -71,6 +74,9 @@ extension BridgedResolvedLoc {
     case .parameters(let arguments2): arguments = arguments2
     case .noncollapsibleParameters(let arguments2): arguments = arguments2
     case .selector(let arguments2): arguments = arguments2
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default: fatalError()
+#endif
     }
     self.init(
       range: BridgedCharSourceRange(from: resolvedLoc.baseNameRange, in: sourceFile),
@@ -90,6 +96,9 @@ fileprivate extension IDEBridging.ResolvedLocContext {
     case .selector: self = .Selector
     case .comment: self = .Comment
     case .stringLiteral: self = .StringLiteral
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default: fatalError()
+#endif
     }
   }
 }

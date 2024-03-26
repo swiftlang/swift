@@ -145,6 +145,11 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch");
   }
 
+  friend bool operator!=(const Requirement &lhs,
+                         const Requirement &rhs) {
+    return !(lhs == rhs);
+  }
+
   /// Whether this requirement's types contain ErrorTypes.
   bool hasError() const;
 
@@ -207,27 +212,44 @@ inline void simple_display(llvm::raw_ostream &out, const Requirement &req) {
   req.print(out, PrintOptions());
 }
 
+enum class CheckRequirementsResult : uint8_t {
+  Success,
+
+  /// One of the requirements was unsatisfied.
+  RequirementFailure,
+
+  /// One of the requirements contained error types, either because of an
+  /// invalid conformance or because it contained a member type that was
+  /// dependent on an earlier conformance requirement that failed.
+  SubstitutionFailure
+};
+
+/// Check if each substituted requirement is satisfied. The requirement must
+/// not contain any type parameters.
+CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements);
+
+/// Check if each substituted requirement is satisfied. If the requirement
+/// contains type parameters, and the answer would depend on the context of
+/// those type parameters, then `nullopt` is returned.
+std::optional<CheckRequirementsResult>
+checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
+
+/// Check if each requirement is satisfied after applying the given
+/// substitutions. The substitutions must replace all type parameters that
+/// appear in the requirement with concrete types or archetypes.
+CheckRequirementsResult checkRequirements(ModuleDecl *module,
+                                          ArrayRef<Requirement> requirements,
+                                          TypeSubstitutionFn substitutions,
+                                          SubstOptions options = std::nullopt);
+
 /// A requirement as written in source, together with a source location. See
 /// ProtocolDecl::getStructuralRequirements().
 struct StructuralRequirement {
-  /// The actual requirement, where the types were resolved with the
-  /// 'Structural' type resolution stage.
+  /// A requirement with resolved in the structural resolution stage.
   Requirement req;
 
-  /// The source location where the requirement is written, used for redundancy
-  /// and conflict diagnostics.
+  /// The source location where the requirement is written, for diagnostics.
   SourceLoc loc;
-
-  /// A flag indicating whether the requirement was inferred from the
-  /// application of a type constructor. Also used for diagnostics, because
-  /// an inferred requirement made redundant by an explicit requirement is not
-  /// diagnosed as redundant, since we want to give users the option of
-  /// spelling out these requirements explicitly.
-  bool inferred = false;
-
-  /// A flag indicating whether this requirement was produced via the expansion
-  /// of default conformances to invertible protocols.
-  bool fromDefault = false;
 };
 
 /// An "anti-conformance" requirement `Subject: ~Protocol`.
@@ -240,20 +262,16 @@ struct InverseRequirement {
 
   InvertibleProtocolKind getKind() const;
 
-  /// Adds the type parameters of this generic context to the result if
-  /// it has default requirements.
-  static void enumerateDefaultedParams(GenericContext *decl,
-                                       SmallVectorImpl<Type> &result);
-
-  /// \returns the protocols that are required by default for the given type
-  /// parameter. These are not inverses themselves.
-  static InvertibleProtocolSet expandDefault(Type gp);
+  /// Linear order on inverse requirements in a generic signature.
+  int compare(const InverseRequirement &other) const;
 
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.
   static void expandDefaults(ASTContext &ctx,
                              ArrayRef<Type> gps,
                              SmallVectorImpl<StructuralRequirement> &result);
+
+  void print(raw_ostream &os, const PrintOptions &opts, bool forInherited=false) const;
 };
 
 } // end namespace swift

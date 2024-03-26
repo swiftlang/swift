@@ -48,6 +48,9 @@ sil @inout_class_argument : $@convention(thin) (@inout X) -> () {
 }
 sil @container_argument : $@convention(thin) (@guaranteed Container) -> ()
 sil @take_closure_as_addr : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+sil @take_closure_as_addr_noescape : $@convention(thin) (@in @callee_guaranteed () -> ()) -> () {
+[%0: noescape **]
+}
 sil @closure_with_inout : $@convention(thin) (@inout Str) -> () {
 [%0: noescape **]
 }
@@ -56,6 +59,7 @@ sil @initX : $@convention(method) (@owned X) -> @owned X {
 }
 sil @modifyStr : $@convention(method) (@inout Str) -> ()
 sil @guaranteed_yield_coroutine : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
+sil @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
 
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
@@ -406,7 +410,7 @@ bb0:
 // CHECK-LABEL: Address escape information for partial_apply_with_inout:
 // CHECK:       value:  %0 = alloc_stack $Str
 // CHECK-NEXT:    ==>   %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
-// CHECK-NEXT:    -     %9 = apply %8() : $@convention(thin) () -> ()
+// CHECK-NEXT:    ==>   %9 = apply %8() : $@convention(thin) () -> ()
 // CHECK:       End function partial_apply_with_inout
 sil @partial_apply_with_inout : $@convention(thin) () -> () {
 bb0:
@@ -417,6 +421,29 @@ bb0:
   %4 = alloc_stack $@callee_guaranteed () -> ()
   store %3 to %4 : $*@callee_guaranteed () -> ()
   %6 = function_ref @take_closure_as_addr : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+  %8 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  dealloc_stack %4 : $*@callee_guaranteed () -> ()
+  dealloc_stack %0 : $*Str
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for partial_apply_with_inout_noescape:
+// CHECK:       value:  %0 = alloc_stack $Str
+// CHECK-NEXT:    ==>   %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
+// CHECK-NEXT:    -     %9 = apply %8() : $@convention(thin) () -> ()
+// CHECK:       End function partial_apply_with_inout_noescape
+sil @partial_apply_with_inout_noescape : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Str
+  fix_lifetime %0 : $*Str
+  %2 = function_ref @closure_with_inout : $@convention(thin) (@inout Str) -> ()
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@inout Str) -> ()
+  %4 = alloc_stack $@callee_guaranteed () -> ()
+  store %3 to %4 : $*@callee_guaranteed () -> ()
+  %6 = function_ref @take_closure_as_addr_noescape : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
   %7 = apply %6(%4) : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
   %8 = function_ref @no_arguments : $@convention(thin) () -> ()
   %9 = apply %8() : $@convention(thin) () -> ()
@@ -707,5 +734,24 @@ bb0(%0 : $Int):
   dealloc_stack %1 : $*P
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: Address escape information for test_stored_pointer:
+// CHECK:       value:  %0 = alloc_stack $Int
+// CHECK-NEXT:    ==>   %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
+// CHECK:      End function test_stored_pointer
+sil @test_stored_pointer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = alloc_stack $Builtin.RawPointer
+  store %1 to %2 : $*Builtin.RawPointer
+  %4 = function_ref @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  dealloc_stack %2 : $*Builtin.RawPointer
+  fix_lifetime %0 : $*Int
+  dealloc_stack %0 : $*Int
+  %8 = tuple ()
+  return %8 : $()
 }
 

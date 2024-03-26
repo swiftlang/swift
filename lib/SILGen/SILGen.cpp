@@ -24,6 +24,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -95,7 +96,7 @@ SILGenModule::~SILGenModule() {
   M.verifyIncompleteOSSA();
 }
 
-static SILDeclRef getBridgingFn(llvm::Optional<SILDeclRef> &cacheSlot,
+static SILDeclRef getBridgingFn(std::optional<SILDeclRef> &cacheSlot,
                                 SILGenModule &SGM, Identifier moduleName,
                                 StringRef functionName,
                                 std::initializer_list<Type> inputTypes,
@@ -277,7 +278,7 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
-                llvm::makeArrayRef(Identifier()));
+                llvm::ArrayRef(Identifier()));
   auto *found = dyn_cast_or_null<FuncDecl>(
     proto->getSingleRequirement(name));
 
@@ -364,164 +365,136 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
-static FuncDecl *lookupIntrinsic(ModuleDecl &module,
-                                 llvm::Optional<FuncDecl *> &cache,
-                                 Identifier name) {
-  if (cache)
-    return *cache;
-
-  SmallVector<ValueDecl *, 1> decls;
-  module.lookupQualified(&module, DeclNameRef(name), SourceLoc(),
-                         NL_QualifiedDefault | NL_IncludeUsableFromInline,
-                         decls);
-  if (decls.size() != 1) {
-    cache = nullptr;
-    return nullptr;
-  }
-  auto func = dyn_cast<FuncDecl>(decls[0]);
-  cache = func;
-  return func;
-}
-
-static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
-                                            llvm::Optional<FuncDecl *> &cache,
-                                            StringRef name) {
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
   auto *module = C.getLoadedModule(C.Id_Concurrency);
-  if (!module) {
-    cache = nullptr;
+  if (!module)
     return nullptr;
-  }
 
-  return lookupIntrinsic(*module, cache, C.getIdentifier(name));
+  return evaluateOrDefault(
+      C.evaluator, LookupIntrinsicRequest{module, C.getIdentifier(name)},
+      /*default=*/nullptr);
 }
 
-FuncDecl *
-SILGenModule::getAsyncLetStart() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    AsyncLetStart,
-                                    "_asyncLetStart");
+FuncDecl *SILGenModule::getAsyncLetStart() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLetStart");
 }
 
-FuncDecl *
-SILGenModule::getAsyncLetGet() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    AsyncLetGet,
-                                    "_asyncLet_get");
+FuncDecl *SILGenModule::getAsyncLetGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get");
 }
 
-FuncDecl *
-SILGenModule::getAsyncLetGetThrowing() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    AsyncLetGetThrowing,
-                                    "_asyncLet_get_throwing");
+FuncDecl *SILGenModule::getAsyncLetGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get_throwing");
 }
 
-FuncDecl *
-SILGenModule::getFinishAsyncLet() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    EndAsyncLet,
-                                    "_asyncLet_finish");
+FuncDecl *SILGenModule::getFinishAsyncLet() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_finish");
 }
 
-FuncDecl *
-SILGenModule::getTaskFutureGet() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    TaskFutureGet,
-                                    "_taskFutureGet");
+FuncDecl *SILGenModule::getTaskFutureGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_taskFutureGet");
 }
 
-FuncDecl *
-SILGenModule::getTaskFutureGetThrowing() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    TaskFutureGetThrowing,
-                                    "_taskFutureGetThrowing");
+FuncDecl *SILGenModule::getTaskFutureGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_taskFutureGetThrowing");
 }
 
-FuncDecl *
-SILGenModule::getResumeUnsafeContinuation() {
+FuncDecl *SILGenModule::getResumeUnsafeContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeUnsafeContinuation,
                                     "_resumeUnsafeContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeUnsafeThrowingContinuation() {
+FuncDecl *SILGenModule::getResumeUnsafeThrowingContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeUnsafeThrowingContinuation,
                                     "_resumeUnsafeThrowingContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeUnsafeThrowingContinuationWithError,
-                                  "_resumeUnsafeThrowingContinuationWithError");
+FuncDecl *SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
+  return lookupConcurrencyIntrinsic(
+      getASTContext(), "_resumeUnsafeThrowingContinuationWithError");
 }
-FuncDecl *
-SILGenModule::getRunTaskForBridgedAsyncMethod() {
+FuncDecl *SILGenModule::getRunTaskForBridgedAsyncMethod() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    RunTaskForBridgedAsyncMethod,
                                     "_runTaskForBridgedAsyncMethod");
 }
-FuncDecl *
-SILGenModule::getCheckExpectedExecutor() {
-  return lookupConcurrencyIntrinsic(getASTContext(), CheckExpectedExecutor,
-                                    "_checkExpectedExecutor");
+FuncDecl *SILGenModule::getCheckExpectedExecutor() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_checkExpectedExecutor");
 }
 
-FuncDecl *
-SILGenModule::getCreateCheckedContinuation() {
+FuncDecl *SILGenModule::getCreateCheckedContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    CreateCheckedContinuation,
                                     "_createCheckedContinuation");
 }
-FuncDecl *
-SILGenModule::getCreateCheckedThrowingContinuation() {
+FuncDecl *SILGenModule::getCreateCheckedThrowingContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    CreateCheckedThrowingContinuation,
                                     "_createCheckedThrowingContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeCheckedContinuation() {
+FuncDecl *SILGenModule::getResumeCheckedContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeCheckedContinuation,
                                     "_resumeCheckedContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeCheckedThrowingContinuation() {
+FuncDecl *SILGenModule::getResumeCheckedThrowingContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeCheckedThrowingContinuation,
                                     "_resumeCheckedThrowingContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeCheckedThrowingContinuationWithError() {
+FuncDecl *SILGenModule::getResumeCheckedThrowingContinuationWithError() {
   return lookupConcurrencyIntrinsic(
-      getASTContext(), ResumeCheckedThrowingContinuationWithError,
-      "_resumeCheckedThrowingContinuationWithError");
+      getASTContext(), "_resumeCheckedThrowingContinuationWithError");
 }
 
 FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
-  return lookupConcurrencyIntrinsic(getASTContext(), AsyncMainDrainQueue,
-                                    "_asyncMainDrainQueue");
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncMainDrainQueue");
 }
 
 FuncDecl *SILGenModule::getSwiftJobRun() {
-  return lookupConcurrencyIntrinsic(getASTContext(), SwiftJobRun,
-                                    "_swiftJobRun");
+  return lookupConcurrencyIntrinsic(getASTContext(), "_swiftJobRun");
 }
 
 FuncDecl *SILGenModule::getExit() {
-  if (ExitFunc)
-    return *ExitFunc;
-
   ASTContext &C = getASTContext();
-  ModuleDecl *concurrencyShims =
-      C.getModuleByIdentifier(C.getIdentifier("_SwiftConcurrencyShims"));
 
-  if (!concurrencyShims) {
-    ExitFunc = nullptr;
-    return nullptr;
+  // Try the most likely modules.
+  Identifier mostLikelyIdentifier;
+  const llvm::Triple &triple = C.LangOpts.Target;
+  if (triple.isOSDarwin()) {
+    mostLikelyIdentifier = C.getIdentifier("Darwin");
+  } else if (triple.isOSWASI()) {
+    mostLikelyIdentifier = C.getIdentifier("SwiftWASILibc");
+  } else if (triple.isWindowsMSVCEnvironment()) {
+    mostLikelyIdentifier = C.getIdentifier("ucrt");
+  } else {
+    mostLikelyIdentifier = C.getIdentifier("SwiftGlibc");
+  }
+  ModuleDecl *exitModule = C.getModuleByIdentifier(mostLikelyIdentifier);
+  FuncDecl *exitFunction = nullptr;
+  if (exitModule) {
+    exitFunction = evaluateOrDefault(
+        C.evaluator,
+        LookupIntrinsicRequest{exitModule, C.getIdentifier("exit")},
+        /*default=*/nullptr);
   }
 
-  return lookupIntrinsic(*concurrencyShims, ExitFunc, C.getIdentifier("exit"));
+  if (!exitFunction) {
+    // No go, look for it in any loaded module. Several of the internal
+    // Swift modules or swift-corelibs modules may have absorbed <stdlib.h>
+    // when buliding without fully specified clang modules in the OS/SDK.
+    for (const auto &loadedModuleVector : C.getLoadedModules()) {
+      if (loadedModuleVector.first == mostLikelyIdentifier) {
+        continue;
+      }
+
+      ModuleDecl *loadedModule = loadedModuleVector.second;
+      if (loadedModule) {
+        exitFunction = evaluateOrDefault(
+            C.evaluator,
+            LookupIntrinsicRequest{loadedModule, C.getIdentifier("exit")},
+            /*default=*/nullptr);
+      }
+      if (exitFunction) {
+        break;
+      }
+    }
+  }
+
+  return exitFunction;
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -583,15 +556,9 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto fn = M.lookUpFunction(functionName);
   if (fn) return fn;
 
-  auto rootType =
-      CanGenericTypeParamType::get(/*isParameterPack*/ false,
-                                   /*depth*/ 0, /*index*/ 0, getASTContext());
-  auto valueType =
-      CanGenericTypeParamType::get(/*isParameterPack*/ false,
-                                   /*depth*/ 0, /*index*/ 1, getASTContext());
-
-  // Build the generic signature <A, B>.
-  auto sig = GenericSignature::get({rootType, valueType}, {});
+  auto sig = keyPathDecl->getGenericSignature().getCanonicalSignature();
+  auto rootType = sig.getGenericParams()[0]->getCanonicalType();
+  auto valueType = sig.getGenericParams()[1]->getCanonicalType();
 
   auto keyPathTy = BoundGenericType::get(keyPathDecl, Type(),
                                          { rootType, valueType })
@@ -630,7 +597,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(
       SILLinkage::PublicExternal, functionName, functionTy, env,
-      /*location*/ llvm::None, IsNotBare, IsNotTransparent, IsNotSerialized,
+      /*location*/ std::nullopt, IsNotBare, IsNotTransparent, IsNotSerialized,
       IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
 
   return fn;
@@ -719,6 +686,13 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   }
   case SILDeclRef::Kind::EnumElement:
     return true;
+  case SILDeclRef::Kind::DefaultArgGenerator: {
+    // Default arguments of C++ functions are only emitted if used.
+    if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+      return true;
+
+    break;
+  }
   default:
     break;
   }
@@ -1022,6 +996,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     auto *init = constant.getInitializationExpr();
     assert(init);
 
+    auto *parentMod = f->getParentModule();
     auto loc = RegularLocation::getAutoGeneratedLocation(init);
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitStoredPropertyInitialization", f);
@@ -1029,6 +1004,12 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     SILGenFunction SGF(*this, *f, initDC);
     SGF.emitGeneratorFunction(constant, init, /*EmitProfilerIncrement=*/true);
     postEmitFunction(constant, f);
+    // Ensure that the SIL function has a module associated with it. This
+    // ensures that SIL serializer serializes the module id for this function
+    // correctly. The parent module can be reset when the function's location is
+    // updated to the autogenerated location above.
+    if (!f->getParentModule())
+      f->setParentModule(parentMod);
     break;
   }
 
@@ -1430,14 +1411,14 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 void SILGenModule::emitFunction(FuncDecl *fd) {
   assert(!shouldSkipDecl(fd));
 
-  Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
-
   SILDeclRef::Loc decl = fd;
 
   emitAbstractFuncDecl(fd);
 
-  if (shouldEmitFunctionBody(fd))
+  if (shouldEmitFunctionBody(fd)) {
+    Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
     emitOrDelayFunction(SILDeclRef(decl));
+  }
 }
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {
@@ -1480,23 +1461,30 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   }
 }
 
-SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
-  SILDeclRef constant(ce);
-  SILFunction *f = getFunction(constant, ForDefinition);
+SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *e,
+                                       const FunctionTypeInfo &closureInfo) {
+  Types.setCaptureTypeExpansionContext(SILDeclRef(e), M);
 
-  // Generate the closure function, if we haven't already.
-  //
-  // We may visit the same closure expr multiple times in some cases,
-  // for instance, when closures appear as in-line initializers of stored
-  // properties. In these cases the closure will be emitted into every
-  // initializer of the containing type.
-  if (!f->isExternalDeclaration())
-    return f;
+  SILFunction *f = nullptr;
+  Types.withClosureTypeInfo(e, closureInfo, [&] {
+    SILDeclRef constant(e);
+    f = getFunction(constant, ForDefinition);
 
-  // Emit property wrapper argument generators.
-  emitArgumentGenerators(ce, ce->getParameters());
+    // Generate the closure function, if we haven't already.
+    //
+    // We may visit the same closure expr multiple times in some cases,
+    // for instance, when closures appear as in-line initializers of stored
+    // properties. In these cases the closure will be emitted into every
+    // initializer of the containing type.
+    if (!f->isExternalDeclaration())
+      return;
 
-  emitFunctionDefinition(constant, f);
+    // Emit property wrapper argument generators.
+    emitArgumentGenerators(e, e->getParameters());
+
+    emitFunctionDefinition(constant, f);
+  });
+
   return f;
 }
 
@@ -1606,7 +1594,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
 void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
                                           DestructorDecl *dd) {
-  assert(cd->canBeNoncopyable());
+  assert(!cd->canBeCopyable());
 
   emitAbstractFuncDecl(dd);
 
@@ -1636,6 +1624,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::ExpressionMacro:
     break;
   }
 }
@@ -1907,7 +1896,10 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
-      return !decl->isFormallyResilient();
+      // Assert here as key path component cannot refer to a static var.
+      assert(!decl->isStatic());
+      // By this point, decl is a fixed layout or its enclosing type is non-resilient.
+      return true;
     }
 
     // If the type is computed and doesn't have a setter that's hidden from
@@ -1917,7 +1909,7 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     if (!setter)
       return true;
 
-    if (setter->getFormalAccessScope(nullptr, true).isPublic())
+    if (setter->getFormalAccessScope(nullptr, true).isPublicOrPackage())
       return true;
 
     return false;
@@ -1964,7 +1956,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   bool needsGenericContext = true;
   
   if (canStorageUseTrivialDescriptor(*this, decl)) {
-    (void)SILProperty::create(M, /*serialized*/ false, decl, llvm::None);
+    (void)SILProperty::create(M, /*serialized*/ false, decl, std::nullopt);
     return;
   }
   
@@ -2114,7 +2106,7 @@ public:
         SGM.pendingForcedFunctions.pop_front();
       }
       while (!SGM.pendingConformances.empty()) {
-        SGM.getWitnessTable(SGM.pendingConformances.front());
+        (void)SGM.getWitnessTable(SGM.pendingConformances.front());
         SGM.pendingConformances.pop_front();
       }
     }
@@ -2127,11 +2119,8 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
                              ASTLoweringDescriptor desc) const {
   // If we have a .sil file to parse, defer to the parsing request.
   if (desc.getSourceFileToParse()) {
-    return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
+    return evaluateOrFatal(evaluator, ParseSILModuleRequest{desc});
   }
-
-  // For leak detection.
-  SILInstruction::resetInstructionCounts();
 
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts, desc.irgenOptions);
@@ -2179,9 +2168,9 @@ swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options,
-                                                    llvm::None, irgenOptions);
-  return llvm::cantFail(
-      mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
+                                                    std::nullopt, irgenOptions);
+  return evaluateOrFatal(mod->getASTContext().evaluator,
+                         ASTLoweringRequest{desc});
 }
 
 std::unique_ptr<SILModule> swift::performASTLowering(CompilerInstance &CI,
@@ -2193,7 +2182,8 @@ std::unique_ptr<SILModule> swift::performASTLowering(CompilerInstance &CI,
   auto &TC = CI.getSILTypes();
   auto Desc = ASTLoweringDescriptor::forWholeModule(
       M, TC, SILOpts, std::move(Sources), &IRGenOpts);
-  return llvm::cantFail(M->getASTContext().evaluator(ASTLoweringRequest{Desc}));
+  return evaluateOrFatal(M->getASTContext().evaluator,
+                         ASTLoweringRequest{Desc});
 }
 
 std::unique_ptr<SILModule>
@@ -2201,6 +2191,7 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc =
-      ASTLoweringDescriptor::forFile(sf, tc, options, llvm::None, irgenOptions);
-  return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
+      ASTLoweringDescriptor::forFile(sf, tc, options, std::nullopt, irgenOptions);
+  return evaluateOrFatal(sf.getASTContext().evaluator,
+                         ASTLoweringRequest{desc});
 }

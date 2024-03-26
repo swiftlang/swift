@@ -82,7 +82,7 @@ bb0(%0 : $TrivialDestructor):
   return %18 : $()
 }
 
-// Test the sanity check in dead object elimination which checks that all stores
+// Test the soundness check in dead object elimination which checks that all stores
 // to the array are within the array's liferange.
 
 // CHECK-LABEL: sil @malformed_deadarray

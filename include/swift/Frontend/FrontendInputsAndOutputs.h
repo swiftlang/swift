@@ -172,6 +172,7 @@ public:
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
   bool shouldTreatAsModuleInterface() const;
+  bool shouldTreatAsNonPackageModuleInterface() const;
   bool shouldTreatAsObjCHeader() const;
 
   bool areAllNonPrimariesSIB() const;
@@ -259,24 +260,15 @@ public:
       llvm::function_ref<const std::string &(const SupplementaryOutputPaths &)>
           extractorFn) const;
 
-  bool hasDependenciesPath() const;
-  bool hasReferenceDependenciesPath() const;
-  bool hasClangHeaderOutputPath() const;
-  bool hasLoadedModuleTracePath() const;
-  bool hasModuleOutputPath() const;
-  bool hasModuleDocOutputPath() const;
-  bool hasModuleSourceInfoOutputPath() const;
-  bool hasModuleInterfaceOutputPath() const;
-  bool hasPrivateModuleInterfaceOutputPath() const;
-  bool hasPackageModuleInterfaceOutputPath() const;
-  bool hasABIDescriptorOutputPath() const;
-  bool hasAPIDescriptorOutputPath() const;
-  bool hasConstValuesOutputPath() const;
-  bool hasModuleSemanticInfoOutputPath() const;
-  bool hasModuleSummaryOutputPath() const;
-  bool hasTBDPath() const;
-  bool hasYAMLOptRecordPath() const;
-  bool hasBitstreamOptRecordPath() const;
+#define OUTPUT(NAME, TYPE)                                                     \
+  bool has##NAME() const {                                                     \
+    return hasSupplementaryOutputPath(                                         \
+        [](const SupplementaryOutputPaths &outs) -> const std::string & {      \
+          return outs.NAME;                                                    \
+        });                                                                    \
+  }
+#include "swift/Basic/SupplementaryOutputPaths.def"
+#undef OUTPUT
 
   bool hasDependencyTrackerPath() const;
 };

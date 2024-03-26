@@ -56,7 +56,7 @@ func mod(_ nc: inout NC) {}
 func test(c: C) {
   borrow(c.data)
   // TODO: Not an inout parameter, should use a "cannot be consumed" error message
-  take(c.data) // expected-error{{missing reinitialization of inout parameter 'c.data' after consume}} expected-note{{consumed here}}
+  take(c.data) // expected-error{{field 'c.data' was consumed but not reinitialized; the field must be reinitialized during the access}} expected-note{{consumed here}}
   mod(&c.data)
 }
 func test(s: S) {
@@ -65,7 +65,7 @@ func test(s: S) {
 }
 func test(m_s s: inout S) {
   borrow(s.data)
-  take(s.data) // expected-error{{missing reinitialization of inout parameter 's.data' after consume}} expected-note{{consumed here}}
+  take(s.data) // expected-error{{field 's.data' was consumed but not reinitialized; the field must be reinitialized during the access}} expected-note{{consumed here}}
   mod(&s.data)
 }
 func test(snc: borrowing SNC) {
@@ -74,7 +74,7 @@ func test(snc: borrowing SNC) {
 }
 func test(m_snc snc: inout SNC) {
   borrow(snc.data)
-  take(snc.data) // expected-error{{missing reinitialization of inout parameter 'snc.data' after consume}} expected-note{{consumed here}}
+  take(snc.data) // expected-error{{field 'snc.data' was consumed but not reinitialized; the field must be reinitialized during the access}} expected-note{{consumed here}}
   mod(&snc.data)
 }
 
@@ -84,7 +84,7 @@ func test<T: P>(t: T) {
 }
 func test<T: P>(m_t t: inout T) {
   borrow(t.data)
-  take(t.data) // expected-error{{missing reinitialization of inout parameter 't.data' after consume}} expected-note{{consumed here}}
+  take(t.data) // expected-error{{field 't.data' was consumed but not reinitialized; the field must be reinitialized during the access}} expected-note{{consumed here}}
   mod(&t.data)
 }
 
@@ -94,7 +94,7 @@ func test(p: P) {
 }
 func test(m_p p: inout P) {
   borrow(p.data)
-  take(p.data) // expected-error{{missing reinitialization of inout parameter 'p.data' after consume}} expected-note{{consumed here}}
+  take(p.data) // expected-error{{field 'p.data' was consumed but not reinitialized; the field must be reinitialized during the access}} expected-note{{consumed here}}
   mod(&p.data)
 }
 

@@ -359,6 +359,9 @@ class LinkEntity {
     /// the metadata cache once.
     CanonicalPrespecializedGenericTypeCachingOnceToken,
 
+    /// The function used to access distributed methods and accessors.
+    DistributedAccessor,
+
     /// The same as AsyncFunctionPointer but with a different stored value, for
     /// use by TBDGen.
     /// The pointer is an AbstractFunctionDecl*.
@@ -382,7 +385,8 @@ class LinkEntity {
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
-    /// An outlined read-only global object. The pointer is a SILGlobalVariable*.
+    /// An outlined read-only global object. The pointer is a
+    /// SILGlobalVariable*.
     ReadOnlyGlobalObject,
 
     // These next few are protocol-conformance kinds.
@@ -511,14 +515,14 @@ class LinkEntity {
     /// The pointer is a const char* of the name.
     KnownAsyncFunctionPointer,
 
-    /// The pointer is SILFunction*
-    DistributedAccessor,
-    /// An async function pointer for a distributed accessor (method or property).
+    /// An async function pointer for a distributed accessor (method or
+    /// property).
     /// The pointer is a SILFunction*.
     DistributedAccessorAsyncPointer,
 
     /// Accessible function record, which describes a function that can be
     /// looked up by name by the runtime.
+    /// The pointer is a SILFunction*.
     AccessibleFunctionRecord,
 
     /// Extended existential type shape.
@@ -1338,6 +1342,10 @@ public:
   }
 
   static LinkEntity forDistributedTargetAccessor(SILFunction *target) {
+    return forDistributedTargetAccessor(target->getDeclContext()->getAsDecl());
+  }
+
+  static LinkEntity forDistributedTargetAccessor(Decl *target) {
     LinkEntity entity;
     entity.Pointer = target;
     entity.SecondaryPointer = nullptr;
@@ -1596,6 +1604,9 @@ public:
            getKind() == Kind::DispatchThunkInitializer ||
            getKind() == Kind::DispatchThunkAllocator ||
            getKind() == Kind::DispatchThunkDerivative;
+  }
+  bool isNominalTypeDescriptor() const {
+    return getKind() == Kind::NominalTypeDescriptor;
   }
 
   /// Determine whether this entity will be weak-imported.

@@ -56,9 +56,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
 
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
-    if (!ctx.LangOpts.EnableSwift3ObjCInference)
-      return DiagnosticBehavior::Unspecified;
-    return DiagnosticBehavior::Ignore;
+    return DiagnosticBehavior::Unspecified;
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
     return ctx.LangOpts.getAccessNoteFailureLimit();
@@ -485,11 +483,13 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     return false;
 
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
     // FIXME: Consider whether to limit @objc on global-actor-qualified
     // declarations. Perhaps only allow main actor, which we can reflect
     // in the generated header.
     return false;
+
+  case ActorIsolation::Erased:
+    llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
@@ -627,12 +627,12 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
 
 bool swift::isRepresentableInObjC(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
-    llvm::Optional<ForeignAsyncConvention> &asyncConvention,
-    llvm::Optional<ForeignErrorConvention> &errorConvention) {
+    std::optional<ForeignAsyncConvention> &asyncConvention,
+    std::optional<ForeignErrorConvention> &errorConvention) {
   // Clear out the async and error conventions. They will be added later if
   // needed.
-  asyncConvention = llvm::None;
-  errorConvention = llvm::None;
+  asyncConvention = std::nullopt;
+  errorConvention = std::nullopt;
 
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
@@ -690,6 +690,8 @@ bool swift::isRepresentableInObjC(
         return false;
       }
       return true;
+    case AccessorKind::DistributedGet:
+      return false;
 
     case AccessorKind::Set:
       if (!storageIsObjC) {
@@ -846,7 +848,7 @@ bool swift::isRepresentableInObjC(
     // For a throwing asynchronous function, an Error? parameter is added
     // to the completion handler parameter, and will be non-nil to signal
     // a thrown error.
-    llvm::Optional<unsigned> completionHandlerErrorParamIndex;
+    std::optional<unsigned> completionHandlerErrorParamIndex;
     if (FD->hasThrows()) {
       completionHandlerErrorParamIndex = completionHandlerParams.size();
       auto errorType = ctx.getErrorExistentialType();
@@ -861,7 +863,7 @@ bool swift::isRepresentableInObjC(
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType->getCanonicalType(), completionHandlerParamIndex,
         completionHandlerErrorParamIndex,
-        /* no flag argument */ llvm::None, false);
+        /* no flag argument */ std::nullopt, false);
   } else if (AFD->hasThrows()) {
     // Synchronous throwing functions must map to a particular error convention.
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
@@ -1219,8 +1221,8 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
     return false;
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    llvm::Optional<ForeignAsyncConvention> asyncConvention;
-    llvm::Optional<ForeignErrorConvention> errorConvention;
+    std::optional<ForeignAsyncConvention> asyncConvention;
+    std::optional<ForeignErrorConvention> errorConvention;
     return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
                                  asyncConvention, errorConvention);
   }
@@ -1263,7 +1265,7 @@ ObjCReason swift::objCReasonForObjCAttr(const ObjCAttr *attr) {
 
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
-static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
+static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
   ASTContext &ctx = CD->getASTContext();
   auto ancestry = CD->checkAncestry();
 
@@ -1277,7 +1279,7 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         // just controlling the runtime name. Don't diagnose this case.
         const_cast<ClassDecl *>(CD)->getAttrs().add(
           new (ctx) ObjCRuntimeNameAttr(*attr));
-        return llvm::None;
+        return std::nullopt;
       }
 
       swift::diagnoseAndRemoveAttr(CD, attr, diag::objc_for_generic_class)
@@ -1293,7 +1295,7 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       if (attr->hasName()) {
         const_cast<ClassDecl *>(CD)->getAttrs().add(
           new (ctx) ObjCRuntimeNameAttr(*attr));
-        return llvm::None;
+        return std::nullopt;
       }
 
 
@@ -1349,26 +1351,26 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 
   if (ancestry.contains(AncestryFlags::ObjC)) {
     if (ancestry.contains(AncestryFlags::Generic)) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     if (ancestry.contains(AncestryFlags::ResilientOther) &&
         !checkObjCClassStubAvailability(ctx, CD)) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     return ObjCReason(ObjCReason::ImplicitlyObjC);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
-static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
-                                                   bool allowImplicit) {
+static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
+                                                  bool allowImplicit) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
-    return llvm::None;
+    return std::nullopt;
 
   if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
     return shouldMarkClassAsObjC(classDecl);
@@ -1413,6 +1415,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       case AccessorKind::Read:
       case AccessorKind::WillSet:
       case AccessorKind::Init:
+      case AccessorKind::DistributedGet:
         return false;
 
       case AccessorKind::MutableAddress:
@@ -1435,7 +1438,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       if (accessor->getStorage()->isObjC())
         return ObjCReason(ObjCReason::Accessor);
 
-      return llvm::None;
+      return std::nullopt;
     }
   }
   // @IBOutlet, @IBAction, @IBSegueAction, @NSManaged, and @GKInspectable imply
@@ -1462,7 +1465,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol) {
     if (!VD->isProtocolRequirement())
-      return llvm::None;
+      return std::nullopt;
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
@@ -1480,7 +1483,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       (isa<ExtensionDecl>(VD->getDeclContext()) &&
        cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
         .hasAttribute<NonObjCAttr>()))
-    return llvm::None;
+    return std::nullopt;
 
   if (isMemberOfObjCClassExtension(VD) && 
       canInferImplicitObjC(/*allowAnyAccess*/true))
@@ -1500,53 +1503,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       return ObjCReason::witnessToObjC(requirements.front());
   }
 
-  ASTContext &ctx = VD->getASTContext();
-
-  // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
-  if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
-    bool isGetterOrSetter =
-      isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
-
-    if (ctx.LangOpts.EnableSwift3ObjCInference) {
-      // If we've been asked to warn about deprecated @objc inference, do so
-      // now.
-      if (ctx.LangOpts.WarnSwift3ObjCInference !=
-            Swift3ObjCInferenceWarnings::None &&
-          !isGetterOrSetter) {
-        VD->diagnose(diag::objc_inference_swift3_dynamic)
-          .highlight(attr->getLocation())
-          .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
-                      "@objc ");
-      }
-
-      return ObjCReason(ObjCReason::ExplicitlyDynamic, attr);
-    }
-  }
-
-  // If we aren't provided Swift 3's @objc inference rules, we're done.
-  if (!ctx.LangOpts.EnableSwift3ObjCInference)
-    return llvm::None;
-
-  // Infer '@objc' for valid, non-implicit, non-operator, members of classes
-  // (and extensions thereof) whose class hierarchies originate in Objective-C,
-  // e.g., which derive from NSObject, so long as the members have internal
-  // access or greater.
-  if (!canInferImplicitObjC(/*allowAnyAccess*/false))
-    return llvm::None;
-
-  // If this declaration is part of a class with implicitly @objc members,
-  // make it implicitly @objc. However, if the declaration cannot be represented
-  // as @objc, don't diagnose.
-  if (auto classDecl = VD->getDeclContext()->getSelfClassDecl()) {
-    // One cannot define @objc members of any foreign classes.
-    if (classDecl->isForeign())
-      return llvm::None;
-
-    if (classDecl->checkAncestry(AncestryFlags::ObjC))
-      return ObjCReason(ObjCReason::MemberOfObjCSubclass);
-  }
-
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Determine whether the given type is a C integer type.
@@ -1626,8 +1583,8 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
 
 /// Record that a declaration is @objc.
 static void markAsObjC(ValueDecl *D, ObjCReason reason,
-                       llvm::Optional<ForeignAsyncConvention> asyncConvention,
-                       llvm::Optional<ForeignErrorConvention> errorConvention);
+                       std::optional<ForeignAsyncConvention> asyncConvention,
+                       std::optional<ForeignErrorConvention> errorConvention);
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
@@ -1636,7 +1593,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   TypeChecker::applyAccessNote(VD);
 
   auto dc = VD->getDeclContext();
-  llvm::Optional<ObjCReason> isObjC;
+  std::optional<ObjCReason> isObjC;
   if (dc->getSelfClassDecl() && !isa<TypeDecl>(VD)) {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
@@ -1678,7 +1635,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
           inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());
-          isObjC = llvm::None;
+          isObjC = std::nullopt;
         }
       }
     }
@@ -1693,27 +1650,9 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   if (!isObjC)
     return false;
 
-  if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
-    auto storage = accessor->getStorage();
-    if (auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc on the storage declaration was inferred using a
-      // deprecated rule, but this accessor is @objc in its own right,
-      // complain.
-      ASTContext &ctx = dc->getASTContext();
-      auto behavior = behaviorLimitForObjCReason(*isObjC, ctx);
-      if (storageObjCAttr && storageObjCAttr->isSwift3Inferred()) {
-        storage->diagnose(diag::accessor_swift3_objc_inference, storage,
-                          accessor->isSetter())
-          .fixItInsert(storage->getAttributeInsertionLoc(/*forModifier=*/false),
-                       "@objc ")
-          .limitBehavior(behavior);
-      }
-    }
-  }
-
   // If needed, check whether this declaration is representable in Objective-C.
-  llvm::Optional<ForeignAsyncConvention> asyncConvention;
-  llvm::Optional<ForeignErrorConvention> errorConvention;
+  std::optional<ForeignAsyncConvention> asyncConvention;
+  std::optional<ForeignErrorConvention> errorConvention;
   if (auto var = dyn_cast<VarDecl>(VD)) {
     if (!isRepresentableInObjC(var, *isObjC)) {
       isObjC->setAttrInvalid();
@@ -1854,7 +1793,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
   // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
-  llvm::Optional<ObjCSelector> requirementObjCName;
+  std::optional<ObjCSelector> requirementObjCName;
   ValueDecl *firstReq = nullptr;
   for (auto req : findWitnessedObjCRequirements(decl)) {
     // If this is the first requirement, take its name.
@@ -1905,8 +1844,8 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 /// If the declaration has a @nonobjc attribute, diagnose an error
 /// using the given Reason, if present.
 void markAsObjC(ValueDecl *D, ObjCReason reason,
-                llvm::Optional<ForeignAsyncConvention> asyncConvention,
-                llvm::Optional<ForeignErrorConvention> errorConvention) {
+                std::optional<ForeignAsyncConvention> asyncConvention,
+                std::optional<ForeignErrorConvention> errorConvention) {
   ASTContext &ctx = D->getASTContext();
 
   // By now, the caller will have handled the case where an implicit @objc
@@ -1924,9 +1863,9 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
 
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
     // Determine the foreign async and error conventions.
-    llvm::Optional<ForeignAsyncConvention> inheritedAsyncConvention;
+    std::optional<ForeignAsyncConvention> inheritedAsyncConvention;
     AbstractFunctionDecl *declProvidingInheritedAsyncConvention = nullptr;
-    llvm::Optional<ForeignErrorConvention> inheritedErrorConvention;
+    std::optional<ForeignErrorConvention> inheritedErrorConvention;
     AbstractFunctionDecl *declProvidingInheritedErrorConvention = nullptr;
     if (auto baseMethod = method->getOverriddenDecl()) {
       // If the overridden method has a foreign async or error convention,
@@ -2030,7 +1969,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     // 'alloc', or 'allocWithZone:'. Check for these cases.
     if (!method->isInstanceMember()) {
       auto isForbiddenSelector = [&](ObjCSelector sel)
-          -> llvm::Optional<Diag<unsigned, DeclName, ObjCSelector>> {
+          -> std::optional<Diag<unsigned, DeclName, ObjCSelector>> {
         switch (sel.getNumArgs()) {
         case 0:
           if (sel.getSelectorPieces().front() == ctx.Id_load ||
@@ -2041,13 +1980,13 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           // the point you expect. It is disallowed in Swift 4 and later.
           if (sel.getSelectorPieces().front() == ctx.Id_initialize)
             return diag::objc_class_method_not_permitted;
-          return llvm::None;
+          return std::nullopt;
         case 1:
           if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)
             return diag::objc_class_method_not_permitted;
-          return llvm::None;
+          return std::nullopt;
         default:
-          return llvm::None;
+          return std::nullopt;
         }
       };
       if (auto diagID = isForbiddenSelector(selector)) {
@@ -2072,33 +2011,10 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     // FIXME: We should have a class-based table to check for conflicts.
   }
 
-  // Special handling for Swift 3 @objc inference rules that are no longer
-  // present in later versions of Swift.
-  if (reason == ObjCReason::MemberOfObjCSubclass) {
-    // If we've been asked to unconditionally warn about these deprecated
-    // @objc inference rules, do so now. However, we don't warn about
-    // accessors---just the main storage declarations.
-    if (ctx.LangOpts.WarnSwift3ObjCInference ==
-          Swift3ObjCInferenceWarnings::Complete &&
-        !(isa<AccessorDecl>(D) && cast<AccessorDecl>(D)->isGetterOrSetter())) {
-      D->diagnose(diag::objc_inference_swift3_objc_derived);
-      D->diagnose(diag::objc_inference_swift3_addobjc)
-        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                     "@objc ");
-      D->diagnose(diag::objc_inference_swift3_addnonobjc)
-        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                     "@nonobjc ");
-    }
-
-    // Mark the attribute as having used Swift 3 inference, or create an
-    // implicit @objc for that purpose.
-    auto attr = D->getAttrs().getAttribute<ObjCAttr>();
-    if (!attr) {
-      attr = ObjCAttr::createUnnamedImplicit(ctx);
-      D->getAttrs().add(attr);
-    }
-    attr->setSwift3Inferred();
-  }
+  // MemberOfObjCSubclass should have only been encountered when using Swift 3
+  // @objc inference rules that are no longer supported in later versions of
+  // Swift.
+  assert(reason != ObjCReason::MemberOfObjCSubclass);
 }
 
 /// Compute the information used to describe an Objective-C redeclaration.
@@ -2115,6 +2031,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
+    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("Not an Objective-C entry point");
 
@@ -2210,8 +2127,8 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 
 bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
                                    const ValueDecl *decl,
-                                   llvm::Optional<ObjCSelector> nameOpt,
-                                   llvm::Optional<ObjCSelector> targetNameOpt,
+                                   std::optional<ObjCSelector> nameOpt,
+                                   std::optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {
   if (decl->isImplicit())
     return false;
@@ -2638,6 +2555,12 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      conflict.selector);
       diag.warnUntilSwiftVersionIf(breakingInSwift5, 6);
 
+      // Temporarily soften selector conflicts in objcImpl extensions; we're
+      // seeing some that are caused by ObjCImplementationChecker improvements.
+      if (conflictingDecl->getDeclContext()->getImplementedObjCContext()
+            != conflictingDecl->getDeclContext())
+        diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
+
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
       swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);
       if (objcAttr)
@@ -2784,9 +2707,9 @@ void TypeChecker::checkObjCImplementation(Decl *D) {
                     evaluator::SideEffect());
 }
 
-static llvm::Optional<Located<StaticSpellingKind>>
+static std::optional<Located<StaticSpellingKind>>
 getLocatedStaticSpelling(ValueDecl *VD) {
-  using Ret = llvm::Optional<Located<StaticSpellingKind>>;
+  using Ret = std::optional<Located<StaticSpellingKind>>;
 
   if (auto FD = dyn_cast<FuncDecl>(VD)) {
     return Ret({ FD->getCorrectStaticSpelling(), FD->getStaticLoc() });
@@ -2803,18 +2726,18 @@ getLocatedStaticSpelling(ValueDecl *VD) {
       llvm_unreachable("unknown AbstractStorageDecl");
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-static llvm::Optional<StaticSpellingKind> getStaticSpelling(ValueDecl *VD) {
+static std::optional<StaticSpellingKind> getStaticSpelling(ValueDecl *VD) {
   if (auto locSpelling = getLocatedStaticSpelling(VD))
     return locSpelling->Item;
-  return llvm::None;
+  return std::nullopt;
 }
 
 static void
 fixDeclarationStaticSpelling(InFlightDiagnostic &diag, ValueDecl *VD,
-                             llvm::Optional<StaticSpellingKind> newSpelling) {
+                             std::optional<StaticSpellingKind> newSpelling) {
   auto spelling = getLocatedStaticSpelling(VD);
   if (!newSpelling || !spelling)
     return;
@@ -2930,16 +2853,18 @@ public:
 
     // Did we actually match this extension to an interface? (In invalid code,
     // we might not have.)
-    auto interfaceDecl = ext->getImplementedObjCDecl();
-    if (!interfaceDecl)
+    auto interfaceDecls = ext->getAllImplementedObjCDecls();
+    if (interfaceDecls.empty())
       return;
 
     // Add the @_objcImplementation extension's members as candidates.
     addCandidates(ext);
 
     // Add its interface's members as requirements.
-    auto interface = cast<IterableDeclContext>(interfaceDecl);
-    addRequirements(interface);
+    for (auto interfaceDecl : interfaceDecls) {
+      auto interface = cast<IterableDeclContext>(interfaceDecl);
+      addRequirements(interface);
+    }
   }
 
 private:
@@ -3102,7 +3027,7 @@ private:
     return ObjCSelector();
   }
 
-  static llvm::Optional<ObjCSelector> getObjCName(ValueDecl *VD) {
+  static std::optional<ObjCSelector> getObjCName(ValueDecl *VD) {
     if (!VD->getCDeclName().empty()) {
       auto ident = VD->getASTContext().getIdentifier(VD->getCDeclName());
       return ObjCSelector(VD->getASTContext(), 0, { ident });
@@ -3368,17 +3293,25 @@ private:
           if (reqParams.size() != implParams.size())
             return false;
 
-          auto implParamList =
-              cast<AbstractFunctionDecl>(implDecl)->getParameters();
+          ParameterList *implParamList = nullptr;
+          if (auto afd = dyn_cast<AbstractFunctionDecl>(implDecl))
+            implParamList = afd->getParameters();
 
           for (auto i : indices(reqParams)) {
             const auto &reqParam = reqParams[i];
             const auto &implParam = implParams[i];
-            ParamDecl *implParamDecl = implParamList->get(i);
-
-            if (!matchParamTypes(reqParam.getOldType(), implParam.getOldType(),
-                                 implParamDecl))
-              return false;
+            if (implParamList) {
+              // Some of the parameters may be IUOs; apply special logic.
+              if (!matchParamTypes(reqParam.getOldType(),
+                                   implParam.getOldType(),
+                                   implParamList->get(i)))
+                return false;
+            } else {
+              // IUOs not allowed here; apply ordinary logic.
+              if (!reqParam.getOldType()->matchesParameter(
+                      implParam.getOldType(), matchOpts))
+                return false;
+            }
           }
 
           return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
@@ -3422,9 +3355,9 @@ private:
 
     // Check only applies to members of implementations, not implementations in
     // their own right.
-    if (!cand->isObjCImplementation()
-          && cand->getDeclContext()->getImplementedObjCContext()
-                 != req->getDeclContext())
+    if (!cand->isObjCImplementation() &&
+          getCategoryName(cand->getDeclContext()->getImplementedObjCContext())
+               != getCategoryName(req->getDeclContext()))
       return MatchOutcome::WrongCategory;
 
     if (cand->getKind() != req->getKind())

@@ -200,8 +200,7 @@ class ConcreteContraction {
     Other
   };
 
-  llvm::Optional<Type> substTypeParameterRec(Type type,
-                                             Position position) const;
+  std::optional<Type> substTypeParameterRec(Type type, Position position) const;
   Type substTypeParameter(Type type, Position position) const;
   Type substType(Type type) const;
   Requirement substRequirement(const Requirement &req) const;
@@ -234,7 +233,7 @@ public:
 /// to be some subclass of SomeClass which does conform to Sequence;
 /// this is perfectly valid, and we cannot substitute the 'T.Element'
 /// requirement. In this case, this method returns None.
-llvm::Optional<Type>
+std::optional<Type>
 ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
   // If we have a superclass (T : C) or same-type requirement (T == C),
@@ -272,7 +271,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
     auto baseType = memberType->getBase();
     auto substBaseType = substTypeParameterRec(baseType, Position::BaseType);
     if (!substBaseType)
-      return llvm::None;
+      return std::nullopt;
 
     // A resolved DependentMemberType stores an associated type declaration.
     //
@@ -302,7 +301,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
           llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
                        << proto->getName() << "\n";
         }
-        return llvm::None;
+        return std::nullopt;
       }
 
       return assocType->getDeclaredInterfaceType()
@@ -323,7 +322,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
         llvm::dbgs() << "@@@ Lookup of " << memberType->getName() << " failed on "
                      << *substBaseType << "\n";
       }
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Substitute the base type into the member type.
@@ -333,7 +332,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
     return typeDecl->getDeclaredInterfaceType().subst(subMap);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Replace the generic parameter at the root of \p type, which must be a
@@ -357,9 +356,9 @@ Type ConcreteContraction::substTypeParameter(
 
 /// Substitute all type parameters occurring in structural positions of \p type.
 Type ConcreteContraction::substType(Type type) const {
-  return type.transformRec([&](Type type) -> llvm::Optional<Type> {
+  return type.transformRec([&](Type type) -> std::optional<Type> {
     if (!type->isTypeParameter())
-      return llvm::None;
+      return std::nullopt;
 
     return substTypeParameter(type, Position::Other);
   });
@@ -625,19 +624,26 @@ bool ConcreteContraction::performConcreteContraction(
 
     auto superclassTy = *found->second.begin();
 
-    for (const auto *proto : pair.second) {
-      if (auto otherSuperclassTy = proto->getSuperclass()) {
-        if (Debug) {
-          llvm::dbgs() << "@ Subject type of superclass requirement "
-                       << subjectType << " : " << superclassTy
-                       << " conforms to "<< proto->getName()
-                       << " which has a superclass bound "
-                       << otherSuperclassTy << "\n";
-        }
+    for (auto *proto : pair.second) {
+      auto *module = proto->getParentModule();
+      if (module->lookupConformance(superclassTy, proto)) {
+        auto genericSig = proto->getGenericSignature();
+        // FIXME: If we end up here while building the requirement
+        // signature of `proto`, we will hit a request cycle.
+        if (auto otherSuperclassTy = genericSig->getSuperclassBound(
+                proto->getSelfInterfaceType())) {
+          if (Debug) {
+            llvm::dbgs() << "@ Subject type of superclass requirement "
+                         << subjectType << " : " << superclassTy
+                         << " conforms to "<< proto->getName()
+                         << " which has a superclass bound "
+                         << otherSuperclassTy << "\n";
+          }
 
-        if (superclassTy->isEqual(otherSuperclassTy)) {
-          Superclasses.erase(subjectType);
-          break;
+          if (superclassTy->isEqual(otherSuperclassTy)) {
+            Superclasses.erase(subjectType);
+            break;
+          }
         }
       }
     }
@@ -691,24 +697,7 @@ bool ConcreteContraction::performConcreteContraction(
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
     SmallVector<InverseRequirement, 4> ignoreInverses;
-    if (req.inferred) {
-      // Discard errors from desugaring a substituted requirement that
-      // was inferred. For example, if we have something like
-      //
-      //   <T, U where T == Int, U == Set<T>>
-      //
-      // The inferred requirement 'T : Hashable' from 'Set<>' will
-      // be substituted with 'T == Int' to get 'Int : Hashable'.
-      //
-      // Desugaring will diagnose a redundant conformance requirement,
-      // but we want to ignore that, since the user did not explicitly
-      // write 'Int : Hashable' (or 'T : Hashable') anywhere.
-      SmallVector<RequirementError, 4> discardErrors;
-      desugarRequirement(substReq, SourceLoc(), reqs,
-                         ignoreInverses, discardErrors);
-    } else {
-      desugarRequirement(substReq, req.loc, reqs, ignoreInverses, errors);
-    }
+    desugarRequirement(substReq, req.loc, reqs, ignoreInverses, errors);
 
     for (auto desugaredReq : reqs) {
       if (Debug) {
@@ -716,7 +705,7 @@ bool ConcreteContraction::performConcreteContraction(
         desugaredReq.dump(llvm::dbgs());
         llvm::dbgs() << "\n";
       }
-      result.push_back({desugaredReq, req.loc, req.inferred});
+      result.push_back({desugaredReq, req.loc});
     }
 
     if (preserveSameTypeRequirement(req.req) &&
@@ -730,7 +719,7 @@ bool ConcreteContraction::performConcreteContraction(
 
       // Make the duplicated requirement 'inferred' so that we don't diagnose
       // it as redundant.
-      result.push_back({req.req, SourceLoc(), /*inferred=*/true});
+      result.push_back({req.req, SourceLoc()});
     }
   }
 

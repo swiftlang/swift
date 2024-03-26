@@ -29,7 +29,7 @@
 
 #include "chrono_utils.h"
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include "swift/Threading/Errors.h"
 
@@ -68,7 +68,7 @@ inline bool threads_same(thread_id a, thread_id b) {
   return ::pthread_equal(a, b);
 }
 
-inline llvm::Optional<stack_bounds> thread_get_current_stack_bounds() {
+inline std::optional<stack_bounds> thread_get_current_stack_bounds() {
   stack_bounds result;
   pthread_t thread = pthread_self();
 
@@ -108,9 +108,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 using lazy_mutex_handle = ::os_unfair_lock;
 
 // We don't need to be lazy here because Darwin has OS_UNFAIR_LOCK_INIT.
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return OS_UNFAIR_LOCK_INIT;
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER OS_UNFAIR_LOCK_INIT
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {

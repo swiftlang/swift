@@ -87,24 +87,15 @@ Type CompletionOverrideLookup::getOpaqueResultType(
     // If it has same type requrement, we will emit the concrete type.
     return nullptr;
 
-  // Collect requirements on the associatedtype.
-  SmallVector<Type, 2> opaqueTypes;
-  bool hasExplicitAnyObject = false;
-  if (auto superTy = genericSig->getSuperclassBound(ResultT))
-    opaqueTypes.push_back(superTy);
-  for (const auto proto : genericSig->getRequiredProtocols(ResultT))
-    opaqueTypes.push_back(proto->getDeclaredInterfaceType());
-  if (auto layout = genericSig->getLayoutConstraint(ResultT))
-    hasExplicitAnyObject = layout->isClass();
+  auto upperBound = genericSig->getUpperBound(
+      ResultT,
+      /*forExistentialSelf=*/false,
+      /*withParameterizedProtocols=*/false);
 
-  if (!hasExplicitAnyObject) {
-    if (opaqueTypes.empty())
-      return nullptr;
-    if (opaqueTypes.size() == 1)
-      return opaqueTypes.front();
-  }
-  return ProtocolCompositionType::get(VD->getASTContext(), opaqueTypes,
-                                      hasExplicitAnyObject);
+  if (upperBound->isAny())
+    return nullptr;
+
+  return upperBound;
 }
 
 void CompletionOverrideLookup::addValueOverride(
@@ -165,12 +156,12 @@ void CompletionOverrideLookup::addValueOverride(
 
   PO.SkipUnderscoredKeywords = true;
   PO.PrintImplicitAttrs = false;
-  PO.ExclusiveAttrList.push_back(TAK_escaping);
-  PO.ExclusiveAttrList.push_back(TAK_autoclosure);
+  PO.ExclusiveAttrList.push_back(TypeAttrKind::Escaping);
+  PO.ExclusiveAttrList.push_back(TypeAttrKind::Autoclosure);
   // Print certain modifiers only when the introducer is not written.
   // Otherwise, the user can add it after the completion.
   if (!hasDeclIntroducer) {
-    PO.ExclusiveAttrList.push_back(DAK_Nonisolated);
+    PO.ExclusiveAttrList.push_back(DeclAttrKind::Nonisolated);
   }
 
   PO.PrintAccess = false;
@@ -466,7 +457,7 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
   {
     llvm::raw_string_ostream out(declStringWithoutFunc);
     printResultBuilderBuildFunction(builder, componentType, function,
-                                    llvm::None, out);
+                                    std::nullopt, out);
   }
   Builder.addTextChunk(declStringWithoutFunc);
   Builder.addBraceStmtWithCursor();

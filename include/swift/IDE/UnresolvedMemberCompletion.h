@@ -27,7 +27,7 @@ class UnresolvedMemberTypeCheckCompletionCallback
     : public TypeCheckCompletionCallback {
   struct Result {
     Type ExpectedTy;
-    bool IsImplicitSingleExpressionReturn;
+    bool IsImpliedResult;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.

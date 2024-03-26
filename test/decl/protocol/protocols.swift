@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
+
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -101,10 +102,9 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{protocol 'CircleMiddle' refines itself}}
-// expected-note@-1 {{protocol 'CircleMiddle' declared here}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error {{protocol 'CircleStart' refines itself}}
-// expected-note@-1 {{protocol 'CircleStart' declared here}}
+protocol CircleMiddle : CircleStart { func circle_middle() }
+// expected-note@-1 2 {{protocol 'CircleMiddle' declared here}}
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2 {{protocol 'CircleStart' refines itself}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
@@ -418,7 +418,7 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
-    // expected-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in Swift 5}}
+    // expected-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in the Swift 5 language mode}}
     weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'any SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 

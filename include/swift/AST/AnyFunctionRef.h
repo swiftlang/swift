@@ -21,9 +21,8 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
+#include <optional>
 
 namespace swift {
 class CaptureInfo;
@@ -58,7 +57,7 @@ public:
 
   /// Construct an AnyFunctionRef from a decl context that might be
   /// some sort of function.
-  static llvm::Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
+  static std::optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
     if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
       return AnyFunctionRef(fn);
     }
@@ -67,7 +66,7 @@ public:
       return AnyFunctionRef(ace);
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   CaptureInfo getCaptureInfo() const {
@@ -92,18 +91,6 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->hasInterfaceType();
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
-  }
-
-  bool hasSingleExpressionBody() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasSingleExpressionBody();
-    return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
-  }
-
-  Expr *getSingleExpressionBody() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getSingleExpressionBody();
-    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
   }
 
   ParameterList *getParameters() const {
@@ -152,16 +139,15 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
-  void setParsedBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setParsedBody(BraceStmt *stmt) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::Parsed);
-      AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }
 
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setBody(stmt, isSingleExpression);
+      CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::ReadyForTypeChecking);
       return;
     }
@@ -169,16 +155,15 @@ public:
     llvm_unreachable("autoclosures don't have statement bodies");
   }
 
-  void setTypecheckedBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setTypecheckedBody(BraceStmt *stmt) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::TypeChecked);
-      AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }
 
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setBody(stmt, isSingleExpression);
+      CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
       return;
     }

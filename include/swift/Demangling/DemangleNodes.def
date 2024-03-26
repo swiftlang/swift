@@ -131,7 +131,10 @@ CONTEXT_NODE(IVarDestroyer)
 NODE(ImplEscaping)
 NODE(ImplConvention)
 NODE(ImplDifferentiabilityKind)
+NODE(ImplErasedIsolation)
+NODE(ImplTransferringResult)
 NODE(ImplParameterResultDifferentiability)
+NODE(ImplParameterTransferring)
 NODE(ImplFunctionAttribute)
 NODE(ImplFunctionConvention)
 NODE(ImplFunctionConventionName)
@@ -148,6 +151,9 @@ NODE(InfixOperator)
 CONTEXT_NODE(Initializer)
 CONTEXT_NODE(InitAccessor)
 NODE(Isolated)
+NODE(Transferring)
+NODE(IsolatedAnyFunctionType)
+NODE(TransferringResultFunctionType)
 NODE(KeyPathGetterThunkHelper)
 NODE(KeyPathSetterThunkHelper)
 NODE(KeyPathEqualsThunkHelper)
@@ -371,11 +377,24 @@ NODE(HasSymbolQuery)
 NODE(OpaqueReturnTypeIndex)
 NODE(OpaqueReturnTypeParent)
 
+// Addedn in Swift 6.0
+NODE(OutlinedEnumTagStore)
+NODE(OutlinedEnumProjectDataForLoad)
+NODE(OutlinedEnumGetTag)
 // Added in Swift 5.9 + 1
 NODE(AsyncRemoved)
 
 // Added in Swift 5.TBD
 NODE(ObjectiveCProtocolSymbolicReference)
+NODE(ParamLifetimeDependence)
+NODE(SelfLifetimeDependence)
+
+NODE(OutlinedInitializeWithCopyNoValueWitness)
+NODE(OutlinedAssignWithTakeNoValueWitness)
+NODE(OutlinedAssignWithCopyNoValueWitness)
+NODE(OutlinedDestroyNoValueWitness)
+
+NODE(DependentGenericInverseConformanceRequirement)
 
 #undef CONTEXT_NODE
 #undef NODE

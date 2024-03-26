@@ -592,10 +592,11 @@ static std::pair<PartialApplyInst *, bool /* changedCFG */>
 replacePartialApplyInst(SILBuilder &builder, SILLocation loc,
                         PartialApplyInst *oldPAI, SILValue newFn,
                         SubstitutionMap newSubs, ArrayRef<SILValue> newArgs) {
-  auto convention =
-      oldPAI->getType().getAs<SILFunctionType>()->getCalleeConvention();
+  auto convention = oldPAI->getCalleeConvention();
+  auto isolation = oldPAI->getResultIsolation();
   auto *newPAI =
-      builder.createPartialApply(loc, newFn, newSubs, newArgs, convention);
+      builder.createPartialApply(loc, newFn, newSubs, newArgs, convention,
+                                 isolation);
 
   // Check if any casting is required for the partially-applied function.
   // A non-guaranteed cast needs no usePoints.

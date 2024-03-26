@@ -13,14 +13,14 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
-#include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
-#include "llvm/ADT/Optional.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include <limits.h>
+#include <optional>
 #include <vector>
 
 namespace swift {
@@ -36,7 +36,7 @@ class TypeBase;
 class DeclContext;
 class Type;
 class ModuleDecl;
-enum DeclAttrKind : unsigned;
+enum class DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 class SILPrintContext;
@@ -90,20 +90,23 @@ class AnyAttrKind {
 
 public:
   AnyAttrKind(TypeAttrKind K) : kind(static_cast<unsigned>(K)), isType(1) {
-    static_assert(TAK_Count < UINT_MAX, "TypeAttrKind is > 31 bits");
+    static_assert(NumTypeAttrKinds < UINT_MAX, "TypeAttrKind is > 31 bits");
   }
   AnyAttrKind(DeclAttrKind K) : kind(static_cast<unsigned>(K)), isType(0) {
-    static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
+    static_assert(NumDeclAttrKinds < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
-  AnyAttrKind() : kind(TAK_Count), isType(1) {}
+  AnyAttrKind() : kind(NumTypeAttrKinds), isType(1) {}
 
-  /// Returns the TypeAttrKind, or TAK_Count if this is not a type attribute.
-  TypeAttrKind type() const {
-    return isType ? static_cast<TypeAttrKind>(kind) : TAK_Count;
+  /// Returns the TypeAttrKind.
+  std::optional<TypeAttrKind> type() const {
+    if (!isType || kind == NumTypeAttrKinds) return {};
+    return static_cast<TypeAttrKind>(kind);
   }
-  /// Returns the DeclAttrKind, or DAK_Count if this is not a decl attribute.
-  DeclAttrKind decl() const {
-    return isType ? DAK_Count : static_cast<DeclAttrKind>(kind);
+  /// Returns the DeclAttrKind.
+  std::optional<DeclAttrKind> decl() const {
+    if (isType || kind == NumDeclAttrKinds)
+      return {};
+    return static_cast<DeclAttrKind>(kind);
   }
 
   bool operator==(AnyAttrKind K) const {
@@ -328,6 +331,11 @@ struct PrintOptions {
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
 
+  /// Whether to print generic signatures with inverse requirements (ie,
+  /// ~Copyable noting the absence of Copyable) or the internal desugared form
+  /// (where the implicit Copyable conformance is spelled explicitly).
+  bool PrintInverseRequirements = false;
+
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
 
@@ -364,10 +372,24 @@ struct PrintOptions {
   /// Whether to suppress printing of custom attributes that are expanded macros.
   bool SuppressExpandedMacros = true;
 
+  /// Whether we're supposed to slap a @rethrows on `AsyncSequence` /
+  /// `AsyncIteratorProtocol` for backward-compatibility reasons.
+  bool AsyncSequenceRethrows = false;
+
+  /// Suppress the @isolated(any) attribute.
+  bool SuppressIsolatedAny = false;
+
+  /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
+  bool SuppressOptionalIsolatedParams = false;
+
+  /// Suppress Noncopyable generics.
+  bool SuppressNoncopyableGenerics = false;
+
   /// List of attribute kinds that should not be printed.
-  std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
-                                              DAK_FixedLayout,
-                                              DAK_ShowInInterface};
+  std::vector<AnyAttrKind> ExcludeAttrList = {
+      DeclAttrKind::Transparent, DeclAttrKind::Effects,
+      DeclAttrKind::FixedLayout, DeclAttrKind::ShowInInterface,
+  };
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -425,7 +447,7 @@ struct PrintOptions {
   bool PrintInSILBody = false;
 
   /// Whether to use an empty line to separate two members in a single decl.
-  bool EmptyLineBetweenMembers = false;
+  bool EmptyLineBetweenDecls = false;
 
   /// Whether to print empty members of a declaration on a single line, e.g.:
   /// ```
@@ -480,9 +502,6 @@ struct PrintOptions {
   /// (e.g. the overridden method in the superclass) if such comment is found.
   bool PrintDocumentationComments = false;
 
-  /// Whether to print regular comments from clang module headers.
-  bool PrintRegularClangComments = false;
-
   /// When true, printing interface from a source file will print the original
   /// source text for applicable declarations, in order to preserve the
   /// formatting.
@@ -528,7 +547,7 @@ struct PrintOptions {
   ModuleDecl *CurrentModule = nullptr;
 
   /// The information for converting archetypes to specialized types.
-  llvm::Optional<TypeTransformContext> TransformContext;
+  std::optional<TypeTransformContext> TransformContext;
 
   /// Whether to display (Clang-)imported module names;
   bool QualifyImportedTypes = false;
@@ -623,7 +642,6 @@ struct PrintOptions {
     result.TypeDefinitions = true;
     result.VarInitializers = true;
     result.PrintDocumentationComments = true;
-    result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
     return result;
@@ -646,10 +664,10 @@ struct PrintOptions {
     result.SynthesizeSugarOnTypes = true;
     result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
-    result.ExcludeAttrList.push_back(DAK_Exported);
-    result.ExcludeAttrList.push_back(DAK_Inline);
-    result.ExcludeAttrList.push_back(DAK_Optimize);
-    result.ExcludeAttrList.push_back(DAK_Rethrows);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Exported);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Inline);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Optimize);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Rethrows);
     result.PrintOverrideKeyword = false;
     result.AccessFilter = accessFilter;
     result.PrintIfConfig = false;
@@ -674,7 +692,7 @@ struct PrintOptions {
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipUnsafeCXXMethods = true;
     result.SkipDeinit = true;
-    result.EmptyLineBetweenMembers = true;
+    result.EmptyLineBetweenDecls = true;
     result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
@@ -737,7 +755,7 @@ struct PrintOptions {
   static PrintOptions printSwiftFileInterface(bool printFullConvention) {
     PrintOptions result = printInterface(printFullConvention);
     result.AccessFilter = AccessLevel::Internal;
-    result.EmptyLineBetweenMembers = true;
+    result.EmptyLineBetweenDecls = true;
     return result;
   }
 
@@ -767,7 +785,7 @@ struct PrintOptions {
   static PrintOptions printDeclarations() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
-    result.ExcludeAttrList.push_back(DAK_FixedLayout);
+    result.ExcludeAttrList.push_back(DeclAttrKind::FixedLayout);
     result.PrintStorageRepresentationAttrs = true;
     result.AbstractAccessors = false;
     result.PrintAccess = true;
@@ -785,7 +803,7 @@ struct PrintOptions {
     PO.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
-    PO.ExcludeAttrList.push_back(DAK_Available);
+    PO.ExcludeAttrList.push_back(DeclAttrKind::Available);
     PO.SkipPrivateStdlibDecls = true;
     PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;

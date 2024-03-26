@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s --implicit-check-not "error:"
-
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
 // CHECK-LABEL: (file).genericFn@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>
@@ -27,8 +25,8 @@ func where1<T>(_ t: borrowing T) where T: ~Copyable {}
 func where2<T>(_ t: borrowing T) where T: NoCopyP, T: ~Copyable {}
 
 // CHECK-LABEL: .where3@
-// CHECK: Generic signature: <T where T : Equatable, T : Escapable>
-func where3<T>(_ t: borrowing T) where T: Equatable, T: ~Copyable {}
+// CHECK: Generic signature: <T where T : Escapable, T : Empty>
+func where3<T>(_ t: borrowing T) where T: Empty, T: ~Copyable {}
 
 // CHECK-LABEL: .where4@
 // CHECK: Generic signature: <T where T : Copyable>
@@ -39,8 +37,8 @@ func where4<T>(_ t: borrowing T) where T: ~Escapable {}
 func where5<T>(_ t: borrowing T) where T: Empty, T: ~Escapable {}
 
 // CHECK-LABEL: .where6@
-// CHECK: Generic signature: <T where T : Equatable, T : Escapable>
-func where6<T>(_ t: borrowing T) where T: Equatable, T: ~Copyable {}
+// CHECK: Generic signature: <T where T : Escapable, T : Empty>
+func where6<T>(_ t: borrowing T) where T: Empty, T: ~Copyable {}
 
 // CHECK-LABEL: .compose1@
 // CHECK: Generic signature: <T where T : NoCopyP>
@@ -58,9 +56,9 @@ func f1<T: NoCopyP>(_ t: T) {}
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable>
 func withSome(_ t: some Any) {}
 
-// CHECK-LABEL: .withSomeEquatable@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Equatable, τ_0_0 : Escapable>
-func withSomeEquatable(_ t: some Equatable) {}
+// CHECK-LABEL: .withSomeEmpty@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable, τ_0_0 : Empty>
+func withSomeEmpty(_ t: some Empty) {}
 
 // CHECK-LABEL: .withSomeProto@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : NoCopyP>
@@ -69,6 +67,15 @@ func withSomeProto(_ t: some NoCopyP) {}
 // CHECK-LABEL: .withInverseSome@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Escapable>
 func withInverseSome(_ t: borrowing some ~Copyable) {}
+
+// CHECK-LABEL: .checkAnyObject@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : AnyObject, τ_0_0 : Copyable, τ_0_0 : Escapable>
+func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {}
+
+// CHECK-LABEL: .checkSoup@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Soup>
+class Soup {}
+func checkSoup<T>(_ t: T) where T: Soup {}
 
 // CHECK-LABEL: .S1@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>
@@ -179,25 +186,19 @@ struct Cond<T: ~Copyable>: ~Copyable {}
 extension Cond: Copyable where T: Copyable {}
 
 
-// CHECK-LABEL: .ImplicitCond@
+// CHECK-LABEL: .FullyGenericArg@
 // CHECK: Generic signature: <T>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0>
-struct ImplicitCond<T: ~Escapable & ~Copyable> {}
+struct FullyGenericArg<T: ~Escapable & ~Copyable> {}
 
-// CHECK-LABEL: StructDecl name=ImplicitCond
-// CHECK-NEXT:    (normal_conformance type="ImplicitCond<T>" protocol="Sendable")
+// CHECK-LABEL: StructDecl name=FullyGenericArg
+// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Copyable")
+// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Escapable")
 
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
-// CHECK-NEXT: (normal_conformance type="ImplicitCond<T>" protocol="Empty")
-extension ImplicitCond: Empty {}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
+// CHECK: Generic signature: <T>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0>
 
-
-// NOTE: the following extensions were implicitly synthesized, so they appear at the end!
-
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
-// CHECK:       (normal_conformance type="ImplicitCond<T>" protocol="Copyable"
-// CHECK-NEXT:       (requirement "T" conforms_to "Copyable"))
-
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
-// CHECK:       (normal_conformance type="ImplicitCond<T>" protocol="Escapable"
-// CHECK-NEXT:       (requirement "T" conforms_to "Escapable"))
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
+// CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty")
+extension FullyGenericArg: Empty where T: ~Copyable, T: ~Escapable {}

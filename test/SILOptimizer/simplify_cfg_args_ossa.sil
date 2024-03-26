@@ -723,14 +723,14 @@ enum ThreeWay {
 
 // CHECK-LABEL: sil hidden [noinline] [ossa] @testUnwrapEnumArg : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   br bb1(undef : $Builtin.Int64, %{{.*}} : $Payload)
-// CHECK: bb1(%{{.*}} : $Builtin.Int64, %{{.*}} : $Payload):
+// CHECK:   br bb1(%{{.*}} : $Payload)
+// CHECK: bb1(%{{.*}} : $Payload):
 // CHECK:   alloc_stack $Payload
 // CHECK:   switch_enum undef : $ThreeWay, case #ThreeWay.one!enumelt: bb4, case #ThreeWay.two!enumelt: bb2, case #ThreeWay.three!enumelt: bb3
 // CHECK: bb2:
 // CHECK:   [[P2:%.*]] = load [trivial] %{{.*}} : $*Payload
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
-// CHECK:   br bb1(undef : $Builtin.Int64, [[P2]] : $Payload)
+// CHECK:   br bb1([[P2]] : $Payload)
 // CHECK: bb3:
 // CHECK:   [[P3:%.*]] = load [trivial] %{{.*}} : $*Payload
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
@@ -740,7 +740,7 @@ enum ThreeWay {
 // CHECK:   dealloc_stack %{{.*}} : $*Payload
 // CHECK:   cond_br undef, bb6, bb5
 // CHECK: bb5:
-// CHECK:   br bb1(undef : $Builtin.Int64, [[P4]] : $Payload)
+// CHECK:   br bb1([[P4]] : $Payload)
 // CHECK: bb6:
 // CHECK:   br bb7
 // CHECK: bb7:

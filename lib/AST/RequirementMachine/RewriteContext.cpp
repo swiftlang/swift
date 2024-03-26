@@ -160,7 +160,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
   debugFlags.split(debug, ',');
   for (auto flagStr : debug) {
     auto flag =
-        llvm::StringSwitch<llvm::Optional<DebugFlags>>(flagStr)
+        llvm::StringSwitch<std::optional<DebugFlags>>(flagStr)
             .Case("simplify", DebugFlags::Simplify)
             .Case("add", DebugFlags::Add)
             .Case("completion", DebugFlags::Completion)
@@ -180,13 +180,11 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
             .Case("redundant-rules", DebugFlags::RedundantRules)
             .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
             .Case("concrete-contraction", DebugFlags::ConcreteContraction)
-            .Case("propagate-requirement-ids",
-                  DebugFlags::PropagateRequirementIDs)
             .Case("timers", DebugFlags::Timers)
             .Case("conflicting-rules", DebugFlags::ConflictingRules)
             .Case("split-concrete-equiv-class",
                   DebugFlags::SplitConcreteEquivalenceClass)
-            .Default(llvm::None);
+            .Default(std::nullopt);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
                    << flagStr << "\n";

@@ -16,6 +16,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 
@@ -61,10 +62,9 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   if (normal == nullptr)
     return;
 
-  // If this conformance was not synthesized by the ClangImporter, we're not
-  // going to be emitting it lazily either, so we can avoid doing anything
-  // below.
-  if (!isa<ClangModuleUnit>(normal->getDeclContext()->getModuleScopeContext()))
+  // If this conformance was not synthesized, we're not going to be emitting
+  // it lazily either, so we can avoid doing anything below.
+  if (!normal->isSynthesized())
     return;
 
   // If we already emitted this witness table, we don't need to track the fact

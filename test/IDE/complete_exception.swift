@@ -98,9 +98,9 @@ func test002() {
 // starting from these, we could remove them.  But that may be infeasible in
 // the presence of overloaded operators.
 // THROW1-DAG: Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local:               text[#String#]; name=text{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e1[#Error1#]; name=e1{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e2[#Error2#]; name=e2{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local:                           text[#String#]; name=text{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: e1[#Error1#]; name=e1{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: e2[#Error2#]; name=e2{{$}}
 }
 
 func test003() {
@@ -147,14 +147,14 @@ func test006() {
   } catch {
     #^INSIDE_CATCH1^#
   }
-// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#Never#]; name=error
+// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#any Error#]; name=error
 }
 func test007() {
   do {
   } catch let e {
     #^INSIDE_CATCH2^#
   }
-// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#Never#]; name=e
+// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#any Error#]; name=e
 }
 func test008() {
   do {
@@ -195,7 +195,7 @@ func test012() {
     error.#^INSIDE_CATCH_ERR_DOT1^#
   }
 }
-// ERROR_DOT: Keyword[self]/CurrNominal: self[#Never#]; name=self
+// ERROR_DOT: Keyword[self]/CurrNominal: self[#any Error#]; name=self
 func test013() {
   do {
   } catch let e {

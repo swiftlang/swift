@@ -1,0 +1,7 @@
+framework module WithInferredClangModule [system] {
+    header "WithInferredClangModule.h"
+    umbrella "Headers"
+
+    export *
+    explicit module * { export * }
+}

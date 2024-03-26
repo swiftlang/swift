@@ -17,9 +17,43 @@ func doesNotThrowConcrete() throws(MyError) { }
 // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B8ConcreteyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
 func throwsConcrete() throws(MyError) {
   // CHECK: [[ERROR:%[0-9]+]] = enum $MyError, #MyError.fail!enumelt
-  // CHECK-NOT: builtin "willThrow"
-  // CHECK: throw [[ERROR]] : $MyError
+  // CHECK: [[ERROR_ALLOC:%.*]] = alloc_stack $MyError
+  // CHECK: store [[ERROR]] to [trivial] [[ERROR_ALLOC]] : $*MyError
+  // CHECK: [[FN:%.*]] = function_ref @swift_willThrowTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FN]]<MyError>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: [[ERROR_RELOAD:%.*]] = load [trivial] [[ERROR_ALLOC]]
+  // CHECK: dealloc_stack [[ERROR_ALLOC]] : $*MyError
+  // CHECK: throw [[ERROR_RELOAD]] : $MyError
   throw .fail
+}
+
+class ClassError: Error { }
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B10ClassErroryyAA0cD0CYKF : $@convention(thin) () -> @error ClassError
+// CHECK: [[META:%.*]] = metatype $@thick ClassError.Type
+// CHECK: [[INIT:%.*]] = function_ref @$s12typed_throws10ClassErrorCACycfC
+// CHECK: [[ERROR:%.*]] = apply [[INIT]]([[META]]) : $@convention(method) (@thick ClassError.Type) -> @owned ClassError
+// CHECK: [[ERROR_ALLOC:%.*]] = alloc_stack $ClassError
+// CHECK: store [[ERROR]] to [init] [[ERROR_ALLOC]] : $*ClassError
+// CHECK: [[FN:%.*]] = function_ref @swift_willThrowTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[FN]]<ClassError>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[ERROR_RELOAD:%.*]] = load [take] [[ERROR_ALLOC]] : $*ClassError
+// CHECK: dealloc_stack [[ERROR_ALLOC]] : $*ClassError
+// CHECK: throw [[ERROR_RELOAD]] : $ClassError
+func throwsClassError() throws(ClassError) {
+  throw ClassError()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B13IndirectErroryyxxYKs0D0RzlF : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error_indirect E
+// CHECK: [[ERROR_ALLOC:%.*]] = alloc_stack $E
+// CHECK: copy_addr %1 to [init] [[ERROR_ALLOC]] : $*E
+// CHECK: [[FN:%.*]] = function_ref @swift_willThrowTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[FN]]<E>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: copy_addr [take] [[ERROR_ALLOC]] to [init] %0 : $*E
+// CHECK: dealloc_stack [[ERROR_ALLOC]] : $*E
+// CHECK-NEXT: throw_addr
+func throwsIndirectError<E: Error>(_ error: E) throws(E) {
+  throw error
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF
@@ -202,6 +236,67 @@ func passesClosureWithReabstractionToRethrowing(count: Int) {
     try! takesClosureThrowingConcrete { }
 }
 
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws13throwAndCatchyyyyxYKXExYKs5ErrorRzlF : $@convention(thin) <E where E : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>) -> @error_indirect E {
+func throwAndCatch<E: Error>(_ body: () throws(E) -> Void) throws(E) {
+  do {
+    // CHECK: [[OUTER_ERR:%.*]] = alloc_stack $E
+    // CHECK: try_apply [[FN:%.*]]([[ERROR_ARG:%.*]]) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>, normal [[NORMAL_BB:bb.*]], error [[ERROR_BB:bb.*]] //
+    try body()
+  } catch {
+    // CHECK: [[ERROR_BB]]:
+    // CHECK-NEXT: copy_addr [take] [[ERROR_ARG]] to [init] [[OUTER_ERR]] : $*E
+    // CHECK: dealloc_stack [[ERROR_ARG]] : $*E
+    print(error)
+  }
+}
+
+enum HomeworkError: Error {
+case dogAteIt
+case forgot
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws25throwAndPatternMatchCatchyyyyxYKXExYKs5ErrorRzlF : $@convention(thin) <E where E : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>) -> @error_indirect E {
+func throwAndPatternMatchCatch<E: Error>(_ body: () throws(E) -> Void) throws(E) {
+  do {
+    // CHECK: [[OUTER_ERR:%.*]] = alloc_stack $E
+    // CHECK: try_apply [[FN:%.*]]([[ERROR_ARG:%.*]]) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>, normal [[NORMAL_BB:bb.*]], error [[ERROR_BB:bb.*]] //
+    try body()
+  } catch let he as HomeworkError where he == .dogAteIt {
+    // CHECK: copy_addr [take] [[ERROR_ARG]] to [init] [[OUTER_ERR]] : $*E
+    // CHECK: [[HOMEWORK_ERR:%.*]] = alloc_stack $HomeworkError
+    // CHECK: checked_cast_addr_br copy_on_success E in [[OUTER_ERR]] : $*E to HomeworkError in [[HOMEWORK_ERR]] : $*HomeworkError
+
+    // bad dog
+  } catch {
+  }
+}
+
+enum MyResult<Success, Failure: Error> {
+  case success(Success)
+  case failure(Failure)
+
+  @inlinable
+  init(catching body: () throws(Failure) -> Success) {
+    do {
+      self = .success(try body())
+    } catch {
+      self = .failure(error)
+    }
+  }
+}
+
+func formerReabstractionCrash() {
+  // CHECK-LABEL: sil private [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGyXEfU_ : $@convention(thin) () -> @owned MyResult<String, any Error> {
+  // CHECK: function_ref @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGyXEfU_SSyXEfU_ : $@convention(thin) () -> @owned String
+  // CHECK-NEXT: thin_to_thick_function
+  // CHECK-NEXT: // function_ref thunk
+  // CHECK-NEXT: function_ref @$sSSIgo_SSs5Error_pIegrzr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> (@out String, @error_indirect any Error)
+  // CHECK-NEXT: partial_apply
+  let _: MyResult<String, Error>? = {
+    return MyResult{"hello"}
+  }()
+}
 
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]

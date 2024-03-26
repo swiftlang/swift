@@ -142,3 +142,13 @@ Casts.test("testCastProtocolWithAnyObjectToProtocolCompoTypeSuperclass") {
   let shouldBeNil = (F() as QAny) as? KQAny
   expectNil(shouldBeNil)
 }
+
+func f1() -> Any { return 1 }
+func attemptFunctionCast<U>(_ u: U.Type) -> U? {
+  return f1 as? U
+}
+Casts.test("testFunctionCastToArchetype") {
+  expectNil(attemptFunctionCast(Int.self))
+  expectNil(attemptFunctionCast(K.self))
+  expectTrue(attemptFunctionCast(Any.self) != nil)
+}

@@ -171,8 +171,7 @@ bool SILWitnessTable::conformanceIsSerialized(
   if (normalConformance && normalConformance->isResilient())
     return false;
 
-  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public ||
-      conformance->getProtocol()->hasPackageAccess())
+  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
     return false;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
@@ -183,6 +182,21 @@ bool SILWitnessTable::enumerateWitnessTableConditionalConformances(
     const ProtocolConformance *conformance,
     llvm::function_ref<bool(unsigned, CanType, ProtocolDecl *)> fn) {
   unsigned conformanceIndex = 0;
+
+  // For a protocol P that conforms to another protocol, introduce a conditional
+  // requirement for that P's Self: P.
+  if (isa<NormalProtocolConformance>(conformance->getRootConformance())) {
+    if (auto selfProto = conformance->getDeclContext()->getSelfProtocolDecl()) {
+      if (Lowering::TypeConverter::protocolRequiresWitnessTable(selfProto)) {
+        auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
+        if (fn(conformanceIndex, selfType, selfProto))
+          return true;
+
+        ++conformanceIndex;
+      }
+    }
+  }
+
   for (auto req : conformance->getConditionalRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;

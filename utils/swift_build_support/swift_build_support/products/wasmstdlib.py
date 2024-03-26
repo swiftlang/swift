@@ -16,6 +16,7 @@ from . import cmake_product
 from . import llvm
 from . import swift
 from . import wasisysroot
+from . import wasmkit
 
 
 class WasmStdlib(cmake_product.CMakeProduct):
@@ -43,7 +44,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
 
         # Toolchain configuration
-        toolchain_path = self.install_toolchain_path(host_target)
+        toolchain_path = self.native_toolchain_path(host_target)
         # Explicitly set the CMake AR and RANLIB to force it to use llvm-ar/llvm-ranlib
         # instead of the system ar/ranlib, which usually don't support WebAssembly
         # object files.
@@ -83,6 +84,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_DISPATCH:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
         self.cmake_options.define(
             'SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING:BOOL', 'FALSE')
@@ -99,7 +101,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         # Test configuration
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SOURCEKIT_TESTS:BOOL', 'FALSE')
-        lit_test_paths = ['IRGen']
+        lit_test_paths = ['IRGen', 'stdlib', 'Concurrency/Runtime']
         lit_test_paths = [os.path.join(
             self.build_dir, 'test-wasi-wasm32', path) for path in lit_test_paths]
         self.cmake_options.define('SWIFT_LIT_TEST_PATHS:STRING',
@@ -115,16 +117,30 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
         # Configure with WebAssembly target variant, and build with just-built toolchain
         self.build_with_cmake([], self._build_variant, [],
-                              prefer_just_built_toolchain=True)
+                              prefer_native_toolchain=True)
 
     def test(self, host_target):
+        build_root = os.path.dirname(self.build_dir)
         bin_paths = [
             os.path.join(self._host_swift_build_dir(host_target), 'bin'),
             os.path.join(self._host_llvm_build_dir(host_target), 'bin'),
             os.environ['PATH']
         ]
-        env = {'PATH': os.path.pathsep.join(bin_paths)}
-        test_target = "check-swift-only_non_executable-wasi-wasm32-custom"
+        wasmkit_build_path = os.path.join(
+            build_root, '%s-%s' % ('wasmkit', host_target))
+        wasmkit_bin_path = wasmkit.WasmKit.cli_file_path(wasmkit_build_path)
+        if not os.path.exists(wasmkit_bin_path):
+            test_target = "check-swift-only_non_executable-wasi-wasm32-custom"
+        else:
+            test_target = "check-swift-wasi-wasm32-custom"
+            bin_paths = [os.path.dirname(wasmkit_bin_path)] + bin_paths
+
+        env = {
+            'PATH': os.path.pathsep.join(bin_paths),
+            # FIXME: WasmKit takes too long to run these exhaustive tests for now
+            'LIT_FILTER_OUT':
+                '(Concurrency/Runtime/clock.swift|stdlib/StringIndex.swift)',
+        }
         self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
 
     @property
@@ -152,4 +168,5 @@ class WasmStdlib(cmake_product.CMakeProduct):
         return [llvm.LLVM,
                 wasisysroot.WASILibc,
                 wasisysroot.WasmLLVMRuntimeLibs,
+                wasmkit.WasmKit,
                 swift.Swift]

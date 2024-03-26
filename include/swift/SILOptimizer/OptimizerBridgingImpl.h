@@ -130,6 +130,26 @@ BridgedFunction BridgedNodeSet::getFunction() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                            BridgedOperandSet
+//===----------------------------------------------------------------------===//
+
+bool BridgedOperandSet::contains(BridgedOperand operand) const {
+  return set->contains(operand.op);
+}
+
+bool BridgedOperandSet::insert(BridgedOperand operand) const {
+  return set->insert(operand.op);
+}
+
+void BridgedOperandSet::erase(BridgedOperand operand) const {
+  set->erase(operand.op);
+}
+
+BridgedFunction BridgedOperandSet::getFunction() const {
+  return {set->getFunction()};
+}
+
+//===----------------------------------------------------------------------===//
 //                            BridgedPassContext
 //===----------------------------------------------------------------------===//
 
@@ -153,6 +173,10 @@ bool BridgedPassContext::hadError() const {
 
 bool BridgedPassContext::moduleIsSerialized() const {
   return invocation->getPassManager()->getModule()->isSerialized();
+}
+
+bool BridgedPassContext::isTransforming(BridgedFunction function) const {
+  return invocation->getFunction() == function.getFunction();
 }
 
 BridgedAliasAnalysis BridgedPassContext::getAliasAnalysis() const {
@@ -208,6 +232,10 @@ BridgedBasicBlock BridgedPassContext::createBlockAfter(BridgedBasicBlock bridged
   return {block->getParent()->createBasicBlockAfter(block)};
 }
 
+BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunction) const {
+  return {bridgedFunction.getFunction()->createBasicBlock()};
+}
+
 void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
   invocation->eraseInstruction(inst.unbridged());
 }
@@ -221,7 +249,7 @@ void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedI
 }
 
 BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
-  return {swift::SILUndef::get(type.unbridged(), *invocation->getFunction())};
+  return {swift::SILUndef::get(invocation->getFunction(), type.unbridged())};
 }
 
 bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) const {
@@ -246,6 +274,14 @@ BridgedNodeSet BridgedPassContext::allocNodeSet() const {
 
 void BridgedPassContext::freeNodeSet(BridgedNodeSet set) const {
   invocation->freeNodeSet(set.set);
+}
+
+BridgedOperandSet BridgedPassContext::allocOperandSet() const {
+  return {invocation->allocOperandSet()};
+}
+
+void BridgedPassContext::freeOperandSet(BridgedOperandSet set) const {
+  invocation->freeOperandSet(set.set);
 }
 
 void BridgedPassContext::notifyInvalidatedStackNesting() const {
@@ -356,6 +392,11 @@ getNextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
   return {&*nextIter};
 }
 
+OptionalBridgedFunction BridgedPassContext::lookupFunction(BridgedStringRef name) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpFunction(name.unbridged())};
+}
+
 OptionalBridgedFunction BridgedPassContext::loadFunction(BridgedStringRef name, bool loadCalleesRecursively) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {mod->loadFunction(name.unbridged(),
@@ -397,8 +438,10 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
       inst.unbridged(), invocation->getFunction(), invocation->getTransform());
 }
 
-void BridgedPassContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
-  invocation->initializeSSAUpdater(type.unbridged(),
+void BridgedPassContext::SSAUpdater_initialize(
+    BridgedFunction function, BridgedType type,
+    BridgedValue::Ownership ownership) const {
+  invocation->initializeSSAUpdater(function.getFunction(), type.unbridged(),
                                    BridgedValue::castToOwnership(ownership));
 }
 

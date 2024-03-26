@@ -6,10 +6,9 @@
 // RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies
 // RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=targeted
 // RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=complete
-// RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 @preconcurrency import NonStrictModule
 @preconcurrency import StrictModule

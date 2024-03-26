@@ -77,6 +77,9 @@ def backup_module_interface_path_EQ :
   Joined<["-"], "backup-module-interface-path=">,
   Alias<backup_module_interface_path>;
 
+def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
+  HelpText<"Emit textual output in a parseable format">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 
 def primary_file : Separate<["-"], "primary-file">,
@@ -86,9 +89,6 @@ def primary_file : Separate<["-"], "primary-file">,
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
-
-def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
-  HelpText<"Emit textual output in a parseable format">;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
@@ -306,6 +306,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "disable-objc-interop">,
     HelpText<"Disable Objective-C interop code generation and config directives">;
 
+  def enable_experimental_opaque_type_erasure :
+    Flag<["-"], "enable-experimental-opaque-type-erasure">,
+    HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
+
   def enable_objc_attr_requires_foundation_module :
     Flag<["-"], "enable-objc-attr-requires-foundation-module">,
     HelpText<"Enable requiring uses of @objc to require importing the "
@@ -319,11 +323,6 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
 def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
-
-def enable_lexical_borrow_scopes :
-  Joined<["-"], "enable-lexical-borrow-scopes=">,
-  HelpText<"Whether to emit lexical borrow scopes (default: true)">,
-  MetaVarName<"true|false">;
 
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
@@ -377,7 +376,13 @@ def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
   Alias<debug_constraints_on_line>;
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
-  HelpText<"Disable per-name lazy member loading">;
+  HelpText<"Disable per-name lazy member loading (obsolete)">;
+
+def disable_named_lazy_import_as_member_loading :
+  Flag<["-"], "disable-named-lazy-import-as-member-loading">,
+  HelpText<"Import all of a type's import-as-member globals together, as Swift "
+           "5.10 and earlier did; temporary workaround for modules that are "
+           "sensitive to this change">;
 
 def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
   HelpText<"Enables dumping rewrite systems from the generics implementation">;
@@ -425,9 +430,6 @@ def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
 
-def warn_redundant_requirements : Flag<["-"], "warn-redundant-requirements">,
-  HelpText<"Emit warnings for redundant requirements in generic signatures">;
-
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
@@ -439,6 +441,9 @@ def disable_round_trip_debug_types : Flag<["-"], "disable-round-trip-debug-types
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
+
+def debug_inverse_requirements : Flag<["-"], "debug-inverse-requirements">,
+  HelpText<"Print real requirements in -debug_generic_signatures output">;
 
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
@@ -585,6 +590,10 @@ def stack_promotion_limit : Separate<["-"], "stack-promotion-limit">,
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
 
+def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
+  HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
+           "stderr">;
+
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
 
@@ -652,13 +661,13 @@ def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
 
-def enable_experimental_associated_type_inference :
-  Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference improvements">;
+def enable_experimental_lifetime_dependence_inference :
+  Flag<["-"], "enable-experimental-lifetime-dependence-inference">,
+  HelpText<"Enable experimental lifetime dependence inference">;
 
-def disable_experimental_associated_type_inference :
-  Flag<["-"], "disable-experimental-associated-type-inference">,
-  HelpText<"Disable experimental associated type inference improvements">;
+def disable_experimental_lifetime_dependence_inference :
+  Flag<["-"], "disable-experimental-lifetime-dependence-inference">,
+  HelpText<"Disable experimental lifetime dependence inference">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -677,12 +686,12 @@ def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
 
 def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -691,10 +700,6 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
 def bypass_resilience : Flag<["-"], "bypass-resilience-checks">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Ignore all checks for module resilience.">;
-  
-def enable_experimental_opaque_type_erasure : Flag<["-"], "enable-experimental-opaque-type-erasure">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
 
 def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -1070,6 +1075,12 @@ def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
 def enable_layout_string_value_witnesses : Flag<["-"], "enable-layout-string-value-witnesses">,
   HelpText<"Enable layout string based value witnesses">;
 
+def enable_large_loadable_types_reg2mem : Flag<["-"], "enable-large-loadable-types-reg2mem">,
+  HelpText<"Enable large loadable types register to memory pass">;
+
+def disable_large_loadable_types_reg2mem : Flag<["-"], "disable-large-loadable-types-reg2mem">,
+  HelpText<"Disable large loadable types register to memory pass">;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
     Joined<["-"], "enable-pack-metadata-stack-promotion=">,
@@ -1166,6 +1177,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
 
+def disable_sil_opaque_values : Flag<["-"], "disable-sil-opaque-values">,
+  HelpText<"Disable SIL Opaque Values">;
+
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
@@ -1218,6 +1232,13 @@ def disable_import_ptrauth_field_function_pointers :
   Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
   HelpText<"Disable import of custom ptrauth qualified field function pointers">;
 
+def enable_lifetime_dependence_diagnostics :
+  Flag<["-"], "enable-lifetime-dependence-diagnostics">,
+  HelpText<"Enable lifetime dependence diagnostics for Nonescapable types.">;
+def disable_lifetime_dependence_diagnostics :
+  Flag<["-"], "disable-lifetime-dependence-diagnostics">,
+  HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
+
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,
   HelpText<"Enable collocate metadata functions">;
@@ -1237,6 +1258,12 @@ def enable_relative_protocol_witness_tables :
   HelpText<"Enable relative protocol witness tables">;
 def disable_relative_protocol_witness_tables :
   Flag<["-"], "disable-relative-protocol-witness-tables">,
+  HelpText<"Disable relative protocol witness tables">;
+def enable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "enable-fragile-relative-protocol-tables">,
+  HelpText<"Enable relative protocol witness tables">;
+def disable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
 def enable_new_llvm_pass_manager :
@@ -1270,9 +1297,6 @@ def always_compile_output_files :
   HelpText<"Always compile output files even it might not change the results">;
 
 // CAS/Caching related options.
-def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-for-testing">,
-  HelpText<"Allow compilation caching with unstable inputs for testing purpose">;
-
 def input_file_key : Separate<["-"], "input-file-key">,
   HelpText<"Cache Key for input file">;
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
@@ -1295,6 +1319,16 @@ def experimental_spi_only_imports :
 def enable_ossa_complete_lifetimes :
   Flag<["-"], "enable-ossa-complete-lifetimes">,
   HelpText<"Require linear OSSA lifetimes after SILGen">;
+def disable_ossa_complete_lifetimes :
+  Flag<["-"], "disable-ossa-complete-lifetimes">,
+  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
+
+def enable_ossa_verify_complete :
+  Flag<["-"], "enable-ossa-verify-complete">,
+  HelpText<"Verify linear OSSA lifetimes after SILGen">;
+def disable_ossa_verify_complete :
+  Flag<["-"], "disable-ossa-verify-complete">,
+  HelpText<"Do not verify linear OSSA lifetimes after SILGen">;
 
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,

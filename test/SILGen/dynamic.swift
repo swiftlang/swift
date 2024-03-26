@@ -409,9 +409,9 @@ func objcMethodDispatchFromOtherFile() {
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.objcProp!setter :
   c.objcProp = x
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter :
-  let y = c[objc: 0]
+  let y = c[objc: 0 as AnyObject]
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter :
-  c[objc: 0] = y
+  c[objc: 0 as AnyObject] = y
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7dynamic0A27MethodDispatchFromOtherFileyyF : $@convention(thin) () -> ()

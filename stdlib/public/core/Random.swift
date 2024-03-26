@@ -147,7 +147,6 @@ extension RandomNumberGenerator {
 ///   from `/dev/urandom`.
 /// - Windows uses `BCryptGenRandom`.
 @frozen
-@_unavailableInEmbedded
 public struct SystemRandomNumberGenerator: RandomNumberGenerator, Sendable {
   /// Creates a new instance of the system's default random number generator.
   @inlinable
@@ -159,9 +158,15 @@ public struct SystemRandomNumberGenerator: RandomNumberGenerator, Sendable {
   @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
+#if hasFeature(TypedThrows)
     _withUnprotectedUnsafeMutablePointer(to: &random) {
       swift_stdlib_random($0, MemoryLayout<UInt64>.size)
     }
+#else
+    __abi_se0413_withUnsafeMutablePointer(to: &random) {
+      swift_stdlib_random($0, MemoryLayout<UInt64>.size)
+    }
+#endif
     return random
   }
 }

@@ -31,7 +31,7 @@ enum ValueEnum {
   // CHECK-LABEL: sil hidden @$s25definite_init_value_types9ValueEnumO1xACSb_tcfC : $@convention(method) (Bool, @thin ValueEnum.Type) -> @owned ValueEnum
   // CHECK:      bb0(%0 : $Bool, %1 : $@thin ValueEnum.Type):
   // CHECK-NEXT:   [[STATE:%.*]] = alloc_stack $Builtin.Int1
-  // CHECK-NEXT:   [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ValueEnum
+  // CHECK-NEXT:   [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ValueEnum
   // CHECK-NEXT:   [[INIT_STATE:%.*]] = integer_literal $Builtin.Int1, 0
   // CHECK-NEXT:   store [[INIT_STATE]] to [[STATE]]
   // CHECK:        [[BOOL:%.*]] = struct_extract %0 : $Bool, #Bool._value
@@ -115,6 +115,16 @@ struct ValueStruct {
       self = ValueStruct()
     }
   }
+
+  // Test control statements with boolean literals, like while-true loops
+  init(es: EmptyStruct) {
+    while true {
+      if cond() {
+        ivar = es
+        break
+      }
+    }
+  }
 }
 
 struct AddressStruct {
@@ -131,3 +141,8 @@ struct AddressStruct {
     }
   }
 }
+
+func cond() -> Bool {
+  return true
+}
+

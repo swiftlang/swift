@@ -59,6 +59,11 @@ void DependencyTracker::addIncrementalDependency(StringRef File,
   }
 }
 
+void DependencyTracker::addMacroPluginDependency(StringRef File,
+                                                 Identifier ModuleName) {
+  macroPluginDeps.insert({ModuleName, std::string(File)});
+}
+
 ArrayRef<std::string>
 DependencyTracker::getDependencies() const {
   return clangCollector->getDependencies();
@@ -67,6 +72,11 @@ DependencyTracker::getDependencies() const {
 ArrayRef<DependencyTracker::IncrementalDependency>
 DependencyTracker::getIncrementalDependencies() const {
   return incrementalDeps;
+}
+
+ArrayRef<DependencyTracker::MacroPluginDependency>
+DependencyTracker::getMacroPluginDependencies() const {
+  return macroPluginDeps.getArrayRef();
 }
 
 std::shared_ptr<clang::DependencyCollector>
@@ -176,11 +186,12 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
 }
 
 llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
-ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
-                                                     StringRef moduleName) const {
+ModuleDependencyInfo::collectCrossImportOverlayNames(
+    ASTContext &ctx, StringRef moduleName,
+    std::vector<std::string> &overlayFiles) const {
   using namespace llvm::sys;
   using namespace file_types;
-  llvm::Optional<std::string> modulePath;
+  std::optional<std::string> modulePath;
   // A map from secondary module name to a vector of overlay names.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
 
@@ -229,6 +240,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
       ModuleDecl::collectCrossImportOverlay(ctx, file, moduleName,
                                             bystandingModule);
     result[bystandingModule] = std::move(overlayNames);
+    overlayFiles.push_back(file.str());
   });
   return result;
 }

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -module-name Test | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-SKIP
-// RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -module-name Test -experimental-skip-non-exportable-decls | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP
+// RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -enable-library-evolution -module-name Test | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-SKIP
+// RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -enable-library-evolution -module-name Test -experimental-skip-non-exportable-decls | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP
 
 import Swift
 
@@ -15,7 +15,7 @@ import Swift
 // CHECK-NO-SKIP: sil_global private @$s4Test15publicGlobalVar_Wz : $Builtin.Word
 // CHECK-SKIP-NOT: s4Test15publicGlobalVar_Wz
 
-// CHECK: sil_global @$s4Test15publicGlobalVarSivp : $Int
+// CHECK: sil_global private @$s4Test15publicGlobalVarSivp : $Int
 
 // CHECK-NO-SKIP: sil private{{.*}} @$s4Test11privateFunc33_CFB3F9DC47F5EF9E1D08B58758351A08LLyyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test11privateFunc33_CFB3F9DC47F5EF9E1D08B58758351A08LLyyF
@@ -46,7 +46,7 @@ internal func internalFuncWithNestedFunc() {
 // CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyFyycyXEfU_
 
 // CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyFyycyXEfU_6$deferL_yyF : $@convention(thin) () -> () {
-// CHECK-SKIP-NOT: @$s4Test022internalFuncWithNestedC0yyFyycyXEfU_6$deferL_yyF
+// CHECK-SKIP-NOT: sil{{.*}} @$s4Test022internalFuncWithNestedC0yyFyycyXEfU_6$deferL_yyF
 
 // CHECK: sil{{.*}} @$s4Test10publicFuncyyF : $@convention(thin) () -> () {
 public func publicFunc() {}
@@ -73,8 +73,8 @@ internal var internalGlobalVar = 1
 // CHECK-NO-SKIP: sil private [global_init_once_fn]{{.*}} @$s4Test15publicGlobalVar_WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK-SKIP-NOT: s4Test15publicGlobalVar_WZ
 
-// CHECK-NO-SKIP: sil [global_init]{{.*}} @$s4Test15publicGlobalVarSivau : $@convention(thin) () -> Builtin.RawPointer {
-// CHECK-SKIP-NOT: s4Test15publicGlobalVarSivau
+// CHECK-NO-SKIP: sil hidden [global_init]{{.*}} @$s4Test15publicGlobalVarSivau : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-SKIP-NOT: sil{{.*}} s4Test15publicGlobalVarSivau
 public var publicGlobalVar = 1
 
 // CHECK: sil [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF : $@convention(thin) () -> () {
@@ -94,9 +94,9 @@ public var publicGlobalVar = 1
 
 @propertyWrapper
 public struct PublicWrapper<T> {
-  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test13PublicWrapperV12wrappedValuexvg : $@convention(method) <T> (@in_guaranteed PublicWrapper<T>) -> @out T {
-  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test13PublicWrapperV12wrappedValuexvs : $@convention(method) <T> (@in T, @inout PublicWrapper<T>) -> () {
-  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test13PublicWrapperV12wrappedValuexvM : $@yield_once @convention(method) <T> (@inout PublicWrapper<T>) -> @yields @inout T {
+  // CHECK: sil{{.*}} @$s4Test13PublicWrapperV12wrappedValuexvg : $@convention(method) <T> (@in_guaranteed PublicWrapper<T>) -> @out T {
+  // CHECK: sil{{.*}} @$s4Test13PublicWrapperV12wrappedValuexvs : $@convention(method) <T> (@in T, @inout PublicWrapper<T>) -> () {
+  // CHECK: sil{{.*}} @$s4Test13PublicWrapperV12wrappedValuexvM : $@yield_once @convention(method) <T> (@inout PublicWrapper<T>) -> @yields @inout T {
   public var wrappedValue: T
 
   // CHECK: sil{{.*}} @$s4Test13PublicWrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <T> (@in T, @thin PublicWrapper<T>.Type) -> @out PublicWrapper<T> {
@@ -118,24 +118,24 @@ private class PrivateClass {
 }
 
 public class PublicClass {
-  // CHECK-NO-SKIP: sil [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivpfi : $@convention(thin) () -> Int {
+  // CHECK-NO-SKIP: sil{{.*}} @$s4Test11PublicClassC11internalVarSivpfi : $@convention(thin) () -> Int {
   // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivpfi
-  // CHECK-NO-SKIP: sil hidden [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivg : $@convention(method) (@guaranteed PublicClass) -> Int {
+  // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test11PublicClassC11internalVarSivg : $@convention(method) (@guaranteed PublicClass) -> Int {
   // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivg
-  // CHECK-NO-SKIP: sil hidden [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
+  // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test11PublicClassC11internalVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
   // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivs
-  // CHECK-NO-SKIP: sil hidden [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivM : $@yield_once @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
+  // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test11PublicClassC11internalVarSivM : $@yield_once @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
   // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivM
   var internalVar = 1
 
-  // CHECK-NO-SKIP: sil [transparent]{{.*}} @$s4Test11PublicClassC9publicVarSivpfi : $@convention(thin) () -> Int {
+  // CHECK-NO-SKIP: sil{{.*}} @$s4Test11PublicClassC9publicVarSivpfi : $@convention(thin) () -> Int {
   // CHECK-SKIP-NOT: s4Test11PublicClassC9publicVarSivpfi
-  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test11PublicClassC9publicVarSivg : $@convention(method) (@guaranteed PublicClass) -> Int {
-  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test11PublicClassC9publicVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
-  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test11PublicClassC9publicVarSivM : $@yield_once @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
+  // CHECK: sil{{.*}} @$s4Test11PublicClassC9publicVarSivg : $@convention(method) (@guaranteed PublicClass) -> Int {
+  // CHECK: sil{{.*}} @$s4Test11PublicClassC9publicVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
+  // CHECK: sil{{.*}} @$s4Test11PublicClassC9publicVarSivM : $@yield_once @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
   public var publicVar = 1
 
-  // CHECK-NO-SKIP: sil{{.*}} @$s4Test11PublicClassC16publicWrappedVarSivpfP : $@convention(thin) (Int) -> PublicWrapper<Int> {
+  // CHECK-NO-SKIP: sil{{.*}} @$s4Test11PublicClassC16publicWrappedVarSivpfP : $@convention(thin) (Int) -> @out PublicWrapper<Int> {
   // CHECK-SKIP-NOT: s4Test11PublicClassC16publicWrappedVarSivpfP
   // CHECK: sil{{.*}} @$s4Test11PublicClassC16publicWrappedVarSivg : $@convention(method) (@guaranteed PublicClass) -> Int {
   // CHECK: sil{{.*}} @$s4Test11PublicClassC16publicWrappedVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
@@ -174,7 +174,7 @@ extension PublicClass {
 // CHECK-NO-SKIP-NEXT:  }
 // CHECK-SKIP-NOT:      sil_vtable PrivateClass
 
-// CHECK-LABEL:         sil_vtable [serialized] PublicClass {
+// CHECK-LABEL:         sil_vtable PublicClass {
 // CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!getter
 // CHECK-SKIP-NOT:        #PublicClass.internalVar!getter
 // CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!setter
@@ -194,4 +194,4 @@ extension PublicClass {
 // CHECK-NEXT:            #PublicClass.deinit!deallocator
 // CHECK-NEXT:          }
 
-// CHECK:               sil_property #PublicClass.publicVar ()
+// CHECK:               sil_property #PublicClass.publicVar

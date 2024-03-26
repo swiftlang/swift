@@ -41,6 +41,12 @@ bool useLegacyObjCBoxingInCasting();
 /// Whether to use legacy semantics when unboxing __SwiftValue
 bool useLegacySwiftValueUnboxingInCasting();
 
+/// Legacy semantics use trivial implementations for -hashValue/-isEqual:
+/// requests from ObjC to Swift values.
+/// New semantics attempt to dispatch to Swift Hashable/Equatable conformances
+/// if present.
+bool useLegacySwiftObjCHashing();
+
 } // namespace bincompat
 
 } // namespace runtime

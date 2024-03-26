@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -swift-version 6 %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: concurrency && asserts
+// REQUIRES: concurrency
 
-class Box { // expected-note 3{{class 'Box' does not conform to the 'Sendable' protocol}}
+class Box {
     let size : Int = 0
 }
 
@@ -25,8 +25,8 @@ actor Door {
     @MainActor var globActor_mutable : Int = 0
     @MainActor let globActor_immutable : Int = 0
 
-    @MainActor(unsafe) var unsafeGlobActor_mutable : Int = 0
-    @MainActor(unsafe) let unsafeGlobActor_immutable : Int = 0
+    @preconcurrency @MainActor var unsafeGlobActor_mutable : Int = 0
+    @preconcurrency @MainActor let unsafeGlobActor_immutable : Int = 0
 
     subscript(byIndex: Int) -> Int { 0 }
 
@@ -47,7 +47,7 @@ func tryKeyPathsMisc(d : Door) {
 
     // in combination with other key paths
 
-    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
+    _ = (\Door.letBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'letBox'}}
                                        \Box?.?.size)
 
     _ = (\Door.varBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'varBox'}}
@@ -61,9 +61,9 @@ func tryKeyPathsFromAsync() async {
 }
 
 func tryNonSendable() {
-    _ = \Door.letDict[0] // expected-warning {{cannot form key path that accesses non-sendable type '[Int : Box]'}}
+    _ = \Door.letDict[0] // expected-error {{cannot form key path to actor-isolated property 'letDict'}}
     _ = \Door.varDict[0] // expected-error {{cannot form key path to actor-isolated property 'varDict'}}
-    _ = \Door.letBox!.size // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
+    _ = \Door.letBox!.size // expected-error {{cannot form key path to actor-isolated property 'letBox'}}
 }
 
 func tryKeypaths() {

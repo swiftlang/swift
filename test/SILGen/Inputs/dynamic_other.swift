@@ -15,8 +15,8 @@ class FromOtherFile: Proto {
   @objc init(objc: Int) {}
   @objc func objcMethod() {}
   @objc var objcProp: Int = 0
-  @objc subscript(objc objc: Int) -> Int {
-    get { return objc }
+  @objc subscript(objc objc: AnyObject) -> Int {
+    get { return 0 }
     set {}
   }
 
@@ -26,6 +26,11 @@ class FromOtherFile: Proto {
   @objc dynamic var dynamicProp: Int = 0
   @objc dynamic subscript(dynamic dynamic: Int) -> Int {
     get { return dynamic }
+    set {}
+  }
+
+  static subscript(nativeType nativeType: Int) -> Int {
+    get { return nativeType }
     set {}
   }
 

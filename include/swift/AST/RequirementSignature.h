@@ -73,6 +73,19 @@ public:
   GenericSignatureErrors getErrors() const {
     return Errors;
   }
+
+  void getRequirementsWithInverses(
+      ProtocolDecl *owner,
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses) const;
+
+  void print(ProtocolDecl *owner, raw_ostream &OS,
+             const PrintOptions &Options = PrintOptions()) const;
+  void print(ProtocolDecl *owner, ASTPrinter &Printer,
+             const PrintOptions &Opts = PrintOptions()) const;
+
+  static RequirementSignature getPlaceholderRequirementSignature(
+      const ProtocolDecl *proto, GenericSignatureErrors errors);
 };
 
 } // end namespace swift

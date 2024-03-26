@@ -25,12 +25,18 @@
 
 namespace swift {
 class CapturedValue;
-}
+} // namespace swift
+
+namespace swift {
+namespace Lowering {
+class TypeConverter;
+} // namespace Lowering
+} // namespace swift
 
 namespace llvm {
 class raw_ostream;
 template <> struct DenseMapInfo<swift::CapturedValue>;
-}
+} // namespace llvm
 
 namespace swift {
 class ValueDecl;
@@ -41,6 +47,8 @@ class VarDecl;
 /// CapturedValue includes both the declaration being captured, along with flags
 /// that indicate how it is captured.
 class CapturedValue {
+  friend class Lowering::TypeConverter;
+
 public:
   using Storage =
       llvm::PointerIntPair<llvm::PointerUnion<ValueDecl*, OpaqueValueExpr*>, 2,
@@ -69,9 +77,17 @@ public:
   CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
       : Value(Val, Flags), Loc(Loc) {}
 
-  CapturedValue(OpaqueValueExpr *Val, unsigned Flags)
+private:
+  // This is only used in TypeLowering when forming Lowered Capture
+  // Info. OpaqueValueExpr captured value should never show up in the AST
+  // itself.
+  //
+  // NOTE: AbstractClosureExpr::getIsolationCrossing relies upon this and
+  // asserts that it never sees one of these.
+  explicit CapturedValue(OpaqueValueExpr *Val, unsigned Flags)
       : Value(Val, Flags), Loc(SourceLoc()) {}
 
+public:
   static CapturedValue getDynamicSelfMetadata() {
     return CapturedValue((ValueDecl *)nullptr, 0, SourceLoc());
   }
@@ -83,6 +99,12 @@ public:
   bool isOpaqueValue() const {
     return Value.getPointer().is<OpaqueValueExpr *>();
   }
+
+  /// Returns true if this captured value is a local capture.
+  ///
+  /// NOTE: This implies that the value is not dynamic self metadata, since
+  /// values with decls are the only values that are able to be local captures.
+  bool isLocalCapture() const;
 
   CapturedValue mergeFlags(CapturedValue cv) {
     assert(Value.getPointer() == cv.Value.getPointer() &&
@@ -129,8 +151,7 @@ class CaptureInfo {
       : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue), Count(count) { }
 
     ArrayRef<CapturedValue> getCaptures() const {
-      return llvm::makeArrayRef(this->getTrailingObjects<CapturedValue>(),
-                                Count);
+      return llvm::ArrayRef(this->getTrailingObjects<CapturedValue>(), Count);
     }
 
     DynamicSelfType *getDynamicSelfType() const {
@@ -172,7 +193,7 @@ public:
     // FIXME: Ideally, everywhere that synthesizes a function should include
     // its capture info.
     if (!hasBeenComputed())
-      return llvm::None;
+      return std::nullopt;
     return StorageAndFlags.getPointer()->getCaptures();
   }
 

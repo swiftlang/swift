@@ -1,10 +1,8 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
-// https://github.com/apple/swift/issues/69481
-// REQUIRES: GH69481
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: asserts
@@ -18,6 +16,10 @@ import Dispatch
 func testMe() {
   DispatchQueue.main.async {
     onlyOnMainActor() // okay, due to inference of @MainActor-ness
+  }
+
+  DispatchQueue.main.sync {
+    onlyOnMainActor()
   }
 }
 

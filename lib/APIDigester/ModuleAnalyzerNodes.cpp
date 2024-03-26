@@ -17,6 +17,7 @@ static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   PrintOptions Opts;
   Opts.SynthesizeSugarOnTypes = true;
   Opts.UseOriginallyDefinedInModuleNames = true;
+  Opts.PrintInverseRequirements = true; // Only inverses are relevant for ABI stability
   if (!CheckerOpts.Migrator) {
     // We should always print fully qualified type names for checking either
     // API or ABI stability.
@@ -35,7 +36,7 @@ struct swift::ide::api::SDKNodeInitInfo {
 #include "swift/IDE/DigesterEnums.def"
 #define KEY_BOOL(X, Y) bool X = false;
 #include "swift/IDE/DigesterEnums.def"
-#define KEY_UINT(X, Y) llvm::Optional<uint8_t> X;
+#define KEY_UINT(X, Y) std::optional<uint8_t> X;
 #include "swift/IDE/DigesterEnums.def"
 #define KEY_STRING_ARR(X, Y) std::vector<StringRef> X;
 #include "swift/IDE/DigesterEnums.def"
@@ -328,7 +329,7 @@ ArrayRef<NodeAnnotation> SDKNode::
 getAnnotations(std::vector<NodeAnnotation> &Scratch) const {
   for (auto Ann : Annotations)
     Scratch.push_back(Ann);
-  return llvm::makeArrayRef(Scratch);
+  return llvm::ArrayRef(Scratch);
 }
 
 bool SDKNode::isAnnotatedAs(NodeAnnotation Anno) const {
@@ -380,7 +381,7 @@ KnownTypeKind SDKNodeType::getTypeKind() const {
 }
 
 ArrayRef<TypeAttrKind> SDKNodeType::getTypeAttributes() const {
-  return llvm::makeArrayRef(TypeAttributes.data(), TypeAttributes.size());
+  return llvm::ArrayRef(TypeAttributes.data(), TypeAttributes.size());
 }
 
 void SDKNodeType::addTypeAttribute(TypeAttrKind AttrKind) {
@@ -499,7 +500,7 @@ StringRef SDKNodeDecl::getFullyQualifiedName() const {
 }
 
 bool SDKNodeDecl::isNonOptionalProtocolRequirement() const {
-  return isProtocolRequirement() && !hasDeclAttribute(DAK_Optional);
+  return isProtocolRequirement() && !hasDeclAttribute(DeclAttrKind::Optional);
 }
 
 bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
@@ -508,7 +509,7 @@ bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
 }
 
 ArrayRef<DeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
-  return llvm::makeArrayRef(DeclAttributes.data(), DeclAttributes.size());
+  return llvm::ArrayRef(DeclAttributes.data(), DeclAttributes.size());
 }
 
 bool SDKNodeDecl::hasAttributeChange(const SDKNodeDecl &Another) const {
@@ -557,19 +558,19 @@ StringRef SDKNodeTypeWitness::getWitnessedTypeName() const {
     getName()) + "." + getName()).str());
 }
 
-llvm::Optional<SDKNodeDeclType *> SDKNodeDeclType::getSuperclass() const {
+std::optional<SDKNodeDeclType *> SDKNodeDeclType::getSuperclass() const {
   if (SuperclassUsr.empty())
-    return llvm::None;
+    return std::nullopt;
   auto Descendants = getRootNode()->getDescendantsByUsr(SuperclassUsr);
   if (!Descendants.empty()) {
     return Descendants.front()->getAs<SDKNodeDeclType>();
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Finding the node through all children, including the inherited ones,
 /// whose printed name matches with the given name.
-llvm::Optional<SDKNodeDecl *>
+std::optional<SDKNodeDecl *>
 SDKNodeDeclType::lookupChildByPrintedName(StringRef Name) const {
   for (auto C : getChildren()) {
     if (C->getPrintedName() == Name)
@@ -579,7 +580,7 @@ SDKNodeDeclType::lookupChildByPrintedName(StringRef Name) const {
   if (auto Super = getSuperclass()) {
     return (*Super)->lookupChildByPrintedName(Name);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 SDKNodeType *SDKNodeDeclType::getRawValueType() const {
@@ -621,11 +622,11 @@ StringRef SDKNodeDeclAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
   }
 #include "swift/IDE/DigesterEnums.def"
 
-static llvm::Optional<KeyKind> parseKeyKind(StringRef Content) {
-  return llvm::StringSwitch<llvm::Optional<KeyKind>>(Content)
+static std::optional<KeyKind> parseKeyKind(StringRef Content) {
+  return llvm::StringSwitch<std::optional<KeyKind>>(Content)
 #define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
 #include "swift/IDE/DigesterEnums.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
@@ -648,8 +649,8 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
   static auto getAsBool = [&](llvm::yaml::Node *N) -> bool {
     auto txt = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
-    assert(txt.startswith("false") || txt.startswith("true"));
-    return txt.startswith("true");
+    assert(txt.starts_with("false") || txt.starts_with("true"));
+    return txt.starts_with("true");
   };
   SDKNodeKind Kind;
   SDKNodeInitInfo Info(Ctx);
@@ -707,33 +708,35 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
 
       case KeyKind::KK_typeAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-        std::transform(Seq->begin(), Seq->end(),
-                       std::back_inserter(Info.TypeAttrs),
-          [&](llvm::yaml::Node &N) {
-            auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
-  #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
-  #include "swift/AST/Attr.def"
-            .Default(TypeAttrKind::TAK_Count);
-            if (Result == TAK_Count)
-              Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
-                           GetScalarString(&N));
-            return Result;
-          });
+        for (auto &N : *Seq) {
+          auto Result = llvm::StringSwitch<std::optional<TypeAttrKind>>(
+                            GetScalarString(&N))
+#define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
+#include "swift/AST/TypeAttr.def"
+                            .Default(std::nullopt);
+
+          if (!Result)
+            Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
+                         GetScalarString(&N));
+          else
+            Info.TypeAttrs.push_back(*Result);
+        }
         break;
       }
       case KeyKind::KK_declAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-        std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
-          [&](llvm::yaml::Node &N) {
-            auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
-  #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
-  #include "swift/AST/Attr.def"
-            .Default(DeclAttrKind::DAK_Count);
-            if (Result == DAK_Count)
-              Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
-                           GetScalarString(&N));
-            return Result;
-          });
+        for (auto &N : *Seq) {
+          auto Result = llvm::StringSwitch<std::optional<DeclAttrKind>>(
+                            GetScalarString(&N))
+#define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::NAME)
+#include "swift/AST/DeclAttr.def"
+                            .Default(std::nullopt);
+          if (!Result)
+            Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
+                         GetScalarString(&N));
+          else
+            Info.DeclAttrs.push_back(*Result);
+        }
         break;
       }
       case KeyKind::KK_accessors: {
@@ -758,11 +761,11 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         break;
       }
       case KeyKind::KK_declKind: {
-        auto dKind = llvm::StringSwitch<llvm::Optional<DeclKind>>(
+        auto dKind = llvm::StringSwitch<std::optional<DeclKind>>(
                          GetScalarString(Pair.getValue()))
 #define DECL(X, PARENT) .Case(#X, DeclKind::X)
   #include "swift/AST/DeclNodes.def"
-                         .Default(llvm::None);
+                         .Default(std::nullopt);
         if (dKind)
           Info.DKind = *dKind;
         else
@@ -855,20 +858,20 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
 }
 
 // Return whether a decl has been moved in/out to an extension
-static llvm::Optional<bool> isFromExtensionChanged(const SDKNode &L,
-                                                   const SDKNode &R) {
+static std::optional<bool> isFromExtensionChanged(const SDKNode &L,
+                                                  const SDKNode &R) {
   assert(L.getKind() == R.getKind());
   // Version 8 starts to include whether a decl is from an extension.
   if (L.getJsonFormatVersion() + R.getJsonFormatVersion() < 2 * 8) {
-    return llvm::None;
+    return std::nullopt;
   }
   auto *Left = dyn_cast<SDKNodeDecl>(&L);
   auto *Right = dyn_cast<SDKNodeDecl>(&R);
   if (!Left) {
-    return llvm::None;
+    return std::nullopt;
   }
   if (Left->isFromExtension() == Right->isFromExtension()) {
-    return llvm::None;
+    return std::nullopt;
   } else {
     return Right->isFromExtension();
   }
@@ -1193,12 +1196,12 @@ static bool isFuncThrowing(ValueDecl *VD) {
   return false;
 }
 
-static llvm::Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
+static std::optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AF->isImportAsInstanceMember())
       return AF->getSelfIndex();
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 static ReferenceOwnership getReferenceOwnership(ValueDecl *VD) {
@@ -1220,8 +1223,15 @@ Requirement getCanonicalRequirement(Requirement &Req) {
   }
 }
 
+// Get an inverse requirement with the subject type canonicalized.
+InverseRequirement getCanonicalInverseRequirement(InverseRequirement &Req) {
+  return {Req.subject->getCanonicalType(), Req.protocol, Req.loc};
+}
+
 static
-StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs,
+StringRef printGenericSignature(SDKContext &Ctx,
+                                ArrayRef<Requirement> AllReqs,
+                                ArrayRef<InverseRequirement> Inverses,
                                 bool Canonical) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
@@ -1241,6 +1251,17 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs,
     else
       Req.print(OS, Opts);
   }
+  for (auto Inv: Inverses) {
+    if (!First) {
+      OS << ", ";
+    } else {
+      First = false;
+    }
+    if (Canonical)
+      getCanonicalInverseRequirement(Inv).print(OS, Opts);
+    else
+      Inv.print(OS, Opts);
+  }
   OS << ">";
   return Ctx.buffer(OS.str());
 }
@@ -1249,8 +1270,10 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
-    return printGenericSignature(Ctx, PD->getRequirementSignature().getRequirements(),
-                                 Canonical);
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    PD->getRequirementSignature().getRequirementsWithInverses(PD, reqs, inverses);
+    return printGenericSignature(Ctx, reqs, inverses, Canonical);
   }
   PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   if (auto *GC = D->getAsGenericContext()) {
@@ -1267,29 +1290,29 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
 
 static
 StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf, bool Canonical) {
-  return printGenericSignature(Ctx, Conf->getConditionalRequirements(), Canonical);
+  return printGenericSignature(Ctx, Conf->getConditionalRequirements(), {}, Canonical);
 }
 
-static llvm::Optional<uint8_t>
+static std::optional<uint8_t>
 getSimilarMemberCount(NominalTypeDecl *NTD, ValueDecl *VD,
                       llvm::function_ref<bool(Decl *)> Check) {
   if (!Check(VD))
-    return llvm::None;
+    return std::nullopt;
   auto Members = NTD->getMembers();
   auto End = std::find(Members.begin(), Members.end(), VD);
   assert(End != Members.end());
   return std::count_if(Members.begin(), End, Check);
 }
 
-llvm::Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
+std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
   // We don't need fixed binary order when checking API stability.
   if (!checkingABI())
-    return llvm::None;
+    return std::nullopt;
   auto *NTD = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext()->
     getAsDecl());
 
   if (!NTD || isa<ProtocolDecl>(NTD) || NTD->isResilient())
-    return llvm::None;
+    return std::nullopt;
 
   // The relative order of stored properties matters for non-resilient type.
   auto isStored = [](Decl *M) {
@@ -1378,7 +1401,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     ParamValueOwnership(Info.ValueOwnership),
     HasDefaultArg(Info.hasDefaultArgument) {
   if (isFunctionTypeNoEscape(Ty))
-    TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
+    TypeAttrs.push_back(TypeAttrKind::NoEscape);
   // If this is a nominal type, get its Usr.
   if (auto *ND = Ty->getAnyNominal()) {
     Usr = calculateUsr(Ctx, ND);
@@ -1396,9 +1419,9 @@ static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
       Results.emplace_back(DeclAttrKind::KIND_NAME);
     // These attributes may be semantically applicable to the current decl but absent from
     // the actual AST. Populating them to the nodes ensure we don't have false positives.
-    HANDLE(isObjC(), DAK_ObjC)
-    HANDLE(isFinal(), DAK_Final)
-    HANDLE(isDynamic(), DAK_Dynamic)
+    HANDLE(isObjC(), ObjC)
+    HANDLE(isFinal(), Final)
+    HANDLE(isDynamic(), Dynamic)
 #undef HANDLE
   }
   return Results;
@@ -1722,6 +1745,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (!checkingABI()) {
       switch (ACC->getAccessorKind()) {
       case AccessorKind::Get:
+      case AccessorKind::DistributedGet:
       case AccessorKind::Set:
         break;
       default:
@@ -1957,16 +1981,14 @@ void swift::ide::api::
 SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
                                               NominalTypeDecl *NTD) {
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-    PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-      if (PD != inherited && !Ctx.shouldIgnore(inherited)) {
+    for (auto *inherited : PD->getAllInheritedProtocols()) {
+      if (!Ctx.shouldIgnore(inherited)) {
         ProtocolConformanceRef Conf(inherited);
         auto ConfNode = SDKNodeInitInfo(Ctx, Conf)
             .createSDKNode(SDKNodeKind::Conformance);
         Root->addConformance(ConfNode);
       }
-
-      return TypeWalker::Action::Continue;
-    });
+    }
   } else {
     // Avoid adding the same conformance twice.
     SmallPtrSet<ProtocolConformance*, 4> Seen;
@@ -2107,10 +2129,10 @@ void SDKNodeRoot::jsonize(json::Output &out) {
     out.mapOptional(getKeyContent(Ctx, KeyKind::KK_tool_arguments).data(), ToolArgs);
 }
 
-llvm::Optional<StringRef> SDKNodeRoot::getSingleModuleName() const {
+std::optional<StringRef> SDKNodeRoot::getSingleModuleName() const {
   auto rawName = getName();
   if (rawName == "MULTI_MODULE" || rawName == "NO_MODULE")
-    return llvm::None;
+    return std::nullopt;
   return rawName;
 }
 
@@ -2225,16 +2247,20 @@ namespace json {
 template<>
 struct ScalarEnumerationTraits<TypeAttrKind> {
   static void enumeration(Output &out, TypeAttrKind &value) {
-#define TYPE_ATTR(X) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
-#include "swift/AST/Attr.def"
+// NOTE: For historical reasons. TypeAttribute uses the spelling, but
+// DeclAttribute uses the kind name.
+#define TYPE_ATTR(X, C) out.enumCase(value, #X, TypeAttrKind::C);
+#include "swift/AST/TypeAttr.def"
   }
 };
 
 template<>
 struct ScalarEnumerationTraits<DeclAttrKind> {
   static void enumeration(Output &out, DeclAttrKind &value) {
-#define DECL_ATTR(_, Name, ...) out.enumCase(value, #Name, DeclAttrKind::DAK_##Name);
-#include "swift/AST/Attr.def"
+// NOTE: For historical reasons. TypeAttribute uses the spelling, but
+// DeclAttribute uses the kind name.
+#define DECL_ATTR(_, Name, ...) out.enumCase(value, #Name, DeclAttrKind::Name);
+#include "swift/AST/DeclAttr.def"
   }
 };
 
@@ -2439,10 +2465,10 @@ class ConstExtractor: public ASTWalker {
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
       record(E, E);
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     if (handleSimpleReference(E)) {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     return Action::Continue(E);
   }
@@ -2737,7 +2763,7 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
         if (parent->getDeclKind() != DeclKind::Class) {
           break;
         }
-        if (hasDeclAttribute(DeclAttrKind::DAK_Final)) {
+        if (hasDeclAttribute(DeclAttrKind::Final)) {
           break;
         }
         auto result = isFromExtensionChanged(*this, *Right);
@@ -2769,12 +2795,11 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
 
 static StringRef getAttrName(DeclAttrKind Kind) {
   switch (Kind) {
-#define DECL_ATTR(NAME, CLASS, ...)                                           \
-  case DAK_##CLASS:                                                           \
-      return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
-#include "swift/AST/Attr.def"
-  case DAK_Count:
-    llvm_unreachable("unrecognized attribute kind.");
+#define DECL_ATTR(NAME, CLASS, ...)                                            \
+  case DeclAttrKind::CLASS:                                                    \
+    return DeclAttribute::isDeclModifier(DeclAttrKind::CLASS) ? #NAME          \
+                                                              : "@" #NAME;
+#include "swift/AST/DeclAttr.def"
   }
   llvm_unreachable("covered switch");
 }

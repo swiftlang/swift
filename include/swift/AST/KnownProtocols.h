@@ -15,6 +15,7 @@
 
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/FixedBitSet.h"
+#include "swift/AST/InvertibleProtocolKind.h"
 #include "swift/Config.h"
 
 namespace llvm {
@@ -57,18 +58,13 @@ enum : uint8_t {
 #include "swift/AST/KnownProtocols.def"
 };
 
-enum class InvertibleProtocolKind : uint8_t {
-#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) Id,
-#include "swift/AST/KnownProtocols.def"
-};
-
 using InvertibleProtocolSet = FixedBitSet<NumInvertibleProtocols,
                                           InvertibleProtocolKind>;
 
 /// Maps a KnownProtocol to the set of InvertibleProtocols, if a mapping exists.
 /// \returns None if the known protocol is not invertible.
-llvm::Optional<InvertibleProtocolKind>
-    getInvertibleProtocolKind(KnownProtocolKind kp);
+std::optional<InvertibleProtocolKind>
+getInvertibleProtocolKind(KnownProtocolKind kp);
 
 /// Returns the KnownProtocolKind corresponding to an InvertibleProtocolKind.
 KnownProtocolKind getKnownProtocolKind(InvertibleProtocolKind ip);

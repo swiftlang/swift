@@ -215,14 +215,16 @@ struct ActorReferenceResult {
   const ActorIsolation isolation;
 
 private:
-  static ActorReferenceResult forSameConcurrencyDomain(
-      ActorIsolation isolation, Options options = llvm::None);
+  static ActorReferenceResult
+  forSameConcurrencyDomain(ActorIsolation isolation,
+                           Options options = std::nullopt);
 
   static ActorReferenceResult forEntersActor(
       ActorIsolation isolation, Options options);
 
-  static ActorReferenceResult forExitsActorToNonisolated(
-      ActorIsolation isolation, Options options = llvm::None);
+  static ActorReferenceResult
+  forExitsActorToNonisolated(ActorIsolation isolation,
+                             Options options = std::nullopt);
 
 public:
   /// Determine what happens when referencing the given declaration from the
@@ -238,10 +240,10 @@ public:
   /// of a member access or a parameter passed to a function.
   static ActorReferenceResult forReference(
       ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
-      llvm::Optional<VarRefUseEnv> useKind = llvm::None,
-      llvm::Optional<ReferencedActor> actorInstance = llvm::None,
-      llvm::Optional<ActorIsolation> knownDeclIsolation = llvm::None,
-      llvm::Optional<ActorIsolation> knownContextIsolation = llvm::None,
+      std::optional<VarRefUseEnv> useKind = std::nullopt,
+      std::optional<ReferencedActor> actorInstance = std::nullopt,
+      std::optional<ActorIsolation> knownDeclIsolation = std::nullopt,
+      std::optional<ActorIsolation> knownContextIsolation = std::nullopt,
       llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
           getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation);
 
@@ -252,10 +254,12 @@ struct IsolationError {
 
   SourceLoc loc;
 
+  bool preconcurrency;
+  
   Diagnostic diag;
 
 public:
-  IsolationError(SourceLoc loc, Diagnostic diag) : loc(loc), diag(diag) {}
+  IsolationError(SourceLoc loc, bool preconcurrency, Diagnostic diag) : loc(loc), preconcurrency(preconcurrency), diag(diag) {}
 
 };
 
@@ -303,14 +307,12 @@ using FunctionCheckOptions = OptionSet<FunctionCheckKind>;
 ///
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
-    Expr *base, ConcreteDeclRef declRef,
-    const DeclContext *fromDC, SourceLoc refLoc,
-    SendableCheckReason refKind,
-    llvm::Optional<ActorIsolation> knownIsolation = llvm::None,
-    FunctionCheckOptions funcCheckOptions =
-        (FunctionCheckOptions() |
-         FunctionCheckKind::Params |
-         FunctionCheckKind::Results),
+    Expr *base, ConcreteDeclRef declRef, const DeclContext *fromDC,
+    SourceLoc refLoc, SendableCheckReason refKind,
+    std::optional<ActorIsolation> knownIsolation = std::nullopt,
+    FunctionCheckOptions funcCheckOptions = (FunctionCheckOptions() |
+                                             FunctionCheckKind::Params |
+                                             FunctionCheckKind::Results),
     SourceLoc diagnoseLoc = SourceLoc());
 
 /// Produce a diagnostic for a missing conformance to Sendable.
@@ -323,6 +325,14 @@ void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
 
 /// Warn about deprecated `Executor.enqueue` implementations.
 void tryDiagnoseExecutorConformance(ASTContext &C, const NominalTypeDecl *nominal, ProtocolDecl *proto);
+
+/// Whether to suppress deprecation diagnostics for \p decl in \p declContext
+/// because \p decl is a deprecated decl from the `_Concurrency` module and is
+/// being referenced from the implementation of the `_Concurrency` module. This
+/// prevents unaddressable warnings in the standard library build. Ideally, a
+/// language feature would obviate the need for this.
+bool shouldIgnoreDeprecationOfConcurrencyDecl(const Decl *decl,
+                                              DeclContext *declContext);
 
 // Get a concrete reference to a declaration
 ConcreteDeclRef getDeclRefInContext(ValueDecl *value);
@@ -361,11 +371,11 @@ static inline bool isImplicitSendableCheck(SendableCheck check) {
 /// Describes the context in which a \c Sendable check occurs.
 struct SendableCheckContext {
   const DeclContext * const fromDC;
-  const llvm::Optional<SendableCheck> conformanceCheck;
+  const std::optional<SendableCheck> conformanceCheck;
 
   SendableCheckContext(
       const DeclContext *fromDC,
-      llvm::Optional<SendableCheck> conformanceCheck = llvm::None)
+      std::optional<SendableCheck> conformanceCheck = std::nullopt)
       : fromDC(fromDC), conformanceCheck(conformanceCheck) {}
 
   /// Determine the default diagnostic behavior for a missing/unavailable
@@ -378,6 +388,8 @@ struct SendableCheckContext {
   /// Determine the diagnostic behavior when referencing the given nominal
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
+
+  std::optional<DiagnosticBehavior> preconcurrencyBehavior(Decl *decl) const;
 
   /// Whether we are in an explicit conformance to Sendable.
   bool isExplicitSendableConformance() const;
@@ -426,13 +438,15 @@ bool diagnoseNonSendableTypes(
     return diagnoseNonSendableTypes(
         type, fromContext, derivedConformance, typeLoc,
         [&](Type specificType, DiagnosticBehavior behavior) {
+          auto preconcurrency =
+              fromContext.preconcurrencyBehavior(type->getAnyNominal());
 
-          if (behavior != DiagnosticBehavior::Ignore) {
-            ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-                .limitBehavior(behavior);
-          }
+          ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
+              .limitBehaviorUntilSwiftVersion(behavior, 6)
+              .limitBehaviorIf(preconcurrency);
 
-          return false;
+          return (behavior == DiagnosticBehavior::Ignore ||
+                  preconcurrency == DiagnosticBehavior::Ignore);
         });
 }
 
@@ -480,8 +494,8 @@ void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
 
 /// Given a set of custom attributes, pick out the global actor attributes
 /// and perform any necessary resolution and diagnostics, returning the
-/// global actor attribute and type it refers to (or \c llvm::None).
-llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+/// global actor attribute and type it refers to (or \c std::nullopt).
+std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
                            ArrayRef<CustomAttr *> attrs);
 
@@ -516,7 +530,7 @@ enum class DispatchQueueOperation {
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
-llvm::Optional<DispatchQueueOperation>
+std::optional<DispatchQueueOperation>
 isDispatchQueueOperationName(StringRef name);
 
 /// Check the correctness of the given Sendable conformance.
@@ -548,7 +562,8 @@ bool isThrowsDecl(ConcreteDeclRef declRef);
 /// for the given expression.
 VarDecl *getReferencedParamOrCapture(
     Expr *expr,
-    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue);
+    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue,
+    llvm::function_ref<VarDecl *()> getCurrentIsolatedVar);
 
 /// Determine whether the given value can be accessed across actors
 /// without from normal synchronous code.
@@ -560,9 +575,8 @@ VarDecl *getReferencedParamOrCapture(
 /// violations should be downgraded to warnings prior to Swift 6.
 bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
-    const DeclContext *fromDC,
-    ActorReferenceResult::Options &options,
-    llvm::Optional<ReferencedActor> actorInstance = llvm::None);
+    const DeclContext *fromDC, ActorReferenceResult::Options &options,
+    std::optional<ReferencedActor> actorInstance = std::nullopt);
 
 /// Determine whether the given value can be accessed across actors
 /// without from normal synchronous code.
@@ -573,7 +587,7 @@ bool isAccessibleAcrossActors(
 bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
     const DeclContext *fromDC,
-    llvm::Optional<ReferencedActor> actorInstance = llvm::None);
+    std::optional<ReferencedActor> actorInstance = std::nullopt);
 
 /// Determines if the 'let' can be read from anywhere within the given module,
 /// regardless of the isolation or async-ness of the context in which
@@ -631,7 +645,7 @@ struct DenseMapInfo<swift::ReferencedActor::Kind> {
     }
 
     static unsigned getHashValue(RefActor Val) {
-     return static_cast<unsigned>(Val.getKind());
+     return hash_value(Val);
     }
 
     static bool isEqual(const RefActor &LHS, const RefActor &RHS) {

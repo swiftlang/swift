@@ -91,13 +91,17 @@ public:
   ManagedValue createPartialApply(SILLocation loc, SILValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention);
+                                  ParameterConvention calleeConvention,
+                                  SILFunctionTypeIsolation resultIsolation =
+                                    SILFunctionTypeIsolation::Unknown);
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention) {
+                                  ParameterConvention calleeConvention,
+                                  SILFunctionTypeIsolation resultIsolation =
+                                    SILFunctionTypeIsolation::Unknown) {
     return createPartialApply(loc, fn.getValue(), subs, args,
-                              calleeConvention);
+                              calleeConvention, resultIsolation);
   }
 
   using SILBuilder::createStructExtract;
@@ -285,7 +289,7 @@ public:
   /// ValueDecl * can implicitly convert to SILLocation. The optional forces the
   /// user to be explicit that they want to use this API.
   ManagedValue createInputFunctionArgument(SILType type,
-                                           llvm::Optional<SILLocation> loc);
+                                           std::optional<SILLocation> loc);
 
   using SILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,
@@ -461,15 +465,26 @@ public:
 
   using SILBuilder::createMarkDependence;
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
-                                    ManagedValue base, bool isNonEscaping);
+                                    ManagedValue base,
+                                    MarkDependenceKind dependencekind);
+
+  ManagedValue createOpaqueBorrowBeginAccess(SILLocation loc,
+                                             ManagedValue address);
+  ManagedValue createOpaqueConsumeBeginAccess(SILLocation loc,
+                                              ManagedValue address);
 
   using SILBuilder::createBeginBorrow;
-  ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
-                                 bool isLexical = false);
+  ManagedValue createBeginBorrow(
+      SILLocation loc, ManagedValue value, IsLexical_t isLexical = IsNotLexical,
+      BeginBorrowInst::IsFixed_t isFixed = BeginBorrowInst::IsNotFixed);
+
+  ManagedValue createFormalAccessBeginBorrow(
+      SILLocation loc, ManagedValue value, IsLexical_t isLexical = IsNotLexical,
+      BeginBorrowInst::IsFixed_t isFixed = BeginBorrowInst::IsNotFixed);
 
   using SILBuilder::createMoveValue;
   ManagedValue createMoveValue(SILLocation loc, ManagedValue value,
-                               bool isLexical = false);
+                               IsLexical_t isLexical = IsNotLexical);
 
   using SILBuilder::createOwnedMoveOnlyWrapperToCopyableValue;
   ManagedValue createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,
@@ -492,7 +507,9 @@ public:
   using SILBuilder::createMarkUnresolvedNonCopyableValueInst;
   ManagedValue createMarkUnresolvedNonCopyableValueInst(
       SILLocation loc, ManagedValue value,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind);
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+      MarkUnresolvedNonCopyableValueInst::IsStrict_t strict
+        = MarkUnresolvedNonCopyableValueInst::IsNotStrict);
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);

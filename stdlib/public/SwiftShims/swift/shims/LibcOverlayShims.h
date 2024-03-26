@@ -59,7 +59,7 @@ static inline char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron() {
   return environ;
 }
 #elif defined(__APPLE__)
-static inline char * _Nullable *_swift_stdlib_getEnviron() {
+static inline char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron() {
   extern char * _Nullable **_NSGetEnviron(void);
   return *_NSGetEnviron();
 }

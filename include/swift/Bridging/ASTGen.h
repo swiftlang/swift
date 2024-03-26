@@ -68,12 +68,18 @@ void *_Nonnull swift_ASTGen_resolveExecutableMacro(
     void *_Nonnull opaquePluginHandle);
 void swift_ASTGen_destroyExecutableMacro(void *_Nonnull macro);
 
+bool swift_ASTGen_checkDefaultArgumentMacroExpression(
+    void *_Nonnull diagEngine, void *_Nonnull sourceFile,
+    const void *_Nonnull macroSourceLocation);
+
 ptrdiff_t swift_ASTGen_checkMacroDefinition(
     void *_Nonnull diagEngine, void *_Nonnull sourceFile,
     const void *_Nonnull macroSourceLocation,
     BridgedStringRef *_Nonnull expansionSourceOutPtr,
     ptrdiff_t *_Nullable *_Nonnull replacementsPtr,
-    ptrdiff_t *_Nonnull numReplacements);
+    ptrdiff_t *_Nonnull numReplacements,
+    ptrdiff_t *_Nullable *_Nonnull genericReplacementsPtr,
+    ptrdiff_t *_Nonnull numGenericReplacements);
 void swift_ASTGen_freeExpansionReplacements(
     ptrdiff_t *_Nullable replacementsPtr, ptrdiff_t numReplacements);
 

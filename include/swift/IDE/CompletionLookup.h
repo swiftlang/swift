@@ -166,7 +166,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   /// Innermost method that the code completion point is in.
   const AbstractFunctionDecl *CurrentMethod = nullptr;
 
-  llvm::Optional<SemanticContextKind> ForcedSemanticContext = llvm::None;
+  std::optional<SemanticContextKind> ForcedSemanticContext = std::nullopt;
   bool IsUnresolvedMember = false;
 
 public:
@@ -234,11 +234,9 @@ public:
   void setIsStaticMetatype(bool value) { IsStaticMetatype = value; }
 
   void setExpectedTypes(
-      ArrayRef<Type> Types, bool isImplicitSingleExpressionReturn,
-      bool preferNonVoid = false,
+      ArrayRef<Type> Types, bool isImpliedResult, bool preferNonVoid = false,
       OptionSet<CustomAttributeKind> expectedCustomAttributeKinds = {}) {
-    expectedTypeContext.setIsImplicitSingleExpressionReturn(
-        isImplicitSingleExpressionReturn);
+    expectedTypeContext.setIsImpliedResult(isImpliedResult);
     expectedTypeContext.setPreferNonVoid(preferNonVoid);
     expectedTypeContext.setPossibleTypes(Types);
     expectedTypeContext.setExpectedCustomAttributeKinds(
@@ -269,8 +267,8 @@ public:
     if (expectedTypeContext.empty() &&
         !expectedTypeContext.getPreferNonVoid()) {
       return CodeCompletionContext::TypeContextKind::None;
-    } else if (expectedTypeContext.isImplicitSingleExpressionReturn()) {
-      return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
+    } else if (expectedTypeContext.isImpliedResult()) {
+      return CodeCompletionContext::TypeContextKind::Implied;
     } else {
       return CodeCompletionContext::TypeContextKind::Required;
     }
@@ -306,7 +304,7 @@ public:
   void includeInstanceMembers() { IncludeInstanceMembers = true; }
 
   bool isHiddenModuleName(Identifier Name) {
-    return (Name.str().startswith("_") || Name == Ctx.SwiftShimsModuleName ||
+    return (Name.hasUnderscoredNaming() || Name == Ctx.SwiftShimsModuleName ||
             Name.str() == SWIFT_ONONE_SUPPORT);
   }
 
@@ -318,7 +316,7 @@ public:
 
   void
   addModuleName(ModuleDecl *MD,
-                llvm::Optional<ContextualNotRecommendedReason> R = llvm::None);
+                std::optional<ContextualNotRecommendedReason> R = std::nullopt);
 
   void addImportModuleNames();
 
@@ -362,7 +360,7 @@ public:
 
   void analyzeActorIsolation(
       const ValueDecl *VD, Type T, bool &implicitlyAsync,
-      llvm::Optional<ContextualNotRecommendedReason> &NotRecommended);
+      std::optional<ContextualNotRecommendedReason> &NotRecommended);
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo);
@@ -393,7 +391,7 @@ public:
                                    const AbstractFunctionDecl *AFD,
                                    bool forceAsync = false);
 
-  void addPoundAvailable(llvm::Optional<StmtKind> ParentKind);
+  void addPoundAvailable(std::optional<StmtKind> ParentKind);
 
   void addPoundSelector(bool needPound);
 
@@ -403,11 +401,11 @@ public:
 
   void addSubscriptCallPattern(
       const AnyFunctionType *AFT, const SubscriptDecl *SD,
-      const llvm::Optional<SemanticContextKind> SemanticContext = llvm::None);
+      const std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   void addFunctionCallPattern(
       const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
-      const llvm::Optional<SemanticContextKind> SemanticContext = llvm::None);
+      const std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   bool isImplicitlyCurriedInstanceMethod(const AbstractFunctionDecl *FD);
 
@@ -416,8 +414,8 @@ public:
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
                           DynamicLookupInfo dynamicLookupInfo,
-                          llvm::Optional<Type> BaseType,
-                          llvm::Optional<Type> Result, bool IsOnType = true,
+                          std::optional<Type> BaseType,
+                          std::optional<Type> Result, bool IsOnType = true,
                           Identifier addName = Identifier());
 
   void addConstructorCallsForType(Type type, Identifier name,
@@ -510,7 +508,7 @@ public:
 
   bool tryFunctionCallCompletions(
       Type ExprType, const ValueDecl *VD,
-      llvm::Optional<SemanticContextKind> SemanticContext = llvm::None);
+      std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   bool tryModuleCompletions(Type ExprType, CodeCompletionFilter Filter);
 
@@ -593,10 +591,9 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
-                                    llvm::Optional<DeclKind> DK,
-                                    StringRef Name);
+                                    std::optional<DeclKind> DK, StringRef Name);
 
-  void getAttributeDeclCompletions(bool IsInSil, llvm::Optional<DeclKind> DK);
+  void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
   void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
                                         int ParamIndex, bool HasLabel);
@@ -628,7 +625,7 @@ public:
 
   void getOptionalBindingCompletions(SourceLoc Loc);
 
-  void getWithoutConstraintTypes();
+  void addWithoutConstraintTypes();
 };
 
 } // end namespace ide

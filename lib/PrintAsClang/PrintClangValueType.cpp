@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -179,22 +180,22 @@ void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl, llvm::function_ref<void(void)> bodyPrinter,
     DeclAndTypePrinter &declAndTypePrinter) {
   // FIXME: Add support for generic structs.
-  llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
-  llvm::Optional<CanGenericSignature> genericSignature;
+  std::optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
+  GenericSignature genericSignature;
   auto printGenericSignature = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignature(*genericSignature);
+    ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
   };
   auto printGenericParamRefs = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignatureParams(*genericSignature);
+    ClangSyntaxPrinter(os).printGenericSignatureParams(genericSignature);
   };
   if (typeDecl->isGeneric()) {
-    genericSignature = typeDecl->getGenericSignature().getCanonicalSignature();
-    // FIXME: Support generic requirements.
-    assert(genericSignature->getRequirements().empty());
+    genericSignature = typeDecl->getGenericSignature();
+    assert(cxx_translation::isExposableToCxx(genericSignature));
+
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.
   } else if (!typeDecl->isResilient()) {
@@ -275,7 +276,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "public:\n";
   if (genericSignature)
     ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
-        *genericSignature);
+        genericSignature);
 
   // Print out the destructor.
   os << "  ";
@@ -457,7 +458,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "public:\n";
         if (genericSignature)
           ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
-              *genericSignature);
+              genericSignature);
 
         os << "  static ";
         ClangSyntaxPrinter(os).printInlineForThunk();

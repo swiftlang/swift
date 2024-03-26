@@ -41,6 +41,7 @@ class ImplicitModuleInterfaceBuilder {
   DiagnosticEngine *diags;
   InterfaceSubContextDelegate &subASTDelegate;
   const StringRef interfacePath;
+  const StringRef sdkPath;
   const StringRef moduleName;
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
@@ -84,7 +85,8 @@ private:
 public:
   ImplicitModuleInterfaceBuilder(
       SourceManager &sourceMgr, DiagnosticEngine *diags,
-      InterfaceSubContextDelegate &subASTDelegate, StringRef interfacePath,
+      InterfaceSubContextDelegate &subASTDelegate,
+      StringRef interfacePath, StringRef sdkPath,
       StringRef moduleName, StringRef moduleCachePath,
       StringRef backupInterfaceDir, StringRef prebuiltCachePath,
       StringRef ABIDescriptorPath, bool disableInterfaceFileLock = false,
@@ -92,7 +94,7 @@ public:
       SourceLoc diagnosticLoc = SourceLoc(),
       DependencyTracker *tracker = nullptr)
       : sourceMgr(sourceMgr), diags(diags), subASTDelegate(subASTDelegate),
-        interfacePath(interfacePath), moduleName(moduleName),
+        interfacePath(interfacePath), sdkPath(sdkPath), moduleName(moduleName),
         moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
         backupInterfaceDir(backupInterfaceDir),
         ABIDescriptorPath(ABIDescriptorPath),

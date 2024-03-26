@@ -29,11 +29,11 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #include <type_traits>
 
@@ -79,8 +79,6 @@ namespace swift {
   class Initializer;
   class ClassDecl;
   class SerializedAbstractClosureExpr;
-  class SerializedPatternBindingInitializer;
-  class SerializedDefaultArgumentInitializer;
   class SerializedTopLevelCodeDecl;
   class StructDecl;
   class AccessorDecl;
@@ -99,7 +97,8 @@ enum class DeclContextKind : unsigned {
   SubscriptDecl,
   EnumElementDecl,
   AbstractFunctionDecl,
-  SerializedLocal,
+  SerializedAbstractClosure,
+  SerializedTopLevelCodeDecl,
   MacroDecl,
   Last_LocalDeclContextKind = MacroDecl,
   Package,
@@ -108,16 +107,6 @@ enum class DeclContextKind : unsigned {
   GenericTypeDecl,
   ExtensionDecl,
   Last_DeclContextKind = ExtensionDecl
-};
-
-/// Kinds of DeclContexts after deserialization.
-///
-/// \see SerializedLocalDeclContext.
-enum class LocalDeclContextKind : uint8_t {
-  AbstractClosure,
-  PatternBindingInitializer,
-  DefaultArgumentInitializer,
-  TopLevelCodeDecl
 };
 
 /// Describes the kind of a particular conformance.
@@ -162,6 +151,8 @@ enum class ConformanceEntryKind : unsigned {
 
   /// Implied by an explicitly-specified conformance.
   Implied,
+
+  Last_Kind = Implied
 };
 
 /// Describes the kind of conformance lookup desired.
@@ -253,10 +244,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
     FileUnit,
     Package,
     Initializer,
-    SerializedLocal,
+    SerializedAbstractClosure,
+    SerializedTopLevelCodeDecl,
     // If you add a new AST hierarchies, then update the static_assert() below.
   };
-  static_assert(unsigned(ASTHierarchy::SerializedLocal) <
+  static_assert(unsigned(ASTHierarchy::SerializedTopLevelCodeDecl) <
                 (1 << DeclContextAlignInBits),
                 "ASTHierarchy exceeds bits available");
 
@@ -285,8 +277,10 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
       return ASTHierarchy::Expr;
     case DeclContextKind::Initializer:
       return ASTHierarchy::Initializer;
-    case DeclContextKind::SerializedLocal:
-      return ASTHierarchy::SerializedLocal;
+    case DeclContextKind::SerializedAbstractClosure:
+      return ASTHierarchy::SerializedAbstractClosure;
+    case DeclContextKind::SerializedTopLevelCodeDecl:
+      return ASTHierarchy::SerializedTopLevelCodeDecl;
     case DeclContextKind::FileUnit:
       return ASTHierarchy::FileUnit;
     case DeclContextKind::Package:
@@ -708,31 +702,6 @@ public:
   static bool classof(const Decl *D);
 };
 
-/// SerializedLocalDeclContext - the base class for DeclContexts that were
-/// serialized to preserve AST structure and accurate mangling after
-/// deserialization.
-class SerializedLocalDeclContext : public DeclContext {
-private:
-  unsigned LocalKind : 3;
-
-protected:
-  unsigned SpareBits : 29;
-
-public:
-  SerializedLocalDeclContext(LocalDeclContextKind LocalKind,
-                             DeclContext *Parent)
-    : DeclContext(DeclContextKind::SerializedLocal, Parent),
-      LocalKind(static_cast<unsigned>(LocalKind)) {}
-
-  LocalDeclContextKind getLocalDeclContextKind() const {
-    return static_cast<LocalDeclContextKind>(LocalKind);
-  }
-
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::SerializedLocal;
-  }
-};
-
 /// An iterator that walks through a list of declarations stored
 /// within some iterable declaration context.
 class DeclIterator {
@@ -980,7 +949,7 @@ public:
 
   /// Return a hash of all tokens in the body for dependency analysis, if
   /// available.
-  llvm::Optional<Fingerprint> getBodyFingerprint() const;
+  std::optional<Fingerprint> getBodyFingerprint() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

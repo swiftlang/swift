@@ -72,8 +72,6 @@ class RewriteSystem final {
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
 
-  unsigned FirstLocalRule = 0;
-
   /// A prefix trie of rule left hand sides to optimize lookup. The value
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
@@ -89,6 +87,8 @@ class RewriteSystem final {
   llvm::DenseSet<const ProtocolDecl *> ReferencedProtocols;
 
   DebugOptions Debug;
+
+  unsigned FirstLocalRule = 0;
 
   /// Whether we've initialized the rewrite system with a call to initialize().
   unsigned Initialized : 1;
@@ -114,6 +114,10 @@ class RewriteSystem final {
   /// completion non-termination heuristic.
   unsigned LongestInitialRule : 16;
 
+  /// The most deeply nested concrete type appearing in an initial rule, used
+  /// for the MaxConcreteNesting completion non-termination heuristic.
+  unsigned DeepestInitialRule : 16;
+
 public:
   explicit RewriteSystem(RewriteContext &ctx);
   ~RewriteSystem();
@@ -134,14 +138,16 @@ public:
 
   void initialize(
       bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
-      std::vector<StructuralRequirement> &&writtenRequirements,
       std::vector<Rule> &&importedRules,
       std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-      std::vector<std::tuple<MutableTerm, MutableTerm,
-                             llvm::Optional<unsigned>>> &&requirementRules);
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   unsigned getLongestInitialRule() const {
     return LongestInitialRule;
+  }
+
+  unsigned getDeepestInitialRule() const {
+    return DeepestInitialRule;
   }
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
@@ -183,20 +189,18 @@ public:
 
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                       llvm::Optional<unsigned> requirementID);
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs);
 
   void addRules(
       std::vector<Rule> &&importedRules,
       std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-      std::vector<std::tuple<MutableTerm, MutableTerm,
-                             llvm::Optional<unsigned>>> &&requirementRules);
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  llvm::Optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
-                                                 const PropertyMap *map,
-                                                 RewritePath *path = nullptr);
+  std::optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
+                                                const PropertyMap *map,
+                                                RewritePath *path = nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -208,8 +212,7 @@ public:
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
   std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxRuleCount,
-                             unsigned maxRuleLength);
+  performKnuthBendix(unsigned maxRuleCount, unsigned maxRuleLength);
 
   void simplifyLeftHandSides();
 
@@ -229,8 +232,6 @@ public:
   /// Diagnostics
   ///
   //////////////////////////////////////////////////////////////////////////////
-
-  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
   void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                                 SourceLoc signatureLoc,
@@ -310,8 +311,8 @@ public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
   bool computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
-                             llvm::Optional<unsigned> &lhsDifferenceID,
-                             llvm::Optional<unsigned> &rhsDifferenceID);
+                             std::optional<unsigned> &lhsDifferenceID,
+                             std::optional<unsigned> &rhsDifferenceID);
 
   const TypeDifference &getTypeDifference(unsigned index) const;
 
@@ -379,7 +380,7 @@ private:
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
 
-  llvm::Optional<std::pair<unsigned, unsigned>>
+  std::optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);

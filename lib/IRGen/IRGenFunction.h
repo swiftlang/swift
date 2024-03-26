@@ -74,17 +74,19 @@ public:
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
+  bool isPerformanceConstraint;
 
-  llvm::Function *CurFn;
+  llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                bool isPerformanceConstraint = false,
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
-                llvm::Optional<SILLocation> DbgLoc = llvm::None);
+                std::optional<SILLocation> DbgLoc = std::nullopt);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
@@ -251,6 +253,8 @@ public:
   /// Whether metadata/wtable packs allocated on the stack must be eagerly
   /// heapified.
   bool canStackPromotePackMetadata() const;
+
+  bool outliningCanCallValueWitnesses() const;
 
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }
@@ -788,6 +792,9 @@ public:
   llvm::Value *getDynamicSelfMetadata();
   void setDynamicSelfMetadata(CanType selfBaseTy, bool selfIsExact,
                               llvm::Value *value, DynamicSelfKind kind);
+#ifndef NDEBUG
+  LocalTypeDataCache const *getLocalTypeData() { return LocalTypeData; }
+#endif
 
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();

@@ -45,8 +45,8 @@ public:
   /// the least-significant chunk.  The value is sign-extended to fill the
   /// final chunk.
   llvm::ArrayRef<UnsignedChunk> getData() const {
-    return llvm::makeArrayRef(Data, (Flags.getBitWidth() + BitsPerChunk - 1) /
-                                        BitsPerChunk);
+    return llvm::ArrayRef(Data, (Flags.getBitWidth() + BitsPerChunk - 1) /
+                                    BitsPerChunk);
   }
 
   /// The flags for this value.

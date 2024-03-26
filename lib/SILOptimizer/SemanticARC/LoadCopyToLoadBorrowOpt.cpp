@@ -56,7 +56,7 @@ class StorageGuaranteesLoadVisitor
   // The current address being visited.
   SILValue currentAddress;
 
-  llvm::Optional<bool> isWritten;
+  std::optional<bool> isWritten;
 
 public:
   StorageGuaranteesLoadVisitor(Context &context, LoadInst *load,
@@ -124,7 +124,7 @@ public:
     // If we have an inout parameter that isn't ever actually written to, return
     // false.
     if (!arg->isIndirectResult() &&
-        arg->getKnownParameterInfo().isIndirectMutating()) {
+        arg->getArgumentConvention().isExclusiveIndirectParameter()) {
       auto wellBehavedWrites = ctx.addressToExhaustiveWriteListCache.get(arg);
       if (!wellBehavedWrites.has_value()) {
         return answer(true);
@@ -386,9 +386,9 @@ bool SemanticARCOptVisitor::performLoadCopyToLoadBorrowOptimization(
   SILValue replacement = lbi;
   if (original != li) {
     getCallbacks().eraseAndRAUWSingleValueInst(li, lbi);
-    auto *bbi =
-        SILBuilderWithScope(cast<SingleValueInstruction>(original))
-            .createBeginBorrow(li->getLoc(), lbi, original->isLexical());
+    auto *bbi = SILBuilderWithScope(cast<SingleValueInstruction>(original))
+                    .createBeginBorrow(li->getLoc(), lbi,
+                                       IsLexical_t(original->isLexical()));
     replacement = bbi;
     lr.insertEndBorrowsAtDestroys(bbi, getDeadEndBlocks(),
                                   ctx.lifetimeFrontier);

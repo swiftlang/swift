@@ -144,14 +144,14 @@ protected:
 
   /// Retrieve overload choice resolved for a given locator
   /// by the constraint solver.
-  llvm::Optional<SelectedOverload>
+  std::optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return S.getOverloadChoiceIfAvailable(locator);
   }
 
   /// Retrieve overload choice resolved for a callee for the anchor
   /// of a given locator.
-  llvm::Optional<SelectedOverload>
+  std::optional<SelectedOverload>
   getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
   }
@@ -176,7 +176,7 @@ protected:
     return S.getConstraintLocator(baseLocator, element);
   }
 
-  llvm::Optional<FunctionArgApplyInfo>
+  std::optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     return S.getFunctionArgApplyInfo(locator);
   }
@@ -449,7 +449,9 @@ class SameShapeExpansionFailure final : public FailureDiagnostic {
 public:
   SameShapeExpansionFailure(const Solution &solution, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), lhs(lhs), rhs(rhs) {}
+      : FailureDiagnostic(solution, locator),
+        lhs(resolveType(lhs)),
+        rhs(resolveType(rhs)) {}
 
   bool diagnoseAsError() override;
 };
@@ -610,10 +612,10 @@ private:
   /// \returns The base subexpression that looks immutable (or that can't be
   /// analyzed any further) along with an OverloadChoice extracted from it if we
   /// could.
-  std::pair<Expr *, llvm::Optional<OverloadChoice>>
+  std::pair<Expr *, std::optional<OverloadChoice>>
   resolveImmutableBase(Expr *expr) const;
 
-  std::pair<Expr *, llvm::Optional<OverloadChoice>>
+  std::pair<Expr *, std::optional<OverloadChoice>>
   resolveImmutableBase(const Expr *expr) const {
     return resolveImmutableBase(const_cast<Expr *>(expr));
   }
@@ -623,7 +625,7 @@ private:
 
   /// Retrieve an member reference associated with given member
   /// looking through dynamic member lookup on the way.
-  llvm::Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
+  std::optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure
@@ -732,7 +734,7 @@ private:
 protected:
   ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
 
-  static llvm::Optional<Diag<Type, Type>>
+  static std::optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 
 protected:
@@ -896,7 +898,7 @@ private:
 
   void emitNoteForMismatch(int mismatchPosition);
 
-  llvm::Optional<Diag<Type, Type>>
+  std::optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
@@ -1513,7 +1515,7 @@ private:
 
   /// Gather information associated with expression that represents
   /// a call - function and argument list.
-  llvm::Optional<std::pair<Expr *, ArgumentList *>>
+  std::optional<std::pair<Expr *, ArgumentList *>>
   getCallInfo(ASTNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
@@ -2118,9 +2120,9 @@ public:
   /// or now deprecated `init(initialValue:)`.
   bool diagnosePropertyWrapperMismatch() const;
 
-  /// Tailored diagnostics for argument mismatches associated with trailing
+  /// Tailored diagnostics for argument mismatches associated with (trailing)
   /// closures being passed to non-closure parameters.
-  bool diagnoseTrailingClosureMismatch() const;
+  bool diagnoseClosureMismatch() const;
 
   /// Tailored key path as function diagnostics for argument mismatches where
   /// argument is a keypath expression that has a root type that matches a
@@ -2341,6 +2343,15 @@ public:
   bool diagnoseAsError() override;
 };
 
+class UnableToInferGenericPackElementType final : public FailureDiagnostic {
+public:
+  UnableToInferGenericPackElementType(const Solution &solution,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
 public:
   UnableToInferProtocolLiteralType(const Solution &solution,
@@ -2453,7 +2464,7 @@ public:
   bool diagnoseAsNote() override;
 
 protected:
-  llvm::Optional<Diag<Type, Type>> getDiagnostic() const;
+  std::optional<Diag<Type, Type>> getDiagnostic() const;
 
   virtual void fixIt(InFlightDiagnostic &diagnostic) const = 0;
 };

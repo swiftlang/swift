@@ -77,7 +77,7 @@ import MyModule
 import #^IMPORT^#;
 // IMPORT-DAG: Decl[Module]/None/NotRecommended:   MyModule[#Module#]; name=MyModule; diagnostics=warning:module 'MyModule' is already imported{{$}}
 // IMPORT-DAG: Decl[Module]/None/NotRecommended:   OtherModule[#Module#]; name=OtherModule; diagnostics=note:module 'OtherModule' is already imported via another module import{{$}}
-// IMPORT-DAG: Decl[Module]/None/NotRecommended/IsSystem:   Swift[#Module#]; name=Swift; diagnostics=warning:module 'Swift' is already imported{{$}}
+// IMPORT-DAG: Decl[Module]/None/NotRecommended:   Swift[#Module#]; name=Swift; diagnostics=warning:module 'Swift' is already imported{{$}}
 
 func test(foo: Foo) {
   foo.#^MEMBER^#

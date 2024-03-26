@@ -1,3 +1,4 @@
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: struct LoadableIntWrapper {
@@ -281,3 +282,7 @@
 // CHECK-NEXT:   func getValue() -> Int32
 // CHECK-NEXT:   mutating func setValue(_ v: Int32)
 // CHECK-NEXT: }
+
+// CHECK: struct HasOperatorCallWithDefaultArg {
+// CHECK:   func callAsFunction(_ x: Int32 = cxxDefaultArg) -> Int32
+// CHECK: }

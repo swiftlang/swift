@@ -269,7 +269,7 @@ private:
     DeinitBarriers &result;
     Dataflow::Result reachability;
     Dataflow dataflow;
-    llvm::Optional<SmallVector<SILBasicBlock *, 16>> cachedRoots;
+    std::optional<SmallVector<SILBasicBlock *, 16>> cachedRoots;
     bool recordDeadUsers = false;
 
   public:
@@ -560,7 +560,6 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
 bool HoistDestroys::foldBarrier(SILInstruction *barrier,
                                 const AccessStorage &storage,
                                 const DeinitBarriers &deinitBarriers) {
-
   // The load [copy]s which will be folded into load [take]s if folding is
   // possible.
   llvm::SmallVector<LoadInst *, 4> loads;
@@ -592,12 +591,19 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
   // it.
   SmallPtrSet<AccessPath::PathNode, 16> trivialLeaves;
 
-  visitProductLeafAccessPathNodes(storageRoot, typeExpansionContext, module,
-                                  [&](AccessPath::PathNode node, SILType ty) {
-                                    if (ty.isTrivial(*function))
-                                      return;
-                                    leaves.insert(node);
-                                  });
+  bool succeeded = visitProductLeafAccessPathNodes(
+      storageRoot, typeExpansionContext, module,
+      [&](AccessPath::PathNode node, SILType ty) {
+        if (ty.isTrivial(*function))
+          return;
+        leaves.insert(node);
+      });
+  if (!succeeded) {
+    // [invalid_access_path] The access path to storageRoot isn't understood.
+    // It can't be determined whether all of its leaves have been visited, so
+    // foldability can't be determined. Bail.
+    return false;
+  }
 
   for (auto *instruction = barrier; instruction != nullptr;
        instruction = instruction->getPreviousInstruction()) {
@@ -746,7 +752,7 @@ bool HoistDestroys::checkFoldingBarrier(
     // leaves of the root storage which we're wating to see.
     bool alreadySawLeaf = false;
     bool alreadySawTrivialSubleaf = false;
-    visitProductLeafAccessPathNodes(
+    auto succeeded = visitProductLeafAccessPathNodes(
         address, typeExpansionContext, module,
         [&](AccessPath::PathNode node, SILType ty) {
           if (ty.isTrivial(*function)) {
@@ -757,6 +763,11 @@ bool HoistDestroys::checkFoldingBarrier(
           bool erased = leaves.erase(node);
           alreadySawLeaf = alreadySawLeaf || !erased;
         });
+    (void)succeeded;
+    // [invalid_access_path] The access path to storageRoot was understood, and
+    // address has identical storage to its storage.  The access path to address
+    // must be valid.
+    assert(succeeded);
     if (alreadySawLeaf) {
       // We saw this non-trivial product leaf already.  That means there are
       // multiple load [copy]s or copy_addrs of at least one product leaf

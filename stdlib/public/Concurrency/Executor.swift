@@ -113,15 +113,15 @@ public protocol SerialExecutor: Executor {
 /// requirements.
 ///
 /// By setting a task executor preference, either with a
-/// ``_withTaskExecutor(_:operation:)``, creating a task with a preference
-/// (`Task(_on:)`, or `group.addTask(on:)`), the task and all of its child
+/// ``withTaskExecutorPreference(_:operation:)``, creating a task with a preference
+/// (`Task(executorPreference:)`, or `group.addTask(executorPreference:)`), the task and all of its child
 /// tasks (unless a new preference is set) will be preferring to execute on
 /// the provided task executor.
 ///
 /// Unstructured tasks do not inherit the task executor.
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
-public protocol _TaskExecutor: Executor {
+@available(SwiftStdlib 6.0, *)
+public protocol TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
   // get a redundant witness-table entry for it.  This allows us to
   // avoid drilling down to the base conformance just for the basic
@@ -152,8 +152,8 @@ public protocol _TaskExecutor: Executor {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
-extension _TaskExecutor {
+@available(SwiftStdlib 6.0, *)
+extension TaskExecutor {
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
     UnownedTaskExecutor(ordinary: self)
   }
@@ -270,7 +270,7 @@ public struct UnownedSerialExecutor: Sendable {
 
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @frozen
 public struct UnownedTaskExecutor: Sendable {
   #if $BuiltinExecutor
@@ -279,7 +279,7 @@ public struct UnownedTaskExecutor: Sendable {
 
   /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
   /// which needs to reach for this from an @_transparent function which prevents @_spi use.
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   public var _executor: Builtin.Executor {
     self.executor
   }
@@ -293,8 +293,8 @@ public struct UnownedTaskExecutor: Sendable {
   }
 
   @inlinable
-  public init<E: _TaskExecutor>(ordinary executor: __shared E) {
-    #if $BuiltinBuildTaskExecutor
+  public init<E: TaskExecutor>(ordinary executor: __shared E) {
+    #if $BuiltinBuildTaskExecutorRef
     self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
@@ -303,7 +303,7 @@ public struct UnownedTaskExecutor: Sendable {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension UnownedTaskExecutor: Equatable {
   @inlinable
   public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
@@ -373,11 +373,10 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("_task_executor_getTaskExecutorRef")
-internal func _task_executor_getTaskExecutorRef<E>(_ executor: E) -> Builtin.Executor
-    where E: _TaskExecutor {
-  return executor.asUnownedTaskExecutor().executor
+internal func _task_executor_getTaskExecutorRef(_ taskExecutor: any TaskExecutor) -> Builtin.Executor {
+  return taskExecutor.asUnownedTaskExecutor().executor
 }
 
 // Used by the concurrency runtime
@@ -397,15 +396,11 @@ where E: SerialExecutor {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
-internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: _TaskExecutor {
+internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: TaskExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(SwiftStdlib 9999, *) {
-    executor.enqueue(ExecutorJob(context: unownedJob._context))
-  } else {
-    executor.enqueue(unownedJob)
-  }
+  executor.enqueue(ExecutorJob(context: unownedJob._context))
   #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   executor.enqueue(unownedJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

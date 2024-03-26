@@ -783,11 +783,11 @@ emitKeyPathComponent(IRGenModule &IGM,
               // FIXME: This seems wrong. We used to just mangle opened archetypes as
               // their interface type. Let's make that explicit now.
               substType = substType
-                              .transformRec([](Type t) -> llvm::Optional<Type> {
+                              .transformRec([](Type t) -> std::optional<Type> {
                                 if (auto *openedExistential =
                                         t->getAs<OpenedArchetypeType>())
                                   return openedExistential->getInterfaceType();
-                                return llvm::None;
+                                return std::nullopt;
                               })
                               ->getCanonicalType();
 
@@ -945,7 +945,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         // only ever use a struct field as a uniquing key from inside the
         // struct's own module, so this is OK.
         idResolution = KeyPathComponentHeader::Resolved;
-        llvm::Optional<unsigned> structIdx;
+        std::optional<unsigned> structIdx;
         unsigned i = 0;
         for (auto storedProp : struc->getStoredProperties()) {
           if (storedProp == property) {
@@ -1309,7 +1309,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
 std::pair<llvm::Value *, llvm::Value *> irgen::emitKeyPathArgument(
     IRGenFunction &IGF, SubstitutionMap subs, const CanGenericSignature &sig,
     ArrayRef<SILType> indiceTypes, Explosion &indiceValues,
-    llvm::Optional<StackAddress> &dynamicArgsBuf) {
+    std::optional<StackAddress> &dynamicArgsBuf) {
   auto &IGM = IGF.IGM;
 
   if (subs.empty() && indiceTypes.empty()) {

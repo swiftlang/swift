@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -57,8 +58,8 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 }
 
 ASTWalker::PreWalkAction BaseDiagnosticWalker::walkToDeclPre(Decl *D) {
-  return Action::VisitChildrenIf(isa<ClosureExpr>(D->getDeclContext()) &&
-                                 shouldWalkIntoDeclInClosureContext(D));
+  return Action::VisitNodeIf(isa<ClosureExpr>(D->getDeclContext()) &&
+                             shouldWalkIntoDeclInClosureContext(D));
 }
 
 bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
@@ -125,7 +126,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipChildren(P);
+      return Action::SkipNode(P);
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
@@ -325,7 +326,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                 tupleExpr->getElementNames());
                                 
         // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isNoncopyable(DC)
+        if (E->getType()->isNoncopyable()
             && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
           auto noncopyableTy = E->getType();
           assert(noncopyableTy->is<TupleType>() && "will use poor wording");
@@ -360,10 +361,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return Action::Continue(E);
     }
 
-    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-      return Action::Continue(E);
-    }
-
     /// Visit each component of the keypath and emit a diagnostic if they
     /// refer to a member that has effects.
     void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
@@ -388,7 +385,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!castType)
         return;
 
-      if (castType->isNoncopyable(DC)) {
+      if (castType->isNoncopyable()) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
@@ -398,7 +395,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // as of now there is no type it could be cast to except itself, so
       // there's no reason for it to happen at runtime.
       if (auto fromType = cast->getSubExpr()->getType()) {
-        if (fromType->isNoncopyable(DC)) {
+        if (fromType->isNoncopyable()) {
           // can't cast move-only to anything.
           Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
           return;
@@ -415,7 +412,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
-        if (proto->isMarkerProtocol() && !proto->isInvertibleProtocol()) {
+        if (proto->isMarkerProtocol() && !proto->getInvertibleProtocolKind()) {
           // can't conditionally cast to a marker protocol
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());
@@ -424,12 +421,88 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
+      auto partialConsumptionEnabled =
+          Ctx.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
       auto *subExpr = consumeExpr->getSubExpr();
-      if (auto *li = dyn_cast<LoadExpr>(subExpr))
-        subExpr = li->getSubExpr();
-      if (!isa<DeclRefExpr>(subExpr)) {
+      bool noncopyable =
+          subExpr->getType()->getCanonicalType()->isNoncopyable();
+
+      bool partial = false;
+      Expr *current = subExpr;
+      while (current) {
+        if (auto *dre = dyn_cast<DeclRefExpr>(current)) {
+          if (partial & !noncopyable) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_partial_copyable);
+            return;
+          }
+          // The chain of member_ref_exprs and load_exprs terminates at a
+          // declref_expr.  This is legal.
+          return;
+        }
+        // Look through loads.
+        if (auto *le = dyn_cast<LoadExpr>(current)) {
+          current = le->getSubExpr();
+          continue;
+        }
+        auto *mre = dyn_cast<MemberRefExpr>(current);
+        if (mre && partialConsumptionEnabled) {
+          auto *vd = dyn_cast<VarDecl>(mre->getMember().getDecl());
+          if (!vd) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_non_storage);
+            return;
+          }
+          partial = true;
+          AccessStrategy strategy = vd->getAccessStrategy(
+              mre->getAccessSemantics(), AccessKind::Read,
+              DC->getParentModule(), ResilienceExpansion::Minimal);
+          if (strategy.getKind() != AccessStrategy::Storage) {
+            if (noncopyable) {
+              Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                                 diag::consume_expression_non_storage);
+              Ctx.Diags.diagnose(
+                  mre->getLoc(),
+                  diag::note_consume_expression_non_storage_property);
+            } else {
+              Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                                 diag::consume_expression_partial_copyable);
+            }
+            return;
+          }
+          current = mre->getBase();
+          continue;
+        }
+        auto *ce = dyn_cast<CallExpr>(current);
+        if (ce && partialConsumptionEnabled) {
+          if (noncopyable) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_non_storage);
+            Ctx.Diags.diagnose(ce->getLoc(),
+                               diag::note_consume_expression_non_storage_call);
+          } else {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_partial_copyable);
+          }
+          return;
+        }
+        auto *se = dyn_cast<SubscriptExpr>(current);
+        if (se && partialConsumptionEnabled) {
+          if (noncopyable) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_non_storage);
+            Ctx.Diags.diagnose(
+                se->getLoc(),
+                diag::note_consume_expression_non_storage_subscript);
+          } else {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_partial_copyable);
+          }
+          return;
+        }
         Ctx.Diags.diagnose(consumeExpr->getLoc(),
                            diag::consume_expression_not_passed_lvalue);
+        return;
       }
     }
 
@@ -604,7 +677,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       Ctx.Diags.diagnose(calleeParam, diag::decl_declared_here, calleeParam);
     }
 
-    llvm::Optional<MagicIdentifierLiteralExpr::Kind>
+    std::optional<MagicIdentifierLiteralExpr::Kind>
     getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
       switch (param->getDefaultArgumentKind()) {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -619,7 +692,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       case DefaultArgumentKind::EmptyArray:
       case DefaultArgumentKind::EmptyDictionary:
       case DefaultArgumentKind::StoredProperty:
-        return llvm::None;
+      case DefaultArgumentKind::ExpressionMacro:
+        return std::nullopt;
       }
 
       llvm_unreachable("Unhandled DefaultArgumentKind in "
@@ -712,9 +786,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             if (argList->isUnlabeledUnary())
               behavior = DiagnosticBehavior::Warning;
           } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
-            if (auto *TR =
-                    dyn_cast_or_null<MemberTypeRepr>(TE->getTypeRepr())) {
-              if (!isa<IdentTypeRepr>(TR->getBaseComponent())) {
+            if (auto *QualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
+                    TE->getTypeRepr())) {
+              if (!isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot())) {
                 behavior = DiagnosticBehavior::Warning;
               }
             }
@@ -1068,7 +1142,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
       
       StringRef replaceBefore, replaceAfter;
-      llvm::Optional<Diag<Type, Type>> diagID;
+      std::optional<Diag<Type, Type>> diagID;
       SmallString<64> replaceBeforeBuf;
 
       // Bitcasting among numeric types should use `bitPattern:` initializers.
@@ -1841,7 +1915,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       if (memberLoc.isValid()) {
         emitFixIts(Diags, memberLoc, ACE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
       
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
@@ -2043,39 +2117,26 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       return;
     }
 
-    auto contextTy = typeDecl->mapTypeIntoContext(genericParamTy);
-    if (auto archetypeTy = contextTy->getAs<ArchetypeType>()) {
-      SmallVector<Type, 2> members;
+    auto genericSig = typeDecl->getGenericSignature();
 
-      bool hasExplicitAnyObject = archetypeTy->requiresClass();
-      if (auto superclass = archetypeTy->getSuperclass()) {
-        hasExplicitAnyObject = false;
-        members.push_back(superclass);
-      }
-
-      for (auto proto : archetypeTy->getConformsTo()) {
-        members.push_back(proto->getDeclaredInterfaceType());
-        if (proto->requiresClass())
-          hasExplicitAnyObject = false;
-      }
-
-      if (hasExplicitAnyObject)
-        members.push_back(typeDecl->getASTContext().getAnyObjectConstraint());
-
-      auto type = ProtocolCompositionType::get(typeDecl->getASTContext(),
-                                               members, hasExplicitAnyObject);
-
-      if (type->isObjCExistentialType() || type->isAny()) {
-        genericParamText << type;
-        return;
-      }
-
-      genericParamText << "<#" << genericParam->getName() << ": ";
-      genericParamText << type << "#>";
+    auto concreteTy = genericSig->getConcreteType(genericParamTy);
+    if (concreteTy) {
+      genericParamText << concreteTy;
       return;
     }
 
-    genericParamText << contextTy;
+    auto upperBound = genericSig->getUpperBound(
+        genericParamTy,
+        /*forExistentialSelf=*/false,
+        /*withParameterizedProtocols=*/false);
+
+    if (upperBound->isObjCExistentialType() || upperBound->isAny()) {
+      genericParamText << upperBound;
+      return;
+    }
+
+    genericParamText << "<#" << genericParam->getName() << ": ";
+    genericParamText << upperBound << "#>";
   };
 
   llvm::interleave(typeDecl->getInnermostGenericParamTypes(),
@@ -2093,7 +2154,7 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
                                        ArrayRef<Identifier> newNames,
                                        ParameterContext paramContext,
                                        InFlightDiagnostic *existingDiag) {
-  llvm::Optional<InFlightDiagnostic> diagOpt;
+  std::optional<InFlightDiagnostic> diagOpt;
   auto getDiag = [&]() -> InFlightDiagnostic & {
     if (existingDiag)
       return *existingDiag;
@@ -2115,10 +2176,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     //  - None if i is out of bounds for the argument list
     //  - nullptr for an argument without a label
     //  - have a value if the argument has a label
-    llvm::Optional<Identifier> oldName;
+    std::optional<Identifier> oldName;
     if (i < argList->size())
       oldName = argList->getLabel(i);
-    llvm::Optional<Identifier> newName;
+    std::optional<Identifier> newName;
     if (i < newNames.size())
       newName = newNames[i];
 
@@ -2601,11 +2662,11 @@ static bool fixItOverrideDeclarationTypesImpl(
 
 bool swift::computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
-    llvm::function_ref<llvm::Optional<InFlightDiagnostic>(bool)> diag) {
+    llvm::function_ref<std::optional<InFlightDiagnostic>(bool)> diag) {
   SmallVector<std::tuple<NoteKind_t, SourceRange, std::string>, 4> Notes;
   bool hasNotes = ::fixItOverrideDeclarationTypesImpl(decl, base, Notes);
 
-  llvm::Optional<InFlightDiagnostic> diagnostic = diag(hasNotes);
+  std::optional<InFlightDiagnostic> diagnostic = diag(hasNotes);
   if (!diagnostic) return hasNotes;
 
   for (const auto &note : Notes) {
@@ -2732,7 +2793,7 @@ public:
   // FIXME: peek into capture lists of nested functions.
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (isa<TypeDecl>(D))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     // The body of #if clauses are not walked into, we need custom processing
     // for them.
@@ -2759,7 +2820,7 @@ public:
     // references the variable, but we don't want to consider it as a real
     // "use".
     if (isa<AccessorDecl>(D) && D->isImplicit())
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this AFD is a setter, track the parameter and the getter for
@@ -2780,7 +2841,7 @@ public:
       // Don't walk into a body that has not yet been type checked. This should
       // only occur for top-level code.
       VarDecls.clear();
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -2940,9 +3001,10 @@ public:
                   .getRequirements(),
               [&exprType, this](auto requirement) {
                 if (requirement.getKind() == RequirementKind::Conformance) {
-                  auto conformance = TypeChecker::conformsToProtocol(
-                      exprType->getRValueType(), requirement.getProtocolDecl(),
-                      Implementation->getModuleContext(),
+                  auto conformance = Implementation->getModuleContext()
+                      ->checkConformance(
+                      exprType->getRValueType(),
+                      requirement.getProtocolDecl(),
                       /*allowMissing=*/false);
                   return !conformance.isInvalid();
                 }
@@ -3011,7 +3073,7 @@ public:
     // A list of all mismatches discovered across all candidates.
     // If there are any mismatches in availability contexts, they
     // are not diagnosed but propagated to the declaration.
-    llvm::Optional<std::pair<unsigned, GenericTypeParamType *>> mismatch;
+    std::optional<std::pair<unsigned, GenericTypeParamType *>> mismatch;
 
     auto opaqueParams = OpaqueDecl->getOpaqueGenericParams();
     SubstitutionMap underlyingSubs = std::get<1>(Candidates.front().second);
@@ -3169,7 +3231,7 @@ public:
       }
 
       Candidates.push_back({CurrentAvailability, candidate});
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
 
     return Action::Continue(E);
@@ -3220,7 +3282,7 @@ public:
           Else->walk(*this);
         }
 
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
       }
     }
 
@@ -3239,7 +3301,7 @@ public:
 
   // Don't descend into nested decls.
   PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 
@@ -3304,7 +3366,7 @@ public:
 
   // Don't descend into nested decls.
   PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 
@@ -3544,8 +3606,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               foundVP = VP;
         });
 
-        if (foundVP && !foundVP->isLet())
+        if (foundVP && foundVP->getIntroducer() != VarDecl::Introducer::Let) {
           FixItLoc = foundVP->getLoc();
+        }
       }
 
       // If this is a parameter explicitly marked 'var', remove it.
@@ -3728,7 +3791,7 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // should replace them with ErrorExpr.
   if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   assert(AllExprsSeen.insert(E).second && "duplicate traversal");
@@ -3749,13 +3812,13 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     if (auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl())) {
       AssociatedGetterRefExpr.insert(std::make_pair(VD, MRE));
       markBaseOfStorageUse(MRE->getBase(), MRE->getMember(), RK_Read);
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
   }
   if (auto SE = dyn_cast<SubscriptExpr>(E)) {
     SE->getArgs()->walk(*this);
     markBaseOfStorageUse(SE->getBase(), SE->getDecl(), RK_Read);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   // If this is an AssignExpr, see if we're mutating something that we know
@@ -3765,14 +3828,14 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     
     // Don't walk into the LHS of the assignment, only the RHS.
     assign->getSrc()->walk(*this);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   
   // '&x' is a read and write of 'x'.
   if (auto *io = dyn_cast<InOutExpr>(E)) {
     markStoredOrInOutExpr(io->getSubExpr(), RK_Read|RK_Written);
     // Don't bother walking into this.
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   
   // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
@@ -3780,14 +3843,14 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
     oee->getSubExpr()->walk(*this);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   // Visit bindings.
   if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {
     if (auto mapping = OpaqueValueMap.lookup(ove))
       mapping->walk(*this);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   
   // If we saw an ErrorExpr, take note of this.
@@ -3850,7 +3913,7 @@ class SingleValueStmtUsageChecker final : public ASTWalker {
 public:
   SingleValueStmtUsageChecker(
       ASTContext &ctx, ASTNode root,
-      llvm::Optional<ContextualTypePurpose> contextualPurpose)
+      std::optional<ContextualTypePurpose> contextualPurpose)
       : Ctx(ctx), Diags(ctx.Diags) {
     assert(!root.is<Expr *>() || contextualPurpose &&
            "Must provide contextual purpose for expr");
@@ -3878,7 +3941,6 @@ private:
     // Allowed in returns, throws, and bindings.
     switch (ctp) {
     case CTP_ReturnStmt:
-    case CTP_ReturnSingleExpr:
     case CTP_ThrowStmt:
     case CTP_Initialization:
       markValidSingleValueStmt(E);
@@ -3937,6 +3999,9 @@ private:
               continue;
             }
           }
+          // TODO: The wording of this diagnostic will need tweaking if either
+          // implicit last expressions or 'then' statements are enabled by
+          // default.
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_result,
                          S->getKind());
@@ -4024,14 +4089,14 @@ private:
     }
     // We don't want to walk into any other decl, we will visit them as part of
     // typeCheckDecl.
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 } // end anonymous namespace
 
 void swift::diagnoseOutOfPlaceExprs(
     ASTContext &ctx, ASTNode root,
-    llvm::Optional<ContextualTypePurpose> contextualPurpose) {
+    std::optional<ContextualTypePurpose> contextualPurpose) {
   // TODO: We ought to consider moving this into pre-checking such that we can
   // still diagnose on invalid code, and don't have to traverse over implicit
   // exprs. We need to first separate out SequenceExpr folding though.
@@ -4100,7 +4165,7 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   auto subjectType = subjectExpr->getType();
   if (!subjectType
       || subjectType->hasError()
-      || !subjectType->isNoncopyable(DC)) {
+      || !subjectType->isNoncopyable()) {
     return;
   }
 
@@ -4109,7 +4174,8 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
     subjectExpr = load->getSubExpr()->getSemanticsProvidingExpr();
   }
-  if (isa<DeclRefExpr>(subjectExpr)) {
+  if (!C.LangOpts.hasFeature(Feature::BorrowingSwitch)
+      && isa<DeclRefExpr>(subjectExpr)) {
     C.Diags.diagnose(subjectExpr->getLoc(),
                            diag::move_only_pattern_match_not_consumed)
       .fixItInsert(subjectExpr->getStartLoc(), "consume ");
@@ -4280,7 +4346,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     walkToArgumentListPre(ArgumentList *args) override {
       // Don't walk into an explicit argument list, as trailing closures that
       // appear in child arguments are fine.
-      return Action::VisitChildrenIf(args->isImplicit(), args);
+      return Action::VisitNodeIf(args->isImplicit(), args);
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -4293,7 +4359,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       case ExprKind::Closure:
         // If a trailing closure appears as a child of one of these types of
         // expression, don't diagnose it as there is no ambiguity.
-        return Action::VisitChildrenIf(E->isImplicit(), E);
+        return Action::VisitNodeIf(E->isImplicit(), E);
       case ExprKind::Call:
         diagnoseIt(cast<CallExpr>(E));
         break;
@@ -4604,6 +4670,10 @@ public:
           switch (bestAccessor->getAccessorKind()) {
           case AccessorKind::Get:
             out << "getter: ";
+            name = bestAccessor->getStorage()->getName();
+            break;
+          case AccessorKind::DistributedGet:
+            out << "_distributed_getter: ";
             name = bestAccessor->getStorage()->getName();
             break;
 
@@ -5268,7 +5338,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (IgnoredExprs.count(E))
         return Action::Continue(E);
@@ -5347,7 +5417,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *KPAE = dyn_cast<KeyPathApplicationExpr>(E)) {
         visitKeyPathApplicationExpr(KPAE);
@@ -5384,6 +5454,11 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       auto isKeyPathLiteral = [&](Expr *argExpr) -> KeyPathExpr * {
         if (auto *DTBE = getAsExpr<DerivedToBaseExpr>(argExpr))
           argExpr = DTBE->getSubExpr();
+        // Sendable key path literals are represented as an existential
+        // protocol composition with `Sendable` protocol which has to be
+        // opened in certain scenarios i.e. to pass it to non-Sendable version.
+        if (auto *OEE = getAsExpr<OpenExistentialExpr>(argExpr))
+          argExpr = OEE->getExistentialValue();
         return getAsExpr<KeyPathExpr>(argExpr);
       };
 
@@ -5427,11 +5502,11 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         maybeDiagnoseCallExpr(CE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -5478,11 +5553,11 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
         tryDiagnoseExplicitLazyStorageVariableUse(MRE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -5611,11 +5686,11 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *BE = dyn_cast<BinaryExpr>(E)) {
         tryDiagnoseComparisonWithNaN(BE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -5648,7 +5723,7 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       // If this is not an explicit 'self' reference, let's keep searching.
@@ -5892,7 +5967,7 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(
     const Expr *E, const DeclContext *DC,
-    llvm::Optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
+    std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
     bool disableExprAvailabilityChecking, bool disableOutOfPlaceExprChecking) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
@@ -6117,16 +6192,16 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   return "";
 }
 
-llvm::Optional<DeclName>
+std::optional<DeclName>
 TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
-    return llvm::None;
+    return std::nullopt;
 
   const DeclName name = afd->getName();
   if (!name)
-    return llvm::None;
+    return std::nullopt;
 
   // String'ify the arguments.
   StringRef baseNameStr = name.getBaseName().userFacingName();
@@ -6170,8 +6245,8 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
           baseNameStr, argNameStrs, firstParamName,
           getTypeNameForOmission(resultType),
           getTypeNameForOmission(contextType), paramTypes, returnsSelf, false,
-          /*allPropertyNames=*/nullptr, llvm::None, llvm::None, scratch))
-    return llvm::None;
+          /*allPropertyNames=*/nullptr, std::nullopt, std::nullopt, scratch))
+    return std::nullopt;
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
@@ -6198,21 +6273,21 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   return DeclName(Context, newBaseName, newArgNames);
 }
 
-llvm::Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
+std::optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
   if (var->isInvalid())
-    return llvm::None;
+    return std::nullopt;
 
   if (var->getName().empty())
-    return llvm::None;
+    return std::nullopt;
 
   auto name = var->getName().str();
 
   // Dig out the context type.
   Type contextType = var->getDeclContext()->getDeclaredInterfaceType();
   if (!contextType)
-    return llvm::None;
+    return std::nullopt;
 
   // Dig out the type of the variable.
   Type type = var->getValueInterfaceType();
@@ -6225,129 +6300,25 @@ llvm::Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (::omitNeedlessWords(name, {}, "", typeName, contextTypeName, {},
                           /*returnsSelf=*/false, true,
-                          /*allPropertyNames=*/nullptr, llvm::None, llvm::None,
-                          scratch)) {
+                          /*allPropertyNames=*/nullptr, std::nullopt,
+                          std::nullopt, scratch)) {
     return Context.getIdentifier(name);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
                                                   ForEachStmt *forEach) {
-  if (!forEach->getAwaitLoc().isValid())
-    return false;
-
-  auto conformanceRef = forEach->getSequenceConformance();
-  if (conformanceRef.hasEffect(EffectKind::Throws) &&
-      forEach->getTryLoc().isInvalid()) {
-    auto &ctx = dc->getASTContext();
-    ctx.Diags
-        .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
-        .fixItInsert(forEach->getAwaitLoc(), "try");
-    return true;
+  auto &ctx = dc->getASTContext();
+  if (auto thrownError = TypeChecker::canThrow(ctx, forEach)) {
+    if (forEach->getTryLoc().isInvalid()) {
+      ctx.Diags
+          .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
+          .fixItInsert(forEach->getAwaitLoc(), "try");
+      return true;
+    }
   }
 
   return false;
-}
-
-//===----------------------------------------------------------------------===//
-//              Copyable Type Containing Move Only Type Visitor
-//===----------------------------------------------------------------------===//
-
-void swift::diagnoseCopyableTypeContainingMoveOnlyType(
-    NominalTypeDecl *copyableNominalType) {
-  auto &ctx = copyableNominalType->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return; // taken care of in conformance checking
-
-  // If we already have a move only type, just bail, we have no further work to
-  // do.
-  if (copyableNominalType->canBeNoncopyable())
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "DiagnoseCopyableType for: "
-                          << copyableNominalType->getName() << '\n');
-
-  auto &DE = copyableNominalType->getASTContext().Diags;
-  auto emitError = [&copyableNominalType,
-                    &DE](PointerUnion<EnumElementDecl *, VarDecl *>
-                             topFieldToError,
-                         DeclBaseName parentName, DescriptiveDeclKind fieldKind,
-                         DeclBaseName fieldName) {
-    assert(!topFieldToError.isNull());
-    if (auto *eltDecl = topFieldToError.dyn_cast<EnumElementDecl *>()) {
-      DE.diagnoseWithNotes(
-          copyableNominalType->diagnose(
-              diag::noncopyable_within_copyable,
-              copyableNominalType),
-          [&]() {
-            eltDecl->diagnose(
-                diag::
-                    noncopyable_within_copyable_location,
-                fieldKind, parentName.userFacingName(),
-                fieldName.userFacingName());
-          });
-      return;
-    }
-
-    auto *varDecl = topFieldToError.get<VarDecl *>();
-    DE.diagnoseWithNotes(
-        copyableNominalType->diagnose(
-            diag::noncopyable_within_copyable,
-            copyableNominalType),
-        [&]() {
-          varDecl->diagnose(
-              diag::noncopyable_within_copyable_location,
-              fieldKind, parentName.userFacingName(),
-              fieldName.userFacingName());
-        });
-  };
-
-  // If we have a struct decl...
-  if (auto *structDecl = dyn_cast<StructDecl>(copyableNominalType)) {
-    // Visit each of the stored property var decls of the struct decl...
-    for (auto *fieldDecl : structDecl->getStoredProperties()) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Visiting struct field: " << fieldDecl->getName() << '\n');
-      if (!fieldDecl->getInterfaceType()->isNoncopyable())
-        continue;
-      emitError(fieldDecl, structDecl->getBaseName(),
-                fieldDecl->getDescriptiveKind(), fieldDecl->getBaseName());
-    }
-    // We completed our checking, just return.
-    return;
-  }
-
-  if (auto *enumDecl = dyn_cast<EnumDecl>(copyableNominalType)) {
-    // If we have an enum but we don't have any elements, just continue, we
-    // have nothing to check.
-    if (enumDecl->getAllElements().empty())
-      return;
-
-    // Otherwise for each element...
-    for (auto *enumEltDecl : enumDecl->getAllElements()) {
-      // If the element doesn't have any associated values, we have nothing to
-      // check, so continue.
-      if (!enumEltDecl->hasAssociatedValues())
-        continue;
-
-      LLVM_DEBUG(llvm::dbgs() << "Visiting enum elt decl: "
-                 << enumEltDecl->getName() << '\n');
-
-      // Otherwise, we have a case and need to check the types of the
-      // parameters of the case payload.
-      for (auto payloadParam : *enumEltDecl->getParameterList()) {
-        LLVM_DEBUG(llvm::dbgs() << "Visiting payload param: "
-                   << payloadParam->getName() << '\n');
-        if (payloadParam->getInterfaceType()->isNoncopyable()) {
-            emitError(enumEltDecl, enumDecl->getBaseName(),
-                      enumEltDecl->getDescriptiveKind(),
-                      enumEltDecl->getBaseName());
-        }
-      }
-    }    
-    // We have finished processing this enum... so return.
-    return;
-  }
 }

@@ -69,3 +69,10 @@ func testAssociatedTypes() {
 func assocFailureType<T: FailureAssociatedType>(_ value: T, _ error: T.Failure) throws(T.Failure) {
   throw error
 }
+
+// Allow a typed-throws version of a function to witness a rethrowing function.
+public protocol HasRethrowingMap: Sequence {
+  func map<T>(_ transform: (Element) throws -> T) rethrows -> [T]
+}
+
+extension Array: HasRethrowingMap {}

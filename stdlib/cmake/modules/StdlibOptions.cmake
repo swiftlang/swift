@@ -175,10 +175,6 @@ option(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK
        "Should stdlib be built with -experimental-hermetic-seal-at-link"
        FALSE)
 
-option(SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS
-      "Should stdlib be built with -experimental-feature NoncopyableGenerics"
-      FALSE)
-
 option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
        "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
        FALSE)
@@ -272,6 +268,10 @@ option(SWIFT_STDLIB_CONCURRENCY_TRACING
 
 option(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
        "Use relative protocol witness tables"
+       FALSE)
+
+option(SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES
+       "Use fragile protocol witness tables for resilient protocols"
        FALSE)
 
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)

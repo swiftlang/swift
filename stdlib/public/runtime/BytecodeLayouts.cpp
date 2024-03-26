@@ -248,9 +248,12 @@ static void handleEnd(const Metadata *metadata,
 
 static void errorDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                          uintptr_t &addrOffset, uint8_t *addr) {
-  SwiftError *error = *(SwiftError**)(addr + addrOffset);
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset += sizeof(SwiftError*);
-  swift_errorRelease(error);
+  swift_errorRelease((SwiftError *)object);
 }
 
 static void nativeStrongDestroy(const Metadata *metadata,
@@ -396,7 +399,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>();
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
@@ -616,7 +619,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>(); // numEmptyCases
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
@@ -899,10 +902,13 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
 static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                         uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  SwiftError *object = *(SwiftError **)(src + _addrOffset);
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   memcpy(dest + addrOffset, &object, sizeof(SwiftError*));
   addrOffset = _addrOffset + sizeof(SwiftError *);
-  swift_errorRetain(object);
+  swift_errorRetain((SwiftError *)object);
 }
 
 static void nativeStrongRetain(const Metadata *metadata,
@@ -1286,12 +1292,21 @@ static void errorAssignWithCopy(const Metadata *metadata,
                                 uintptr_t &addrOffset, uint8_t *dest,
                                 uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  SwiftError *destObject = *(SwiftError **)(dest + _addrOffset);
-  SwiftError *srcObject = *(SwiftError **)(src + _addrOffset);
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+
   memcpy(dest + _addrOffset, &srcObject, sizeof(SwiftError *));
   addrOffset = _addrOffset + sizeof(SwiftError *);
-  swift_errorRelease(destObject);
-  swift_errorRetain(srcObject);
+
+  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
+    destObject &= ~_swift_abi_SwiftSpareBitsMask;
+    swift_errorRelease((SwiftError *)destObject);
+  }
+
+  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
+    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+    swift_errorRetain((SwiftError *)srcObject);
+  }
 }
 
 static void nativeStrongAssignWithCopy(const Metadata *metadata,
@@ -1435,14 +1450,32 @@ static void existentialAssignWithCopy(const Metadata *metadata,
                                uint8_t *dest,
                                uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  auto *type = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
+  auto *srcType = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
+  auto *destType = getExistentialTypeMetadata((OpaqueValue*)(dest + _addrOffset));
   auto *destObject = (OpaqueValue *)(dest + _addrOffset);
   auto *srcObject = (OpaqueValue *)(src + _addrOffset);
   addrOffset = _addrOffset + (sizeof(uintptr_t) * NumWords_ValueBuffer);
-  if (type->getValueWitnesses()->isValueInline()) {
-    type->vw_assignWithCopy(destObject, srcObject);
+
+  if (srcType == destType) {
+    if (srcType->getValueWitnesses()->isValueInline()) {
+      srcType->vw_assignWithCopy(destObject, srcObject);
+    } else {
+      swift_release(*(HeapObject**)destObject);
+      memcpy(destObject, srcObject, sizeof(uintptr_t));
+      swift_retain(*(HeapObject**)srcObject);
+    }
+    return;
+  }
+
+  if (destType->getValueWitnesses()->isValueInline()) {
+      destType->vw_destroy(destObject);
   } else {
     swift_release(*(HeapObject**)destObject);
+  }
+
+  if (srcType->getValueWitnesses()->isValueInline()) {
+    srcType->vw_initializeWithCopy(destObject, srcObject);
+  } else {
     memcpy(destObject, srcObject, sizeof(uintptr_t));
     swift_retain(*(HeapObject**)srcObject);
   }
@@ -1655,7 +1688,7 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>(); // numEmptyCases
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 

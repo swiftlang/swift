@@ -47,11 +47,13 @@ set(swift_runtime_sources
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp
+    Exception.cpp
     Exclusivity.cpp
     ExistentialContainer.cpp
     Float16Support.cpp
     FoundationSupport.cpp
     FunctionReplacement.cpp
+    GenericMetadataBuilder.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionCommon.cpp
@@ -63,6 +65,7 @@ set(swift_runtime_sources
     SymbolInfo.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
+    LibPrespecialized.cpp
     Metadata.cpp
     MetadataLookup.cpp
     Numeric.cpp

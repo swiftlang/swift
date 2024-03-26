@@ -117,3 +117,58 @@ extension LazyMapSequence : CollectionLikeSequence,
 extension LazyFilterSequence : CollectionLikeSequence,
                                FormattedLikeArray, CustomStringConvertible, CustomReflectable
                                where Base: CollectionLikeSequence {}
+
+//===----------------------------------------------------------------------===//
+//                      Single-Element Inline Array
+//===----------------------------------------------------------------------===//
+
+public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeArray {
+  private var singleElement: Element?
+  private var multipleElements: [Element] = []
+
+  public init() {}
+
+  public init(element: Element) {
+    singleElement = element
+  }
+
+  public var startIndex: Int { 0 }
+  public var endIndex: Int {
+    singleElement == nil ? 0 : multipleElements.count + 1
+  }
+
+  public subscript(_ index: Int) -> Element {
+    _read {
+      if index == 0 {
+        yield singleElement!
+      } else {
+        yield multipleElements[index - 1]
+      }
+    }
+    _modify {
+      if index == 0 {
+        yield &singleElement!
+      } else {
+        yield &multipleElements[index - 1]
+      }
+    }
+  }
+
+  public mutating func append(_ element: __owned Element) {
+    push(element)
+  }
+
+  public mutating func append<S: Sequence>(contentsOf newElements: __owned S) where S.Element == Element {
+    for element in newElements {
+      push(element)
+    }
+  }
+
+  public mutating func push(_ element: __owned Element) {
+    guard singleElement != nil else {
+      singleElement = element
+      return
+    }
+    multipleElements.append(element)
+  }
+}

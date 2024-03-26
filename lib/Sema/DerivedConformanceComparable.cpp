@@ -81,7 +81,7 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
 
   auto *cmpExpr =
       BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true);
-  statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
+  statements.push_back(ReturnStmt::createImplicit(C, cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return { body, /*isTypeChecked=*/false };
@@ -132,7 +132,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
-    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
     if (hasBoundDecls) {
       // We allocated a direct copy of our lhs var decls for the case
       // body.
@@ -176,7 +176,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     // return false 
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                /*Implicit*/true);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, falseExpr);
     statementsInCase.push_back(returnStmt);
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
@@ -197,7 +197,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      defaultItem, SourceLoc(), SourceLoc(),
                                      body,
-                                     /*case body var decls*/ llvm::None));
+                                     /*case body var decls*/ std::nullopt));
   }
 
   // switch (a, b) { <case statements> }

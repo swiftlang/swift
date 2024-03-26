@@ -182,10 +182,11 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   LangOptions LangOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  CASOptions CASOpts;
   LangOpts.Target = Invocation.getTargetTriple();
   ASTContext &ASTCtx = *ASTContext::get(
       LangOpts, TypeCheckOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
-      SymbolGraphOpts, SrcMgr, Instance.getDiags(),
+      SymbolGraphOpts, CASOpts, SrcMgr, Instance.getDiags(),
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);

@@ -11,7 +11,7 @@
 #===----------------------------------------------------------------------===#
 
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
-set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
+set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/InternalShims)
 
 set(swift_concurrency_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -60,6 +60,11 @@ else()
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
+  "-enable-experimental-feature"
+  "IsolatedAny"
+)
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -107,6 +112,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
   GlobalActor.swift
+  GlobalConcurrentExecutor.swift
   MainActor.swift
   PartialAsyncTask.swift
   SourceCompatibilityShims.swift
@@ -168,10 +174,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
-    -Xfrontend -enable-experimental-concurrency
-    -diagnostic-style swift
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
   ${swift_concurrency_options}
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR zippered
 )

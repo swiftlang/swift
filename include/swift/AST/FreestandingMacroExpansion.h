@@ -45,6 +45,10 @@ struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
   /// The referenced macro.
   ConcreteDeclRef macroRef;
 
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+  unsigned Discriminator = InvalidDiscriminator;
+
   MacroExpansionInfo(SourceLoc sigilLoc, DeclNameRef moduleName,
                      DeclNameLoc moduleNameLoc, DeclNameRef macroName,
                      DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
@@ -71,12 +75,12 @@ enum class FreestandingMacroKind {
 /// A base class of either 'MacroExpansionExpr' or 'MacroExpansionDecl'.
 class FreestandingMacroExpansion {
   llvm::PointerIntPair<MacroExpansionInfo *, 1, FreestandingMacroKind>
-      infoAndKind;
+    infoAndKind;
 
 protected:
   FreestandingMacroExpansion(FreestandingMacroKind kind,
                              MacroExpansionInfo *info)
-      : infoAndKind(info, kind) {}
+  : infoAndKind(info, kind) {}
 
 public:
   MacroExpansionInfo *getExpansionInfo() const {
@@ -114,7 +118,13 @@ public:
 
   DeclContext *getDeclContext() const;
   SourceRange getSourceRange() const;
+
+  /// Returns a discriminator which determines this macro expansion's index
+  /// in the sequence of macro expansions within the current context.
   unsigned getDiscriminator() const;
+
+  /// Returns the raw discriminator, for debugging purposes only.
+  unsigned getRawDiscriminator() const;
 };
 
 } // namespace swift

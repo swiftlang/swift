@@ -6,15 +6,25 @@
 // Define a couple protocols with no requirements that're easy to conform to
 public protocol SampleProtocol1 {}
 public protocol SampleProtocol2 {}
+public protocol SampleProtocol1a: SampleProtocol1 {}
+public protocol SampleProtocol1b: SampleProtocol1 {}
 
 public struct Sample1 {}
 public struct Sample2 {}
+public struct Sample2a {}
+public struct Sample2b {}
+public struct Sample2c {}
+public struct Sample2d {}
+public struct Sample2e {}
 public struct Sample3 {}
 public struct Sample4 {}
 public struct Sample5 {}
 public struct Sample6 {}
 
 public struct SampleAlreadyConforms: SampleProtocol1 {}
+
+public struct GenericSample1<T> {}
+
 #else
 
 import Library
@@ -32,6 +42,19 @@ extension Sample2: InheritsSampleProtocol {} // expected-warning {{extension dec
 // expected-note @-1 {{add '@retroactive' to silence this warning}} {{1-1=extension Sample2: @retroactive SampleProtocol1 {\}\n}}
 
 extension SampleAlreadyConforms: InheritsSampleProtocol {} // ok, SampleAlreadyConforms already conforms in the source module
+
+extension Sample2a: @retroactive SampleProtocol1, InheritsSampleProtocol {} // ok, the concrete conformance to SampleProtocol1 has been declared retroactive
+
+extension Sample2b: InheritsSampleProtocol, @retroactive SampleProtocol1 {} // ok, same as above but in the opposite order
+
+// FIXME: It would be better to only suggest marking SampleProtocol1a @retroactive here
+extension Sample2c: SampleProtocol1a {} // expected-warning {{extension declares a conformance of imported type 'Sample2c' to imported protocols 'SampleProtocol1a', 'SampleProtocol1'}}
+// expected-note @-1 {{add '@retroactive' to silence this warning}} {{21-37=@retroactive SampleProtocol1a}} {{1-1=extension Sample2c: @retroactive SampleProtocol1 {\}\n}}
+
+extension Sample2d: @retroactive SampleProtocol1a {} // ok, retroactive conformance to SampleProtocol1a covers conformance to SampleProtocol1
+
+extension Sample2e: SampleProtocol1a, @retroactive SampleProtocol1b {} // expected-warning {{extension declares a conformance of imported type 'Sample2e' to imported protocol 'SampleProtocol1a'}}
+// expected-note @-1 {{add '@retroactive' to silence this warning}} {{21-37=@retroactive SampleProtocol1a}}
 
 extension Sample3: NestedInheritsSampleProtocol {} // expected-warning {{extension declares a conformance of imported type 'Sample3' to imported protocol 'SampleProtocol1'}}
 // expected-note @-1 {{add '@retroactive' to silence this warning}} {{1-1=extension Sample3: @retroactive SampleProtocol1 {\}\n}}
@@ -62,9 +85,9 @@ extension Sample1: ClientProtocol {}
 
 struct Sample7: @retroactive SampleProtocol1 {} // expected-error {{'retroactive' attribute only applies in inheritance clauses in extensions}}
 
-extension Sample7: @retroactive ClientProtocol {} // expected-error {{'retroactive' attribute does not apply; 'Sample7' is declared in this module}}
+extension Sample7: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'Sample7' is declared in this module}}
 
-extension Int: @retroactive ClientProtocol {} // expected-error {{'retroactive' attribute does not apply; 'ClientProtocol' is declared in this module}}
+extension Int: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'ClientProtocol' is declared in this module}}
 
 func f(_ x: @retroactive Int) {} // expected-error {{'retroactive' attribute only applies in inheritance clauses in extensions}}
 
@@ -80,5 +103,10 @@ public struct OriginallyDefinedInLibrary {}
 extension OriginallyDefinedInLibrary: SampleProtocol1 {} // ok, @_originallyDefinedIn attribute makes this authoritative
 
 #endif
+
+// conditional conformances
+extension GenericSample1: SampleProtocol1 where T: SampleProtocol1 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'GenericSample1' to imported protocol 'SampleProtocol1'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-2 {{add '@retroactive' to silence this warning}}
 
 #endif

@@ -112,14 +112,14 @@ struct AsyncHandlerDesc {
   ArrayRef<AnyFunctionType::Param> getSuccessParams() const;
 
   /// If the completion handler has an Error parameter, return it.
-  llvm::Optional<AnyFunctionType::Param> getErrorParam() const;
+  std::optional<AnyFunctionType::Param> getErrorParam() const;
 
   /// Get the type of the error that will be thrown by the \c async method or \c
   /// None if the completion handler doesn't accept an error parameter.
   /// This may be more specialized than the generic 'Error' type if the
   /// completion handler of the converted function takes a more specialized
   /// error type.
-  llvm::Optional<swift::Type> getErrorType() const;
+  std::optional<swift::Type> getErrorType() const;
 
   /// The `CallExpr` if the given node is a call to the `Handler`
   CallExpr *getAsHandlerCall(ASTNode Node) const;
@@ -200,7 +200,7 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
       return AsyncHandlerParamDesc();
 
     const auto *Alternative = FD->getAsyncAlternative();
-    llvm::Optional<unsigned> Index =
+    std::optional<unsigned> Index =
         FD->findPotentialCompletionHandlerParam(Alternative);
     if (!Index)
       return AsyncHandlerParamDesc();
@@ -287,7 +287,7 @@ enum class ConditionPath { SUCCESS, FAILURE };
 /// Finds the `Subject` being compared to in various conditions. Also finds any
 /// pattern that may have a bound name.
 struct CallbackCondition {
-  llvm::Optional<ConditionType> Type;
+  std::optional<ConditionType> Type;
   const Decl *Subject = nullptr;
   const Pattern *BindPattern = nullptr;
 
@@ -347,10 +347,10 @@ struct ClassifiedCondition : public CallbackCondition {
 /// \c None if they are not present in any conditions.
 struct ClassifiedCallbackConditions final
     : llvm::MapVector<const Decl *, ClassifiedCondition> {
-  llvm::Optional<ClassifiedCondition> lookup(const Decl *D) const {
+  std::optional<ClassifiedCondition> lookup(const Decl *D) const {
     auto Res = find(D);
     if (Res == end())
-      return llvm::None;
+      return std::nullopt;
     return Res->second;
   }
 };
@@ -599,7 +599,7 @@ class ClosureCallbackParams final {
   ArrayRef<const ParamDecl *> AllParams;
   llvm::SetVector<const ParamDecl *> SuccessParams;
   const ParamDecl *ErrParam = nullptr;
-  llvm::Optional<KnownBoolFlagParam> BoolFlagParam;
+  std::optional<KnownBoolFlagParam> BoolFlagParam;
 
 public:
   ClosureCallbackParams(const AsyncHandlerParamDesc &HandlerDesc,
@@ -685,7 +685,7 @@ public:
 
   /// If there is a known Bool flag parameter indicating success or failure,
   /// returns it, \c None otherwise.
-  llvm::Optional<KnownBoolFlagParam> getKnownBoolFlagParam() const {
+  std::optional<KnownBoolFlagParam> getKnownBoolFlagParam() const {
     return BoolFlagParam;
   }
 
@@ -769,7 +769,7 @@ private:
   bool hasForceUnwrappedErrorParam(ArrayRef<ASTNode> Nodes);
 
   /// Given a callback condition, classify it as a success or failure path.
-  llvm::Optional<ClassifiedCondition>
+  std::optional<ClassifiedCondition>
   classifyCallbackCondition(const CallbackCondition &Cond,
                             const NodesToPrint &SuccessNodes, Stmt *ElseStmt);
 
@@ -922,7 +922,7 @@ public:
 ///
 /// Calls to functions with an async alternative will be replaced with a call
 /// to the alternative, possibly wrapped in a do/catch. The do/catch is skipped
-/// if the the closure either:
+/// if the closure either:
 ///   1. Has no error
 ///   2. Has an error but no error handling (eg. just ignores)
 ///   3. Has error handling that only calls the containing function's handler
@@ -1217,7 +1217,7 @@ private:
                           const AsyncHandlerParamDesc &HandlerDesc);
 
   /// Add a binding to a known bool flag that indicates success or failure.
-  void addBoolFlagParamBindingIfNeeded(llvm::Optional<KnownBoolFlagParam> Flag,
+  void addBoolFlagParamBindingIfNeeded(std::optional<KnownBoolFlagParam> Flag,
                                        BlockKind Block);
 
   /// Add a call to the async alternative of \p CE and convert the \p Callback

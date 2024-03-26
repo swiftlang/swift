@@ -1,6 +1,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
@@ -78,11 +79,12 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   INITIALIZE_LLVM();
   swift::SearchPathOptions searchPathOpts;
   swift::symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
+  swift::CASOptions casOpts;
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
   std::unique_ptr<ASTContext> context(
       ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-                      symbolGraphOpts, sourceMgr, diags));
+                      symbolGraphOpts, casOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context);
 
   std::string PCH = createFilename(cache, "bridging.h.pch");
@@ -192,6 +194,7 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
   ClangImporterOptions options;
+  CASOptions casOpts;
   options.clangPath = "/usr/bin/clang";
   options.ExtraArgs.push_back(
       (llvm::Twine("--gcc-toolchain=") + "/opt/rh/devtoolset-9/root/usr")
@@ -199,7 +202,7 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   options.ExtraArgs.push_back("--gcc-toolchain");
   std::unique_ptr<ASTContext> context(
       ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-                      symbolGraphOpts, sourceMgr, diags));
+                      symbolGraphOpts, casOpts, sourceMgr, diags));
 
   {
     LibStdCxxInjectionVFS vfs;

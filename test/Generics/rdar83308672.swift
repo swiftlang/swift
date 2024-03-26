@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // CHECK: rdar83308672.(file).A@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[A]X.[P1]T, Self.[A]X : P1, Self.[A]Y : P2>
@@ -40,13 +40,13 @@ protocol G1 {
 // CHECK: rdar83308672.(file).G2@
 // CHECK-NEXT: Requirement signature: <Self where Self.[G2]T : A, Self.[G2]T.[A]X == Self.[G2]T.[A]Y>
 protocol G2 {
-  associatedtype T : A where T : B, T.X == T.Y // expected-warning {{redundant conformance constraint 'Self.T' : 'B'}}
+  associatedtype T : A where T : B, T.X == T.Y
 }
 
 // CHECK: rdar83308672.(file).G3@
 // CHECK-NEXT: Requirement signature: <Self where Self.[G3]T : A, Self.[G3]T.[A]X == Self.[G3]T.[A]Y>
 protocol G3 {
-  associatedtype T : A where T.X == T.Y, T : B // expected-warning {{redundant conformance constraint 'Self.T' : 'B'}}
+  associatedtype T : A where T.X == T.Y, T : B
 }
 
 // CHECK: rdar83308672.(file).G4@

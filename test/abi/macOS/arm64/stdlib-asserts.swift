@@ -40,23 +40,4 @@
 
 // Standard Library Symbols
 
-// class __StaticArrayStorage
-Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfC
-Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfCTj
-Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfCTq
-Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfc
-Added: _$ss20__StaticArrayStorageC16_doNotCallMeBaseAByt_tcfC
-Added: _$ss20__StaticArrayStorageC16_doNotCallMeBaseAByt_tcfc
-Added: _$ss20__StaticArrayStorageC16canStoreElements13ofDynamicTypeSbypXp_tF
-Added: _$ss20__StaticArrayStorageC17staticElementTypeypXpvg
-Added: _$ss20__StaticArrayStorageCMa
-Added: _$ss20__StaticArrayStorageCMn
-Added: _$ss20__StaticArrayStorageCMo
-Added: _$ss20__StaticArrayStorageCMu
-Added: _$ss20__StaticArrayStorageCN
-Added: _$ss20__StaticArrayStorageCfD
-Added: _$ss20__StaticArrayStorageCfd
-Added: _OBJC_CLASS_$__TtCs20__StaticArrayStorage
-Added: _OBJC_METACLASS_$__TtCs20__StaticArrayStorage
-
 // Runtime Symbols

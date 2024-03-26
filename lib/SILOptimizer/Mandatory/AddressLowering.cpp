@@ -645,7 +645,7 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       SILArgument *arg = pass.function->getArgument(argIdx);
       SILType addrType = arg->getType().getAddressType();
       auto loc = SILValue(arg).getLoc();
-      SILValue undefAddress = SILUndef::get(addrType, *pass.function);
+      SILValue undefAddress = SILUndef::get(pass.function, addrType);
       SingleValueInstruction *load;
       if (addrType.isTrivial(*pass.function)) {
         load = argBuilder.createLoad(loc, undefAddress,
@@ -947,6 +947,9 @@ static Operand *getProjectedDefOperand(SILValue value) {
 
     return nullptr;
 
+  case ValueKind::MarkUnresolvedNonCopyableValueInst:
+    return &cast<MarkUnresolvedNonCopyableValueInst>(value)->getOperandRef();
+
   case ValueKind::MoveValueInst:
     return &cast<MoveValueInst>(value)->getOperandRef();
 
@@ -1006,6 +1009,8 @@ static Operand *getReusedStorageOperand(SILValue value) {
   default:
     break;
 
+  case ValueKind::CopyableToMoveOnlyWrapperValueInst:
+  case ValueKind::MoveOnlyWrapperToCopyableValueInst:
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -2798,7 +2803,7 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
   // Temporarily redirect all uses to Undef. They will be fixed in
   // replaceDirectResults().
   replaceTermResult(
-      SILUndef::get(resultArg->getType().getAddressType(), *pass.function));
+      SILUndef::get(pass.function, resultArg->getType().getAddressType()));
 }
 
 // Replace all formally direct results by rewriting the destructure_tuple.
@@ -3406,6 +3411,19 @@ protected:
 
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
 
+  void visitCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *inst) {
+    assert(use == getReusedStorageOperand(inst));
+    assert(inst->getType().isAddressOnly(*pass.function));
+    SILValue srcVal = inst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr =
+        builder.createCopyableToMoveOnlyWrapperAddr(inst->getLoc(), srcAddr);
+
+    markRewritten(inst, destAddr);
+  }
+
   void visitEndBorrowInst(EndBorrowInst *end) {}
 
   void visitFixLifetimeInst(FixLifetimeInst *fli) {
@@ -3418,7 +3436,7 @@ protected:
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
 
-    use->set(SILUndef::get(use->get()->getType(), *pass.function));
+    use->set(SILUndef::get(use->get()));
   }
 
   // Copy from an opaque source operand.
@@ -3480,7 +3498,30 @@ protected:
   // types.
   void visitOpenExistentialValueInst(OpenExistentialValueInst *openExistential);
 
+  void visitMarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableValueInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+
+    auto address = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    auto *replacement = builder.createMarkUnresolvedNonCopyableValueInst(
+        inst->getLoc(), address, inst->getCheckKind());
+    markRewritten(inst, replacement);
+  }
+
   void visitMoveValueInst(MoveValueInst *mvi);
+
+  void visitMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *inst) {
+    assert(use == getReusedStorageOperand(inst));
+    assert(inst->getType().isAddressOnly(*pass.function));
+    SILValue srcVal = inst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr =
+        builder.createMoveOnlyWrapperToCopyableAddr(inst->getLoc(), srcAddr);
+
+    markRewritten(inst, destAddr);
+  }
 
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after

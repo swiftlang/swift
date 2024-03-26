@@ -32,6 +32,12 @@ bool getDocumentationCommentAsXML(
   const Decl *D, raw_ostream &OS,
   TypeOrExtensionDecl SynthesizedTarget = TypeOrExtensionDecl());
 
+/// If the declaration has a documentation comment, prints the comment to \p OS
+/// in the form it's written in source.
+///
+/// \returns true if the declaration has a documentation comment.
+bool getRawDocumentationComment(const Decl *D, raw_ostream &OS);
+
 /// If the declaration has a documentation comment and a localization key,
 /// print it into the given output stream and return true. Else, return false.
 bool getLocalizationKey(const Decl *D, raw_ostream &OS);

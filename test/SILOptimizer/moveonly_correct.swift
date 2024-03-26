@@ -14,3 +14,13 @@ struct VM: ~Copyable {
         env.constants
     }
 }
+
+// rdar://109232806
+public protocol P_109232806 {}
+public struct M_109232806: ~Copyable {
+  var x: P_109232806? = nil
+  var y: Int { 0 }
+}
+public func test_109232806(m: borrowing M_109232806) {
+  _ = m.y
+}

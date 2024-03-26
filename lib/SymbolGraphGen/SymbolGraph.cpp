@@ -31,9 +31,9 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
-                         llvm::Optional<ModuleDecl *> ExtendedModule,
+                         std::optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
-                         llvm::Optional<llvm::VersionTuple> ModuleVersion,
+                         std::optional<llvm::VersionTuple> ModuleVersion,
                          bool IsForSingleNode)
     : Walker(Walker), M(M), ExtendedModule(ExtendedModule), Ctx(Ctx),
       ModuleVersion(ModuleVersion), IsForSingleNode(IsForSingleNode) {
@@ -75,30 +75,39 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
-#include "swift/AST/Attr.def"
+#define TYPE_ATTR(X, C)                                                        \
+  ExcludeAttrs.insert(std::make_pair("TypeAttrKind::" #C, TypeAttrKind::C));
+#include "swift/AST/TypeAttr.def"
 
   // Allow the following type attributes:
-  ExcludeAttrs.erase("TAK_autoclosure");
-  ExcludeAttrs.erase("TAK_convention");
-  ExcludeAttrs.erase("TAK_noescape");
-  ExcludeAttrs.erase("TAK_escaping");
-  ExcludeAttrs.erase("TAK_inout");
+  ExcludeAttrs.erase("TypeAttrKind::Autoclosure");
+  ExcludeAttrs.erase("TypeAttrKind::Convention");
+  ExcludeAttrs.erase("TypeAttrKind::NoEscape");
+  ExcludeAttrs.erase("TypeAttrKind::Escaping");
+  ExcludeAttrs.erase("TypeAttrKind::Inout");
 
   // Don't allow the following decl attributes:
   // These can be large and are already included elsewhere in
   // symbol graphs.
-  ExcludeAttrs.insert(std::make_pair("DAK_Available", DAK_Available));
-  ExcludeAttrs.insert(std::make_pair("DAK_Inline", DAK_Inline));
-  ExcludeAttrs.insert(std::make_pair("DAK_Inlinable", DAK_Inlinable));
-  ExcludeAttrs.insert(std::make_pair("DAK_Prefix", DAK_Prefix));
-  ExcludeAttrs.insert(std::make_pair("DAK_Postfix", DAK_Postfix));
-  ExcludeAttrs.insert(std::make_pair("DAK_Infix", DAK_Infix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Available", DeclAttrKind::Available));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Inline", DeclAttrKind::Inline));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Inlinable", DeclAttrKind::Inlinable));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Prefix", DeclAttrKind::Prefix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Postfix", DeclAttrKind::Postfix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Infix", DeclAttrKind::Infix));
 
   // In "emit modules separately" jobs, access modifiers show up as attributes,
   // but we don't want them to be printed in declarations
-  ExcludeAttrs.insert(std::make_pair("DAK_AccessControl", DAK_AccessControl));
-  ExcludeAttrs.insert(std::make_pair("DAK_SetterAccess", DAK_SetterAccess));
+  ExcludeAttrs.insert(std::make_pair("DeclAttrKind::AccessControl",
+                                     DeclAttrKind::AccessControl));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::SetterAccess", DeclAttrKind::SetterAccess));
 
   for (const auto &Entry : ExcludeAttrs) {
     Opts.ExcludeAttrList.push_back(Entry.getValue());
@@ -129,17 +138,16 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   Options.PrintOverrideKeyword = false;
   Options.PrintGenericRequirements = false;
 
-  #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
-    Options.ExcludeAttrList.push_back(DAK_##CLASS);
-  #define TYPE_ATTR(X) \
-    Options.ExcludeAttrList.push_back(TAK_##X);
-  #include "swift/AST/Attr.def"
+#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)                              \
+  Options.ExcludeAttrList.push_back(DeclAttrKind::CLASS);
+#define TYPE_ATTR(X, C) Options.ExcludeAttrList.push_back(TypeAttrKind::C);
+#include "swift/AST/DeclAttr.def"
 
   // Don't include these attributes in subheadings.
-  Options.ExcludeAttrList.push_back(DAK_Final);
-  Options.ExcludeAttrList.push_back(DAK_Mutating);
-  Options.ExcludeAttrList.push_back(DAK_NonMutating);
-  Options.ExcludeAttrList.push_back(TAK_escaping);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::Final);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::Mutating);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::NonMutating);
+  Options.ExcludeAttrList.push_back(TypeAttrKind::Escaping);
 
   return Options;
 }
@@ -156,7 +164,7 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
   // or a freestanding implementation from a protocol extension without
   // a corresponding requirement.
 
-  auto *Proto = dyn_cast_or_null<ProtocolDecl>(DC->getSelfNominalTypeDecl());
+  auto *Proto = DC->getSelfProtocolDecl();
   if (!Proto) {
     return false;
   }
@@ -177,7 +185,8 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
   if (FoundRequirementMemberNamed(VD->getName(), Proto)) {
     return true;
   }
-  for (auto *Inherited : Proto->getInheritedProtocols()) {
+
+  for (auto *Inherited : Proto->getAllInheritedProtocols()) {
     if (FoundRequirementMemberNamed(VD->getName(), Inherited)) {
       return true;
     }
@@ -261,11 +270,12 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
     case swift::DeclContextKind::AbstractClosureExpr:
+    case swift::DeclContextKind::SerializedAbstractClosure:
     case swift::DeclContextKind::Initializer:
     case swift::DeclContextKind::TopLevelCodeDecl:
+    case swift::DeclContextKind::SerializedTopLevelCodeDecl:
     case swift::DeclContextKind::SubscriptDecl:
     case swift::DeclContextKind::AbstractFunctionDecl:
-    case swift::DeclContextKind::SerializedLocal:
     case swift::DeclContextKind::Package:
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:
@@ -387,23 +397,18 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
 void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
-  const auto VD = S.getLocalSymbolDecl();
-  if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (const auto &InheritanceLoc : NTD->getInherited().getEntries()) {
-      auto Ty = InheritanceLoc.getType();
-      if (!Ty) {
-        continue;
-      }
-      auto *InheritedTypeDecl =
-          dyn_cast_or_null<ClassDecl>(Ty->getAnyNominal());
-      if (!InheritedTypeDecl) {
-        continue;
-      }
+  const auto D = S.getLocalSymbolDecl();
 
-      recordEdge(Symbol(this, NTD, nullptr),
-                 Symbol(this, InheritedTypeDecl, nullptr),
-                 RelationshipKind::InheritsFrom());
-    }
+  ClassDecl *Super = nullptr;
+  if (auto *CD = dyn_cast<ClassDecl>(D))
+    Super = CD->getSuperclassDecl();
+  else if (auto *PD = dyn_cast<ProtocolDecl>(D))
+    Super = PD->getSuperclassDecl();
+
+  if (Super) {
+    recordEdge(Symbol(this, cast<ValueDecl>(D), nullptr),
+               Symbol(this, Super, nullptr),
+               RelationshipKind::InheritsFrom());
   }
 }
 
@@ -448,7 +453,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
   if (const auto *Extension = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
     if (const auto *ExtendedProtocol = Extension->getExtendedProtocolDecl()) {
       HandleProtocol(ExtendedProtocol);
-      for (const auto *Inherited : ExtendedProtocol->getInheritedProtocols()) {
+      for (const auto *Inherited : ExtendedProtocol->getAllInheritedProtocols()) {
         HandleProtocol(Inherited);
       }
     }
@@ -483,16 +488,20 @@ void SymbolGraph::recordConformanceRelationships(Symbol S) {
   const auto D = S.getLocalSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-      PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-        if (inherited != PD) {
-          recordEdge(S, Symbol(this, inherited, nullptr),
-                     RelationshipKind::ConformsTo(), nullptr);
-        }
+      for (auto *inherited : PD->getAllInheritedProtocols()) {
+        // FIXME(noncopyable_generics): Figure out what we want here.
+        if (inherited->getInvertibleProtocolKind())
+          continue;
 
-        return TypeWalker::Action::Continue;
-      });
+        recordEdge(S, Symbol(this, inherited, nullptr),
+                   RelationshipKind::ConformsTo(), nullptr);
+      }
     } else {
       for (const auto *Conformance : NTD->getAllConformances()) {
+        // FIXME(noncopyable_generics): Figure out what we want here.
+        if (Conformance->getProtocol()->getInvertibleProtocolKind())
+          continue;
+
         // Check to make sure that this conformance wasn't declared via an
         // unconditionally-unavailable extension. If so, don't add that to the graph.
         if (const auto *ED = dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext())) {
@@ -738,7 +747,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     // ${MODULE}Version{Number,String} in ${Module}.h
     SmallString<32> VersionNameIdentPrefix { M.getName().str() };
     VersionNameIdentPrefix.append("Version");
-    if (BaseName.startswith(VersionNameIdentPrefix.str())) {
+    if (BaseName.starts_with(VersionNameIdentPrefix.str())) {
       return true;
     }
 
@@ -773,6 +782,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
+/// FIXME: This should use AvailableAttr::isUnavailable() or similar.
 bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
   return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
     if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {

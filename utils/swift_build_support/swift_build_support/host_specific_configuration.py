@@ -188,14 +188,6 @@ class HostSpecificConfiguration(object):
                 else:
                     subset_suffix = ""
 
-                # If the compiler is being tested after being built to use the
-                # standalone swift-driver, we build a test-target to
-                # run a reduced set of lit-tests that verify the early swift-driver.
-                if args.test_early_swift_driver and\
-                   not test_host_only:
-                    self.swift_test_run_targets.append(
-                        "check-swift-only_early_swiftdriver-{}".format(name))
-
                 # Support for running the macCatalyst tests with
                 # the iOS-like target triple.
                 macosx_platform_match = re.search("macosx-(.*)", name)

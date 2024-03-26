@@ -157,21 +157,28 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
     if (classDecl->isActor()) {
       ASTContext &ctx = decl->getASTContext();
 
-      if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
-        SmallVector<ProtocolConformance *, 1> conformances;
-        classDecl->lookupConformance(actorProto, conformances);
-        for (auto conformance : conformances)
-          TypeChecker::checkConformance(conformance->getRootNormalConformance());
-      }
+      auto evaluateConformance = [&](KnownProtocolKind Kind) {
+        if (auto actorProto = ctx.getProtocol(Kind)) {
+          SmallVector<ProtocolConformance *, 1> conformances;
+          classDecl->lookupConformance(actorProto, conformances);
+          for (auto conformance : conformances) {
+            // FIXME: This is too much. Instead, we should force the witnesses.
+            // that we actually need.
+
+            auto *normal = conformance->getRootNormalConformance();
+            evaluateOrDefault(ctx.evaluator,
+                              ResolveTypeWitnessesRequest{normal},
+                              evaluator::SideEffect());
+            normal->resolveValueWitnesses();
+          }
+        }
+      };
+
+      evaluateConformance(KnownProtocolKind::Actor);
 
       // If this is a distributed actor, synthesize its special stored properties.
       if (classDecl->isDistributedActor()) {
-        if (auto actorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor)) {
-          SmallVector<ProtocolConformance *, 1> conformances;
-          classDecl->lookupConformance(actorProto, conformances);
-          for (auto conformance : conformances)
-            TypeChecker::checkConformance(conformance->getRootNormalConformance());
-        }
+        evaluateConformance(KnownProtocolKind::DistributedActor);
       }
     }
   }
@@ -411,8 +418,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     return &pbe;
   }
 
-  binding->setPattern(entryNumber, pattern,
-                      binding->getInitContext(entryNumber));
+  binding->setPattern(entryNumber, pattern);
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -608,9 +614,7 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
       return;
   }
 
-  auto *initContext =
-      cast_or_null<PatternBindingInitializer>(binding->getInitContext(i));
-  if (initContext) {
+  if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeInitializer(initContext, init);
     (void)binding->getInitializerIsolation(i);
@@ -787,8 +791,8 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  auto *dc = storage->getDeclContext();
-  if (storage->getValueInterfaceType()->isNoncopyable(dc))
+  if (storage->getInnermostDeclContext()->mapTypeIntoContext(
+        storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
 
   return OpaqueReadOwnership::Owned;
@@ -919,31 +923,31 @@ namespace  {
 }
 
 /// Determine whether the given property should be accessed via the enclosing-self access pattern.
-static llvm::Optional<EnclosingSelfPropertyWrapperAccess>
+static std::optional<EnclosingSelfPropertyWrapperAccess>
 getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   // The enclosing-self pattern only applies to instance properties of
   // classes.
   if (!property->isInstanceMember())
-    return llvm::None;
+    return std::nullopt;
   auto classDecl = property->getDeclContext()->getSelfClassDecl();
   if (!classDecl)
-    return llvm::None;
+    return std::nullopt;
 
   // The pattern currently only works with the outermost property wrapper.
   Type outermostWrapperType = property->getPropertyWrapperBackingPropertyType();
   if (!outermostWrapperType)
-    return llvm::None;
+    return std::nullopt;
   NominalTypeDecl *wrapperTypeDecl = outermostWrapperType->getAnyNominal();
   if (!wrapperTypeDecl)
-    return llvm::None;
+    return std::nullopt;
 
   // Look for a generic subscript that fits the general form we need.
   auto wrapperInfo = wrapperTypeDecl->getPropertyWrapperTypeInfo();
-  auto subscript =
-      forProjected ? wrapperInfo.enclosingInstanceProjectedSubscript
-                   : wrapperInfo.enclosingInstanceWrappedSubscript;
+  auto subscript = forProjected
+                       ? wrapperInfo.enclosingInstanceProjectedSubscript
+                       : wrapperInfo.enclosingInstanceWrappedSubscript;
   if (!subscript)
-    return llvm::None;
+    return std::nullopt;
 
   EnclosingSelfPropertyWrapperAccess result;
   result.subscript = subscript;
@@ -957,11 +961,11 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
-static llvm::Optional<PropertyWrapperLValueness>
+static std::optional<PropertyWrapperLValueness>
 getPropertyWrapperLValueness(VarDecl *var) {
   auto &ctx = var->getASTContext();
   return evaluateOrDefault(ctx.evaluator, PropertyWrapperLValuenessRequest{var},
-                           llvm::None);
+                           std::nullopt);
 }
 
 /// Build a reference to the storage of a declaration. Returns nullptr if there
@@ -987,7 +991,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isLValue = isUsedForSetAccess;
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
-  llvm::Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
+  std::optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
   // Contains the underlying wrappedValue declaration in a property wrapper
   // along with whether or not the reference to this field needs to be an lvalue
   llvm::SmallVector<std::pair<VarDecl *, bool>, 1> underlyingVars;
@@ -1313,8 +1317,7 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = TypeChecker::conformsToProtocol(type, proto,
-                                                      dc->getParentModule()))
+    if (auto result = dc->getParentModule()->checkConformance(type, proto))
       return result;
   }
 
@@ -1505,9 +1508,7 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
 
   SmallVector<ASTNode, 2> body;
   if (result != nullptr) {
-    ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result,
-                                              /*IsImplicit=*/true);
-    body.push_back(returnStmt);
+    body.push_back(ReturnStmt::createImplicit(ctx, result));
   }
 
   return { BraceStmt::create(ctx, loc, body, loc, true),
@@ -1568,7 +1569,7 @@ namespace {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -1605,7 +1606,7 @@ namespace {
 
       // Skip walking the children of any Decls that are also DeclContexts,
       // they will already have the right parent.
-      return Action::SkipChildrenIf(isa<DeclContext>(D));
+      return Action::SkipNodeIf(isa<DeclContext>(D));
     }
   };
 } // end anonymous namespace
@@ -1651,8 +1652,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                         AccessSemantics::Ordinary);
   Tmp1DRE->setType(Tmp1VD->getTypeInContext());
-  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
-                                      /*implicit*/true);
+  auto *Return = ReturnStmt::createImplicit(Ctx, Tmp1DRE);
   auto *ReturnBranch = BraceStmt::createImplicit(Ctx, {Return});
 
   // Build the "if" around the early return.
@@ -1717,7 +1717,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                                   AccessSemantics::DirectToStorage);
   Tmp2DRE->setType(Tmp2VD->getTypeInContext());
 
-  Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
+  Body.push_back(ReturnStmt::createImplicit(Ctx, Tmp2DRE));
 
   auto Range = InitValue->getSourceRange();
   return { BraceStmt::create(Ctx, Range.Start, Body, Range.End,
@@ -2191,6 +2191,7 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return synthesizeGetterBody(accessor, ctx);
 
   case AccessorKind::Set:
@@ -2236,10 +2237,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
       const auto i = bindingDecl->getPatternEntryIndexForVarDecl(varDecl);
-      auto *bindingInit = cast<PatternBindingInitializer>(
-        bindingDecl->getInitContext(i));
-
-      selfDecl = bindingInit->getImplicitSelfDecl();
+      selfDecl = bindingDecl->getInitContext(i)->getImplicitSelfDecl();
     }
   }
 
@@ -2494,6 +2492,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return createGetterPrototype(storage, ctx);
 
   case AccessorKind::Set:
@@ -2672,6 +2671,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
     break;
+  case AccessorKind::DistributedGet:
+    return false;
 
   case AccessorKind::Set:
 
@@ -2963,7 +2964,7 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
     : PropertyWrapperMutability::Nonmutating;
 }
 
-llvm::Optional<PropertyWrapperMutability>
+std::optional<PropertyWrapperMutability>
 PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *originalVar = var;
   unsigned numWrappers = originalVar->getAttachedPropertyWrappers().size();
@@ -2972,7 +2973,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
     originalVar = var->getOriginalWrappedProperty(
         PropertyWrapperSynthesizedPropertyKind::Projection);
     if (!originalVar)
-      return llvm::None;
+      return std::nullopt;
 
     numWrappers = originalVar->getAttachedPropertyWrappers().size();
     isProjectedValue = true;
@@ -2985,9 +2986,9 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
       varSourceFile && varSourceFile->Kind != SourceFileKind::Interface;
 
   if (var->getParsedAccessor(AccessorKind::Get) && isVarNotInInterfaceFile)
-    return llvm::None;
+    return std::nullopt;
   if (var->getParsedAccessor(AccessorKind::Set) && isVarNotInInterfaceFile)
-    return llvm::None;
+    return std::nullopt;
 
   // Figure out which member we're looking through.
   auto varMember = isProjectedValue
@@ -2997,7 +2998,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   // Start with the traits from the outermost wrapper.
   auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
   if (firstWrapper.*varMember == nullptr)
-    return llvm::None;
+    return std::nullopt;
 
   PropertyWrapperMutability result;
   
@@ -3014,7 +3015,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
     assert(var == originalVar);
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
-      return llvm::None;
+      return std::nullopt;
 
     PropertyWrapperMutability nextResult;
     nextResult.Getter =
@@ -3028,7 +3029,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i]),
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i-1]));
 
-      return llvm::None;
+      return std::nullopt;
     }
     nextResult.Setter =
               result.composeWith(getSetterMutatingness(wrapper.valueVar,
@@ -3040,7 +3041,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   return result;
 }
 
-llvm::Optional<PropertyWrapperLValueness>
+std::optional<PropertyWrapperLValueness>
 PropertyWrapperLValuenessRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *VD = var;
   unsigned numWrappers = var->getAttachedPropertyWrappers().size();
@@ -3053,7 +3054,7 @@ PropertyWrapperLValuenessRequest::evaluate(Evaluator &, VarDecl *var) const {
   }
 
   if (!VD)
-    return llvm::None;
+    return std::nullopt;
 
   auto varMember = isProjectedValue
       ? &PropertyWrapperTypeInfo::projectedValueVar
@@ -3633,11 +3634,11 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
   return hasStorage;
 }
 
-llvm::Optional<bool> HasStorageRequest::getCachedResult() const {
+std::optional<bool> HasStorageRequest::getCachedResult() const {
   AbstractStorageDecl *decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.HasStorageComputed)
     return static_cast<bool>(decl->LazySemanticInfo.HasStorage);
-  return llvm::None;
+  return std::nullopt;
 }
 
 void HasStorageRequest::cacheResult(bool hasStorage) const {

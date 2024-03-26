@@ -73,5 +73,6 @@ func goodCallToZip<each T, each U>(t: repeat each T, u: repeat each U) where (re
 
 func badCallToZip<each T, each U>(t: repeat each T, u: repeat each U) {
   _ = zip(t: repeat each t, u: repeat each u)
-  // expected-error@-1 {{global function 'zip(t:u:)' requires the type packs 'repeat each T' and 'repeat each U' have the same shape}}
+  // expected-error@-1 {{global function 'zip(t:u:)' requires the type packs 'each T' and 'each U' have the same shape}}
+  // expected-error@-2 {{pack expansion requires that 'each U' and 'each T' have the same shape}}
 }

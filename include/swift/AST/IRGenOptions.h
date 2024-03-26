@@ -31,6 +31,7 @@
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -404,6 +405,9 @@ public:
   /// using TypeInfo entries.
   unsigned ForceStructTypeLayouts : 1;
 
+  /// Run a reg2Mem pass after large loadable type lowering.
+  unsigned EnableLargeLoadableTypesReg2Mem : 1;
+
   /// Enable generation and use of layout string based value witnesses
   unsigned EnableLayoutStringValueWitnesses : 1;
 
@@ -463,6 +467,8 @@ public:
   /// Use relative (and constant) protocol witness tables.
   unsigned UseRelativeProtocolWitnessTables : 1;
 
+  unsigned UseFragileResilientProtocolWitnesses : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -488,10 +494,10 @@ public:
   TypeInfoDumpFilter TypeInfoFilter;
   
   /// Pull in runtime compatibility shim libraries by autolinking.
-  llvm::Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
+  std::optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
   bool AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary;
 
@@ -537,6 +543,7 @@ public:
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
+        EnableLargeLoadableTypesReg2Mem(true),
         EnableLayoutStringValueWitnesses(false),
         EnableLayoutStringValueWitnessesInstantiation(false),
         EnableObjectiveCProtocolSymbolicReferences(true),
@@ -550,6 +557,7 @@ public:
         EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
+        UseFragileResilientProtocolWitnesses(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
@@ -597,7 +605,8 @@ public:
   }
 
   std::string getDebugFlags(StringRef PrivateDiscriminator,
-                            bool EnableCXXInterop) const {
+                            bool EnableCXXInterop,
+                            bool EnableEmbeddedSwift) const {
     std::string Flags = DebugFlags;
     if (!PrivateDiscriminator.empty()) {
       if (!Flags.empty())
@@ -609,6 +618,12 @@ public:
         Flags += " ";
       Flags += "-enable-experimental-cxx-interop";
     }
+    if (EnableEmbeddedSwift) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += "-enable-embedded-swift";
+    }
+
     return Flags;
   }
 
@@ -627,6 +642,10 @@ public:
   bool hasMultipleIRGenThreads() const { return !UseSingleModuleLLVMEmission && NumThreads > 1; }
   bool shouldPerformIRGenerationInParallel() const { return !UseSingleModuleLLVMEmission && NumThreads != 0; }
   bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
+
+  bool isDebugInfoCodeView() const {
+    return DebugInfoFormat == IRGenDebugInfoFormat::CodeView;
+  }
 };
 
 } // end namespace swift

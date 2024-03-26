@@ -87,7 +87,7 @@ class SelectorBothAsync2: NSObject, SelectorBothAsyncProto {
   func hello() async -> Bool // expected-note {{method 'hello()' declared here}}
 
   @objc(helloWithCompletion:)
-  func hello(completion: @escaping (Bool) -> Void) // expected-warning {{method 'hello(completion:)' with Objective-C selector 'helloWithCompletion:' conflicts with method 'hello()' with the same Objective-C selector; this is an error in Swift 6}}
+  func hello(completion: @escaping (Bool) -> Void) // expected-warning {{method 'hello(completion:)' with Objective-C selector 'helloWithCompletion:' conflicts with method 'hello()' with the same Objective-C selector; this is an error in the Swift 6 language mode}}
 }
 
 // additional coverage for situation like C4, where the method names don't
@@ -111,4 +111,8 @@ class C5 {
 
 class C6: C5, ServiceProvider {
   @MainActor func allOperations() async -> [String] { [] }
+}
+
+extension ImplementsLoadable: @retroactive Loadable {
+  public func loadStuff(withOtherIdentifier otherIdentifier: Int, reply: @escaping () -> Void) {}
 }

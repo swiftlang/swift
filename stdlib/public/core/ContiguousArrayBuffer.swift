@@ -63,6 +63,9 @@ internal final class __EmptyArrayStorage
   }
 }
 
+@available(*, unavailable)
+extension __EmptyArrayStorage: Sendable {}
+
 #if $Embedded
 // In embedded Swift, the stdlib is a .swiftmodule only without any .o/.a files,
 // to allow consuming it by clients with different LLVM codegen setting (-mcpu
@@ -116,6 +119,9 @@ internal final class __StaticArrayStorage
     fatalError("__StaticArrayStorage.staticElementType must not be called")
   }
 }
+
+@available(*, unavailable)
+extension __StaticArrayStorage: Sendable {}
 
 /// The empty array prototype.  We use the same object for all empty
 /// `[Native]Array<Element>`s.
@@ -305,6 +311,9 @@ internal final class _ContiguousArrayStorage<
     return UnsafeMutablePointer(Builtin.projectTailElems(self, Element.self))
   }
 }
+
+@available(*, unavailable)
+extension _ContiguousArrayStorage: Sendable {}
 
 @_alwaysEmitIntoClient
 @inline(__always)
@@ -767,7 +776,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// Returns `true` if this buffer's storage is uniquely-referenced;
   /// otherwise, returns `false`.
   ///
-  /// This function should only be used for internal sanity checks.
+  /// This function should only be used for internal soundness checks.
   /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
@@ -967,6 +976,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return true
   }
 }
+
+@available(*, unavailable)
+extension _ContiguousArrayBuffer: Sendable {}
 
 /// Append the elements of `rhs` to `lhs`.
 @inlinable
@@ -1218,3 +1230,6 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     return ContiguousArray(_buffer: finalResult)
   }
 }
+
+@available(*, unavailable)
+extension _UnsafePartiallyInitializedContiguousArrayBuffer: Sendable {}

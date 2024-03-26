@@ -122,14 +122,16 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
     CGO.DwarfDebugFlags =
-        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
+                           Context.LangOpts.hasFeature(Feature::Embedded));
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
     CGO.DwarfDebugFlags =
-        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
+                           Context.LangOpts.hasFeature(Feature::Embedded));
     break;
   }
   if (!Opts.TrapFuncName.empty()) {
@@ -190,7 +192,7 @@ static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayR
 static void sanityCheckStdlib(IRGenModule &IGM) {
   if (!IGM.getSwiftModule()->isStdlibModule()) return;
 
-  // Only run the sanity check when we're building the real stdlib.
+  // Only run the soundness check when we're building the real stdlib.
   if (!lookupSimple(IGM.getSwiftModule(), { "String" })) return;
 
   if (!IGM.ObjCInterop) return;
@@ -230,6 +232,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   EnableValueNames = opts.shouldProvideValueNames();
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
+  PtrTy = llvm::PointerType::getUnqual(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
@@ -672,13 +675,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
-  SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
-  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftTaskOptionRecordTy = createStructType(
-      *this, "swift.task_option", {
+  SwiftTaskOptionRecordTy =
+    llvm::StructType::create(getLLVMContext(), "swift.task_option");
+  SwiftTaskOptionRecordPtrTy = SwiftTaskOptionRecordTy->getPointerTo(DefaultAS);
+  SwiftTaskOptionRecordTy->setBody({
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
   });
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
   SwiftTaskGroupTaskOptionRecordTy = createStructType(
       *this, "swift.task_group_task_option", {
     SwiftTaskOptionRecordTy,    // Base option record
@@ -698,6 +702,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
+  });
+  SwiftInitialSerialExecutorTaskOptionRecordTy =
+      createStructType(*this, "swift.serial_executor_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    SwiftExecutorTy,         // Executor
   });
   SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy =
       createStructType(*this, "swift.task_executor_task_option", {
@@ -953,7 +962,7 @@ namespace RuntimeConstants {
   }
 
   RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
-    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    auto featureAvailability = Context.getParameterizedExistentialAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -1997,6 +2006,20 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
+#define FEATURE(N, V)                                                   \
+bool IRGenModule::is##N##FeatureAvailable(const ASTContext &context) {  \
+  auto deploymentAvailability                                           \
+    = AvailabilityContext::forDeploymentTarget(context);                \
+  auto runtimeAvailability                                              \
+    = AvailabilityContext::forRuntimeTarget(context);                   \
+  return deploymentAvailability.isContainedIn(                          \
+    context.get##N##Availability())                                     \
+    && runtimeAvailability.isContainedIn(                               \
+      context.get##N##RuntimeAvailability());                           \
+}
+
+#include "swift/AST/FeatureAvailability.def"
+
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
       (Triple.isOSDarwin() || Triple.isOSWindows() ||
@@ -2016,11 +2039,9 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
 bool IRGenModule::canUseObjCSymbolicReferences() {
   if (!IRGen.Opts.EnableObjectiveCProtocolSymbolicReferences)
     return false;
-  auto &context = getSwiftModule()->getASTContext();
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(context);
-  return deploymentAvailability.isContainedIn(
-      context.getObjCSymbolicReferencesAvailability());
+  return isObjCSymbolicReferencesFeatureAvailable(
+    getSwiftModule()->getASTContext()
+  );
 }
 
 bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
@@ -2042,7 +2063,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (clDecl->getNameStr() != "_ContiguousArrayStorage")
     return false;
 
-  if (!getAvailabilityContext().isContainedIn(Context.getStaticReadOnlyArraysAvailability()))
+  if (!isStaticReadOnlyArraysFeatureAvailable())
     return false;
 
   if (!getStaticArrayStorageDecl())

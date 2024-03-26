@@ -31,4 +31,5 @@ target_sources(swiftSILOptimizer PRIVATE
   SpecializationMangler.cpp
   StackNesting.cpp
   ValueLifetime.cpp
+  VariableNameUtils.cpp
   OwnershipOptUtils.cpp)

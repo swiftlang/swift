@@ -1,4 +1,14 @@
-// RUN: %target-sil-opt -module-name moveonly_addresschecker -enable-experimental-feature MoveOnlyPartialConsumption -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -move-only-address-checker-disable-lifetime-extension=true | %FileCheck %s
+// RUN: %target-sil-opt                                                \
+// RUN:     -sil-move-only-address-checker                             \
+// RUN:     %s                                                         \
+// RUN:     -module-name moveonly_addresschecker                       \
+// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption    \
+// RUN:     -enable-experimental-feature MoveOnlyClasses               \
+// RUN:     -enable-sil-verify-all                                     \
+// RUN:     -move-only-address-checker-disable-lifetime-extension=true \
+// RUN: | %FileCheck %s
+
+import Builtin
 
 @_moveOnly
 struct M {
@@ -18,6 +28,7 @@ sil @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
 sil @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
 sil @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
 sil @get_out_2 : $@convention(thin) () -> (@out M, @out M)
+sil @take_addr_2 : $@convention(thin) (@in M, @in M) -> ()
 
 /// Two non-contiguous fields (#M4.s2, #M4.s4) are borrowed by @see_addr_2.
 /// Two non-contiguous fields (#M4.s1, #M$.s3) are consumed by @end_2.
@@ -147,4 +158,49 @@ sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
   dealloc_stack %stack_addr : $*M4
   %22 = tuple ()
   return %22 : $()
+}
+
+// Two non-contiguous fields (#M4.s2, #M$.s4) are consumed by @take_addr_2.
+// CHECK-LABEL: sil [ossa] @consume_noncontiguous : $@convention(thin) (@in M4) -> () {
+// CHECK:       bb0([[M4:%[^,]+]] :
+// CHECK:         [[S1:%[^,]+]] = struct_element_addr [[M4]] : $*M4, #M4.s1
+// CHECK:         [[S3:%[^,]+]] = struct_element_addr [[M4]] : $*M4, #M4.s3
+// CHECK:         [[TAKE_ADDR_2:%[^,]+]] = function_ref @take_addr_2
+// CHECK:         apply [[TAKE_ADDR_2]]([[S1]], [[S3]])
+// CHECK-LABEL: } // end sil function 'consume_noncontiguous'
+sil [ossa] @consume_noncontiguous : $@convention(thin) (@in M4) -> () {
+entry(%m4_addr : $*M4):
+  %m4 = mark_unresolved_non_copyable_value [consumable_and_assignable] %m4_addr : $*M4
+  %s1 = struct_element_addr %m4 : $*M4, #M4.s1
+  %s2 = struct_element_addr %m4 : $*M4, #M4.s2
+  %s3 = struct_element_addr %m4 : $*M4, #M4.s3
+  %s4 = struct_element_addr %m4 : $*M4, #M4.s4
+  %take_addr_2 = function_ref @take_addr_2 : $@convention(thin) (@in M, @in M) -> ()
+  apply %take_addr_2(%s1, %s3) : $@convention(thin) (@in M, @in M) -> ()
+  destroy_addr %s2 : $*M
+  destroy_addr %s4 : $*M
+  %retval = tuple ()
+  return %retval : $()
+}
+
+struct S : ~Copyable {
+  var o: Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_copyable : {{.*}} {
+// CHECK:       bb0([[S:%[^,]+]] :
+// CHECK:         [[O_ADDR:%[^,]+]] = struct_element_addr [[S]] : $*S, #S.o
+// CHECK:         [[O:%[^,]+]] = load [take] [[O_ADDR]]
+// CHECK:         [[OM:%[^,]+]] = move_value [[O]]
+// CHECK:         destroy_value [[OM]]
+// CHECK-LABEL: } // end sil function 'load_take_copyable'
+sil [ossa] @load_take_copyable : $@convention(thin) (@in S) -> () {
+bb0(%s_addr : $*S):
+  %s = mark_unresolved_non_copyable_value [consumable_and_assignable] %s_addr : $*S
+  %o_addr = struct_element_addr %s : $*S, #S.o
+  %o = load [take] %o_addr : $*Builtin.NativeObject
+  %om = move_value %o : $Builtin.NativeObject
+  destroy_value %om : $Builtin.NativeObject
+  %retval = tuple ()
+  return %retval : $()
 }

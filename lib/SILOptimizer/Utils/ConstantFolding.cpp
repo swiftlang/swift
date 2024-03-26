@@ -203,7 +203,7 @@ static SILValue constructResultWithOverflowTuple(BuiltinInst *BI,
 static SILValue
 constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
                                bool ReportOverflow,
-                               llvm::Optional<bool> &ResultsInError) {
+                               std::optional<bool> &ResultsInError) {
   OperandValueArrayRef Args = BI->getArguments();
   assert(Args.size() >= 2);
 
@@ -295,7 +295,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
           .highlight(LHSRange)
           .highlight(RHSRange);
     }
-    ResultsInError = llvm::Optional<bool>(true);
+    ResultsInError = std::optional<bool>(true);
   }
 
   return constructResultWithOverflowTuple(BI, Res, Overflow);
@@ -303,7 +303,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
 
 static SILValue
 constantFoldBinaryWithOverflow(BuiltinInst *BI, BuiltinValueKind ID,
-                               llvm::Optional<bool> &ResultsInError) {
+                               std::optional<bool> &ResultsInError) {
   OperandValueArrayRef Args = BI->getArguments();
   auto *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
   return constantFoldBinaryWithOverflow(BI,
@@ -347,7 +347,7 @@ constantFoldCountLeadingOrTrialingZeroIntrinsic(BuiltinInst *bi,
 }
 
 static SILValue constantFoldIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID,
-                                      llvm::Optional<bool> &ResultsInError) {
+                                      std::optional<bool> &ResultsInError) {
   switch (ID) {
   default: break;
   case llvm::Intrinsic::expect: {
@@ -379,6 +379,13 @@ static SILValue constantFoldIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID,
                                           ResultsInError);
   }
   return nullptr;
+}
+
+static bool isFiniteFloatLiteral(SILValue v) {
+  if (auto *lit = dyn_cast<FloatLiteralInst>(v)) {
+    return lit->getValue().isFinite();
+  }
+  return false;
 }
 
 static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
@@ -640,17 +647,11 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                 m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg)))))) {
     APInt val = builtinArg->getValue();
-    if (hasIEEEFloatPosInfBitRepr(val)) {
-      // One of the operands is infinity, but unless the other operand is not
-      // fully visible we cannot definitively say what it is. It can be anything, 
-      // including NaN and infinity itself. Therefore, we cannot fold the comparison
-      // just yet.
-      if (isa<StructExtractInst>(Other) || isa<TupleExtractInst>(Other)) {
-        return nullptr;
-      } else {  
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-      }
+    if (hasIEEEFloatPosInfBitRepr(val) &&
+        // Only if `Other` is a literal we can be sure that it's not Inf or NaN.
+        isFiniteFloatLiteral(Other)) {
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
     }
   }
 
@@ -682,17 +683,11 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                 m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
     APInt val = builtinArg->getValue();
-    if (hasIEEEFloatPosInfBitRepr(val)) {
-      // One of the operands is infinity, but unless the other operand is not
-      // fully visible we cannot definitively say what it is. It can be anything, 
-      // including NaN and infinity itself. Therefore, we cannot fold the comparison
-      // just yet.
-      if (isa<StructExtractInst>(Other) || isa<TupleExtractInst>(Other)) {
-        return nullptr;
-      } else {  
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
-      }
+    if (hasIEEEFloatPosInfBitRepr(val) &&
+        // Only if `Other` is a literal we can be sure that it's not Inf or NaN.
+        isFiniteFloatLiteral(Other)) {
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
     }
   }
 
@@ -841,7 +836,7 @@ static SILValue constantFoldCompare(BuiltinInst *BI, BuiltinValueKind ID) {
 
 static SILValue
 constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
-                             llvm::Optional<bool> &ResultsInError) {
+                             std::optional<bool> &ResultsInError) {
   assert(ID == BuiltinValueKind::SDiv ||
          ID == BuiltinValueKind::SRem ||
          ID == BuiltinValueKind::UDiv ||
@@ -865,7 +860,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
     // Otherwise emit a diagnosis error and set ResultsInError to true.
     diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
              diag::division_by_zero);
-    ResultsInError = llvm::Optional<bool>(true);
+    ResultsInError = std::optional<bool>(true);
     return nullptr;
   }
 
@@ -893,7 +888,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
              llvm::toString(NumVal, /*Radix*/ 10, /*Signed*/ true),
              IsRem ? "%" : "/",
              llvm::toString(DenomVal, /*Radix*/ 10, /*Signed*/ true));
-    ResultsInError = llvm::Optional<bool>(true);
+    ResultsInError = std::optional<bool>(true);
     return nullptr;
   }
 
@@ -921,7 +916,7 @@ static SILValue specializePolymorphicBuiltin(BuiltinInst *bi,
 /// The list of operations we constant fold might not be complete. Start with
 /// folding the operations used by the standard library.
 static SILValue constantFoldBinary(BuiltinInst *BI, BuiltinValueKind ID,
-                                   llvm::Optional<bool> &ResultsInError) {
+                                   std::optional<bool> &ResultsInError) {
   switch (ID) {
   default:
     return nullptr;
@@ -996,7 +991,7 @@ static SILValue constantFoldBinary(BuiltinInst *BI, BuiltinValueKind ID,
                RHS->getLoc().getSourceLoc(),
                diag::shifting_all_significant_bits);
 
-      ResultsInError = llvm::Optional<bool>(true);
+      ResultsInError = std::optional<bool>(true);
       return nullptr;
     }
 
@@ -1042,7 +1037,7 @@ static SILValue constantFoldBinary(BuiltinInst *BI, BuiltinValueKind ID,
 static SILValue
 constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
                                        const BuiltinInfo &Builtin,
-                                       llvm::Optional<bool> &ResultsInError) {
+                                       std::optional<bool> &ResultsInError) {
   assert(Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
@@ -1146,7 +1141,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
                  UserSrcTy.isNull() ? SrcTy : UserSrcTy,
                  UserDstTy.isNull() ? DstTy : UserDstTy);
 
-      ResultsInError = llvm::Optional<bool>(true);
+      ResultsInError = std::optional<bool>(true);
       return nullptr;
     }
 
@@ -1189,7 +1184,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       }
     }
 
-    ResultsInError = llvm::Optional<bool>(true);
+    ResultsInError = std::optional<bool>(true);
     return nullptr;
   }
 
@@ -1220,7 +1215,7 @@ static bool tryExtractLiteralText(FloatLiteralInst *flitInst,
 
 static SILValue foldFPToIntConversion(BuiltinInst *BI,
                                       const BuiltinInfo &Builtin,
-                                      llvm::Optional<bool> &ResultsInError) {
+                                      std::optional<bool> &ResultsInError) {
 
   assert(Builtin.ID == BuiltinValueKind::FPToSI ||
          Builtin.ID == BuiltinValueKind::FPToUI);
@@ -1249,7 +1244,7 @@ static SILValue foldFPToIntConversion(BuiltinInst *BI,
                diag::negative_fp_literal_overflow_unsigned, fpStr,
                CE ? CE->getType() : destTy,
                CE ? false : conversionToUnsigned);
-      ResultsInError = llvm::Optional<bool>(true);
+      ResultsInError = std::optional<bool>(true);
     }
     return nullptr;
   }
@@ -1273,7 +1268,7 @@ static SILValue foldFPToIntConversion(BuiltinInst *BI,
                diag::float_to_int_overflow, fpStr,
                CE ? CE->getType() : destTy,
                CE ? CE->isImplicit() : false);
-      ResultsInError = llvm::Optional<bool>(true);
+      ResultsInError = std::optional<bool>(true);
     }
     return nullptr;
   }
@@ -1388,7 +1383,7 @@ bool isLossyUnderflow(APFloat srcVal, BuiltinFloatType *srcType,
 /// SIL instruction is specified using hex-float notation in the Swift source.
 bool isHexLiteralInSource(FloatLiteralInst *flitInst) {
   auto *flitExpr = flitInst->getLoc().getAsASTNode<FloatLiteralExpr>();
-  return flitExpr && flitExpr->getDigitsText().startswith("0x");
+  return flitExpr && flitExpr->getDigitsText().starts_with("0x");
 }
 
 bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
@@ -1415,7 +1410,7 @@ bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
 }
 
 static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
-                            llvm::Optional<bool> &ResultsInError) {
+                            std::optional<bool> &ResultsInError) {
 
   assert(Builtin.ID == BuiltinValueKind::FPTrunc);
 
@@ -1465,7 +1460,7 @@ static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
       diagnose(M.getASTContext(), Loc.getSourceLoc(), diagId, fplitStr,
                userType, truncVal.isNegative());
 
-      ResultsInError = llvm::Optional<bool>(true);
+      ResultsInError = std::optional<bool>(true);
     }
   }
   // Abort folding if we have subnormality, NaN or opInvalid status.
@@ -1493,7 +1488,7 @@ static SILValue constantFoldIsConcrete(BuiltinInst *BI) {
 }
 
 SILValue swift::constantFoldBuiltin(BuiltinInst *BI,
-                                    llvm::Optional<bool> &ResultsInError) {
+                                    std::optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
   SILModule &M = BI->getModule();
 
@@ -1600,7 +1595,7 @@ case BuiltinValueKind::id:
                    diag::warning_int_to_fp_inexact, CE ? CE->getType() : DestTy,
                    SrcAsString, destStr);
         }
-        ResultsInError = llvm::Optional<bool>(true);
+        ResultsInError = std::optional<bool>(true);
       }
       // If there is an overflow, just return nullptr as this is undefined
       // behavior. Otherwise, continue folding as in the normal workflow.
@@ -1661,7 +1656,7 @@ case BuiltinValueKind::id:
       diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
                diag::wrong_non_negative_assumption,
                llvm::toString(VInt, /*Radix*/ 10, /*Signed*/ true));
-      ResultsInError = llvm::Optional<bool>(true);
+      ResultsInError = std::optional<bool>(true);
     }
     return V;
   }
@@ -1675,7 +1670,7 @@ case BuiltinValueKind::id:
 /// results, we still return true, but signal that we couldn't simplify by
 /// placing SILValue() in that position instead.
 static bool constantFoldInstruction(Operand *Op,
-                                    llvm::Optional<bool> &ResultsInError,
+                                    std::optional<bool> &ResultsInError,
                                     SmallVectorImpl<SILValue> &Results) {
   auto *User = Op->getUser();
 
@@ -2262,7 +2257,7 @@ ConstantFolder::processWorkList() {
         //
         // We are essentially using this optional to represent 3 states: true,
         // false, and n/a.
-        llvm::Optional<bool> ResultsInError;
+        std::optional<bool> ResultsInError;
 
         // If we are asked to emit diagnostics, override ResultsInError with a
         // Some optional initialized to false.

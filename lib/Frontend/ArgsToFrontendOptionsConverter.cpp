@@ -66,6 +66,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
     Opts.ExplicitModulesOutputPath = A->getValue();
+  } else {
+    SmallString<128> defaultPath;
+    llvm::sys::path::cache_directory(defaultPath);
+    Opts.ExplicitModulesOutputPath = defaultPath.str().str();
   }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();
@@ -166,6 +170,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeDebugTimeOptions();
   computeTBDOptions();
 
+  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
+
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
@@ -185,7 +191,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   computeDumpScopeMapLocations();
 
-  llvm::Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+  std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
   // None here means error, not just "no inputs". Propagate unconditionally.
@@ -253,33 +259,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (checkBuildFromInterfaceOnlyOptions())
     return true;
 
-  Opts.DeterministicCheck = Args.hasArg(OPT_enable_deterministic_check);
-  Opts.EnableCaching = Args.hasArg(OPT_cache_compile_job);
-  Opts.EnableCachingRemarks = Args.hasArg(OPT_cache_remarks);
-  Opts.CacheSkipReplay = Args.hasArg(OPT_cache_disable_replay);
-  Opts.CASOpts.CASPath =
-      Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
-  Opts.CASOpts.PluginPath = Args.getLastArgValue(OPT_cas_plugin_path);
-  for (StringRef Opt : Args.getAllArgValues(OPT_cas_plugin_option)) {
-    StringRef Name, Value;
-    std::tie(Name, Value) = Opt.split('=');
-    Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
-                                            std::string(Value));
-  }
-
-  Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
-  Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
-  Opts.InputFileKey = Args.getLastArgValue(OPT_input_file_key);
+  Opts.DeterministicCheck |= Args.hasArg(OPT_enable_deterministic_check);
   Opts.CacheReplayPrefixMap = Args.getAllArgValues(OPT_cache_replay_prefix_map);
-
-  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
-      Opts.ClangIncludeTrees.empty() &&
-      FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
-    if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
-        Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
-        return true;
-    }
-  }
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
     if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
@@ -320,18 +301,6 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
-  Opts.SkipNonExportableDecls |=
-      Args.hasArg(OPT_experimental_skip_non_exportable_decls);
-  Opts.SkipNonExportableDecls |=
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
-  // HACK: The driver currently erroneously passes all flags to module interface
-  // verification jobs. -experimental-skip-non-exportable-decls is not
-  // appropriate for verification tasks and should be ignored, though.
-  if (Opts.RequestedAction ==
-      FrontendOptions::ActionType::TypecheckModuleFromInterface)
-    Opts.SkipNonExportableDecls = false;
-
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
@@ -342,7 +311,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(options::OPT_clang_header_expose_decls)) {
     Opts.ClangHeaderExposedDecls =
         llvm::StringSwitch<
-            llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(
+            std::optional<FrontendOptions::ClangHeaderExposeBehavior>>(
             A->getValue())
             .Case("all-public",
                   FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
@@ -351,7 +320,7 @@ bool ArgsToFrontendOptionsConverter::convert(
             .Case("has-expose-attr-or-stdlib",
                   FrontendOptions::ClangHeaderExposeBehavior::
                       HasExposeAttrOrImplicitDeps)
-            .Default(llvm::None);
+            .Default(std::nullopt);
   }
   for (const auto &arg :
        Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
@@ -393,17 +362,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
-
-  if (Arg *A = Args.getLastArg(OPT_cas_backend_mode)) {
-    Opts.CASObjMode = llvm::StringSwitch<llvm::CASBackendMode>(A->getValue())
-                          .Case("native", llvm::CASBackendMode::Native)
-                          .Case("casid", llvm::CASBackendMode::CASID)
-                          .Case("verify", llvm::CASBackendMode::Verify)
-                          .Default(llvm::CASBackendMode::Native);
-  }
-
-  Opts.UseCASBackend = Args.hasArg(OPT_cas_backend);
-  Opts.EmitCASIDFile = Args.hasArg(OPT_cas_emit_casid_file);
 
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
 
@@ -697,7 +655,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     // selected".
     return false;
   }
-  llvm::Optional<std::vector<std::string>> outputFilenames =
+  std::optional<std::vector<std::string>> outputFilenames =
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
           Args, Diags, options::OPT_o, options::OPT_output_filelist);
 
@@ -752,12 +710,12 @@ bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
 bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     const {
   if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasDependenciesPath()) {
+      Opts.InputsAndOutputs.hasDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
   if (!FrontendOptions::canActionEmitReferenceDependencies(Opts.RequestedAction)
-      && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
+      && Opts.InputsAndOutputs.hasReferenceDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;

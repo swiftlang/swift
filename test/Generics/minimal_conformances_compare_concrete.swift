@@ -19,13 +19,23 @@ extension G where X : Base, X : P, X == Derived {}
 // RULE: + (requirement "\xCF\x84_0_0" same_type "Derived")
 
 // RULE: Rewrite system: {
+// RULE-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
+// RULE-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
 // RULE-NEXT: - [P].[P] => [P] [permanent]
+// RULE-NEXT: - [P].[Copyable] => [P] [explicit]
+// RULE-NEXT: - [P].[Escapable] => [P] [explicit]
+// RULE-NEXT: - τ_0_0.[Copyable] => τ_0_0 [explicit]
+// RULE-NEXT: - τ_0_0.[Escapable] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[superclass: Base] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[P] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[concrete: Derived] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[layout: _NativeClass] => τ_0_0
 // RULE-NEXT: - τ_0_0.[superclass: Derived] => τ_0_0
+// RULE-NEXT: - τ_0_0.[concrete: Derived : Copyable] => τ_0_0
+// RULE-NEXT: - τ_0_0.[concrete: Derived : Escapable] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Derived : P] => τ_0_0
+// RULE-NEXT: - τ_0_0.[concrete: Base : Copyable] => τ_0_0
+// RULE-NEXT: - τ_0_0.[concrete: Base : Escapable] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Base : P] => τ_0_0
 // RULE-NEXT: }
 

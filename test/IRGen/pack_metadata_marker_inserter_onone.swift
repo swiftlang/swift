@@ -72,7 +72,8 @@ public func consume2S<T>(_: consuming S<T>, _: consuming S<T>) {}
 // CHECK-LLVM:         [[S_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[S_METADATA_RESPONSE]]
 // CHECK-LLVM:         [[S_VWT_ADDR:%[^,]+]] = getelementptr inbounds ptr, ptr [[S_METADATA]], [[INT]] -1
 // CHECK-LLVM:         [[S_VWT:%[^,]+]] = load ptr, ptr [[S_VWT_ADDR]]
-// CHECK-LLVM:         [[S_SIZE_ADDR:%[^,]+]] = getelementptr inbounds %swift.vwtable, ptr [[S_VWT]]
+// CHECK-LLVM:         [[S_SIZE_ADDR:%[^,]+]] = getelementptr inbounds %swift.vwtable, ptr 
+//  HECK-LLVM-SAME:        [[S_VWT]]
 // CHECK-LLVM:         [[S_SIZE:%[^,]+]] = load [[INT]], ptr [[S_SIZE_ADDR]]
 // CHECK-LLVM:         [[COPY_1_ADDR:%[^,]+]] = alloca i8, [[INT]] [[S_SIZE]]
 // CHECK-LLVM:         call void @llvm.lifetime.start.p0(

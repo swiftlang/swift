@@ -109,7 +109,7 @@ public:
         if (ObjC) {
           if (auto clazz = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal())) {
             if (clazz->isTypeErasedGenericClass()) {
-              return Action::SkipChildren;
+              return Action::SkipNode;
             }
           }
         }
@@ -230,7 +230,7 @@ public:
     // FIXME(TapExpr): This is probably caused by the scoping 
     // algorithm's ignorance of TapExpr. We should fix that.
     if (D->getBaseName() == Context.Id_dollarInterpolation)
-      return Action::SkipChildren(DRE);
+      return Action::SkipNode(DRE);
 
     // DC is the DeclContext where D was defined
     // CurDC is the DeclContext where D was referenced
@@ -251,11 +251,11 @@ public:
 
     // Don't "capture" type definitions at all.
     if (isa<TypeDecl>(D))
-      return Action::SkipChildren(DRE);
+      return Action::SkipNode(DRE);
 
     // A local reference is not a capture.
     if (CurDC == DC || isa<TopLevelCodeDecl>(CurDC))
-      return Action::SkipChildren(DRE);
+      return Action::SkipNode(DRE);
 
     auto TmpDC = CurDC;
     while (TmpDC != nullptr) {
@@ -309,7 +309,7 @@ public:
                           DescriptiveDeclKind::Type);
 
             D->diagnose(diag::decl_declared_here, D);
-            return Action::SkipChildren(DRE);
+            return Action::SkipNode(DRE);
           }
         }
       }
@@ -320,12 +320,12 @@ public:
     // We walked all the way up to the root without finding the declaration,
     // so this is not a capture.
     if (TmpDC == nullptr)
-      return Action::SkipChildren(DRE);
+      return Action::SkipNode(DRE);
 
     // Only capture var decls at global scope.  Other things can be captured
     // if they are local.
     if (!isa<VarDecl>(D) && !D->isLocalCapture())
-      return Action::SkipChildren(DRE);
+      return Action::SkipNode(DRE);
 
     // We're going to capture this, compute flags for the capture.
     unsigned Flags = 0;
@@ -348,7 +348,7 @@ public:
       Flags |= CapturedValue::IsNoEscape;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
-    return Action::SkipChildren(DRE);
+    return Action::SkipNode(DRE);
   }
 
   void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
@@ -396,13 +396,13 @@ public:
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       TypeChecker::computeCaptures(AFD);
       propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     // Don't walk into local types; we'll walk their initializers when we check
     // the local type itself.
     if (isa<NominalTypeDecl>(D))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     return Action::Continue();
   }
@@ -499,6 +499,10 @@ public:
     if (isa<DiscardAssignmentExpr>(E))
       return false;
 
+    // Unreachables are a no-op.
+    if (isa<UnreachableExpr>(E))
+      return false;
+
     // Opening an @objc existential or metatype is a no-op.
     if (auto open = dyn_cast<OpenExistentialExpr>(E))
       return (!open->getSubExpr()->getType()->isObjCExistentialType()
@@ -565,7 +569,7 @@ public:
     // Some kinds of expression don't really evaluate their subexpression,
     // so we don't need to traverse.
     if (isa<ObjCSelectorExpr>(E)) {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
 
     if (auto *ECE = dyn_cast<ExplicitCastExpr>(E)) {
@@ -588,7 +592,7 @@ public:
         if (CurDC->isChildContextOf(selfDecl->getDeclContext()))
           addCapture(CapturedValue(selfDecl, 0, superE->getLoc()));
       }
-      return Action::SkipChildren(superE);
+      return Action::SkipNode(superE);
     }
 
     // Don't recur into child closures. They should already have a capture
@@ -597,7 +601,7 @@ public:
     if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
       TypeChecker::computeCaptures(SubCE);
       propagateCaptures(SubCE->getCaptureInfo(), SubCE->getLoc());
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
 
     // Capture a placeholder opaque value.
@@ -674,8 +678,8 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
         AFD->diagnose(diag::objc_generic_extension_using_type_parameter);
 
         // If it's possible, suggest adding @objc.
-        llvm::Optional<ForeignAsyncConvention> asyncConvention;
-        llvm::Optional<ForeignErrorConvention> errorConvention;
+        std::optional<ForeignAsyncConvention> asyncConvention;
+        std::optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
             isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
                                   asyncConvention, errorConvention)) {

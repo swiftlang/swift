@@ -46,5 +46,6 @@ SIL_ANALYSIS(RCIdentity)
 SIL_ANALYSIS(TypeExpansion)
 SIL_ANALYSIS(PassManagerVerifier)
 SIL_ANALYSIS(DeadEndBlocks)
+SIL_ANALYSIS(Region)
 
 #undef SIL_ANALYSIS

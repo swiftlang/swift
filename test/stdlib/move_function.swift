@@ -91,7 +91,6 @@ tests.test("simpleVarTest") {
     expectTrue(_isUnique_native(&x))
 
     var y = x
-    expectFalse(_isUnique_native(&x))
     let _ = consume y
     expectTrue(_isUnique_native(&x))
     y = Klass()
@@ -101,7 +100,6 @@ tests.test("simpleVarTest") {
 tests.test("simpleInoutVarTest") {
     func inOutTest(_ x: inout Klass) {
         var y = x
-        expectFalse(_isUnique_native(&x))
         let _ = consume y
         expectTrue(_isUnique_native(&x))
         y = Klass()

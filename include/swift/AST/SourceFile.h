@@ -46,39 +46,44 @@ enum class RestrictedImportKind {
 };
 
 /// Import that limits the access level of imported entities.
-using ImportAccessLevel = llvm::Optional<AttributedImport<ImportedModule>>;
+using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
 /// Stores range information for a \c #if block in a SourceFile.
-class IfConfigRangeInfo final {
-  /// The range of the entire \c #if block, including \c #else and \c #endif.
-  CharSourceRange WholeRange;
+class IfConfigClauseRangeInfo final {
+public:
+  enum ClauseKind {
+    // Active '#if', '#elseif', or '#else' clause.
+    ActiveClause,
+    // Inactive '#if', '#elseif', or '#else' clause.
+    InactiveClause,
+    // '#endif' directive.
+    EndDirective,
+  };
 
-  /// The range of the active selected body, if there is one. This does not
-  /// include the outer syntax of the \c #if. This may be invalid, which
-  /// indicates there is no active body.
-  CharSourceRange ActiveBodyRange;
+private:
+  /// Source location of '#if', '#elseif', etc.
+  SourceLoc DirectiveLoc;
+  /// Character source location of body starts.
+  SourceLoc BodyLoc;
+  /// Location of the end of the body.
+  SourceLoc EndLoc;
+
+  ClauseKind Kind;
 
 public:
-  IfConfigRangeInfo(CharSourceRange wholeRange, CharSourceRange activeBodyRange)
-      : WholeRange(wholeRange), ActiveBodyRange(activeBodyRange) {
-    assert(wholeRange.getByteLength() > 0 && "Range must be non-empty");
-    assert(activeBodyRange.isInvalid() || wholeRange.contains(activeBodyRange));
+  IfConfigClauseRangeInfo(SourceLoc DirectiveLoc, SourceLoc BodyLoc,
+                          SourceLoc EndLoc, ClauseKind Kind)
+      : DirectiveLoc(DirectiveLoc), BodyLoc(BodyLoc), EndLoc(EndLoc),
+        Kind(Kind) {
+    assert(DirectiveLoc.isValid() && BodyLoc.isValid() && EndLoc.isValid());
   }
 
-  CharSourceRange getWholeRange() const { return WholeRange; }
-  SourceLoc getStartLoc() const { return WholeRange.getStart(); }
+  SourceLoc getStartLoc() const { return DirectiveLoc; }
+  CharSourceRange getDirectiveRange(const SourceManager &SM) const;
+  CharSourceRange getWholeRange(const SourceManager &SM) const;
+  CharSourceRange getBodyRange(const SourceManager &SM) const;
 
-  friend bool operator==(const IfConfigRangeInfo &lhs,
-                         const IfConfigRangeInfo &rhs) {
-    return lhs.WholeRange == rhs.WholeRange &&
-           lhs.ActiveBodyRange == rhs.ActiveBodyRange;
-  }
-
-  /// Retrieve the ranges produced by subtracting the active body range from
-  /// the whole range. This includes both inactive branches as well as the
-  /// other syntax of the \c #if.
-  SmallVector<CharSourceRange, 2>
-  getRangesWithoutActiveBody(const SourceManager &SM) const;
+  ClauseKind getKind() const { return Kind; }
 };
 
 /// A file containing Swift source code.
@@ -142,7 +147,10 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is \c None until it is filled in by the import resolution phase.
-  llvm::Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
+  std::optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
+
+  /// The underlying clang module, if imported in this file.
+  ModuleDecl *ImportedUnderlyingModule = nullptr;
 
   /// Which imports have made use of @preconcurrency.
   llvm::SmallDenseSet<AttributedImport<ImportedModule>>
@@ -172,7 +180,7 @@ private:
   /// this source file.
   ///
   /// We only collect interface hash for primary input files.
-  llvm::Optional<StableHasher> InterfaceHasher;
+  std::optional<StableHasher> InterfaceHasher;
 
   /// The ID for the memory buffer containing this file's source.
   ///
@@ -214,7 +222,7 @@ private:
   /// they have not yet been parsed.
   /// FIXME: Once addTopLevelDecl/prependTopLevelDecl
   /// have been removed, this can become an optional ArrayRef.
-  llvm::Optional<std::vector<ASTNode>> Items;
+  std::optional<std::vector<ASTNode>> Items;
 
   /// The list of hoisted declarations. See Decl::isHoisted().
   /// This is only used by lldb.
@@ -241,9 +249,9 @@ private:
   ParserStatePtr DelayedParserState =
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
-  struct IfConfigRangesData {
+  struct IfConfigClauseRangesData {
     /// All the \c #if source ranges in this file.
-    std::vector<IfConfigRangeInfo> Ranges;
+    std::vector<IfConfigClauseRangeInfo> Ranges;
 
     /// Whether the elemnts in \c Ranges are sorted in source order within
     /// this file. We flip this to \c false any time a new range gets recorded,
@@ -252,7 +260,7 @@ private:
   };
 
   /// Stores all the \c #if source range info in this file.
-  mutable IfConfigRangesData IfConfigRanges;
+  mutable IfConfigClauseRangesData IfConfigClauseRanges;
 
   friend class HasImportsMatchingFlagRequest;
 
@@ -296,10 +304,10 @@ public:
 
   /// Retrieves an immutable view of the top-level items if they have already
   /// been parsed, or \c None if they haven't. Should only be used for dumping.
-  llvm::Optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
+  std::optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
     if (!Items)
-      return llvm::None;
-    return llvm::makeArrayRef(*Items);
+      return std::nullopt;
+    return llvm::ArrayRef(*Items);
   }
 
   /// Retrieve the parsing options for the file.
@@ -385,7 +393,7 @@ public:
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
-  SourceFile(ModuleDecl &M, SourceFileKind K, llvm::Optional<unsigned> bufferID,
+  SourceFile(ModuleDecl &M, SourceFileKind K, std::optional<unsigned> bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
@@ -402,6 +410,13 @@ public:
   /// Set the imports for this source file. This gets called by import
   /// resolution.
   void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
+
+  /// Set the imported underlying clang module for this source file. This gets
+  /// called by import resolution.
+  void setImportedUnderlyingModule(ModuleDecl *module) {
+    assert(!ImportedUnderlyingModule && "underlying module already set");
+    ImportedUnderlyingModule = module;
+  }
 
   /// Whether the given import has used @preconcurrency.
   bool hasImportUsedPreconcurrency(
@@ -490,12 +505,16 @@ public:
      const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
   }
 
-  /// Record the source range info for a parsed \c #if block.
-  void recordIfConfigRangeInfo(IfConfigRangeInfo ranges);
+  /// Record the source range info for a parsed \c #if clause.
+  void recordIfConfigClauseRangeInfo(const IfConfigClauseRangeInfo &range);
 
-  /// Retrieve the source range infos for any \c #if blocks contained within a
+  /// Retrieve the source range info for any \c #if clauses in the file.
+  ArrayRef<IfConfigClauseRangeInfo> getIfConfigClauseRanges() const;
+
+  /// Retrieve the source range infos for any \c #if clauses contained within a
   /// given source range of this file.
-  ArrayRef<IfConfigRangeInfo> getIfConfigsWithin(SourceRange outer) const;
+  ArrayRef<IfConfigClauseRangeInfo>
+  getIfConfigClausesWithin(SourceRange outer) const;
 
   void getMissingImportedModules(
          SmallVectorImpl<ImportedModule> &imports) const override;
@@ -555,16 +574,16 @@ public:
 
   Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
   Identifier getPrivateDiscriminator(bool createIfMissing = false) const;
-  llvm::Optional<ExternalSourceLocs::RawLocs>
+  std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
-  llvm::Optional<unsigned> getBufferID() const {
+  std::optional<unsigned> getBufferID() const {
     if (BufferID == -1)
-      return llvm::None;
+      return std::nullopt;
     return BufferID;
   }
 
@@ -598,7 +617,7 @@ public:
   ///
   /// \Returns the fulfilled macro role, or \c None if this source file is not
   /// for a macro expansion.
-  llvm::Optional<MacroRole> getFulfilledMacroRole() const;
+  std::optional<MacroRole> getFulfilledMacroRole() const;
 
   /// When this source file is enclosed within another source file, for example
   /// because it describes a macro expansion, return the source file it was
@@ -664,6 +683,7 @@ public:
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
       return false;
     }
     llvm_unreachable("bad SourceFileKind");
@@ -691,6 +711,17 @@ public:
   /// a designated main class.
   bool hasEntryPoint() const override {
     return isScriptMode() || hasMainDecl();
+  }
+
+  ModuleDecl *getUnderlyingModuleIfOverlay() const override {
+    return ImportedUnderlyingModule;
+  }
+
+  const clang::Module *getUnderlyingClangModule() const override {
+    if (!ImportedUnderlyingModule)
+      return nullptr;
+
+    return ImportedUnderlyingModule->findUnderlyingClangModule();
   }
 
   /// Get the root refinement context for the file. The root context may be
@@ -765,7 +796,7 @@ private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
   /// source file.
-  llvm::Optional<ArrayRef<Token>> AllCollectedTokens;
+  std::optional<ArrayRef<Token>> AllCollectedTokens;
 };
 
 inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,

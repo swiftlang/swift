@@ -11,5 +11,5 @@ func test() {
 // GLOBAL: Literal[Nil]/None:                  nil;
 // GLOBAL: Literal[String]/None:               "{#(abc)#}"[#String#];
 // GLOBAL: Literal[Array]/None:                [{#(values)#}][#Array#];
-// GLOBAL: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}];
+// GLOBAL: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
 }

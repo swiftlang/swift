@@ -57,12 +57,19 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
+  public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
-  public var isEscapable: Bool { bridged.isEscapable() }
 
   public var canBeClass: BridgedType.TraitResult { bridged.canBeClass() }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
+
+  public func isEscapable(in function: Function) -> Bool {
+    bridged.isEscapable(function.bridged)
+  }
+  public func mayEscape(in function: Function) -> Bool {
+    !isNoEscapeFunction && isEscapable(in: function)
+  }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: NominalTypeDecl {
@@ -82,6 +89,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public func isExactSuperclass(of type: Type) -> Bool {
     bridged.isExactSuperclassOf(type.bridged)
+  }
+
+  public func isEmpty(in function: Function) -> Bool {
+    bridged.isEmpty(function.bridged)
   }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
@@ -137,6 +148,16 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var description: String {
     String(taking: bridged.getDebugDescription())
+  }
+}
+
+extension Value {
+  public var isEscapable: Bool {
+    type.objectType.isEscapable(in: parentFunction)
+  }
+
+  public var mayEscape: Bool {
+    type.objectType.mayEscape(in: parentFunction)
   }
 }
 

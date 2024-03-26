@@ -30,6 +30,7 @@ sil @single_indirect_arg_coroutine : $@yield_once @convention(thin) (@in Int32) 
 sil @indirect_arg_and_ptr : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
 sil @single_reference : $@convention(thin) (@guaranteed X) -> Int32
 sil @nouser_func : $@convention(thin) () -> ()
+sil @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
 
 sil @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () {
 [%1: write v**]
@@ -1076,3 +1077,169 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
   return %r : $()
 }
 
+// CHECK-LABEL: @test_builtin_zeroInitializer
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %0 = alloc_stack
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %1 = alloc_stack
+// CHECK-NEXT:    r=0,w=1
+sil @test_builtin_zeroInitializer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = alloc_stack $C
+  %2 = builtin "zeroInitializer"<C>(%1 : $*C) : $()
+  %3 = apply undef<C>(%1) : $@convention(thin) <C> () -> @out C
+  copy_addr [take] %1 to [init] %0 : $*C
+  dealloc_stack %1 : $*C
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: @test_builtin_zeroInitializer_atomicload
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %0 = alloc_stack
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %1 = alloc_stack
+// CHECK-NEXT:    r=0,w=1
+sil @test_builtin_zeroInitializer_atomicload : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = alloc_stack $C
+  %1 = alloc_stack $C
+  %2 = builtin "zeroInitializer"<C>(%1 : $*C) : $()
+  %3 = apply undef<C>(%1) : $@convention(thin) <C> () -> @out C
+  copy_addr [take] %1 to [init] %0 : $*C
+  dealloc_stack %1 : $*C
+  %4 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  %5 = builtin "atomicload_monotonic_Int64"(%4 : $Builtin.RawPointer) : $Builtin.Int64
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  return %5 : $Builtin.Int64
+}
+
+// CHECK-LABEL: @test_builtin_zeroInitializer_atomicstore
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %0 = alloc_stack
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %1 = alloc_stack
+// CHECK-NEXT:    r=0,w=1
+sil @test_builtin_zeroInitializer_atomicstore : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = alloc_stack $C
+  %2 = builtin "zeroInitializer"<C>(%1 : $*C) : $()
+  %3 = apply undef<C>(%1) : $@convention(thin) <C> () -> @out C
+  copy_addr [take] %1 to [init] %0 : $*C
+  dealloc_stack %1 : $*C
+  %4 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = builtin "atomicstore_monotonic_Int64"(%4 : $Builtin.RawPointer, %5 : $Builtin.Int64) : $()
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: @test_builtin_zeroInitializer_atomicrmw
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %0 = alloc_stack
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %1 = alloc_stack
+// CHECK-NEXT:    r=0,w=1
+sil @test_builtin_zeroInitializer_atomicrmw : $@convention(thin) () -> (Builtin.Int64, Builtin.Int64) {
+bb0:
+  %0 = alloc_stack $C
+  %1 = alloc_stack $C
+  %2 = builtin "zeroInitializer"<C>(%1 : $*C) : $()
+  %3 = apply undef<C>(%1) : $@convention(thin) <C> () -> @out C
+  copy_addr [take] %1 to [init] %0 : $*C
+  dealloc_stack %1 : $*C
+  %4 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = builtin "atomicrmw_xchg_monotonic_Int64"(%4 : $Builtin.RawPointer, %5 : $Builtin.Int64) : $Builtin.Int64
+  %7 = builtin "atomicrmw_add_monotonic_Int64"(%4 : $Builtin.RawPointer, %5 : $Builtin.Int64) : $Builtin.Int64
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %8 = tuple (%6 : $Builtin.Int64, %7 : $Builtin.Int64)
+  return %8 : $(Builtin.Int64, Builtin.Int64)
+}
+
+// CHECK-LABEL: @test_builtin_zeroInitializer_cmpxchg
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %0 = alloc_stack
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %1 = alloc_stack
+// CHECK-NEXT:    r=0,w=1
+sil @test_builtin_zeroInitializer_cmpxchg : $@convention(thin) () -> (Builtin.Int64, Builtin.Int1) {
+bb0:
+  %0 = alloc_stack $C
+  %1 = alloc_stack $C
+  %2 = builtin "zeroInitializer"<C>(%1 : $*C) : $()
+  %3 = apply undef<C>(%1) : $@convention(thin) <C> () -> @out C
+  copy_addr [take] %1 to [init] %0 : $*C
+  dealloc_stack %1 : $*C
+  %4 = address_to_pointer %0 : $*C to $Builtin.RawPointer
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = builtin "cmpxchg_monotonic_monotonic_Int64"(%4 : $Builtin.RawPointer, %5 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  return %6 : $(Builtin.Int64, Builtin.Int1)
+}
+
+// CHECK-LABEL: @test_builtin_zeroInitializer_fence
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %0 = alloc_stack
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %1 = alloc_stack
+// CHECK-NEXT:    r=0,w=1
+sil @test_builtin_zeroInitializer_fence : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = alloc_stack $C
+  %2 = builtin "zeroInitializer"<C>(%1 : $*C) : $()
+  %3 = apply undef<C>(%1) : $@convention(thin) <C> () -> @out C
+  copy_addr [take] %1 to [init] %0 : $*C
+  dealloc_stack %1 : $*C
+  %5 = builtin "fence_release"() : $()
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  return %5 : $()
+}
+
+// CHECK-LABEL: @test_stored_pointer
+// CHECK:       PAIR #3.
+// CHECK-NEXT:      %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
+// CHECK-NEXT:      %0 = alloc_stack $Int                           // users: %7, %1
+// CHECK-NEXT:    r=1,w=1
+sil @test_stored_pointer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = alloc_stack $Builtin.RawPointer
+  store %1 to %2 : $*Builtin.RawPointer
+  %4 = function_ref @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  dealloc_stack %2 : $*Builtin.RawPointer
+  dealloc_stack %0 : $*Int
+  %8 = tuple ()
+  return %8 : $()
+}

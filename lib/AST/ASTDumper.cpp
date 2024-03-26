@@ -33,7 +33,6 @@
 #include "swift/Basic/STLExtras.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -41,6 +40,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 //
 // AST DUMPING TIPS
@@ -309,6 +309,8 @@ static StringRef getDumpString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
     case DefaultArgumentKind::StoredProperty: return "stored property";
+    case DefaultArgumentKind::ExpressionMacro:
+    return "expression macro";
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
@@ -418,6 +420,7 @@ static StringRef getDumpString(ValueOwnership ownership) {
 
   llvm_unreachable("Unhandled ValueOwnership in switch.");
 }
+
 static StringRef getDumpString(ForeignErrorConvention::IsOwned_t owned) {
   switch (owned) {
   case swift::ForeignErrorConvention::IsNotOwned:
@@ -439,12 +442,16 @@ static StringRef getDumpString(RequirementKind kind) {
 
   llvm_unreachable("Unhandled RequirementKind in switch.");
 }
+static StringRef getDumpString(StringRef s) {
+  return s;
+}
 static unsigned getDumpString(unsigned value) {
   return value;
 }
 static size_t getDumpString(size_t value) {
   return value;
 }
+static void *getDumpString(void *value) { return value; }
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -1013,7 +1020,8 @@ namespace {
       printFoot();
     }
     void visitBindingPattern(BindingPattern *P, StringRef label) {
-      printCommon(P, P->isLet() ? "pattern_let" : "pattern_var", label);
+      printCommon(P, "pattern_binding", label);
+      printField(P->getIntroducerStringRef(), "kind");
       printRec(P->getSubPattern());
       printFoot();
     }
@@ -1186,9 +1194,13 @@ namespace {
       printCommon(PD, "protocol", label);
 
       if (PD->isRequirementSignatureComputed()) {
-        auto requirements = PD->getRequirementSignatureAsGenericSignature();
-        std::string reqSigStr = requirements->getAsString();
-        printFieldQuoted(reqSigStr, "requirement_signature");
+        auto reqSig = PD->getRequirementSignature();
+
+        std::string reqSigStr;
+        llvm::raw_string_ostream out(reqSigStr);
+        reqSig.print(PD, out);
+
+        printFieldQuoted(out.str(), "requirement_signature");
       } else {
         printFlag("uncomputed_requirement_signature");
       }
@@ -1531,17 +1543,6 @@ namespace {
         });
       }
 
-      if (D->hasSingleExpressionBody()) {
-        // There won't be an expression if this is an initializer that was
-        // originally spelled "init?(...) { nil }", because "nil" is modeled
-        // via FailStmt in this context.
-        if (auto *Body = D->getSingleExpressionBody()) {
-          printRec(Body);
-
-          return;
-        }
-      }
-
       if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         printRec(Body, &D->getASTContext());
       }
@@ -1731,8 +1732,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     os << "(file)";
     break;
 
-  case DeclContextKind::SerializedLocal:
-    os << "local context";
+  case DeclContextKind::SerializedAbstractClosure:
+    os << "serialized abstract closure";
     break;
 
   case DeclContextKind::AbstractClosureExpr: {
@@ -1781,6 +1782,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     os << "top-level code";
     break;
 
@@ -2215,11 +2217,6 @@ public:
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E, StringRef label) {
     printCommon(E, "interpolated_string_literal_expr", label);
 
-    // Print the trailing quote location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
-      printSourceLoc(E->getTrailingQuoteLoc(), &Ctx, "trailing_quote_loc");
-    }
     printField(E->getLiteralCapacity(), "literal_capacity", ExprModifierColor);
     printField(E->getInterpolationCount(), "interpolation_count",
                ExprModifierColor);
@@ -2661,6 +2658,11 @@ public:
     printRec(E->getSubExpr());
     printFoot();
   }
+  void visitUnreachableExpr(UnreachableExpr *E, StringRef label) {
+    printCommon(E, "unreachable", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E, StringRef label) {
     printCommon(E, "differentiable_function", label);
     printRec(E->getSubExpr());
@@ -2687,6 +2689,20 @@ public:
       LinearToDifferentiableFunctionExpr *E, StringRef label) {
     printCommon(E, "linear_to_differentiable_function", label);
     printRec(E->getSubExpr());
+    printFoot();
+  }
+
+  void visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
+                                      StringRef label) {
+    printCommon(E, "actor_isolation_erasure_expr", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
+
+  void visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                         StringRef label) {
+    printCommon(E, "extract_function_isolation", label);
+    printRec(E->getFunctionExpr());
     printFoot();
   }
 
@@ -2778,8 +2794,15 @@ public:
 
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::Nonisolated:
+      printFlag(true, "nonisolated", CapturesColor);
+      break;
+
+    case ActorIsolation::Erased:
+      printFlag(true, "dynamically_isolated", CapturesColor);
       break;
 
     case ActorIsolation::ActorInstance:
@@ -2788,7 +2811,6 @@ public:
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       printFieldQuoted(isolation.getGlobalActor().getString(),
                        "global_actor_isolated", CapturesColor);
       break;
@@ -3027,12 +3049,6 @@ public:
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, StringRef label) {
     printCommon(E, "editor_placeholder_expr", label);
 
-    // Print the trailing angle bracket location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
-      printSourceLoc(E->getTrailingAngleBracketLoc(), &Ctx,
-                     "trailing_angle_bracket_loc");
-    }
     auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
@@ -3144,6 +3160,15 @@ public:
         printRec(path, "parsed_path");
       }
     }
+    printFoot();
+  }
+
+  void visitCurrentContextIsolationExpr(
+      CurrentContextIsolationExpr *E, StringRef label) {
+    printCommon(E, "current_context_isolation_expr", label);
+    if (auto actor = E->getActor())
+      printRec(actor);
+
     printFoot();
   }
 
@@ -3270,8 +3295,10 @@ public:
     printRec(T->getTypeRepr());
   }
 
-  void visitIdentTypeRepr(IdentTypeRepr *T, StringRef label) {
-    printCommon("type_ident", label);
+  void visitDeclRefTypeRepr(DeclRefTypeRepr *T, StringRef label) {
+    printCommon(isa<UnqualifiedIdentTypeRepr>(T) ? "type_unqualified_ident"
+                                                 : "type_qualified_ident",
+                label);
 
     printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
     if (T->isBound())
@@ -3279,21 +3306,12 @@ public:
     else
       printFlag("unbound");
 
-    if (auto *GenIdT = dyn_cast<GenericIdentTypeRepr>(T)) {
-      for (auto genArg : GenIdT->getGenericArgs()) {
-        printRec(genArg);
-      }
+    if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T)) {
+      printRec(qualIdentTR->getBase());
     }
 
-    printFoot();
-  }
-
-  void visitMemberTypeRepr(MemberTypeRepr *T, StringRef label) {
-    printCommon("type_member", label);
-
-    printRec(T->getBaseComponent());
-    for (auto *comp : T->getMemberComponents()) {
-      printRec(comp);
+    for (auto *genArg : T->getGenericArgs()) {
+      printRec(genArg);
     }
 
     printFoot();
@@ -3411,6 +3429,12 @@ public:
     printFoot();
   }
 
+  void visitTransferringTypeRepr(TransferringTypeRepr *T, StringRef label) {
+    printCommon("transferring", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
   void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T, StringRef label) {
     printCommon("_const", label);
     printRec(T->getBase());
@@ -3502,6 +3526,20 @@ public:
     for (auto arg : T->getGenericArguments())
       printRec(arg);
 
+    printFoot();
+  }
+
+  void visitLifetimeDependentReturnTypeRepr(LifetimeDependentReturnTypeRepr *T,
+                                            StringRef label) {
+    printCommon("type_lifetime_dependent_return", label);
+    for (auto &dep : T->getLifetimeDependencies()) {
+      printFieldRaw(
+          [&](raw_ostream &out) {
+            out << " " << dep.getLifetimeDependenceSpecifierString() << " ";
+          },
+          "");
+    }
+    printRec(T->getBase());
     printFoot();
   }
 };
@@ -4271,6 +4309,7 @@ namespace {
         printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
+        printFlag(T->hasTransferringResult(), "transferring_result");
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");

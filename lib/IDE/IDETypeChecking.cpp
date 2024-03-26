@@ -52,7 +52,9 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
           !accessScope.isPublic() && !accessScope.isPackage())
         continue;
 
-      (void)swift::isSendableType(M, NTD->getDeclaredInterfaceType());
+      auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+      if (proto)
+        (void) M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 
@@ -112,11 +114,10 @@ PrintOptions PrintOptions::printDocInterface() {
       PrintOptions::printModuleInterface(/*printFullConvention*/ false);
   result.PrintAccess = false;
   result.SkipUnavailable = false;
-  result.ExcludeAttrList.push_back(DAK_Available);
+  result.ExcludeAttrList.push_back(DeclAttrKind::Available);
   result.ArgAndParamPrinting =
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;
-  result.PrintRegularClangComments = false;
   result.PrintFunctionRepresentationAttrs =
     PrintOptions::FunctionRepresentationMode::None;
   return result;
@@ -587,7 +588,7 @@ forEachExtensionMergeGroup(MergeGroupKind Kind, ExtensionGroupOperation Fn) {
       GroupContent.push_back(
           {Member->Ext, Member->EnablingExt, Member->IsSynthesized});
     }
-    Fn(llvm::makeArrayRef(GroupContent));
+    Fn(llvm::ArrayRef(GroupContent));
   }
 }
 
@@ -689,7 +690,7 @@ class ExpressionTypeCollector: public SourceEntityWalker {
 
     // Collecting protocols conformed by this expressions that are in the list.
     for (auto Proto: InterestedProtocols) {
-      if (Module.conformsToProtocol(E->getType(), Proto.first)) {
+      if (Module.checkConformance(E->getType(), Proto.first)) {
         Conformances.push_back(Proto.second);
       }
     }

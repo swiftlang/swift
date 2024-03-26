@@ -24,6 +24,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 
+#include "clang/AST/DeclObjC.h"
+
 using namespace swift;
 
 SILValue swift::lookThroughOwnershipInsts(SILValue v) {
@@ -568,6 +570,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::PackElementSetInst:
   case SILInstructionKind::PackLengthInst:
   case SILInstructionKind::DebugStepInst:
+  case SILInstructionKind::FunctionExtractIsolationInst:
     return RuntimeEffect::NoEffect;
       
   case SILInstructionKind::OpenExistentialMetatypeInst:
@@ -579,7 +582,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DebugValueInst:
     // Ignore runtime calls of debug_value
     return RuntimeEffect::NoEffect;
-  case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::SpecifyTestInst:
     // Ignore runtime calls of test-only instructions
     return RuntimeEffect::NoEffect;
 
@@ -743,6 +746,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
   case SILInstructionKind::CopyAddrInst: {
     auto *ca = cast<CopyAddrInst>(inst);
+    if (ca->getSrc()->getType().isTrivial(ca->getFunction()))
+      return RuntimeEffect::NoEffect;
     impactType = ca->getSrc()->getType();
     if (!ca->isInitializationOfDest())
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
@@ -867,6 +872,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     if (impactType.isBlockPointerCompatible())
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Releasing;
+    if (impactType.isMoveOnly() &&
+        !isa<DropDeinitInst>(lookThroughOwnershipInsts(inst->getOperand(0)))) {
+      // Not de-virtualized value type deinits can require metatype in case the
+      // deinit needs to be called via the value witness table.
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    }
     return ifNonTrivial(inst->getOperand(0)->getType(),
                         RuntimeEffect::Releasing);
 
@@ -916,6 +927,16 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
     switch (as.getSubstCalleeType()->getRepresentation()) {
     case SILFunctionTypeRepresentation::ObjCMethod:
+      if (auto *callee = as.getCalleeFunction()) {
+        if (auto *clangDecl = callee->getClangDecl()) {
+          if (auto clangMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+            if (clangMethodDecl->isDirectMethod()) {
+              break;
+            }
+          }
+        }
+      }
+      LLVM_FALLTHROUGH;
     case SILFunctionTypeRepresentation::Block:
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
@@ -996,8 +1017,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
       return RuntimeEffect::RefCounting | RuntimeEffect::Deallocating;
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
-      return RuntimeEffect::ObjectiveC | RuntimeEffect::Allocating;
     case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
@@ -1168,7 +1187,7 @@ bool PolymorphicBuiltinSpecializedOverloadInfo::init(
   // we have an overload for its current operand type.
   StringRef name = getBuiltinName(builtinKind);
   StringRef prefix = "generic_";
-  assert(name.startswith(prefix) &&
+  assert(name.starts_with(prefix) &&
          "Invalid polymorphic builtin name! Prefix should be Generic$OP?!");
   SmallString<32> staticOverloadName;
   staticOverloadName.append(name.drop_front(prefix.size()));

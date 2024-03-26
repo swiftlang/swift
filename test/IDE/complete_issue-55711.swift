@@ -1,6 +1,4 @@
-// RUN: %swift-ide-test -code-completion -source-filename=%s -code-completion-token=A | %FileCheck %s --check-prefix=A
-// RUN: %swift-ide-test -code-completion -source-filename=%s -code-completion-token=B | %FileCheck %s --check-prefix=B
-// RUN: %swift-ide-test -code-completion -source-filename=%s -code-completion-token=D | %FileCheck %s --check-prefix=D
+// RUN: %batch-code-completion
 
 // https://github.com/apple/swift/issues/55711
 // https://forums.swift.org/t/code-completion-enhancement-request/38677
@@ -36,6 +34,10 @@ struct D <T> {
 func test() {
   C(.a) {
     .#^A^#
+  }
+  C(.a) {
+    ()
+    return .#^A_MULTISTMT?check=A^#
   }
 // A: Begin completions, 2 items
 // A-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: foo({#arg: Bool#})[#A<X>#];

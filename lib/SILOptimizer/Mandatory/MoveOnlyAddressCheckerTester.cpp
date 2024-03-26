@@ -78,10 +78,6 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().supportsMoveOnlyTypes())
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
@@ -98,7 +94,8 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         moveIntroducersToProcess;
     searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-        fn, moveIntroducersToProcess, diagnosticEmitter);
+        fn, getAnalysis<PostOrderAnalysis>(), moveIntroducersToProcess,
+        diagnosticEmitter);
 
     LLVM_DEBUG(llvm::dbgs()
                << "Emitting diagnostic when checking for mark must check inst: "

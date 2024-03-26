@@ -163,16 +163,16 @@ public:
   bool empty() const { return innerResults().empty(); }
 
   ArrayRef<LookupResultEntry> innerResults() const {
-    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
+    return llvm::ArrayRef(Results).take_front(IndexOfFirstOuterResult);
   }
 
   ArrayRef<LookupResultEntry> outerResults() const {
-    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
+    return llvm::ArrayRef(Results).drop_front(IndexOfFirstOuterResult);
   }
 
   /// \returns An array of both the inner and outer results.
   ArrayRef<LookupResultEntry> allResults() const {
-    return llvm::makeArrayRef(Results);
+    return llvm::ArrayRef(Results);
   }
 
   const LookupResultEntry& operator[](unsigned index) const {
@@ -247,6 +247,9 @@ enum class UnqualifiedLookupFlags {
   MacroLookup            = 1 << 7,
   /// This lookup should only return modules
   ModuleLookup           = 1 << 8,
+  /// This lookup should discard 'Self' requirements in protocol extension
+  /// 'where' clauses.
+  DisregardSelfBounds    = 1 << 9
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -261,7 +264,7 @@ inline UnqualifiedLookupOptions operator|(UnqualifiedLookupFlags flag1,
 /// Describes the reason why a certain declaration is visible.
 enum class DeclVisibilityKind {
   /// Declaration is a local variable or type.
-  LocalVariable,
+  LocalDecl,
 
   /// Declaration is a function parameter.
   FunctionParameter,
@@ -442,8 +445,8 @@ public:
                  DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
 
-/// Filters out decls that are not usable based on their source location, eg.
-/// a decl inside its own initializer or a non-type decl before its definition.
+/// Filters out decls that are not usable based on their source location, e.g.
+/// a top-level decl inside its own initializer or shadowed decls.
 class UsableFilteringDeclConsumer final : public VisibleDeclConsumer {
   const SourceManager &SM;
   const DeclContext *DC;
@@ -465,7 +468,7 @@ public:
   }
 
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
-                 DynamicLookupInfo dynamicLookupInfo) override;
+                 DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
 
 /// Remove any declarations in the given set that were overridden by
@@ -504,14 +507,11 @@ bool removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
 bool removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
                          const DeclContext *dc);
 
-/// Finds decls visible in the given context and feeds them to the given
-/// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
-/// the SourceLoc is used to determine which declarations in that function
-/// are visible.
-void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                        const DeclContext *DC,
-                        bool IncludeTopLevel,
-                        SourceLoc Loc = SourceLoc());
+/// Finds decls visible in the given context at the given location and feeds
+/// them to the given VisibleDeclConsumer. The \p Loc must be valid, and \p DC
+/// must be in a SourceFile.
+void lookupVisibleDecls(VisibleDeclConsumer &Consumer, SourceLoc Loc,
+                        const DeclContext *DC, bool IncludeTopLevel);
 
 /// Finds decls visible as members of the given type and feeds them to the given
 /// VisibleDeclConsumer.
@@ -586,12 +586,15 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   /// The location of the "unchecked" attribute, if present.
   SourceLoc uncheckedLoc;
 
+  /// The location of the "preconcurrency" attribute if present.
+  SourceLoc preconcurrencyLoc;
+
   InheritedNominalEntry() { }
 
-  InheritedNominalEntry(
-    NominalTypeDecl *item, SourceLoc loc,
-    SourceLoc uncheckedLoc
-  ) : Located(item, loc), uncheckedLoc(uncheckedLoc) { }
+  InheritedNominalEntry(NominalTypeDecl *item, SourceLoc loc,
+                        SourceLoc uncheckedLoc, SourceLoc preconcurrencyLoc)
+      : Located(item, loc), uncheckedLoc(uncheckedLoc),
+        preconcurrencyLoc(preconcurrencyLoc) {}
 };
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -603,7 +606,7 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
-    bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration, looking through typealiases
@@ -612,7 +615,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// If we come across the AnyObject type, set \c anyObject true.
 SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the
@@ -626,70 +629,6 @@ SelfBounds getSelfBoundsFromWhereClause(
 SelfBounds getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl);
 
 namespace namelookup {
-
-/// Searches through statements and patterns for local variable declarations.
-class FindLocalVal : public StmtVisitor<FindLocalVal> {
-  friend class ASTVisitor<FindLocalVal>;
-
-  const SourceManager &SM;
-  SourceLoc Loc;
-  VisibleDeclConsumer &Consumer;
-
-public:
-  FindLocalVal(const SourceManager &SM, SourceLoc Loc,
-               VisibleDeclConsumer &Consumer)
-      : SM(SM), Loc(Loc), Consumer(Consumer) {}
-
-  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason);
-
-  void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
-  
-  void checkParameterList(const ParameterList *params);
-
-  void checkGenericParams(GenericParamList *Params);
-
-  void checkSourceFile(const SourceFile &SF);
-
-private:
-  bool isReferencePointInRange(SourceRange R) {
-    return SM.rangeContainsTokenLoc(R, Loc);
-  }
-
-  void visitBreakStmt(BreakStmt *) {}
-  void visitContinueStmt(ContinueStmt *) {}
-  void visitFallthroughStmt(FallthroughStmt *) {}
-  void visitFailStmt(FailStmt *) {}
-  void visitReturnStmt(ReturnStmt *) {}
-  void visitYieldStmt(YieldStmt *) {}
-  void visitThenStmt(ThenStmt *) {}
-  void visitThrowStmt(ThrowStmt *) {}
-  void visitDiscardStmt(DiscardStmt *) {}
-  void visitPoundAssertStmt(PoundAssertStmt *) {}
-  void visitDeferStmt(DeferStmt *DS) {
-    // Nothing in the defer is visible.
-  }
-
-  void checkStmtCondition(const StmtCondition &Cond);
-
-  void visitIfStmt(IfStmt *S);
-  void visitGuardStmt(GuardStmt *S);
-
-  void visitWhileStmt(WhileStmt *S);
-  void visitRepeatWhileStmt(RepeatWhileStmt *S);
-  void visitDoStmt(DoStmt *S);
-
-  void visitForEachStmt(ForEachStmt *S);
-
-  void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false);
-  
-  void visitSwitchStmt(SwitchStmt *S);
-
-  void visitCaseStmt(CaseStmt *S);
-
-  void visitDoCatchStmt(DoCatchStmt *S);
-  
-};
-
 
 /// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
@@ -734,9 +673,9 @@ public:
   }
 
 #ifndef NDEBUG
-  virtual void startingNextLookupStep() = 0;
-  virtual void finishingLookup(std::string) const = 0;
-  virtual bool isTargetLookup() const = 0;
+  virtual void startingNextLookupStep() {}
+  virtual void finishingLookup(std::string) const {}
+  virtual bool isTargetLookup() const { return false; }
 #endif
 };
   

@@ -142,6 +142,27 @@ enum class ValueOwnership : uint8_t {
 enum : unsigned { NumValueOwnershipBits =
   countBitsUsed(static_cast<unsigned>(ValueOwnership::Last_Kind)) };
 
+enum class ParameterOwnership : uint8_t;
+
+/// Map a `ValueOwnership` to the corresponding ABI-stable constant used by
+/// runtime metadata.
+ParameterOwnership asParameterOwnership(ValueOwnership o);
+/// Map an ABI-stable ownership identifier to a `ValueOwnership`.
+ValueOwnership asValueOwnership(ParameterOwnership o);
+
+static inline llvm::StringRef getOwnershipSpelling(ValueOwnership ownership) {
+  switch (ownership) {
+  case ValueOwnership::Default:
+    return "";
+  case ValueOwnership::InOut:
+    return "inout";
+  case ValueOwnership::Shared:
+    return "borrowing";
+  case ValueOwnership::Owned:
+    return "consuming";
+  }
+  llvm_unreachable("Invalid ValueOwnership");
+}
 } // end namespace swift
 
 #endif

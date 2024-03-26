@@ -25,12 +25,12 @@
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
-#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/VersionTuple.h"
+#include <optional>
 #include <system_error>
 
 namespace llvm {
@@ -106,15 +106,25 @@ public:
         : path(std::move(Path)), fingerprint(std::move(FP)) {}
   };
 
-  inline static std::string getPath(const IncrementalDependency &id) {
-    return id.path;
+  struct MacroPluginDependency {
+    Identifier moduleName;
+    std::string path;
+
+    MacroPluginDependency(const Identifier &moduleName, const std::string &path)
+        : moduleName(moduleName), path(path) {}
+  };
+
+  template <typename Dep>
+  inline static const std::string getPath(const Dep &dep) {
+    return dep.path;
   }
-  typedef ArrayRefView<IncrementalDependency, std::string, getPath>
-      DependencyPathArrayRef;
+  template <typename Dep>
+  using PathArrayRefView = ArrayRefView<Dep, const std::string, getPath>;
 
   std::shared_ptr<clang::DependencyCollector> clangCollector;
   SmallVector<IncrementalDependency, 8> incrementalDeps;
   llvm::StringSet<> incrementalDepsUniquer;
+  llvm::SetVector<MacroPluginDependency> macroPluginDeps;
 
 public:
   explicit DependencyTracker(
@@ -134,6 +144,12 @@ public:
   /// \p File is performed.
   void addIncrementalDependency(StringRef File, Fingerprint FP);
 
+  /// Adds a macro plugin dependency.
+  ///
+  /// No additional canonicalization or adulteration of the file path in
+  /// \p File is performed.
+  void addMacroPluginDependency(StringRef File, Identifier ModuleName);
+
   /// Fetches the list of dependencies.
   ArrayRef<std::string> getDependencies() const;
 
@@ -143,8 +159,19 @@ public:
 
   /// A view of the paths of the dependencies known to have incremental swift
   /// dependency information embedded inside of them.
-  DependencyPathArrayRef getIncrementalDependencyPaths() const {
-    return DependencyPathArrayRef(getIncrementalDependencies());
+  PathArrayRefView<IncrementalDependency>
+  getIncrementalDependencyPaths() const {
+    return PathArrayRefView<IncrementalDependency>(
+        getIncrementalDependencies());
+  }
+
+  /// The list of macro plugin dependencies.
+  ArrayRef<MacroPluginDependency> getMacroPluginDependencies() const;
+
+  PathArrayRefView<MacroPluginDependency>
+  getMacroPluginDependencyPaths() const {
+    return PathArrayRefView<MacroPluginDependency>(
+        getMacroPluginDependencies());
   }
 
   /// Return the underlying clang::DependencyCollector that this
@@ -182,6 +209,7 @@ public:
 struct InterfaceSubContextDelegate {
   virtual std::error_code runInSubContext(StringRef moduleName,
                                           StringRef interfacePath,
+                                          StringRef sdkPath,
                                           StringRef outputPath,
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
@@ -189,6 +217,7 @@ struct InterfaceSubContextDelegate {
                                        ArrayRef<StringRef>, StringRef)> action) = 0;
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
                                                    StringRef interfacePath,
+                                                   StringRef sdkPath,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
                                                    bool silenceErrors,
@@ -228,7 +257,7 @@ public:
   /// Represents a module version and the source it was parsed from.
   class ModuleVersionInfo {
     llvm::VersionTuple Version;
-    llvm::Optional<ModuleVersionSourceKind> SourceKind;
+    std::optional<ModuleVersionSourceKind> SourceKind;
 
   public:
     /// Returns true if the version has a valid source kind.
@@ -352,5 +381,29 @@ public:
 };
 
 } // namespace swift
+
+namespace llvm {
+template <>
+struct DenseMapInfo<swift::DependencyTracker::MacroPluginDependency> {
+  using MacroPluginDependency = swift::DependencyTracker::MacroPluginDependency;
+
+  static MacroPluginDependency getEmptyKey() {
+    return {DenseMapInfo<swift::Identifier>::getEmptyKey(), ""};
+  }
+
+  static MacroPluginDependency getTombstoneKey() {
+    return {DenseMapInfo<swift::Identifier>::getTombstoneKey(), ""};
+  }
+
+  static unsigned getHashValue(MacroPluginDependency Val) {
+    return hash_combine(Val.moduleName, Val.path);
+  }
+
+  static bool isEqual(const MacroPluginDependency &LHS,
+                      const MacroPluginDependency &RHS) {
+    return LHS.moduleName == RHS.moduleName && LHS.path == RHS.path;
+  }
+};
+} // namespace llvm
 
 #endif

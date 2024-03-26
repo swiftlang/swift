@@ -41,7 +41,7 @@ func testNoDynamic() -> some P {
 dynamic func testNoOpaque() -> P {
   // CHECK: erasure_expr implicit type="any P"
   // CHECK-NEXT: normal_conformance type="ConcreteP" protocol="P"
-  // CHECK-NEXT: call_expr type="ConcreteP"
+  // CHECK: call_expr type="ConcreteP"
   ConcreteP()
 }
 

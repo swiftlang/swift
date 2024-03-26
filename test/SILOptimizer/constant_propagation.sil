@@ -870,6 +870,35 @@ bb0:
 // CHECK-NEXT: } // end sil function 'fold_double_comparison_with_inf'
 }
 
+sil @dont_fold_comparison_with_inf : $@convention(thin) (Builtin.FPIEEE32) -> Builtin.Int1 {
+bb0(%0 : $Builtin.FPIEEE32):
+  %2 = float_literal $Builtin.FPIEEE32, 0x0
+  %4 = builtin "fadd_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %5 = integer_literal $Builtin.Int32, 2139095040
+  %6 = builtin "bitcast_Int32_FPIEEE32"(%5 : $Builtin.Int32) : $Builtin.FPIEEE32
+  %9 = builtin "fcmp_olt_FPIEEE32"(%4 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.Int1
+  return %9 : $Builtin.Int1
+
+// CHECK-LABEL: sil @dont_fold_comparison_with_inf :
+// CHECK:         [[R:%.*]] = builtin "fcmp_olt_FPIEEE32"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'dont_fold_comparison_with_inf'
+}
+
+sil @dont_fold_comparison_with_inf2 : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %2 = float_literal $Builtin.FPIEEE32, 0x7F800000 // +Inf // user: %3
+  %5 = integer_literal $Builtin.Int32, 2139095040
+  %6 = builtin "bitcast_Int32_FPIEEE32"(%5 : $Builtin.Int32) : $Builtin.FPIEEE32
+  %9 = builtin "fcmp_olt_FPIEEE32"(%2 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.Int1
+  return %9 : $Builtin.Int1
+
+// CHECK-LABEL: sil @dont_fold_comparison_with_inf2 :
+// CHECK:         [[R:%.*]] = builtin "fcmp_olt_FPIEEE32"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'dont_fold_comparison_with_inf2'
+}
+
 // fold float comparison operations with Infinity/NaN when the other argument is not constant
 sil @fold_float_comparison_with_non_constant_arg : $@convention(thin) (Float) -> () {
 bb0(%0: $Float):

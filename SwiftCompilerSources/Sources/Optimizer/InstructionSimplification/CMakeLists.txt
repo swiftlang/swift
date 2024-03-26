@@ -12,6 +12,7 @@ swift_compiler_sources(Optimizer
   SimplifyBeginCOWMutation.swift
   SimplifyBranch.swift
   SimplifyBuiltin.swift
+  SimplifyCheckedCast.swift
   SimplifyCondBranch.swift
   SimplifyCondFail.swift
   SimplifyConvertEscapeToNoEscape.swift
@@ -21,6 +22,7 @@ swift_compiler_sources(Optimizer
   SimplifyDestructure.swift
   SimplifyGlobalValue.swift
   SimplifyInitEnumDataAddr.swift
+  SimplifyKeyPath.swift
   SimplifyLoad.swift
   SimplifyPartialApply.swift
   SimplifyPointerToAddress.swift

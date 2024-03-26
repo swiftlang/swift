@@ -184,8 +184,8 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC->getParentModule())) {
+    if (!DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
+                                                 protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -462,8 +462,6 @@ CallExpr *
 DerivedConformance::createBuiltinCall(ASTContext &ctx,
                                       BuiltinValueKind builtin,
                                       ArrayRef<Type> typeArgs,
-                                      ArrayRef<ProtocolConformanceRef>
-                                        conformances,
                                       ArrayRef<Expr *> args) {
   auto name = ctx.getIdentifier(getBuiltinName(builtin));
   auto decl = getBuiltinValueDecl(ctx, name);
@@ -472,8 +470,10 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   ConcreteDeclRef declRef = decl;
   auto fnType = decl->getInterfaceType();
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
+    auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
-    auto subs = SubstitutionMap::get(generics, typeArgs, conformances);
+    auto subs = SubstitutionMap::get(generics, typeArgs,
+                                     LookUpConformanceInModule{builtinModule});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
   } else {
@@ -655,8 +655,8 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
                                         Expr *guardReturnValue) {
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
-  
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), guardReturnValue);
+
+  auto *returnStmt = ReturnStmt::createImplicit(C, guardReturnValue);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
@@ -700,7 +700,7 @@ GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
 
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, nilExpr);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
@@ -805,7 +805,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body vardecls*/ llvm::None));
+                                     /*case body vardecls*/ std::nullopt));
   }
 
   // generate: switch enumVar { }
@@ -839,9 +839,8 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC->getParentModule())
-              .isInvalid()) {
+      if (DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
+                                                  protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }

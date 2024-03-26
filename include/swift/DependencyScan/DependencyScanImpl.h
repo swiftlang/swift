@@ -30,6 +30,9 @@ struct swiftscan_dependency_graph_s {
 
   /// The complete list of modules discovered
   swiftscan_dependency_set_t *dependencies;
+
+  /// Diagnostics produced during this scan
+  swiftscan_diagnostic_set_t *diagnostics;
 };
 
 struct swiftscan_dependency_info_s {
@@ -125,9 +128,14 @@ typedef struct {
   /// Clang module dependencies
   swiftscan_string_set_t *swift_overlay_module_dependencies;
 
-  /// (Clang) header dependencies of this binary module.
-  /// Typically pre-compiled bridging header.
-  swiftscan_string_set_t *header_dependencies;
+  /// (Clang) header (.h) dependency of this binary module.
+  swiftscan_string_ref_t header_dependency;
+
+  /// (Clang) module dependencies of the textual header inputs
+  swiftscan_string_set_t *header_dependencies_module_dependnecies;
+
+  /// Source files included by the header dependencies of this binary module
+  swiftscan_string_set_t *header_dependencies_source_files;
 
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
@@ -192,6 +200,8 @@ struct swiftscan_batch_scan_entry_s {
 struct swiftscan_import_set_s {
   /// The complete list of imports discovered
   swiftscan_string_set_t *imports;
+  /// Diagnostics produced during this import scan
+  swiftscan_diagnostic_set_t *diagnostics;
 };
 
 struct swiftscan_scan_invocation_s {

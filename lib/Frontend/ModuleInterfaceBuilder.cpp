@@ -44,11 +44,11 @@ namespace path = llvm::sys::path;
 
 /// If the file dependency in \p FullDepPath is inside the \p Base directory,
 /// this returns its path relative to \p Base. Otherwise it returns None.
-static llvm::Optional<StringRef> getRelativeDepPath(StringRef DepPath,
-                                                    StringRef Base) {
+static std::optional<StringRef> getRelativeDepPath(StringRef DepPath,
+                                                   StringRef Base) {
   // If Base is the root directory, or DepPath does not start with Base, bail.
-  if (Base.size() <= 1 || !DepPath.startswith(Base)) {
-    return llvm::None;
+  if (Base.size() <= 1 || !DepPath.starts_with(Base)) {
+    return std::nullopt;
   }
 
   assert(DepPath.size() > Base.size() &&
@@ -65,7 +65,7 @@ static llvm::Optional<StringRef> getRelativeDepPath(StringRef DepPath,
 
   // We have something next to Base, like "Base.h", that's somehow
   // become a dependency.
-  return llvm::None;
+  return std::nullopt;
 }
 
 struct ErrorDowngradeConsumerRAII: DiagnosticConsumer {
@@ -110,6 +110,9 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
   auto IncDeps =
       Instance.getDependencyTracker()->getIncrementalDependencyPaths();
   InitialDepNames.append(IncDeps.begin(), IncDeps.end());
+  auto MacroDeps =
+      Instance.getDependencyTracker()->getMacroPluginDependencyPaths();
+  InitialDepNames.append(MacroDeps.begin(), MacroDeps.end());
   InitialDepNames.push_back(interfacePath.str());
   for (const auto &extra : extraDependencies) {
     InitialDepNames.push_back(extra.str());
@@ -120,29 +123,29 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
     path::native(InitialDepName, Scratch);
     StringRef DepName = Scratch.str();
 
-    assert(moduleCachePath.empty() || !DepName.startswith(moduleCachePath));
+    assert(moduleCachePath.empty() || !DepName.starts_with(moduleCachePath));
 
     // Serialize the paths of dependencies in the SDK relative to it.
-    llvm::Optional<StringRef> SDKRelativePath =
+    std::optional<StringRef> SDKRelativePath =
         getRelativeDepPath(DepName, SDKPath);
     StringRef DepNameToStore = SDKRelativePath.value_or(DepName);
     bool IsSDKRelative = SDKRelativePath.has_value();
 
     // Forwarding modules add the underlying prebuilt module to their
     // dependency list -- don't serialize that.
-    if (!prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath))
+    if (!prebuiltCachePath.empty() && DepName.starts_with(prebuiltCachePath))
       continue;
     // Don't serialize interface path if it's from the preferred interface dir.
     // This ensures the prebuilt module caches generated from these interfaces
     // are relocatable.
-    if (!backupInterfaceDir.empty() && DepName.startswith(backupInterfaceDir))
+    if (!backupInterfaceDir.empty() && DepName.starts_with(backupInterfaceDir))
       continue;
     if (dependencyTracker) {
       dependencyTracker->addDependency(DepName, /*isSystem*/ IsSDKRelative);
     }
 
     // Don't serialize compiler-relative deps so the cache is relocatable.
-    if (DepName.startswith(ResourcePath))
+    if (DepName.starts_with(ResourcePath))
       continue;
 
     auto Status = fs.status(DepName);
@@ -275,10 +278,12 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
       !Invocation.getIRGenOptions().ForceLoadSymbolName.empty();
   SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
   SerializationOpts.AllowableClients = FEOpts.AllowableClients;
-
-  // Record any non-SDK module interface files for the debug info.
   StringRef SDKPath = Instance.getASTContext().SearchPathOpts.getSDKPath();
-  if (!getRelativeDepPath(InPath, SDKPath))
+
+  auto SDKRelativePath = getRelativeDepPath(InPath, SDKPath);
+  if (SDKRelativePath.has_value())
+    SerializationOpts.ModuleInterface = SDKRelativePath.value();
+  else
     SerializationOpts.ModuleInterface = InPath;
 
   SerializationOpts.SDKName = Instance.getASTContext().LangOpts.SDKName;
@@ -330,7 +335,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModuleInternal(
     };
 
     NullDiagnosticConsumer noopConsumer;
-    llvm::Optional<DiagnosticEngine> localDiags;
+    std::optional<DiagnosticEngine> localDiags;
     DiagnosticEngine *rebuildDiags = diags;
     if (silenceInterfaceDiagnostics) {
       // To silence diagnostics, use a local temporary engine.
@@ -340,7 +345,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
 
     SubError = (bool)subASTDelegate.runInSubCompilerInstance(
-        moduleName, interfacePath, OutPath, diagnosticLoc,
+        moduleName, interfacePath, sdkPath, OutPath, diagnosticLoc,
         silenceInterfaceDiagnostics,
         [&](SubCompilerInstanceInfo &info) {
           auto EBuilder = ExplicitModuleInterfaceBuilder(

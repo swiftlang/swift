@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,33 +19,53 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   //
   // TODO(String performance): SIMD-ize
   //
-  let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
-  var i = 0
-
   let count = input.count
-  let stride = MemoryLayout<UInt>.stride
-  let address = Int(bitPattern: ptr)
+  var ptr = UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
 
-  let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
-  let byteASCIIMask = UInt8(truncatingIfNeeded: wordASCIIMask)
+  let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
+  let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
+  let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
+  let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
+  
+  let end128 = ptr + count & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
+  let end64 = ptr + count & ~(MemoryLayout<UInt64>.stride &- 1)
+  let end32 = ptr + count & ~(MemoryLayout<UInt32>.stride &- 1)
+  let end16 = ptr + count & ~(MemoryLayout<UInt16>.stride &- 1)
+  let end = ptr + count
 
-  while (address &+ i) % stride != 0 && i < count {
-    guard ptr[i] & byteASCIIMask == 0 else { return false }
-    i &+= 1
+  
+  while ptr < end128 {
+    let pair = ptr.loadUnaligned(as: (UInt64, UInt64).self)
+    let result = (pair.0 | pair.1) & asciiMask64
+    guard result == 0 else { return false }
+    ptr = ptr + MemoryLayout<(UInt64, UInt64)>.stride
+  }
+  
+  // If we had enough bytes for two iterations of this, we would have hit
+  // the loop above, so we only need to do this once
+  if ptr < end64 {
+    let value = ptr.loadUnaligned(as: UInt64.self)
+    guard value & asciiMask64 == 0 else { return false }
+    ptr = ptr + MemoryLayout<UInt64>.stride
+  }
+  
+  if ptr < end32 {
+    let value = ptr.loadUnaligned(as: UInt32.self)
+    guard value & asciiMask32 == 0 else { return false }
+    ptr = ptr + MemoryLayout<UInt32>.stride
+  }
+  
+  if ptr < end16 {
+    let value = ptr.loadUnaligned(as: UInt16.self)
+    guard value & asciiMask16 == 0 else { return false }
+    ptr = ptr + MemoryLayout<UInt16>.stride
   }
 
-  while (i &+ stride) <= count {
-    let word: UInt = UnsafePointer(
-      bitPattern: address &+ i
-    )._unsafelyUnwrappedUnchecked.pointee
-    guard word & wordASCIIMask == 0 else { return false }
-    i &+= stride
+  if ptr < end {
+    let value = ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
+    guard value & asciiMask8 == 0 else { return false }
   }
-
-  while i < count {
-    guard ptr[i] & byteASCIIMask == 0 else { return false }
-    i &+= 1
-  }
+  _internalInvariant(ptr == end || ptr + 1 == end)
   return true
 }
 
@@ -297,5 +317,81 @@ extension String {
     return Array(str.utf8).withUnsafeBufferPointer {
       String._uncheckedFromUTF8($0)
     }
+  }
+
+  @usableFromInline
+  @available(SwiftStdlib 6.0, *)
+  internal static func _validate<Encoding: Unicode.Encoding>(
+    _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
+    as encoding: Encoding.Type
+  ) -> String? {
+    if encoding.CodeUnit.self == UInt8.self {
+      let bytes = _identityCast(input, to: UnsafeBufferPointer<UInt8>.self)
+      if encoding.self == UTF8.self {
+        guard case .success(let info) = validateUTF8(bytes) else { return nil }
+        return String._uncheckedFromUTF8(bytes, asciiPreScanResult: info.isASCII)
+      } else if encoding.self == Unicode.ASCII.self {
+        guard _allASCII(bytes) else { return nil }
+        return String._uncheckedFromASCII(bytes)
+      }
+    }
+
+    // slow-path
+    var isASCII = true
+    var buffer: UnsafeMutableBufferPointer<UInt8>
+    buffer = UnsafeMutableBufferPointer.allocate(capacity: input.count*3)
+    var written = buffer.startIndex
+
+    var parser = Encoding.ForwardParser()
+    var input = input.makeIterator()
+
+    transcodingLoop:
+    while true {
+      switch parser.parseScalar(from: &input) {
+      case .valid(let s):
+        let scalar = Encoding.decode(s)
+        guard let utf8 = Unicode.UTF8.encode(scalar) else {
+          // transcoding error: clean up and return nil
+          fallthrough
+        }
+        if buffer.count < written + utf8.count {
+          let newCapacity = buffer.count + (buffer.count >> 1)
+          let copy: UnsafeMutableBufferPointer<UInt8>
+          copy = UnsafeMutableBufferPointer.allocate(capacity: newCapacity)
+          let copied = copy.moveInitialize(
+            fromContentsOf: buffer.prefix(upTo: written)
+          )
+          buffer.deallocate()
+          buffer = copy
+          written = copied
+        }
+        if isASCII && utf8.count > 1 {
+          isASCII = false
+        }
+        written = buffer.suffix(from: written).initialize(fromContentsOf: utf8)
+        break
+      case .error:
+        // validation error: clean up and return nil
+        buffer.prefix(upTo: written).deinitialize()
+        buffer.deallocate()
+        return nil
+      case .emptyInput:
+        break transcodingLoop
+      }
+    }
+
+    let storage = buffer.baseAddress.map {
+      __SharedStringStorage(
+        _mortal: $0,
+        countAndFlags: _StringObject.CountAndFlags(
+          count: buffer.startIndex.distance(to: written),
+          isASCII: isASCII,
+          isNFC: isASCII,
+          isNativelyStored: false,
+          isTailAllocated: false
+        )
+      )
+    }
+    return storage?.asString
   }
 }

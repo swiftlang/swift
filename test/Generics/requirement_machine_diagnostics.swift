@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 func testInvalidConformance() {
   // expected-error@+1 {{type 'T' constrained to non-protocol, non-class type 'Int'}}
@@ -39,44 +40,36 @@ func badTypeConformance4<T>(_: T) where (inout T) throws -> () : EqualComparable
 func badTypeConformance5<T>(_: T) where T & Sequence : EqualComparable { }
 // expected-error@-1 {{non-protocol, non-class type 'T' cannot be used within a protocol-constrained type}}
 
-func badTypeConformance6<T>(_: T) where [T] : Collection { }
-// expected-warning@-1{{redundant conformance constraint '[T]' : 'Collection'}}
+func redundantTypeConformance6<T>(_: T) where [T] : Collection { }
 
 func concreteSameTypeRedundancy<T>(_: T) where Int == Int {}
-// expected-warning@-1{{redundant same-type constraint 'Int' == 'Int'}}
 
 func concreteSameTypeRedundancy<T>(_: T) where Array<Int> == Array<T> {}
-// expected-warning@-1{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
-// expected-warning@-2{{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-warning@-1{{same-type requirement makes generic parameter 'T' non-generic}}
 
 protocol P {}
 struct S: P {}
 func concreteConformanceRedundancy<T>(_: T) where S : P {}
-// expected-warning@-1{{redundant conformance constraint 'S' : 'P'}}
 
 class C {}
 func concreteLayoutRedundancy<T>(_: T) where C : AnyObject {}
-// expected-warning@-1{{redundant constraint 'C' : 'AnyObject'}}
 
 func concreteLayoutConflict<T>(_: T) where Int : AnyObject {}
 // expected-error@-1{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
 
 class C2: C {}
 func concreteSubclassRedundancy<T>(_: T) where C2 : C {}
-// expected-warning@-1{{redundant superclass constraint 'C2' : 'C'}}
 
 class D {}
 func concreteSubclassConflict<T>(_: T) where D : C {}
 // expected-error@-1{{type 'D' in conformance requirement does not refer to a generic parameter or associated type}}
 
 protocol UselessProtocolWhereClause where Int == Int {}
-// expected-warning@-1 {{redundant same-type constraint 'Int' == 'Int'}}
 
 protocol InvalidProtocolWhereClause where Self: Int {}
 // expected-error@-1 {{type 'Self' constrained to non-protocol, non-class type 'Int'}}
 
 typealias Alias<T> = T where Int == Int
-// expected-warning@-1 {{redundant same-type constraint 'Int' == 'Int'}}
 
 func cascadingConflictingRequirement<T>(_: T) where DoesNotExist : EqualComparable { }
 // expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
@@ -85,32 +78,23 @@ func cascadingInvalidConformance<T>(_: T) where T : DoesNotExist { }
 // expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
 
 func trivialRedundant1<T>(_: T) where T: P, T: P {}
-// expected-warning@-1 {{redundant conformance constraint 'T' : 'P'}}
 
 func trivialRedundant2<T>(_: T) where T: AnyObject, T: AnyObject {}
-// expected-warning@-1 {{redundant constraint 'T' : 'AnyObject'}}
 
 func trivialRedundant3<T>(_: T) where T: C, T: C {}
-// expected-warning@-1 {{redundant superclass constraint 'T' : 'C'}}
 
 func trivialRedundant4<T>(_: T) where T == T {}
-// expected-warning@-1 {{redundant same-type constraint 'T' == 'T'}}
 
 protocol TrivialRedundantConformance: P, P {}
-// expected-warning@-1 {{redundant conformance constraint 'Self' : 'P'}}
 
 protocol TrivialRedundantLayout: AnyObject, AnyObject {}
-// expected-warning@-1 {{redundant constraint 'Self' : 'AnyObject'}}
-// expected-error@-2 {{duplicate inheritance from 'AnyObject'}}
+// expected-error@-1 {{duplicate inheritance from 'AnyObject'}}
 
 protocol TrivialRedundantSuperclass: C, C {}
-// expected-warning@-1 {{redundant superclass constraint 'Self' : 'C'}}
-// expected-error@-2 {{duplicate inheritance from 'C'}}
+// expected-error@-1 {{duplicate inheritance from 'C'}}
 
 protocol TrivialRedundantSameType where Self == Self {
-// expected-warning@-1 {{redundant same-type constraint 'Self' == 'Self'}}
   associatedtype T where T == T
-  // expected-warning@-1 {{redundant same-type constraint 'Self.T' == 'Self.T'}}
 }
 
 struct G<T> { }
@@ -120,8 +104,9 @@ protocol Pair {
   associatedtype B
 }
 
+// CHECK-LABEL: .test1@
+// CHECK-NEXT: Generic signature: <T where T : Pair, T.[Pair]A == G<Int>, T.[Pair]B == Int>
 func test1<T: Pair>(_: T) where T.A == G<Int>, T.A == G<T.B>, T.B == Int { }
-// expected-warning@-1 {{redundant same-type constraint 'T.A' == 'G<T.B>'}}
 
 
 protocol P1 {
@@ -138,8 +123,9 @@ protocol P4 {
   associatedtype P4Assoc : P1
 }
 
+// CHECK-LABEL: .inferSameType2@
+// CHECK-NEXT: Generic signature: <T, U where T : P3, U : P4, T.[P3]P3Assoc == U.[P4]P4Assoc>
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
-// expected-warning@-1{{redundant conformance constraint 'U.P4Assoc' : 'P2'}}
 
 protocol P5 {
   associatedtype Element
@@ -153,7 +139,8 @@ protocol P7 : P6 {
   associatedtype AssocP7: P6
 }
 
-// expected-warning@+1{{redundant conformance constraint 'Self.AssocP6.Element' : 'P6'}}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=P7
+// CHECK-NEXT: Generic signature: <Self where Self : P7, Self.[P6]AssocP6.[P5]Element : P6, Self.[P6]AssocP6.[P5]Element == Self.[P7]AssocP7.[P6]AssocP6.[P5]Element
 extension P7 where AssocP6.Element : P6,
         AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
@@ -177,11 +164,12 @@ protocol P10 {
 
 class X3 { }
 
+// CHECK-LABEL: .sameTypeConcrete2@
+// CHECK-NEXT: Generic signature: <T where T : P10, T : P9, T.[P8]B == X3, T.[P10]C == X3>
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
-// expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
 
 
-// Redundant requirement warnings are suppressed for inferred requirements.
+// Test inferred requirements.
 
 protocol P11 {
  associatedtype X
@@ -189,17 +177,32 @@ protocol P11 {
  associatedtype Z
 }
 
+// CHECK-LABEL: .inferred1@
+// CHECK-NEXT: Generic signature: <T where T : Hashable>
 func inferred1<T : Hashable>(_: Set<T>) {}
+
+// CHECK-LABEL: .inferred2@
+// CHECK-NEXT: Generic signature: <T where T : Hashable>
 func inferred2<T>(_: Set<T>) where T: Hashable {}
+
+// CHECK-LABEL: .inferred3@
+// CHECK-NEXT: Generic signature:  <T where T : P11, T.[P11]X : Hashable, T.[P11]X == T.[P11]Y, T.[P11]Z == Set<T.[P11]X>>
 func inferred3<T : P11>(_: T) where T.X : Hashable, T.Z == Set<T.Y>, T.X == T.Y {}
+
+// CHECK-LABEL: .inferred4@
+// CHECK-NEXT: Generic signature:  <T where T : P11, T.[P11]X : Hashable, T.[P11]X == T.[P11]Y, T.[P11]Z == Set<T.[P11]X>>
 func inferred4<T : P11>(_: T) where T.Z == Set<T.Y>, T.X : Hashable, T.X == T.Y {}
+
+// CHECK-LABEL: .inferred5@
+// CHECK-NEXT: Generic signature:  <T where T : P11, T.[P11]X : Hashable, T.[P11]X == T.[P11]Y, T.[P11]Z == Set<T.[P11]X>>
 func inferred5<T : P11>(_: T) where T.Z == Set<T.X>, T.Y : Hashable, T.X == T.Y {}
+
+// CHECK-LABEL: .inferred6@
+// CHECK-NEXT: Generic signature:  <T where T : P11, T.[P11]X : Hashable, T.[P11]X == T.[P11]Y, T.[P11]Z == Set<T.[P11]X>>
 func inferred6<T : P11>(_: T) where T.Y : Hashable, T.Z == Set<T.X>, T.X == T.Y {}
 
 func typeMatcherSugar<T>(_: T) where Array<Int> == Array<T>, Array<Int> == Array<T> {}
-// expected-warning@-1 2{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
-// expected-warning@-2{{redundant same-type constraint 'T' == 'Int'}}
-// expected-warning@-3{{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-warning@-1{{same-type requirement makes generic parameter 'T' non-generic}}
 
 
 struct ConcreteSelf: ConcreteProtocol {}
@@ -319,9 +322,11 @@ func sameTypeConflicts() {
   // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == G<U.Foo>' and 'T.X == Int'}}
   func fail7<U: Fooable, T: Concrete>(_: U, _: T) where T.X == G<U.Foo> {}
 
+  // expected-warning@+2{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
   // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail8<T, U: Fooable>(_: U, _: T) where T == G<U.Foo>, T == Int {}
 
   // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail9<T, U: Fooable>(_: U, _: T) where T == Int, T == G<U.Foo> {}
+  // expected-warning@-1{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
 }

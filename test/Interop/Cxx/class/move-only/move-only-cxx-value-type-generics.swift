@@ -4,6 +4,8 @@
 // REQUIRES: executable_test
 // REQUIRES: GH_ISSUE_70246
 
+
+
 import MoveOnlyCxxValueType
 import StdlibUnittest
 
@@ -37,4 +39,3 @@ MoveOnlyCxxValueType.test("Test move only type ref return pointee borrow") {
 }
 
 runAllTests()
-

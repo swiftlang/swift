@@ -288,6 +288,9 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:s5Int32V">Int32</Type></Declaration>
 // CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:s5Int32V">Int32</ref.struct></decl.var.type></decl.var.global>
+// CHECK4-NEXT: DOC COMMENT 
+// CHECK4-NEXT: Aaa. fooIntVar. Bbb. 
+// CHECK4-NEXT: DOC COMMENT XML
 // CHECK4-NEXT: <Variable file="{{[^"]+}}Foo.h" line="{{[0-9]+}}" column="{{[0-9]+}}"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK5 %s
@@ -307,6 +310,9 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK6-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
+// CHECK6-NEXT: DOC COMMENT 
+// CHECK6-NEXT: This is 'fooSwiftFunc' from 'FooSwiftModule'. 
+// CHECK6-NEXT: DOC COMMENT XML
 // CHECK6-NEXT: {{^}}<Function file="{{.*}}/FooSwiftModule.swift" line="2" column="13"><Name>fooSwiftFunc()</Name><USR>s:14FooSwiftModule03fooB4FuncSiyF</USR><Declaration>func fooSwiftFunc() -&gt; Int</Declaration><CommentParts><Abstract><Para>This is ‘fooSwiftFunc’ from ‘FooSwiftModule’.</Para></Abstract></CommentParts></Function>{{$}}
 
 // RUN: %sourcekitd-test -req=cursor -pos=14:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK7 %s
@@ -319,6 +325,9 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK7-NEXT: cursor_info{{$}}
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
 // CHECK7-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
+// CHECK7-NEXT: DOC COMMENT 
+// CHECK7-NEXT: Aaa. S1. Bbb. 
+// CHECK7-NEXT: DOC COMMENT XML
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:11cursor_info2S1V</USR><Declaration>struct S1</Declaration><CommentParts><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></CommentParts></Class>
 
 // RUN: %sourcekitd-test -req=cursor -pos=19:12 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK8 %s
@@ -780,6 +789,11 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK87-NEXT: cursor_info{{$}}
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
 // CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
+// CHECK87-NEXT: DOC COMMENT
+// CHECK87-NEXT: Brief. 
+// CHECK87-EMPTY:  
+// CHECK87-NEXT: - LocalizationKey: ABC 
+// CHECK87-NEXT: DOC COMMENT XML
 // CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="213" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract></CommentParts></Class>
 // CHECK87-NEXT: <LocalizationKey>ABC</LocalizationKey>
 
@@ -793,6 +807,9 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK88-NEXT: cursor_info{{$}}
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
+// CHECK88-NEXT: DOC COMMENT 
+// CHECK88-NEXT: - LocalizationKey: ABC 
+// CHECK88-NEXT: DOC COMMENT XML 
 // CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="216" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function>
 // CHECK88-NEXT: <LocalizationKey>ABC</LocalizationKey>
 

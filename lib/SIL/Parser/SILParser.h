@@ -70,7 +70,7 @@ private:
 
   /// Data structures used to perform name lookup for local values.
   llvm::StringMap<ValueBase *> LocalValues;
-  llvm::StringMap<llvm::SmallVector<TestSpecificationInst *>> TestSpecsWithRefs;
+  llvm::StringMap<llvm::SmallVector<SpecifyTestInst *>> TestSpecsWithRefs;
   llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
   Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
@@ -141,14 +141,13 @@ public:
   /// \verbatim
   ///   sil-identifier ::= [A-Za-z_0-9]+
   /// \endverbatim
-  bool parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
-                          const Diagnostic &D);
+  bool parseSILIdentifier(Identifier &Result, SourceLoc &Loc, DiagRef D);
 
   template <typename... DiagArgTypes, typename... ArgTypes>
   bool parseSILIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
                           ArgTypes... Args) {
     SourceLoc L;
-    return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
+    return parseSILIdentifier(Result, L, {ID, {Args...}});
   }
 
   template <typename T, typename... DiagArgTypes, typename... ArgTypes>
@@ -156,13 +155,13 @@ public:
                                 Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     Identifier TmpResult;
     SourceLoc L;
-    if (parseSILIdentifier(TmpResult, L, Diagnostic(ID, Args...))) {
+    if (parseSILIdentifier(TmpResult, L, {ID, {Args...}})) {
       return true;
     }
 
     auto Iter = std::find(Strings.begin(), Strings.end(), TmpResult.str());
     if (Iter == Strings.end()) {
-      P.diagnose(P.Tok, Diagnostic(ID, Args...));
+      P.diagnose(P.Tok, ID, Args...);
       return true;
     }
 
@@ -173,18 +172,18 @@ public:
   template <typename... DiagArgTypes, typename... ArgTypes>
   bool parseSILIdentifier(Identifier &Result, SourceLoc &L,
                           Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-    return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
+    return parseSILIdentifier(Result, L, {ID, {Args...}});
   }
 
   template <typename T>
   bool
-  parseSILQualifier(llvm::Optional<T> &result,
-                    llvm::function_ref<llvm::Optional<T>(StringRef)> parseName);
+  parseSILQualifier(std::optional<T> &result,
+                    llvm::function_ref<std::optional<T>(StringRef)> parseName);
 
   bool parseVerbatim(StringRef identifier);
 
   template <typename T>
-  bool parseInteger(T &Result, const Diagnostic &D) {
+  bool parseInteger(T &Result, DiagRef D) {
     if (!P.Tok.is(tok::integer_literal)) {
       P.diagnose(P.Tok, D);
       return true;
@@ -236,15 +235,15 @@ public:
     return false;
   }
 
-  llvm::Optional<StringRef>
+  std::optional<StringRef>
   parseOptionalAttribute(ArrayRef<StringRef> expected) {
     // We parse here @ <identifier>.
     if (P.Tok.getKind() != tok::at_sign)
-      return llvm::None;
+      return std::nullopt;
 
     auto name = P.peekToken().getText();
     if (!is_contained(expected, name))
-      return llvm::None;
+      return std::nullopt;
 
     // Ok, we can do this.
     P.consumeToken(tok::at_sign);
@@ -369,12 +368,12 @@ public:
     return parseProtocolConformance(dummy, genericSig, genericParams);
   }
 
-  llvm::Optional<llvm::coverage::Counter>
+  std::optional<llvm::coverage::Counter>
   parseSILCoverageExpr(llvm::coverage::CounterExpressionBuilder &Builder);
 
   template <class T>
   struct ParsedEnum {
-    llvm::Optional<T> Value;
+    std::optional<T> Value;
     StringRef Name;
     SourceLoc Loc;
 

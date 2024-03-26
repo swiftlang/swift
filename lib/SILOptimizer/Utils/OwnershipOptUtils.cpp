@@ -386,6 +386,11 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
   if (m->getStage() == SILStage::Raw)
     return false;
 
+  // OSSA rauw can create copies. Bail out if we have move only values.
+  if (newValue->getType().isMoveOnly()) {
+    return false;
+  }
+
   return true;
 }
 
@@ -647,7 +652,7 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
   InstructionDeleter deleter(std::move(tempCallbacks));
 
   // Generate and map the phis with undef operands first, in case of recursion.
-  auto undef = SILUndef::get(ownedValue->getType(), *ownedValue->getFunction());
+  auto undef = SILUndef::get(ownedValue);
   for (PhiValue reborrowedPhi : reborrowedPhis) {
     auto *phiBlock = reborrowedPhi.phiBlock;
     auto *ownedPhi = phiBlock->createPhiArgument(ownedValue->getType(),
@@ -1258,8 +1263,7 @@ OwnershipRAUWHelper::getReplacementAddress() {
   // guaranteedUsePoints?
   BeginBorrowInst *bbi = extender.borrowCopyOverGuaranteedUses(
       base.getReference(), borrowPt,
-      llvm::makeArrayRef(
-        ctx->extraAddressFixupInfo.allAddressUsesFromOldValue));
+      llvm::ArrayRef(ctx->extraAddressFixupInfo.allAddressUsesFromOldValue));
   auto bbiNext = &*std::next(bbi->getIterator());
   auto *refProjection = cast<SingleValueInstruction>(base.getBaseAddress());
   auto *newBase = refProjection->clone(bbiNext);

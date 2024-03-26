@@ -453,6 +453,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES")
   endif()
 
+  if(SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES)
+    list(APPEND result "-DSWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES")
+  endif()
+
   if(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE)
     list(APPEND result "-DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE")
   endif()
@@ -530,7 +534,11 @@ function(_add_target_variant_link_flags)
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26")
+        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
+      else()
+        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      endif()
       list(APPEND result "-resource-dir=${RESOURCE_DIR}")
     endif()
 
@@ -1043,7 +1051,9 @@ function(add_swift_target_library_single target name)
     add_custom_target("${target}"
       DEPENDS
         "${swift_module_dependency_target}")
-    add_dependencies("${install_in_component}" "${target}")
+    if(TARGET "${install_in_component}")
+      add_dependencies("${install_in_component}" "${target}")
+    endif()
 
     return()
   endif()
@@ -1077,7 +1087,9 @@ function(add_swift_target_library_single target name)
   if (SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
     add_custom_target("${target}"
       DEPENDS "${swift_module_dependency_target}")
-    add_dependencies("${install_in_component}" "${target}")
+    if(TARGET "${install_in_component}")
+      add_dependencies("${install_in_component}" "${target}")
+    endif()
     return()
   endif()
 
@@ -1086,7 +1098,7 @@ function(add_swift_target_library_single target name)
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
               ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
-  if (NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY)
+  if (NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND TARGET "${install_in_component}")
     add_dependencies("${install_in_component}" "${target}")
   endif()
   # NOTE: always inject the LLVMSupport directory before anything else.  We want
@@ -1233,6 +1245,9 @@ function(add_swift_target_library_single target name)
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
     endif()
+
+    set_target_properties(${target} PROPERTIES
+      POSITION_INDEPENDENT_CODE YES)
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OPENBSD")
     set_target_properties("${target}"
       PROPERTIES

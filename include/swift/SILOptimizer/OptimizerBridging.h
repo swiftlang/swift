@@ -50,6 +50,7 @@ class DominanceInfo;
 class PostDominanceInfo;
 class BasicBlockSet;
 class NodeSet;
+class OperandSet;
 class ClonerWithFixedLocation;
 class SwiftPassInvocation;
 class FixedSizeSlabPayload;
@@ -128,6 +129,12 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
+struct BridgedUtilities {
+  typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
+
+  static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
+};
+
 struct BridgedBasicBlockSet {
   swift::BasicBlockSet * _Nonnull set;
 
@@ -146,6 +153,15 @@ struct BridgedNodeSet {
   BRIDGED_INLINE bool containsInstruction(BridgedInstruction inst) const;
   BRIDGED_INLINE bool insertInstruction(BridgedInstruction inst) const;
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
+
+struct BridgedOperandSet {
+  swift::OperandSet * _Nonnull set;
+
+  BRIDGED_INLINE bool contains(BridgedOperand operand) const;
+  BRIDGED_INLINE bool insert(BridgedOperand operand) const;
+  BRIDGED_INLINE void erase(BridgedOperand operand) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
 };
 
@@ -175,6 +191,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE SILStage getSILStage() const;
   BRIDGED_INLINE bool hadError() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;
+  BRIDGED_INLINE bool isTransforming(BridgedFunction function) const;
 
   // Analysis
 
@@ -200,12 +217,14 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockBefore(BridgedInstruction bridgedInst) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockAfter(BridgedInstruction bridgedInst) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock appendBlock(BridgedFunction bridgedFunction) const;
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
+  bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
   SWIFT_IMPORT_UNSAFE swift::SILVTable * _Nullable specializeVTableForType(BridgedType type,
                                                                            BridgedFunction function) const;
@@ -213,6 +232,10 @@ struct BridgedPassContext {
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
+                                                            SwiftInt numDeadArgs,
+                                                            BridgedFunction function) const;
+
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
                                                             bool isPrivate) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
@@ -232,6 +255,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE void freeBasicBlockSet(BridgedBasicBlockSet set) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNodeSet allocNodeSet() const;
   BRIDGED_INLINE void freeNodeSet(BridgedNodeSet set) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandSet allocOperandSet() const;
+  BRIDGED_INLINE void freeOperandSet(BridgedOperandSet set) const;
 
   // Stack nesting
 
@@ -272,6 +297,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDefaultWitnessTable getFirstDefaultWitnessTableInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedDefaultWitnessTable getNextDefaultWitnessTableInModule(
                                                                                   BridgedDefaultWitnessTable table);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction loadFunction(BridgedStringRef name,
                                                                           bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
@@ -279,6 +305,12 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
+  SWIFT_IMPORT_UNSAFE BridgedFunction createEmptyFunction(BridgedStringRef name,
+                                                          const BridgedParameterInfo * _Nullable bridgedParams,
+                                                          SwiftInt paramCount,
+                                                          bool hasSelfParam,
+                                                          BridgedFunction fromFunc) const;
+  void moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const;
 
   // Passmanager housekeeping
 
@@ -288,7 +320,9 @@ struct BridgedPassContext {
 
   // SSAUpdater
 
-  BRIDGED_INLINE void SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const;
+  BRIDGED_INLINE void
+  SSAUpdater_initialize(BridgedFunction function, BridgedType type,
+                        BridgedValue::Ownership ownership) const;
   BRIDGED_INLINE void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const;
@@ -309,6 +343,18 @@ struct BridgedPassContext {
 };
 
 bool FullApplySite_canInline(BridgedInstruction apply);
+
+enum class BridgedDynamicCastResult {
+  willSucceed,
+  maySucceed,
+  willFail
+};
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
+                                                    BridgedFunction function,
+                                                    bool sourceTypeIsExact);
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst);
 
 //===----------------------------------------------------------------------===//
 //                          Pass registration

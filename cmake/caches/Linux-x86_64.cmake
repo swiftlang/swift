@@ -135,7 +135,7 @@ set(LLDB_TOOLS
       lldb-argdumper
       lldb-python-scripts
       lldb-server
-      lldb-vscode
+      lldb-dap
       repl_swift
     CACHE STRING "")
 

@@ -47,23 +47,34 @@ StringRef swift::prettyPlatformString(PlatformKind platform) {
   llvm_unreachable("bad PlatformKind");
 }
 
-llvm::Optional<PlatformKind> swift::platformFromString(StringRef Name) {
+std::optional<PlatformKind> swift::platformFromString(StringRef Name) {
   if (Name == "*")
     return PlatformKind::none;
-  return llvm::StringSwitch<llvm::Optional<PlatformKind>>(Name)
+  return llvm::StringSwitch<std::optional<PlatformKind>>(Name)
 #define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
 #include "swift/AST/PlatformKinds.def"
       .Case("OSX", PlatformKind::macOS)
       .Case("OSXApplicationExtension", PlatformKind::macOSApplicationExtension)
-      .Default(llvm::Optional<PlatformKind>());
+      .Default(std::optional<PlatformKind>());
 }
 
-llvm::Optional<StringRef>
+std::optional<PlatformKind> swift::platformFromUnsigned(unsigned value) {
+  PlatformKind platform = PlatformKind(value);
+  switch (platform) {
+  case PlatformKind::none:
+#define AVAILABILITY_PLATFORM(X, PrettyName) case PlatformKind::X:
+#include "swift/AST/PlatformKinds.def"
+    return platform;
+  }
+  return std::nullopt;
+}
+
+std::optional<StringRef>
 swift::closestCorrectedPlatformString(StringRef candidate) {
   auto lowerCasedCandidate = candidate.lower();
   auto lowerCasedCandidateRef = StringRef(lowerCasedCandidate);
   auto minDistance = std::numeric_limits<unsigned int>::max();
-  llvm::Optional<StringRef> result = llvm::None;
+  std::optional<StringRef> result = std::nullopt;
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
   {                                                                            \
     auto platform = StringRef(#X);                                             \
@@ -80,17 +91,22 @@ swift::closestCorrectedPlatformString(StringRef candidate) {
   // If the most similar platform distance is greater than this threshold,
   // it's not similar enough to be suggested as correction.
   const unsigned int distanceThreshold = 5;
-  return (minDistance < distanceThreshold) ? result : llvm::None;
+  return (minDistance < distanceThreshold) ? result : std::nullopt;
 }
 
-static bool isApplicationExtensionPlatform(PlatformKind Platform) {
+std::optional<PlatformKind>
+swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   switch (Platform) {
   case PlatformKind::macOSApplicationExtension:
+    return PlatformKind::macOS;
   case PlatformKind::iOSApplicationExtension:
+    return PlatformKind::iOS;
   case PlatformKind::macCatalystApplicationExtension:
+    return PlatformKind::macCatalyst;
   case PlatformKind::tvOSApplicationExtension:
+    return PlatformKind::tvOS;
   case PlatformKind::watchOSApplicationExtension:
-    return true;
+    return PlatformKind::watchOS;
   case PlatformKind::macOS:
   case PlatformKind::iOS:
   case PlatformKind::macCatalyst:
@@ -99,7 +115,7 @@ static bool isApplicationExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
-    return false;
+    return std::nullopt;
   }
   llvm_unreachable("bad PlatformKind");
 }
@@ -187,19 +203,20 @@ PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
 
 bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
                                              PlatformKind Parent) {
+  if (auto ChildPlatformBase = basePlatformForExtensionPlatform(Child)) {
+    if (Parent == ChildPlatformBase)
+      return true;
+  }
+
   if (Child == PlatformKind::macCatalyst && Parent == PlatformKind::iOS)
     return true;
 
   if (Child == PlatformKind::macCatalystApplicationExtension) {
     if (Parent == PlatformKind::iOS ||
-        Parent == PlatformKind::iOSApplicationExtension ||
-        Parent == PlatformKind::macCatalyst) {
+        Parent == PlatformKind::iOSApplicationExtension) {
       return true;
     }
   }
-
-  // Ideally we would have all ApplicationExtension platforms
-  // inherit from their non-extension platform.
 
   return false;
 }

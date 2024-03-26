@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature FullTypedThrows
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature FullTypedThrows
 
 enum MyError: Error {
 case failed
@@ -136,6 +136,17 @@ func testTryIncompatibleTyped(cond: Bool) throws(HomeworkError) {
     // expected-warning@-1{{'catch' block is unreachable because no errors are thrown in 'do' block}}
     // expected-warning@-2{{'as' test is always true}}
     throw .forgot
+  }
+}
+
+func doSomethingWithoutThrowing() { }
+
+func testDoCatchWithoutThrowing() {
+  do {
+    try doSomethingWithoutThrowing() // expected-warning{{no calls to throwing functions occur within 'try' expression}}
+  } catch HomeworkError.forgot { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
+    // expected-error@-1{{pattern of type 'HomeworkError' cannot match 'Never'}}
+  } catch {
   }
 }
 

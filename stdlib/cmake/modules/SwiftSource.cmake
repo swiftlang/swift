@@ -321,6 +321,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION")
   endif()
 
+  if(SWIFT_ENABLE_SYNCHRONIZATION)
+    list(APPEND result "-D" "SWIFT_ENABLE_SYNCHRONIZATION")
+  endif()
+
   if(SWIFT_STDLIB_OS_VERSIONING)
     list(APPEND result "-D" "SWIFT_RUNTIME_OS_VERSIONING")
   endif()
@@ -579,6 +583,11 @@ function(_compile_swift_files
     list(APPEND swift_flags "-swift-version" "5")
   endif()
 
+  # Avoiding emiting ABI descriptor files while building stdlib.
+  if (SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-empty-abi-descriptor")
+  endif()
+
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
   endif()
@@ -595,10 +604,6 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-disable-standard-substitutions-in-reflection-mangling")
   endif()
 
-  if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
-    list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
-  endif()
-
   if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
     list(APPEND swift_flags "-Xfrontend" "-disable-objc-interop")
   endif()
@@ -607,13 +612,23 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
-  if(SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS)
-    list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
+  list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
+    list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
+  endif()
+
+  if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
+    list(APPEND swift_flags "-strict-concurrency=complete")
   endif()
 
   if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
     list(APPEND swift_flags "-Xfrontend" "-enable-relative-protocol-witness-tables")
     list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")
+  endif()
+
+  if (SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES)
+    list(APPEND swift_flags "-Xfrontend" "-enable-fragile-relative-protocol-tables")
   endif()
 
   if(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES)
@@ -831,8 +846,9 @@ function(_compile_swift_files
   endif()
 
   set(swift_compiler_tool_dep)
-  if(SWIFT_INCLUDE_TOOLS)
-    # Depend on the binary itself, in addition to the symlink.
+  if(SWIFT_INCLUDE_TOOLS AND NOT BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+    # Depend on the binary itself, in addition to the symlink, unless
+    # cross-compiling the compiler.
     set(swift_compiler_tool_dep "swift-frontend${target_suffix}")
   endif()
 
@@ -1040,7 +1056,8 @@ function(_compile_swift_files
   if (NOT SWIFTFILE_IS_MAIN)
     add_custom_command_target(
         module_dependency_target
-        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
+        COMMAND
+          "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND

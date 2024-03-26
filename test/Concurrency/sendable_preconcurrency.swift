@@ -3,10 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 // RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -I %t %s -o /dev/null -verify -emit-sil
 // RUN: %target-swift-frontend -disable-availability-checking -I %t %s -o /dev/null -verify -emit-sil -strict-concurrency=complete
-// RUN: %target-swift-frontend -disable-availability-checking -I %t %s -o /dev/null -verify -emit-sil -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -disable-availability-checking -I %t %s -o /dev/null -verify -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 import StrictModule // no remark: we never recommend @preconcurrency due to an explicitly non-Sendable (via -strict-concurrency=complete) type
 @preconcurrency import NonStrictModule

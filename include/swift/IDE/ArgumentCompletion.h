@@ -42,7 +42,7 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     unsigned ArgIdx;
 
     /// The index of the parameter corresponding to the completion argument.
-    llvm::Optional<unsigned> ParamIdx;
+    std::optional<unsigned> ParamIdx;
 
     /// The indices of all params that were bound to non-synthesized
     /// arguments. Used so we don't suggest them even when the args are out of
@@ -51,6 +51,14 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
 
     /// True if the completion is a noninitial term in a variadic argument.
     bool IsNoninitialVariadic;
+
+    /// Whether to suggest the entire functions signature instead of a single
+    /// argument for this result.
+    ///
+    /// This is the case if there are no arguments or labels in the call yet and
+    /// causes us to add a completion result that completes `Point(|)` to
+    /// `Point(x: <Int>, y: <Int>)`.
+    bool IncludeSignature;
 
     /// The base type of the call/subscript (null for free functions).
     Type BaseType;
@@ -61,7 +69,7 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// The argument index of the first trailing closure.
     ///
     /// \c None if the call doesn't have a trailing closure.
-    llvm::Optional<unsigned> FirstTrailingClosureIndex;
+    std::optional<unsigned> FirstTrailingClosureIndex;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
@@ -106,14 +114,10 @@ public:
                                       DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
 
-  /// \param IncludeSignature Whether to include a suggestion for the entire
-  /// function signature instead of suggesting individual labels. Used when
-  /// completing after the opening '(' of a function call \param Loc The
-  /// location of the code completion token
   /// \param IsLabeledTrailingClosure Whether we are completing the label of a
   /// labeled trailing closure, ie. if the code completion location is outside
   /// the call after the first trailing closure of the call.
-  void collectResults(bool IncludeSignature, bool IsLabeledTrailingClosure,
+  void collectResults(bool IsLabeledTrailingClosure,
                       SourceLoc Loc, DeclContext *DC,
                       CodeCompletionContext &CompletionCtx);
 };

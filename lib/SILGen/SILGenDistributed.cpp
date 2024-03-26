@@ -98,11 +98,14 @@ void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
                        "'Distributed' module available?");
 
+  auto conformances = SGM.M.getSwiftModule()->collectExistentialConformances(
+      selfTy->getCanonicalType(), ctx.getAnyObjectType());
+
   ManagedValue selfAnyObject = B.createInitExistentialRef(
       Loc,
       /*existentialType=*/getLoweredType(ctx.getAnyObjectType()),
-      /*formalConcreteType=*/selfValue.getType().getASTType(),
-      selfValue, {});
+      /*formalConcreteType=*/selfTy->getCanonicalType(),
+      selfValue, conformances);
   auto result = emitApplyOfLibraryIntrinsic(
       Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
 

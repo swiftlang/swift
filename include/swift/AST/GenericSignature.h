@@ -225,9 +225,6 @@ public:
   /// requirement signature against the protocol generic signature
   /// <Self where Self : P>.
   void verify(ArrayRef<Requirement> reqts) const;
-
-  /// Returns a new signature with the given parameters erased
-  GenericSignature typeErased(ArrayRef<Type> typeErasedParams) const;
 };
 
 /// A reference to a canonical generic signature.
@@ -309,6 +306,13 @@ public:
     assert(Mem);
     return Mem;
   }
+
+  /// Transform the requirements into a form where implicit Copyable and
+  /// Escapable conformances are omitted, and their absence is explicitly
+  /// noted.
+  void getRequirementsWithInverses(
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses) const;
 
   /// Look up a stored conformance in the generic signature. These are formed
   /// from same-type constraints placed on associated types of generic
@@ -458,9 +462,22 @@ public:
   /// Given a type parameter, compute the most specific supertype (upper bound),
   /// possibly dependent on other type parameters.
   ///
+  ///
+  /// \param forExistentialSelf If true, we ensure the result does not include
+  /// any type parameters rooted in the same generic parameter as the one given.
+  ///
+  /// \param includeParameterizedProtocols If true, we form parameterized
+  /// protocol types if we find that the given type's primary associated types
+  /// are sufficiently constrained.
+  ///
   /// \note If the upper bound is a protocol or protocol composition,
   /// will return an instance of \c ExistentialType.
-  Type getUpperBound(Type type) const;
+  Type getUpperBound(Type type,
+                     bool forExistentialSelf,
+                     bool includeParameterizedProtocols) const;
+
+  /// Utility wrapper for use when this is an opened existential signature.
+  Type getExistentialType(Type type) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
@@ -543,16 +560,17 @@ void validateGenericSignaturesInModule(ModuleDecl *module);
 /// required to be minimal or canonical, and may contain unresolved
 /// DependentMemberTypes.
 ///
-/// If \p baseSignature is non-null, the new parameters and requirements
-/// are added on; existing requirements of the base signature might become
-/// redundant.
-///
-/// If \p baseSignature is null, build a new signature from scratch.
+/// \param baseSignature if non-null, the new parameters and requirements
+///// are added on; existing requirements of the base signature might become
+///// redundant. Otherwise if null, build a new signature from scratch.
+/// \param allowInverses if true, default requirements to Copyable/Escapable are
+/// expanded for generic parameters.
 GenericSignature buildGenericSignature(
     ASTContext &ctx,
     GenericSignature baseSignature,
     SmallVector<GenericTypeParamType *, 2> addedParameters,
-    SmallVector<Requirement, 2> addedRequirements);
+    SmallVector<Requirement, 2> addedRequirements,
+    bool allowInverses);
 
 /// Summary of error conditions detected by the Requirement Machine.
 enum class GenericSignatureErrorFlags {

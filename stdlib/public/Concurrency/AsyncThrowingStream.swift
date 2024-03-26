@@ -254,9 +254,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
 
   final class _Context {
     let storage: _Storage?
-    let produce: () async throws -> Element?
+    let produce: () async throws(Failure) -> Element?
 
-    init(storage: _Storage? = nil, produce: @escaping () async throws -> Element?) {
+    init(storage: _Storage? = nil, produce: @escaping () async throws(Failure) -> Element?) {
       self.storage = storage
       self.produce = produce
     }
@@ -369,7 +369,17 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///         print(error)
   ///     }
   ///
+  @_alwaysEmitIntoClient
   public init(
+    unfolding produce: @escaping @Sendable () async throws -> Element?
+  ) where Failure == Error {
+    self.init(
+      unfolding: produce as () async throws -> Element?
+    )
+  }
+
+  @usableFromInline
+  internal init(
     unfolding produce: @escaping () async throws -> Element?
   ) where Failure == Error {
     let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
@@ -413,6 +423,24 @@ extension AsyncThrowingStream: AsyncSequence {
     /// `next()` may return `nil` immediately, or else return `nil` on
     /// subsequent calls.
     public mutating func next() async throws -> Element? {
+      return try await context.produce()
+    }
+
+    /// The next value from the asynchronous stream.
+    ///
+    /// When `next()` returns `nil`, this signifies the end of the
+    /// `AsyncThrowingStream`.
+    ///
+    /// It is a programmer error to invoke `next()` from a concurrent
+    /// context that contends with another such call, which results in a call to
+    /// `fatalError()`.
+    ///
+    /// If you cancel the task this iterator is running in while `next()`
+    /// is awaiting a value, the `AsyncThrowingStream` terminates. In this case,
+    /// `next()` may return `nil` immediately, or else return `nil` on
+    /// subsequent calls.
+    @available(SwiftStdlib 6.0, *)
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
       return try await context.produce()
     }
   }

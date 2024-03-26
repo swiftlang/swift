@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InferSendableFromCaptures -disable-availability-checking
-// RUN: %target-swift-emit-silgen %s -verify -enable-experimental-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking
+// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -154,7 +154,7 @@ let helloworld:  @Sendable () -> Void = World.greet
 class NonSendableC {
     var x: Int = 0
 
-    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in Swift 6}}
+    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in the Swift 6 language mode}}
         x += 1
     }
 }
@@ -227,4 +227,20 @@ do {
       let _ = X.test(self) // Ok
     }
   }
+}
+
+do {
+  struct Test {
+    static func fn() {}
+    static func otherFn() {}
+  }
+
+  func fnRet(cond: Bool) -> () -> Void {
+    cond ? Test.fn : Test.otherFn // Ok
+  }
+
+  func forward<T>(_: T) -> T {
+  }
+
+  let _: () -> Void = forward(Test.fn) // Ok
 }

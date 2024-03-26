@@ -85,7 +85,7 @@ class BugReducerTester : public SILFunctionTransform {
     auto FuncType = SILFunctionType::get(
         nullptr, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, ArrayRef<SILParameterInfo>(),
-        ArrayRef<SILYieldInfo>(), ResultInfoArray, llvm::None,
+        ArrayRef<SILYieldInfo>(), ResultInfoArray, std::nullopt,
         SubstitutionMap(), SubstitutionMap(),
         getFunction()->getModule().getASTContext());
 
@@ -147,7 +147,7 @@ class BugReducerTester : public SILFunctionTransform {
           // the next instruction and then replace its current value
           // with undef.
           auto *Inst = cast<SingleValueInstruction>(&*II);
-          Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), *getFunction()));
+          Inst->replaceAllUsesWith(SILUndef::get(Inst));
           Inst->eraseFromParent();
 
           // Mark that we found the miscompile and return so we do not try to
@@ -170,7 +170,7 @@ class BugReducerTester : public SILFunctionTransform {
 
         auto *Inst = cast<SingleValueInstruction>(&*II);
         ++II;
-        Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), *getFunction()));
+        Inst->replaceAllUsesWith(SILUndef::get(Inst));
         Inst->eraseFromParent();
 
         CausedError = true;

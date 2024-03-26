@@ -79,6 +79,12 @@ extension AsyncDropWhileSequence: AsyncSequence {
   /// The drop-while sequence produces whatever type of element its base
   /// sequence produces.
   public typealias Element = Base.Element
+  /// The type of errors produced by this asynchronous sequence.
+  ///
+  /// The drop-while sequence produces whatever type of error its base
+  /// sequence produces.
+  @available(SwiftStdlib 6.0, *)
+  public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
@@ -119,6 +125,30 @@ extension AsyncDropWhileSequence: AsyncSequence {
         }
       }
       return try await baseIterator.next()
+    }
+
+    /// Produces the next element in the drop-while sequence.
+    ///
+    /// This iterator calls `next(isolation:)` on its base iterator and
+    /// evaluates the result with the `predicate` closure. As long as the
+    /// predicate returns `true`, this method returns `nil`. After the predicate
+    /// returns `false`, for a value received from the base iterator, this
+    /// method returns that value. After that, the iterator returns values
+    /// received from its base iterator as-is, and never executes the predicate
+    /// closure again.
+    @available(SwiftStdlib 6.0, *)
+    @inlinable
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
+      while let predicate = self.predicate {
+        guard let element = try await baseIterator.next(isolation: actor) else {
+          return nil
+        }
+        if await predicate(element) == false {
+          self.predicate = nil
+          return element
+        }
+      }
+      return try await baseIterator.next(isolation: actor)
     }
   }
 

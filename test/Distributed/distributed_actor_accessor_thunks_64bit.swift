@@ -104,13 +104,13 @@ public distributed actor MyOtherActor {
 // CHECK: [[ARG_0_SIZE_ADJ:%.*]] = add i64 %size, 15
 // CHECK-NEXT: [[ARG_0_SIZE:%.*]] = and i64 [[ARG_0_SIZE_ADJ]], -16
 // CHECK-NEXT: [[ARG_0_VALUE_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_0_SIZE]])
-// CHECK-NEXT: [[ENCODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %arg_type, ptr @"$sSeMp")
+// CHECK-NEXT: [[ENCODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %arg_type, ptr @"$sSeMp")
 // CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq ptr [[ENCODABLE_WITNESS]], null
 // CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness, label [[CONT:%.*]]
 // CHECK: missing-witness:
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK: [[DECODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %arg_type, ptr @"$sSEMp")
+// CHECK: [[DECODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %arg_type, ptr @"$sSEMp")
 // CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq ptr [[DECODABLE_WITNESS]], null
 // CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness1, label [[CONT:%.*]]
 // CHECK: missing-witness1:
@@ -272,7 +272,7 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTE"
 
-// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTETF"(ptr swiftasync {{.*}}, ptr [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
+// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTETF"(ptr swiftasync {{.*}}, ptr [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
 
 /// First, let's check that all of the different argument types here are loaded correctly.
 

@@ -10,6 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
+func _eytzingerize<C: Collection>(_ collection: C, result: inout [C.Element], sourceIndex: Int, resultIndex: Int) -> Int where C.Element: Comparable, C.Index == Int {
+  var sourceIndex = sourceIndex
+  if resultIndex < result.count {
+    sourceIndex = _eytzingerize(collection, result: &result, sourceIndex: sourceIndex, resultIndex: 2 * resultIndex)
+    result[resultIndex] = collection[sourceIndex]
+    sourceIndex = _eytzingerize(collection, result: &result, sourceIndex: sourceIndex + 1, resultIndex: 2 * resultIndex + 1)
+  }
+  return sourceIndex
+}
+
+/*
+ Takes a sorted collection and reorders it to an array-encoded binary search tree, as originally developed by Michaël Eytzinger in the 16th century.
+ This allows binary searching the array later to touch roughly 4x fewer cachelines, significantly speeding it up.
+ */
+public func eytzingerize<C: Collection>(_ collection: C, dummy: C.Element) -> [C.Element] where C.Element: Comparable, C.Index == Int {
+  var result = Array(repeating: dummy, count: collection.count + 1)
+  _ = _eytzingerize(collection, result: &result, sourceIndex: 0, resultIndex: 1)
+  return result
+}
+
 public func emitCollection<C: Collection>(
   _ collection: C,
   name: String,

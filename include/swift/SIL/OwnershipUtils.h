@@ -261,6 +261,7 @@ public:
     TryApply,
     Yield,
     PartialApplyStack,
+    MarkDependenceNonEscaping,
     BeginAsyncLet,
   };
 
@@ -292,6 +293,8 @@ public:
       return Kind::Yield;
     case SILInstructionKind::PartialApplyInst:
       return Kind::PartialApplyStack;
+    case SILInstructionKind::MarkDependenceInst:
+      return Kind::MarkDependenceNonEscaping;
     case SILInstructionKind::BuiltinInst: {
       auto bi = cast<BuiltinInst>(i);
       if (bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
@@ -357,12 +360,16 @@ struct BorrowingOperand {
   /// over a region of code instead of just for a single instruction, visit
   /// those uses.
   ///
-  /// Returns false and early exits if the visitor \p func returns false.
+  /// Returns false and early exits if the \p visitScopeEnd or \p
+  /// visitUnknownUse returns false.
   ///
   /// For an instantaneous borrow, such as apply, this visits no uses. For
   /// begin_apply it visits the end_apply uses. For borrow introducers, it
   /// visits the end of the introduced borrow scope.
-  bool visitScopeEndingUses(function_ref<bool(Operand *)> func) const;
+  bool visitScopeEndingUses(function_ref<bool(Operand *)> visitScopeEnd,
+                            function_ref<bool(Operand *)> visitUnknownUse
+                            = [](Operand *){ return false; })
+    const;
 
   /// Returns true for borrows that create a local borrow scope but have no
   /// scope-ending uses (presumably all paths are dead-end blocks). This does
@@ -378,7 +385,10 @@ struct BorrowingOperand {
   /// BorrowingOperand.
   ///
   /// Returns false and early exits if the visitor \p func returns false.
-  bool visitExtendedScopeEndingUses(function_ref<bool(Operand *)> func) const;
+  bool visitExtendedScopeEndingUses(
+    function_ref<bool(Operand *)> func,
+    function_ref<bool(Operand *)> visitUnknownUse
+    = [](Operand *){ return false; }) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
@@ -395,6 +405,7 @@ struct BorrowingOperand {
     case BorrowingOperandKind::TryApply:
     case BorrowingOperandKind::Yield:
     case BorrowingOperandKind::PartialApplyStack:
+    case BorrowingOperandKind::MarkDependenceNonEscaping:
     case BorrowingOperandKind::BeginAsyncLet:
       return false;
     case BorrowingOperandKind::Branch:
@@ -428,6 +439,7 @@ struct BorrowingOperand {
     case BorrowingOperandKind::TryApply:
     case BorrowingOperandKind::Yield:
     case BorrowingOperandKind::PartialApplyStack:
+    case BorrowingOperandKind::MarkDependenceNonEscaping:
     case BorrowingOperandKind::BeginAsyncLet:
       return false;
     }

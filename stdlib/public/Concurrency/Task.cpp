@@ -653,6 +653,11 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   RunInlineTaskOptionRecord *runInlineOption = nullptr;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
+    case TaskOptionRecordKind::InitialSerialExecutor:
+      serialExecutor = cast<InitialSerialExecutorTaskOptionRecord>(option)
+                          ->getExecutorRef();
+      break;
+
     case TaskOptionRecordKind::InitialTaskExecutor:
       taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
@@ -1635,6 +1640,8 @@ static void swift_task_asyncMainDrainQueueImpl() {
   swift_task_donateThreadToGlobalExecutorUntil([](void *context) {
     return *reinterpret_cast<bool*>(context);
   }, &Finished);
+  swift_unreachable(
+      "Returned from swift_task_donateThreadToGlobalExecutorUntil()");
 #elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   // FIXME: consider implementing a concurrent global main queue for
   // these environments?

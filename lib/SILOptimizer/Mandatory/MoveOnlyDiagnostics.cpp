@@ -23,8 +23,10 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/Support/Debug.h"
 
+#include "MoveOnlyTypeUtils.h"
 using namespace swift;
 using namespace swift::siloptimizer;
 
@@ -72,181 +74,12 @@ static void diagnose(ASTContext &context, SourceLoc loc, Diag<T...> diag,
   context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-/// Helper function that actually implements getVariableNameForValue. Do not
-/// call it directly! Call the unary variants instead.
-static void getVariableNameForValue(SILValue value2,
-                                    SILValue searchValue,
-                                    SmallString<64> &resultingString) {
-  // Before we do anything, lets see if we have an exact debug_value on our
-  // mmci. In such a case, we can end early and are done.
-  if (auto *use = getAnyDebugUse(value2)) {
-    if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
-      assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-      resultingString += debugVar.getName();
-      return;
-    }
-  }
-
-  // Otherwise, we need to look at our mark_unresolved_non_copyable_value's
-  // operand.
-  StackList<llvm::PointerUnion<SILInstruction *, SILValue>> variableNamePath(
-      value2->getFunction());
-  while (searchValue) {
-    if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
-      // If the instruction itself doesn't carry any variable info, see whether
-      // it's copied from another place that does.
-      if (!allocInst->getDecl()) {
-        if (auto copy = allocInst->getSingleUserOfType<CopyAddrInst>()) {
-          if (copy->getDest() == allocInst
-              && !copy->isTakeOfSrc()
-              && copy->isInitializationOfDest()) {
-            searchValue = copy->getSrc();
-            continue;
-          }
-        }
-      }
-    
-      variableNamePath.push_back(allocInst);
-      break;
-    }
-
-    if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
-      variableNamePath.push_back(globalAddrInst);
-      break;
-    }
-
-    if (auto *oeInst = dyn_cast<OpenExistentialAddrInst>(searchValue)) {
-      searchValue = oeInst->getOperand();
-      continue;
-    }
-
-    if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(rei);
-      searchValue = rei->getOperand();
-      continue;
-    }
-
-    if (auto *fArg = dyn_cast<SILFunctionArgument>(searchValue)) {
-      variableNamePath.push_back({fArg});
-      break;
-    }
-    
-    auto getNamePathComponentFromCallee = [&](FullApplySite call) -> llvm::Optional<SILValue> {
-      // Use the name of the property being accessed if we can get to it.
-      if (isa<FunctionRefBaseInst>(call.getCallee())
-          || isa<MethodInst>(call.getCallee())) {
-        variableNamePath.push_back(call.getCallee()->getDefiningInstruction());
-        // Try to name the base of the property if this is a method.
-        if (call.getSubstCalleeType()->hasSelfParam()) {
-          return call.getSelfArgument();
-        } else {
-          return SILValue();
-        }
-      }
-      return llvm::None;
-    };
-
-    // Read or modify accessor.
-    if (auto bai = dyn_cast_or_null<BeginApplyInst>(searchValue->getDefiningInstruction())) {
-      if (auto selfParam = getNamePathComponentFromCallee(bai)) {
-        searchValue = *selfParam;
-        continue;
-      }
-    }
-    
-    // Addressor accessor.
-    if (auto ptrToAddr = dyn_cast<PointerToAddressInst>(stripAccessMarkers(searchValue))) {
-      // The addressor can either produce the raw pointer itself or an `UnsafePointer` stdlib type wrapping it.
-      ApplyInst *addressorInvocation;
-      if (auto structExtract = dyn_cast<StructExtractInst>(ptrToAddr->getOperand())) {
-        addressorInvocation = dyn_cast<ApplyInst>(structExtract->getOperand());
-      } else {
-        addressorInvocation = dyn_cast<ApplyInst>(ptrToAddr->getOperand());
-      }
-      
-      if (addressorInvocation) {
-        if (auto selfParam = getNamePathComponentFromCallee(addressorInvocation)) {
-          searchValue = *selfParam;
-          continue;
-        }
-      }
-    }
-
-    // If we do not do an exact match, see if we can find a debug_var inst. If
-    // we do, we always break since we have a root value.
-    if (auto *use = getAnyDebugUse(searchValue)) {
-      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
-        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-        variableNamePath.push_back(use->getUser());
-        break;
-      }
-    }
-
-    // Otherwise, try to see if we have a single value instruction we can look
-    // through.
-    if (isa<BeginBorrowInst>(searchValue) || isa<LoadInst>(searchValue) ||
-        isa<LoadBorrowInst>(searchValue) || isa<BeginAccessInst>(searchValue) ||
-        isa<MarkUnresolvedNonCopyableValueInst>(searchValue) ||
-        isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue)) {
-      searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
-      continue;
-    }
-    
-    // If we do not pattern match successfully, just set resulting string to
-    // unknown and return early.
-    resultingString += "unknown";
-    return;
-  }
-  
-  auto nameFromDecl = [&](Decl *d) -> StringRef {
-    if (d) {
-      if (auto accessor = dyn_cast<AccessorDecl>(d)) {
-        return accessor->getStorage()->getBaseName().userFacingName();
-      }
-      if (auto vd = dyn_cast<ValueDecl>(d)) {
-        return vd->getBaseName().userFacingName();
-      }
-    }
-    
-    return "<unknown decl>";
-  };
-
-  // Walk backwards, constructing our string.
-  while (true) {
-    auto next = variableNamePath.pop_back_val();
-
-    if (auto *inst = next.dyn_cast<SILInstruction *>()) {
-      if (auto i = DebugVarCarryingInst(inst)) {
-        resultingString += i.getName();
-      } else if (auto i = VarDeclCarryingInst(inst)) {
-        resultingString += i.getName();
-      } else if (auto f = dyn_cast<FunctionRefBaseInst>(inst)) {
-        if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
-          resultingString += nameFromDecl(dc->getAsDecl());
-        } else {
-          resultingString += "<unknown decl>";
-        }
-      } else if (auto m = dyn_cast<MethodInst>(inst)) {
-        resultingString += nameFromDecl(m->getMember().getDecl());
-      } else {
-        resultingString += "<unknown decl>";      
-      }
-    } else {
-      auto value = next.get<SILValue>();
-      if (auto *fArg = dyn_cast<SILFunctionArgument>(value))
-        resultingString += fArg->getDecl()->getBaseName().userFacingName();
-    }
-
-    if (variableNamePath.empty())
-      return;
-
-    resultingString += '.';
-  }
-}
-
 static void getVariableNameForValue(MarkUnresolvedNonCopyableValueInst *mmci,
                                     SmallString<64> &resultingString) {
-  return getVariableNameForValue(mmci, mmci->getOperand(), resultingString);
+  VariableNameInferrer inferrer(mmci->getFunction(), resultingString);
+  if (inferrer.tryInferNameFromUses(mmci))
+    return;
+  inferrer.inferByWalkingUsesToDefs(mmci->getOperand());
 }
 
 //===----------------------------------------------------------------------===//
@@ -668,7 +501,7 @@ void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
 void DiagnosticEmitter::emitAddressDiagnostic(
     MarkUnresolvedNonCopyableValueInst *markedValue,
     SILInstruction *lastLiveUser, SILInstruction *violatingUser,
-    bool isUseConsuming, bool isInOutEndOfFunction) {
+    bool isUseConsuming, std::optional<ScopeRequiringFinalInit> scopeKind) {
   if (!useWithDiagnostic.insert(violatingUser).second)
     return;
   registerDiagnosticEmitted(markedValue);
@@ -694,12 +527,24 @@ void DiagnosticEmitter::emitAddressDiagnostic(
     return;
   }
 
-  if (isInOutEndOfFunction) {
-    diagnose(
-        astContext, markedValue,
-        diag::
-            sil_movechecking_not_reinitialized_before_end_of_function,
-        varName, isClosureCapture(markedValue));
+  if (scopeKind.has_value()) {
+    switch (scopeKind.value()) {
+    case ScopeRequiringFinalInit::InoutArgument:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_function,
+               varName, isClosureCapture(markedValue));
+      break;
+    case ScopeRequiringFinalInit::Coroutine:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_coroutine,
+               varName);
+      break;
+    case ScopeRequiringFinalInit::ModifyMemoryAccess:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_access,
+               varName, isClosureCapture(markedValue));
+      break;
+    }
     diagnose(astContext, violatingUser,
              diag::sil_movechecking_consuming_use_here);
     return;
@@ -931,83 +776,111 @@ void DiagnosticEmitter::emitPromotedBoxArgumentError(
   }
 }
 
-void DiagnosticEmitter::emitCannotPartiallyConsumeError(
-    MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-    NominalTypeDecl *nominal, SILInstruction *consumingUser, bool isForDeinit) {
+void DiagnosticEmitter::emitCannotPartiallyMutateError(
+    MarkUnresolvedNonCopyableValueInst *address, PartialMutationError error,
+    SILInstruction *user, TypeTreeLeafTypeRange usedBits,
+    PartialMutation kind) {
+
+  TypeOffsetSizePair pair(usedBits);
+
+  SmallString<128> pathString;
+  auto rootType = address->getType();
+  if (error.type != rootType) {
+    llvm::raw_svector_ostream os(pathString);
+    auto *fn = address->getFunction();
+    pair.constructPathString(error.type, {rootType, fn}, rootType, fn, os);
+  }
+
   auto &astContext = fn->getASTContext();
 
   SmallString<64> varName;
-  getVariableNameForValue(markedValue, varName);
+  getVariableNameForValue(address, varName);
 
   if (!pathString.empty())
     varName.append(pathString);
 
-  bool hasPartialConsumption =
-      astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
-  (void)hasPartialConsumption;
+  switch (error) {
+  case PartialMutationError::Kind::FeatureDisabled: {
+    assert(!astContext.LangOpts.hasFeature(
+        partialMutationFeature(error.getKind())));
 
-  if (isForDeinit) {
-    assert(hasPartialConsumption);
-    diagnose(astContext, consumingUser,
-             diag::sil_movechecking_cannot_destructure_has_deinit, varName);
-
-  } else {
-    assert(!hasPartialConsumption);
-    diagnose(astContext, consumingUser,
-             diag::sil_movechecking_cannot_destructure, varName);
-  }
-
-  registerDiagnosticEmitted(markedValue);
-
-  if (!isForDeinit)
+    switch (kind) {
+    case PartialMutation::Kind::Consume:
+      diagnose(astContext, user, diag::sil_movechecking_cannot_destructure,
+               varName);
+      break;
+    case PartialMutation::Kind::Reinit:
+      diagnose(astContext, user, diag::sil_movechecking_cannot_partially_reinit,
+               varName);
+      diagnose(astContext, &kind.getEarlierConsumingUse(),
+               diag::sil_movechecking_consuming_use_here);
+      break;
+    }
+    registerDiagnosticEmitted(address);
     return;
-
-  // Point to the deinit if we know where it is.
-  assert(nominal);
-  if (auto deinitLoc =
-          nominal->getValueTypeDestructor()->getLoc(/*SerializedOK=*/false))
-    astContext.Diags.diagnose(deinitLoc, diag::sil_movechecking_deinit_here);
-}
-
-void DiagnosticEmitter::emitCannotPartiallyReinitError(
-    MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-    NominalTypeDecl *nominal, SILInstruction *initingUser,
-    SILInstruction *consumingUser, bool isForDeinit) {
-  auto &astContext = fn->getASTContext();
-
-  SmallString<64> varName;
-  getVariableNameForValue(markedValue, varName);
-
-  if (!pathString.empty())
-    varName.append(pathString);
-
-  bool hasPartialConsumption =
-      astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
-  (void)hasPartialConsumption;
-
-  if (isForDeinit) {
-    assert(hasPartialConsumption);
-    diagnose(astContext, initingUser,
-             diag::sil_movechecking_cannot_partially_reinit_has_deinit,
-             varName);
-
-  } else {
-    assert(!hasPartialConsumption);
-    diagnose(astContext, initingUser,
-             diag::sil_movechecking_cannot_partially_reinit, varName);
   }
-
-  diagnose(astContext, consumingUser,
-           diag::sil_movechecking_consuming_use_here);
-
-  registerDiagnosticEmitted(markedValue);
-
-  if (!isForDeinit)
-    return;
-
-  // Point to the deinit if we know where it is.
-  assert(nominal);
-  if (auto deinitLoc =
-          nominal->getValueTypeDestructor()->getLoc(/*SerializedOK=*/false))
+  case PartialMutationError::Kind::HasDeinit: {
+    assert(
+        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
+        astContext.LangOpts.hasFeature(
+            Feature::MoveOnlyPartialReinitialization));
+    auto diagnostic = [&]() {
+      switch (kind) {
+      case PartialMutation::Kind::Consume:
+        return diag::sil_movechecking_cannot_destructure_has_deinit;
+      case PartialMutation::Kind::Reinit:
+        return diag::sil_movechecking_cannot_partially_reinit_has_deinit;
+      }
+    }();
+    diagnose(astContext, user, diagnostic, varName);
+    registerDiagnosticEmitted(address);
+    auto deinitLoc =
+        error.getDeinitingNominal().getValueTypeDestructor()->getLoc(
+            /*SerializedOK=*/false);
+    if (!deinitLoc)
+      return;
     astContext.Diags.diagnose(deinitLoc, diag::sil_movechecking_deinit_here);
+    return;
+  }
+  case PartialMutationError::Kind::NonfrozenImportedType: {
+    assert(
+        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
+        astContext.LangOpts.hasFeature(
+            Feature::MoveOnlyPartialReinitialization));
+    auto &nominal = error.getNonfrozenImportedNominal();
+    auto diagnostic = [&]() {
+      switch (kind) {
+      case PartialMutation::Kind::Consume:
+        return diag::sil_movechecking_cannot_destructure_imported_nonfrozen;
+      case PartialMutation::Kind::Reinit:
+        return diag::sil_movechecking_cannot_partially_reinit_nonfrozen;
+      }
+    }();
+    diagnose(astContext, user, diagnostic, varName,
+             nominal.getDeclaredInterfaceType(), nominal.getModuleContext());
+    registerDiagnosticEmitted(address);
+    return;
+  }
+  case PartialMutationError::Kind::NonfrozenUsableFromInlineType: {
+    assert(
+        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
+        astContext.LangOpts.hasFeature(
+            Feature::MoveOnlyPartialReinitialization));
+    auto &nominal = error.getNonfrozenUsableFromInlineNominal();
+    auto diagnostic = [&]() {
+      switch (kind) {
+      case PartialMutation::Kind::Consume:
+        return diag::
+            sil_movechecking_cannot_destructure_exported_usableFromInline_alwaysEmitIntoClient;
+      case PartialMutation::Kind::Reinit:
+        return diag::
+            sil_movechecking_cannot_partially_reinit_exported_usableFromInline_alwaysEmitIntoClient;
+      }
+    }();
+    diagnose(astContext, user, diagnostic, varName,
+             nominal.getDeclaredInterfaceType());
+    registerDiagnosticEmitted(address);
+    return;
+  }
+  }
 }

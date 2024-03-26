@@ -2319,6 +2319,8 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::EndBorrowInst:
       break;
     // We can only ignore a dealloc_stack instruction if we can ignore all
     // instructions in the block.
@@ -3014,7 +3016,7 @@ class ArgumentSplitter {
   /// The list of first level projections that Arg can be split into.
   llvm::SmallVector<Projection, 4> Projections;
 
-  llvm::Optional<int> FirstNewArgIndex;
+  std::optional<int> FirstNewArgIndex;
 
 public:
   ArgumentSplitter(SILArgument *A, std::vector<SILArgument *> &W)
@@ -3738,7 +3740,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Okay, we'll replace the BB arg with one with the right type, replace
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
+  A->replaceAllUsesWith(SILUndef::get(A));
   auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
                                         BB->getArgument(i)->getOwnershipKind());
   proj->replaceAllUsesWith(NewArg);

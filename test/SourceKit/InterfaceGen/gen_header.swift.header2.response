@@ -1,4 +1,3 @@
-
 public struct NUPixelSize {
 
     public init()
@@ -17,132 +16,132 @@ public struct NUPixelSize {
 [
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1,
+    key.offset: 0,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 8,
+    key.offset: 7,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 15,
+    key.offset: 14,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 34,
+    key.offset: 33,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 41,
+    key.offset: 40,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 53,
+    key.offset: 52,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 60,
+    key.offset: 59,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 65,
+    key.offset: 64,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 72,
+    key.offset: 71,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 77,
+    key.offset: 76,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 85,
+    key.offset: 84,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 95,
+    key.offset: 94,
     key.length: 32
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 132,
+    key.offset: 131,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 139,
+    key.offset: 138,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 143,
+    key.offset: 142,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 150,
+    key.offset: 149,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 159,
+    key.offset: 158,
     key.length: 44
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 208,
+    key.offset: 207,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 215,
+    key.offset: 214,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 219,
+    key.offset: 218,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 227,
+    key.offset: 226,
     key.length: 3
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 72,
+    key.offset: 71,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 85,
+    key.offset: 84,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 150,
+    key.offset: 149,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 227,
+    key.offset: 226,
     key.length: 3,
     key.is_system: 1
   }
@@ -152,15 +151,15 @@ public struct NUPixelSize {
     key.kind: source.lang.swift.decl.struct,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "NUPixelSize",
-    key.offset: 8,
+    key.offset: 7,
     key.length: 224,
-    key.nameoffset: 15,
+    key.nameoffset: 14,
     key.namelength: 11,
-    key.bodyoffset: 28,
+    key.bodyoffset: 27,
     key.bodylength: 203,
     key.attributes: [
       {
-        key.offset: 1,
+        key.offset: 0,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -170,13 +169,13 @@ public struct NUPixelSize {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "init()",
-        key.offset: 41,
+        key.offset: 40,
         key.length: 6,
-        key.nameoffset: 41,
+        key.nameoffset: 40,
         key.namelength: 6,
         key.attributes: [
           {
-            key.offset: 34,
+            key.offset: 33,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -186,13 +185,13 @@ public struct NUPixelSize {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "init(width:height:)",
-        key.offset: 60,
+        key.offset: 59,
         key.length: 29,
-        key.nameoffset: 60,
+        key.nameoffset: 59,
         key.namelength: 29,
         key.attributes: [
           {
-            key.offset: 53,
+            key.offset: 52,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -201,19 +200,19 @@ public struct NUPixelSize {
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "width",
-            key.offset: 65,
+            key.offset: 64,
             key.length: 10,
             key.typename: "Int",
-            key.nameoffset: 65,
+            key.nameoffset: 64,
             key.namelength: 5
           },
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "height",
-            key.offset: 77,
+            key.offset: 76,
             key.length: 11,
             key.typename: "Int",
-            key.nameoffset: 77,
+            key.nameoffset: 76,
             key.namelength: 6
           }
         ]
@@ -223,16 +222,16 @@ public struct NUPixelSize {
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "width",
-        key.offset: 139,
+        key.offset: 138,
         key.length: 14,
         key.typename: "Int",
-        key.nameoffset: 143,
+        key.nameoffset: 142,
         key.namelength: 5,
-        key.docoffset: 95,
+        key.docoffset: 94,
         key.doclength: 32,
         key.attributes: [
           {
-            key.offset: 132,
+            key.offset: 131,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -243,16 +242,16 @@ public struct NUPixelSize {
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "height",
-        key.offset: 215,
+        key.offset: 214,
         key.length: 15,
         key.typename: "Int",
-        key.nameoffset: 219,
+        key.nameoffset: 218,
         key.namelength: 6,
-        key.docoffset: 159,
+        key.docoffset: 158,
         key.doclength: 44,
         key.attributes: [
           {
-            key.offset: 208,
+            key.offset: 207,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }

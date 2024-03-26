@@ -50,12 +50,12 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
     /// we know that we can't retrieve a value from it anymore.
     bool ExpectsNonVoid;
 
-    /// If the code completion expression occurs as a single statement in a
-    /// single-expression closure. In such cases we don't want to disfavor
-    /// results that produce 'Void' because the user might intend to make the
-    /// closure a multi-statment closure, in which case this expression is no
-    /// longer implicitly returned.
-    bool IsImplicitSingleExpressionReturn;
+    /// If the code completion expression occurs as e.g a single statement in a
+    /// single-expression closure, where the return is implied. In such cases
+    /// we don't want to disfavor results that produce 'Void' because the user
+    /// might intend to make the closure a multi-statment closure, in which case
+    /// this expression is no longer implicitly returned.
+    bool IsImpliedResult;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.

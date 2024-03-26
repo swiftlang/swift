@@ -36,6 +36,12 @@ if #available(OSX { // expected-error {{expected version number}} expected-error
 if #available(OSX) { // expected-error {{expected version number}}
 }
 
+if #available(OSX 0) { // expected-warning {{expected version number; this is an error in the Swift 6 language mode}}
+}
+
+if #available(OSX 0.0) { // expected-warning {{expected version number; this is an error in the Swift 6 language mode}}
+}
+
 if #available(OSX 10.51 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{must handle potential future platforms with '*'}} {{24-24=, *}}
 }
 

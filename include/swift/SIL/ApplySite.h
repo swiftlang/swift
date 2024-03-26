@@ -54,14 +54,14 @@ struct ApplySiteKind {
   ApplySiteKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static llvm::Optional<ApplySiteKind> fromNodeKind(SILInstructionKind kind) {
+  static std::optional<ApplySiteKind> fromNodeKind(SILInstructionKind kind) {
     if (auto innerTyOpt = ApplySiteKind::fromNodeKindHelper(kind))
       return ApplySiteKind(*innerTyOpt);
-    return llvm::None;
+    return std::nullopt;
   }
 
 private:
-  static llvm::Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+  static std::optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
     case SILInstructionKind::ApplyInst:
       return ApplySiteKind::ApplyInst;
@@ -72,7 +72,7 @@ private:
     case SILInstructionKind::BeginApplyInst:
       return ApplySiteKind::BeginApplyInst;
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
 };
@@ -571,6 +571,16 @@ public:
     return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
   }
 
+  /// Return the SILParameterInfo for this operand in the callee function.
+  SILParameterInfo getArgumentParameterInfo(const Operand &oper) const {
+    assert(!getArgumentConvention(oper).isIndirectOutParameter() &&
+           "Can only be applied to non-out parameters");
+
+    // The ParameterInfo is going to be the parameter in the caller.
+    unsigned calleeArgIndex = getCalleeArgIndex(oper);
+    return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
+  }
+
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
 
   friend bool operator==(ApplySite lhs, ApplySite rhs) {
@@ -611,15 +621,15 @@ struct FullApplySiteKind {
   FullApplySiteKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static llvm::Optional<FullApplySiteKind>
+  static std::optional<FullApplySiteKind>
   fromNodeKind(SILInstructionKind kind) {
     if (auto innerOpt = FullApplySiteKind::fromNodeKindHelper(kind))
       return FullApplySiteKind(*innerOpt);
-    return llvm::None;
+    return std::nullopt;
   }
 
 private:
-  static llvm::Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+  static std::optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
     case SILInstructionKind::ApplyInst:
       return FullApplySiteKind::ApplyInst;
@@ -628,7 +638,7 @@ private:
     case SILInstructionKind::BeginApplyInst:
       return FullApplySiteKind::BeginApplyInst;
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
 };
@@ -721,6 +731,18 @@ public:
                                 getNumIndirectSILErrorResults());
   }
 
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() const {
+    return getArgumentOperands().slice(getNumIndirectSILResults() +
+                                       getNumIndirectSILErrorResults());
+  }
+
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResultsOrSelf() const {
+    auto ops = getOperandsWithoutIndirectResults();
+    if (!hasSelfArgument())
+      return ops;
+    return ops.drop_back();
+  }
+
   InoutArgumentRange getInoutArguments() const {
     switch (getKind()) {
     case FullApplySiteKind::ApplyInst:
@@ -787,6 +809,20 @@ public:
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(**this)->getIsolationCrossing();
     }
+  }
+
+  /// Return the applied argument index for the given operand ignoring indirect
+  /// results.
+  ///
+  /// So for instance:
+  ///
+  /// apply %f(%result, %0, %1, %2, ...).
+  unsigned getAppliedArgIndexWithoutIndirectResults(const Operand &oper) const {
+    assert(oper.getUser() == **this);
+    assert(isArgumentOperand(oper));
+
+    return getAppliedArgIndex(oper) - getNumIndirectSILResults() -
+           getNumIndirectSILErrorResults();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

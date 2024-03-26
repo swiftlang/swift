@@ -47,8 +47,11 @@ actor A: P2 {
   // CHECK: hop_to_executor {{.*}} : $MainActor
   // CHECK: [[F:%.*]] = function_ref @$s4test11mainActorFnyyF : $@convention(thin) () -> ()
   // CHECK: [[THICK_F:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+  // CHECK: [[THICK_F_VAR:%.*]] = move_value [var_decl] [[THICK_F]]
+  // CHECK: [[THICK_F_BORROW:%.*]] = begin_borrow [[THICK_F_VAR]]
+  // CHECK: [[THICK_F_COPY:%.*]] = copy_value [[THICK_F_BORROW]]
   // CHECK: [[THUNK:%.*]] = function_ref @$sIeg_IegH_TR : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> ()
-  // CHECK:  = partial_apply [callee_guaranteed] [[THUNK]]([[THICK_F]]) : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> ()
+  // CHECK:  = partial_apply [callee_guaranteed] [[THUNK]]([[THICK_F_COPY]]) : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> ()
   // ... after applying ...
   // CHECK: hop_to_executor {{.*}} : $MainActor
   let f: () -> () = mainActorFn
@@ -65,7 +68,7 @@ actor A: P2 {
 actor AnActor {
   func isolatedMethod(_ i: Int) {}
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7AnActorC6calleryyYaF : $@convention(method) @async (@guaranteed AnActor) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7AnActorC6calleryyYaF : $@convention(method) @async (@sil_isolated @guaranteed AnActor) -> () {
   func caller() async {
     // CHECK: hop_to_executor {{..*}} : $AnActor
     //  [[F:%.*]] = function_ref @$s4test7AnActorC6calleryyYaFySicACYicfu_ : $@convention(thin) (@guaranteed AnActor) -> @owned @callee_guaranteed (Int) -> ()

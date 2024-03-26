@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -15,9 +15,7 @@ func missingAsync<T : AsyncSequence>(_ seq: T) throws {
 @available(SwiftStdlib 5.1, *)
 func missingThrows<T : AsyncSequence>(_ seq: T) async {
   for try await _ in seq { } 
-  // expected-error@-1 {{error is not handled because the enclosing function is not declared 'throws'}}
-  // expected-error@-2 {{call can throw, but the error is not handled}}
-  // expected-note@-3 {{call is to 'rethrows' function, but a conformance has a throwing witness}}
+  // expected-error@-1 {{errors thrown from here are not handled}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -36,8 +34,8 @@ func missingThrowingInBlock<T : AsyncSequence>(_ seq: T) {
 func missingTryInBlock<T : AsyncSequence>(_ seq: T) { 
   executeAsync { 
     for await _ in seq { } 
-    // expected-error@-1 2{{call can throw, but the error is not handled}}
-    // expected-note@-2 {{call is to 'rethrows' function, but a conformance has a throwing witness}}
+    // expected-error@-1{{call can throw, but the error is not handled}}
+    // expected-error@-2{{errors thrown from here are not handled}}
   }
 }
 
@@ -53,7 +51,6 @@ func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) {
 @available(SwiftStdlib 5.1, *)
 func doubleDiagCheckGeneric<T : AsyncSequence>(_ seq: T) async {
   var it = seq.makeAsyncIterator()
-  // expected-note@+2{{call is to 'rethrows' function, but a conformance has a throwing witness}}
   // expected-error@+1{{call can throw, but it is not marked with 'try' and the error is not handled}}
   let _ = await it.next()
 }
@@ -101,4 +98,36 @@ func forTryAwaitReturningExistentialType() async throws {
 
   for try await _ in S().seq() { // Ok
   }
+}
+
+@available(SwiftStdlib 5.1, *)
+public struct ReaderSeq: AsyncSequence, Sendable {
+  public enum Failure: Error {
+    case x
+  }
+
+  public typealias Element = Int
+
+  public func makeAsyncIterator() -> Reader {}
+
+  public actor Reader: AsyncIteratorProtocol {
+    public func next() async throws -> Element? {}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func test1() -> Error {
+  return ReaderSeq.Failure.x
+}
+
+@available(SwiftStdlib 5.1, *)
+public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
+  public mutating func next() async -> Element? { nil }
+  public func makeAsyncIterator() -> Self { self }
+
+  @_implements(AsyncIteratorProtocol, Failure)
+  public typealias __AsyncIteratorProtocol_Failure = Never
+
+  @_implements(AsyncSequence, Failure)
+  public typealias __AsyncSequence_Failure = Never
 }

@@ -53,7 +53,8 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
 /// \param paramIndex if set will be used to generate name in the form of
 ///                   '_$paramIndex' when VarDecl has no name.
 static Identifier
-getVarNameForCoding(VarDecl *var, llvm::Optional<int> paramIndex = llvm::None) {
+getVarNameForCoding(VarDecl *var,
+                    std::optional<int> paramIndex = std::nullopt) {
   auto &C = var->getASTContext();
   Identifier identifier;
   if (auto *PD = dyn_cast<ParamDecl>(var)) {
@@ -269,8 +270,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  if (!TypeChecker::conformsToProtocol(codingKeysType, codingKeyProto,
-                                       derived.getParentModule())) {
+  if (!derived.getParentModule()->lookupConformance(codingKeysType, codingKeyProto)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -337,8 +337,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     // We have a property to map to. Ensure it's {En,De}codable.
     auto target = derived.getConformanceContext()->mapTypeIntoContext(
          it->second->getValueInterfaceType());
-    if (TypeChecker::conformsToProtocol(target, derived.Protocol,
-                                        derived.getParentModule())
+    if (derived.getParentModule()->checkConformance(target, derived.Protocol)
             .isInvalid()) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
@@ -674,7 +673,7 @@ static CallExpr *createNestedContainerKeyedByForKeyCall(
 static ThrowStmt *createThrowCodingErrorStmt(ASTContext &C, Expr *containerExpr,
                                              NominalTypeDecl *errorDecl,
                                              Identifier errorId,
-                                             llvm::Optional<Expr *> argument,
+                                             std::optional<Expr *> argument,
                                              StringRef debugMessage) {
   auto *contextDecl = lookupErrorContext(C, errorDecl);
   assert(contextDecl && "Missing Context decl.");
@@ -938,7 +937,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
     // .<elt>(let a0, let a1, ...)
     SmallVector<VarDecl *, 3> payloadVars;
     Pattern *subpattern = nullptr;
-    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
 
     if (createSubpattern) {
       subpattern = DerivedConformance::enumElementPayloadSubpattern(
@@ -980,11 +979,11 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
       pat->setImplicit();
 
       auto labelItem = CaseLabelItem(pat);
-      auto stmt = CaseStmt::create(
-          C, CaseParentKind::Switch, SourceLoc(), labelItem, SourceLoc(),
-          SourceLoc(), caseBody,
-          /*case body vardecls*/
-              createSubpattern ? caseBodyVarDecls : llvm::None);
+      auto stmt =
+          CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), labelItem,
+                           SourceLoc(), SourceLoc(), caseBody,
+                           /*case body vardecls*/
+                           createSubpattern ? caseBodyVarDecls : std::nullopt);
       cases.push_back(stmt);
     }
   }
@@ -1726,7 +1725,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
             //           debugDescription: "...")
             auto *throwStmt = createThrowCodingErrorStmt(
                 C, containerExpr, C.getDecodingErrorDecl(), C.Id_dataCorrupted,
-                llvm::None, "Unavailable enum element encountered.");
+                std::nullopt, "Unavailable enum element encountered.");
 
             auto body =
                 BraceStmt::create(C, SourceLoc(), {throwStmt}, SourceLoc());
@@ -1890,11 +1889,12 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
 
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
-                              /*Failable=*/false,SourceLoc(),
+                              /*Failable=*/false, SourceLoc(),
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/true, SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramList,
-                              /*GenericParams=*/nullptr, conformanceDC);
+                              /*GenericParams=*/nullptr, conformanceDC,
+                              /*LifetimeDependentReturnTypeRepr*/ nullptr);
   initDecl->setImplicit();
   initDecl->setSynthesized();
 
@@ -1944,8 +1944,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (TypeChecker::conformsToProtocol(superType, proto,
-                                          derived.getParentModule())) {
+      if (derived.getParentModule()->checkConformance(superType, proto)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {
@@ -2088,12 +2087,6 @@ static bool canDeriveCodable(NominalTypeDecl *NTD,
     return false;
   }
 
-  // Actor-isolated structs and classes cannot derive encodable/decodable
-  // unless all of their stored properties are immutable.
-  if ((isa<StructDecl>(NTD) || isa<ClassDecl>(NTD)) &&
-      memberwiseAccessorsRequireActorIsolation(NTD))
-    return false;
-
   return true;
 }
 
@@ -2142,7 +2135,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
       !isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
+  if (!requirement->getBaseName().isConstructor()) {
     // Unknown requirement.
     requirement->diagnose(diag::broken_decodable_requirement);
     return nullptr;

@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-build-swift -module-name CompleteSwiftTypes -parse-as-library %S/Inputs/custom-modules/IncompleteTypes/complete-swift-types.swift -emit-module -emit-module-path %t/CompleteSwiftTypes.swiftmodule
-// RUN: not %target-swift-frontend -enable-upcoming-feature ImportObjcForwardDeclarations -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %t/incomplete_definition.swift %t/full_definition.swift 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -enable-upcoming-feature ImportObjcForwardDeclarations -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %t/incomplete_definition.swift %t/full_definition.swift -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 

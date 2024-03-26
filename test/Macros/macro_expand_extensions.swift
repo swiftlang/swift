@@ -256,3 +256,13 @@ final class SendableClass {
 @AddSendable
 class InvalidSendableClass {
 }
+
+@AddSendable
+struct HasNestedType {
+  struct Inner {}
+}
+
+// Make sure no circularity error is produced when resolving
+// extensions of nested types when the outer type has an
+// attached macro that can add other nested types.
+extension HasNestedType.Inner {}

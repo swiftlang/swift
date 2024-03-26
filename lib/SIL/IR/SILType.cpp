@@ -22,6 +22,7 @@
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/Test.h"
 #include "swift/SIL/TypeLowering.h"
 #include <tuple>
 
@@ -106,6 +107,12 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
 
 SILType SILType::getPackIndexType(const ASTContext &C) {
   return getPrimitiveObjectType(C.ThePackIndexType);
+}
+
+SILType SILType::getOpaqueIsolationType(const ASTContext &C) {
+  auto actorProtocol = C.getProtocol(KnownProtocolKind::Actor);
+  auto actorType = ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
+  return getPrimitiveObjectType(CanType(actorType).wrapInOptionalType());
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
@@ -902,7 +909,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
       SmallVector<SILParameterInfo, 4> newParams;
       SmallVector<SILYieldInfo, 4> newYields;
       SmallVector<SILResultInfo, 4> newResults;
-      llvm::Optional<SILResultInfo> newErrorResult;
+      std::optional<SILResultInfo> newErrorResult;
       for (auto param : sft->getParameters()) {
         auto newParamTy = param.getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
@@ -1045,25 +1052,52 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
   return SILType();
 }
 
-bool SILType::isEscapable() const {
-  return getASTType()->isEscapable();
-}
+bool SILType::isEscapable(const SILFunction &function) const {
+  CanType ty = getASTType();
 
-bool SILType::isMoveOnly() const {
-  // Legacy check.
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return getASTType()->isNoncopyable() || isMoveOnlyWrapped();
+  // For storage with reference ownership, check the referent.
+  if (auto refStorage = ty->getAs<ReferenceStorageType>())
+    ty = refStorage->getReferentType()->getCanonicalType();
+
+  if (auto fnTy = getAs<SILFunctionType>()) {
+    // Use isNoEscape instead to determine whether a function type may escape.
+    return true;
+  }
+  if (auto boxTy = getAs<SILBoxType>()) {
+    auto fields = boxTy->getLayout()->getFields();
+    assert(fields.size() == 1);
+    ty = ::getSILBoxFieldLoweredType(function.getTypeExpansionContext(), boxTy,
+                                     function.getModule().Types, 0);
   }
 
-  // Anything within the move-only wrapper is move-only.
-  if (isMoveOnlyWrapped())
+  if (auto *moveOnlyTy = ty->getAs<SILMoveOnlyWrappedType>())
+    ty = moveOnlyTy->getInnerType();
+
+  // TODO: Support ~Escapable in parameter packs.
+  //
+  // Treat all other SIL-specific types as Escapable.
+  if (isa<SILBlockStorageType,
+          SILBoxType,
+          SILPackType,
+          SILTokenType>(ty)) {
     return true;
+  }
+  return ty->isEscapable();
+}
 
-  auto ty = getASTType();
+bool SILType::isMoveOnly(bool orWrapped) const {
+  // If it's inside the move-only wrapper, return true iff we want to include
+  // such types as "move-only" in this query. Such values are typically
+  // just "no-implicit-copy" and not "move-only".
+  if (isMoveOnlyWrapped())
+    return orWrapped;
 
-  // All kinds of references are copyable.
-  if (isa<ReferenceStorageType>(ty))
-    return false;
+  // NOTE: getASTType strips the MoveOnlyWrapper off!
+  CanType ty = getASTType();
+
+  // For storage with reference ownership, check the referent.
+  if (auto refStorage = ty->getAs<ReferenceStorageType>())
+    ty = refStorage->getReferentType()->getCanonicalType();
 
   // TODO: Nonescaping closures ought to be treated as move-only in SIL.
   // They aren't marked move-only now, because the necessary move-only passes
@@ -1250,11 +1284,24 @@ SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   return SILType::getPrimitiveObjectType(newBoxType);
 }
 
-ProtocolConformanceRef
-SILType::conformsToProtocol(SILFunction *fn, ProtocolDecl *protocol) const {
-  return fn->getParentModule()->conformsToProtocol(getASTType(), protocol);
+bool SILType::isSendable(SILFunction *fn) const {
+  return getASTType()->isSendableType();
 }
 
-bool SILType::isSendable(SILFunction *fn) const {
-  return getASTType()->isSendableType(fn->getParentModule());
-}
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - message
+static FunctionTest IsSILTrivial("is-sil-trivial", [](auto &function,
+                                                      auto &arguments,
+                                                      auto &test) {
+  SILValue value = arguments.takeValue();
+  llvm::outs() << value;
+  if (value->getType().isTrivial(value->getFunction())) {
+    llvm::outs() << " is trivial\n";
+  } else {
+    llvm::outs() << " is not trivial\n";
+  }
+});
+} // end namespace swift::test

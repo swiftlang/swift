@@ -6,7 +6,7 @@
 
 import Distributed
 
-struct MissingRemoteCall: DistributedActorSystem {
+struct MissingRemoteCall: DistributedActorSystem { // expected-error {{type 'MissingRemoteCall' does not conform to protocol 'DistributedActorSystem'}}
   // expected-error@-1{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-2{{add stubs for conformance}}{{51-51=\nfunc remoteCall<Act, Err, Res>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res where Act: DistributedActor, Act.ID == ActorID, Err: Error, Res: SerializationRequirement {\n    <#code#>\n}\n}}
 
@@ -41,7 +41,7 @@ struct MissingRemoteCall: DistributedActorSystem {
   }
 }
 
-public struct PublicMissingRemoteCall: DistributedActorSystem {
+public struct PublicMissingRemoteCall: DistributedActorSystem { // expected-error {{type 'PublicMissingRemoteCall' does not conform to protocol 'DistributedActorSystem'}}
   // expected-error@-1{{struct 'PublicMissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-2{{add stubs for conformance}}{{64-64=\npublic func remoteCall<Act, Err, Res>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res where Act: DistributedActor, Act.ID == ActorID, Err: Error, Res: SerializationRequirement {\n    <#code#>\n}\n}}
 

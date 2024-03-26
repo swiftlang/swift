@@ -35,9 +35,12 @@
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -primary-file %t/src/macro_library.swift \
 // RUN:   -emit-reference-dependencies-path %t/macro_library.swiftdeps \
+// RUN:   -emit-loaded-module-trace-path %t/macro_library.trace.json \
 // RUN:   -emit-dependencies-path %t/macro_library.d
 // RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/macro_library.swiftdeps > %t/macro_library.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITH_PLUGIN %s < %t/macro_library.swiftdeps.processed
+// RUN: %FileCheck --check-prefix TRACE_WITH_PLUGIN %s < %t/macro_library.trace.json
+// RUN: %FileCheck --check-prefix D_WITH_PLUGIN %s < %t/macro_library.d
 
 //#-- Without macro (no -D USE_MACRO)
 // RUN: %target-swift-frontend \
@@ -49,9 +52,12 @@
 // RUN:   -external-plugin-path %t/external-plugin#%swift-plugin-server \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -emit-reference-dependencies-path %t/without_macro.swiftdeps \
+// RUN:   -emit-loaded-module-trace-path %t/without_macro.trace.json \
 // RUN:   -emit-dependencies-path %t/without_macro.d
 // RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/without_macro.swiftdeps > %t/without_macro.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITHOUT_PLUGIN %s < %t/without_macro.swiftdeps.processed
+// RUN: %FileCheck --check-prefix TRACE_WITHOUT_PLUGIN %s < %t/without_macro.trace.json
+// RUN: %FileCheck --check-prefix D_WITHOUT_PLUGIN %s < %t/without_macro.d
 
 //#-- With macro - primary (-D USE_MACRO)
 // RUN: %target-swift-frontend \
@@ -64,9 +70,12 @@
 // RUN:   -external-plugin-path %t/external-plugin#%swift-plugin-server \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -emit-reference-dependencies-path %t/with_macro_primary.swiftdeps \
+// RUN:   -emit-loaded-module-trace-path %t/with_macro_primary.trace.json \
 // RUN:   -emit-dependencies-path %t/with_macro_primary.d
 // RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/with_macro_primary.swiftdeps > %t/with_macro_primary.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITH_PLUGIN %s < %t/with_macro_primary.swiftdeps.processed
+// RUN: %FileCheck --check-prefix TRACE_WITH_PLUGIN %s < %t/with_macro_primary.trace.json
+// RUN: %FileCheck --check-prefix D_WITH_PLUGIN %s < %t/with_macro_primary.d
 
 //#-- With macro - non-primary (-D USE_MACRO)
 // RUN: %target-swift-frontend \
@@ -79,9 +88,12 @@
 // RUN:   -external-plugin-path %t/external-plugin#%swift-plugin-server \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -emit-reference-dependencies-path %t/with_macro_nonprimary.swiftdeps \
+// RUN:   -emit-loaded-module-trace-path %t/with_macro_nonprimary.trace.json \
 // RUN:   -emit-dependencies-path %t/with_macro_nonprimary.d
 // RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/with_macro_nonprimary.swiftdeps > %t/with_macro_nonprimary.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITHOUT_PLUGIN %s < %t/with_macro_nonprimary.swiftdeps.processed
+// RUN: %FileCheck --check-prefix TRACE_WITHOUT_PLUGIN %s < %t/with_macro_nonprimary.trace.json
+// RUN: %FileCheck --check-prefix D_WITHOUT_PLUGIN %s < %t/with_macro_nonprimary.d
 
 // WITH_PLUGIN-DAG: externalDepend interface '' '{{.*}}mock-plugin' false
 // WITH_PLUGIN-DAG: externalDepend interface '' '{{.*}}StringifyPlugin.{{(dylib|so|dll)}}' false
@@ -90,6 +102,25 @@
 // WITHOUT_PLUGIN-NOT:  StringifyPlugin
 // WITHOUT_PLUGIN-NOT:  AssertPlugin
 // WITHOUT_PLUGIN-NOT:  mock-plugin
+
+// TRACE_WITH_PLGUIN: "swiftmacros":[
+// TRACE_WITH_PLUGIN-DAG: {"name":"AssertPlugin","path":"{{.*}}AssertPlugin.{{(dylib|so|dll)}}"}
+// TRACE_WITH_PLUGIN-DAG: {"name":"StringifyPlugin","path":"{{.*}}StringifyPlugin.{{(dylib|so|dll)}}"}
+// TRACE_WITH_PLUGIN-DAG: {"name":"TestPlugin","path":"{{.*}}mock-plugin"}
+// TRACE_WITH_PLUGIN: ]
+
+// TRACE_WITHOUT_PLUGIN-NOT:  StringifyPlugin
+// TRACE_WITHOUT_PLUGIN-NOT:  AssertPlugin
+// TRACE_WITHOUT_PLUGIN-NOT:  mock-plugin
+// TRACE_WITHOUT_PLUGIN: "swiftmacros":[]
+
+// D_WITH_PLUGIN-DAG: AssertPlugin.{{(dylib|so|dll)}}
+// D_WITH_PLUGIN-DAG: StringifyPlugin.{{(dylib|so|dll)}}
+// D_WITH_PLUGIN-DAG: mock-plugin
+
+// D_WITHOUT_PLUGIN-NOT:  StringifyPlugin
+// D_WITHOUT_PLUGIN-NOT:  AssertPlugin
+// D_WITHOUT_PLUGIN-NOT:  mock-plugin
 
 //--- macro_library.swift
 @freestanding(expression) public macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "StringifyPlugin", type: "StringifyMacro")

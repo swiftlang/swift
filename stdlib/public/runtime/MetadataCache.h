@@ -1227,7 +1227,8 @@ public:
                              MetadataRequest request, Args &&...args) {
     // Note that we ignore the extra arguments; those are just for the
     // constructor and allocation.
-    return doInitialization(worker, request);
+    auto result = doInitialization(worker, request);
+    return result;
   }
 
 private:

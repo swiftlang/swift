@@ -933,6 +933,9 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   }
 }
 
+@available(*, unavailable)
+extension KeyedEncodingContainer: Sendable {}
+
 /// A type that provides a view into a decoder's storage and is used to hold
 /// the encoded properties of a decodable type in a keyed manner.
 ///
@@ -2114,6 +2117,9 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.superDecoder(forKey: key)
   }
 }
+
+@available(*, unavailable)
+extension KeyedDecodingContainer: Sendable {}
 
 //===----------------------------------------------------------------------===//
 // Unkeyed Encoding Containers

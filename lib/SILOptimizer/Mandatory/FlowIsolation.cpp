@@ -156,8 +156,8 @@ public:
   /// a normal return is reached, along with the block that returns normally.
   /// Only computed after calling solve(), where it remains None if the function
   /// doesn't return normally.
-  llvm::Optional<std::pair<SILBasicBlock *, State::Kind>> normalReturn =
-      llvm::None;
+  std::optional<std::pair<SILBasicBlock *, State::Kind>> normalReturn =
+      std::nullopt;
 
   /// indicates whether the SILFunction is (or contained in) a deinit.
   bool forDeinit;
@@ -457,11 +457,22 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     // If the illegal use is a call to a defer, then recursively diagnose
     // all of the defer's uses, if this is the first time encountering it.
     if (auto *callee = getCallee(use)) {
-      assert(info.haveDeferInfo(callee) && "non-defer call as a property use?");
-      auto &defer = info.getOrCreateDeferInfo(callee);
-      if (defer.setNonisolatedStart()) {
-        defer.diagnoseEntireFunction(blame);
+      if (info.haveDeferInfo(callee)) {
+        auto &defer = info.getOrCreateDeferInfo(callee);
+        if (defer.setNonisolatedStart()) {
+          defer.diagnoseEntireFunction(blame);
+        }
+        continue;
       }
+
+      // Init accessor `setter` use.
+      auto *accessor =
+          cast<AccessorDecl>(callee->getLocation().getAsDeclContext());
+      auto illegalLoc = use->getDebugLocation().getLocation();
+      diag.diagnose(illegalLoc.getSourceLoc(),
+                    diag::isolated_property_mutation_in_nonisolated_context,
+                    accessor->getStorage(), accessor->isSetter())
+          .warnUntilSwiftVersion(6);
       continue;
     }
 
@@ -497,9 +508,8 @@ static bool accessIsConcurrencySafe(ModuleDecl *module,
                                     RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
 
-  // must be accessible from nonisolated and Sendable
-  return isLetAccessibleAnywhere(module, var)
-      && isSendableType(module, var->getTypeInContext());
+  // must be accessible from nonisolated.
+  return isLetAccessibleAnywhere(module, var);
 }
 
 /// \returns true iff the ref_element_addr instruction is only used
@@ -517,11 +527,10 @@ static bool onlyDeinitAccess(RefElementAddrInst *inst) {
 /// diagnostic if it is not Sendable. The diagnostic assumes that the access
 /// is happening in a deinit that uses flow-isolation.
 /// \returns true iff a diagnostic was emitted for this reference.
-static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
-                                          RefElementAddrInst *inst) {
+static bool diagnoseNonSendableFromDeinit(RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
   Type ty = var->getTypeInContext();
-  DeclContext* dc = inst->getFunction()->getDeclContext();
+  DeclContext *dc = inst->getFunction()->getDeclContext();
 
 // FIXME: we should emit diagnostics in other modes using:
 //
@@ -534,7 +543,7 @@ static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
       != StrictConcurrency::Complete)
       return false;
 
-  if (isSendableType(module, ty))
+  if (ty->isSendableType())
     return false;
 
   auto &diag = var->getASTContext().Diags;
@@ -633,6 +642,37 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
             }
           }
         }
+
+        // Detect and handle use of init accessor properties.
+        if (callee->hasLocation()) {
+          auto loc = callee->getLocation();
+          if (auto *accessor =
+                  dyn_cast_or_null<AccessorDecl>(loc.getAsDeclContext())) {
+            auto *storage = accessor->getStorage();
+
+            // Note 'nonisolated' property use.
+            if (storage->getAttrs().hasAttribute<NonisolatedAttr>()) {
+              markNonIsolated(user);
+              continue;
+            }
+
+            // Init accessor is used exclusively for initialization
+            // of properties while 'self' is not fully initialized.
+            if (accessor->isInitAccessor()) {
+              markNonIsolated(user);
+              continue;
+            }
+
+            // Otherwise if this is an init accessor property, it's either
+            // a call to a getter or a setter and should be treated like
+            // an isolated computed property reference.
+
+            if (storage->hasInitAccessor()) {
+              markPropertyUse(user);
+              continue;
+            }
+          }
+        }
       }
 
       // For all other call-sites, uses of `self` are nonisolated.
@@ -657,7 +697,7 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
           continue;
 
         // emit a diagnostic and skip if it's non-sendable in a deinit
-        if (forDeinit && diagnoseNonSendableFromDeinit(module, refInst))
+        if (forDeinit && diagnoseNonSendableFromDeinit(refInst))
           continue;
 
         markPropertyUse(user);

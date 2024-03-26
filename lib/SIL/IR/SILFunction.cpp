@@ -12,32 +12,87 @@
 
 #define DEBUG_TYPE "sil-function"
 
+#include "swift/SIL/SILFunction.h"
+#include "swift/AST/Availability.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
+#include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
-#include "swift/SIL/CFG.h"
-#include "swift/SIL/PrettyStackTrace.h"
-#include "swift/AST/Availability.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/Stmt.h"
-#include "swift/Basic/OptimizationMode.h"
-#include "swift/Basic/Statistic.h"
-#include "llvm/ADT/Optional.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
-#include "clang/AST/Decl.h"
+#include <optional>
 
 using namespace swift;
 using namespace Lowering;
+
+GenericSignature SILSpecializeAttr::buildTypeErasedSignature(
+    GenericSignature sig, ArrayRef<Type> typeErasedParams) {
+  bool changedSignature = false;
+  llvm::SmallVector<Requirement, 2> requirementsErased;
+  auto &C = sig->getASTContext();
+
+  for (auto req : sig.getRequirements()) {
+    bool found = std::any_of(typeErasedParams.begin(),
+                             typeErasedParams.end(),
+                             [&](Type t) {
+      auto other = req.getFirstType();
+      return t->isEqual(other);
+    });
+    if (found && req.getKind() == RequirementKind::Layout) {
+      auto layout = req.getLayoutConstraint();
+      if (layout->isClass()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.getAnyObjectType()));
+      } else if (layout->isBridgeObject()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.TheBridgeObjectType));
+      } else if (layout->isFixedSizeTrivial()) {
+        unsigned bitWidth = layout->getTrivialSizeInBits();
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        CanType(BuiltinIntegerType::get(bitWidth, C))));
+      } else if (layout->isTrivialStride()) {
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        CanType(BuiltinVectorType::get(
+                            C,
+                            BuiltinIntegerType::get(8, C),
+                            layout->getTrivialStride()))));
+      } else {
+        requirementsErased.push_back(req);
+      }
+    } else {
+      requirementsErased.push_back(req);
+    }
+    changedSignature |= found;
+  }
+
+  if (changedSignature) {
+    return buildGenericSignature(
+        C, GenericSignature(),
+        SmallVector<GenericTypeParamType *>(sig.getGenericParams()),
+        requirementsErased,
+        /*allowInverses=*/false);
+  }
+
+  return sig;
+}
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
@@ -62,7 +117,9 @@ SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
                           AvailabilityContext availability) {
-  auto erasedSpecializedSig = specializedSig.typeErased(typeErasedParams);
+  auto erasedSpecializedSig =
+      SILSpecializeAttr::buildTypeErasedSignature(specializedSig,
+                                                  typeErasedParams);
 
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
 
@@ -94,7 +151,7 @@ void SILFunction::removeSpecializeAttr(SILSpecializeAttr *attr) {
 SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-    llvm::Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+    std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
     IsTransparent_t isTrans, IsSerialized_t isSerialized,
     ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
@@ -210,6 +267,7 @@ void SILFunction::init(
   this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->HasUnsafeNonEscapableResult = false;
   this->HasResultDependsOnSelf = false;
+  this->IsPerformanceConstraint = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -840,8 +898,10 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
       isAvailableExternally())
     return false;
 
-  // Otherwise, only public functions can be referenced.
-  return hasPublicVisibility(getLinkage());
+  // Otherwise, only public or package functions can be referenced.
+  // If it has a package linkage at this point, package CMO must
+  // have been enabled, so opt in for visibility.
+  return hasPublicOrPackageVisibility(getLinkage(), /*includePackage*/ true);
 }
 
 bool
@@ -882,11 +942,17 @@ bool SILFunction::shouldBePreservedForDebugger() const {
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
     return false;
 
+  if (isAvailableExternally())
+    return false;
+
   if (hasSemanticsAttr("no.preserve.debugger"))
     return false;
 
   // Only keep functions defined in this module.
   if (!isDefinition())
+    return false;
+
+  if (getLinkage() == SILLinkage::Shared)
     return false;
 
   // Don't preserve anything markes as always emit into client.

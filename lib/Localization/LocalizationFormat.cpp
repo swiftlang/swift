@@ -16,7 +16,6 @@
 
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Basic/Range.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -26,6 +25,7 @@
 #include "llvm/Support/Path.h"
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <system_error>
 #include <type_traits>
@@ -221,7 +221,7 @@ void StringsLocalizationProducer::readStringsFile(
   auto buffer = in->getBuffer();
   while (!buffer.empty()) {
     // consume comment.
-    if (buffer.startswith("/*")) {
+    if (buffer.starts_with("/*")) {
       auto endOfComment = buffer.find("*/");
       assert(endOfComment != std::string::npos);
       // Consume the comment and trailing `*/`
@@ -229,7 +229,7 @@ void StringsLocalizationProducer::readStringsFile(
       continue;
     }
 
-    assert(buffer.startswith("\"") && "malformed diagnostics file");
+    assert(buffer.starts_with("\"") && "malformed diagnostics file");
 
     // Consume leading `"`
     buffer = buffer.drop_front();

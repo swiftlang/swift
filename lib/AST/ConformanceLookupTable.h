@@ -91,6 +91,9 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the "unchecked" attribute, if there is one.
     SourceLoc uncheckedLoc;
 
+    /// The location of the "preconcurrency" attribute, if there is one.
+    SourceLoc preconcurrencyLoc;
+
     ConformanceSource(void *ptr, ConformanceEntryKind kind) 
       : Storage(ptr), Kind(kind) { }
 
@@ -141,6 +144,15 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return result;
     }
 
+    /// Return a new conformance source with the given location of
+    /// "@preconcurrency".
+    ConformanceSource withPreconcurrencyLoc(SourceLoc preconcurrencyLoc) {
+      ConformanceSource result(*this);
+      if (preconcurrencyLoc.isValid())
+        result.preconcurrencyLoc = preconcurrencyLoc;
+      return result;
+    }
+
     /// Retrieve the kind of conformance formed from this source.
     ConformanceEntryKind getKind() const { return Kind; }
 
@@ -182,6 +194,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the @unchecked attribute, if any.
     SourceLoc getUncheckedLoc() const {
       return uncheckedLoc;
+    }
+
+    SourceLoc getPreconcurrencyLoc() const {
+      return preconcurrencyLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration
@@ -365,11 +381,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   bool addProtocol(ProtocolDecl *protocol, SourceLoc loc,
                    ConformanceSource source);
 
-  /// Add the protocols from the given list.
-  void addInheritedProtocols(
-      llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-      ConformanceSource source);
-
   /// Add the protocols added by attached extension macros that are not
   /// yet expanded.
   void addMacroGeneratedProtocols(
@@ -448,10 +459,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// Update a lookup table with conformances from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal, ConformanceStage stage);
 
-  /// Load all of the protocol conformances for the given (serialized)
+  /// Register deserialized protocol conformances for the given (serialized)
   /// declaration context.
-  void loadAllConformances(DeclContext *dc,
-                           ArrayRef<ProtocolConformance *> conformances);
+  void registerProtocolConformances(DeclContext *dc,
+                                  ArrayRef<ProtocolConformance *> conformances);
 
 public:
   /// Create a new conformance lookup table.
@@ -466,7 +477,8 @@ public:
                                  DeclContext *conformanceDC);
 
   /// Register an externally-supplied protocol conformance.
-  void registerProtocolConformance(ProtocolConformance *conformance,
+  void registerProtocolConformance(DeclContext *dc,
+                                   ProtocolConformance *conformance,
                                    bool synthesized = false);
 
   /// Look for conformances to the given protocol.

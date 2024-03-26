@@ -137,8 +137,8 @@ bool IDEInspectionSecondPassRequest::evaluate(
 void Parser::performIDEInspectionSecondPassImpl(
     IDEInspectionDelayedDeclState &info) {
   // Disable updating the interface hash
-  llvm::SaveAndRestore<llvm::Optional<StableHasher>> CurrentTokenHashSaver(
-      CurrentTokenHash, llvm::None);
+  llvm::SaveAndRestore<std::optional<StableHasher>> CurrentTokenHashSaver(
+      CurrentTokenHash, std::nullopt);
 
   auto BufferID = L->getBufferID();
   auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
@@ -325,6 +325,7 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
     case swift::SourceFileKind::Library:
     case swift::SourceFileKind::Main:
     case swift::SourceFileKind::MacroExpansion:
+    case swift::SourceFileKind::DefaultArgument:
       return LexerMode::Swift;
   }
   llvm_unreachable("covered switch");
@@ -405,7 +406,7 @@ public:
   TokenRecorder(ASTContext &ctx, Lexer &BaseLexer)
       : Ctx(ctx), BaseLexer(BaseLexer), BufferID(BaseLexer.getBufferID()) {}
 
-  llvm::Optional<std::vector<Token>> finalize() override {
+  std::optional<std::vector<Token>> finalize() override {
     auto &SM = Ctx.SourceMgr;
 
     // We should consume the comments at the end of the file that don't attach
@@ -576,6 +577,23 @@ SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
+SourceLoc Parser::consumeAttributeLParen() {
+  SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
+  if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
+    diagnose(LastTokenEndLoc, diag::attr_extra_whitespace_before_lparen)
+        .warnUntilSwiftVersion(6);
+  }
+  return consumeToken(tok::l_paren);
+}
+
+bool Parser::consumeIfAttributeLParen() {
+  if (!Tok.isFollowingLParen()) {
+    return false;
+  }
+  consumeAttributeLParen();
+  return true;
+}
+
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
   // Consumes prefix of token and returns its location.
   // (like '?', '<', '>' or '!' immediately followed by '<') 
@@ -620,7 +638,7 @@ bool Parser::startsWithEllipsis(Token Tok) {
   if (!Tok.isAnyOperator() && !Tok.isPunctuation())
     return false;
 
-  return Tok.getText().startswith("...");
+  return Tok.getText().starts_with("...");
 }
 
 SourceLoc Parser::consumeStartingEllipsis() {
@@ -829,7 +847,7 @@ getStructureMarkerKindForToken(const Token &tok) {
 Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser, SourceLoc loc,
                                                  StructureMarkerKind kind)
     : StructureMarkerRAII(parser) {
-  parser.StructureMarkers.push_back({loc, kind, llvm::None});
+  parser.StructureMarkers.push_back({loc, kind, std::nullopt});
   if (parser.StructureMarkers.size() > MaxDepth) {
     parser.diagnose(loc, diag::structure_overflow, MaxDepth);
     // We need to cut off parsing or we will stack-overflow.
@@ -850,7 +868,7 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
 //===----------------------------------------------------------------------===//
 
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
-                             const Diagnostic &D, bool diagnoseDollarPrefix) {
+                             DiagRef D, bool diagnoseDollarPrefix) {
   switch (Tok.getKind()) {
   case tok::kw_self:
   case tok::kw_Self:
@@ -865,7 +883,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
 }
 
 bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
-                                     const Diagnostic &D) {
+                                     DiagRef D) {
   if (Tok.getText() != expected) {
     diagnose(Tok, D);
     return true;
@@ -877,8 +895,7 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
 /// parseAnyIdentifier - Consume an identifier or operator if present and return
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
-                                const Diagnostic &D,
-                                bool diagnoseDollarPrefix) {
+                                DiagRef D, bool diagnoseDollarPrefix) {
   if (Tok.is(tok::identifier)) {
     Loc = consumeIdentifier(Result, diagnoseDollarPrefix);
     return false;
@@ -917,7 +934,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
 /// consumed and false is returned.
 ///
 /// If the input is malformed, this emits the specified error diagnostic.
-bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
+bool Parser::parseToken(tok K, SourceLoc &TokLoc, DiagRef D) {
   if (Tok.is(K)) {
     TokLoc = consumeToken(K);
     return false;
@@ -928,7 +945,7 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
+bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, DiagRef ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
   switch (K) {
@@ -948,7 +965,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
 }
 
 bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                                  const Diagnostic &D) {
+                                  DiagRef D) {
   auto IntTok = Tok;
   if (parseToken(tok::integer_literal, Loc, D))
     return true;
@@ -1040,7 +1057,7 @@ Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
 
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                  bool AllowSepAfterLast, Diag<> ErrorDiag,
+                  bool AllowSepAfterLast, DiagRef ErrorDiag,
                   llvm::function_ref<ParserStatus()> callback) {
   if (Tok.is(RightK)) {
     RightLoc = consumeToken(RightK);
@@ -1079,14 +1096,14 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   return Status;
 }
 
-llvm::Optional<StringRef>
+std::optional<StringRef>
 Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText) {
   assert(Tok.is(tok::string_literal));
 
   // FIXME: Support extended escaping string literal.
   if (Tok.getCustomDelimiterLen()) {
     diagnose(Loc, diag::forbidden_extended_escaping_string, DiagText);
-    return llvm::None;
+    return std::nullopt;
   }
 
   SmallVector<Lexer::StringSegment, 1> Segments;
@@ -1094,7 +1111,7 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText) {
   if (Segments.size() != 1 ||
       Segments.front().Kind == Lexer::StringSegment::Expr) {
     diagnose(Loc, diag::forbidden_interpolated_string, DiagText);
-    return llvm::None;
+    return std::nullopt;
   }
 
   return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
@@ -1108,6 +1125,7 @@ struct ParserUnit::Implementation {
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions clangImporterOpts;
   symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
+  CASOptions CASOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
@@ -1116,10 +1134,10 @@ struct ParserUnit::Implementation {
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
                  const SILOptions &silOpts, StringRef ModuleName)
-      : LangOpts(Opts),
-        TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
+      : LangOpts(Opts), TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
-                             clangImporterOpts, symbolGraphOpts, SM, Diags)) {
+                             clangImporterOpts, symbolGraphOpts, CASOpts, SM,
+                             Diags)) {
     registerParseRequestFunctions(Ctx.evaluator);
 
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
@@ -1179,7 +1197,7 @@ void ParserUnit::parse() {
   SmallVector<ASTNode, 128> items;
   P.parseTopLevelItems(items);
 
-  llvm::Optional<ArrayRef<Token>> tokensRef;
+  std::optional<ArrayRef<Token>> tokensRef;
   if (auto tokens = P.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 
@@ -1269,11 +1287,11 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 
   // If the base name is prefixed by "getter:" or "setter:", it's an
   // accessor.
-  if (baseName.startswith("getter:")) {
+  if (baseName.starts_with("getter:")) {
     result.IsGetter = true;
     result.IsFunctionName = false;
     baseName = baseName.substr(7);
-  } else if (baseName.startswith("setter:")) {
+  } else if (baseName.starts_with("setter:")) {
     result.IsSetter = true;
     result.IsFunctionName = false;
     baseName = baseName.substr(7);

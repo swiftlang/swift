@@ -367,16 +367,21 @@ private:
 
   XRefTracePath path;
 
+  /// Expected vs found type if the mismatch caused a decl to be rejected.
+  std::optional<std::pair<Type, Type>> mismatchingTypes;
+
 public:
   explicit ModularizationError(DeclName name, bool declIsType, Kind errorKind,
                                const ModuleDecl *expectedModule,
                                const ModuleFile *referenceModule,
                                const ModuleDecl *foundModule,
-                               XRefTracePath path):
+                               XRefTracePath path,
+                               std::optional<std::pair<Type, Type>> mismatchingTypes):
     name(name), declIsType(declIsType), errorKind(errorKind),
     expectedModule(expectedModule),
     referenceModule(referenceModule),
-    foundModule(foundModule), path(path) {}
+    foundModule(foundModule), path(path),
+    mismatchingTypes(mismatchingTypes) {}
 
   void diagnose(const ModuleFile *MF,
                 DiagnosticBehavior limit = DiagnosticBehavior::Fatal) const;
@@ -639,6 +644,32 @@ public:
 
   void log(raw_ostream &OS) const override {
     OS << "Decl '" << name << "' is unsafe to deserialize";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+class InvalidEnumValueError
+    : public llvm::ErrorInfo<InvalidEnumValueError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  unsigned enumValue;
+  const char *enumDescription;
+
+public:
+  explicit InvalidEnumValueError(unsigned enumValue,
+                                 const char *enumDescription) {
+    this->enumValue = enumValue;
+    this->enumDescription = enumDescription;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "invalid value " << enumValue << " for enumeration "
+       << enumDescription;
   }
 
   std::error_code convertToErrorCode() const override {

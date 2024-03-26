@@ -58,6 +58,8 @@ static SILFunction *specializeVTableMethod(SILFunction *origMethod,
                                            SILModule &module,
                                            SILTransform *transform);
 
+static bool specializeVTablesOfSuperclasses(SILModule &module, SILTransform *transform);
+
 static bool specializeVTablesInFunction(SILFunction &func, SILModule &module,
                                         SILTransform *transform) {
   bool changed = false;
@@ -85,8 +87,10 @@ static bool specializeVTablesInFunction(SILFunction &func, SILModule &module,
 bool VTableSpecializer::specializeVTables(SILModule &module) {
   bool changed = false;
   for (SILFunction &func : module) {
-    specializeVTablesInFunction(func, module, this);
+    changed |= specializeVTablesInFunction(func, module, this);
   }
+
+  changed |= specializeVTablesOfSuperclasses(module, this);
 
   for (SILVTable *vtable : module.getVTables()) {
     if (vtable->getClass()->isGenericContext()) continue;
@@ -98,9 +102,51 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
       ValueDecl *decl = entry.getMethod().getDecl();
       module.getASTContext().Diags.diagnose(
           decl->getLoc(), diag::non_final_generic_class_function);
+
+      if (decl->getLoc().isInvalid()) {
+        auto demangledName = Demangle::demangleSymbolAsString(
+            method->getName(),
+            Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+        llvm::errs() << "in function " << demangledName << "\n";
+        llvm::errs() << "in class " << vtable->getClass()->getName() << "\n";
+      }
     }
   }
 
+  return changed;
+}
+
+static bool specializeVTablesOfSuperclasses(SILVTable *vtable,
+                                            SILModule &module,
+                                            SILTransform *transform) {
+  if (vtable->getClass()->isGenericContext() && !vtable->getClassType())
+    return false;
+
+  SILType superClassTy;
+  if (SILType classTy = vtable->getClassType()) {
+    superClassTy = classTy.getSuperclass();
+  } else {
+    if (Type superTy = vtable->getClass()->getSuperclass())
+      superClassTy =
+          SILType::getPrimitiveObjectType(superTy->getCanonicalType());
+  }
+  if (superClassTy) {
+    return (specializeVTableForType(superClassTy, module, transform) !=
+            nullptr);
+  }
+
+  return false;
+}
+
+static bool specializeVTablesOfSuperclasses(SILModule &module,
+                                            SILTransform *transform) {
+  bool changed = false;
+  // The module's vtable table can grow while we are specializing superclass
+  // vtables.
+  for (unsigned i = 0; i < module.getVTables().size(); ++i) {
+    SILVTable *vtable = module.getVTables()[i];
+    specializeVTablesOfSuperclasses(vtable, module, transform);
+  }
   return changed;
 }
 
@@ -140,6 +186,9 @@ SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
 
   SILVTable *vtable = SILVTable::create(module, classDecl, classTy,
                                         IsNotSerialized, newEntries);
+
+  specializeVTablesOfSuperclasses(vtable, module, transform);
+
   return vtable;
 }
 

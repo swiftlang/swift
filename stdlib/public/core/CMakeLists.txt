@@ -65,12 +65,12 @@ split_embedded_sources(
     NORMAL CString.swift
   EMBEDDED CTypes.swift
     NORMAL DebuggerSupport.swift
-    NORMAL Dictionary.swift
-    NORMAL DictionaryBridging.swift
-    NORMAL DictionaryBuilder.swift
-    NORMAL DictionaryCasting.swift
-    NORMAL DictionaryStorage.swift
-    NORMAL DictionaryVariant.swift
+  EMBEDDED Dictionary.swift
+  EMBEDDED DictionaryBridging.swift
+  EMBEDDED DictionaryBuilder.swift
+  EMBEDDED DictionaryCasting.swift
+  EMBEDDED DictionaryStorage.swift
+  EMBEDDED DictionaryVariant.swift
     NORMAL DiscontiguousSlice.swift
     NORMAL DropWhile.swift
     NORMAL Dump.swift
@@ -97,21 +97,21 @@ split_embedded_sources(
     NORMAL IntegerParsing.swift
   EMBEDDED Integers.swift
     NORMAL Join.swift
-    NORMAL KeyPath.swift
+  EMBEDDED KeyPath.swift
     NORMAL KeyValuePairs.swift
-    NORMAL LazyCollection.swift
-    NORMAL LazySequence.swift
+  EMBEDDED LazyCollection.swift
+  EMBEDDED LazySequence.swift
     NORMAL LegacyABI.swift
   EMBEDDED LifetimeManager.swift
     NORMAL Macros.swift
   EMBEDDED ManagedBuffer.swift
     NORMAL Map.swift
   EMBEDDED MemoryLayout.swift
-    NORMAL UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
-    NORMAL NativeDictionary.swift
+  EMBEDDED NativeDictionary.swift
   EMBEDDED NativeSet.swift
     NORMAL NewtypeWrapper.swift
     NORMAL NFC.swift
@@ -125,7 +125,7 @@ split_embedded_sources(
     NORMAL PrefixWhile.swift
     NORMAL Prespecialize.swift
     NORMAL Print.swift
-    NORMAL PtrAuth.swift
+  EMBEDDED PtrAuth.swift
   EMBEDDED Random.swift
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
@@ -260,9 +260,15 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
+# Freestanding and Linux builds both have failures to resolve.
+if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+  list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
+endif()
+
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
+  EmbeddedPrint.swift
   )
 
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
@@ -308,6 +314,19 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowingSwitch")
+
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
+  set(swift_lib_dir "${CMAKE_BINARY_DIR}/lib")
+else()
+  set(swift_bin_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+  set(swift_lib_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib")
+endif()
+
+list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
+  "${swift_lib_dir}/swift/host/plugins#${swift_bin_dir}/swift-plugin-server")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
@@ -393,9 +412,6 @@ add_swift_target_library(swiftCore
 # Embedded standard library - embedded libraries are built as .swiftmodule only,
 # i.e. there is no .o or .a file produced (no binary code is actually produced)
 # and only users of a library are going to actually compile any needed code.
-#
-# For now, we build a hardcoded list of target triples of the embedded stdlib,
-# and only when building Swift on macOS.
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib ALL)
 

@@ -42,8 +42,8 @@ class InstrumenterBase {
 protected:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
-  llvm::Optional<DeclNameRef> ModuleIdentifier;
-  llvm::Optional<DeclNameRef> FileIdentifier;
+  std::optional<DeclNameRef> ModuleIdentifier;
+  std::optional<DeclNameRef> FileIdentifier;
 
   InstrumenterBase(ASTContext &C, DeclContext *DC);
   virtual ~InstrumenterBase() = default;
@@ -54,7 +54,7 @@ protected:
 
   /// Create an expression which retrieves a valid ModuleIdentifier or
   /// FileIdentifier, if available.
-  Expr *buildIDArgumentExpr(llvm::Optional<DeclNameRef> name, SourceRange SR);
+  Expr *buildIDArgumentExpr(std::optional<DeclNameRef> name, SourceRange SR);
 
   class ClosureFinder : public ASTWalker {
   private:
@@ -70,8 +70,8 @@ protected:
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
-        return Action::SkipChildren(S); // don't walk into brace statements; we
-                           // need to respect nesting!
+        return Action::SkipNode(S); // don't walk into brace statements; we
+                                    // need to respect nesting!
       } else {
         return Action::Continue(S);
       }
@@ -82,7 +82,7 @@ protected:
         if (B) {
           const ParameterList *PL = CE->getParameters();
           BraceStmt *NB = I.transformBraceStmt(B, PL);
-          CE->setBody(NB, false);
+          CE->setBody(NB);
           // just with the entry and exit logging this is going to
           // be more than a single expression!
         }

@@ -26,6 +26,7 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   DistributedActorSystem.swift
   DistributedAssertions.swift
   DistributedDefaultExecutor.swift
+  DistributedMacros.swift
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift
 
@@ -45,10 +46,13 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   C_COMPILE_FLAGS
     -DswiftDistributed_EXPORTS
     -I${SWIFT_SOURCE_DIR}/stdlib/include
+
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+
+  LINK_FLAGS
+    "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _Concurrency
   INSTALL_IN_COMPONENT stdlib

@@ -400,7 +400,9 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   llvm::SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Owned &&
+    auto ownership = arg->getOwnershipKind();
+    if ((ownership == OwnershipKind::Owned ||
+         ownership == OwnershipKind::Guaranteed) &&
         !arg->getType().isMoveOnly()) {
       LLVM_DEBUG(llvm::dbgs() << "Found owned arg to check: " << *arg);
       valuesToCheck.insert(arg);
@@ -435,8 +437,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   LLVM_DEBUG(llvm::dbgs()
              << "Found at least one value to check, performing checking.\n");
   auto valuesToProcess =
-      llvm::makeArrayRef(valuesToCheck.begin(), valuesToCheck.end());
-  auto &mod = fn->getModule();
+      llvm::ArrayRef(valuesToCheck.begin(), valuesToCheck.end());
 
   // If we do not emit any diagnostics, we need to put in a break after each dbg
   // info carrying inst for a lexical value that we find a move on. This ensures
@@ -494,9 +495,8 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
             // referring to the same "debug entity".
             builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
             builder.createDebugValue(
-                dbgVarInst->getLoc(),
-                SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
-                false /*poison*/, true /*moved*/);
+                dbgVarInst->getLoc(), SILUndef::get(mvi->getOperand()),
+                *varInfo, false /*poison*/, UsesMoveableValueDebugInfo);
           }
         }
         foundMove = true;
@@ -552,10 +552,6 @@ namespace {
 class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().supportsMoveOnlyTypes())
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (fn->wasDeserializedCanonical())

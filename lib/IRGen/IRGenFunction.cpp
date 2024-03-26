@@ -40,12 +40,14 @@ static llvm::cl::opt<bool> EnableTrapDebugInfo(
     llvm::cl::desc("Generate failure-message functions in the debug info"));
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
+                             bool isPerformanceConstraint,
                              OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
-                             llvm::Optional<SILLocation> DbgLoc)
+                             std::optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
-      OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {
+      OptMode(OptMode), isPerformanceConstraint(isPerformanceConstraint),
+      CurFn(Fn), DbgScope(DbgScope) {
 
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
@@ -81,6 +83,12 @@ OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
 bool IRGenFunction::canStackPromotePackMetadata() const {
   return IGM.getSILModule().getOptions().EnablePackMetadataStackPromotion &&
          !packMetadataStackPromotionDisabled;
+}
+
+bool IRGenFunction::outliningCanCallValueWitnesses() const {
+  if (!IGM.getOptions().UseTypeLayoutValueHandling)
+    return false;
+  return !isPerformanceConstraint && !IGM.Context.LangOpts.hasFeature(Feature::Embedded);
 }
 
 ModuleDecl *IRGenFunction::getSwiftModule() const {
@@ -132,7 +140,7 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF, FunctionPointer fn,
                                        const llvm::Twine &name) {
   auto allocAttrs = IGF.IGM.getAllocAttrs();
   llvm::CallInst *call =
-    IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
+      IGF.Builder.CreateCall(fn, llvm::ArrayRef(args.begin(), args.size()));
   call->setAttributes(allocAttrs);
   return call;
 }
@@ -236,7 +244,7 @@ llvm::Value *IRGenFunction::emitAllocEmptyBoxCall() {
 static void emitDeallocatingCall(IRGenFunction &IGF, FunctionPointer fn,
                                  std::initializer_list<llvm::Value *> args) {
   llvm::CallInst *call =
-      IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
+      IGF.Builder.CreateCall(fn, llvm::ArrayRef(args.begin(), args.size()));
   call->setDoesNotThrow();
 }
 
@@ -379,7 +387,7 @@ void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
 // Debug output for Explosions.
 
 void Explosion::print(llvm::raw_ostream &OS) {
-  for (auto value : makeArrayRef(Values).slice(NextValue)) {
+  for (auto value : llvm::ArrayRef(Values).slice(NextValue)) {
     value->print(OS);
     OS << '\n';
   }
@@ -437,6 +445,20 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
 
 llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
                                                   StringRef failureMsg) {
+  if (IGM.DebugInfo && IGM.getOptions().isDebugInfoCodeView()) {
+    auto TrapLoc = getCurrentDebugLocation();
+    // Line 0 is invalid in CodeView, so create a new location that uses the
+    // line and column from the inlined location of the trap, that should
+    // correspond to its original source location.
+    if (TrapLoc.getLine() == 0 && TrapLoc.getInlinedAt()) {
+      auto DL = llvm::DILocation::getDistinct(
+          IGM.getLLVMContext(), TrapLoc.getInlinedAt()->getLine(),
+          TrapLoc.getInlinedAt()->getColumn(), TrapLoc.getScope(),
+          TrapLoc.getInlinedAt());
+      SetCurrentDebugLocation(DL);
+    }
+  }
+
   if (IGM.IRGen.Opts.shouldOptimize()) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass

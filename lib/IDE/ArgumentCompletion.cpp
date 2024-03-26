@@ -126,6 +126,18 @@ static bool isExpressionResultTypeUnconstrained(const Solution &S, Expr *E) {
   }
 }
 
+/// Returns whether `E` has a parent expression with arguments.
+static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
+  E = CS.getParentExpr(E);
+  while (E) {
+    if (E->getArgs() || isa<ParenExpr>(E) || isa<TupleExpr>(E) || isa<CollectionExpr>(E)) {
+      return true;
+    }
+    E = CS.getParentExpr(E);
+  }
+  return false;
+}
+
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
@@ -182,7 +194,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   // Find the parameter the completion was bound to (if any), as well as which
   // parameters are already bound (so we don't suggest them even when the args
   // are out of order).
-  llvm::Optional<unsigned> ParamIdx;
+  std::optional<unsigned> ParamIdx;
   std::set<unsigned> ClaimedParams;
   bool IsNoninitialVariadic = false;
 
@@ -216,7 +228,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   bool HasLabel = false;
-  llvm::Optional<unsigned> FirstTrailingClosureIndex = llvm::None;
+  std::optional<unsigned> FirstTrailingClosureIndex = std::nullopt;
   if (auto PE = CS.getParentExpr(CompletionExpr)) {
     if (auto Args = PE->getArgs()) {
       HasLabel = !Args->getLabel(ArgIdx).empty();
@@ -278,10 +290,27 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     }
   }
 
+  bool IncludeSignature = false;
+  if (ParentCall->getArgs()->getUnlabeledUnaryExpr() == CompletionExpr) {
+    // If the code completion expression is the only expression in the call
+    // and the code completion token doesn’t have a label, we have a case like
+    // `Point(|)`. Suggest the entire function signature.
+    IncludeSignature = true;
+  } else if (!ParentCall->getArgs()->empty() &&
+             ParentCall->getArgs()->getExpr(0) == CompletionExpr &&
+             !ParentCall->getArgs()->get(0).hasLabel()) {
+    if (hasParentCallLikeExpr(ParentCall, CS)) {
+      // We are completing in cases like `bar(arg: foo(|, option: 1)`
+      // In these cases, we don’t know if `option` belongs to the call to `foo`
+      // or `bar`. Be defensive and also suggest the signature.
+      IncludeSignature = true;
+    }
+  }
+
   Results.push_back(
-      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall),
+      {ExpectedTy,  ExpectedCallType, isa<SubscriptExpr>(ParentCall),
        Info.getValue(), FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
-       IsNoninitialVariadic, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
+       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
        IsAsync, DeclParamIsOptional, SolutionSpecificVarTypes});
 }
 
@@ -316,7 +345,7 @@ void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
 }
 
 void ArgumentTypeCheckCompletionCallback::collectResults(
-    bool IncludeSignature, bool IsLabeledTrailingClosure, SourceLoc Loc,
+    bool IsLabeledTrailingClosure, SourceLoc Loc,
     DeclContext *DC, ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
@@ -333,13 +362,13 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
   }
 
   SmallVector<Type, 8> ExpectedTypes;
+  SmallVector<PossibleParamInfo, 8> Params;
 
-  if (IncludeSignature && !Results.empty()) {
-    Lookup.setHaveLParen(true);
-    Lookup.setExpectedTypes(ExpectedCallTypes,
-                            /*isImplicitSingleExpressionReturn=*/false);
+  for (auto &Result : Results) {
+    if (Result.IncludeSignature) {
+      Lookup.setHaveLParen(true);
+      Lookup.setExpectedTypes(ExpectedCallTypes, /*isImpliedResult=*/false);
 
-    for (auto &Result : Results) {
       auto SemanticContext = SemanticContextKind::None;
       NominalTypeDecl *BaseNominal = nullptr;
       if (Result.BaseType) {
@@ -383,19 +412,16 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
           }
         }
       }
-    }
-    Lookup.setHaveLParen(false);
-
-    shouldPerformGlobalCompletion |=
-        !Lookup.FoundFunctionCalls || Lookup.FoundFunctionsWithoutFirstKeyword;
-  } else if (!Results.empty()) {
-    SmallVector<PossibleParamInfo, 8> Params;
-    for (auto &Ret : Results) {
+      Lookup.setHaveLParen(false);
+      // We didn't find any function signatures. Perform global completion as a fallback.
       shouldPerformGlobalCompletion |=
-          addPossibleParams(Ret, Params, ExpectedTypes);
+          !Lookup.FoundFunctionCalls || Lookup.FoundFunctionsWithoutFirstKeyword;
+    } else {
+      shouldPerformGlobalCompletion |=
+          addPossibleParams(Result, Params, ExpectedTypes);
     }
-    Lookup.addCallArgumentCompletionResults(Params, IsLabeledTrailingClosure);
   }
+  Lookup.addCallArgumentCompletionResults(Params, IsLabeledTrailingClosure);
 
   if (shouldPerformGlobalCompletion) {
     llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: not %target-swift-frontend -typecheck %s -sdk %t 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
-// RUN: not %target-swift-frontend -typecheck %s -resource-dir %t -sdk %t 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
+// RUN: not %target-swift-frontend -typecheck -diagnostic-style llvm %s -sdk %t 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
+// RUN: not %target-swift-frontend -typecheck -diagnostic-style llvm %s -resource-dir %t -sdk %t 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
 
 // NO-MODULE: error: no such module 'NonExistent'
 

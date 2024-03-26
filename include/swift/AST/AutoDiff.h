@@ -109,7 +109,7 @@ struct NormalDifferentiableFunctionTypeComponent {
 
   /// Returns the derivative function kind, if the component is a derivative
   /// function.
-  llvm::Optional<AutoDiffDerivativeFunctionKind>
+  std::optional<AutoDiffDerivativeFunctionKind>
   getAsDerivativeFunctionKind() const;
 };
 
@@ -180,7 +180,7 @@ struct DifferentiabilityWitnessFunctionKind {
   explicit DifferentiabilityWitnessFunctionKind(StringRef name);
   operator innerty() const { return rawValue; }
 
-  llvm::Optional<AutoDiffDerivativeFunctionKind>
+  std::optional<AutoDiffDerivativeFunctionKind>
   getAsDerivativeFunctionKind() const;
 };
 
@@ -522,15 +522,15 @@ struct TangentPropertyInfo {
   VarDecl *tangentProperty = nullptr;
 
   /// An optional error.
-  llvm::Optional<Error> error = llvm::None;
+  std::optional<Error> error = std::nullopt;
 
 private:
-  TangentPropertyInfo(VarDecl *tangentProperty, llvm::Optional<Error> error)
+  TangentPropertyInfo(VarDecl *tangentProperty, std::optional<Error> error)
       : tangentProperty(tangentProperty), error(error) {}
 
 public:
   TangentPropertyInfo(VarDecl *tangentProperty)
-      : TangentPropertyInfo(tangentProperty, llvm::None) {}
+      : TangentPropertyInfo(tangentProperty, std::nullopt) {}
 
   TangentPropertyInfo(Error::Kind errorKind)
       : TangentPropertyInfo(nullptr, Error(errorKind)) {}

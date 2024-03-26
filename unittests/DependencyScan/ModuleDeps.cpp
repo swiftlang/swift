@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "ScanFixture.h"
-#include "swift/Basic/Platform.h"
 #include "swift/Basic/Defer.h"
-#include "llvm/TargetParser/Triple.h"
-#include "llvm/Support/Host.h"
+#include "swift/Basic/Platform.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/Triple.h"
 #include "gtest/gtest.h"
 #include <string>
 
@@ -246,6 +246,6 @@ public func overlayFuncA() { }\n"));
   auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA);
   auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB);
   // Ensure that scans that only differ in module name have distinct scanning context hashes
-  ASSERT_NE(instanceA->get()->getInvocation().getModuleScanningHash(),
-            instanceB->get()->getInvocation().getModuleScanningHash());
+  ASSERT_NE(instanceA->ScanInstance.get()->getInvocation().getModuleScanningHash(),
+            instanceB->ScanInstance.get()->getInvocation().getModuleScanningHash());
 }

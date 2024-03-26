@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 
 using namespace swift;
 
@@ -119,8 +120,13 @@ public:
     } else {
       // Accessing a class member -> reading the class
       parent->project(AccessType::Get, [&](SILValue parentValue) {
-        SingleValueInstruction *Ref = builder.createLoad(loc, parentValue,
-                                                         LoadOwnershipQualifier::Unqualified);
+        SingleValueInstruction *Borrow = nullptr;
+        SingleValueInstruction *Ref;
+        if (builder.hasOwnership()) {
+          Ref = Borrow = builder.createLoadBorrow(loc, parentValue);
+        } else {
+          Ref = builder.createLoad(loc, parentValue, LoadOwnershipQualifier::Unqualified);
+        }
         
         // If we were previously accessing a class member, we're done now.
         insertEndAccess(beginAccess, builder);
@@ -134,6 +140,9 @@ public:
             // decl or in a superclass of it. Just handle this to be on the safe
             // side.
             callback(SILValue());
+            if (Borrow) {
+              builder.createEndBorrow(loc, Borrow);
+            }
             return;
           }
           Ref = builder.createUpcast(loc, Ref, superCl);
@@ -161,6 +170,10 @@ public:
         // end the access now
         if (beginAccess == addr) {
           insertEndAccess(beginAccess, builder);
+        }
+        
+        if (Borrow) {
+          builder.createEndBorrow(loc, Borrow);
         }
       });
     }
@@ -224,7 +237,7 @@ public:
       // so allocate a buffer.
       auto &function = builder.getFunction();
       auto substType = component.getComponentType().subst(
-          keyPath->getSubstitutions(), llvm::None);
+          keyPath->getSubstitutions(), std::nullopt);
       SILType type = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       auto addr = builder.createAllocStack(loc, type);
@@ -302,7 +315,7 @@ public:
           // so allocate a writeback buffer.
           auto &function = builder.getFunction();
           auto substType = component.getComponentType().subst(
-              keyPath->getSubstitutions(), llvm::None);
+              keyPath->getSubstitutions(), std::nullopt);
           SILType type = function.getLoweredType(
                         Lowering::AbstractionPattern::getOpaque(), substType);
           auto addr = builder.createAllocStack(loc, type);
@@ -352,7 +365,7 @@ public:
     parent->project(AccessType::Get, [&](SILValue parentValue) {
       auto &function = builder.getFunction();
       auto substType = component.getComponentType().subst(
-          keyPath->getSubstitutions(), llvm::None);
+          keyPath->getSubstitutions(), std::nullopt);
       SILType optType = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       SILType objType = optType.getOptionalObjectType().getAddressType();
@@ -569,7 +582,7 @@ public:
       auto resultCanType = components.back().getComponentType();
       auto &function = builder.getFunction();
       auto substType =
-          resultCanType.subst(keyPath->getSubstitutions(), llvm::None);
+          resultCanType.subst(keyPath->getSubstitutions(), std::nullopt);
       auto optType = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       
@@ -669,9 +682,10 @@ private:
 
 KeyPathInst *
 KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
-  if (auto *upCast = dyn_cast<UpcastInst>(keyPath))
-    keyPath = upCast->getOperand();
-  // TODO: Look through other conversions, copies, etc.?
+  while (auto *upCast = dyn_cast<UpcastInst>(keyPath)) {
+    keyPath = lookThroughOwnershipInsts(upCast->getOperand());
+  }
+
   return dyn_cast<KeyPathInst>(keyPath);
 }
 

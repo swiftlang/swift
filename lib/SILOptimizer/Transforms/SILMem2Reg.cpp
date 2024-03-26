@@ -269,7 +269,7 @@ static void
 prepareForDeletion(SILInstruction *inst,
                    SmallVectorImpl<SILInstruction *> &instructionsToDelete) {
   for (auto &operand : inst->getAllOperands()) {
-    operand.set(SILUndef::get(operand.get()->getType(), *inst->getFunction()));
+    operand.set(SILUndef::get(operand.get()));
   }
   instructionsToDelete.push_back(inst);
 }
@@ -679,44 +679,6 @@ replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
   }
 }
 
-/// Instantiate the specified empty type by recursively tupling and structing
-/// the empty types aggregated together at each level.
-static SILValue createValueForEmptyType(SILType ty,
-                                        SILInstruction *insertionPoint,
-                                        SILBuilderContext &ctx) {
-  auto *function = insertionPoint->getFunction();
-  assert(ty.isEmpty(*function));
-  if (auto tupleTy = ty.getAs<TupleType>()) {
-    SmallVector<SILValue, 4> elements;
-    for (unsigned idx : range(tupleTy->getNumElements())) {
-      SILType elementTy = ty.getTupleElementType(idx);
-      auto element = createValueForEmptyType(elementTy, insertionPoint, ctx);
-      elements.push_back(element);
-    }
-    SILBuilderWithScope builder(insertionPoint, ctx);
-    return builder.createTuple(insertionPoint->getLoc(), ty, elements);
-  } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
-    TypeExpansionContext tec = *function;
-    auto &module = function->getModule();
-    if (decl->isResilient(tec.getContext()->getParentModule(),
-                          tec.getResilienceExpansion())) {
-      llvm::errs() << "Attempting to create value for illegal empty type:\n";
-      ty.print(llvm::errs());
-      llvm::report_fatal_error("illegal empty type: resilient struct");
-    }
-    SmallVector<SILValue, 4> elements;
-    for (auto *field : decl->getStoredProperties()) {
-      auto elementTy = ty.getFieldType(field, module, tec);
-      auto element = createValueForEmptyType(elementTy, insertionPoint, ctx);
-      elements.push_back(element);
-    }
-    SILBuilderWithScope builder(insertionPoint, ctx);
-    return builder.createStruct(insertionPoint->getLoc(), ty, elements);
-  }
-  llvm::errs() << "Attempting to create value for illegal empty type:\n";
-  ty.print(llvm::errs());
-  llvm::report_fatal_error("illegal empty type: neither tuple nor struct.");
-}
 
 /// Whether lexical lifetimes should be added for the values stored into the
 /// alloc_stack.
@@ -778,7 +740,7 @@ beginOwnedLexicalLifetimeAfterStore(AllocStackInst *asi, StoreInst *inst) {
 
   MoveValueInst *mvi = nullptr;
   SILBuilderWithScope::insertAfter(inst, [&](SILBuilder &builder) {
-    mvi = builder.createMoveValue(loc, stored, /*isLexical*/ true);
+    mvi = builder.createMoveValue(loc, stored, IsLexical);
   });
   StorageStateTracking<LiveValues> vals = {LiveValues::forOwned(stored, mvi),
                                            /*isStorageValid=*/true};
@@ -799,7 +761,7 @@ beginGuaranteedLexicalLifetimeAfterStore(AllocStackInst *asi,
     return {LiveValues::forGuaranteed(stored, {}), /*isStorageValid*/ true};
   }
   auto *borrow = SILBuilderWithScope(inst->getNextInstruction())
-                     .createBeginBorrow(loc, stored, /*isLexical*/ true);
+                     .createBeginBorrow(loc, stored, IsLexical);
   return {LiveValues::forGuaranteed(stored, borrow), /*isStorageValid*/ true};
 }
 
@@ -992,8 +954,8 @@ private:
 
   /// Get the values for this AllocStack variable that are flowing out of
   /// StartBB.
-  llvm::Optional<LiveValues> getLiveOutValues(BasicBlockSetVector &phiBlocks,
-                                              SILBasicBlock *startBlock);
+  std::optional<LiveValues> getLiveOutValues(BasicBlockSetVector &phiBlocks,
+                                             SILBasicBlock *startBlock);
 
   /// Get the values for this AllocStack variable that are flowing out of
   /// StartBB or undef if there are none.
@@ -1001,8 +963,8 @@ private:
                                        SILBasicBlock *startBlock);
 
   /// Get the values for this AllocStack variable that are flowing into block.
-  llvm::Optional<LiveValues> getLiveInValues(BasicBlockSetVector &phiBlocks,
-                                             SILBasicBlock *block);
+  std::optional<LiveValues> getLiveInValues(BasicBlockSetVector &phiBlocks,
+                                            SILBasicBlock *block);
 
   /// Get the values for this AllocStack variable that are flowing into block or
   /// undef if there are none.
@@ -1036,7 +998,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
   // - Some + !isStorageValid: a value was encountered but is no longer stored--
   //                           it has been destroy_addr'd, etc
   // - Some + isStorageValid: a value was encountered and is currently stored
-  llvm::Optional<StorageStateTracking<LiveValues>> runningVals;
+  std::optional<StorageStateTracking<LiveValues>> runningVals;
   // The most recent StoreInst or StoreBorrowInst that encountered while
   // iterating over the block.  The final value will be returned to the caller
   // which will use it to determine the live-out value of the block.
@@ -1268,7 +1230,7 @@ void StackAllocationPromoter::addBlockArguments(
   }
 }
 
-llvm::Optional<LiveValues>
+std::optional<LiveValues>
 StackAllocationPromoter::getLiveOutValues(BasicBlockSetVector &phiBlocks,
                                           SILBasicBlock *startBlock) {
   LLVM_DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
@@ -1303,7 +1265,7 @@ StackAllocationPromoter::getLiveOutValues(BasicBlockSetVector &phiBlocks,
     LLVM_DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
   LLVM_DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
-  return llvm::None;
+  return std::nullopt;
 }
 
 LiveValues StackAllocationPromoter::getEffectiveLiveOutValues(
@@ -1311,11 +1273,11 @@ LiveValues StackAllocationPromoter::getEffectiveLiveOutValues(
   if (auto values = getLiveOutValues(phiBlocks, startBlock)) {
     return *values;
   }
-  auto *undef = SILUndef::get(asi->getElementType(), *asi->getFunction());
+  auto *undef = SILUndef::get(asi->getFunction(), asi->getElementType());
   return LiveValues::forOwned(undef, undef);
 }
 
-llvm::Optional<LiveValues>
+std::optional<LiveValues>
 StackAllocationPromoter::getLiveInValues(BasicBlockSetVector &phiBlocks,
                                          SILBasicBlock *block) {
   // First, check if there is a Phi value in the current block. We know that
@@ -1330,7 +1292,7 @@ StackAllocationPromoter::getLiveInValues(BasicBlockSetVector &phiBlocks,
   }
 
   if (block->pred_empty() || !domInfo->getNode(block))
-    return llvm::None;
+    return std::nullopt;
 
   // No phi for this value in this block means that the value flowing
   // out of the immediate dominator reaches here.
@@ -1346,7 +1308,7 @@ LiveValues StackAllocationPromoter::getEffectiveLiveInValues(
   if (auto values = getLiveInValues(phiBlocks, block)) {
     return *values;
   }
-  auto *undef = SILUndef::get(asi->getElementType(), *asi->getFunction());
+  auto *undef = SILUndef::get(asi->getFunction(), asi->getElementType());
   // TODO: Add another kind of LiveValues for undef.
   return LiveValues::forOwned(undef, undef);
 }
@@ -1876,7 +1838,7 @@ class MemoryToRegisters {
   /// DomTreeLevelMap is a DenseMap implying that if we initialize it, we always
   /// will initialize a heap object with 64 objects. Thus by using an optional,
   /// computing this lazily, we only do this if we actually need to do so.
-  llvm::Optional<DomTreeLevelMap> domTreeLevels;
+  std::optional<DomTreeLevelMap> domTreeLevels;
 
   /// The function that we are optimizing.
   SILFunction &f;
@@ -1967,7 +1929,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   SILBasicBlock *parentBlock = asi->getParent();
   // The default value of the AllocStack is NULL because we don't have
   // uninitialized variables in Swift.
-  llvm::Optional<StorageStateTracking<LiveValues>> runningVals;
+  std::optional<StorageStateTracking<LiveValues>> runningVals;
 
   // For all instructions in the block.
   for (auto bbi = parentBlock->begin(), bbe = parentBlock->end(); bbi != bbe;) {
@@ -1982,7 +1944,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
         // empty--an aggregate of types without storage.
         runningVals = {
             LiveValues::toReplace(asi,
-                                  /*replacement=*/createValueForEmptyType(
+                                  /*replacement=*/createEmptyAndUndefValue(
                                       asi->getElementType(), inst, ctx)),
             /*isStorageValid=*/true};
       }

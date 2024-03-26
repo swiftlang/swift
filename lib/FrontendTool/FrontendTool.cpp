@@ -311,6 +311,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
     C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
+    C.NumMacroPluginDependencies = D->getMacroPluginDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
@@ -409,21 +410,32 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   bool IgnoreAdjacentModules = Instance.hasASTContext() &&
                                Instance.getASTContext().IgnoreAdjacentModules;
 
+  // When building explicit module dependencies, they are
+  // discovered by dependency scanner and the swiftmodule is already rebuilt
+  // ignoring candidate module. There is no need to serialized dependencies for
+  // validation purpose because the build system (swift-driver) is then
+  // responsible for checking whether inputs are up-to-date.
+  bool ShouldSerializeDeps = !FEOpts.ExplicitInterfaceBuild;
+
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
   // and isntead directly use the current \c Instance for compilation.
-  if (FEOpts.ExplicitInterfaceBuild)
+  //
+  // FIXME: -typecheck-module-from-interface is the exception here because
+  // currently we need to ensure it still reads the flags written out
+  // in the .swiftinterface file itself. Instead, creation of that
+  // job should incorporate those flags.
+  if (FEOpts.ExplicitInterfaceBuild && !(FEOpts.isTypeCheckAction()))
     return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
-        Invocation.getOutputFilename(),
-        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        Invocation.getOutputFilename(), ShouldSerializeDeps,
         Invocation.getSearchPathOptions().CandidateCompiledModules);
-  else
-    return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
+
+  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
-      Invocation.getClangImporterOptions(),
+      Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(), ABIPath,
@@ -662,7 +674,7 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasReferenceDependenciesPath() &&
+          .InputsAndOutputs.hasReferenceDependenciesFilePath() &&
       Instance.getPrimarySourceFiles().empty()) {
     Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
@@ -1110,6 +1122,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (auto *stats = ctx.Stats)
     countASTStats(*stats, Instance);
 
+  if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->dumpSwiftLookupTables();
+
   // Report mangling stats if there was no error.
   if (!ctx.hadError())
     Mangle::printManglingStats();
@@ -1447,7 +1462,7 @@ static bool performAction(CompilerInstance &Instance,
 /// false and will not replay any output.
 static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   if (!Instance.supportCaching() ||
-      Instance.getInvocation().getFrontendOptions().CacheSkipReplay)
+      Instance.getInvocation().getCASOptions().CacheSkipReplay)
     return false;
 
   assert(Instance.getCompilerBaseKey() &&
@@ -1463,7 +1478,7 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
       Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
-      Instance.getInvocation().getFrontendOptions().EnableCachingRemarks);
+      Instance.getInvocation().getCASOptions().EnableCachingRemarks);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)
@@ -1746,7 +1761,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   const ASTContext &Context = Instance.getASTContext();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  llvm::Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  std::optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
@@ -2228,10 +2243,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::setBugReportMsg(nullptr);
   }
   
-  /// Enable leaks checking because this SILModule is the only one in the process
-  /// (leaks checking is not thread safe).
-  Invocation.getSILOptions().checkSILModuleLeaks = true;
-
   PrettyStackTraceFrontend frontendTrace(Invocation);
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
@@ -2245,12 +2256,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      std::make_unique<llvm::Optional<PrettyStackTraceFileContents>[]>(
+      std::make_unique<std::optional<PrettyStackTraceFileContents>[]>(
           configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],
            [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              llvm::Optional<PrettyStackTraceFileContents> &trace) {
+              std::optional<PrettyStackTraceFileContents> &trace) {
              trace.emplace(*buffer);
            });
 

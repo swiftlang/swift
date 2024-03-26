@@ -295,7 +295,7 @@ extension Unicode.Scalar: CustomStringConvertible, CustomDebugStringConvertible 
   }
 }
 
-@_unavailableInEmbedded
+#if !$Embedded
 extension Unicode.Scalar: LosslessStringConvertible {
   @inlinable
   public init?(_ description: String) {
@@ -306,6 +306,7 @@ extension Unicode.Scalar: LosslessStringConvertible {
     self = v
   }
 }
+#endif
 
 extension Unicode.Scalar: Hashable {
   /// Hashes the essential components of this value by feeding them into the
@@ -410,6 +411,8 @@ extension Unicode.Scalar {
     return UTF16View(value: self)
   }
 }
+
+#if !$Embedded
 
 extension Unicode.Scalar.UTF16View: RandomAccessCollection {
 
@@ -532,11 +535,20 @@ extension Unicode.Scalar {
 
     // The first code unit is in the least significant byte of codeUnits.
     codeUnits = codeUnits.littleEndian
+#if hasFeature(TypedThrows)
     return try Swift._withUnprotectedUnsafePointer(to: &codeUnits) {
       return try $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
         return try body(UnsafeBufferPointer(start: $0, count: utf8Count))
       }
     }
+#else
+    return try Swift.__abi_se0413_withUnsafePointer(to: &codeUnits) {
+      return try $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
+        return try body(UnsafeBufferPointer(start: $0, count: utf8Count))
+      }
+    }
+#endif
   }
 }
 
+#endif

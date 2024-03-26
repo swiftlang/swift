@@ -12,7 +12,7 @@ import StdlibUnittest
 
 import Dispatch
 
-final class MyTaskExecutor: _TaskExecutor, @unchecked Sendable {
+final class MyTaskExecutor: TaskExecutor, @unchecked Sendable {
   let queue: DispatchQueue
 
   init(queue: DispatchQueue) {
@@ -31,27 +31,27 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
                    _ secondExecutor: MyTaskExecutor) async {
   // 1 level of child tasks
   await withTaskGroup(of: Int.self) { group in
-    group._addTask(on: firstExecutor) {
+    group.addTask(executorPreference: firstExecutor) {
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
       return 1
     }
   }
   await withThrowingTaskGroup(of: Int.self) { group in
-    group._addTask(on: firstExecutor) {
+    group.addTask(executorPreference: firstExecutor) {
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
       return 2
     }
   }
   await withDiscardingTaskGroup() { group in
-    group._addTask(on: firstExecutor) {
+    group.addTask(executorPreference: firstExecutor) {
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
     }
   }
   try! await withThrowingDiscardingTaskGroup() { group in
-    group._addTask(on: firstExecutor) {
+    group.addTask(executorPreference: firstExecutor) {
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
     }
@@ -59,12 +59,12 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
 
   // Multiple levels of child tasks
   await withTaskGroup(of: Int.self) { group in
-    group._addTask(on: firstExecutor) {
+    group.addTask(executorPreference: firstExecutor) {
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
 
       return await withTaskGroup(of: Int.self) { group in
-        group._addTask(on: secondExecutor) {
+        group.addTask(executorPreference: secondExecutor) {
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
           return 12
@@ -79,11 +79,11 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
     dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
 
-    group._addTask(on: secondExecutor) {
+    group.addTask(executorPreference: secondExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
       return await withTaskGroup(of: Int.self) { inner in
-        inner._addTask(on: nil) {
+        inner.addTask(executorPreference: globalConcurrentExecutor) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -93,11 +93,11 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
       }
     }
 
-    _ = group._addTaskUnlessCancelled(on: secondExecutor) {
+    _ = group.addTaskUnlessCancelled(executorPreference: secondExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
       return await withTaskGroup(of: Int.self) { inner in
-        inner._addTask(on: nil) {
+        inner.addTask(executorPreference: globalConcurrentExecutor) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -107,16 +107,16 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
       }
     }
 
-    group._addTask(on: secondExecutor) {
+    group.addTask(executorPreference: secondExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
       await withDiscardingTaskGroup { inner in
-        inner._addTask(on: nil) {
+        inner.addTask(executorPreference: globalConcurrentExecutor) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
         }
-        _ = inner._addTaskUnlessCancelled(on: nil) {
+        _ = inner.addTaskUnlessCancelled(executorPreference: globalConcurrentExecutor) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -125,16 +125,16 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
       return 0
     }
 
-    group._addTask(on: secondExecutor) {
+    group.addTask(executorPreference: secondExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
       try! await withThrowingDiscardingTaskGroup { inner in
-        inner._addTask(on: nil) {
+        inner.addTask(executorPreference: globalConcurrentExecutor) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
         }
-        _ = inner._addTaskUnlessCancelled(on: nil) {
+        _ = inner.addTaskUnlessCancelled(executorPreference: globalConcurrentExecutor) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -149,7 +149,7 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
 
 func testAsyncLet(_ firstExecutor: MyTaskExecutor,
                   _ secondExecutor: MyTaskExecutor) async {
-  await _withTaskExecutor(firstExecutor) {
+  await withTaskExecutorPreference(firstExecutor) {
     async let first: Int = {
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -157,8 +157,8 @@ func testAsyncLet(_ firstExecutor: MyTaskExecutor,
     }()
     _ = await first
   }
-  await _withTaskExecutor(firstExecutor) {
-    await _withTaskExecutor(secondExecutor) {
+  await withTaskExecutorPreference(firstExecutor) {
+    await withTaskExecutorPreference(secondExecutor) {
       async let first: Int = {
         dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
         dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
@@ -168,8 +168,8 @@ func testAsyncLet(_ firstExecutor: MyTaskExecutor,
     }
   }
 
-  await _withTaskExecutor(firstExecutor) {
-    await _withTaskExecutor(secondExecutor) {
+  await withTaskExecutorPreference(firstExecutor) {
+    await withTaskExecutorPreference(secondExecutor) {
       async let first: Int = {
         async let firstInside: Int = {
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
@@ -186,14 +186,14 @@ func testAsyncLet(_ firstExecutor: MyTaskExecutor,
 func testGroupAsyncLet(_ firstExecutor: MyTaskExecutor,
                        _ secondExecutor: MyTaskExecutor) async {
   await withTaskGroup(of: Void.self) { group in
-    group._addTask(on: firstExecutor) {
+    group.addTask(executorPreference: firstExecutor) {
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
 
       async let first: () = expect(firstExecutor)
       _ = await first
 
-      await _withTaskExecutor(secondExecutor) {
+      await withTaskExecutorPreference(secondExecutor) {
         async let second: () = expect(secondExecutor)
         _ = await second
       }

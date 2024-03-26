@@ -299,6 +299,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_Rpass_missed_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_remarks);
+  inputArgs.AddLastArg(arguments, options::OPT_experimental_package_bypass_resilience);
+  inputArgs.AddLastArg(arguments, options::OPT_ExperimentalPackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
@@ -334,8 +336,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
@@ -553,7 +553,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_CrossModuleOptimization)) {
     Arguments.push_back("-cross-module-optimization");
   }
-                                 
+
   if (context.Args.hasArg(options::OPT_ExperimentalPerformanceAnnotations)) {
     Arguments.push_back("-experimental-performance-annotations");
   }
@@ -1201,8 +1201,6 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
-
-  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));

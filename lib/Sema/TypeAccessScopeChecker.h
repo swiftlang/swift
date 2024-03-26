@@ -30,7 +30,7 @@ class TypeAccessScopeChecker {
   const SourceFile *File;
   bool TreatUsableFromInlineAsPublic;
 
-  llvm::Optional<AccessScope> Scope = AccessScope::getPublic();
+  std::optional<AccessScope> Scope = AccessScope::getPublic();
 
   TypeAccessScopeChecker(const DeclContext *useDC,
                          bool treatUsableFromInlineAsPublic)
@@ -47,18 +47,17 @@ class TypeAccessScopeChecker {
   }
 
 public:
-
-  static llvm::Optional<AccessScope>
+  static std::optional<AccessScope>
   getAccessScope(TypeRepr *TR, const DeclContext *useDC,
                  bool treatUsableFromInlineAsPublic = false) {
     TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
-    TR->walk(TypeReprIdentFinder([&](const IdentTypeRepr *typeRepr) {
+    TR->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *typeRepr) {
       return checker.visitDecl(typeRepr->getBoundDecl());
     }));
     return checker.Scope;
   }
 
-  static llvm::Optional<AccessScope>
+  static std::optional<AccessScope>
   getAccessScope(Type T, const DeclContext *useDC,
                  bool treatUsableFromInlineAsPublic = false) {
     TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);

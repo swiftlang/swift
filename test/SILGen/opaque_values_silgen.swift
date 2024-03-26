@@ -365,8 +365,16 @@ public struct EnumSeq<Base : Seq> : Seq {
 }
 
 extension Collection {
+  func myMap<T>(_ body: (Element) -> T) -> [T] {
+    var result = [T]()
+    for element in self {
+      result.append(body(element))
+    }
+    return result
+  }
+
   func transformEachElement<U>(_ cl: (Element) -> U) -> [U] {
-    return map(cl)
+    return myMap(cl)
   }
 }
 
@@ -827,7 +835,7 @@ func consumeExprOfLoadExprOfOwnedAddrOnlyLValue<T>(_ ty: T.Type) {
 struct Twople<T> {
   var storage: (T, T)
 
-// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen6TwopleV2t12t2ACyxGx_xtcfC : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] @Twople_init_from_t1_t2 : {{.*}} {
 // CHECK:       bb0([[T1:%[^,]+]] : 
 // CHECK-SAME:      [[T2:%[^,]+]] : 
 // CHECK-SAME:  ):
@@ -860,9 +868,20 @@ struct Twople<T> {
 // CHECK:         end_borrow [[VAR_LIFETIME]]
 // CHECK:         destroy_value [[VAR_UNINIT]]
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen6TwopleV2t12t2ACyxGx_xtcfC'
+// CHECK-LABEL: } // end sil function 'Twople_init_from_t1_t2'
   @_silgen_name("Twople_init_from_t1_t2")
   init(t1: T, t2: T) {
     self.storage = (t1, t2)
   }
 }
+
+// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValue : {{.*}} {
+// CHECK:       bb0([[E:%[^,]+]] :
+// CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped
+// CHECK:         apply [[SWIFT_WILL_THROW_TYPED]]<Err>([[E]])
+// CHECK:         throw [[E]]
+// CHECK-LABEL: } // end sil function 'throwTypedValue'
+@_silgen_name("throwTypedValue")
+func throwTypedValue(_ e: Err) throws(Err) { throw e }
+
+struct Err : Error {}

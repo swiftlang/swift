@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -disable-availability-checking -swift-version 6 %s -verify
 
-// REQUIRES: asserts
-
 // Even though enable-experimental-async-top-level is enabled, there are no
 // 'await's made from the top-level, thus the top-level is not an asynchronous
 // context. `a` is just a normal top-level global variable with no actor

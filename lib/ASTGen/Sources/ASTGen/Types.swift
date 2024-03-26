@@ -82,7 +82,7 @@ extension ASTGenVisitor {
     case .implicitlyUnwrappedOptionalType(let node):
       return self.generate(implicitlyUnwrappedOptionalType: node).asTypeRepr
     case .memberType(let node):
-      return self.generate(memberType: node)
+      return self.generate(memberType: node).asTypeRepr
     case .metatypeType(let node):
       return self.generate(metatypeType: node)
     case .missingType:
@@ -101,6 +101,10 @@ extension ASTGenVisitor {
       return self.generate(suppressedType: node).asTypeRepr
     case .tupleType(let node):
       return self.generate(tupleType: node).asTypeRepr
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     preconditionFailure("isTypeMigrated() mismatch")
   }
@@ -116,14 +120,14 @@ extension ASTGenVisitor {
     let id = self.generateIdentifier(node.name)
 
     guard let generics = node.genericArgumentClause else {
-      return BridgedSimpleIdentTypeRepr.createParsed(ctx, loc: loc, name: id).asTypeRepr
+      return BridgedUnqualifiedIdentTypeRepr.createParsed(ctx, loc: loc, name: id).asTypeRepr
     }
 
     let genericArguments = generics.arguments.lazy.map {
       self.generate(type: $0.argument)
     }
 
-    return BridgedGenericIdentTypeRepr.createParsed(
+    return BridgedUnqualifiedIdentTypeRepr.createParsed(
       self.ctx,
       name: id,
       nameLoc: loc,
@@ -133,45 +137,29 @@ extension ASTGenVisitor {
     ).asTypeRepr
   }
 
-  func generate(memberType node: MemberTypeSyntax) -> BridgedTypeRepr {
-    // Gather the member components, in decreasing depth order.
-    var reverseMemberComponents = [BridgedTypeRepr]()
+  func generate(memberType node: MemberTypeSyntax) -> BridgedDeclRefTypeRepr {
+    let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
-    var baseType = TypeSyntax(node)
-    while let memberType = baseType.as(MemberTypeSyntax.self) {
-      let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    let genericArguments: BridgedArrayRef
+    let angleRange: BridgedSourceRange
+    if let generics = node.genericArgumentClause {
+      genericArguments = generics.arguments.lazy.map {
+        self.generate(type: $0.argument)
+      }.bridgedArray(in: self)
 
-      if let generics = memberType.genericArgumentClause {
-        let genericArguments = generics.arguments.lazy.map {
-          self.generate(type: $0.argument)
-        }
-
-        reverseMemberComponents.append(
-          BridgedGenericIdentTypeRepr.createParsed(
-            self.ctx,
-            name: name,
-            nameLoc: nameLoc,
-            genericArgs: genericArguments.bridgedArray(in: self),
-            leftAngleLoc: self.generateSourceLoc(generics.leftAngle),
-            rightAngleLoc: self.generateSourceLoc(generics.rightAngle)
-          ).asTypeRepr
-        )
-      } else {
-        reverseMemberComponents.append(
-          BridgedSimpleIdentTypeRepr.createParsed(self.ctx, loc: nameLoc, name: name).asTypeRepr
-        )
-      }
-
-      baseType = memberType.baseType
+      angleRange = self.generateSourceRange(start: generics.leftAngle, end: generics.rightAngle)
+    } else {
+      genericArguments = .init()
+      angleRange = .init()
     }
 
-    let baseComponent = generate(type: baseType)
-    let memberComponents = reverseMemberComponents.reversed().bridgedArray(in: self)
-
-    return BridgedMemberTypeRepr.createParsed(
+    return BridgedDeclRefTypeRepr.createParsed(
       self.ctx,
-      base: baseComponent,
-      members: memberComponents
+      base: self.generate(type: node.baseType),
+      name: name,
+      nameLoc: nameLoc,
+      genericArguments: genericArguments,
+      angleRange: angleRange
     )
   }
 
@@ -298,7 +286,7 @@ extension ASTGenVisitor {
         rightParenLoc: self.generateSourceLoc(node.rightParen)
       ).asTypeRepr,
       asyncLoc: self.generateSourceLoc(node.effectSpecifiers?.asyncSpecifier),
-      throwsLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsSpecifier),
+      throwsLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.effectSpecifiers?.thrownError),
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
       resultType: generate(type: node.returnClause.type)
@@ -337,7 +325,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(classRestrictionType node: ClassRestrictionTypeSyntax) -> BridgedSimpleIdentTypeRepr {
+  func generate(classRestrictionType node: ClassRestrictionTypeSyntax) -> BridgedUnqualifiedIdentTypeRepr {
     // TODO: diagnostics.
     // warning: using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead
     return .createParsed(
@@ -388,58 +376,13 @@ extension ASTGenVisitor {
     }
 
     // Handle type attributes.
-    if !node.attributes.isEmpty {
-      let typeAttributes = BridgedTypeAttributes()
-      for attributeElt in node.attributes {
-        // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
-        // but we don't have that ability right now.
-        guard case let .attribute(attribute) = attributeElt else {
-          continue
-        }
-
-        // Only handle simple attribute names right now.
-        guard let identType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
-          continue
-        }
-
-        let nameSyntax = identType.name
-        let typeAttrKind = BridgedTypeAttrKind(from: nameSyntax.rawText.bridged)
-        let atLoc = self.generateSourceLoc(attribute.atSign)
-        let attrLoc = self.generateSourceLoc(nameSyntax)
-        switch typeAttrKind {
-        // SIL attributes
-        // FIXME: Diagnose if not in SIL mode? Or should that move to the
-        // type checker?
-        case .out, .in, .owned, .unowned_inner_pointer, .guaranteed,
-          .autoreleased, .callee_owned, .callee_guaranteed, .objc_metatype,
-          .sil_weak, .sil_unowned, .inout, .block_storage, .box,
-          .dynamic_self, .sil_unmanaged, .error, .error_indirect,
-          .error_unowned, .direct, .inout_aliasable,
-          .in_guaranteed, .in_constant, .captures_generics, .moveOnly:
-          fallthrough
-
-        case .autoclosure, .escaping, .noescape, .noDerivative, .async,
-          .sendable, .retroactive, .unchecked, ._local, ._noMetadata,
-          .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
-          .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
-          .count, .unimplementable:
-          typeAttributes.addSimpleAttr(kind: typeAttrKind, atLoc: atLoc, attrLoc: attrLoc)
-
-        case .opened, .pack_element, .differentiable, .convention,
-          ._opaqueReturnTypeOf:
-          // FIXME: These require more complicated checks
-          break
-        }
-      }
-
-      if (!typeAttributes.isEmpty) {
-        type =
-          BridgedAttributedTypeRepr.createParsed(
-            self.ctx,
-            base: type,
-            consumingAttributes: typeAttributes
-          ).asTypeRepr
-      }
+    if let typeAttributes = self.generateTypeAttributes(node) {
+      type =
+        BridgedAttributedTypeRepr.createParsed(
+          self.ctx,
+          base: type,
+          consumingAttributes: typeAttributes
+        ).asTypeRepr
     }
 
     return type

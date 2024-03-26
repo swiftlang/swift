@@ -47,6 +47,7 @@ enum _dyld_section_location_kind {
   _dyld_section_location_text_swift5_replace,
   _dyld_section_location_text_swift5_replace2,
   _dyld_section_location_text_swift5_ac_funcs,
+  _dyld_section_location_text_swift5_ac_p_funcs,
 };
 
 #endif
@@ -59,6 +60,7 @@ enum _dyld_section_location_kind {
 #define _dyld_section_location_text_swift5_replace 3
 #define _dyld_section_location_text_swift5_replace2 4
 #define _dyld_section_location_text_swift5_ac_funcs 5
+#define _dyld_section_location_text_swift5_ac_p_funcs 6
 
 #if OBJC_ADDLOADIMAGEFUNC2_DEFINED
 // Redefine _dyld_lookup_section_info as weak so we can build against it but

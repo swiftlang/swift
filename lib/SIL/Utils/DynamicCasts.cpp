@@ -103,7 +103,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
-  // If the target is a parameterized protocol type, conformsToProtocol
+  // If the target is a parameterized protocol type, checkConformance
   // is insufficient to prove the feasibility of the cast as it does not
   // check the additional requirements.
   // FIXME: This is a weak predicate that doesn't take into account
@@ -111,9 +111,9 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (isa<ParameterizedProtocolType>(unwrapExistential(target)))
     return DynamicCastFeasibility::MaySucceed;
 
-  // If conformsToProtocol returns a valid conformance, then all requirements
-  // were proven by the type checker.
-  if (M->conformsToProtocol(source, TargetProtocol))
+  // If checkConformance() returns a valid conformance, then all conditional
+  // requirements were satisfied.
+  if (M->checkConformance(source, TargetProtocol))
     return DynamicCastFeasibility::WillSucceed;
 
   auto *SourceNominalTy = source.getAnyNominal();
@@ -141,14 +141,14 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   }
 
   // The WillFail conditions below assume any possible conformance on the
-  // nominal source type has been ruled out. The prior conformsToProtocol query
+  // nominal source type has been ruled out. The prior checkConformance query
   // identified any definite conformance. Now check if there is already a known
   // conditional conformance on the nominal type with requirements that were
   // not proven.
   //
   // TODO: The TypeChecker can easily prove that some requirements cannot be
   // met. Returning WillFail in those cases would be more optimal. To do that,
-  // the conformsToProtocol interface needs to be reformulated as a query, and
+  // the checkConformance interface needs to be reformulated as a query, and
   // the implementation, including checkGenericArguments, needs to be taught to
   // recognize that types with archetypes may potentially succeed.
   if (auto conformance = M->lookupConformance(source, TargetProtocol)) {
@@ -223,6 +223,22 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
     M->getASTContext().getProtocol(KnownProtocolKind::Hashable);
   if (!hashable) return CanType();
   return hashable->getDeclaredInterfaceType()->getCanonicalType();
+}
+
+// Distinguish between class-bound types that might be AnyObject vs other
+// class-bound types. Only types that are potentially AnyObject might have a
+// transparent runtime type wrapper like __SwiftValue. This must look through
+// all optional types because dynamic casting sees through them.
+static bool isPotentiallyAnyObject(Type type) {
+  Type unwrappedTy = type->lookThroughAllOptionalTypes();
+  if (auto archetype = unwrappedTy->getAs<ArchetypeType>()) {
+    for (auto *proto : archetype->getConformsTo()) {
+      if (!proto->getInvertibleProtocolKind())
+        return false;
+    }
+    return !archetype->getSuperclass();
+  }
+  return unwrappedTy->isAnyObject();
 }
 
 // Returns true if casting \p sourceFormalType to \p targetFormalType preserves
@@ -321,11 +337,11 @@ bool swift::doesCastPreserveOwnershipForTypes(SILModule &module,
     return false;
 
   // (B2) unwrapping
-  if (sourceType->isPotentiallyAnyObject())
+  if (isPotentiallyAnyObject(sourceType))
     return false;
 
   // (B1) wrapping
-  if (targetType->isPotentiallyAnyObject()) {
+  if (isPotentiallyAnyObject(targetType)) {
     // A class type cannot be wrapped in __SwiftValue, so casting
     // from a class to AnyObject preserves ownership.
     return

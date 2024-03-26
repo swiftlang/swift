@@ -32,13 +32,13 @@ using namespace swift;
 namespace {
 
 /// Get PlatformConditionKind from platform condition name.
-static llvm::Optional<PlatformConditionKind>
+static std::optional<PlatformConditionKind>
 getPlatformConditionKind(StringRef Name) {
-  return llvm::StringSwitch<llvm::Optional<PlatformConditionKind>>(Name)
+  return llvm::StringSwitch<std::optional<PlatformConditionKind>>(Name)
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
     .Case(IDENTIFIER, PlatformConditionKind::LABEL)
 #include "swift/AST/PlatformConditionKinds.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 /// Get platform condition name from PlatformConditionKind.
@@ -58,9 +58,8 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   return SM.extractText(Range);
 }
 
-static bool
-isValidPrefixUnaryOperator(llvm::Optional<StringRef> UnaryOperator) {
-  return UnaryOperator != llvm::None &&
+static bool isValidPrefixUnaryOperator(std::optional<StringRef> UnaryOperator) {
+  return UnaryOperator != std::nullopt &&
          (UnaryOperator.value() == ">=" || UnaryOperator.value() == "<");
 }
 
@@ -165,13 +164,13 @@ class ValidateIfConfigCondition :
   bool HasError;
 
   /// Get the identifier string of the UnresolvedDeclRefExpr.
-  llvm::Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
+  std::optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
     auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
     if (!UDRE ||
         !UDRE->hasName() ||
         UDRE->getRefKind() != Kind ||
         UDRE->getName().isCompoundName())
-      return llvm::None;
+      return std::nullopt;
 
     return UDRE->getName().getBaseIdentifier().str();
   }
@@ -198,7 +197,7 @@ class ValidateIfConfigCondition :
   Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
     assert(!S.empty() && ((S.size() & 1) == 0));
 
-    auto getNextOperator = [&]() -> llvm::Optional<StringRef> {
+    auto getNextOperator = [&]() -> std::optional<StringRef> {
       assert((S.size() & 1) == 0);
       while (!S.empty()) {
         auto Name = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
@@ -213,7 +212,7 @@ class ValidateIfConfigCondition :
         // Consume invalid operator and the immediate RHS.
         S = S.slice(2);
       }
-      return llvm::None;
+      return std::nullopt;
     };
 
     // Extract out the first operator name.
@@ -300,10 +299,13 @@ public:
       if (E->getArgs()->empty()) {
         D.diagnose(E->getLoc(), diag::platform_condition_expected_argument);
       } else {
-        D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+        SourceLoc DiagLoc = E->getArgs()->front().getStartLoc();
+        assert(DiagLoc.isValid() && "parsed Argument should have a location");
+        D.diagnose(DiagLoc, diag::platform_condition_expected_one_argument);
       }
       return nullptr;
     }
+    SourceLoc ArgLoc = Arg->getStartLoc();
     // '_compiler_version' '(' string-literal ')'
     if (*KindName == "_compiler_version") {
       if (auto SLE = dyn_cast<StringLiteralExpr>(Arg)) {
@@ -327,12 +329,12 @@ public:
     if (*KindName == "swift" || *KindName == "compiler" ||
         *KindName == "_compiler_version") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
-      llvm::Optional<StringRef> PrefixName =
+      std::optional<StringRef> PrefixName =
           PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator)
-              : llvm::None;
+              : std::nullopt;
       if (!isValidPrefixUnaryOperator(PrefixName)) {
         D.diagnose(
-            Arg->getLoc(), diag::unsupported_platform_condition_argument,
+            ArgLoc, diag::unsupported_platform_condition_argument,
             "a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'");
         return nullptr;
       }
@@ -353,7 +355,7 @@ public:
       }
 
       if (!isModulePath(Arg)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "module name");
         return nullptr;
       }
@@ -362,7 +364,7 @@ public:
 
     if (*KindName == "hasFeature") {
       if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "feature name");
         return nullptr;
       }
@@ -372,7 +374,7 @@ public:
 
     if (*KindName == "hasAttribute") {
       if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "attribute name");
         return nullptr;
       }
@@ -389,7 +391,7 @@ public:
 
     auto ArgStr = getDeclRefStr(Arg, DeclRefKind::Ordinary);
     if (!ArgStr.has_value()) {
-      D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+      D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                  "identifier");
       return nullptr;
     }
@@ -400,7 +402,7 @@ public:
                                                       suggestedKind, suggestedValues)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
-        D.diagnose(Arg->getLoc(),
+        D.diagnose(ArgLoc,
                    diag::unsupported_platform_runtime_condition_argument);
         return nullptr;
       }
@@ -427,27 +429,25 @@ public:
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
-      auto Loc = Arg->getLoc();
-      D.diagnose(Loc, diag::unknown_platform_condition_argument,
-                 DiagName, *KindName);
+      D.diagnose(ArgLoc, diag::unknown_platform_condition_argument, DiagName,
+                 *KindName);
       if (suggestedKind != *Kind) {
         auto suggestedKindName = getPlatformConditionName(suggestedKind);
-        D.diagnose(Loc, diag::note_typo_candidate, suggestedKindName)
-          .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
+        D.diagnose(ArgLoc, diag::note_typo_candidate, suggestedKindName)
+            .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
       }
       for (auto suggestion : suggestedValues)
-        D.diagnose(Loc, diag::note_typo_candidate, suggestion)
-          .fixItReplace(Arg->getSourceRange(), suggestion);
+        D.diagnose(ArgLoc, diag::note_typo_candidate, suggestion)
+            .fixItReplace(Arg->getSourceRange(), suggestion);
     }
     else if (!suggestedValues.empty()) {
       // The value the user gave has been replaced by something newer.
       assert(suggestedValues.size() == 1 && "only support one replacement");
       auto replacement = suggestedValues.front();
 
-      auto Loc = Arg->getLoc();
-      D.diagnose(Loc, diag::renamed_platform_condition_argument,
-                 *ArgStr, replacement)
-        .fixItReplace(Arg->getSourceRange(), replacement);
+      D.diagnose(ArgLoc, diag::renamed_platform_condition_argument, *ArgStr,
+                 replacement)
+          .fixItReplace(Arg->getSourceRange(), replacement);
     }
 
     return E;
@@ -559,7 +559,7 @@ public:
     if (Name.empty())
       return false;
 
-    if (Name.startswith("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
+    if (Name.starts_with("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;
 
     return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
@@ -773,7 +773,6 @@ Result Parser::parseIfConfigRaw(
                             bool isActive, IfConfigElementsRole role)>
       parseElements,
     llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
-  auto startLoc = Tok.getLoc();
   assert(Tok.is(tok::pound_if));
 
   Parser::StructureMarkerRAII ParsingDecl(
@@ -785,8 +784,8 @@ Result Parser::parseIfConfigRaw(
       SourceMgr.getIDEInspectionTargetBufferID() == L->getBufferID() &&
       SourceMgr.isBeforeInBuffer(Tok.getLoc(),
                                  SourceMgr.getIDEInspectionTargetLoc())) {
-    llvm::SaveAndRestore<llvm::Optional<StableHasher>> H(CurrentTokenHash,
-                                                         llvm::None);
+    llvm::SaveAndRestore<std::optional<StableHasher>> H(CurrentTokenHash,
+                                                        std::nullopt);
     BacktrackingScope backtrack(*this);
     do {
       auto startLoc = Tok.getLoc();
@@ -875,9 +874,9 @@ Result Parser::parseIfConfigRaw(
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
     // Disable updating the interface hash inside inactive blocks.
-    llvm::Optional<llvm::SaveAndRestore<llvm::Optional<StableHasher>>> T;
+    std::optional<llvm::SaveAndRestore<std::optional<StableHasher>>> T;
     if (!isActive)
-      T.emplace(CurrentTokenHash, llvm::None);
+      T.emplace(CurrentTokenHash, std::nullopt);
 
     if (isActive || !isVersionCondition) {
       parseElements(
@@ -890,10 +889,12 @@ Result Parser::parseIfConfigRaw(
           ClauseLoc, Condition, isActive, IfConfigElementsRole::Skipped);
     }
 
-    // Record the active body range for the SourceManager.
-    if (shouldEvaluate && isActive) {
-      assert(!activeBodyRange.isValid() && "Multiple active regions?");
-      activeBodyRange = CharSourceRange(SourceMgr, bodyStart, Tok.getLoc());
+    // Record the clause range info in SourceFile.
+    if (shouldEvaluate) {
+      auto kind = isActive ? IfConfigClauseRangeInfo::ActiveClause
+                           : IfConfigClauseRangeInfo::InactiveClause;
+      SF.recordIfConfigClauseRangeInfo(
+          {ClauseLoc, bodyStart, Tok.getLoc(), kind});
     }
 
     if (Tok.isNot(tok::pound_elseif, tok::pound_else))
@@ -906,11 +907,11 @@ Result Parser::parseIfConfigRaw(
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);
 
-  // Record the #if ranges on the SourceManager.
+  // Record the '#end' ranges in SourceFile.
   if (!HadMissingEnd && shouldEvaluate) {
-    auto wholeRange = Lexer::getCharSourceRangeFromSourceRange(
-        SourceMgr, SourceRange(startLoc, EndLoc));
-    SF.recordIfConfigRangeInfo({wholeRange, activeBodyRange});
+    SourceLoc EndOfEndLoc = getEndOfPreviousLoc();
+    SF.recordIfConfigClauseRangeInfo({EndLoc, EndOfEndLoc, EndOfEndLoc,
+                                      IfConfigClauseRangeInfo::EndDirective});
   }
   return finish(EndLoc, HadMissingEnd);
 }

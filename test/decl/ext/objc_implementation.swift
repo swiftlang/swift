@@ -12,6 +12,7 @@ protocol EmptySwiftProto {}
   // FIXME: give better diagnostic expected-warning@-6 {{extension for main class interface should provide implementation for instance method 'method(fromHeader3:)'}}
   // expected-warning@-7 {{'@_objcImplementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
   // expected-warning@-8 {{'@_objcImplementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
+  // expected-warning@-9 {{extension for main class interface should provide implementation for instance method 'extensionMethod(fromHeader2:)'}}
 
   func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
@@ -215,6 +216,19 @@ protocol EmptySwiftProto {}
   @nonobjc public convenience init(notFromHeader6: CInt) {
     // OK
   }
+
+  @objc func extensionMethod(fromHeader1: CInt) {
+    // OK
+  }
+
+  @objc(copyWithZone:) func copy(with zone: NSZone?) -> Any {
+    // OK
+    return self
+  }
+
+  // rdar://122280735 - crash when the parameter of a block property needs @escaping
+  let rdar122280735: (() -> ()) -> Void = { _ in }
+  // expected-warning@-1 {{property 'rdar122280735' of type '(() -> ()) -> Void' does not match type '(@escaping () -> Void) -> Void' declared by the header}}
 }
 
 @_objcImplementation(PresentAdditions) extension ObjCClass {

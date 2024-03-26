@@ -391,8 +391,9 @@ rewriteKnownCalleeConventionOnly(SILFunction *callee,
     case ApplySiteKind::PartialApplyInst: {
       auto pa = cast<PartialApplyInst>(site.getInstruction());
       newInst = B.createPartialApply(loc, fr, site.getSubstitutionMap(), args,
-                                 pa->getFunctionType()->getCalleeConvention(),
-                                 pa->isOnStack());
+                                     pa->getCalleeConvention(),
+                                     pa->getResultIsolation(),
+                                     pa->isOnStack());
       break;
     }
     case ApplySiteKind::ApplyInst:
@@ -752,11 +753,10 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       // Continue emitting code to populate the context.
       B.setInsertionPoint(contextAlloc->getNextInstruction());
     } else {
-      contextBuffer =
-          B.createAllocBox(loc, contextStorageTy.castTo<SILBoxType>(),
-                           /*debug variable*/ llvm::None,
-                           /*dynamic lifetime*/ false,
-                           /*reflection*/ true);
+      contextBuffer = B.createAllocBox(
+          loc, contextStorageTy.castTo<SILBoxType>(),
+          /*debug variable*/ std::nullopt, DoesNotHaveDynamicLifetime,
+          /*reflection*/ true);
       contextProj = B.createProjectBox(loc, contextBuffer, 0);
     }
     
@@ -822,6 +822,8 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     SILInstruction *newInst;
     switch (site.getKind()) {
     case ApplySiteKind::PartialApplyInst: {
+      auto oldPA = cast<PartialApplyInst>(site.getInstruction());
+      auto paIsolation = oldPA->getResultIsolation();
       auto paConvention = isNoEscape ? ParameterConvention::Direct_Guaranteed
                                      : contextParam.getConvention();
       auto paOnStack = isNoEscape ? PartialApplyInst::OnStack
@@ -830,6 +832,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
                                      site.getSubstitutionMap(),
                                      newArgs,
                                      paConvention,
+                                     paIsolation,
                                      paOnStack);
       assert(isSimplePartialApply(newPA)
              && "partial apply wasn't simple after transformation?");

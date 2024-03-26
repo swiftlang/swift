@@ -19,6 +19,9 @@ extension SourceManager {
     /// The source manager.
     private let sourceManager: SourceManager
 
+    /// The lexical context for this expansion.
+    let lexicalContext: [Syntax]
+
     /// The set of diagnostics that were emitted as part of expanding the
     /// macro.
     var diagnostics: [Diagnostic] = []
@@ -35,18 +38,25 @@ extension SourceManager {
     /// Used in conjunction with `expansionDiscriminator`.
     private var uniqueNames: [String: Int] = [:]
 
-    init(sourceManager: SourceManager, discriminator: String) {
+    init(
+      sourceManager: SourceManager,
+      lexicalContext: [Syntax],
+      discriminator: String
+    ) {
       self.sourceManager = sourceManager
+      self.lexicalContext = lexicalContext
       self.discriminator = discriminator
     }
   }
 
   /// Create a new macro expansion context
   func createMacroExpansionContext(
+    lexicalContext: [Syntax],
     discriminator: String = ""
   ) -> MacroExpansionContext {
     return MacroExpansionContext(
       sourceManager: self,
+      lexicalContext: lexicalContext,
       discriminator: discriminator
     )
   }
@@ -117,7 +127,6 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
       return nil
     }
 
-
     // Find the node's offset relative to its root.
     let rawPosition: AbsolutePosition
     switch position {
@@ -132,6 +141,11 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
 
     case .afterTrailingTrivia:
       rawPosition = node.endPosition
+
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
 
     let offsetWithinSyntaxNode =
@@ -165,6 +179,11 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
 
     case .filePath:
       break
+
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
 
     // Do the location lookup.

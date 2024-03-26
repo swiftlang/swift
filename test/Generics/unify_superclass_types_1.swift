@@ -18,6 +18,8 @@ extension P where Self : Derived {
 // CHECK-NEXT: - [P].[P] => [P] [permanent]
 // CHECK-NEXT: - [P].[superclass: Base] => [P]
 // CHECK-NEXT: - [P].[layout: _NativeClass] => [P]
+// CHECK-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
+// CHECK-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
 // CHECK-NEXT: - τ_0_0.[P] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[superclass: Derived] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[superclass: Base] => τ_0_0
@@ -25,5 +27,7 @@ extension P where Self : Derived {
 // CHECK-NEXT: }
 // CHECK: Property map: {
 // CHECK-NEXT:   [P] => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Base] }
+// CHECK-NEXT:   [Copyable] => { conforms_to: [Copyable] }
+// CHECK-NEXT:   [Escapable] => { conforms_to: [Escapable] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Derived] }
 // CHECK-NEXT: }

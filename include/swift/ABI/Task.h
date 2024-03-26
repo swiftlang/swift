@@ -170,8 +170,8 @@ static_assert(alignof(Job) == 2 * alignof(void*),
 class NullaryContinuationJob : public Job {
 
 private:
-  AsyncTask* Task;
-  AsyncTask* Continuation;
+  SWIFT_ATTRIBUTE_UNUSED AsyncTask *Task;
+  AsyncTask *Continuation;
 
 public:
   NullaryContinuationJob(AsyncTask *task, JobPriority priority, AsyncTask *continuation)
@@ -186,7 +186,7 @@ public:
   }
 };
 
-/// Descibes type information and offers value methods for an arbitrary concrete
+/// Describes type information and offers value methods for an arbitrary concrete
 /// type in a way that's compatible with regular Swift and embedded Swift. In
 /// regular Swift, just holds a Metadata pointer and dispatches to the value
 /// witness table. In embedded Swift, because we do not have any value witness
@@ -424,7 +424,7 @@ public:
 
   /// WARNING: Only to be used during task completion (destroy).
   ///
-  /// This is because between task creation and its destory, we cannot carry the
+  /// This is because between task creation and its destroy, we cannot carry the
   /// exact record to `pop(record)`, and instead assume that there will be
   /// exactly one record remaining -- the "initial" record (added during
   /// creating the task), and it must be that record that is removed by this

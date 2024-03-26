@@ -17,21 +17,19 @@
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
 #include "swift/AST/Type.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LangOptions.h"
-#include "llvm/ADT/None.h"
 
 namespace swift {
 
 class ASTContext;
+class QualifiedIdentTypeRepr;
 class TypeRepr;
-class IdentTypeRepr;
 class PackElementTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
 class SILTypeResolutionContext;
-class GenericIdentTypeRepr;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -86,6 +84,9 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether to suppress warnings about conversions from and bindings of type
   /// Never
   SilenceNeverWarnings = 1 << 13,
+
+  /// Whether the immediate context has an @escaping attribute.
+  DirectEscaping = 1 << 14,
 };
 
 /// Type resolution contexts that require special handling.
@@ -235,7 +236,8 @@ public:
   TypeResolutionOptions(Context context) : base(context), context(context),
       flags(unsigned(TypeResolutionFlags::Direct)) {}
   // Helper forwarding constructors:
-  TypeResolutionOptions(llvm::NoneType) : TypeResolutionOptions(Context::None){}
+  TypeResolutionOptions(std::nullopt_t)
+      : TypeResolutionOptions(Context::None) {}
 
   /// Test the current type resolution base context.
   bool hasBase(Context context) const { return base == context; }
@@ -251,9 +253,10 @@ public:
   /// Set the current type resolution context.
   void setContext(Context newContext) {
     context = newContext;
-    flags &= ~unsigned(TypeResolutionFlags::Direct);
+    flags &= ~(unsigned(TypeResolutionFlags::Direct) |
+               unsigned(TypeResolutionFlags::DirectEscaping));
   }
-  void setContext(llvm::NoneType) { setContext(Context::None); }
+  void setContext(std::nullopt_t) { setContext(Context::None); }
 
   /// Get the current flags.
   TypeResolutionFlags getFlags() const { return TypeResolutionFlags(flags); }
@@ -473,7 +476,7 @@ public:
   /// Strip the contextual options from the given type resolution options.
   inline TypeResolutionOptions withoutContext(bool preserveSIL = false) const {
     auto copy = *this;
-    copy.setContext(llvm::None);
+    copy.setContext(std::nullopt);
     // FIXME: Move SILType to TypeResolverContext.
     if (!preserveSIL) copy -= TypeResolutionFlags::SILType;
     return copy;
@@ -621,7 +624,7 @@ public:
   /// name.
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
-                                  IdentTypeRepr *repr) const;
+                                  QualifiedIdentTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
@@ -663,22 +666,18 @@ public:
                                     ArrayRef<Type> genericArgs) const;
 };
 
-void diagnoseInvalidGenericArguments(SourceLoc loc,
-                                     ValueDecl *decl,
-                                     unsigned argCount,
-                                     unsigned paramCount,
+void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
+                                     unsigned argCount, unsigned paramCount,
                                      bool hasParameterPack,
-                                     GenericIdentTypeRepr *generic);
+                                     SourceRange angleBrackets);
 
 /// \param repr the repr for the type of the parameter.
 /// \param ty the non-error resolved type of the repr.
 /// \param ownership the ownership kind of the parameter
-/// \param dc the decl context used for resolving the type
 /// \returns true iff a diagnostic was emitted and the \c repr was invalidated.
-bool diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
-                              ParamSpecifier ownership,
+bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
-                              TypeResolutionOptions options);
+                              const TypeResolution &resolution);
 
 } // end namespace swift
 

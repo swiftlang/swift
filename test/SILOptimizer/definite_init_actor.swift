@@ -13,7 +13,7 @@ func arbitraryAsync() async {}
 
 actor BoringActor {
 
-    // CHECK-LABEL: sil hidden @$s4test11BoringActorCACyYacfc : $@convention(method) @async (@owned BoringActor) -> @owned BoringActor {
+    // CHECK-LABEL: sil hidden @$s4test11BoringActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned BoringActor) -> @owned BoringActor {
     // CHECK:   bb0([[SELF:%[0-9]+]] : $BoringActor):
     // CHECK:       initializeDefaultActor
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
@@ -21,7 +21,7 @@ actor BoringActor {
     // CHECK: } // end sil function '$s4test11BoringActorCACyYacfc'
     init() async {}
 
-    // CHECK-LABEL: sil hidden @$s4test11BoringActorC4sizeACSi_tYacfc : $@convention(method) @async (Int, @owned BoringActor) -> @owned BoringActor {
+    // CHECK-LABEL: sil hidden @$s4test11BoringActorC4sizeACSi_tYacfc : $@convention(method) @async (Int, @sil_isolated @owned BoringActor) -> @owned BoringActor {
     // CHECK:   bb0({{%[0-9]+}} : $Int, [[SELF:%[0-9]+]] : $BoringActor):
     // CHECK:       initializeDefaultActor
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
@@ -47,7 +47,7 @@ actor BoringActor {
       await arbitraryAsync()
     }
 
-    // CHECK-LABEL: sil hidden @$s4test11BoringActorC6crashyACSgyt_tYacfc : $@convention(method) @async (@owned BoringActor) -> @owned Optional<BoringActor> {
+    // CHECK-LABEL: sil hidden @$s4test11BoringActorC6crashyACSgyt_tYacfc : $@convention(method) @async (@sil_isolated @owned BoringActor) -> @owned Optional<BoringActor> {
     // CHECK:   bb0([[SELF:%[0-9]+]] : $BoringActor):
     // CHECK:       initializeDefaultActor
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
@@ -55,7 +55,7 @@ actor BoringActor {
     // CHECK: } // end sil function '$s4test11BoringActorC6crashyACSgyt_tYacfc'
     init!(crashy: Void) async { return nil }
 
-    // CHECK-LABEL: sil hidden @$s4test11BoringActorC5nillyACSgSi_tYacfc : $@convention(method) @async (Int, @owned BoringActor) -> @owned Optional<BoringActor> {
+    // CHECK-LABEL: sil hidden @$s4test11BoringActorC5nillyACSgSi_tYacfc : $@convention(method) @async (Int, @sil_isolated @owned BoringActor) -> @owned Optional<BoringActor> {
     // CHECK:   bb0({{%[0-9]+}} : $Int, [[SELF:%[0-9]+]] : $BoringActor):
     // CHECK:       initializeDefaultActor
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
@@ -73,7 +73,7 @@ actor BoringActor {
      myVar = 0
    }
 
-    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorCACyYacfc : $@convention(method) @async (@owned SingleVarActor) -> @owned SingleVarActor {
+    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned SingleVarActor) -> @owned SingleVarActor {
     // CHECK:    bb0([[SELF:%[0-9]+]] : $SingleVarActor):
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       store {{%[0-9]+}} to [[ACCESS:%[0-9]+]]
@@ -86,7 +86,7 @@ actor BoringActor {
         myVar = 1
     }
 
-    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC10iterationsACSi_tYacfc : $@convention(method) @async (Int, @owned SingleVarActor) -> @owned SingleVarActor {
+    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC10iterationsACSi_tYacfc : $@convention(method) @async (Int, @sil_isolated @owned SingleVarActor) -> @owned SingleVarActor {
     // CHECK:   bb0({{%[0-9]+}} : $Int, [[SELF:%[0-9]+]] : $SingleVarActor):
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       [[MYVAR_REF:%[0-9]+]] = ref_element_addr [[EI]] : $SingleVarActor, #SingleVarActor.myVar
@@ -103,7 +103,7 @@ actor BoringActor {
         } while iter > 0
     }
 
-    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC2b12b2ACSb_SbtYacfc : $@convention(method) @async (Bool, Bool, @owned SingleVarActor) -> @owned SingleVarActor {
+    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC2b12b2ACSb_SbtYacfc : $@convention(method) @async (Bool, Bool, @sil_isolated @owned SingleVarActor) -> @owned SingleVarActor {
     // CHECK:   bb0({{%[0-9]+}} : $Bool, {{%[0-9]+}} : $Bool, [[SELF:%[0-9]+]] : $SingleVarActor):
 
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
@@ -130,7 +130,7 @@ actor BoringActor {
         myVar = 2
     }
 
-   // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC14failable_asyncACSgSb_tYacfc : $@convention(method) @async (Bool, @owned SingleVarActor) -> @owned Optional<SingleVarActor> {
+   // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC14failable_asyncACSgSb_tYacfc : $@convention(method) @async (Bool, @sil_isolated @owned SingleVarActor) -> @owned Optional<SingleVarActor> {
    // CHECK: bb0({{%[0-9]+}} : $Bool, {{%[0-9]+}} : $SingleVarActor):
    // CHECK:   cond_br {{%[0-9]+}}, [[SUCCESS_BB:bb[0-9]+]], {{bb[0-9]+}}
    //
@@ -149,7 +149,7 @@ actor BoringActor {
    // FIXME: the convenience init below is missing a hop after the call to arbitraryAsync (rdar://87485045)
 
    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC10delegatingACSb_tYacfC : $@convention(method) @async (Bool, @thick SingleVarActor.Type) -> @owned SingleVarActor {
-   // CHECK:         [[SELF_ALLOC:%[0-9]+]] = alloc_stack [lexical] $SingleVarActor, let, name "self", implicit
+   // CHECK:         [[SELF_ALLOC:%[0-9]+]] = alloc_stack [lexical] [var_decl] $SingleVarActor, let, name "self", implicit
    //           ** first hop is after the call to the synchronous init, right after initializing the allocation.
    // CHECK:         [[SYNC_FN:%[0-9]+]] = function_ref @$s4test14SingleVarActorC4syncACyt_tcfC : $@convention(method) (@thick SingleVarActor.Type) -> @owned SingleVarActor
    // CHECK:         [[INIT1:%[0-9]+]] = apply [[SYNC_FN]]({{%[0-9]+}}) : $@convention(method) (@thick SingleVarActor.Type) -> @owned SingleVarActor
@@ -177,7 +177,7 @@ actor DefaultInit {
     var y: String = ""
     var z: ActingError<Int> = .smuggledValue(5)
 
-    // CHECK-LABEL: sil hidden @$s4test11DefaultInitCACyYacfc : $@convention(method) @async (@owned DefaultInit) -> @owned DefaultInit {
+    // CHECK-LABEL: sil hidden @$s4test11DefaultInitCACyYacfc : $@convention(method) @async (@sil_isolated @owned DefaultInit) -> @owned DefaultInit {
     // CHECK:   bb0([[SELF:%[0-9]+]] : $DefaultInit):
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       store {{%[0-9]+}} to {{%[0-9]+}} : $*ActingError<Int>
@@ -185,7 +185,7 @@ actor DefaultInit {
     // CHECK: } // end sil function '$s4test11DefaultInitCACyYacfc'
     init() async {}
 
-    // CHECK-LABEL: sil hidden @$s4test11DefaultInitC5nillyACSgSb_tYacfc : $@convention(method) @async (Bool, @owned DefaultInit) -> @owned Optional<DefaultInit> {
+    // CHECK-LABEL: sil hidden @$s4test11DefaultInitC5nillyACSgSb_tYacfc : $@convention(method) @async (Bool, @sil_isolated @owned DefaultInit) -> @owned Optional<DefaultInit> {
     // CHECK:   bb0({{%[0-9]+}} : $Bool, [[SELF:%[0-9]+]] : $DefaultInit):
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       store {{%[0-9]+}} to {{%[0-9]+}} : $*ActingError<Int>
@@ -203,7 +203,7 @@ actor MultiVarActor {
     var firstVar: Int
     var secondVar: Float
 
-    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10doNotThrowACSb_tYaKcfc : $@convention(method) @async (Bool, @owned MultiVarActor) -> (@owned MultiVarActor, @error any Error) {
+    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10doNotThrowACSb_tYaKcfc : $@convention(method) @async (Bool, @sil_isolated @owned MultiVarActor) -> (@owned MultiVarActor, @error any Error) {
     // CHECK:   bb0({{%[0-9]+}} : $Bool, [[SELF:%[0-9]+]] : $MultiVarActor):
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       [[REF:%[0-9]+]] = ref_element_addr [[EI]] : $MultiVarActor, #MultiVarActor.firstVar
@@ -218,7 +218,7 @@ actor MultiVarActor {
         firstVar = 1
     }
 
-    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10noSuccCaseACSb_tYacfc : $@convention(method) @async (Bool, @owned MultiVarActor) -> @owned MultiVarActor {
+    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10noSuccCaseACSb_tYacfc : $@convention(method) @async (Bool, @sil_isolated @owned MultiVarActor) -> @owned MultiVarActor {
     // CHECK:       store {{%[0-9]+}} to [[A1:%[0-9]+]] : $*Int
     // CHECK-NEXT:  end_access [[A1]]
     // CHECK-NEXT:  hop_to_executor {{%[0-9]+}} : $MultiVarActor
@@ -235,7 +235,7 @@ actor MultiVarActor {
         firstVar = 2
     }
 
-    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10noPredCaseACSb_tYacfc : $@convention(method) @async (Bool, @owned MultiVarActor) -> @owned MultiVarActor {
+    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10noPredCaseACSb_tYacfc : $@convention(method) @async (Bool, @sil_isolated @owned MultiVarActor) -> @owned MultiVarActor {
     // CHECK:       store {{%[0-9]+}} to [[ACCESS:%[0-9]+]] : $*Int
     // CHECK-NEXT:  end_access [[ACCESS]]
     // CHECK-NEXT:  hop_to_executor {{%[0-9]+}} : $MultiVarActor
@@ -282,7 +282,7 @@ actor TaskMaster {
     func sayHello() { print("hello") }
 
     ////// for the initializer
-    // CHECK-LABEL: @$s4test10TaskMasterCACyYacfc : $@convention(method) @async (@owned TaskMaster) -> @owned TaskMaster {
+    // CHECK-LABEL: @$s4test10TaskMasterCACyYacfc : $@convention(method) @async (@sil_isolated @owned TaskMaster) -> @owned TaskMaster {
     // CHECK:           [[ELM:%[0-9]+]] = ref_element_addr [[SELF:%[0-9]+]] : $TaskMaster, #TaskMaster.task
     // CHECK:           [[NIL:%[0-9]+]] = enum $Optional<Task<(), Never>>, #Optional.none!enumelt
     // CHECK:           store [[NIL]] to [[ELM]] : $*Optional<Task<(), Never>>
@@ -301,7 +301,7 @@ actor TaskMaster {
 actor SomeActor {
     var x: Int = 0
 
-    // CHECK-LABEL: sil hidden @$s4test9SomeActorCACyYacfc : $@convention(method) @async (@owned SomeActor) -> @owned SomeActor {
+    // CHECK-LABEL: sil hidden @$s4test9SomeActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned SomeActor) -> @owned SomeActor {
     // CHECK-NOT:       begin_access
     // CHECK:           store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
     // CHECK-NEXT:      hop_to_executor {{%[0-9]+}} : $SomeActor

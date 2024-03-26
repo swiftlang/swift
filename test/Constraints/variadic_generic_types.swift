@@ -56,6 +56,7 @@ do {
     return Test<String, Int, repeat each T>("a", 42, repeat each v) // Ok
   }
 }
+
 // rdar://107479662 - variadic tuple of Sendable elements does not conform to Sendable
 do {
   struct Test<each T> : Sendable {
@@ -64,4 +65,56 @@ do {
 
   struct TestProperty<T> : Sendable {
   }
+}
+
+// https://github.com/apple/swift/issues/68160
+do {
+  struct G<each T, U> {
+    let f: (repeat Optional<each T>) -> U
+
+    init(f: @escaping (repeat Optional<each T>) -> U) {
+      self.f = f
+    }
+  }
+}
+
+// rdar://121692664 - compiler doesn't respect contravariance of the variadic function parameters
+do {
+  class Value<T> {
+    init<each V>(_ v: repeat Value<each V>,
+                 transform: @escaping (repeat each V) -> T) {
+    }
+  }
+
+  func coerce(_: Int) {}
+
+  func test(first: Value<Int?>, second: Value<(a: Int, b: Int)>) {
+    let _ = Value(first, second) { first, second in
+      coerce(first)
+      // expected-error@-1 {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+      // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+      // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    }
+
+    // multi-statement closure
+    let _ = Value(first, second) { first, second in
+      _ = 42
+      coerce(first)
+      // expected-error@-1 {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+      // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+      // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    }
+  }
+}
+
+// apple/swift#69432 - Passing nil to a parameter pack fails to produce diagnostic for expression
+do {
+  struct Foo<each T> {
+    init(_ value: repeat each T) {}
+    // expected-note@-1 {{in inferring pack element #0 of 'value'}}
+    // expected-note@-2 {{in inferring pack element #0 of 'value'}}
+  }
+
+  _ = Foo(nil) // expected-error {{'nil' requires a contextual type}}
+  _ = Foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
 }

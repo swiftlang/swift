@@ -35,13 +35,13 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include <deque>
+#include <optional>
 
 using namespace swift;
 
@@ -476,7 +476,7 @@ static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
   return false;
 }
 
-static llvm::Optional<std::pair<SILFunction *, SubstitutionMap>>
+static std::optional<std::pair<SILFunction *, SubstitutionMap>>
 findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
                      SILDynamicCastInst dynamicCast) {
   CanType sourceFormalType = dynamicCast.getSourceFormalType();
@@ -494,7 +494,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
   ModuleDecl *modDecl =
       mod.getASTContext().getLoadedModule(mod.getASTContext().Id_Foundation);
   if (!modDecl)
-    return llvm::None;
+    return std::nullopt;
   SmallVector<ValueDecl *, 2> results;
   modDecl->lookupMember(results,
                         sourceFormalType.getNominalOrBoundGenericNominal(),
@@ -508,7 +508,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
     resultsRef = results;
   }
   if (resultsRef.size() != 1)
-    return llvm::None;
+    return std::nullopt;
 
   auto *resultDecl = results.front();
   auto memberDeclRef = SILDeclRef(resultDecl);
@@ -521,16 +521,22 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)
-    return llvm::None;
+    return std::nullopt;
+  // The bridging function must have the correct parent module set. This ensures
+  // that IRGen sets correct linkage when this function comes from the same
+  // module as being compiled.
+  if (!bridgedFunc->getDeclContext())
+    bridgedFunc->setParentModule(
+        resultDecl->getDeclContext()->getParentModule());
 
   if (dynamicCast.getFunction()->isSerialized() &&
       !bridgedFunc->hasValidLinkageForFragileRef())
-    return llvm::None;
+    return std::nullopt;
 
   if (bridgedFunc->getLoweredFunctionType()
           ->getSingleResult()
           .isFormalIndirect())
-    return llvm::None;
+    return std::nullopt;
   return std::make_pair(bridgedFunc, subMap);
 }
 
@@ -1059,7 +1065,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         CastedValue =
             emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
       } else {
-        CastedValue = SILUndef::get(TargetLoweredType, *F);
+        CastedValue = SILUndef::get(F, TargetLoweredType);
       }
       if (!CastedValue)
         CastedValue =
@@ -1197,7 +1203,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,
-        // The cast is now from the the MetatypeInst, so get the source formal
+        // The cast is now from the MetatypeInst, so get the source formal
         // type from it.
         mi->getType().getASTType(),
         dynamicCast.getTargetLoweredType(),
@@ -1455,14 +1461,14 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // SourceType is a non-existential type with a non-conditional
     // conformance to a protocol represented by the TargetType.
     //
-    // TypeChecker::conformsToProtocol checks any conditional conformances. If
+    // ModuleDecl::checkConformance() checks any conditional conformances. If
     // they depend on information not known until runtime, the conformance
     // will not be returned. For instance, if `X: P` where `T == Int` in `func
     // foo<T>(_: T) { ... X<T>() as? P ... }`, the cast will succeed for
     // `foo(0)` but not for `foo("string")`. There are many cases where
     // everything is completely static (`X<Int>() as? P`), in which case a
     // valid conformance will be returned.
-    auto Conformance = SM->conformsToProtocol(SourceType, Proto);
+    auto Conformance = SM->checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
       return false;
 

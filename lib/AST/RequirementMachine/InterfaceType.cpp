@@ -484,53 +484,52 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
 
   return schema.transformWithPosition(
       TypePosition::Invariant,
-      [&](Type t, TypePosition pos) -> llvm::Optional<Type> {
-    if (t->is<GenericTypeParamType>()) {
-      auto index = RewriteContext::getGenericParamIndex(t);
-      auto substitution = substitutions[index];
+      [&](Type t, TypePosition pos) -> std::optional<Type> {
+        if (t->is<GenericTypeParamType>()) {
+          auto index = RewriteContext::getGenericParamIndex(t);
+          auto substitution = substitutions[index];
 
-      bool isShapePosition = (pos == TypePosition::Shape);
-      bool isShapeTerm = (substitution.back() == Symbol::forShape(Context));
-      if (isShapePosition != isShapeTerm) {
-        llvm::errs() << "Shape vs. type mixup\n\n";
-        schema.dump(llvm::errs());
-        llvm::errs() << "Substitutions:\n";
-        for (auto otherSubst : substitutions) {
-          llvm::errs() << "- ";
-          otherSubst.dump(llvm::errs());
-          llvm::errs() << "\n";
+          bool isShapePosition = (pos == TypePosition::Shape);
+          bool isShapeTerm = (substitution.back() == Symbol::forShape(Context));
+          if (isShapePosition != isShapeTerm) {
+            llvm::errs() << "Shape vs. type mixup\n\n";
+            schema.dump(llvm::errs());
+            llvm::errs() << "Substitutions:\n";
+            for (auto otherSubst : substitutions) {
+              llvm::errs() << "- ";
+              otherSubst.dump(llvm::errs());
+              llvm::errs() << "\n";
+            }
+            llvm::errs() << "\n";
+            dump(llvm::errs());
+
+            abort();
+          }
+
+          // Undo the thing where the count type of a PackExpansionType
+          // becomes a shape term.
+          if (isShapeTerm) {
+            MutableTerm mutTerm(substitution.begin(), substitution.end() - 1);
+            substitution = Term::get(mutTerm, Context);
+          }
+
+          // Prepend the prefix of the lookup key to the substitution.
+          if (prefix.empty()) {
+            // Skip creation of a new MutableTerm in the case where the
+            // prefix is empty.
+            return getTypeForTerm(substitution, genericParams);
+          } else {
+            // Otherwise build a new term by appending the substitution
+            // to the prefix.
+            MutableTerm result(prefix);
+            result.append(substitution);
+            return getTypeForTerm(result, genericParams);
+          }
         }
-        llvm::errs() << "\n";
-        dump(llvm::errs());
 
-        abort();
-      }
-
-      // Undo the thing where the count type of a PackExpansionType
-      // becomes a shape term.
-      if (isShapeTerm) {
-        MutableTerm mutTerm(substitution.begin(),
-                            substitution.end() - 1);
-        substitution = Term::get(mutTerm, Context);
-      }
-
-      // Prepend the prefix of the lookup key to the substitution.
-      if (prefix.empty()) {
-        // Skip creation of a new MutableTerm in the case where the
-        // prefix is empty.
-        return getTypeForTerm(substitution, genericParams);
-      } else {
-        // Otherwise build a new term by appending the substitution
-        // to the prefix.
-        MutableTerm result(prefix);
-        result.append(substitution);
-        return getTypeForTerm(result, genericParams);
-      }
-    }
-
-    assert(!t->isTypeParameter());
-    return llvm::None;
-  });
+        assert(!t->isTypeParameter());
+        return std::nullopt;
+      });
 }
 
 /// This method takes a concrete type that was derived from a concrete type
@@ -566,31 +565,29 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
 
   return CanType(concreteType.transformWithPosition(
       TypePosition::Invariant,
-      [&](Type t, TypePosition pos) -> llvm::Optional<Type> {
+      [&](Type t, TypePosition pos) -> std::optional<Type> {
+        if (!t->isTypeParameter())
+          return std::nullopt;
 
-    if (!t->isTypeParameter())
-      return llvm::None;
+        auto term = getRelativeTermForType(CanType(t), substitutions);
 
-    auto term = getRelativeTermForType(CanType(t), substitutions);
+        // PackExpansionType(pattern=T, count=U) becomes
+        // PackExpansionType(pattern=τ_0_0, count=τ_0_1) with
+        //
+        // τ_0_0 := T
+        // τ_0_1 := U.[shape]
+        if (pos == TypePosition::Shape) {
+          assert(false);
+          term.add(Symbol::forShape(*this));
+        }
 
-    // PackExpansionType(pattern=T, count=U) becomes
-    // PackExpansionType(pattern=τ_0_0, count=τ_0_1) with
-    //
-    // τ_0_0 := T
-    // τ_0_1 := U.[shape]
-    if (pos == TypePosition::Shape) {
-      assert(false);
-      term.add(Symbol::forShape(*this));
-    }
+        unsigned index = result.size();
 
-    unsigned index = result.size();
+        result.push_back(Term::get(term, *this));
 
-    result.push_back(Term::get(term, *this));
-
-    return CanGenericTypeParamType::get(/*isParameterPack=*/ false,
-                                        /*depth=*/ 0, index,
-                                        Context);
-  }));
+        return CanGenericTypeParamType::get(/*isParameterPack=*/false,
+                                            /*depth=*/0, index, Context);
+      }));
 }
 
 /// Given a concrete type that may contain type parameters in structural positions,
@@ -612,27 +609,24 @@ RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
 
   return CanType(concreteType.transformWithPosition(
       TypePosition::Invariant,
-      [&](Type t, TypePosition pos)
-          -> llvm::Optional<Type> {
+      [&](Type t, TypePosition pos) -> std::optional<Type> {
+        if (!t->isTypeParameter())
+          return std::nullopt;
 
-    if (!t->isTypeParameter())
-      return llvm::None;
+        // PackExpansionType(pattern=T, count=U) becomes
+        // PackExpansionType(pattern=τ_0_0, count=τ_0_1) with
+        //
+        // τ_0_0 := T
+        // τ_0_1 := U.[shape]
+        MutableTerm term = getMutableTermForType(CanType(t), proto);
+        if (pos == TypePosition::Shape)
+          term.add(Symbol::forShape(*this));
 
-    // PackExpansionType(pattern=T, count=U) becomes
-    // PackExpansionType(pattern=τ_0_0, count=τ_0_1) with
-    //
-    // τ_0_0 := T
-    // τ_0_1 := U.[shape]
-    MutableTerm term = getMutableTermForType(CanType(t), proto);
-    if (pos == TypePosition::Shape)
-      term.add(Symbol::forShape(*this));
+        unsigned index = result.size();
 
-    unsigned index = result.size();
+        result.push_back(Term::get(term, *this));
 
-    result.push_back(Term::get(term, *this));
-
-    return CanGenericTypeParamType::get(/*isParameterPack=*/ false,
-                                        /*depth=*/0, index,
-                                        Context);
-  }));
+        return CanGenericTypeParamType::get(/*isParameterPack=*/false,
+                                            /*depth=*/0, index, Context);
+      }));
 }

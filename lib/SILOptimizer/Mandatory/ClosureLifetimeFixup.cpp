@@ -279,7 +279,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   auto *borrow = lifetimeExtendBuilder.createBeginBorrow(loc, optionalSome);
   auto *mdi =
     lifetimeExtendBuilder.createMarkDependence(loc, cvt, borrow,
-                                               /*isNonEscaping*/false);
+                                               MarkDependenceKind::Escaping);
 
   // Replace all uses of the non escaping closure with mark_dependence
   SmallVector<Operand *, 4> convertUses;
@@ -295,7 +295,8 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
 
   auto fixupSILForLifetimeExtension = [&](SILValue value, SILValue entryValue) {
     // Use SSAUpdater to find insertion points for lifetime ends.
-    updater.initialize(optionalEscapingClosureTy, value->getOwnershipKind());
+    updater.initialize(value->getFunction(), optionalEscapingClosureTy,
+                       value->getOwnershipKind());
     SmallVector<SILPhiArgument *, 8> insertedPhis;
     updater.setInsertedPhis(&insertedPhis);
 
@@ -405,7 +406,7 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
       if (m->hasGuaranteedInitialKind())
         continue;
     curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
-                                  /*isNonEscaping*/false);
+                                  MarkDependenceKind::NonEscaping);
   }
 
   return curr;
@@ -644,7 +645,7 @@ static SILValue tryRewriteToPartialApplyStack(
   // Convert to a partial_apply [stack].
   auto newPA = b.createPartialApply(
       origPA->getLoc(), origPA->getCallee(), origPA->getSubstitutionMap(), args,
-      origPA->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      origPA->getCalleeConvention(), origPA->getResultIsolation(),
       PartialApplyInst::OnStackKind::OnStack);
 
   // Insert mark_dependence for any non-trivial address operands to the
@@ -1303,9 +1304,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(optionalEscapingClosureTy, fn.hasOwnership()
-                                                    ? OwnershipKind::Owned
-                                                    : OwnershipKind::None);
+  updater.initialize(&fn, optionalEscapingClosureTy,
+                     fn.hasOwnership() ? OwnershipKind::Owned
+                                       : OwnershipKind::None);
 
   // Create the Optional.none as the beginning available value.
   SILValue entryBlockOptionalNone;

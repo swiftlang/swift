@@ -26,6 +26,7 @@ namespace clang {
 
 namespace swift {
 
+class AccessorDecl;
 class PrimitiveTypeMapping;
 class ValueDecl;
 class SwiftToClangInteropContext;
@@ -41,6 +42,7 @@ struct CxxDeclEmissionScope {
   /// lexical scope.
   llvm::StringMap<llvm::SmallVector<const AbstractFunctionDecl *, 2>>
       emittedFunctionOverloads;
+  llvm::StringMap<const AccessorDecl *> emittedAccessorMethodNames;
 };
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
@@ -57,7 +59,7 @@ private:
   raw_ostream &os;
   raw_ostream &prologueOS;
   raw_ostream &outOfLineDefinitionsOS;
-  const DelayedMemberSet &delayedMembers;
+  const DelayedMemberSet &objcDelayedMembers;
   CxxDeclEmissionScope *cxxDeclEmissionScope;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
@@ -84,7 +86,8 @@ public:
                      llvm::StringSet<> &exposedModules,
                      OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS),
-        outOfLineDefinitionsOS(outOfLineDefinitionsOS), delayedMembers(delayed),
+        outOfLineDefinitionsOS(outOfLineDefinitionsOS),
+        objcDelayedMembers(delayed),
         cxxDeclEmissionScope(&topLevelEmissionScope), typeMapping(typeMapping),
         interopContext(interopContext), minRequiredAccess(access),
         requiresExposedAttribute(requiresExposedAttribute),
