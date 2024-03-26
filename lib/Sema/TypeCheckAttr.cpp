@@ -1519,6 +1519,15 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
 static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
                                          Feature requiredFeature) {
   if (D->getASTContext().LangOpts.hasFeature(requiredFeature)) {
+    // Encourage early ObjCImplementation adopters to adopt @implementation.
+    // (We'll do this for CImplementation when we're ready to stabilize it.)
+    if (requiredFeature == Feature::ObjCImplementation
+            && attr->isEarlyAdopter())
+      D->getASTContext().Diags.diagnose(
+            attr->getLocation(),
+            diag::objc_implementation_early_spelling_deprecated)
+        .fixItReplace(attr->getLocation(), "implementation");
+
     return true;
   }
 
