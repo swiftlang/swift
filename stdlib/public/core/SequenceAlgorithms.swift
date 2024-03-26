@@ -603,9 +603,9 @@ extension Sequence {
   /// - Returns: The number of elements in the sequence that satisfy the given
   ///   predicate.
   @_alwaysEmitIntoClient
-  public func count(
-    where predicate: (Element) throws -> Bool
-  ) rethrows -> Int {
+  public func count<E>(
+    where predicate: (Element) throws(E) -> Bool
+  ) throws(E) -> Int {
     var count = 0
     for e in self {
       count += try predicate(e) ? 1 : 0
