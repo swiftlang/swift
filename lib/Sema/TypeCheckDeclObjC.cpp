@@ -2810,9 +2810,11 @@ class ObjCImplementationChecker {
                         typename detail::PassArgument<ArgTypes>::type... Args) {
     auto diag = diags.diagnose(loc, diagID, std::forward<ArgTypes>(Args)...);
 
-    // WORKAROUND (5.9): Soften newly-introduced errors to make things easier
-    // for early adopters.
-    if (diags.declaredDiagnosticKindFor(diagID.ID) == DiagnosticKind::Error)
+    // Early adopters using the '@_objcImplementation' syntax may have had the
+    // ObjCImplementationChecker evolve out from under them. Soften their errors
+    // to warnings so we don't break their projects.
+    if (isEarlyAdopter
+         && diags.declaredDiagnosticKindFor(diagID.ID) == DiagnosticKind::Error)
       diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
 
     return diag;
@@ -2823,11 +2825,17 @@ class ObjCImplementationChecker {
   /// Candidates with their explicit ObjC names, if any.
   llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
 
+  bool isEarlyAdopter;
+
 public:
   ObjCImplementationChecker(Decl *D)
       : diags(D->getASTContext().Diags)
   {
     assert(!D->hasClangNode() && "passed interface, not impl, to checker");
+
+    isEarlyAdopter = D->getAttrs()
+        .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true)
+        ->isEarlyAdopter();
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
       addCandidate(D);
