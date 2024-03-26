@@ -535,7 +535,7 @@ extension Unicode.Scalar {
 
     // The first code unit is in the least significant byte of codeUnits.
     codeUnits = codeUnits.littleEndian
-#if hasFeature(TypedThrows)
+#if $TypedThrows
     return try Swift._withUnprotectedUnsafePointer(to: &codeUnits) {
       return try $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
         return try body(UnsafeBufferPointer(start: $0, count: utf8Count))
