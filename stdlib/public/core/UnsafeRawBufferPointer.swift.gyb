@@ -1230,13 +1230,14 @@ public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafeMutableBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
+//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss22withUnsafeMutableBytes2of_q_xz_q_SwKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeMutableBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws -> Result
-) throws -> Result {
+) rethrows -> Result {
   return try withUnsafeMutablePointer(to: &value) {
     return try body(UnsafeMutableRawBufferPointer(
         start: $0, count: MemoryLayout<T>.size))
@@ -1297,13 +1298,14 @@ public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
+//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss15withUnsafeBytes2of_q_xz_q_SWKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
-) throws -> Result {
+) rethrows -> Result {
   return try withUnsafePointer(to: &value) {
     try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
@@ -1361,13 +1363,14 @@ public func withUnsafeBytes<
 
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
+//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss15withUnsafeBytes2of_q_x_q_SWKXEtKr0_lF")
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
-) throws -> Result {
+) rethrows -> Result {
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
