@@ -987,7 +987,7 @@ NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
       "%0 used after being passed as a transferring parameter; Later uses could race",
       (Identifier))
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
-      "%0 %1 is captured by %2 closure. %2 uses in closure may race against later %3 uses",
+      "%0 %1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
       (StringRef, Identifier, ActorIsolation, ActorIsolation))
 
 // Misc Error.

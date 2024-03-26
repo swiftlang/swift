@@ -1217,6 +1217,10 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
   if (F->getLoweredFunctionType()->isPolymorphic())
     F->setGenericEnvironment(Types.getConstantGenericEnvironment(constant));
 
+  // Set the actor isolation of the function to its innermost decl context.
+  F->setActorIsolation(
+      getActorIsolationOfContext(constant.getInnermostDeclContext()));
+
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
 
