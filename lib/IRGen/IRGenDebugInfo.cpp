@@ -3394,7 +3394,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) &&
-      !llvm::FindDbgDeclareUses(Storage).empty())
+      !llvm::findDbgDeclares(Storage).empty())
     return;
 
   // Fragment DIExpression cannot cover the whole variable
