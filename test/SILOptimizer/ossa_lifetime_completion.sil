@@ -17,6 +17,16 @@ public enum FakeOptional<T> {
   case some(T)
 }
 
+sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+
+protocol Error {}
+
+enum Optional<Wrapped> {
+case none
+case some(Wrapped)
+}
+
 // CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
 // CHECK-LABEL: OSSA lifetime completion: %0 = argument of bb0 : $C
 // CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
@@ -460,4 +470,31 @@ exit:
 right:
   end_borrow %c : $C
   unreachable
+}
+
+// Nothing to check here--the output is the same as the input.  Verify that
+// completing the lifetime of a value used by a startAsyncLetWithLocalBuffer
+// doesn't crash when visiting an endAsyncLetLifetime.
+sil [ossa] @async_let : $@convention(thin) @async () -> () {
+bb0:
+  %result_addr = alloc_stack $()
+  %result_ptr = address_to_pointer %result_addr : $*() to $Builtin.RawPointer
+  %task_options = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %callee_pa = partial_apply [callee_guaranteed] undef() : $@convention(thin) @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  %callee_noescape = convert_escape_to_noescape [not_guaranteed] %callee_pa : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> 
+            to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  specify_test "ossa-lifetime-completion %callee_noescape"
+  %async_let = builtin "startAsyncLetWithLocalBuffer"<()>(
+            %task_options : $Optional<Builtin.RawPointer>, 
+            %callee_noescape : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>, 
+            %result_ptr : $Builtin.RawPointer
+        ) : $Builtin.RawPointer
+  %get = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  apply %get(%async_let, %result_ptr) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  builtin "endAsyncLetLifetime"(%async_let : $Builtin.RawPointer) : $()
+  destroy_value %callee_noescape : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  destroy_value %callee_pa : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  %retval = load [trivial] %result_addr : $*()
+  dealloc_stack %result_addr : $*()
+  return %retval : $()
 }

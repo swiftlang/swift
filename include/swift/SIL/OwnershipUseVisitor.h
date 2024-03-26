@@ -303,6 +303,15 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
     // [nonescaping] def.
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
   }
+  case OperandOwnership::InstantaneousUse: {
+    auto builtinUser = dyn_cast<BuiltinInst>(borrowEnd->getUser());
+    if (builtinUser && builtinUser->getBuiltinKind() ==
+                           BuiltinValueKind::EndAsyncLetLifetime) {
+      return handleUsePoint(borrowEnd,
+                            UseLifetimeConstraint::NonLifetimeEnding);
+    }
+    LLVM_FALLTHROUGH;
+  }
   default:
     llvm_unreachable("expected borrow scope end");
   }
