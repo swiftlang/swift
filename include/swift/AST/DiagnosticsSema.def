@@ -1739,6 +1739,9 @@ ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
 
+WARNING(objc_implementation_early_spelling_deprecated,none,
+        "warning-only '@_objcImplementation' spelling is deprecated; use "
+        "'@implementation' instead", ())
 ERROR(attr_objc_implementation_must_be_unconditional,none,
       "only unconditional extensions can implement an Objective-C '@interface'",
       ())
