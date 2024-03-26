@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 
 using namespace swift;
 
@@ -119,8 +120,13 @@ public:
     } else {
       // Accessing a class member -> reading the class
       parent->project(AccessType::Get, [&](SILValue parentValue) {
-        SingleValueInstruction *Ref = builder.createLoad(loc, parentValue,
-                                                         LoadOwnershipQualifier::Unqualified);
+        SingleValueInstruction *Borrow = nullptr;
+        SingleValueInstruction *Ref;
+        if (builder.hasOwnership()) {
+          Ref = Borrow = builder.createLoadBorrow(loc, parentValue);
+        } else {
+          Ref = builder.createLoad(loc, parentValue, LoadOwnershipQualifier::Unqualified);
+        }
         
         // If we were previously accessing a class member, we're done now.
         insertEndAccess(beginAccess, builder);
@@ -134,6 +140,9 @@ public:
             // decl or in a superclass of it. Just handle this to be on the safe
             // side.
             callback(SILValue());
+            if (Borrow) {
+              builder.createEndBorrow(loc, Borrow);
+            }
             return;
           }
           Ref = builder.createUpcast(loc, Ref, superCl);
@@ -161,6 +170,10 @@ public:
         // end the access now
         if (beginAccess == addr) {
           insertEndAccess(beginAccess, builder);
+        }
+        
+        if (Borrow) {
+          builder.createEndBorrow(loc, Borrow);
         }
       });
     }
@@ -669,9 +682,10 @@ private:
 
 KeyPathInst *
 KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
-  if (auto *upCast = dyn_cast<UpcastInst>(keyPath))
-    keyPath = upCast->getOperand();
-  // TODO: Look through other conversions, copies, etc.?
+  while (auto *upCast = dyn_cast<UpcastInst>(keyPath)) {
+    keyPath = lookThroughOwnershipInsts(upCast->getOperand());
+  }
+
   return dyn_cast<KeyPathInst>(keyPath);
 }
 

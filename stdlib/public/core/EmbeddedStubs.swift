@@ -18,6 +18,7 @@ import SwiftShims
 public struct String: Hashable { 
     public var utf8CString: ContiguousArray<CChar> { fatalError() }
     public init() {}
+    public init(validatingCString: UnsafePointer<CChar>) { fatalError() }
 }
 
 @_unavailableInEmbedded
@@ -242,20 +243,3 @@ public enum DecodingError: Error {
   case keyNotFound(any CodingKey, Context)
   case dataCorrupted(Context)
 }
-
-/// KeyPath
-
-@_unavailableInEmbedded
-public class AnyKeyPath {
-  @usableFromInline
-  internal var _storedInlineOffset: Int? { fatalError() }
-}
-
-@_unavailableInEmbedded
-public class PartialKeyPath<Root>: AnyKeyPath { }
-
-@_unavailableInEmbedded
-public class KeyPath<Root, Value>: PartialKeyPath<Root> { }
-
-@_unavailableInEmbedded
-public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> { }

@@ -97,7 +97,7 @@ split_embedded_sources(
     NORMAL IntegerParsing.swift
   EMBEDDED Integers.swift
     NORMAL Join.swift
-    NORMAL KeyPath.swift
+  EMBEDDED KeyPath.swift
     NORMAL KeyValuePairs.swift
   EMBEDDED LazyCollection.swift
   EMBEDDED LazySequence.swift
@@ -125,7 +125,7 @@ split_embedded_sources(
     NORMAL PrefixWhile.swift
     NORMAL Prespecialize.swift
     NORMAL Print.swift
-    NORMAL PtrAuth.swift
+  EMBEDDED PtrAuth.swift
   EMBEDDED Random.swift
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift

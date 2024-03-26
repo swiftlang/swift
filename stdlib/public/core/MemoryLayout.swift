@@ -237,7 +237,6 @@ extension MemoryLayout {
   ///   `nil`, it can be because `key` is computed, has observers, requires
   ///   reabstraction, or overlaps storage with other properties.
   @_transparent
-  @_unavailableInEmbedded
   public static func offset(of key: PartialKeyPath<T>) -> Int? {
     return key._storedInlineOffset
   }
