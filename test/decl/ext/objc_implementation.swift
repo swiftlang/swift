@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h
+// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature CImplementation
 // REQUIRES: objc_interop
 
 protocol EmptySwiftProto {}

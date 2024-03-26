@@ -683,6 +683,9 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
 
 UNINTERESTING_FEATURE(IsolatedAny2)
 
+UNINTERESTING_FEATURE(ObjCImplementation)
+UNINTERESTING_FEATURE(CImplementation)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
