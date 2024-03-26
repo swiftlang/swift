@@ -3346,9 +3346,9 @@ struct DbgIntrinsicEmitter {
 
   ///
 
-  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                            llvm::DIExpression *Expr,
-                            const llvm::DILocation *DL) {
+  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                          llvm::DIExpression *Expr,
+                          const llvm::DILocation *DL) {
     if (auto *Inst = InsertPt.dyn_cast<llvm::Instruction *>()) {
       return insert(Addr, VarInfo, Expr, DL, Inst);
     } else {
@@ -3357,10 +3357,10 @@ struct DbgIntrinsicEmitter {
     }
   }
 
-  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                            llvm::DIExpression *Expr,
-                            const llvm::DILocation *DL,
-                            llvm::Instruction *InsertBefore) {
+  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                          llvm::DIExpression *Expr,
+                          const llvm::DILocation *DL,
+                          llvm::Instruction *InsertBefore) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
@@ -3368,10 +3368,10 @@ struct DbgIntrinsicEmitter {
                                             InsertBefore);
   }
 
-  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                            llvm::DIExpression *Expr,
-                            const llvm::DILocation *DL,
-                            llvm::BasicBlock *Block) {
+  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                          llvm::DIExpression *Expr,
+                          const llvm::DILocation *DL,
+                          llvm::BasicBlock *Block) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
