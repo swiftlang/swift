@@ -53,6 +53,10 @@ import ClassArrayGetter
 import CodableTest
 import Combos
 import CountAlgo
+import CreateObjects
+import CxxSetToCollection
+import CxxStringConversion
+import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition

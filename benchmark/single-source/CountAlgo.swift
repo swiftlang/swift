@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
-public let CountAlgo = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "CountAlgoArray",
     runFunction: run_CountAlgoArray,
