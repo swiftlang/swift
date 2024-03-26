@@ -56,6 +56,14 @@ struct BufferView : ~Escapable {
   consuming func consume() -> dependsOn(scoped self) BufferView { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
     return BufferView(self.ptr)
   }
+
+  func get() -> dependsOn(self) Self { // expected-note{{'get()' previously declared here}}
+    return self
+  }
+
+  func get() -> dependsOn(scoped self) Self { // expected-error{{invalid redeclaration of 'get()'}}
+    return self
+  }
 }
 
 struct MutableBufferView : ~Escapable, ~Copyable {
@@ -201,4 +209,12 @@ public struct GenericBufferView<Element> : ~Escapable {
     self.baseAddress = baseAddress
     self.count = count
   } 
+}
+
+func derive(_ x: BufferView) -> dependsOn(x) BufferView { // expected-note{{'derive' previously declared here}}
+  return BufferView(x.ptr)
+}
+
+func derive(_ x: BufferView) -> dependsOn(scoped x) BufferView { // expected-error{{invalid redeclaration of 'derive'}}
+  return BufferView(x.ptr)
 }
