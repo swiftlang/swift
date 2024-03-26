@@ -209,3 +209,15 @@ struct Clock {
 
   useValue(ns)
 }
+
+@MainActor func testGlobalAndDisconnected() {
+  let ns = NonSendableKlass()
+
+  let _ = { @MainActor in
+    print(ns)
+  }
+
+  // Since useValue is running in an actor isolated context, it is ok to use the
+  // transferred value 'ns' here.
+  useValue(ns)
+}

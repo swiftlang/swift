@@ -645,12 +645,14 @@ bb0:
 
   fix_lifetime %value : $SendableKlass
 
+  // This is not considered a bad use of the raw pointer since this is
+  // transferring to the same isolation domain.
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
-  // expected-note @-2 {{use here could race}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{use here could race}}
+  // expected-note @-2 {{use here could race}}  
 
   destroy_value %value : $SendableKlass
   %9999 = tuple ()
@@ -723,10 +725,10 @@ bb0:
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
-  // expected-note @-2 {{use here could race}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{use here could race}}
+  // expected-note @-2 {{use here could race}}
 
   destroy_value %value : $SendableKlass
   %9999 = tuple ()
@@ -802,10 +804,10 @@ bb0:
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
-  // expected-note @-2 {{use here could race}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{use here could race}}
+  // expected-note @-2 {{use here could race}}
 
   end_borrow %valueB : $SendableKlass
   destroy_value %value : $SendableKlass
@@ -1238,7 +1240,8 @@ bb0:
   unchecked_ref_cast_addr NonSendableKlass in %a : $*NonSendableKlass to NonSendableKlass in %b : $*NonSendableKlass // expected-note {{use here could race}}
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
+  %use = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %use<NonSendableKlass>(%b) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
 
   destroy_addr %b : $*NonSendableKlass
   dealloc_stack %b : $*NonSendableKlass
@@ -1264,7 +1267,8 @@ bb0:
   unconditional_checked_cast_addr NonSendableKlass in %a : $*NonSendableKlass to NonSendableKlass in %b : $*NonSendableKlass // expected-note {{use here could race}}
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
+  %use = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %use<NonSendableKlass>(%b) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
 
   destroy_addr %b : $*NonSendableKlass
   dealloc_stack %b : $*NonSendableKlass
@@ -1290,7 +1294,8 @@ bb0:
   destroy_value %aValue : $NonSendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@sil_unowned NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@sil_unowned NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
+    %use = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %use<@sil_unowned NonSendableKlass>(%b) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
 
   destroy_addr %b : $*@sil_unowned NonSendableKlass
   destroy_addr %a : $*NonSendableKlass
