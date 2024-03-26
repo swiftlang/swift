@@ -1285,6 +1285,14 @@ namespace {
 
       return { importedType, ImportHint::ObjCPointer };
     }
+
+    ImportResult VisitPackIndexingType(const clang::PackIndexingType *type) {
+      return Type();
+    }
+
+    ImportResult VisitCountAttributedType(const clang::CountAttributedType *type) {
+      return Type();
+    }
   };
 } // end anonymous namespace
 
