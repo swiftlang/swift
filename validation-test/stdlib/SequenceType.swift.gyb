@@ -643,6 +643,25 @@ SequenceTypeTests.test("count/Predicate") {
   }
 }
 
+SequenceTypeTests.test("count/Predicate/throws") {
+  struct E: Error, Equatable {}
+  
+  // FIXME: remove `throws(E)` annotations once error type is inferred
+  do throws(E) {
+    let c = try ([] as [Int]).count(where: { (_) throws(E) in throw E() })
+    expectEqual(c, 0)
+  } catch {
+    expectUnreachable()
+  }
+  
+  do throws(E) {
+    let c = try [1, 2, 3].count(where: { (_) throws(E) in throw E() })
+    expectUnreachable()
+  } catch {
+    expectEqual(error, E())
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//
