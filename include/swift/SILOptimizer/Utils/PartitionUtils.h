@@ -875,27 +875,37 @@ public:
       apply(o);
   }
 
+  /// Provides a way for subclasses to disable the error squelching
+  /// functionality.
+  ///
+  /// Used by the unittests.
+  bool shouldTryToSquelchErrors() const {
+    return asImpl().shouldTryToSquelchErrors();
+  }
+
 private:
   // Private helper that squelches the error if our transfer instruction and our
   // use have the same isolation.
   void
   handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
                                     TransferringOperand *transferringOp) const {
-    if (auto isolationInfo = SILIsolationInfo::get(op.getSourceInst())) {
-      if (isolationInfo.isActorIsolated() &&
-          isolationInfo == SILIsolationInfo::get(transferringOp->getUser()))
-        return;
-    }
+    if (shouldTryToSquelchErrors()) {
+      if (auto isolationInfo = SILIsolationInfo::get(op.getSourceInst())) {
+        if (isolationInfo.isActorIsolated() &&
+            isolationInfo == SILIsolationInfo::get(transferringOp->getUser()))
+          return;
+      }
 
-    // If our instruction does not have any isolation info associated with it,
-    // it must be nonisolated. See if our function has a matching isolation to
-    // our transferring operand. If so, we can squelch this.
-    if (auto functionIsolation =
-            transferringOp->getUser()->getFunction()->getActorIsolation()) {
-      if (functionIsolation->isActorIsolated() &&
-          SILIsolationInfo::getActorIsolated(*functionIsolation) ==
-              SILIsolationInfo::get(transferringOp->getUser()))
-        return;
+      // If our instruction does not have any isolation info associated with it,
+      // it must be nonisolated. See if our function has a matching isolation to
+      // our transferring operand. If so, we can squelch this.
+      if (auto functionIsolation =
+              transferringOp->getUser()->getFunction()->getActorIsolation()) {
+        if (functionIsolation->isActorIsolated() &&
+            SILIsolationInfo::getActorIsolated(*functionIsolation) ==
+                SILIsolationInfo::get(transferringOp->getUser()))
+          return;
+      }
     }
 
     // Ok, we actually need to emit a call to the callback.
@@ -970,6 +980,9 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// to access the instruction in the evaluator which creates a problem when
   /// since the operand we pass in is a dummy operand.
   bool isClosureCaptured(Element elt, Operand *op) const { return false; }
+
+  /// By default squelch errors.
+  bool shouldTryToSquelchErrors() const { return true; }
 };
 
 /// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special
