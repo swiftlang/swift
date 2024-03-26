@@ -1107,6 +1107,13 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(InjectEnumTag, "injectEnumTag", "", Special)
 /// `any Actor` existential that refers to the local actor.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActorAsAnyActor", "n", Special)
 
+/// addressOfRawLayout: <T: ~Copyable>(_: borrowing T) -> Builtin.RawPointer
+///
+/// Returns a raw pointer to the address of the raw layout type. This address is
+/// only valid during a borrow access of the raw layout type or until the value
+/// is either moved or consumed.
+BUILTIN_SIL_OPERATION(AddressOfRawLayout, "addressOfRawLayout", Special)
+
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
