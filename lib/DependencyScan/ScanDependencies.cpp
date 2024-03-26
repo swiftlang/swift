@@ -278,13 +278,6 @@ static llvm::Error resolveExplicitModuleInputs(
         commandLine.push_back("-Xcc");
         commandLine.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
                               clangDepDetails->mappedPCMPath);
-        if (!instance.getInvocation()
-                 .getClangImporterOptions()
-                 .UseClangIncludeTree) {
-          commandLine.push_back("-Xcc");
-          commandLine.push_back("-fmodule-map-file=" +
-                                remapPath(clangDepDetails->moduleMapFile));
-        }
       }
       if (!clangDepDetails->moduleCacheKey.empty()) {
         commandLine.push_back("-Xcc");
