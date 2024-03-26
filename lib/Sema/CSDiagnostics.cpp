@@ -457,12 +457,25 @@ bool RequirementFailure::diagnoseAsError() {
     auto *namingDecl = OTD->getNamingDecl();
 
     auto &req = getRequirement();
-    if (req.getKind() == RequirementKind::SameType) {
-      emitDiagnostic(diag::type_is_not_equal_in_opaque_return, namingDecl, lhs,
-                     rhs);
-    } else {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
       emitDiagnostic(diag::type_does_not_conform_in_opaque_return, namingDecl,
                      lhs, rhs, rhs->isAnyObject());
+      break;
+
+    case RequirementKind::Superclass:
+      emitDiagnostic(diag::types_not_inherited_in_opaque_return, namingDecl,
+                    lhs, rhs);
+      break;
+
+    case RequirementKind::SameType:
+      emitDiagnostic(diag::type_is_not_equal_in_opaque_return, namingDecl, lhs,
+                     rhs);
+      break;
+
+    case RequirementKind::SameShape:
+      return false;
     }
 
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
