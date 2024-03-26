@@ -1297,7 +1297,7 @@ void SILGenFunction::emitProlog(
 
   emitExpectedExecutor();
 
-  // IMPORTANT: This block should be the last one in `emitProlog`, 
+  // IMPORTANT: This block should be the last one in `emitProlog`,
   // since it terminates BB and no instructions should be insterted after it.
   // Emit an unreachable instruction if a parameter type is
   // uninhabited
@@ -1499,6 +1499,19 @@ uint16_t SILGenFunction::emitBasicProlog(
     if (throwsLoc.isValid())
       loc = throwsLoc;
     B.createDebugValue(loc, undef.getValue(), dbgVar);
+  }
+
+  for (auto &i : *B.getInsertionBB()) {
+    auto *alloc = dyn_cast<AllocStackInst>(&i);
+    if (!alloc)
+      continue;
+    auto varInfo = alloc->getVarInfo();
+    if (!varInfo || varInfo->ArgNo)
+      continue;
+    // The allocation has a varinfo but no argument number, which should not
+    // happen in the prolog. Unfortunately, some copies can generate wrong
+    // debug info, so we have to fix it here, by invalidating it.
+    alloc->invalidateVarInfo();
   }
 
   return ArgNo;

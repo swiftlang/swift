@@ -820,6 +820,11 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   /// fix this for each of its uses.
   llvm::DenseSet<std::pair<SILValue, const Operand *>> isOperandInValueUsesCache;
 
+  /// Used for checking all equivalent variables have the same type
+  using VarID = std::tuple<const SILDebugScope *, llvm::StringRef, SILLocation>;
+  llvm::DenseMap<VarID, SILType> DebugVarTypes;
+  llvm::StringSet<> VarNames;
+
   /// Check that this operand appears in the use-chain of the value it uses.
   bool isOperandInValueUses(const Operand *operand) {
     SILValue value = operand->get();
@@ -1519,6 +1524,26 @@ public:
       require(VarDS->getInlinedFunction() == debugScope->getInlinedFunction(),
               "Scope of the debug variable should have the same parent function"
               " as that of instruction.");
+
+    // Check that every var info with the same name, scope and location, refer
+    // to a variable of the same type
+    llvm::StringRef UniqueName = VarNames.insert(varInfo->Name).first->getKey();
+    if (!varInfo->Loc)
+      varInfo->Loc = inst->getLoc();
+    if (!varInfo->Loc)
+      varInfo->Loc = SILLocation::invalid();
+    VarID Key(varInfo->Scope ? varInfo->Scope : debugScope,
+              UniqueName, *varInfo->Loc);
+    auto CachedVar = DebugVarTypes.insert({Key, DebugVarTy});
+    if (!CachedVar.second) {
+      auto lhs = CachedVar.first->second.removingMoveOnlyWrapper();
+      auto rhs = DebugVarTy.removingMoveOnlyWrapper();
+
+      require(lhs == rhs ||
+              (lhs.isAddress() && lhs.getObjectType() == rhs) ||
+              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()),
+              "Two variables with different type but same scope!");
+    }
 
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {
