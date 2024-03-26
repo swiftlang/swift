@@ -15,7 +15,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 36{{}}
+class NonSendableKlass { // expected-complete-note 38{{}}
   // expected-typechecker-only-note @-1 4{{}}
   // expected-tns-note @-2 2{{}}
   var field: NonSendableKlass? = nil
@@ -129,15 +129,43 @@ func closureInOut(_ a: Actor) async {
   // expected-tns-warning @-2 {{transferring 'ns0' may cause a race}}
   // expected-tns-note @-3 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
 
-  // We only emit a warning on the first use we see, so make sure we do both
-  // klass and the closure.
   if await booleanFlag {
-    await a.useKlass(ns1) // expected-tns-note {{use here could race}}
+    // This is not an actual use since we are passing values to the same
+    // isolation domain.
+    await a.useKlass(ns1)
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
   } else {
     closure() // expected-tns-note {{use here could race}}
   }
 }
+
+func closureInOutDifferentActor(_ a: Actor, _ a2: Actor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+  closure = { useInOut(&contents) }
+
+  await a.useKlass(ns0)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+  // expected-tns-warning @-2 {{transferring 'ns0' may cause a race}}
+  // expected-tns-note @-3 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
+
+  // We only emit a warning on the first use we see, so make sure we do both
+  // the print and the closure.
+  if await booleanFlag {
+    // This is an actual use since a2 is a different actor from a1
+    await a2.useKlass(ns1)
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+  } else {
+    closure() // expected-tns-note {{use here could race}}
+  }
+}
+
 
 func closureInOut2(_ a: Actor) async {
   var contents = NonSendableKlass()
@@ -1182,9 +1210,11 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive4() async {
     // good... that is QoI though.
     await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
     // expected-tns-note @-1 {{transferring disconnected 'test' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-    // expected-tns-note @-2 {{use here could race}}
-    // expected-complete-warning @-3 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
-    test = StructFieldTests()
+    // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
+
+    // This is treated as a use since test is in box form and is mutable. So we
+    // treat assignment as a merge.
+    test = StructFieldTests() // expected-tns-note {{use here could race}}
     cls = {
       useInOut(&test.varSendableNonTrivial)
     }
@@ -1215,7 +1245,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
   }
 
   test.varSendableNonTrivial = SendableKlass()
-  useValue(test)
+  useValue(test) // expected-tns-note {{use here could race}}
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
@@ -1387,7 +1417,7 @@ func controlFlowTest2() async {
     x = NonSendableKlass()
   }
 
-  useValue(x)
+  useValue(x) // expected-tns-note {{use here could race}}
 }
 
 ////////////////////////
@@ -1502,6 +1532,7 @@ final actor FinalActorWithSetter {
 
 func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let _ = { @MainActor in
-    let _ = x // expected-tns-warning {{task-isolated value of type '() -> ()' transferred to main actor-isolated context}}
+    let _ = x // expected-tns-warning {{transferring 'x' may cause a race}}
+    // expected-tns-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }

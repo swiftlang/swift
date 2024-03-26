@@ -1470,6 +1470,7 @@ public:
     llvm::SmallVector<Element, 8> nonSendableJoinedIndices;
     llvm::SmallVector<Element, 8> nonSendableSeparateIndices;
     for (SILArgument *arg : functionArguments) {
+      // This will decide what the isolation region is.
       if (auto state = tryToTrackValue(arg)) {
         // If we can transfer our parameter, just add it to
         // nonSendableSeparateIndices.
@@ -1485,9 +1486,8 @@ public:
 
         // Otherwise, it is one of our merged parameters. Add it to the never
         // transfer list and to the region join list.
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
-        valueMap.mergeIsolationRegionInfo(
-            arg, SILIsolationInfo::getTaskIsolated(arg));
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ";
+                   state->print(llvm::dbgs()); llvm::dbgs() << *arg);
         nonSendableJoinedIndices.push_back(state->getID());
       }
     }
@@ -3460,7 +3460,9 @@ void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
   }
   std::sort(temp.begin(), temp.end());
   for (auto p : temp) {
-    os << "%%" << p.first << ": " << p.second;
+    os << "%%" << p.first << ": ";
+    auto value = getValueForId(Element(p.first));
+    value->print(os);
   }
 #endif
 }

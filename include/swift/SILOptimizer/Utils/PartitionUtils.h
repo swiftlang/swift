@@ -17,6 +17,7 @@
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -204,7 +205,7 @@ public:
       return getActorIsolated(actorIsolation);
     if (nomDecl->isActor())
       return {Kind::Actor, nomDecl};
-    return {};
+    return SILIsolationInfo();
   }
 
   static SILIsolationInfo getTaskIsolated(SILValue value) {
@@ -756,8 +757,8 @@ public:
       // value... emit an error.
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransfer(op, op.getOpArgs()[1],
-                                      transferredOperand);
+          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[1],
+                                            transferredOperand);
         }
       }
       p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
@@ -788,6 +789,21 @@ public:
       SILIsolationInfo transferredRegionIsolation;
       std::tie(transferredRegionIsolation, isClosureCapturedElt) =
           getIsolationRegionInfo(transferredRegion, op.getSourceOp());
+
+      // Before we do anything, see if our dynamic isolation kind is the same as
+      // the isolation info for our partition op. If they match, this is not a
+      // real transfer operation.
+      //
+      // DISCUSSION: We couldn't not emit this earlier since we needed the
+      // dynamic isolation info of our value.
+      if (transferredRegionIsolation.isActorIsolated()) {
+        if (auto calleeIsolationInfo =
+                SILIsolationInfo::get(op.getSourceInst())) {
+          if (transferredRegionIsolation == calleeIsolationInfo) {
+            return;
+          }
+        }
+      }
 
       // If we merged anything, we need to handle a transfer
       // non-transferrable. We pass in the dynamic isolation region info of our
@@ -824,14 +840,14 @@ public:
       // if attempting to merge a transferred region, handle the failure
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransfer(op, op.getOpArgs()[0],
-                                      transferredOperand);
+          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[0],
+                                            transferredOperand);
         }
       }
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[1])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransfer(op, op.getOpArgs()[1],
-                                      transferredOperand);
+          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[1],
+                                            transferredOperand);
         }
       }
 
@@ -844,8 +860,8 @@ public:
              "Require PartitionOp's argument should already be tracked");
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransfer(op, op.getOpArgs()[0],
-                                      transferredOperand);
+          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[0],
+                                            transferredOperand);
         }
       }
       return;
@@ -857,6 +873,43 @@ public:
   void apply(std::initializer_list<PartitionOp> ops) {
     for (auto &o : ops)
       apply(o);
+  }
+
+  /// Provides a way for subclasses to disable the error squelching
+  /// functionality.
+  ///
+  /// Used by the unittests.
+  bool shouldTryToSquelchErrors() const {
+    return asImpl().shouldTryToSquelchErrors();
+  }
+
+private:
+  // Private helper that squelches the error if our transfer instruction and our
+  // use have the same isolation.
+  void
+  handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
+                                    TransferringOperand *transferringOp) const {
+    if (shouldTryToSquelchErrors()) {
+      if (auto isolationInfo = SILIsolationInfo::get(op.getSourceInst())) {
+        if (isolationInfo.isActorIsolated() &&
+            isolationInfo == SILIsolationInfo::get(transferringOp->getUser()))
+          return;
+      }
+
+      // If our instruction does not have any isolation info associated with it,
+      // it must be nonisolated. See if our function has a matching isolation to
+      // our transferring operand. If so, we can squelch this.
+      if (auto functionIsolation =
+              transferringOp->getUser()->getFunction()->getActorIsolation()) {
+        if (functionIsolation->isActorIsolated() &&
+            SILIsolationInfo::getActorIsolated(*functionIsolation) ==
+                SILIsolationInfo::get(transferringOp->getUser()))
+          return;
+      }
+    }
+
+    // Ok, we actually need to emit a call to the callback.
+    return handleLocalUseAfterTransfer(op, elt, transferringOp);
   }
 };
 
@@ -927,6 +980,9 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// to access the instruction in the evaluator which creates a problem when
   /// since the operand we pass in is a dummy operand.
   bool isClosureCaptured(Element elt, Operand *op) const { return false; }
+
+  /// By default squelch errors.
+  bool shouldTryToSquelchErrors() const { return true; }
 };
 
 /// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special

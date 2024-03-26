@@ -47,6 +47,8 @@ struct MockedPartitionOpEvaluator final
   SILIsolationInfo getIsolationRegionInfo(Element elt) const {
     return SILIsolationInfo::getDisconnected();
   }
+
+  bool shouldTryToSquelchErrors() const { return false; }
 };
 
 } // namespace
@@ -566,6 +568,8 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
   SILIsolationInfo getIsolationRegionInfo(Element elt) const {
     return SILIsolationInfo::getDisconnected();
   }
+
+  bool shouldTryToSquelchErrors() const { return false; }
 };
 
 } // namespace

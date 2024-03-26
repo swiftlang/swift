@@ -36,18 +36,21 @@ func doSomething(_ x: NonSendableKlass, _ y: NonSendableKlass) { }
 actor ProtectsNonSendable {
   var ns: NonSendableKlass = .init()
 
-  nonisolated func testParameter(_ ns: NonSendableKlass) async {
+  nonisolated func testParameter(_ nsArg: NonSendableKlass) async {
+    // TODO: This is wrong, we should get an error saying that nsArg is task
+    // isolated since this is nonisolated.
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = ns // expected-warning {{task-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+      isolatedSelf.ns = nsArg // expected-warning {{transferring 'nsArg' may cause a race}}
+      // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
-  // This should get the note since l is different from 'ns'.
-  nonisolated func testParameterMergedIntoLocal(_ ns: NonSendableKlass) async {
+  nonisolated func testParameterMergedIntoLocal(_ nsArg: NonSendableKlass) async {
     let l = NonSendableKlass()
-    doSomething(l, ns)
+    doSomething(l, nsArg)
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = l // expected-warning {{task-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+      isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a race}}
+      // expected-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
@@ -66,7 +69,7 @@ actor ProtectsNonSendable {
     // This is not safe since we use l later.
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a race}}
-      // expected-note @-1 {{disconnected 'l' is captured by actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{disconnected 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
 
     useValue(l) // expected-note {{use here could race}}
@@ -84,7 +87,7 @@ func normalFunc_testLocal_2() {
   let x = NonSendableKlass()
   let _ = { @MainActor in
     useValue(x) // expected-warning {{transferring 'x' may cause a race}}
-    // expected-note @-1 {{disconnected 'x' is captured by main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{disconnected 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
   useValue(x) // expected-note {{use here could race}}
 }

@@ -42,13 +42,21 @@ static llvm::cl::opt<bool, true> // The parser
 //===----------------------------------------------------------------------===//
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
-  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
-    if (auto crossing = apply->getIsolationCrossing())
-      return SILIsolationInfo::getActorIsolated(crossing->getCalleeIsolation());
+  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
+    if (auto crossing = apply->getIsolationCrossing()) {
+      if (crossing->getCalleeIsolation().isActorIsolated())
+        return SILIsolationInfo::getActorIsolated(
+            crossing->getCalleeIsolation());
+    }
+  }
 
   if (auto fas = FullApplySite::isa(inst)) {
-    if (auto crossing = fas.getIsolationCrossing())
-      return SILIsolationInfo::getActorIsolated(crossing->getCalleeIsolation());
+    if (auto crossing = fas.getIsolationCrossing()) {
+      if (crossing->getCalleeIsolation().isActorIsolated()) {
+        return SILIsolationInfo::getActorIsolated(
+            crossing->getCalleeIsolation());
+      }
+    }
 
     if (fas.hasSelfArgument()) {
       auto &self = fas.getSelfArgumentOperand();
@@ -79,9 +87,18 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 }
 
 SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
+  // If we have self and our function is actor isolated, all of our arguments
+  // should be marked as actor isolated.
   if (auto *self = arg->getFunction()->maybeGetSelfArgument()) {
-    if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
-      return SILIsolationInfo::getActorIsolated(nomDecl);
+    if (auto functionIsolation = arg->getFunction()->getActorIsolation()) {
+      if (functionIsolation->isActorIsolated()) {
+        if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
+          if (auto isolationInfo =
+                  SILIsolationInfo::getActorIsolated(nomDecl)) {
+            return isolationInfo;
+          }
+        }
+      }
     }
   }
 
@@ -171,7 +188,7 @@ bool SILIsolationInfo::operator==(const SILIsolationInfo &other) const {
 
     // Otherwise, try to use the inferred actor decl.
     auto *lhsDecl = tryInferActorDecl();
-    auto *rhsDecl = tryInferActorDecl();
+    auto *rhsDecl = other.tryInferActorDecl();
     if (lhsDecl && rhsDecl)
       return lhsDecl == rhsDecl;
 
