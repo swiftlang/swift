@@ -124,6 +124,16 @@ TypeAttribute::getAttrKindFromString(StringRef Str) {
       .Default(std::nullopt);
 }
 
+bool TypeAttribute::isSilOnly(TypeAttrKind TK) {
+  switch (TK) {
+#define SIL_TYPE_ATTR(X, C) case TypeAttrKind::C:
+#include "swift/AST/TypeAttr.def"
+    return true;
+  default:
+    return false;
+  }
+}
+
 /// Return the name (like "autoclosure") for an attribute ID.
 const char *TypeAttribute::getAttrName(TypeAttrKind kind) {
   switch (kind) {
@@ -2947,8 +2957,8 @@ void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
     attr->print(out);
 }
 
-bool swift::hasAttribute(
-    const LangOptions &langOpts, llvm::StringRef attributeName) {
+static bool hasDeclAttribute(const LangOptions &langOpts,
+                             llvm::StringRef attributeName) {
   std::optional<DeclAttrKind> kind =
       DeclAttribute::getAttrKindFromString(attributeName);
   if (!kind)
@@ -2966,4 +2976,28 @@ bool swift::hasAttribute(
     return false;
 
   return true;
+}
+
+static bool hasTypeAttribute(const LangOptions &langOpts,
+                             llvm::StringRef attributeName) {
+  std::optional<TypeAttrKind> kind =
+      TypeAttribute::getAttrKindFromString(attributeName);
+  if (!kind)
+    return false;
+
+  if (TypeAttribute::isSilOnly(*kind))
+    return false;
+
+  return true;
+}
+
+bool swift::hasAttribute(const LangOptions &langOpts,
+                         llvm::StringRef attributeName) {
+  if (hasDeclAttribute(langOpts, attributeName))
+    return true;
+
+  if (hasTypeAttribute(langOpts, attributeName))
+    return true;
+
+  return false;
 }
