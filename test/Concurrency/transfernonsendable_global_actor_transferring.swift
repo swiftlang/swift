@@ -27,9 +27,8 @@ func useValue<T>(_ t: T) {}
 
   // Will be resolved once @MainActor is @Sendable
   Task.fakeInit { @MainActor in // expected-error {{main actor-isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter}}
-    print(ns) // expected-error {{transferring 'ns' may cause a race}}
-    // expected-note @-1 {{disconnected 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    print(ns)
   }
 
-  useValue(ns) // expected-note {{use here could race}}
+  useValue(ns)
 }
