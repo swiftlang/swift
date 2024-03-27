@@ -73,7 +73,7 @@ public:
   void clear() { bits = 0; }
 
 #define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) \
-  constexpr bool contains##Name() const {            \
+  bool contains##Name() const {                      \
     return contains(SuppressibleProtocolKind::Name); \
   }
 #include "swift/ABI/SuppressibleProtocols.def"
