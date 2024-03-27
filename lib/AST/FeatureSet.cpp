@@ -691,9 +691,14 @@ void FeatureSet::collectSuppressibleFeature(Feature feature,
                               operation == Insert);
 }
 
-static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
+static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
+                                           bool inverted) {
   auto attr = decl->getAttrs().getAttribute<AllowFeatureSuppressionAttr>();
-  if (!attr) return false;
+  if (!attr)
+    return false;
+
+  if (attr->getInverted() != inverted)
+    return false;
 
   for (auto suppressedFeature : attr->getSuppressedFeatures()) {
     if (suppressedFeature.is(featureName))
@@ -701,6 +706,14 @@ static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
   }
 
   return false;
+}
+
+static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, true);
+}
+
+static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, false);
 }
 
 /// Go through all the features used by the given declaration and
@@ -712,11 +725,15 @@ void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
   if (usesFeature##FeatureName(decl))                                          \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl))                                          \
-    collectSuppressibleFeature(Feature::FeatureName, operation);
+  if (usesFeature##FeatureName(decl)) {                                        \
+    if (disallowFeatureSuppression(#FeatureName, decl))                        \
+      collectRequiredFeature(Feature::FeatureName, operation);                 \
+    else                                                                       \
+      collectSuppressibleFeature(Feature::FeatureName, operation);             \
+  }
 #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
   if (usesFeature##FeatureName(decl)) {                                        \
-    if (shouldSuppressFeature(#FeatureName, decl))                             \
+    if (allowFeatureSuppression(#FeatureName, decl))                           \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
     else                                                                       \
       collectRequiredFeature(Feature::FeatureName, operation);                 \
