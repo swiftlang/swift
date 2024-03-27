@@ -22,6 +22,9 @@ func transferToNonIsolated<T>(_ t: T) async {}
 @MainActor func transferToMainActor<T>(_ t: T) async {}
 @CustomActor func transferToCustomActor<T>(_ t: T) async {}
 func useValue<T>(_ t: T) {}
+func useValueAsync<T>(_ t: T) async {}
+@MainActor func useValueMainActor<T>(_ t: T) {}
+@MainActor func mainActorFunction() {}
 
 var booleanFlag: Bool { false }
 @MainActor var mainActorIsolatedGlobal = NonSendableKlass()
@@ -220,4 +223,84 @@ struct Clock {
   // Since useValue is running in an actor isolated context, it is ok to use the
   // transferred value 'ns' here.
   useValue(ns)
+}
+
+@MainActor func synchronousActorIsolatedClosureError() async {
+  let closure = { @MainActor @Sendable in
+    MainActor.assertIsolated()
+  }
+
+  let erased: () -> Void = closure
+
+  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a race}}
+  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
+  // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+@MainActor func synchronousActorIsolatedFunctionError() async {
+  let erased: () -> Void = mainActorFunction
+
+  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a race}}
+  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
+  // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+@MainActor func synchronousActorIsolatedGenericFunctionError<T>(_ t: T) async {
+  let erased: (T) -> Void = useValueMainActor
+
+  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a race}}
+  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '(T) -> Void' outside of main actor-isolated context may introduce data races}}
+  // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+@MainActor func synchronousActorIsolatedClassMethodError() async {
+  @MainActor class Test {
+    func foo() {}
+  }
+
+  let t = Test()
+  let erased: () -> Void = t.foo
+
+  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a race}}
+  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
+  // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+@MainActor func synchronousActorIsolatedFinalClassMethodError() async {
+  @MainActor final class Test {
+    func foo() {}
+  }
+
+  let t = Test()
+  let erased: () -> Void = t.foo
+
+  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a race}}
+  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
+  // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+@MainActor func synchronousClosureCapturingGlobalActorIsolatedGlobal() async {
+  let closure = {
+    print(mainActorIsolatedGlobal)
+  }
+  // Regions: [{(closure), @MainActor}]
+  await transferToCustomActor(closure) // expected-tns-warning {{transferring 'closure' may cause a race}}
+  // expected-tns-note @-1 {{transferring main actor-isolated 'closure' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into global actor 'CustomActor'-isolated context may introduce data races}}
+  // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+@MainActor func synchronousClosureCapturingGlobalActorIsolatedFunction() async {
+  let closure = {
+    mainActorFunction()
+  }
+  await transferToCustomActor(closure) // expected-tns-warning {{transferring 'closure' may cause a race}}
+  // expected-tns-note @-1 {{transferring main actor-isolated 'closure' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into global actor 'CustomActor'-isolated context may introduce data races}}
+  // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }

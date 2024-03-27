@@ -1848,7 +1848,7 @@ public:
     }
 
     // If our self parameter was transferring, transfer it. Otherwise, just
-    // stick it in the non seld operand values array and run multiassign on
+    // stick it in the non self operand values array and run multiassign on
     // it.
     if (fas.hasSelfArgument()) {
       auto &selfOperand = fas.getSelfArgumentOperand();
@@ -1863,6 +1863,12 @@ public:
         nonTransferringParameters.push_back(selfOperand.get());
       }
     }
+
+    // Add our callee to non-transferring parameters. This ensures that if it is
+    // actor isolated, that propagates into our results. This is especially
+    // important since our callee could be dynamically isolated and we cannot
+    // know that until we perform dataflow.
+    nonTransferringParameters.push_back(fas.getCallee());
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
@@ -3283,12 +3289,59 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     }
   }
 
-  // Then see if we have a sendable value. By default we assume values are not
-  // sendable.
   if (auto *defInst = value.getDefiningInstruction()) {
-    // Though these values are technically non-Sendable, we can safely and
-    // consistently treat them as Sendable.
-    if (isa<ClassMethodInst, FunctionRefInst>(defInst)) {
+    // Treat function ref as either actor isolated or sendable.
+    if (auto *fri = dyn_cast<FunctionRefInst>(defInst)) {
+      auto isolation = fri->getReferencedFunction()->getActorIsolation();
+      if (isolation.isActorIsolated()) {
+        iter.first->getSecond().mergeIsolationRegionInfo(
+            SILIsolationInfo::getActorIsolated(isolation));
+        return {iter.first->first, iter.first->second};
+      }
+
+      // Otherwise, lets look at the AST and see if our function ref is from an
+      // autoclosure.
+      if (auto *autoclosure = fri->getLoc().getAsASTNode<AutoClosureExpr>()) {
+        if (auto *funcType = autoclosure->getType()->getAs<AnyFunctionType>()) {
+          if (funcType->hasGlobalActor()) {
+            if (funcType->hasGlobalActor()) {
+              iter.first->getSecond().mergeIsolationRegionInfo(
+                  SILIsolationInfo::getActorIsolated(
+                      ActorIsolation::forGlobalActor(
+                          funcType->getGlobalActor())));
+              return {iter.first->first, iter.first->second};
+            }
+          }
+
+          if (auto *resultFType =
+                  funcType->getResult()->getAs<AnyFunctionType>()) {
+            if (resultFType->hasGlobalActor()) {
+              iter.first->getSecond().mergeIsolationRegionInfo(
+                  SILIsolationInfo::getActorIsolated(
+                      ActorIsolation::forGlobalActor(
+                          resultFType->getGlobalActor())));
+              return {iter.first->first, iter.first->second};
+            }
+          }
+        }
+      }
+
+      iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+      return {iter.first->first, iter.first->second};
+    }
+
+    if (auto *cmi = dyn_cast<ClassMethodInst>(defInst)) {
+      if (auto *declRefExpr = cmi->getLoc().getAsASTNode<DeclRefExpr>()) {
+        // See if we are actor isolated. If so, treat this as non-Sendable so we
+        // propagate actor isolation.
+        if (auto isolation = getActorIsolation(declRefExpr->getDecl())) {
+          if (isolation.isActorIsolated()) {
+            iter.first->getSecond().mergeIsolationRegionInfo(
+                SILIsolationInfo::getActorIsolated(isolation));
+            return {iter.first->first, iter.first->second};
+          }
+        }
+      }
       iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
       return {iter.first->first, iter.first->second};
     }
@@ -3376,6 +3429,71 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
       iter.first->getSecond().mergeIsolationRegionInfo(
           SILIsolationInfo::get(fArg));
       return {iter.first->first, iter.first->second};
+    }
+  }
+
+  // See if we have a convert function from a Sendable actor isolated function,
+  // we want to treat the result of the convert function as being actor isolated
+  // so that we cannot escape the value.
+  //
+  // NOTE: At this point, we already know that cfi's result is not sendable,
+  // since we would have exited above already.
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(iter.first->first.getValue())) {
+    SILValue operand = cfi->getOperand();
+    if (operand->getType().getAs<SILFunctionType>()->isSendable()) {
+      SILValue newValue = operand;
+      do {
+        operand = newValue;
+
+        newValue = lookThroughOwnershipInsts(operand);
+        if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(newValue)) {
+          newValue = ttfi->getOperand();
+        }
+
+        if (auto *cfi = dyn_cast<ConvertFunctionInst>(newValue)) {
+          newValue = cfi->getOperand();
+        }
+
+        if (auto *pai = dyn_cast<PartialApplyInst>(newValue)) {
+          newValue = pai->getCallee();
+        }
+      } while (newValue != operand);
+
+      if (auto *ai = dyn_cast<ApplyInst>(operand)) {
+        if (auto *callExpr = ai->getLoc().getAsASTNode<ApplyExpr>()) {
+          if (auto *callType = callExpr->getType()->getAs<AnyFunctionType>()) {
+            if (callType->hasGlobalActor()) {
+              iter.first->getSecond().mergeIsolationRegionInfo(
+                  SILIsolationInfo::getGlobalActorIsolated(
+                      callType->getGlobalActor()));
+              return {iter.first->first, iter.first->second};
+            }
+          }
+        }
+      }
+
+      if (auto *fri = dyn_cast<FunctionRefInst>(operand)) {
+        if (auto actorIsolation =
+                fri->getReferencedFunction()->getActorIsolation()) {
+          if (actorIsolation.isActorIsolated()) {
+            iter.first->getSecond().mergeIsolationRegionInfo(
+                SILIsolationInfo::getActorIsolated(actorIsolation));
+            return {iter.first->first, iter.first->second};
+          }
+        }
+
+        // See if the function ref statically is known to have actor isolation.
+        //
+        // TODO: We should make it so that the closure constructed has actor
+        // isolation.
+        if (auto value = tryToTrackValue(fri)) {
+          auto isolation = value->getIsolationRegionInfo();
+          if (isolation.isActorIsolated()) {
+            iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+            return {iter.first->first, iter.first->second};
+          }
+        }
+      }
     }
   }
 
