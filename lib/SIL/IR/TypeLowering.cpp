@@ -3203,7 +3203,8 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     }
   }
 
-  if (!lowering.isTrivial() && conformance) {
+  if (!lowering.isTrivial() && conformance &&
+      !conformance.hasUnavailableConformance()) {
     // A non-trivial type can have a conformance in a few cases:
     // (1) containing or being a conforming archetype
     // (2) is resilient with minimal expansion
