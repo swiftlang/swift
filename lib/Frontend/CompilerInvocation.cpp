@@ -582,6 +582,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
+  bool buildingFromInterface =
+      FrontendOptions::doesActionBuildModuleFromInterface(
+          FrontendOpts.RequestedAction);
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
@@ -791,10 +794,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                OPT_disable_testable_attr_requires_testable_module)) {
     Opts.EnableTestableAttrRequiresTestableModule
       = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
-  } else if (FrontendOpts.RequestedAction ==
-             FrontendOptions::ActionType::TypecheckModuleFromInterface ||
-	     FrontendOpts.RequestedAction ==
-             FrontendOptions::ActionType::CompileModuleFromInterface) {
+  } else if (buildingFromInterface) {
     Opts.EnableObjCAttrRequiresFoundation = false;
   }
 
@@ -873,7 +873,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // (non-release) builds for testing purposes.
     if (auto feature = getExperimentalFeature(value)) {
 #ifdef NDEBUG
-      if (!isFeatureAvailableInProduction(*feature)) {
+      if (!buildingFromInterface && !isFeatureAvailableInProduction(*feature)) {
         Diags.diagnose(SourceLoc(), diag::experimental_not_supported_in_production,
                        A->getValue());
         HadError = true;
@@ -1142,10 +1142,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
     // If built from interface, non-resilient access should not be allowed.
     if (Opts.AllowNonResilientAccess &&
-        (FrontendOpts.RequestedAction ==
-             FrontendOptions::ActionType::CompileModuleFromInterface ||
-         FrontendOpts.RequestedAction ==
-             FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
+        FrontendOptions::doesActionBuildModuleFromInterface(
+            FrontendOpts.RequestedAction)) {
       Diags.diagnose(
           SourceLoc(), diag::warn_ignore_option_overriden_by,
           "-experimental-allow-non-resilient-access",

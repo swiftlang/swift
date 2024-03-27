@@ -227,8 +227,8 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.RequestedAction = determineRequestedAction(Args);
   }
 
-  if (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
-      Opts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface) {
+  if (FrontendOptions::doesActionBuildModuleFromInterface(
+          Opts.RequestedAction)) {
     // The situations where we use this action, e.g. explicit module building and
     // generating prebuilt module cache, don't need synchronization. We should avoid
     // using lock files for them.
@@ -695,10 +695,8 @@ bool ArgsToFrontendOptionsConverter::
 
 bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
     const {
-  if (Opts.RequestedAction !=
-          FrontendOptions::ActionType::CompileModuleFromInterface &&
-      Opts.RequestedAction !=
-          FrontendOptions::ActionType::TypecheckModuleFromInterface &&
+  if (!FrontendOptions::doesActionBuildModuleFromInterface(
+          Opts.RequestedAction) &&
       Opts.ExplicitInterfaceBuild) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_explicit_interface_build_in_mode);
