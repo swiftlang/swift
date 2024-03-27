@@ -63,13 +63,15 @@ _swift_embedded_invoke_heap_object_destroy(void *object) {
 }
 
 static inline void
-_swift_embedded_invoke_heap_object_ivardestroyer(void *object, void *metadata) {
+_swift_embedded_invoke_heap_object_optional_ivardestroyer(void *object, void *metadata) {
   void **ivardestroyer_location = &((void **)metadata)[2];
+  if (*ivardestroyer_location) {
 #if __has_feature(ptrauth_calls)
-  (*(HeapObjectDestroyer __ptrauth(0, 1, 0xbbbf) *)ivardestroyer_location)(object);
+    (*(HeapObjectDestroyer __ptrauth(0, 1, 0xbbbf) *)ivardestroyer_location)(object);
 #else
-  (*(HeapObjectDestroyer *)ivardestroyer_location)(object);
+    (*(HeapObjectDestroyer *)ivardestroyer_location)(object);
 #endif
+  }
 }
 
 static inline void *_swift_embedded_get_heap_object_metadata_pointer(void *object) {

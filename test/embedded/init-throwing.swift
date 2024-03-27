@@ -22,16 +22,28 @@ public class Foo {
     }
 }
 
-_ = try? Foo(shouldThrow: true)
+public class Bar: Foo {
+  var value: Int = 17
+}
+
+public class Wibble: Bar {
+  var c: PrintingClass = .init()
+}
+
+_ = try? Wibble(shouldThrow: true)
 print("OK 1")
 // CHECK: PrintingClass.init
+// CHECK: PrintingClass.init
+// CHECK: PrintingClass.deinit
 // CHECK: PrintingClass.deinit
 // CHECK: OK 1
 
-_ = try? Foo(shouldThrow: false)
+_ = try? Wibble(shouldThrow: false)
 print("OK 2")
 // CHECK: PrintingClass.init
 // CHECK: PrintingClass.init
+// CHECK: PrintingClass.init
+// CHECK: PrintingClass.deinit
 // CHECK: PrintingClass.deinit
 // CHECK: PrintingClass.deinit
 // CHECK: OK 2
