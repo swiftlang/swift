@@ -489,6 +489,7 @@ SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
 DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
   157)
+DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
 SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
   OnAbstractFunction | OnSubscript | OnVar | OnExtension | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   158)
