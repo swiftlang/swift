@@ -61,14 +61,14 @@ actor MyActor {
 struct Runner {
   static func main() async {
     print("Launching a main-actor task")
-    // CHECK: warning: data race detected: @MainActor function at main/data_race_detection.swift:25 was not called on the main thread
+    // CHECK: warning: data race detected: @MainActor function at main/data_race_detection_legacy_warning.swift:25 was not called on the main thread
     launchFromMainThread()
     sleep(1)
 
     let actor = MyActor()
     let actorFn = await actor.getTaskOnMyActor()
     print("Launching an actor-instance task")
-    // CHECK: warning: data race detected: actor-isolated function at main/data_race_detection.swift:54 was not called on the same actor
+    // CHECK: warning: data race detected: actor-isolated function at main/data_race_detection_legacy_warning.swift:54 was not called on the same actor
     launchTask(actorFn)
 
     sleep(1)

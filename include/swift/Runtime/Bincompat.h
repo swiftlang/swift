@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -46,6 +46,17 @@ bool useLegacySwiftValueUnboxingInCasting();
 /// New semantics attempt to dispatch to Swift Hashable/Equatable conformances
 /// if present.
 bool useLegacySwiftObjCHashing();
+
+/// Legacy semantics allowed for the `swift_task_reportUnexpectedExecutor` to
+/// only log a warning. This changes in future releases and this function
+/// will fatal error always.
+///
+/// Old behavior:
+/// - logging a warning on concurrency violation is allowed
+/// New behavior:
+/// - always fatal error in `swift_task_reportUnexpectedExecutor`
+SWIFT_RUNTIME_STDLIB_SPI
+bool swift_bincompat_useLegacyWarningModeReportUnexpectedExecutor();
 
 } // namespace bincompat
 
