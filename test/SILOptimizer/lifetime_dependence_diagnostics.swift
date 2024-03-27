@@ -22,6 +22,12 @@ func bv_copy(_ bv: borrowing BV) -> dependsOn(bv) BV {
   copy bv
 }
 
+struct NCInt: ~Copyable {
+  var value: Int
+}
+
+func takeClosure(_: () -> ()) {}
+
 // No mark_dependence is needed for a inherited scope.
 //
 // CHECK-LABEL: sil hidden @$s4test14bv_borrow_copyyAA2BVVADYlsF : $@convention(thin) (@guaranteed BV) -> _scope(1) @owned BV {
@@ -44,4 +50,11 @@ func bv_borrow_copy(_ bv: borrowing BV) -> dependsOn(scoped bv) BV {
 // CHECK-LABEL: } // end sil function '$s4test010bv_borrow_C00B0AA2BVVAEYls_tF'
 func bv_borrow_borrow(bv: borrowing BV) -> dependsOn(scoped bv) BV {
   bv_borrow_copy(bv)
+}
+
+// This already has a mark_dependence [nonescaping] before diagnostics. If it triggers diagnostics again, it will fail
+// because lifetime dependence does not expect a dependence directly on an 'inout' address without any 'begin_access'
+// marker.
+func ncint_capture(ncInt: inout NCInt) {
+  takeClosure { _ = ncInt.value }
 }
