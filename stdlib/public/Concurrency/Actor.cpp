@@ -316,9 +316,53 @@ bool _task_serialExecutor_isSameExclusiveExecutionContext(
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
+// We currently still support "legacy mode" in which isCurrentExecutor is NOT
+// allowed to crash, because it is used to power "log warnings" data race
+// detector. This mode is going away in Swift 6, but until then we allow this.
+// This override exists primarily to be able to test both code-paths.
+enum IsCurrentExecutorCheckMode: unsigned {
+  /// The default mode when an app was compiled against "new" enough SDK.
+  /// It allows crashing in isCurrentExecutor, and calls into `checkIsolated`.
+  Default_UseCheckIsolated_AllowCrash,
+  /// Legacy mode; Primarily to support old applications which used data race
+  /// detector with "warning" mode, which is no longer supported. When such app
+  /// is re-compiled against a new SDK, it will see crashes in what was
+  /// previously warnings; however, until until recompiled, warnings will be
+  /// used, and `checkIsolated` cannot be invoked.
+  Legacy_NoCheckIsolated_NonCrashing,
+};
+static IsCurrentExecutorCheckMode isCurrentExecutorMode =
+    Default_UseCheckIsolated_AllowCrash;
+
+// Check override of executor checking mode.
+static void checkIsCurrentExecutorMode(void *context) {
+  auto useLegacyMode =
+      swift_bincompat_useLegacyNonCrashingExecutorChecks();
+
+  // Potentially, override the platform detected mode, primarily used in tests.
+#if SWIFT_STDLIB_HAS_ENVIRON
+  const char *modeStr = getenv("SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE");
+  if (!modeStr)
+    return;
+  
+  if (strcmp(modeStr, "nocrash") == 0) {
+    useLegacyMode = Legacy_NoCheckIsolated_NonCrashing;
+  } else if (strcmp(modeStr, "crash") == 0)  {
+    useLegacyMode = Default_UseCheckIsolated_AllowCrash;
+  } // else, just use the platform detected mode
+#endif // SWIFT_STDLIB_HAS_ENVIRON
+  isCurrentExecutorMode = useLegacyMode ? Legacy_NoCheckIsolated_NonCrashing
+                                        : Default_UseCheckIsolated_AllowCrash;
+}
+
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
   auto current = ExecutorTrackingInfo::current();
+
+  // To support old applications on apple platforms which assumed this call
+  // does not crash, try to use a more compatible mode for those apps.
+  static swift::once_t checkModeToken;
+  swift::once(checkModeToken, checkIsCurrentExecutorMode, nullptr);
 
   if (!current) {
     // We have no current executor, i.e. we are running "outside" of Swift
@@ -328,16 +372,24 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
 
     // Are we expecting the main executor and are using the main thread?
     if (expectedExecutor.isMainExecutor() && isExecutingOnMainThread()) {
-      // TODO(concurrency): consider removing this special case, as checkIsolated will compare against mainQueue already
+      // Due to compatibility with pre-checkIsolated code, we cannot remove
+      // this special handling. CheckIsolated can handle this if the expected
+      // executor is the main queue / main executor, however, if we cannot call
+      // checkIsolated we cannot rely on it to handle this.
+      // TODO: consider removing this branch when `useCrashingCheckIsolated=true`
       return true;
     }
 
     // Otherwise, as last resort, let the expected executor check using
     // external means, as it may "know" this thread is managed by it etc.
-    swift_task_checkIsolated(expectedExecutor);
+    if (isCurrentExecutorMode == Default_UseCheckIsolated_AllowCrash) {
+      swift_task_checkIsolated(expectedExecutor);
+      // checkIsolated did not crash, so we are on the right executor, after all!
+      return true;
+    }
 
-    // checkIsolated did not crash, so we are on the right executor, after all!
-    return true;
+    assert(isCurrentExecutorMode == Legacy_NoCheckIsolated_NonCrashing);
+    return false;
   }
 
   SerialExecutorRef currentExecutor = current->getActiveExecutor();
@@ -416,10 +468,16 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
   // Note that this only works because the closure in assumeIsolated is
   // synchronous, and will not cause suspensions, as that would require the
   // presence of a Task.
-  swift_task_checkIsolated(expectedExecutor);
+  // compat_invoke_swift_task_checkIsolated(expectedExecutor);
+  if (isCurrentExecutorMode == Default_UseCheckIsolated_AllowCrash) {
+    swift_task_checkIsolated(expectedExecutor);
+    // The checkIsolated call did not crash, so we are on the right executor.
+    return true;
+  }
 
-  // The checkIsolated call did not crash, so we are on the right executor.
-  return true;
+  // Using legacy mode, if no explicit executor match worked, we assume `false`
+  assert(isCurrentExecutorMode == Legacy_NoCheckIsolated_NonCrashing);
+  return false;
 }
 
 /// Logging level for unexpected executors:
@@ -431,7 +489,7 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
 /// an application was linked to. Since Swift 6 the default is to crash,
 /// and the logging behavior is no longer available.
 static unsigned unexpectedExecutorLogLevel =
-    swift_bincompat_useLegacyWarningModeReportUnexpectedExecutor()
+    swift_bincompat_useLegacyNonCrashingExecutorChecks()
         ? 1 // legacy apps default to the logging mode, and cannot use `checkIsolated`
         : 2; // new apps will only crash upon concurrency violations, and will call into `checkIsolated`
 

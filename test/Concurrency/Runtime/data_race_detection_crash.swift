@@ -1,7 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %import-libdispatch -Xfrontend -disable-availability-checking -enable-actor-data-race-checks -parse-as-library %s -o %t/a.out -module-name main
 // RUN: %target-codesign %t/a.out
-// RUN: env %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/a.out
+
+// NOTE: This test specifically tests the crashing behavior of `checkIsolated`,
+// because this behavior is currently disabled
+// RUN: env %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=crash %target-run %t/a.out
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

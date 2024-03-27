@@ -256,7 +256,7 @@ bool useLegacySwiftObjCHashing() {
 }
 
 // FIXME(concurrency): Once the release is announced, adjust the logic detecting the SDKs
-bool swift_bincompat_useLegacyWarningModeReportUnexpectedExecutor() {
+bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #if BINARY_COMPATIBILITY_APPLE
   return true; // For now, legacy behavior on Apple OSes
 #elif SWIFT_TARGET_OS_DARWIN
@@ -265,7 +265,6 @@ bool swift_bincompat_useLegacyWarningModeReportUnexpectedExecutor() {
   return false; // Always use the new behavior on non-Apple OSes
 #endif
 }
-
 
 } // namespace bincompat
 
