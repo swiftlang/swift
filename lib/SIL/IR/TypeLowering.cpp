@@ -3203,11 +3203,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     }
   }
 
-  if (!lowering.isTrivial() && conformance) {
+  if (!lowering.isTrivial() && conformance &&
+      !conformance.hasUnavailableConformance()) {
     // A non-trivial type can have a conformance in a few cases:
-    // (1) contains a conforming archetype
+    // (1) containing or being a conforming archetype
     // (2) is resilient with minimal expansion
     // (3) containing or being ~Escapable
+    // (4) containing or being an opaque archetype
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
@@ -3255,6 +3257,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // An archetype may conform but be non-trivial (case (1)).
           if (origTy.isTypeParameter())
             return false;
+
+          // An opaque archetype may conform but be non-trivial (case (4)).
+          if (isa<OpaqueTypeArchetypeType>(ty)) {
+            return false;
+          }
 
           return true;
         });
