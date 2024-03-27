@@ -426,10 +426,6 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   if (cd && cd->isImplicit()) {
     if (cd->getParameters()->size() == 0) {
       return std::nullopt;
-    } else {
-      diags.diagnose(cd->getLoc(),
-                     diag::lifetime_dependence_cannot_infer_implicit_init);
-      return std::nullopt;
     }
   }
 
@@ -471,9 +467,16 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
       continue;
     }
     if (candidateParam) {
-      diags.diagnose(
-          returnLoc,
-          diag::lifetime_dependence_cannot_infer_ambiguous_candidate);
+      if (afd->getKind() == DeclKind::Constructor && afd->isImplicit()) {
+        diags.diagnose(
+            returnLoc,
+            diag::lifetime_dependence_cannot_infer_ambiguous_candidate,
+            "on implicit initializer");
+        return std::nullopt;
+      }
+      diags.diagnose(returnLoc,
+                     diag::lifetime_dependence_cannot_infer_ambiguous_candidate,
+                     "");
       return std::nullopt;
     }
     candidateParam = param;
@@ -482,17 +485,15 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   }
 
   if (!candidateParam && !hasParamError) {
-    // Explicitly turn off error messages for builtins, since some of are
-    // ~Escapable currently.
-    // TODO: rdar://123555720: Remove this check after another round of
-    // surveying builtins
-    if (auto *fd = dyn_cast<FuncDecl>(afd)) {
-      if (fd->isImplicit() && fd->getModuleContext()->isBuiltinModule()) {
-        return std::nullopt;
-      }
+    if (afd->getKind() == DeclKind::Constructor && afd->isImplicit()) {
+      diags.diagnose(returnLoc,
+                     diag::lifetime_dependence_cannot_infer_no_candidates,
+                     "on implicit initializer");
+      return std::nullopt;
     }
     diags.diagnose(returnLoc,
-                   diag::lifetime_dependence_cannot_infer_no_candidates);
+                   diag::lifetime_dependence_cannot_infer_no_candidates,
+                   "");
     return std::nullopt;
   }
   return lifetimeDependenceInfo;
