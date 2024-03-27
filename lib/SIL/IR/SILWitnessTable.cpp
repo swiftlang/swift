@@ -171,11 +171,19 @@ bool SILWitnessTable::conformanceIsSerialized(
   if (normalConformance && normalConformance->isResilient())
     return false;
 
-  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
+  // Allow serializing conformance with package access level if
+  // package serialization is enabled.
+  auto optInPackage = conformance->getDeclContext()
+                          ->getASTContext()
+                          .SILOpts.EnableSerializePackage;
+  auto accessLevelToCheck =
+      optInPackage ? AccessLevel::Package : AccessLevel::Public;
+
+  if (conformance->getProtocol()->getEffectiveAccess() < accessLevelToCheck)
     return false;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  return nominal->getEffectiveAccess() >= AccessLevel::Public;
+  return nominal->getEffectiveAccess() >= accessLevelToCheck;
 }
 
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(

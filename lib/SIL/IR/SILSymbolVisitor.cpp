@@ -289,7 +289,9 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
             return;
 
           if (!isa<SelfProtocolConformance>(rootConformance) &&
-              !fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+              !fixmeWitnessHasLinkageThatNeedsToBePublic(
+                  witnessRef,
+                  witnessRef.getASTContext().SILOpts.EnableSerializePackage)) {
             return;
           }
         }
