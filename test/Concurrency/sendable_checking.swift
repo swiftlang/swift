@@ -254,12 +254,12 @@ final class NonSendable {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
     // expected-tns-warning @-2 {{transferring 'self' may cause a race}}
-    // expected-tns-note @-3 {{transferring nonisolated 'self' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+    // expected-tns-note @-3 {{transferring task-isolated 'self' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
     // expected-tns-warning @-2 {{transferring 'self' may cause a race}}
-    // expected-tns-note @-3 {{transferring nonisolated 'self' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+    // expected-tns-note @-3 {{transferring task-isolated 'self' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -274,15 +274,15 @@ final class NonSendable {
 
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
-  let t = NonSendable() // expected-tns-note {{variable defined here}}
+  let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{transferring 't' may cause a race}}
-  // expected-tns-note @-3 {{'t' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-tns-note @-3 {{transferring disconnected 't' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
-  // expected-tns-note@-2 {{access here could race}}
+  // expected-tns-note@-2 {{use here could race}}
 }
 
 @available(SwiftStdlib 5.1, *)

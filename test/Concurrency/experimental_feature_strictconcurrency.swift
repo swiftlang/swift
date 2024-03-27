@@ -27,13 +27,13 @@ struct Test2: TestProtocol { // expected-warning{{conformance of 'C2' to 'Sendab
 
 @MainActor
 func iterate(stream: AsyncStream<Int>) async {
-  nonisolated(unsafe) var it = stream.makeAsyncIterator() // expected-region-isolation-note {{variable defined here}}
+  nonisolated(unsafe) var it = stream.makeAsyncIterator()
   // FIXME: Region isolation should consider a value from a 'nonisolated(unsafe)'
   // declaration to be in a disconnected region
 
   // expected-region-isolation-warning @+3 {{transferring 'it' may cause a race}}
-  // expected-region-isolation-note @+2 {{'it' is transferred from main actor-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
-  // expected-region-isolation-note @+1 {{access here could race}}
+  // expected-region-isolation-note @+2 {{transferring disconnected 'it' to nonisolated callee could cause races in between callee nonisolated and local main actor-isolated uses}}
+  // expected-region-isolation-note @+1 {{use here could race}}
   while let element = await it.next() {
     print(element)
   }

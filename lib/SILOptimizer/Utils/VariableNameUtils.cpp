@@ -51,6 +51,11 @@ findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
       }
     }
 
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst)) {
+      if (sbi->getDest() == allocInst)
+        return sbi->getSrc();
+    }
+
     // If we do not identify the write... return SILValue(). We weren't able
     // to understand the write.
     break;
@@ -128,6 +133,57 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
     if (auto *si = dyn_cast<StoreInst>(&inst)) {
       if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        // Check if we are updating the entire tuple value.
+        if (si->getDest() == allocInst) {
+          // If we already found a root address (meaning we were processing
+          // tuple_elt_addr), bail. We have some sort of unhandled mix of
+          // copy_addr and store.
+          if (foundRootAddress)
+            return SILValue();
+
+          // If we already found a destructure, return SILValue(). We are
+          // initializing twice.
+          if (foundDestructure)
+            return SILValue();
+
+          // We are looking for a pattern where we construct a tuple from
+          // destructured parts.
+          if (auto *ti = dyn_cast<TupleInst>(si->getSrc())) {
+            for (auto p : llvm::enumerate(ti->getOperandValues())) {
+              SILValue value = lookThroughOwnershipInsts(p.value());
+              if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+                      value->getDefiningInstruction())) {
+                // We should always go through the same dti.
+                if (foundDestructure && foundDestructure != dti)
+                  return SILValue();
+                if (!foundDestructure)
+                  foundDestructure = dti;
+
+                // If we have a mixmatch of indices, we cannot look through.
+                if (p.index() != dti->getIndexOfResult(value))
+                  return SILValue();
+                if (tupleValues[p.index()])
+                  return SILValue();
+                tupleValues[p.index()] = value;
+
+                // If we have completely covered the tuple, break.
+                --numEltsLeft;
+                if (!numEltsLeft)
+                  break;
+              }
+            }
+
+            // If we haven't completely covered the tuple, return SILValue(). We
+            // should completely cover the tuple.
+            if (numEltsLeft)
+              return SILValue();
+
+            // Otherwise, break since we are done.
+            break;
+          }
+        }
+
+        // If we store to a tuple_element_addr, update for a single value.
         if (auto *tei = dyn_cast<TupleElementAddrInst>(si->getDest())) {
           if (tei->getOperand() == allocInst) {
             unsigned i = tei->getFieldIndex();
@@ -183,7 +239,7 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
 SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     AllocationInst *allocInst) {
-  struct AddressWalker : public TransitiveAddressWalker<AddressWalker> {
+  struct AddressWalker final : public TransitiveAddressWalker<AddressWalker> {
     AddressWalkerState &state;
 
     AddressWalker(AddressWalkerState &state) : state(state) {}
@@ -192,6 +248,12 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
       if (use->getUser()->mayWriteToMemory())
         state.writes.insert(use->getUser());
       return true;
+    }
+
+    TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+        return TransitiveUseVisitation::OnlyUser;
+      return TransitiveUseVisitation::OnlyUses;
     }
 
     void onError(Operand *use) { state.foundError = true; }
@@ -286,6 +348,13 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
       variableNamePath.push_back(allocInst);
       return allocInst;
+    }
+
+    // If we have a store_borrow, always look at the dest. We are going to see
+    // if we can determine if dest is a temporary alloc_stack.
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(searchValue)) {
+      searchValue = sbi->getDest();
+      continue;
     }
 
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
@@ -487,7 +556,9 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperAddrInst>(searchValue) ||
-        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue)) {
+        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
+        isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
+        isa<CopyableToMoveOnlyWrapperValueInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }

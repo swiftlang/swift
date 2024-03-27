@@ -250,6 +250,55 @@ public:
     return NewNode;
   }
 
+  template <typename U, typename... Args>
+  struct IsTrivialTypedPointerAndHasProfile {
+    constexpr static bool hasProfile =
+        std::is_same_v<decltype(std::remove_pointer<U>::type::Profile(
+                           std::declval<Args>()...)),
+                       void>;
+    constexpr static bool value =
+        hasProfile && std::is_trivial_v<U> && std::is_pointer_v<U>;
+  };
+
+  /// Emplace a new value with \p args if we do not yet have one. We allocate
+  /// the object with our bump ptr allocator, so we require that the type be
+  /// trivial.
+  template <typename... Args>
+  typename std::enable_if_t<IsTrivialTypedPointerAndHasProfile<
+                                T, llvm::FoldingSetNodeID &, Args...>::value,
+                            PtrSet> *
+  emplace(Args... args) {
+    llvm::FoldingSetNodeID ID;
+    using NoPointerTy = typename std::remove_pointer<T>::type;
+    NoPointerTy::Profile(ID, std::forward<Args>(args)...);
+
+    void *InsertPt;
+    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+      return PSet;
+    }
+
+    size_t NumElts = 1;
+    size_t MemSize = sizeof(PtrSet) + sizeof(NoPointerTy);
+
+    // Allocate the memory.
+    auto *Mem =
+        reinterpret_cast<PtrSet *>(Allocator.Allocate(MemSize, AllocAlignment));
+
+    // Copy in the pointers into the tail allocated memory. We do not need to do
+    // any sorting/uniquing ourselves since we assume that our users perform
+    // this task for us.
+    llvm::MutableArrayRef<NoPointerTy *> DataMem(
+        reinterpret_cast<NoPointerTy **>(&Mem[1]), NumElts);
+    NoPointerTy *type =
+        new (Allocator) NoPointerTy(std::forward<Args>(args)...);
+    DataMem[0] = type;
+
+    // Allocate the new node and insert it into the Set.
+    auto *NewNode = new (Mem) PtrSet(this, DataMem);
+    Set.InsertNode(NewNode, InsertPt);
+    return NewNode;
+  }
+
   PtrSet *get(T value) {
     llvm::FoldingSetNodeID ID;
     ID.AddPointer(PtrTraits::getAsVoidPointer(value));
