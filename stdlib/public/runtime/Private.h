@@ -294,6 +294,13 @@ public:
   using SubstGenericParameterFn =
     std::function<const void *(unsigned depth, unsigned index)>;
 
+  /// Callback used to provide the substitution of a generic parameter
+  /// (described by the ordinal, or "flat index") to its metadata.
+  ///
+  /// The return type here is a lie; it's actually a MetadataOrPack.
+  using SubstGenericParameterOrdinalFn =
+    std::function<const void *(unsigned ordinal)>;
+
   /// Callback used to provide the substitution of a witness table based on
   /// its index into the enclosing generic environment.
   using SubstDependentWitnessTableFn =
@@ -453,6 +460,7 @@ public:
     const void * const *getGenericArgs() const { return genericArgs; }
 
     MetadataOrPack getMetadata(unsigned depth, unsigned index) const;
+    MetadataOrPack getMetadataOrdinal(unsigned ordinal) const;
     const WitnessTable *getWitnessTable(const Metadata *type,
                                         unsigned index) const;
   };
@@ -530,6 +538,9 @@ public:
   /// arguments, collecting the key arguments (e.g., witness tables) for
   /// the caller.
   ///
+  /// \param genericParams The generic parameters corresponding to the
+  /// arguments.
+  ///
   /// \param requirements The set of requirements to evaluate.
   ///
   /// \param extraArguments The extra arguments determined while checking
@@ -538,9 +549,11 @@ public:
   ///
   /// \returns the error if an error occurred, None otherwise.
   std::optional<TypeLookupError> _checkGenericRequirements(
+      llvm::ArrayRef<GenericParamDescriptor> genericParams,
       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
       llvm::SmallVectorImpl<const void *> &extraArguments,
       SubstGenericParameterFn substGenericParam,
+      SubstGenericParameterOrdinalFn substGenericParamOrdinal,
       SubstDependentWitnessTableFn substWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
