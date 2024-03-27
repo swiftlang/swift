@@ -24,8 +24,8 @@ public struct ClassMetadata {
 
   // There is no way to express the actual calling convention on this
   // function (swiftcc with 'self') currently, so let's use UnsafeRawPointer
-  // and a helper function in C (_swift_embedded_invoke_heap_object_ivardestroyer).
-  var ivarDestroyer: UnsafeRawPointer
+  // and a helper function in C (_swift_embedded_invoke_heap_object_optional_ivardestroyer).
+  var ivarDestroyer: UnsafeRawPointer?
 }
 
 public struct HeapObject {
@@ -129,7 +129,7 @@ public func swift_deallocPartialClassInstance(object: Builtin.RawPointer, metada
 func swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>, metadata: UnsafeMutablePointer<ClassMetadata>, allocatedSize: Int, allocatedAlignMask: Int) {
   var classMetadata = _swift_embedded_get_heap_object_metadata_pointer(object).assumingMemoryBound(to: ClassMetadata.self)
   while classMetadata != metadata {
-    _swift_embedded_invoke_heap_object_ivardestroyer(object, classMetadata)
+    _swift_embedded_invoke_heap_object_optional_ivardestroyer(object, classMetadata)
     guard let superclassMetadata = classMetadata.pointee.superclassMetadata else { break }
     classMetadata = superclassMetadata
   }
