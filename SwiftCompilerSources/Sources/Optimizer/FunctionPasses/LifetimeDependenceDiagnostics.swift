@@ -14,9 +14,9 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    print((prefix ? "### " : "") + message())
   }
 }
 
@@ -32,7 +32,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   if !context.options.hasFeature(.NonescapableTypes) {
     return
   }
-  log(" --- Diagnosing lifetime dependence in \(function.name)")
+  log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
 
   for argument in function.arguments
@@ -297,6 +297,8 @@ private struct LifetimeVariable {
       // TODO: bridge VarDecl for FunctionConvention.Yields
       self.varDecl = nil
       self.sourceLoc = result.parentInstruction.location.sourceLoc
+    case .storeBorrow(let sb):
+      self = .init(dependent: sb.source, context)
     case .pointer(let ptrToAddr):
       self.varDecl = nil
       self.sourceLoc = ptrToAddr.location.sourceLoc

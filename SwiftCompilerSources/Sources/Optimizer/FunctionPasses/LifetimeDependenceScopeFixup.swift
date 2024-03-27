@@ -22,9 +22,9 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    print((prefix ? "### " : "") + message())
   }
 }
 
@@ -34,7 +34,7 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
   if !context.options.hasFeature(.NonescapableTypes) {
     return
   }
-  log(" --- Scope fixup for lifetime dependence in \(function.name)")
+  log(prefix: false, "\n--- Scope fixup for lifetime dependence in \(function.name)")
 
   let localReachabilityCache = LocalVariableReachabilityCache()
 
