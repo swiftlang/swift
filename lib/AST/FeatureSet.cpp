@@ -568,6 +568,8 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   return !inverseReqs.empty();
 }
 
+UNINTERESTING_FEATURE(NoncopyableGenerics2)
+
 static bool usesFeatureStructLetDestructuring(Decl *decl) {
   auto sd = dyn_cast<StructDecl>(decl);
   if (!sd)

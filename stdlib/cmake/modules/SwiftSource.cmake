@@ -612,7 +612,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
-  list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
+  list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics2")
 
   if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
     list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")

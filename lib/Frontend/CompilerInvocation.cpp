@@ -883,6 +883,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 #else
       Opts.enableFeature(*feature);
 #endif
+
+      if (*feature == Feature::NoncopyableGenerics2)
+        Opts.enableFeature(Feature::NoncopyableGenerics);
     }
 
     // Hack: In order to support using availability macros in SPM packages, we
