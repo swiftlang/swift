@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature CImplementation
+// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -enable-experimental-feature CImplementation
 // REQUIRES: objc_interop
 
 protocol EmptySwiftProto {}
@@ -432,14 +432,21 @@ protocol EmptySwiftProto {}
   func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @_objcImplementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
 }
 
+// Intentionally using `@_objcImplementation` for this test; do not upgrade!
+@_objcImplementation(EmptyCategory) extension ObjCClass {
+  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{2-21=implementation}}
+}
+
 @_objcImplementation extension ObjCImplSubclass {
-    @objc(initFromProtocol1:)
+  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{2-21=implementation}}
+  @objc(initFromProtocol1:)
     required public init?(fromProtocol1: CInt) {
       // OK
     }
 }
 
 @_objcImplementation extension ObjCBasicInitClass {
+  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{2-21=implementation}}
   init() {
     // OK
   }

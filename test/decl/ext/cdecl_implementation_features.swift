@@ -3,7 +3,7 @@
 
 // YES-DAG: cdecl_implementation_features.swift:[[@LINE+4]]:{{[0-9]+}}: warning: global function 'CImplFunc1' of type '(Double) -> ()' does not match type '(Int32) -> Void' declared by the header; this will become an error after adopting '@implementation'
 // NO-DAG: cdecl_implementation_features.swift:[[@LINE+3]]:{{[0-9]+}}: error: '_objcImplementation' attribute is only valid when experimental feature CImplementation is enabled
-// YES-NOT: cdecl_implementation_features.swift:[[@LINE+2]]:{{[0-9]+}}: warning: warning-only '@_objcImplementation' spelling is deprecated; use '@implementation' instead
+// YES-NOT: cdecl_implementation_features.swift:[[@LINE+2]]:{{[0-9]+}}: warning: '@_objcImplementation' is deprecated; use '@implementation' instead
 // TODO: When @implementation @_cdecl stabilizes, YES-NOT on the line above will become YES-DAG
 @_objcImplementation @_cdecl("CImplFunc1") func CImplFunc1(_: Double) {}
 
