@@ -127,6 +127,9 @@
 
 @end
 
+@interface ObjCClass (EmptyCategory)
+@end
+
 @protocol PartiallyOptionalProtocol
 
 - (void)requiredMethod1;
