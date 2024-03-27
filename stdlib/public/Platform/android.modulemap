@@ -346,12 +346,20 @@ module inet [system] {
     header "arpa/inet.h"
     export *
   }
+  explicit module net_if {
+    header "net/if.h"
+    export *
+  }
   explicit module netinet_in {
     header "netinet/in.h"
     export *
   }
   explicit module netinet_in6 {
     header "netinet/in6.h"
+    export *
+  }
+  explicit module netinet_tcp {
+    header "netinet/tcp.h"
     export *
   }
   explicit module bits_ip_mreq_source {

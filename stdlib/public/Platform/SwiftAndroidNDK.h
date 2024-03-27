@@ -35,6 +35,14 @@
 #include <uchar.h>
 #include <wchar.h>
 
+// C headers that are included with the compiler.
+#include <float.h>
+#include <iso646.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <tgmath.h>
+
 #include <alloca.h>
 #include <ar.h>
 #include <cpio.h>
@@ -89,8 +97,10 @@
 
 #include <arpa/inet.h>
 #include <linux/if.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in6.h>
+#include <netinet/tcp.h>
 
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
@@ -115,10 +125,17 @@
 #include <sys/msg.h>
 #include <sys/random.h>
 #include <sys/resource.h>
+#include <sys/select.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/times.h>
+#include <sys/types.h>
 #include <sys/un.h>
+#include <sys/user.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 
 #include <android/api-level.h>
 #include <android/asset_manager_jni.h>
@@ -127,7 +144,5 @@
 #include <android/log.h>
 #include <android/trace.h>
 #include <android/versioning.h>
-
-#include <zlib.h>
 
 #endif // SWIFT_ANDROID_NDK_MODULE
