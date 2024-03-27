@@ -34,6 +34,11 @@
 // imply the existence of earlier features.  (This only needs to apply to
 // suppressible features.)
 //
+// Sometimes, certain declarations will conflict with existing declarations
+// when printed with a suppressible feature disabled. The attribute
+// @_disallowFeatureSuppression can be used to suppress feature suppression on
+// a particular declaration.
+//
 // If suppressing a feature in general is problematic, but it's okay to
 // suppress it for specific declarations, the feature can be made
 // conditionally suppressible.  Declarations opt in to suppression with

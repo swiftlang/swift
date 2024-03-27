@@ -1275,14 +1275,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(" << cast<AlignmentAttr>(this)->getValue() << ")";
     break;
 
-  case DeclAttrKind::AllowFeatureSuppression:
-    Printer.printAttrName("@_allowFeatureSuppression");
+  case DeclAttrKind::AllowFeatureSuppression: {
+    auto Attr = cast<AllowFeatureSuppressionAttr>(this);
+    Printer.printAttrName(Attr->getInverted() ? "@_disallowFeatureSuppression"
+                                              : "@_allowFeatureSuppression");
     Printer << "(";
-    interleave(cast<AllowFeatureSuppressionAttr>(this)->getSuppressedFeatures(),
-               [&](Identifier ident) { Printer << ident; },
-               [&] { Printer << ", "; });
+    interleave(
+        Attr->getSuppressedFeatures(),
+        [&](Identifier ident) { Printer << ident; }, [&] { Printer << ", "; });
     Printer << ")";
     break;
+  }
 
   case DeclAttrKind::SILGenName:
     Printer.printAttrName("@_silgen_name");
@@ -1947,7 +1950,11 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Extern:
     return "_extern";
   case DeclAttrKind::AllowFeatureSuppression:
-    return "_allowFeatureSuppression";
+    if (cast<AllowFeatureSuppressionAttr>(this)->getInverted()) {
+      return "_disallowFeatureSuppression";
+    } else {
+      return "_allowFeatureSuppression";
+    }
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2932,24 +2939,24 @@ StorageRestrictionsAttr::getAccessesProperties(AccessorDecl *attachedTo) const {
                            {});
 }
 
-AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(SourceLoc atLoc,
-                                                         SourceRange range,
-                                                         bool implicit,
-                                              ArrayRef<Identifier> features)
-    : DeclAttribute(DeclAttrKind::AllowFeatureSuppression,
-                    atLoc, range, implicit) {
+AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(
+    SourceLoc atLoc, SourceRange range, bool implicit, bool inverted,
+    ArrayRef<Identifier> features)
+    : DeclAttribute(DeclAttrKind::AllowFeatureSuppression, atLoc, range,
+                    implicit) {
+  Bits.AllowFeatureSuppressionAttr.Inverted = inverted;
   Bits.AllowFeatureSuppressionAttr.NumFeatures = features.size();
   std::uninitialized_copy(features.begin(), features.end(),
                           getTrailingObjects<Identifier>());
 }
 
-AllowFeatureSuppressionAttr *
-AllowFeatureSuppressionAttr::create(ASTContext &ctx, SourceLoc atLoc,
-                                    SourceRange range, bool implicit,
-                                    ArrayRef<Identifier> features) {
+AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
+    ASTContext &ctx, SourceLoc atLoc, SourceRange range, bool implicit,
+    bool inverted, ArrayRef<Identifier> features) {
   unsigned size = totalSizeToAlloc<Identifier>(features.size());
   auto *mem = ctx.Allocate(size, alignof(AllowFeatureSuppressionAttr));
-  return new (mem) AllowFeatureSuppressionAttr(atLoc, range, implicit, features);
+  return new (mem)
+      AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
