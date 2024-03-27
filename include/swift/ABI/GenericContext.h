@@ -21,6 +21,7 @@
 #include "swift/ABI/TargetLayout.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/MetadataRef.h"
+#include "swift/ABI/SuppressibleProtocols.h"
 #include "swift/ABI/TrailingObjects.h"
 #include "swift/Demangling/Demangle.h"
 
@@ -103,6 +104,10 @@ struct TargetGenericContextDescriptorHeader {
   bool hasArguments() const {
     return getNumArguments() > 0;
   }
+
+  bool hasConditionalSuppressedProtocols() const {
+    return Flags.hasConditionalSuppressedProtocols();
+  }
 };
 using GenericContextDescriptorHeader =
   TargetGenericContextDescriptorHeader<InProcess>;
@@ -137,6 +142,20 @@ public:
     ///
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
+
+    /// The set of suppressible protocols whose check is suppressed, along
+    /// with the index of the generic parameter being suppressed.
+    ///
+    /// The index is technically redundant with the subject type, but its
+    /// storage is effectively free because this union is 32 bits anyway. The
+    /// index 0xFFFF is reserved for "not a generic parameter", in case we
+    /// need to use that in the future.
+    ///
+    /// Only valid if the requirement has SuppressedProtocols kind.
+    struct {
+      uint16_t GenericParamIndex;
+      SuppressibleProtocolSet Protocols;
+    } SuppressedProtocols;
   };
 
   constexpr GenericRequirementFlags getFlags() const {
@@ -204,6 +223,18 @@ public:
     return Layout;
   }
 
+  /// Retrieve the set of suppressed protocols.
+  SuppressibleProtocolSet getSuppressedProtocols() const {
+    assert(getKind() == GenericRequirementKind::SuppressedProtocols);
+    return SuppressedProtocols.Protocols;
+  }
+
+  /// Retrieve the suppressible protocol kind.
+  uint16_t getSuppressedProtocolsGenericParamIndex() const {
+    assert(getKind() == GenericRequirementKind::SuppressedProtocols);
+    return SuppressedProtocols.GenericParamIndex;
+  }
+
   /// Determine whether this generic requirement has a known kind.
   ///
   /// \returns \c false for any future generic requirement kinds.
@@ -215,6 +246,7 @@ public:
     case GenericRequirementKind::SameConformance:
     case GenericRequirementKind::SameType:
     case GenericRequirementKind::SameShape:
+    case GenericRequirementKind::SuppressedProtocols:
       return true;
     }
 
@@ -266,6 +298,26 @@ struct GenericPackShapeDescriptor {
   uint16_t Unused;
 };
 
+/// A count for the number of requirements for the number of requirements
+/// for a given conditional conformance to a suppressible protocols.
+struct ConditionalSuppressibleProtocolsRequirementCount {
+  uint16_t count;
+};
+
+/// A suppressible protocol set used for the conditional conformances in a
+/// generic context.
+struct ConditionalSuppressibleProtocolSet: SuppressibleProtocolSet {
+  using SuppressibleProtocolSet::SuppressibleProtocolSet;
+};
+
+/// A generic requirement for describing a conditional conformance to a
+/// suppressible protocol.
+///
+/// This type is equivalent to a `TargetGenericRequirementDescriptor`, and
+/// differs only because it needs to occur alongside
+template<typename Runtime>
+struct TargetConditionalSuppressibleProtocolRequirement: TargetGenericRequirementDescriptor<Runtime> { };
+
 /// An array of generic parameter descriptors, all
 /// GenericParamDescriptor::implicit(), which is by far
 /// the most common case.  Some generic context storage can
@@ -306,7 +358,8 @@ class RuntimeGenericSignature {
 
 public:
   RuntimeGenericSignature()
-    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr),
+    : Header{0, 0, 0, GenericContextDescriptorFlags(false, false)},
+      Params(nullptr), Requirements(nullptr),
       PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr) {}
 
   RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
@@ -425,6 +478,9 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       TargetGenericRequirementDescriptor<Runtime>,
       GenericPackShapeHeader,
       GenericPackShapeDescriptor,
+      ConditionalSuppressibleProtocolSet,
+      ConditionalSuppressibleProtocolsRequirementCount,
+      TargetConditionalSuppressibleProtocolRequirement<Runtime>,
       FollowingTrailingObjects...>
 {
 protected:
@@ -432,13 +488,17 @@ protected:
   using GenericContextHeaderType = TargetGenericContextHeaderType<Runtime>;
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
-
+  using GenericConditionalSuppressibleProtocolRequirement =
+    TargetConditionalSuppressibleProtocolRequirement<Runtime>;
   using TrailingObjects = swift::ABI::TrailingObjects<Self,
     GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
     GenericPackShapeHeader,
     GenericPackShapeDescriptor,
+    ConditionalSuppressibleProtocolSet,
+    ConditionalSuppressibleProtocolsRequirementCount,
+    GenericConditionalSuppressibleProtocolRequirement,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -467,7 +527,84 @@ public:
     /// HeaderType ought to be convertible to GenericContextDescriptorHeader.
     return getFullGenericContextHeader();
   }
-  
+
+  bool hasConditionalSuppressedProtocols() const {
+    if (!asSelf()->isGeneric())
+      return false;
+
+    return getGenericContextHeader().hasConditionalSuppressedProtocols();
+  }
+
+  const SuppressibleProtocolSet &
+  getConditionalSuppressedProtocols() const {
+    assert(hasConditionalSuppressedProtocols());
+    return *this->template
+        getTrailingObjects<ConditionalSuppressibleProtocolSet>();
+  }
+
+  /// Retrieve the counts for # of conditional suppressible protocols for each
+  /// conditional conformance to a suppressible protocol.
+  ///
+  /// The counts are cumulative, so the first entry in the array is the
+  /// number of requirements for the first conditional conformance. The
+  /// second entry in the array is the number of requirements in the first
+  /// and second conditional conformances. The last entry is, therefore, the
+  /// total count of requirements in the structure.
+  llvm::ArrayRef<ConditionalSuppressibleProtocolsRequirementCount>
+  getConditionalSuppressibleProtocolRequirementCounts() const {
+    if (!asSelf()->hasConditionalSuppressedProtocols())
+      return {};
+
+    return {
+      this->template
+        getTrailingObjects<ConditionalSuppressibleProtocolsRequirementCount>(),
+      getNumConditionalSuppressibleProtocolsRequirementCounts()
+    };
+  }
+
+  /// Retrieve the array of requirements for conditional conformances to
+  /// the ith conditional conformance to a suppressible protocol.
+  llvm::ArrayRef<GenericConditionalSuppressibleProtocolRequirement>
+  getConditionalSuppressibleProtocolRequirementsAt(unsigned i) const {
+    auto counts = getConditionalSuppressibleProtocolRequirementCounts();
+    assert(i < counts.size());
+
+    unsigned startIndex = (i == 0) ? 0 : counts[i-1].count;
+    unsigned endIndex = counts[i].count;
+
+    auto basePtr =
+      this->template
+        getTrailingObjects<GenericConditionalSuppressibleProtocolRequirement>();
+    return { basePtr + startIndex, basePtr + endIndex };
+  }
+
+  /// Retrieve the array of requirements for conditional conformances to
+  /// the ith conditional conformance to a suppressible protocol.
+  llvm::ArrayRef<GenericConditionalSuppressibleProtocolRequirement>
+  getConditionalSuppressibleProtocolRequirementsFor(
+      SuppressibleProtocolKind kind
+  ) const {
+    if (!asSelf()->hasConditionalSuppressedProtocols())
+      return { };
+
+    auto conditionallySuppressed = getConditionalSuppressedProtocols();
+    if (!conditionallySuppressed.contains(kind))
+      return { };
+
+    // Count the number of "set" bits up to (but not including) the
+    // bit we're looking at.
+    unsigned targetBit = static_cast<uint8_t>(kind);
+    auto suppressedBits = conditionallySuppressed.rawBits();
+    unsigned priorBits = 0;
+    for (unsigned i = 0; i != targetBit; ++i) {
+      if (suppressedBits & 0x01)
+        ++priorBits;
+      suppressedBits = suppressedBits >> 1;
+    }
+
+    return getConditionalSuppressibleProtocolRequirementsAt(priorBits);
+  }
+
   const TargetGenericContext<Runtime> *getGenericContext() const {
     if (!asSelf()->isGeneric())
       return nullptr;
@@ -547,6 +684,32 @@ protected:
       return 0;
 
     return getGenericPackShapeHeader().NumPacks;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<ConditionalSuppressibleProtocolSet>
+  ) const {
+    return asSelf()->hasConditionalSuppressedProtocols() ? 1 : 0;
+  }
+
+  unsigned getNumConditionalSuppressibleProtocolsRequirementCounts() const {
+    if (!asSelf()->hasConditionalSuppressedProtocols())
+      return 0;
+
+    return countBitsUsed(getConditionalSuppressedProtocols().rawBits());
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<ConditionalSuppressibleProtocolsRequirementCount>
+  ) const {
+    return getNumConditionalSuppressibleProtocolsRequirementCounts();
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<GenericConditionalSuppressibleProtocolRequirement>
+  ) const {
+    auto counts = getConditionalSuppressibleProtocolRequirementCounts();
+    return counts.empty() ? 0 : counts.back().count;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920

@@ -1190,6 +1190,7 @@ public:
         genericParamCounts(genericParamCounts) {}
 
   MetadataOrPack getMetadata(unsigned depth, unsigned index) const;
+  MetadataOrPack getMetadataOrdinal(unsigned ordinal) const;
   const WitnessTable *getWitnessTable(const Metadata *type,
                                       unsigned index) const;
 };
@@ -1404,9 +1405,13 @@ _gatherGenericParameters(const ContextDescriptor *context,
     SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                         genericParamCounts);
     auto error = _checkGenericRequirements(
+        generics->getGenericParams(),
         generics->getGenericRequirements(), allGenericArgsVec,
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index).Ptr;
+        },
+        [&substitutions](unsigned ordinal) {
+          return substitutions.getMetadataOrdinal(ordinal).Ptr;
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -1831,13 +1836,20 @@ public:
 
     // Collect any other generic arguments.
     auto error = _checkGenericRequirements(
-        genSig.getRequirements(), allArgsVec,
+        genSig.getParams(), genSig.getRequirements(), allArgsVec,
         [genArgs](unsigned depth, unsigned index) -> const Metadata * {
           if (depth != 0 || index >= genArgs.size())
-            return nullptr;
+            return (const Metadata*)nullptr;
 
           // FIXME: variadic generics
           return genArgs[index].getMetadata();
+        },
+        [genArgs](unsigned ordinal) {
+          if (ordinal >= genArgs.size())
+            return (const Metadata*)nullptr;
+
+          // FIXME: variadic generics
+          return genArgs[ordinal].getMetadata();
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
@@ -2790,9 +2802,13 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
   auto error = _checkGenericRequirements(
+      genericEnv->getGenericParameters(),
       genericEnv->getGenericRequirements(), witnessTables,
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
+      },
+      [&substFn](unsigned ordinal) {
+        return substFn.getMetadataOrdinal(ordinal).Ptr;
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
@@ -3220,6 +3236,18 @@ SubstGenericParametersFromMetadata::getMetadata(
   return MetadataOrPack(genericArgs[flatIndex]);
 }
 
+MetadataOrPack
+SubstGenericParametersFromMetadata::getMetadataOrdinal(unsigned ordinal) const {
+  // Don't attempt anything if we have no generic parameters.
+  if (genericArgs == nullptr)
+    return MetadataOrPack();
+
+  // On first access, compute the descriptor path.
+  setup();
+
+  return MetadataOrPack(genericArgs[numShapeClasses + ordinal]);
+}
+
 const WitnessTable *
 SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
                                                     unsigned index) const {
@@ -3241,6 +3269,15 @@ MetadataOrPack SubstGenericParametersFromWrittenArgs::getMetadata(
     if (*flatIndex < allGenericArgs.size()) {
       return MetadataOrPack(allGenericArgs[*flatIndex]);
     }
+  }
+
+  return MetadataOrPack();
+}
+
+MetadataOrPack SubstGenericParametersFromWrittenArgs::getMetadataOrdinal(
+                                        unsigned ordinal) const {
+  if (ordinal < allGenericArgs.size()) {
+    return MetadataOrPack(allGenericArgs[ordinal]);
   }
 
   return MetadataOrPack();

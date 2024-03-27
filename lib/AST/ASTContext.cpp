@@ -130,6 +130,28 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << getProtocolName(getKnownProtocolKind(value));
 }
 
+// Metadata stores a 16-bit field for suppressible protocols. Trigger a build
+// error when we assign the 15th bit so we can think about what to do.
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) \
+  static_assert(Bit < 15);
+#include "swift/ABI/SuppressibleProtocols.def"
+
+SuppressibleProtocolKind swift::asSuppressible(InvertibleProtocolKind kind) {
+  switch (kind) {
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) \
+    case InvertibleProtocolKind::Name: return SuppressibleProtocolKind::Name;
+#include "swift/ABI/SuppressibleProtocols.def"
+  }
+}
+
+InvertibleProtocolKind swift::asInvertible(SuppressibleProtocolKind kind) {
+  switch (kind) {
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) \
+    case SuppressibleProtocolKind::Name: return InvertibleProtocolKind::Name;
+#include "swift/ABI/SuppressibleProtocols.def"
+  }
+}
+
 namespace {
 enum class SearchPathKind : uint8_t {
   Import = 1 << 0,
