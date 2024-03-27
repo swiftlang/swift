@@ -91,7 +91,7 @@ SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
   // should be marked as actor isolated.
   if (auto *self = arg->getFunction()->maybeGetSelfArgument()) {
     if (auto functionIsolation = arg->getFunction()->getActorIsolation()) {
-      if (functionIsolation->isActorIsolated()) {
+      if (functionIsolation.isActorIsolated()) {
         if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
           if (auto isolationInfo =
                   SILIsolationInfo::getActorIsolated(nomDecl)) {

@@ -901,8 +901,8 @@ private:
       // our transferring operand. If so, we can squelch this.
       if (auto functionIsolation =
               transferringOp->getUser()->getFunction()->getActorIsolation()) {
-        if (functionIsolation->isActorIsolated() &&
-            SILIsolationInfo::getActorIsolated(*functionIsolation) ==
+        if (functionIsolation.isActorIsolated() &&
+            SILIsolationInfo::getActorIsolated(functionIsolation) ==
                 SILIsolationInfo::get(transferringOp->getUser()))
           return;
       }

@@ -348,7 +348,7 @@ private:
   unsigned BlockListChangeIdx = 0;
 
   /// The isolation of this function.
-  std::optional<ActorIsolation> actorIsolation;
+  ActorIsolation actorIsolation = ActorIsolation::forUnspecified();
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -1374,9 +1374,7 @@ public:
     actorIsolation = newActorIsolation;
   }
 
-  std::optional<ActorIsolation> getActorIsolation() const {
-    return actorIsolation;
-  }
+  ActorIsolation getActorIsolation() const { return actorIsolation; }
 
   //===--------------------------------------------------------------------===//
   // Block List Access
