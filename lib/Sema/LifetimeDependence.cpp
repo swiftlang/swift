@@ -409,10 +409,6 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     return std::nullopt;
   }
 
-  auto &diags = ctx.Diags;
-  auto returnTypeRepr = afd->getResultTypeRepr();
-  auto returnLoc = returnTypeRepr ? returnTypeRepr->getLoc() : afd->getLoc();
-
   if (hasEscapableResultOrYield(afd, resultType)) {
     return std::nullopt;
   }
@@ -420,6 +416,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return std::nullopt;
   }
+
+  auto &diags = ctx.Diags;
+  auto returnTypeRepr = afd->getResultTypeRepr();
+  auto returnLoc = returnTypeRepr ? returnTypeRepr->getLoc()
+                                  : afd->getLoc(/* SerializedOK */ false);
 
   auto *cd = dyn_cast<ConstructorDecl>(afd);
   if (cd && cd->isImplicit()) {
@@ -438,7 +439,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     auto selfOwnership = afd->getImplicitSelfDecl()->getValueOwnership();
     if (!isLifetimeDependenceCompatibleWithOwnership(kind, selfOwnership,
                                                      afd)) {
-      diags.diagnose(afd->getLoc(),
+      diags.diagnose(returnLoc,
                      diag::lifetime_dependence_invalid_self_ownership);
       return std::nullopt;
     }
