@@ -1903,7 +1903,7 @@ bool swift::isAsyncDecl(ConcreteDeclRef declRef) {
 /// \param ty a function type where \c globalActor was removed from it.
 /// \return true if it is safe to drop the global-actor qualifier.
 static bool safeToDropGlobalActor(
-    DeclContext *dc, Type globalActor, Type ty) {
+    DeclContext *dc, Type globalActor, Type ty, ApplyExpr *call) {
   auto funcTy = ty->getAs<AnyFunctionType>();
   if (!funcTy)
     return false;
@@ -1927,6 +1927,12 @@ static bool safeToDropGlobalActor(
   // in light of SE-338.
   if (funcTy->isAsync())
     return true;
+
+  // If the argument is passed over an isolation boundary, it's not
+  // safe to erase actor isolation, because the callee can call the
+  // function synchronously from outside the isolation domain.
+  if (call && call->getIsolationCrossing())
+    return false;
 
   // fundamentally cannot be sendable if we want to drop isolation info
   if (funcTy->isSendable())
@@ -2350,7 +2356,8 @@ namespace {
               return;
 
             auto dc = const_cast<DeclContext*>(getDeclContext());
-            if (!safeToDropGlobalActor(dc, fromActor, toType)) {
+            if (!safeToDropGlobalActor(dc, fromActor, toType,
+                                       getImmediateApply())) {
               // otherwise, it's not a safe cast.
               dc->getASTContext()
                   .Diags
