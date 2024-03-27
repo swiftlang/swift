@@ -506,6 +506,9 @@ static bool usesFeatureRawLayout(Decl *decl) {
 UNINTERESTING_FEATURE(Embedded)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
+    return true;
+
   if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
     if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
       auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
