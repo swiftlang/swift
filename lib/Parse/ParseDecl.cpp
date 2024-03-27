@@ -2461,8 +2461,10 @@ Parser::parseDocumentationAttribute(SourceLoc atLoc, SourceLoc loc) {
 }
 
 ParserResult<AllowFeatureSuppressionAttr>
-Parser::parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc) {
-  StringRef attrName = "_allowFeatureSuppression";
+Parser::parseAllowFeatureSuppressionAttribute(bool inverted, SourceLoc atLoc,
+                                              SourceLoc loc) {
+  StringRef attrName =
+      inverted ? "_disallowFeatureSuppression" : "_allowFeatureSuppression";
 
   SmallVector<Identifier, 4> features;
   SourceRange parensRange;
@@ -2479,9 +2481,9 @@ Parser::parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc) {
     return status;
 
   auto range = SourceRange(loc, parensRange.End);
-  return makeParserResult(
-    AllowFeatureSuppressionAttr::create(Context, loc, range, /*implicit*/ false,
-                                        features));
+  return makeParserResult(AllowFeatureSuppressionAttr::create(
+      Context, loc, range, /*implicit*/ false, /*inverted*/ inverted,
+      features));
 }
 
 static std::optional<MacroIntroducedDeclNameKind>
@@ -3900,7 +3902,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
   case DeclAttrKind::AllowFeatureSuppression: {
-    auto Attr = parseAllowFeatureSuppressionAttribute(AtLoc, Loc);
+    auto inverted = (AttrName == "_disallowFeatureSuppression");
+    auto Attr = parseAllowFeatureSuppressionAttribute(inverted, AtLoc, Loc);
     Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());

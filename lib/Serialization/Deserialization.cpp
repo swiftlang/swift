@@ -6034,22 +6034,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::AllowFeatureSuppression_DECL_ATTR: {
-        bool isImplicit;
-        ArrayRef<uint64_t> featureIds;
-        serialization::decls_block::AllowFeatureSuppressionDeclAttrLayout
-                     ::readRecord(scratch, isImplicit, featureIds);
-
-        SmallVector<Identifier, 4> features;
-        for (auto id : featureIds)
-          features.push_back(MF.getIdentifier(id));
-
-        Attr = AllowFeatureSuppressionAttr::create(ctx, SourceLoc(),
-                                                   SourceRange(), isImplicit,
-                                                   features);
-        break;
-      }
-
       case decls_block::UnavailableFromAsync_DECL_ATTR: {
         bool isImplicit;
         serialization::decls_block::UnavailableFromAsyncDeclAttrLayout::

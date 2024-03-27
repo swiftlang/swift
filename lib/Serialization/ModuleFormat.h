@@ -2138,12 +2138,6 @@ namespace decls_block {
     BCArray<IdentifierIDField> // name components
   >;
 
-  using AllowFeatureSuppressionDeclAttrLayout = BCRecordLayout<
-    AllowFeatureSuppression_DECL_ATTR,
-    BCFixed<1>,   // implicit flag
-    BCArray<IdentifierIDField>  // feature names
-  >;
-
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<
     SPIAccessControl_DECL_ATTR,
     BCArray<IdentifierIDField>  // SPI names
@@ -2254,6 +2248,8 @@ namespace decls_block {
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
+  using AllowFeatureSuppressionDeclAttrLayout =
+      BCRecordLayout<AllowFeatureSuppression_DECL_ATTR>;
   using ProjectedValuePropertyDeclAttrLayout = BCRecordLayout<
       ProjectedValueProperty_DECL_ATTR,
       BCFixed<1>,        // isImplicit
