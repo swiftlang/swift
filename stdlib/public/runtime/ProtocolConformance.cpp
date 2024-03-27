@@ -1875,6 +1875,11 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
   // Now, check all of the generic arguments for suppressible protocols.
   unsigned numGenericParams = genericParams.size();
   for (unsigned index = 0; index != numGenericParams; ++index) {
+    // Non-key arguments don't need to be checked, because they are
+    // aliased to another type.
+    if (!genericParams[index].hasKeyArgument())
+      continue;
+
     SuppressibleProtocolSet suppressed;
     if (index < allSuppressed.size())
       suppressed = allSuppressed[index];
