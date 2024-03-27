@@ -5980,32 +5980,27 @@ public:
     if (T->isInvalid())
       return Action::SkipNode();
 
-    // Arbitrary protocol constraints are OK on opaque types.
-    if (isa<OpaqueReturnTypeRepr>(T))
-      return Action::SkipNode();
-
-    // Arbitrary protocol constraints are okay for 'any' types.
-    if (isa<ExistentialTypeRepr>(T))
-      return Action::SkipNode();
+    reprStack.push_back(T);
 
     // Suppressed conformance needs to be within any/some.
     if (auto inverse = dyn_cast<InverseTypeRepr>(T)) {
-      // Find an enclosing protocol composition, if there is one, so we
-      // can insert 'any' before that.
-      SourceLoc anyLoc = inverse->getTildeLoc();
-      if (!reprStack.empty()) {
-        if (isa<CompositionTypeRepr>(reprStack.back())) {
-          anyLoc = reprStack.back()->getStartLoc();
+      if (isAnyOrSomeMissing()) {
+        // Find an enclosing protocol composition, if there is one, so we
+        // can insert 'any' before that.
+        SourceLoc anyLoc = inverse->getTildeLoc();
+        if (reprStack.size() > 1) {
+          if (auto *repr =
+                  dyn_cast<CompositionTypeRepr>(*(reprStack.end() - 2))) {
+            anyLoc = repr->getStartLoc();
+          }
         }
+
+        Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
+            .highlight(inverse->getConstraint()->getSourceRange())
+            .fixItInsert(anyLoc, "any ");
       }
-
-      Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
-        .highlight(inverse->getConstraint()->getSourceRange())
-        .fixItInsert(anyLoc, "any ");
-      return Action::SkipNode();
+      return Action::SkipChildren();
     }
-
-    reprStack.push_back(T);
 
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
     if (!declRefTR) {
@@ -6135,6 +6130,40 @@ private:
     diag.fixItReplace(replaceRepr->getSourceRange(), fix);
   }
 
+  /// Returns a Boolean value indicating whether the type representation being
+  /// visited, assuming it is a constraint type demanding `any` or `some`, is
+  /// missing either keyword.
+  bool isAnyOrSomeMissing() const {
+    if (reprStack.size() < 2) {
+      return true;
+    }
+
+    auto it = reprStack.end() - 1;
+    while (true) {
+      --it;
+      if (it == reprStack.begin()) {
+        break;
+      }
+
+      // Look through parens, inverses, metatypes, and compositions.
+      if ((*it)->isParenType() || isa<InverseTypeRepr>(*it) ||
+          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
+        continue;
+      }
+
+      // Look through '?' and '!' too; `any P?` et al. is diagnosed in the
+      // type resolver.
+      if (isa<OptionalTypeRepr>(*it) ||
+          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
+        continue;
+      }
+
+      break;
+    }
+
+    return !(isa<OpaqueReturnTypeRepr>(*it) || isa<ExistentialTypeRepr>(*it));
+  }
+
   void checkDeclRefTypeRepr(DeclRefTypeRepr *T) const {
     assert(!T->isInvalid());
 
@@ -6148,7 +6177,7 @@ private:
     }
 
     if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-      if (proto->existentialRequiresAny()) {
+      if (proto->existentialRequiresAny() && isAnyOrSomeMissing()) {
         auto diag =
             Ctx.Diags.diagnose(T->getNameLoc(), diag::existential_requires_any,
                                proto->getDeclaredInterfaceType(),
@@ -6178,7 +6207,7 @@ private:
         if (auto *PCT = type->getAs<ProtocolCompositionType>())
           diagnose |= !PCT->getInverses().empty();
 
-        if (diagnose) {
+        if (diagnose && isAnyOrSomeMissing()) {
           auto diag = Ctx.Diags.diagnose(
               T->getNameLoc(), diag::existential_requires_any,
               alias->getDeclaredInterfaceType(),

@@ -94,7 +94,7 @@ func testHasAssoc(_ x: Any, _: any HasAssoc) {
 
     func method() -> any HasAssoc {}
     func existentialArray() ->  [any HasAssoc] {}
-    func existentialcSequence() ->  any Sequence<HasAssoc> {}
+    func existentialcSequence() ->  any Sequence<any HasAssoc> {}
   }
 }
 
@@ -465,12 +465,16 @@ func testAnyFixIt() {
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{21-21=any }}
   let _: (borrowing ~Copyable) -> Void
   // https://github.com/apple/swift/issues/72588
-  // FIXME: No diagnostic.
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{30-38=any HasAssoc}}
   let _: any HasAssocGeneric<HasAssoc>
+  // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{30-30=any }}
   let _: any HasAssocGeneric<~Copyable>
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{16-24=any HasAssoc}}
   let _: any G<HasAssoc>.HasAssoc_Alias
+  // FIXME: Generic argument not diagnosed.
   let _: any ~G<HasAssoc>.Copyable_Alias
   do {
+    // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{22-30=any HasAssoc}}
     func f(_: some G<HasAssoc>.HasAssoc_Alias) {}
   }
 
@@ -480,6 +484,7 @@ func testAnyFixIt() {
   // expected-error@+2 {{constraint that suppresses conformance requires 'any'}}{{21-21=any }}
   // expected-error@+1 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{21-40=any NonCopyableHasAssoc}}
   let _: (borrowing NonCopyableHasAssoc & ~Copyable) -> Void
+  let _: any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type // OK
 
   // Misplaced '?'.
 
