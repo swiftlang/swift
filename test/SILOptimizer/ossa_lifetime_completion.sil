@@ -414,3 +414,44 @@ bb0(%0 : @owned $C):
   store %0 to [init] %4 : $*C
   unreachable
 }
+
+indirect enum IndirectEnumNontrivialPayload {
+  case c(C)
+}
+
+// CHECK-LABEL: sil [ossa] @project_box_owned : {{.*}} {
+// CHECK:       bb0([[IE:%[^,]+]] :
+// CHECK:         switch_enum [[IE]] 
+// CHECK-SAME:        case #IndirectEnumNontrivialPayload.c!enumelt: [[ONE_CASE:bb[0-9]+]]
+// CHECK:       [[ONE_CASE]]([[BOX:%[^,]+]] :
+// CHECK:         [[C_ADDR:%[^,]+]] = project_box [[BOX]]
+// CHECK:         [[C:%[^,]+]] = load_borrow [[C_ADDR]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[BASIC_BLOCK4:bb[0-9]+]]
+// CHECK:       [[BASIC_BLOCK4]]:
+// CHECK:         end_borrow [[C]]
+// CHECK:         destroy_value [[BOX]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'project_box_owned'
+sil [ossa] @project_box_owned : $@convention(thin) (@owned IndirectEnumNontrivialPayload) -> () {
+entry(%ie : @owned $IndirectEnumNontrivialPayload):
+  switch_enum %ie : $IndirectEnumNontrivialPayload, case #IndirectEnumNontrivialPayload.c!enumelt: one_case
+
+one_case(%box : @owned ${ var C }):
+  specify_test "ossa-lifetime-completion %box"
+  %c_addr = project_box %box : ${ var C }, 0
+  %c = load_borrow %c_addr : $*C
+  cond_br undef, left, right
+
+left:
+  end_borrow %c : $C
+  destroy_value %box : ${ var C }
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+right:
+  end_borrow %c : $C
+  unreachable
+}

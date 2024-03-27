@@ -361,6 +361,11 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
     return handleUsePoint(use, UseLifetimeConstraint::LifetimeEnding);
 
   case OperandOwnership::PointerEscape:
+    // TODO: Change ProjectBox ownership to InteriorPointer and allow them to
+    // take owned values.
+    if (isa<ProjectBoxInst>(use->getUser())) {
+      return visitInteriorPointerUses(use);
+    }
     if (!asImpl().handlePointerEscape(use))
       return false;
 
