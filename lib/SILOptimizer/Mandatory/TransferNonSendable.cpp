@@ -1152,13 +1152,18 @@ public:
   bool run();
 
 private:
-  bool initForIsolatedPartialApply(Operand *op, AbstractClosureExpr *ace);
+  /// \p actualCallerIsolation is used to override the caller isolation we use
+  /// when emitting the error if the closure would have the incorrect one.
+  bool initForIsolatedPartialApply(
+      Operand *op, AbstractClosureExpr *ace,
+      std::optional<ActorIsolation> actualCallerIsolation = {});
 };
 
 } // namespace
 
 bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
-    Operand *op, AbstractClosureExpr *ace) {
+    Operand *op, AbstractClosureExpr *ace,
+    std::optional<ActorIsolation> actualCallerIsolation) {
   SmallVector<std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>, 8>
       foundCapturedIsolationCrossing;
   ace->getIsolationCrossing(foundCapturedIsolationCrossing);
@@ -1169,8 +1174,15 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) == opIndex) {
       auto loc = RegularLocation(std::get<0>(p).getLoc());
+      auto crossing = std::get<2>(p);
+      auto declIsolation = crossing.getCallerIsolation();
+      auto closureIsolation = crossing.getCalleeIsolation();
+      if (!bool(declIsolation) && actualCallerIsolation) {
+        declIsolation = *actualCallerIsolation;
+      }
       diagnosticEmitter.emitNamedFunctionArgumentClosure(
-          loc, std::get<0>(p).getDecl()->getBaseIdentifier(), std::get<2>(p));
+          loc, std::get<0>(p).getDecl()->getBaseIdentifier(),
+          ApplyIsolationCrossing(declIsolation, closureIsolation));
       return true;
     }
   }
@@ -1219,6 +1231,15 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       return false;
     }
     assert(isolation && "Expected non-null");
+
+    // Then if we are calling a closure expr. If so, we should use the loc of
+    // the closure.
+    if (auto *closureExpr =
+            dyn_cast<AbstractClosureExpr>(sourceApply->getFn())) {
+      initForIsolatedPartialApply(op, closureExpr,
+                                  isolation->getCallerIsolation());
+      return true;
+    }
 
     // See if we can infer a name from the value.
     SmallString<64> resultingName;

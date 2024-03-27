@@ -208,6 +208,10 @@ public:
     return SILIsolationInfo();
   }
 
+  static SILIsolationInfo getGlobalActorIsolated(Type globalActorType) {
+    return getActorIsolated(ActorIsolation::forGlobalActor(globalActorType));
+  }
+
   static SILIsolationInfo getTaskIsolated(SILValue value) {
     return {Kind::Task, value};
   }
