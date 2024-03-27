@@ -1757,6 +1757,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_WASI
 #   Swift modules this library depends on when built for WASI.
 #
+# SWIFT_MODULE_DEPENDS_ANDROID
+#   Swift modules this library depends on when built for Android.
+#
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
 #
@@ -1880,6 +1883,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_XROS
         SWIFT_COMPILE_FLAGS_LINUX
         SWIFT_MODULE_DEPENDS
+        SWIFT_MODULE_DEPENDS_ANDROID
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
         SWIFT_MODULE_DEPENDS_FREESTANDING
@@ -2091,12 +2095,15 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "OPENBSD")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OPENBSD})
-    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
+    elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftlib_module_depends_flattened
           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
@@ -2920,6 +2927,7 @@ function(add_swift_target_executable name)
     DEPENDS
     LINK_LIBRARIES
     SWIFT_MODULE_DEPENDS
+    SWIFT_MODULE_DEPENDS_ANDROID
     SWIFT_MODULE_DEPENDS_CYGWIN
     SWIFT_MODULE_DEPENDS_FREEBSD
     SWIFT_MODULE_DEPENDS_FREESTANDING
@@ -3030,12 +3038,15 @@ function(add_swift_target_executable name)
     elseif(sdk STREQUAL "OPENBSD")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_OPENBSD})
-    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
+    elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_LINUX})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftexe_module_depends_flattened
+        ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_CYGWIN})
