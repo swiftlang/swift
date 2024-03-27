@@ -50,7 +50,7 @@ bool useLegacySwiftObjCHashing();
 /// Legacy semantics allowed for the `swift_task_reportUnexpectedExecutor` to
 /// only log a warning. This changes in future releases and this function
 /// will fatal error always.
-
+///
 /// Old behavior:
 /// - logging a warning on concurrency violation is allowed
 /// New behavior:
