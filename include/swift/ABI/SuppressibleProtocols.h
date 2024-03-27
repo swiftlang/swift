@@ -54,7 +54,7 @@ public:
   bool empty() const { return bits == 0; }
 
   /// Check whether the set contains the specific suppressible protocol.
-  constexpr bool contains(SuppressibleProtocolKind kind) const {
+  bool contains(SuppressibleProtocolKind kind) const {
     return bits & getMask(kind);
   }
 
