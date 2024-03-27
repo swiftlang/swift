@@ -156,6 +156,11 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public func borrowsNoncopyable<T>(_ t: T)
 // CHECK-MISC-NEXT: #endif
 
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public func suppressesNoncopyableGenerics<T>(_ t: borrowing T) where T : ~Copyable
+// CHECK-MISC-NEXT: #endif
+
+
 import Swiftskell
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics

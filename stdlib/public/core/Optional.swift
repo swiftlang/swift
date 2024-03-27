@@ -213,20 +213,22 @@ extension Optional where Wrapped: ~Copyable {
     }
   }
 
-#if hasFeature(BorrowingSwitch)
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
   public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
+    #if $NoncopyableGenerics
     switch self {
     case .some(_borrowing y):
       return .some(try transform(y))
     case .none:
       return .none
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
   }
-#endif
 }
 
 extension Optional {
@@ -263,6 +265,7 @@ extension Optional {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -277,7 +280,6 @@ extension Optional where Wrapped: ~Copyable {
     }
   }
 
-#if hasFeature(BorrowingSwitch)
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
   public func _borrowingFlatMap<U: ~Copyable, E: Error>(
@@ -290,7 +292,6 @@ extension Optional where Wrapped: ~Copyable {
       return .none
     }
   }
-#endif
 }
 
 extension Optional {
@@ -546,7 +547,6 @@ public struct _OptionalNilComparisonType: ExpressibleByNilLiteral {
   }
 }
 
-#if hasFeature(BorrowingSwitch)
 extension Optional where Wrapped: ~Copyable {
   /// Returns a Boolean value indicating whether an argument matches `nil`.
   ///
@@ -735,9 +735,6 @@ extension Optional where Wrapped: ~Copyable {
     }
   }
 }
-#else
-#error("FIXME(NCG): Fill this out.")
-#endif
 
 /// Performs a nil-coalescing operation, returning the wrapped value of an
 /// `Optional` instance or a default value.
