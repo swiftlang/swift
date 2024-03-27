@@ -12,7 +12,7 @@
 
 import SIL
 
-private let verbose = true
+private let verbose = false
 
 private func log(_ message: @autoclosure () -> String) {
   if verbose {
@@ -97,20 +97,26 @@ extension AddressUseVisitor {
       if markDep.type.isAddress {
         return projectedAddressUse(of: operand, into: markDep)
       }
-      if LifetimeDependence(markDep, context) != nil {
-        // This is unreachable from InteriorUseVisitor because the
-        // base address of a `mark_dependence [nonescaping]` must be a
-        // `begin_access`, and interior liveness does not check uses of
-        // the accessed address.
+      switch markDep.dependenceKind {
+      case .Unresolved:
+        if LifetimeDependence(markDep, context) == nil {
+          break
+        }
+        fallthrough
+      case .NonEscaping:
+        // Note: This is unreachable from InteriorUseVisitor because the base address of a `mark_dependence
+        // [nonescaping]` must be a `begin_access`, and interior liveness does not check uses of the accessed address.
         return dependentAddressUse(of: operand, into: markDep)
+      case .Escaping:
+        break
       }
       // A potentially escaping value depends on this address.
       return escapingAddressUse(of: operand)
 
-    case let pai as PartialApplyInst where pai.isOnStack:
+    case let pai as PartialApplyInst where !pai.mayEscape:
       return dependentAddressUse(of: operand, into: pai)
 
-    case let pai as PartialApplyInst where !pai.isOnStack:
+    case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
 
     case is ReturnInst, is ThrowInst, is YieldInst, is AddressToPointerInst:
@@ -502,7 +508,7 @@ extension AddressOwnershipLiveRange {
   ///
   /// For address values, use AccessBase.computeOwnershipRange.
   ///
-  /// FIXME: This should use computeLinearLiveness rather than computeInteriorLiveness as soon as lifetime completion
+  /// FIXME: This should use computeLinearLiveness rather than computeKnownLiveness as soon as lifetime completion
   /// runs immediately after SILGen.
   private static func computeValueLiveRange(of value: Value, _ context: FunctionPassContext)
     -> AddressOwnershipLiveRange? {
@@ -511,7 +517,7 @@ extension AddressOwnershipLiveRange {
       // This is unexpected for a value with derived addresses.
       return nil
     case .owned:
-      return .owned(value, computeInteriorLiveness(for: value, context))
+      return .owned(value, computeKnownLiveness(for: value, context))
     case .guaranteed:
       return .borrow(computeBorrowLiveRange(for: value, context))
     }

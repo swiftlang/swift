@@ -154,7 +154,17 @@ public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeA
     }
   }
 
-  public mutating func push(_ element: Element) {
+  public mutating func append(_ element: __owned Element) {
+    push(element)
+  }
+
+  public mutating func append<S: Sequence>(contentsOf newElements: __owned S) where S.Element == Element {
+    for element in newElements {
+      push(element)
+    }
+  }
+
+  public mutating func push(_ element: __owned Element) {
     guard singleElement != nil else {
       singleElement = element
       return

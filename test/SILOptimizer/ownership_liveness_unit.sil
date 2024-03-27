@@ -254,7 +254,6 @@ exit(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
 // CHECK-LABEL: testInteriorRefElementEscape: interior_liveness_swift with: %0
 // CHECK: Interior liveness: %0 = argument of bb0 : $C
 // CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
-// CHECK-NEXT: Incomplete liveness
 // CHECK-NEXT: begin:      %{{.*}} = unchecked_ref_cast %0 : $C to $D
 // CHECK-NEXT: ends:       %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
 // CHECK-NEXT: exits:    
