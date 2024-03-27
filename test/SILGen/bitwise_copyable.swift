@@ -47,3 +47,15 @@ public enum E : _BitwiseCopyable {
 func take<T : _BitwiseCopyable>(_ t: T) {}
 
 func pass(_ e: E) { take(e) }
+
+func opacify() -> some _BitwiseCopyable {
+    return Int()
+}
+
+struct NeverGoingToBeBitwiseCopyable {
+  var a: AnyObject
+}
+
+@available(*, unavailable)
+extension NeverGoingToBeBitwiseCopyable : _BitwiseCopyable {
+}
