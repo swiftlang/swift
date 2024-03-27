@@ -264,6 +264,20 @@ static llvm::Error resolveExplicitModuleInputs(
                        : binaryDepDetails->moduleCacheKey;
       commandLine.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
                             path);
+      // If this binary module was built with a header, the header's module
+      // dependencies must also specify a .modulemap to the compilation, in
+      // order to resolve the header's own header include directives.
+      for (const auto &bridgingHeaderDepName :
+           binaryDepDetails->headerModuleDependencies) {
+        auto optionalBridgingHeaderDepModuleInfo = cache.findDependency(
+            {bridgingHeaderDepName, ModuleDependencyKind::Clang});
+        assert(optionalDepInfo.has_value());
+        const auto bridgingHeaderDepModuleDetails =
+            optionalBridgingHeaderDepModuleInfo.value()->getAsClangModule();
+        commandLine.push_back(
+            "-fmodule-map-file=" +
+            remapPath(bridgingHeaderDepModuleDetails->moduleMapFile));
+      }
     } break;
     case swift::ModuleDependencyKind::SwiftPlaceholder: {
       auto placeholderDetails = depInfo->getAsPlaceholderDependencyModule();
