@@ -26,7 +26,7 @@ struct Lock: ~Copyable {
 @_rawLayout(like: T)
 struct Cell<T>: ~Copyable {
     // CHECK-LABEL: sil {{.*}} @$s10raw_layout4CellV7addressSpyxGvg : $@convention(method) <T> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {
-    // CHECK:         [[RAW_LAYOUT_ADDR:%.*]] = raw_layout_address_to_pointer {{%.*}} : $*Cell<T> to $Builtin.RawPointer
+    // CHECK:         {{%.*}} = builtin "addressOfRawLayout"<Cell<T>>({{%.*}} : $*Cell<T>) : $Builtin.RawPointer
     // CHECK-LABEL: } // end sil function '$s10raw_layout4CellV7addressSpyxGvg'
     var address: UnsafeMutablePointer<T> {
         .init(Builtin.addressOfRawLayout(self))

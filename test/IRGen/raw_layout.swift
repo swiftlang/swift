@@ -160,12 +160,12 @@ entry(%K: $*Keymaster):
     return undef : $()
 }
 
-// CHECK: define swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself [[SELF:%.*]])
+// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself [[SELF:%.*]])
 // CHECK-NEXT:   entry:
 // CHECK-NEXT:     ret ptr [[SELF]]
 sil @get_cell_addr : $@convention(method) <T> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {
 entry(%0 : $*Cell<T>):
-    %1 = raw_layout_address_to_pointer %0 : $*Cell<T> to $Builtin.RawPointer
+    %1 = builtin "addressOfRawLayout"(%0 : $*Cell<T>) : $Builtin.RawPointer
     %2 = struct $UnsafeMutablePointer<T> (%1 : $Builtin.RawPointer)
     return %2 : $UnsafeMutablePointer<T>
 }

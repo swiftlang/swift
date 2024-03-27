@@ -1112,7 +1112,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActor
 /// Returns a raw pointer to the address of the raw layout type. This address is
 /// only valid during a borrow access of the raw layout type or until the value
 /// is either moved or consumed.
-BUILTIN_SIL_OPERATION(AddressOfRawLayout, "addressOfRawLayout", Special)
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AddressOfRawLayout, "addressOfRawLayout", "n", Special)
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION

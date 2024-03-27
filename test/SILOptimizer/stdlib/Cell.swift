@@ -7,7 +7,7 @@ import Builtin
 public struct Cell<T: ~Copyable>: ~Copyable {
   // CHECK-LABEL: sil {{.*}} @$s4CellAAVAARiczrlE7addressSpyxGvg : $@convention(method) <T where T : ~Copyable> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {
   // CHECK:       bb0([[SELF:%.*]] : $*Cell<T>):
-  // CHECK:         [[RAW_LAYOUT_ADDR:%.*]] = raw_layout_address_to_pointer [[SELF]] : $*Cell<T> to $Builtin.RawPointer
+  // CHECK:         [[RAW_LAYOUT_ADDR:%.*]] = builtin "addressOfRawLayout"<Cell<T>>([[SELF]] : $*Cell<T>) : $Builtin.RawPointer
   // CHECK-NEXT:    [[POINTER:%.*]] = struct $UnsafeMutablePointer<T> ([[RAW_LAYOUT_ADDR]] : $Builtin.RawPointer)
   // CHECK-NEXT:    return [[POINTER]] : $UnsafeMutablePointer<T>
   // CHECK-LABEL: } // end sil function '$s4CellAAVAARiczrlE7addressSpyxGvg'
@@ -17,9 +17,9 @@ public struct Cell<T: ~Copyable>: ~Copyable {
   }
 
   // CHECK-LABEL: sil {{.*}} @$s4CellAAVAARiczrlEyAByxGxcfC : $@convention(method) <T where T : ~Copyable> (@in T, @thin Cell<T>.Type) -> @out Cell<T> {
-  // CHECK:       bb0([[SELF:%.*]] : $*Cell<T>, [[VALUE:%.*]] : $*T, {{%.*}} : $@thin Cell<T>.Type):
-  // CHECK-NEXT:    {{%.*}} = builtin "zeroInitializer"<Cell<T>>([[SELF]] : $*Cell<T>) : $()
-  // CHECK-NEXT:    [[RAW_LAYOUT_ADDR:%.*]] = raw_layout_address_to_pointer [[SELF]] : $*Cell<T> to $Builtin.RawPointer
+  // CHECK:       bb0({{%.*}} : $*Cell<T>, [[VALUE:%.*]] : $*T, {{%.*}} : $@thin Cell<T>.Type):
+  // CHECK:         {{%.*}} = builtin "zeroInitializer"<Cell<T>>([[SELF:%.*]] : $*Cell<T>) : $()
+  // CHECK-NEXT:    [[RAW_LAYOUT_ADDR:%.*]] = builtin "addressOfRawLayout"<Cell<T>>([[SELF]] : $*Cell<T>) : $Builtin.RawPointer
   // CHECK-NEXT:    [[POINTER:%.*]] = struct $UnsafeMutablePointer<T> ([[RAW_LAYOUT_ADDR]] : $Builtin.RawPointer)
   //                Calling 'UnsafeMutablePointer<T>.initialize(to:)'
   // CHECK:         {{%.*}} = apply {{%.*}}<T>([[VALUE]], [[POINTER]])

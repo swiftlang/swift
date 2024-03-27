@@ -1477,5 +1477,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::AddressOfRawLayout) {
+    auto addr = args.claimNext();
+    auto value = IGF.Builder.CreateBitCast(addr, IGF.IGM.Int8PtrTy);
+    out.add(value);
+    return;
+  }
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
