@@ -27,6 +27,7 @@
 #include "swift/Concurrency/Actor.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Threading/Mutex.h"
@@ -77,6 +78,7 @@ extern "C" void objc_autoreleasePoolPop(void *);
 #endif
 
 using namespace swift;
+using namespace swift::runtime::bincompat;
 
 /// Should we yield the thread?
 static bool shouldYieldThread() {
@@ -424,7 +426,14 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
 /// 0 - no logging
 /// 1 - warn on each instance
 /// 2 - fatal error
-static unsigned unexpectedExecutorLogLevel = 2;
+///
+/// NOTE: The default behavior on Apple platforms depends on the SDK version
+/// an application was linked to. Since Swift 6 the default is to crash,
+/// and the logging behavior is no longer available.
+static unsigned unexpectedExecutorLogLevel =
+    swift_bincompat_useLegacyWarningModeReportUnexpectedExecutor()
+        ? 1 // legacy apps default to the logging mode, and cannot use `checkIsolated`
+        : 2; // new apps will only crash upon concurrency violations, and will call into `checkIsolated`
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
 #if SWIFT_STDLIB_HAS_ENVIRON
