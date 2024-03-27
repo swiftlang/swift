@@ -28,8 +28,9 @@
 extern "C" {
 #endif
 
-// FIXME: Replace with __has_feature(swiftcc) once that's added to Clang.
-#if __has_feature(swiftasynccc)
+// TODO: __has_feature(swiftasynccc) is just for older clang. Remove this
+// when we no longer support older clang.
+#if __has_extension(swiftcc) || __has_feature(swiftasynccc)
 #define SWIFT_CC_swift __attribute__((swiftcall))
 #define SWIFT_CONTEXT __attribute__((swift_context))
 #define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
