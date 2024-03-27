@@ -45,7 +45,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     }
   }
   for instruction in function.instructions {
-    if let markDep = instruction as? MarkDependenceInst {
+    if let markDep = instruction as? MarkDependenceInst, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
         analyze(dependence: lifetimeDep, context)
       }
