@@ -1408,11 +1408,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       DidRunSILCodeGenPreparePasses = true;
     }
 
-    if (!layoutStringsEnabled(*IGM)) {
-      auto moduleName = IGM->getSwiftModule()->getRealName().str();
-      IGM->Context.Diags.diagnose(SourceLoc(), diag::layout_strings_blocked,
-                                  moduleName);
-    }
+    (void)layoutStringsEnabled(*IGM, /*diagnose*/ true);
   }
   
   if (!IGMcreated) {
