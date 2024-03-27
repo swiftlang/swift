@@ -468,6 +468,8 @@ actor Crystal {
   await asyncGlobalActorFunc()
 }
 
+func crossIsolationBoundary(_ closure: () -> Void) async {}
+
 @available(SwiftStdlib 5.1, *)
 func testGlobalActorClosures() {
   let _: Int = acceptAsyncClosure { @SomeGlobalActor in
@@ -480,6 +482,15 @@ func testGlobalActorClosures() {
   }
 
   acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-warning {{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
+
+  @MainActor func test() async {
+    let closure = { @MainActor @Sendable in
+      MainActor.assertIsolated()
+    }
+
+    await crossIsolationBoundary(closure)
+    // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
