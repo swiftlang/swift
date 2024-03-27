@@ -68,9 +68,6 @@ class CMakeTestCase(unittest.TestCase):
                          build_ninja=False)
 
     def which_ninja(self, args):
-        toolchain = host_toolchain()
-        if toolchain.ninja is not None:
-            return '/path/to/installed/ninja'
         # Maybe we'll build a ninja, maybe we wont.
         # Fake it anyway for the tests.
         return '/path/to/built/ninja'
