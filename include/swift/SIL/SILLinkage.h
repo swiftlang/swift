@@ -394,12 +394,16 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
 // protocol requirement, even if the extended type is not public;
 // then SILGen gives the member private linkage, ignoring the more
 // visible access level it was given in the AST.
-inline bool
-fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness) {
+//
+// Despite the FIXME above, this is still used to determine the linkage
+// for witness thunks. In case package serialization is enabled, we need
+// to take the package linkage into account so we can set a proper final
+// linkage to the thunks in the witness table with a package linkage.
+inline bool fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness,
+                                                      bool isPackageVisible) {
   auto witnessLinkage = witness.getLinkage(ForDefinition);
-  return !hasPublicVisibility(witnessLinkage)
-         && (!hasSharedVisibility(witnessLinkage)
-             || !witness.isSerialized());
+  return !hasPublicOrPackageVisibility(witnessLinkage, isPackageVisible) &&
+         (!hasSharedVisibility(witnessLinkage) || !witness.isSerialized());
 }
 
 } // end swift namespace
