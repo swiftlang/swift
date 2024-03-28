@@ -7889,6 +7889,10 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "invalid lifetime dependence on bitwise copyable type", ())
  ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
        "lifetime dependence specifiers cannot be applied to tuple elements", ())
+ ERROR(lifetime_dependence_method_escapable_bitwisecopyable_self, none,
+       "cannot infer lifetime dependence on a self which is BitwiseCopyable & "
+       "Escapable",
+       ())
 
  //===----------------------------------------------------------------------===//
  //                             MARK: Transferring

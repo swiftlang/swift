@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BitwiseCopyable
 // REQUIRES: asserts
 
 struct Container {
@@ -217,4 +217,18 @@ func derive(_ x: BufferView) -> dependsOn(x) BufferView { // expected-note{{'der
 
 func derive(_ x: BufferView) -> dependsOn(scoped x) BufferView { // expected-error{{invalid redeclaration of 'derive'}}
   return BufferView(x.ptr)
+}
+
+struct RawBufferView {
+  let ptr: UnsafeRawBufferPointer
+  @_unsafeNonescapableResult
+  init(_ ptr: UnsafeRawBufferPointer) {
+    self.ptr = ptr
+  }
+}
+
+extension RawBufferView {
+  mutating func zeroBufferView() throws -> BufferView { // expected-error{{cannot infer lifetime dependence on a self which is BitwiseCopyable & Escapable}}
+    return BufferView(ptr)
+  }
 }
