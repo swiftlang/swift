@@ -3134,9 +3134,9 @@ NodePointer Demangler::demangleLifetimeDependenceKind(bool isSelfDependence) {
     return createNode(Node::Kind::SelfLifetimeDependence,
                       (Node::IndexType)kind);
   }
-  auto node = createNode(Node::Kind::ParamLifetimeDependence);
-  node->addChild(createNode(Node::Kind::Index, unsigned(kind)), *this);
-  node->addChild(popTypeAndGetChild(), *this);
+  auto node = createWithChildren(Node::Kind::ParamLifetimeDependence,
+                                 createNode(Node::Kind::Index, unsigned(kind)),
+                                 popTypeAndGetChild());
   return createType(node);
 }
 
