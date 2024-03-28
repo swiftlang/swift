@@ -506,6 +506,9 @@ static bool usesFeatureRawLayout(Decl *decl) {
 UNINTERESTING_FEATURE(Embedded)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
+    return true;
+
   if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
     if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
       auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
@@ -567,6 +570,8 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
 
   return !inverseReqs.empty();
 }
+
+UNINTERESTING_FEATURE(NoncopyableGenerics2)
 
 static bool usesFeatureStructLetDestructuring(Decl *decl) {
   auto sd = dyn_cast<StructDecl>(decl);
@@ -676,6 +681,8 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
+UNINTERESTING_FEATURE(IsolatedAny2)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
@@ -691,9 +698,14 @@ void FeatureSet::collectSuppressibleFeature(Feature feature,
                               operation == Insert);
 }
 
-static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
+static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
+                                           bool inverted) {
   auto attr = decl->getAttrs().getAttribute<AllowFeatureSuppressionAttr>();
-  if (!attr) return false;
+  if (!attr)
+    return false;
+
+  if (attr->getInverted() != inverted)
+    return false;
 
   for (auto suppressedFeature : attr->getSuppressedFeatures()) {
     if (suppressedFeature.is(featureName))
@@ -701,6 +713,14 @@ static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
   }
 
   return false;
+}
+
+static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, true);
+}
+
+static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, false);
 }
 
 /// Go through all the features used by the given declaration and
@@ -712,11 +732,15 @@ void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
   if (usesFeature##FeatureName(decl))                                          \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl))                                          \
-    collectSuppressibleFeature(Feature::FeatureName, operation);
+  if (usesFeature##FeatureName(decl)) {                                        \
+    if (disallowFeatureSuppression(#FeatureName, decl))                        \
+      collectRequiredFeature(Feature::FeatureName, operation);                 \
+    else                                                                       \
+      collectSuppressibleFeature(Feature::FeatureName, operation);             \
+  }
 #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
   if (usesFeature##FeatureName(decl)) {                                        \
-    if (shouldSuppressFeature(#FeatureName, decl))                             \
+    if (allowFeatureSuppression(#FeatureName, decl))                           \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
     else                                                                       \
       collectRequiredFeature(Feature::FeatureName, operation);                 \

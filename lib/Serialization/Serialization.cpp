@@ -2717,6 +2717,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::RestatedObjCConformance:
     case DeclAttrKind::ClangImporterSynthesizedType:
     case DeclAttrKind::PrivateImport:
+    case DeclAttrKind::AllowFeatureSuppression:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -2766,20 +2767,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                       theAttr->isImplicit(),
                                       theAttr->Name);
-      return;
-    }
-
-    case DeclAttrKind::AllowFeatureSuppression: {
-      auto *theAttr = cast<AllowFeatureSuppressionAttr>(DA);
-      auto abbrCode =
-        S.DeclTypeAbbrCodes[AllowFeatureSuppressionDeclAttrLayout::Code];
-
-      SmallVector<IdentifierID> ids;
-      for (auto id : theAttr->getSuppressedFeatures())
-        ids.push_back(S.addUniquedStringRef(id.str()));
-
-      AllowFeatureSuppressionDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), ids);
       return;
     }
 

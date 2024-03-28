@@ -433,12 +433,14 @@ BridgedAllowFeatureSuppressionAttr
 BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
                                                 BridgedSourceLoc cAtLoc,
                                                 BridgedSourceRange cRange,
+                                                bool inverted,
                                                 BridgedArrayRef cFeatures) {
   SmallVector<Identifier> features;
   for (auto elem : cFeatures.unbridged<BridgedIdentifier>())
     features.push_back(elem.unbridged());
-  return AllowFeatureSuppressionAttr::create(cContext.unbridged(),
-      cAtLoc.unbridged(), cRange.unbridged(), /*implicit*/ false, features);
+  return AllowFeatureSuppressionAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      /*implicit*/ false, inverted, features);
 }
 
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,

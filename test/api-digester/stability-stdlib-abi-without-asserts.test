@@ -712,10 +712,17 @@ Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to
 Func withExtendedLifetime(_:_:) has mangled name changing from 'Swift.withExtendedLifetime<A, B>(A, () throws -> B) throws -> B' to 'Swift.withExtendedLifetime<A, B where A: ~Swift.Copyable, B: ~Swift.Copyable>(A, () throws -> B) throws -> B'
 Func withExtendedLifetime(_:_:) has parameter 0 changing from Default to Shared
 Func withExtendedLifetime(_:_:) is now with @_preInverseGenerics
-Func withUnsafeBytes(of:_:) has been removed
-Func withUnsafeMutableBytes(of:_:) has been removed
-Func withUnsafeMutablePointer(to:_:) has been removed
-Func withUnsafePointer(to:_:) has been removed
+Func withUnsafeBytes(of:_:) has been renamed to Func __abi_se0413_withUnsafeBytes(of:_:)
+Func withUnsafeBytes(of:_:) has mangled name changing from 'Swift.withUnsafeBytes<A, B>(of: A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeBytes<A, B>(of: A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B'
+Func withUnsafeBytes(of:_:) has mangled name changing from 'Swift.withUnsafeBytes<A, B>(of: inout A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeBytes<A, B>(of: inout A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B'
+Func withUnsafeMutableBytes(of:_:) has been renamed to Func __abi_se0413_withUnsafeMutableBytes(of:_:)
+Func withUnsafeMutableBytes(of:_:) has mangled name changing from 'Swift.withUnsafeMutableBytes<A, B>(of: inout A, _: (Swift.UnsafeMutableRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeMutableBytes<A, B>(of: inout A, _: (Swift.UnsafeMutableRawBufferPointer) throws -> B) throws -> B'
+Func withUnsafeMutablePointer(to:_:) has been renamed to Func __abi_se0413_withUnsafeMutablePointer(to:_:)
+Func withUnsafeMutablePointer(to:_:) has mangled name changing from 'Swift.withUnsafeMutablePointer<A, B>(to: inout A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeMutablePointer<A, B>(to: inout A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B'
+Func withUnsafePointer(to:_:) has been renamed to Func __abi_se0413_withUnsafePointer(to:_:)
+Func withUnsafePointer(to:_:) has been renamed to Func __abi_withUnsafePointer(to:_:)
+Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
+Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: inout A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafePointer<A, B>(to: inout A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
 Protocol _Pointer has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable, Self : Swift._BitwiseCopyable, Self.Pointee : ~Copyable>
 Struct ManagedBufferPointer has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Struct UnsafeBufferPointer has generic signature change from <Element> to <Element where Element : ~Copyable>

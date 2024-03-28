@@ -223,7 +223,7 @@ extension _SmallString {
   ) rethrows -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-#if hasFeature(TypedThrows)
+#if $TypedThrows
     return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
       let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the

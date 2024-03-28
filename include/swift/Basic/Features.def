@@ -34,6 +34,11 @@
 // imply the existence of earlier features.  (This only needs to apply to
 // suppressible features.)
 //
+// Sometimes, certain declarations will conflict with existing declarations
+// when printed with a suppressible feature disabled. The attribute
+// @_disallowFeatureSuppression can be used to suppress feature suppression on
+// a particular declaration.
+//
 // If suppressing a feature in general is problematic, but it's okay to
 // suppress it for specific declarations, the feature can be made
 // conditionally suppressible.  Declarations opt in to suppression with
@@ -314,6 +319,9 @@ EXPERIMENTAL_FEATURE(Embedded, true)
 /// Enables noncopyable generics
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
 
+// Alias for NoncopyableGenerics
+EXPERIMENTAL_FEATURE(NoncopyableGenerics2, true)
+
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
@@ -352,6 +360,9 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
+
+// Alias for IsolatedAny
+EXPERIMENTAL_FEATURE(IsolatedAny2, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

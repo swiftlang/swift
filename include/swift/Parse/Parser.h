@@ -1157,7 +1157,8 @@ public:
                                       std::optional<AccessLevel> &Visibility);
 
   ParserResult<AllowFeatureSuppressionAttr>
-  parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc);
+  parseAllowFeatureSuppressionAttribute(bool inverted, SourceLoc atLoc,
+                                        SourceLoc loc);
 
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.

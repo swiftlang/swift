@@ -345,6 +345,16 @@ extension ASTGenVisitor {
       return nil
     }
 
+    let inverted: Bool
+    switch node.attributeName {
+    case "_allowFeatureSuppression":
+      inverted = false
+    case "_disallowFeatureSuppression":
+      inverted = true
+    default:
+      return nil
+    }
+
     let features = args.compactMap(in: self) { arg -> BridgedIdentifier? in
       guard arg.label == nil,
             let declNameExpr = arg.expression.as(DeclReferenceExprSyntax.self),
@@ -361,6 +371,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateSourceRange(node),
+      inverted: inverted,
       features: features)
   }
 
@@ -388,7 +399,7 @@ extension ASTGenVisitor {
 
   func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
     guard
-      // `@_OriginallyDefinedIn` has special argument list syntax.
+      // `@available` has special argument list syntax.
       let args = node.arguments?.as(AvailabilityArgumentListSyntax.self)
     else {
       // TODO: Diagnose.

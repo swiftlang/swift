@@ -1501,7 +1501,7 @@ extension UnsafeMutableRawPointer {
       "storeBytes to misaligned raw pointer")
 
     var temp = value
-#if hasFeature(TypedThrows)
+#if $TypedThrows
     withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       // FIXME: to be replaced by _memcpy when conversions are implemented.

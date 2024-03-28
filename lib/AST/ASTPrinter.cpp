@@ -1154,7 +1154,16 @@ public:
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
     if (Options.PrintCompatibilityFeatureChecks) {
-      printWithCompatibilityFeatureChecks(Printer, Options, D, [&]{
+      printWithCompatibilityFeatureChecks(Printer, Options, D, [&] {
+        // If we are in a scope where non-copyable generics are being suppressed
+        // and we are also printing a decl that has @_preInverseGenerics, make
+        // sure we also suppress printing ownership modifiers that were added
+        // to satisfy the requirements of non-copyability.
+        llvm::SaveAndRestore<bool> scope(
+            Options.SuppressNoncopyableOwnershipModifiers,
+            Options.SuppressNoncopyableGenerics &&
+                D->getAttrs().hasAttribute<PreInverseGenericsAttr>());
+
         ASTVisitor::visit(D);
       });
     } else {
@@ -3139,9 +3148,12 @@ static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
 static void suppressingFeatureNoncopyableGenerics(
     PrintOptions &options,
     llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::PreInverseGenerics);
   llvm::SaveAndRestore<bool> scope(
       options.SuppressNoncopyableGenerics, true);
   action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 /// Suppress the printing of a particular feature.
@@ -3696,10 +3708,14 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("inout", options, " ");
     break;
   case ParamSpecifier::Borrowing:
-    printer.printKeyword("borrowing", options, " ");
+    if (!options.SuppressNoncopyableOwnershipModifiers) {
+      printer.printKeyword("borrowing", options, " ");
+    }
     break;
   case ParamSpecifier::Consuming:
-    printer.printKeyword("consuming", options, " ");
+    if (!options.SuppressNoncopyableOwnershipModifiers) {
+      printer.printKeyword("consuming", options, " ");
+    }
     break;
   case ParamSpecifier::LegacyShared:
     printer.printKeyword("__shared", options, " ");
