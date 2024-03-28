@@ -681,6 +681,8 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
+UNINTERESTING_FEATURE(IsolatedAny2)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

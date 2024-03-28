@@ -361,6 +361,9 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
 
+// Alias for IsolatedAny
+EXPERIMENTAL_FEATURE(IsolatedAny2, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
