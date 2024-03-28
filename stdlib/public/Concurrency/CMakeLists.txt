@@ -62,7 +62,7 @@ endif()
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
   "-enable-experimental-feature"
-  "IsolatedAny"
+  "IsolatedAny2"
 )
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
