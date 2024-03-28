@@ -483,13 +483,33 @@ func testAnyFixIt() {
     // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{22-30=any HasAssoc}}
     func f(_: some G<HasAssoc>.HasAssoc_Alias) {}
   }
+  // https://github.com/apple/swift/issues/65027
+  // expected-error@+2:10 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-29=any HasAssoc & HasAssoc}}
+  // expected-error@+1:21 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-29=any HasAssoc & HasAssoc}}
+  let _: HasAssoc & HasAssoc
+  // expected-error@+2:10 {{constraint that suppresses conformance requires 'any'}}{{10-10=any }}
+  // expected-error@+1:22 {{constraint that suppresses conformance requires 'any'}}{{10-10=any }}
+  let _: ~Copyable & ~Copyable
+  // expected-error@+3:10 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-42=any HasAssoc & (HasAssoc & HasAssoc)}}
+  // expected-error@+2:22 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-42=any HasAssoc & (HasAssoc & HasAssoc)}}
+  // expected-error@+1:33 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-42=any HasAssoc & (HasAssoc & HasAssoc)}}
+  let _: HasAssoc & (HasAssoc & HasAssoc)
+  // FIXME: Incorrect fix-its for nested composition.
+  // expected-error@+3:10 {{constraint that suppresses conformance requires 'any'}}{{10-10=any }}
+  // expected-error@+2:23 {{constraint that suppresses conformance requires 'any'}}{{23-23=any }}
+  // expected-error@+1:35 {{constraint that suppresses conformance requires 'any'}}{{23-23=any }}
+  let _: ~Copyable & (~Copyable & ~Copyable)
 
   // Misc. compound cases.
 
-  // FIXME: Incorrect fix-it for 'NonCopyableHasAssoc'.
   // expected-error@+2 {{constraint that suppresses conformance requires 'any'}}{{21-21=any }}
-  // expected-error@+1 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{21-40=any NonCopyableHasAssoc}}
+  // expected-error@+1 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{21-52=any NonCopyableHasAssoc & ~Copyable}}
   let _: (borrowing NonCopyableHasAssoc & ~Copyable) -> Void
+  // FIXME: Incorrect fix-it.
+  // expected-error@+3:15 {{constraint that suppresses conformance requires 'any'}}{{15-15=any }}
+  // expected-error@+2:28 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}
+  // expected-error@+1:51 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}
+  let _: (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type?
   let _: any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type // OK
 
   // Misplaced '?'.
