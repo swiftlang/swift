@@ -506,6 +506,9 @@ static bool usesFeatureRawLayout(Decl *decl) {
 UNINTERESTING_FEATURE(Embedded)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
+    return true;
+
   if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
     if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
       auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
@@ -567,6 +570,8 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
 
   return !inverseReqs.empty();
 }
+
+UNINTERESTING_FEATURE(NoncopyableGenerics2)
 
 static bool usesFeatureStructLetDestructuring(Decl *decl) {
   auto sd = dyn_cast<StructDecl>(decl);
@@ -675,6 +680,8 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
     return false;
   });
 }
+
+UNINTERESTING_FEATURE(IsolatedAny2)
 
 static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
   return false;
