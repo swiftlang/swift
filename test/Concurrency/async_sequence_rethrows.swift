@@ -51,3 +51,27 @@ extension InheritsAsyncSequence {
     try await self.reduce(into: [Element]()) { $0.append($1) }
   }
 }
+
+// Ensure that we can get the thrown error type from next().
+struct Data { }
+
+struct ErrorSequence<Element, Failure: Error>: AsyncSequence, AsyncIteratorProtocol {
+    let throwError : Failure
+
+    func makeAsyncIterator() -> ErrorSequence<Element, Failure> {
+        self
+    }
+
+    mutating func next() async throws(Failure) -> Element? {
+        throw throwError
+    }
+}
+
+enum MyError: Error {
+    case foo
+}
+
+
+func getASequence() -> any AsyncSequence<Data, MyError> {
+    return ErrorSequence<Data, _>(throwError: MyError.foo) // ERROR: Cannot convert return expression of type 'any Error' to return type 'MyError'
+}
