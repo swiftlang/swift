@@ -151,7 +151,7 @@
     "Builtin.swift",
     "VarArgs.swift",
     "CTypes.swift",
-    "MemoryLayout.swift",
+    "MemoryLayout.swift"
   ],
   "KeyPaths": [
     "KeyPath.swift"
