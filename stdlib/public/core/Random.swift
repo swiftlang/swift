@@ -158,7 +158,7 @@ public struct SystemRandomNumberGenerator: RandomNumberGenerator, Sendable {
   @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
-#if hasFeature(TypedThrows)
+#if $TypedThrows
     _withUnprotectedUnsafeMutablePointer(to: &random) {
       swift_stdlib_random($0, MemoryLayout<UInt64>.size)
     }
