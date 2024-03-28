@@ -55,11 +55,11 @@ final class NaiveQueueExecutor: SerialExecutor {
 }
 
 actor ActorOnNaiveQueueExecutor {
-  let queue: DispatchSerialQueue
+  let queue: DispatchQueue
   let executor: NaiveQueueExecutor
 
   init() {
-    self.queue = DispatchSerialQueue(label: "MyQueue")
+    self.queue = DispatchQueue(label: "MyQueue")
     self.executor = NaiveQueueExecutor(queue: queue)
   }
 
