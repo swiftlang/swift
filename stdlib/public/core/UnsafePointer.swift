@@ -286,6 +286,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
@@ -315,6 +316,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
@@ -843,6 +845,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
@@ -1300,6 +1303,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it

@@ -385,6 +385,9 @@ struct PrintOptions {
   /// Suppress Noncopyable generics.
   bool SuppressNoncopyableGenerics = false;
 
+  /// Suppress printing of `borrowing` and `consuming`.
+  bool SuppressNoncopyableOwnershipModifiers = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,

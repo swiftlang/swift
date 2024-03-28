@@ -144,7 +144,22 @@ import NoncopyableGenerics_Misc
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: @_preInverseGenerics public func old_swap<T>(_ a: inout T, _ b: inout T) where T : ~Copyable
+// CHECK-MISC-NEXT: #else
+// CHECK-MISC-NOT: @_preInverseGenerics
+// CHECK-MISC-NEXT: public func old_swap<T>(_ a: inout T, _ b: inout T)
 // CHECK-MISC: #endif
+
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: @_preInverseGenerics public func borrowsNoncopyable<T>(_ t: borrowing T) where T : ~Copyable
+// CHECK-MISC-NEXT: #else
+// CHECK-MISC-NOT: @_preInverseGenerics
+// CHECK-MISC-NEXT: public func borrowsNoncopyable<T>(_ t: T)
+// CHECK-MISC-NEXT: #endif
+
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public func suppressesNoncopyableGenerics<T>(_ t: borrowing T) where T : ~Copyable
+// CHECK-MISC-NEXT: #endif
+
 
 import Swiftskell
 

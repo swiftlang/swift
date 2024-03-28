@@ -456,6 +456,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Unsafe${Mutable}BufferPointer {
   /// Accesses the element at the specified position.
   ///

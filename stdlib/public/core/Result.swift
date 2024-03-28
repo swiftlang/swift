@@ -61,6 +61,7 @@ extension Result {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -75,7 +76,6 @@ extension Result where Success: ~Copyable {
     }
   }
 
-#if $BorrowingSwitch
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
   public borrowing func _borrowingMap<NewSuccess: ~Copyable>(
@@ -88,7 +88,6 @@ extension Result where Success: ~Copyable {
       return .failure(failure)
     }
   }
-#endif
 }
 
 extension Result where Success: ~Copyable {
@@ -131,6 +130,7 @@ extension Result where Success: ~Copyable {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
@@ -186,6 +186,7 @@ extension Result {
   }
 }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -200,7 +201,6 @@ extension Result where Success: ~Copyable {
     }
   }
 
-#if $BorrowingSwitch
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
   public borrowing func _borrowingFlatMap<NewSuccess: ~Copyable>(
@@ -213,7 +213,6 @@ extension Result where Success: ~Copyable {
       return .failure(failure)
     }
   }
-#endif
 }
 
 extension Result {
