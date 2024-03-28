@@ -5579,9 +5579,11 @@ bool ConstraintSystem::repairFailures(
   }
 
   if (auto *VD = getAsDecl<ValueDecl>(anchor)) {
-    // Matching a witness to a ObjC protocol requirement.
-    if (VD->isObjC() && VD->isProtocolRequirement() &&
-        path[0].is<LocatorPathElt::Witness>() && 
+    // Matching a witness to an ObjC protocol requirement.
+    if (VD->isObjC() &&
+        isa<ProtocolDecl>(VD->getDeclContext()) &&
+        VD->isProtocolRequirement() &&
+        path[0].is<LocatorPathElt::Witness>() &&
         // Note that the condition below is very important,
         // we need to wait until the very last moment to strip
         // the concurrency annotations from the inner most type.
@@ -5593,10 +5595,11 @@ bool ConstraintSystem::repairFailures(
       if (!(Context.isSwiftVersionAtLeast(6) ||
             Context.LangOpts.StrictConcurrencyLevel ==
                 StrictConcurrency::Complete)) {
-        auto strippedLHS = lhs->stripConcurrency(/*resursive=*/true,
+        auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
                                                  /*dropGlobalActor=*/true);
-        auto strippedRHS = rhs->stripConcurrency(/*resursive=*/true,
+        auto strippedRHS = rhs->stripConcurrency(/*recursive=*/true,
                                                  /*dropGlobalActor=*/true);
+
         auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
                                  flags | TMF_ApplyingFix, locator);
         if (!result.isFailure()) {
