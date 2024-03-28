@@ -94,6 +94,10 @@ extension AsyncCompactMapSequence: AsyncSequence {
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ElementOfResult
 
+    // FIXME: Remove when $AssociatedTypeImplements is no longer needed
+    @available(SwiftStdlib 6.0, *)
+    public typealias Failure = Base.Failure
+
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
