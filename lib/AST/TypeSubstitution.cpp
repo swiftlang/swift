@@ -230,6 +230,22 @@ operator()(CanType dependentType, Type conformingReplacementType,
   return Subs.lookupConformance(dependentType, conformedProtocol);
 }
 
+ProtocolConformanceRef MakeAbstractOrBuiltinConformanceForGenericType::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
+  // Workaround for rdar://125460667
+  if (conformedProtocol->getInvertibleProtocolKind()) {
+    auto &ctx = conformedProtocol->getASTContext();
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(conformingReplacementType, conformedProtocol,
+                                  BuiltinConformanceKind::Synthesized));
+  }
+
+  return MakeAbstractConformanceForGenericType()(dependentType,
+                                                 conformingReplacementType,
+                                                 conformedProtocol);
+}
+
 ProtocolConformanceRef MakeAbstractConformanceForGenericType::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
