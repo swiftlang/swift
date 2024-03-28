@@ -419,6 +419,13 @@ func testAnyFixIt() {
   let _: (HasAssoc)?
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-20=any ~Copyable}}
   let _: (~Copyable)?
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
+  let _: HasAssoc!
+  // expected-error@+2 {{type '(any Copyable)?' cannot be suppressed}}
+  // expected-warning@+1 {{using '!' is not allowed here; treating this as '?' instead}}
+  let _: ~Copyable!
+  // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-20=any ~Copyable}}
+  let _: (~Copyable)!
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=(any HasAssoc.Type)}}
   let _: HasAssoc.Type?
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{10-26=(any (~Copyable).Type)}}
