@@ -6085,14 +6085,14 @@ private:
       auto replacementIt = it;
 
       // Backtrack the stack and expand the replacement range to any parent
-      // `.Type` metatypes, skipping only parentheses.
+      // compositions or `.Type` metatypes, skipping only parentheses.
       do {
         --it;
         if ((*it)->isParenType()) {
           continue;
         }
 
-        if (isa<MetatypeTypeRepr>(*it)) {
+        if (isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
           replacementIt = it;
           continue;
         }
