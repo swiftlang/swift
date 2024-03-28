@@ -2205,6 +2205,11 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
 /// from other modules. This happens e.g. if a public class contains a (dead)
 /// private method.
 void IRGenModule::emitVTableStubs() {
+  if (getSILModule().getOptions().DropAllSILAfterSerialization) {
+    // We're asked to emit an empty IR module
+    return;
+  }
+
   llvm::Function *stub = nullptr;
   for (auto I = getSILModule().zombies_begin();
            I != getSILModule().zombies_end(); ++I) {

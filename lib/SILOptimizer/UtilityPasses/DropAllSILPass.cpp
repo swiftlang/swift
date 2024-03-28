@@ -44,7 +44,6 @@ public:
     for (SILFunction *F : FunctionsToErase) {
       notifyWillDeleteFunction(F);
       M.eraseFunction(F);
-      M.removeFromZombieList(F->getName());
     }
 
     for (SILGlobalVariable *G : GlobalsToErase) {
