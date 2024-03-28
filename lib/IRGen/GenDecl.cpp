@@ -454,7 +454,7 @@ public:
 
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF) {
-  if (getSILModule().getOptions().DropAllSILAfterSerialization) {
+  if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
     // We're asked to emit an empty IR module
     return;
   }
@@ -1264,7 +1264,7 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
 
 void IRGenerator::emitGlobalTopLevel(
     const std::vector<std::string> &linkerDirectives) {
-  if (PrimaryIGM->getSILModule().getOptions().DropAllSILAfterSerialization) {
+  if (PrimaryIGM->getSILModule().getOptions().StopOptimizationAfterSerialization) {
     // We're asked to emit an empty IR module
     return;
   }
@@ -2205,7 +2205,7 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
 /// from other modules. This happens e.g. if a public class contains a (dead)
 /// private method.
 void IRGenModule::emitVTableStubs() {
-  if (getSILModule().getOptions().DropAllSILAfterSerialization) {
+  if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
     // We're asked to emit an empty IR module
     return;
   }

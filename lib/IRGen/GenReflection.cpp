@@ -1667,7 +1667,7 @@ llvm::ArrayRef<CanType> IRGenModule::getOrCreateSpecialStlibBuiltinTypes() {
 }
 
 void IRGenModule::emitBuiltinReflectionMetadata() {
-  if (getSILModule().getOptions().DropAllSILAfterSerialization) {
+  if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
     // We're asked to emit an empty IR module
     return;
   }

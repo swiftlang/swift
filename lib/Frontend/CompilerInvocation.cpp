@@ -2186,7 +2186,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.StopOptimizationAfterSerialization = true;
 
   if (Args.getLastArg(OPT_emit_empty_object_file)) {
-    Opts.DropAllSILAfterSerialization = true;
+    Opts.StopOptimizationAfterSerialization = true;
   }
 
   // Propagate the typechecker's understanding of
