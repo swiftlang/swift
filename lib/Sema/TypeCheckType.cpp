@@ -6042,6 +6042,7 @@ private:
   static bool anySyntaxNeedsParens(TypeRepr *parent) {
     switch (parent->getKind()) {
     case TypeReprKind::Optional:
+    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Protocol:
       return true;
     case TypeReprKind::Metatype:
@@ -6056,7 +6057,6 @@ private:
     case TypeReprKind::UnqualifiedIdent:
     case TypeReprKind::QualifiedIdent:
     case TypeReprKind::Dictionary:
-    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Inverse:
     case TypeReprKind::Tuple:
     case TypeReprKind::Fixed:
