@@ -34,7 +34,7 @@ struct NC : ~Copyable {
 struct NE {
   var bv: BV
 
-  init(_ bv: consuming BV) -> _consume(bv) Self {
+  init(_ bv: consuming BV) -> dependsOn(bv) Self {
     self.bv = bv
     return self
   }
