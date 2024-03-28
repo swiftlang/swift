@@ -568,6 +568,7 @@ public:
   static bool doesActionGenerateIR(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
+  static bool doesActionBuildModuleFromInterface(ActionType);
   static bool needsProperModuleName(ActionType);
   static file_types::ID formatForPrincipalOutputFileForAction(ActionType);
 };
