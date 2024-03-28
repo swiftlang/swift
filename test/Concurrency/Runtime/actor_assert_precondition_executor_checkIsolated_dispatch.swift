@@ -18,25 +18,24 @@
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
 
-// FIXME(concurrency): corelibs-dispatch is missing the `DispatchSerialQueue` type
-// XFAIL: OS=freebsd, OS=openbsd, OS=linux-gnu, OS=linux-android, OS=linux-androideabi
-
 import StdlibUnittest
 import Dispatch
 
 // FIXME(concurrency): Dispatch should provide such implementation
-extension DispatchSerialQueue {
+extension DispatchQueue { // which includes DispatchSerialQueue, when a platform has it
   public func checkIsolated() {
     dispatchPrecondition(condition: .onQueue(self))
   }
 }
 
-/// We only do the executor dance because missing 'asUnownedSerialExecutor'
-/// on DispatchSerialQueue on some platforms.
-final class NaiveQueueExecutor: SerialExecutor {
-  let queue: DispatchSerialQueue
 
-  init(queue: DispatchSerialQueue) {
+/// We only do the executor dance because missing 'asUnownedSerialExecutor'
+/// on DispatchSerialQueue on some platforms, so we can't make this test
+/// reliably just use a queue as the executor directly.
+final class NaiveQueueExecutor: SerialExecutor {
+  let queue: DispatchQueue
+
+  init(queue: DispatchQueue) {
     self.queue = queue
   }
 
@@ -90,7 +89,7 @@ actor Other {
   }
 }
 
-// TODO: DispatchSerialQueue conformance to SerialExecutor not available on all platforms yet
+// FIXME(dispatch): DispatchSerialQueue conformance to SerialExecutor not available on all platforms yet
 //actor ActorOnQueue {
 //  let queue: DispatchSerialQueue
 //
@@ -138,10 +137,10 @@ actor Other {
         await other.checkUnexpected(actor: other)
       }
 
-      // TODO: DispatchSerialQueue conformance to SerialExecutor not available on all platforms yet
-      // tests.test("\(ActorOnQueue.self): queue.sync { preconditionIsolated() } ") {
-      //   await ActorOnQueue().checkPreconditionIsolated()
-      // }
+      // FIXME(dispatch): DispatchSerialQueue conformance to SerialExecutor not available on all platforms yet
+//      tests.test("\(ActorOnQueue.self): queue.sync { preconditionIsolated() } ") {
+//        await ActorOnQueue().checkPreconditionIsolated()
+//      }
 
     }
 
