@@ -30,10 +30,12 @@ public:
     llvm::SmallVector<SILGlobalVariable *, 16> GlobalsToErase;
 
     for (SILFunction &F : M) {
+      F.dropAllReferences();
       FunctionsToErase.push_back(&F);
     }
 
     for (SILGlobalVariable &G : M.getSILGlobals()) {
+      G.dropAllReferences();
       GlobalsToErase.push_back(&G);
     }
 
