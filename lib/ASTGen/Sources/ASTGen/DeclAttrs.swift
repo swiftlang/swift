@@ -1066,6 +1066,11 @@ extension ASTGenVisitor {
       return nil
     }
 
+    if case .token(let tok) = arguments {
+      // Special case: was parsed as a token, not an an argument list
+      return valueGeneratorFunction(tok)
+    }
+
     guard var arguments = arguments.as(LabeledExprListSyntax.self)?[...] else {
       // TODO: Diagnose.
       return nil
