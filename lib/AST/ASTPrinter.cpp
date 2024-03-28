@@ -705,6 +705,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     StringRef RawText =
         RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
     trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
+    indent();
     bool FirstLine = true;
     for (auto Line : Lines) {
       if (FirstLine)
@@ -1133,23 +1134,6 @@ public:
     if (Synthesize) {
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
     }
-
-    // We want to print a newline before doc comments.  Swift code already
-    // handles this, but we need to insert it for clang doc comments when not
-    // printing other clang comments. Do it now so the printDeclPre callback
-    // happens after the newline.
-    if (Options.PrintDocumentationComments &&
-        !Options.PrintRegularClangComments &&
-        D->hasClangNode()) {
-      auto clangNode = D->getClangNode();
-      auto clangDecl = clangNode.getAsDecl();
-      if (clangDecl &&
-          clangDecl->getASTContext().getRawCommentForAnyRedecl(clangDecl)) {
-        Printer.printNewline();
-        indent();
-      }
-    }
-
 
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
@@ -2736,7 +2720,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
       if (!member->shouldPrintInContext(Options))
         continue;
 
-      if (Options.EmptyLineBetweenMembers)
+      if (Options.EmptyLineBetweenDecls)
         Printer.printNewline();
       indent();
       visit(member);

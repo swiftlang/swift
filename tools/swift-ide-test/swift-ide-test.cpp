@@ -699,12 +699,6 @@ SkipDocumentationComments("skip-print-doc-comments",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-PrintRegularComments("print-regular-comments",
-    llvm::cl::desc("Print regular comments from clang module headers"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 PrintOriginalSourceText("print-original-source",
     llvm::cl::desc("print the original source text for applicable declarations"),
     llvm::cl::cat(Category),
@@ -4606,7 +4600,6 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintAccess = options::PrintAccess;
     PrintOpts.AccessFilter = options::AccessFilter;
     PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
-    PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
     PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
     PrintOpts.SkipUnsafeCXXMethods = options::SkipUnsafeCXXMethods;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
@@ -4761,7 +4754,7 @@ int main(int argc, char *argv[]) {
       ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
     else {
       if (options::NoEmptyLineBetweenMembers.getNumOccurrences() > 0)
-        PrintOpts.EmptyLineBetweenMembers = !options::NoEmptyLineBetweenMembers;
+        PrintOpts.EmptyLineBetweenDecls = !options::NoEmptyLineBetweenMembers;
       ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,
