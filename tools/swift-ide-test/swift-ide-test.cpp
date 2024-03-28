@@ -4519,7 +4519,7 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
 
   if (!options::ExplicitSwiftModuleMap.empty()) {
-    InitInvok.getSearchPathOptions().ExplicitSwiftModuleMap =
+    InitInvok.getSearchPathOptions().ExplicitSwiftModuleMapPath =
       options::ExplicitSwiftModuleMap;
     InitInvok.getFrontendOptions().DisableImplicitModules = true;
   }
