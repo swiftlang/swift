@@ -839,9 +839,6 @@ public:
   /// Look up a specialized VTable
   SILVTable *lookUpSpecializedVTable(SILType classTy);
 
-  /// Remove all VTables and specialized VTables from the module.
-  void eraseAllVTables();
-
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
