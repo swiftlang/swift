@@ -1169,8 +1169,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   @discardableResult
   public func deinitialize(count: Int) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
-    // TODO: IRGen optimization when `count` value is statically known to be 1,
-    //       then call `Builtin.destroy(Pointee.self, _rawValue)` instead.
+    // Note: When count is statically known to be 1 the compiler will optimize
+    // away a call to swift_arrayDestroy into the type's specific destroy.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
     return UnsafeMutableRawPointer(self)
   }
