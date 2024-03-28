@@ -18,6 +18,9 @@
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
 
+// FIXME(concurrency): corelibs-dispatch is missing the `DispatchSerialQueue` type
+// XFAIL: OS=freebsd, OS=openbsd, OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+
 import StdlibUnittest
 import Dispatch
 
