@@ -593,6 +593,14 @@ namespace swift {
     /// type-checking, SIL verification, and IR emission,
     bool BypassResilienceChecks = false;
 
+    /// Whether or not to allow experimental features that are only available
+    /// in "production".
+#ifdef NDEBUG
+    bool RestrictNonProductionExperimentalFeatures = true;
+#else
+    bool RestrictNonProductionExperimentalFeatures = false;
+#endif
+
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }
