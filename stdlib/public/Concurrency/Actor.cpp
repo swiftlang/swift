@@ -78,7 +78,6 @@ extern "C" void objc_autoreleasePoolPop(void *);
 #endif
 
 using namespace swift;
-using namespace swift::runtime::bincompat;
 
 /// Should we yield the thread?
 static bool shouldYieldThread() {
@@ -333,6 +332,17 @@ enum IsCurrentExecutorCheckMode: unsigned {
 };
 static IsCurrentExecutorCheckMode isCurrentExecutorMode =
     Default_UseCheckIsolated_AllowCrash;
+
+
+// Shimming call to Swift runtime because Swift Embedded does not have
+// these symbols defined
+bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  swift::runtime::bincompat::
+      swift_bincompat_useLegacyNonCrashingExecutorChecks();
+#endif
+  return false;
+}
 
 // Check override of executor checking mode.
 static void checkIsCurrentExecutorMode(void *context) {
