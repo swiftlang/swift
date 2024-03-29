@@ -70,6 +70,10 @@
 #include "swift/Runtime/Atomic.h"
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
+#if defined(_WIN32)
+#include "swift/Runtime/Atomic.h"
+#endif // _WIN32
+
 #include "BacktracePrivate.h"
 
 namespace FatalErrorFlags {
@@ -268,16 +272,15 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
     fprintf(stderr, "<backtrace unavailable>\n");
 }
 
-// Report a message to any forthcoming crash log.
-static void
-reportOnCrash(uint32_t flags, const char *message)
-{
-#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
+#if defined(SWIFT_HAVE_CRASHREPORTERCLIENT) || defined(_WIN32)
+// Update the last fatal error message for crash reporting.
+static void updateLastFatalErrorMessage(void* location,
+                                        const char* message) {
   char *oldMessage = nullptr;
   char *newMessage = nullptr;
 
   oldMessage = std::atomic_load_explicit(
-    (volatile std::atomic<char *> *)&gCRAnnotations.message,
+    (volatile std::atomic<char *> *)location,
     SWIFT_MEMORY_ORDER_CONSUME);
 
   do {
@@ -292,13 +295,25 @@ reportOnCrash(uint32_t flags, const char *message)
       newMessage = strdup(message);
     }
   } while (!std::atomic_compare_exchange_strong_explicit(
-             (volatile std::atomic<char *> *)&gCRAnnotations.message,
+             (volatile std::atomic<char *> *)location,
              &oldMessage, newMessage,
              std::memory_order_release,
              SWIFT_MEMORY_ORDER_CONSUME));
+}
+#endif  // SWIFT_HAVE_CRASHREPORTERCLIENT || _WIN32
+
+// Report a message to any forthcoming crash log.
+static void
+reportOnCrash(uint32_t flags, const char *message)
+{
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
+  updateLastFatalErrorMessage(&gCRAnnotations.message, message);
+#elif defined(_WIN32)
+  // Make the fatal error message accessible for Windows dump tools.
+  updateLastFatalErrorMessage(&gLastFatalErrorMessage, message);
 #else
   // empty
-#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT || _WIN32
 }
 
 // Report a message to system console and stderr.

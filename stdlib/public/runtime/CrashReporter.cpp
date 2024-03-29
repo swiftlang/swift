@@ -33,3 +33,10 @@ struct crashreporter_annotations_t gCRAnnotations __attribute__((
 }
 
 #endif
+
+#if defined(_WIN32)
+extern "C" {
+SWIFT_ATTRIBUTE_FOR_EXPORTS
+char* gLastFatalErrorMessage = nullptr;
+}
+#endif

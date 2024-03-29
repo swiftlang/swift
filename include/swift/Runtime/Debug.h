@@ -60,6 +60,13 @@ static inline const char *CRGetCrashLogMessage() {
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline void CRSetCrashLogMessage(const char *) {}
 
+#if defined(_WIN32)
+extern "C" {
+SWIFT_ATTRIBUTE_FOR_EXPORTS
+extern char* gLastFatalErrorMessage;
+}
+#endif // _WIN32
+
 #endif
 
 namespace swift {
