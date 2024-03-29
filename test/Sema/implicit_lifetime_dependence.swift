@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics
 // REQUIRES: asserts
 
 struct BufferView : ~Escapable, ~Copyable {

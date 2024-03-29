@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s \
-// RUN: -emit-sil  \
+// RUN: -emit-sil  -disable-availability-checking \
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
 // REQUIRES: asserts
