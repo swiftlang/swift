@@ -1,11 +1,11 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics
 // REQUIRES: asserts
 
 struct BufferView : ~Escapable, ~Copyable {
-  let ptr: UnsafeRawBufferPointer
+  let ptr: UnsafeRawBufferPointer?
   let c: Int
   @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
+  init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
@@ -23,3 +23,8 @@ struct ImplicitInit3 : ~Escapable, ~Copyable { // expected-error{{cannot infer l
   let mbv1: BufferView
   let mbv2: BufferView
 }
+
+func foo() -> BufferView { // expected-error{{cannot infer lifetime dependence , no parameters found that are ~Escapable or Escapable with a borrowing ownership}}
+  return BufferView(nil, 0)
+}
+
