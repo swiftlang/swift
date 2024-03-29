@@ -217,6 +217,16 @@ public func funcPublicWithNestedTypeActor() {
 // CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeActor()"
 // CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeActor()"
 
+public func funcPublicWithNestedTypeProtocol() {
+  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeProtocol()"
+  _blackHole(INLINENOTYPECHECK_local)
+  protocol P {}
+}
+// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeProtocol()"
+// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeProtocol()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeProtocol()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeProtocol()"
+
 public func funcPublicWithNestedTypeStruct() {
   let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeStruct()"
   _blackHole(INLINENOTYPECHECK_local)
