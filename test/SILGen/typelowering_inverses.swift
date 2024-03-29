@@ -53,19 +53,19 @@ func check(_ t: borrowing CondCopyableEnum<NC>) {}
 // CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGlF : $@convention(thin) <T> (@in_guaranteed CondCopyableEnum<T>) -> () {
 func check<T>(_ t: CondCopyableEnum<T>) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGRiczlF : $@convention(thin) <U where U : ~Copyable> (@in_guaranteed CondCopyableEnum<U>) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGRi_zlF : $@convention(thin) <U where U : ~Copyable> (@in_guaranteed CondCopyableEnum<U>) -> () {
 func check<U: ~Copyable>(_ t: borrowing CondCopyableEnum<U>) {}
 
 // CHECK: sil hidden [ossa] @$s4main5checkyyAA7NoCopyP_pF : $@convention(thin) (@in_guaranteed any NoCopyP) -> () {
 func check(_ t: any NoCopyP) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA7NoCopyP_pRics_XPF : $@convention(thin) (@in_guaranteed any NoCopyP & ~Copyable) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA7NoCopyP_pRi_s_XPF : $@convention(thin) (@in_guaranteed any NoCopyP & ~Copyable) -> () {
 func check(_ t: borrowing any NoCopyP & ~Copyable) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA7NoCopyP_pRics_XPnF : $@convention(thin) (@in any NoCopyP & ~Copyable) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA7NoCopyP_pRi_s_XPnF : $@convention(thin) (@in any NoCopyP & ~Copyable) -> () {
 func check(_ t: consuming any NoCopyP & ~Copyable) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA7NoCopyP_pRics_XPzF : $@convention(thin) (@inout any NoCopyP & ~Copyable) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA7NoCopyP_pRi_s_XPzF : $@convention(thin) (@inout any NoCopyP & ~Copyable) -> () {
 func check(_ t: inout any NoCopyP & ~Copyable) {}
 
 struct MyStruct<T: ~Copyable>: ~Copyable {

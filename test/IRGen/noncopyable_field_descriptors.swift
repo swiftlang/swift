@@ -30,10 +30,10 @@ public enum NeverCopyable<Wrapped: ~Copyable>: ~Copyable {
 public struct NonCopyable: ~Copyable { }
 
 // CHECK: @"$s4test1CCMF" = 
-// CHECK-SAME: @"symbolic _____yxG 4test21ConditionallyCopyableOAARiczrlE"
-// CHECK-SAME: @"get_type_metadata Riczl4test21ConditionallyCopyableOyAA03NonC0VG.3"
-// CHECK-SAME: @"symbolic _____yxG 4test21ConditionallyCopyableOAARiczrlE"
-// CHECK-SAME: @"get_type_metadata Riczl4test21ConditionallyCopyableOyAA03NonC0VG.3"
+// CHECK-SAME: @"symbolic _____yxG 4test21ConditionallyCopyableOAARi_zrlE"
+// CHECK-SAME: @"get_type_metadata Ri_zl4test21ConditionallyCopyableOyAA03NonC0VG.3"
+// CHECK-SAME: @"symbolic _____yxG 4test21ConditionallyCopyableOAARi_zrlE"
+// CHECK-SAME: @"get_type_metadata Ri_zl4test21ConditionallyCopyableOyAA03NonC0VG.3"
 public class C<T: ~Copyable> {
   var ccT: ConditionallyCopyable<T> = .none
   var ccNC: ConditionallyCopyable<NonCopyable> = .none

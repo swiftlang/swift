@@ -1011,9 +1011,6 @@ now codified into the ABI; the index 0 is therefore reserved.
 
   generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
 
-  INVERTIBLE-KIND ::= 'c'  // Copyable
-  INVERTIBLE-KIND ::= 'e'  // Escapable
-
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters
 
@@ -1022,7 +1019,10 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= protocol assoc-type-list 'RP' GENERIC-PARAM-INDEX // protocol requirement on associated type at depth
   requirement ::= protocol substitution 'RQ'                        // protocol requirement with substitution
 #if SWIFT_RUNTIME_VERSION >= 6.0
-  requirement ::= 'Ri' INVERTIBLE-KIND GENERIC-PARAM-INDEX          // inverse requirement
+  requirement ::= 'Ri' INDEX GENERIC-PARAM-INDEX                    // inverse requirement on generic parameter where INDEX is the bit number
+  requirement ::= substitution 'RI' INDEX                           // inverse requirement with substitution
+  requirement ::= assoc-type-name 'Rj' INDEX GENERIC-PARAM-INDEX    // inverse requirement on associated type
+  requirement ::= assoc-type-list 'RJ' INDEX GENERIC-PARAM-INDEX    // inverse requirement on associated type at depth
 #endif
   requirement ::= type 'Rb' GENERIC-PARAM-INDEX                     // base class requirement
   requirement ::= type assoc-type-name 'Rc' GENERIC-PARAM-INDEX     // base class requirement on associated type

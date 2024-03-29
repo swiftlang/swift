@@ -26,7 +26,7 @@ namespace swift {
 /// Describes a "suppressible" protocol, such as Copyable, which is assumed to
 /// hold for all types unless explicitly suppressed.
 enum class SuppressibleProtocolKind : uint8_t {
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) Name = Bit,
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit) Name = Bit,
 #include "swift/ABI/SuppressibleProtocols.def"
 };
 
@@ -72,7 +72,7 @@ public:
   /// Clear out all of the protocols from the set.
   void clear() { bits = 0; }
 
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) \
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit)             \
   bool contains##Name() const {                      \
     return contains(SuppressibleProtocolKind::Name); \
   }
@@ -82,7 +82,7 @@ public:
   /// protocols.
   static SuppressibleProtocolSet allKnown() {
     SuppressibleProtocolSet result;
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar)    \
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit)           \
     result.insert(SuppressibleProtocolKind::Name);
 #include "swift/ABI/SuppressibleProtocols.def"
     return result;
@@ -213,7 +213,7 @@ public:
 static inline const char *
 getSuppressibleProtocolKindName(SuppressibleProtocolKind kind) {
   switch (kind) {
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar)    \
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit)             \
   case SuppressibleProtocolKind::Name: return #Name;
 #include "swift/ABI/SuppressibleProtocols.def"
   }

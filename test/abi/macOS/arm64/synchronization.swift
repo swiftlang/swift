@@ -450,22 +450,22 @@ Added: _$sSO15Synchronization27AtomicOptionalRepresentableAAMc
 Added: _$sSO15Synchronization27AtomicOptionalRepresentableAAWP
 
 // protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafePointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSPyxG15Synchronization19AtomicRepresentableABRiczrlMc
+Added: _$sSPyxG15Synchronization19AtomicRepresentableABRi_zrlMc
 
 // protocol witness table for < where A: ~Swift.Copyable> Swift.UnsafePointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSPyxG15Synchronization19AtomicRepresentableABRiczrlWP
+Added: _$sSPyxG15Synchronization19AtomicRepresentableABRi_zrlWP
 
 // protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
-Added: _$sSPyxG15Synchronization27AtomicOptionalRepresentableABRiczrlMc
+Added: _$sSPyxG15Synchronization27AtomicOptionalRepresentableABRi_zrlMc
 
 // protocol witness table for < where A: ~Swift.Copyable> Swift.UnsafePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
-Added: _$sSPyxG15Synchronization27AtomicOptionalRepresentableABRiczrlWP
+Added: _$sSPyxG15Synchronization27AtomicOptionalRepresentableABRi_zrlWP
 
 // protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSRyxG15Synchronization19AtomicRepresentableABRiczrlMc
+Added: _$sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc
 
 // protocol witness table for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSRyxG15Synchronization19AtomicRepresentableABRiczrlWP
+Added: _$sSRyxG15Synchronization19AtomicRepresentableABRi_zrlWP
 
 // protocol conformance descriptor for Swift.UnsafeRawPointer : Synchronization.AtomicRepresentable in Synchronization
 Added: _$sSV15Synchronization19AtomicRepresentableAAMc
@@ -510,22 +510,22 @@ Added: _$sSi15Synchronization19AtomicRepresentableAAMc
 Added: _$sSi15Synchronization19AtomicRepresentableAAWP
 
 // protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeMutablePointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSpyxG15Synchronization19AtomicRepresentableABRiczrlMc
+Added: _$sSpyxG15Synchronization19AtomicRepresentableABRi_zrlMc
 
 // protocol witness table for < where A: ~Swift.Copyable> Swift.UnsafeMutablePointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSpyxG15Synchronization19AtomicRepresentableABRiczrlWP
+Added: _$sSpyxG15Synchronization19AtomicRepresentableABRi_zrlWP
 
 // protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeMutablePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
-Added: _$sSpyxG15Synchronization27AtomicOptionalRepresentableABRiczrlMc
+Added: _$sSpyxG15Synchronization27AtomicOptionalRepresentableABRi_zrlMc
 
 // protocol witness table for < where A: ~Swift.Copyable> Swift.UnsafeMutablePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
-Added: _$sSpyxG15Synchronization27AtomicOptionalRepresentableABRiczrlWP
+Added: _$sSpyxG15Synchronization27AtomicOptionalRepresentableABRi_zrlWP
 
 // protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeMutableBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSryxG15Synchronization19AtomicRepresentableABRiczrlMc
+Added: _$sSryxG15Synchronization19AtomicRepresentableABRi_zrlMc
 
 // protocol witness table for < where A: ~Swift.Copyable> Swift.UnsafeMutableBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
-Added: _$sSryxG15Synchronization19AtomicRepresentableABRiczrlWP
+Added: _$sSryxG15Synchronization19AtomicRepresentableABRi_zrlWP
 
 // protocol conformance descriptor for Swift.UInt : Synchronization.AtomicRepresentable in Synchronization
 Added: _$sSu15Synchronization19AtomicRepresentableAAMc

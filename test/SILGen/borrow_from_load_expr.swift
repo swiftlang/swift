@@ -12,7 +12,7 @@ public struct FA<T> {
   public subscript(_ int: Int) -> T {
 // CHECK-LABEL: sil [ossa] @read : {{.*}} {
                   // function_ref UnsafeMutablePointer.subscript.unsafeAddressor
-// CHECK:         [[ADDRESSOR:%[^,]+]] = function_ref @$sSpsRiczrlEyxSicilu
+// CHECK:         [[ADDRESSOR:%[^,]+]] = function_ref @$sSpsRi_zrlEyxSicilu
 // CHECK:         [[POINTER:%[^,]+]] = apply [[ADDRESSOR]]
 // CHECK:         [[RAW_POINTER:%[^,]+]] = struct_extract [[POINTER]]
 // CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[RAW_POINTER]]

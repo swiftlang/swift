@@ -3420,11 +3420,34 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
   }
 }
 
+ASTMangler::RequirementSubject ASTMangler::appendRequirementSubject(
+    CanType subjectType, GenericSignature sig) {
+  // Handle dependent types.
+  if (auto *depTy = subjectType->getAs<DependentMemberType>()) {
+    if (tryMangleTypeSubstitution(depTy, sig)) {
+      return RequirementSubject {RequirementSubject::Substitution};
+    }
+
+    bool isAssocTypeAtDepth = false;
+    GenericTypeParamType *gpBase = appendAssocType(depTy, sig,
+                                                   isAssocTypeAtDepth);
+    addTypeSubstitution(depTy, sig);
+    return RequirementSubject {
+      isAssocTypeAtDepth ? RequirementSubject::AssociatedTypeAtDepth
+                         : RequirementSubject::AssociatedType,
+      gpBase
+    };
+  }
+
+  GenericTypeParamType *gpBase = subjectType->castTo<GenericTypeParamType>();
+  return RequirementSubject { RequirementSubject::GenericParameter, gpBase };
+}
+
 void ASTMangler::appendRequirement(const Requirement &reqt,
                                    GenericSignature sig,
                                    bool lhsBaseIsProtocolSelf) {
 
-  Type FirstTy = reqt.getFirstType()->getCanonicalType();
+  CanType FirstTy = reqt.getFirstType()->getCanonicalType();
 
   switch (reqt.getKind()) {
   case RequirementKind::Layout:
@@ -3446,84 +3469,94 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   }
   }
 
-  if (auto *DT = FirstTy->getAs<DependentMemberType>()) {
-    if (tryMangleTypeSubstitution(DT, sig)) {
-      switch (reqt.getKind()) {
-        case RequirementKind::SameShape:
-          llvm_unreachable("Same-shape requirement with dependent member type?");
-        case RequirementKind::Conformance:
-          return appendOperator("RQ");
-        case RequirementKind::Layout:
-          appendOperator("RL");
-          appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
-          return;
-        case RequirementKind::Superclass:
-          return appendOperator("RB");
-        case RequirementKind::SameType:
-          return appendOperator("RS");
-      }
-      llvm_unreachable("bad requirement type");
-    }
-    bool isAssocTypeAtDepth = false;
-    GenericTypeParamType *gpBase = appendAssocType(DT, sig,
-                                                   isAssocTypeAtDepth);
-    addTypeSubstitution(DT, sig);
-    assert(gpBase);
+  auto subject = appendRequirementSubject(FirstTy, sig);
+  switch (subject.kind) {
+  case RequirementSubject::GenericParameter:
     switch (reqt.getKind()) {
-      case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement with a dependent member type?");
-      case RequirementKind::Conformance:
-        return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
-                                             gpBase, lhsBaseIsProtocolSelf);
-      case RequirementKind::Layout:
-        appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RM" : "Rm", gpBase,
-                                      lhsBaseIsProtocolSelf);
-        appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
-        return;
-      case RequirementKind::Superclass:
-        return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RC" : "Rc",
-                                             gpBase, lhsBaseIsProtocolSelf);
-      case RequirementKind::SameType:
-        return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RT" : "Rt",
-                                             gpBase, lhsBaseIsProtocolSelf);
-    }
-    llvm_unreachable("bad requirement type");
-  }
-  GenericTypeParamType *gpBase = FirstTy->castTo<GenericTypeParamType>();
-  switch (reqt.getKind()) {
     case RequirementKind::Conformance:
-      return appendOpWithGenericParamIndex("R", gpBase);
+      return appendOpWithGenericParamIndex("R", subject.gpBase);
     case RequirementKind::Layout:
-      appendOpWithGenericParamIndex("Rl", gpBase);
+      appendOpWithGenericParamIndex("Rl", subject.gpBase);
       appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
       return;
     case RequirementKind::Superclass:
-      return appendOpWithGenericParamIndex("Rb", gpBase);
+      return appendOpWithGenericParamIndex("Rb", subject.gpBase);
     case RequirementKind::SameType:
-      return appendOpWithGenericParamIndex("Rs", gpBase);
+      return appendOpWithGenericParamIndex("Rs", subject.gpBase);
     case RequirementKind::SameShape:
-      return appendOpWithGenericParamIndex("Rh", gpBase);
+      return appendOpWithGenericParamIndex("Rh", subject.gpBase);
+    }
+    break;
+
+  case RequirementSubject::Substitution:
+    switch (reqt.getKind()) {
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement with dependent member type?");
+    case RequirementKind::Conformance:
+      return appendOperator("RQ");
+    case RequirementKind::Layout:
+      appendOperator("RL");
+      appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+      return;
+    case RequirementKind::Superclass:
+      return appendOperator("RB");
+    case RequirementKind::SameType:
+      return appendOperator("RS");
+    }
+    break;
+
+  case RequirementSubject::AssociatedType:
+  case RequirementSubject::AssociatedTypeAtDepth:
+    bool isAssocTypeAtDepth =
+        subject.kind == RequirementSubject::AssociatedTypeAtDepth;
+    auto gpBase = subject.gpBase;
+    switch (reqt.getKind()) {
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement with a dependent member type?");
+    case RequirementKind::Conformance:
+      return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
+                                           gpBase, lhsBaseIsProtocolSelf);
+    case RequirementKind::Layout:
+      appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RM" : "Rm", gpBase,
+                                    lhsBaseIsProtocolSelf);
+      appendOpParamForLayoutConstraint(reqt.getLayoutConstraint());
+      return;
+    case RequirementKind::Superclass:
+      return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RC" : "Rc",
+                                           gpBase, lhsBaseIsProtocolSelf);
+    case RequirementKind::SameType:
+      return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RT" : "Rt",
+                                           gpBase, lhsBaseIsProtocolSelf);
+    }
+    break;
   }
-  llvm_unreachable("bad requirement type");
 }
 
 void ASTMangler::appendInverseRequirement(const InverseRequirement &req,
                                           GenericSignature sig,
                                           bool lhsBaseIsProtocolSelf) {
-  appendOperator("Ri");
-
-  switch (req.getKind()) {
-  case InvertibleProtocolKind::Copyable:
-    appendOperator("c");
-    break;
-  case InvertibleProtocolKind::Escapable:
-    appendOperator("e");
-    break;
-  }
-
+  unsigned bit = static_cast<uint8_t>(req.getKind());
   auto firstType = req.subject->getCanonicalType();
-  auto gpBase = firstType->castTo<GenericTypeParamType>();
-  return appendOpWithGenericParamIndex("", gpBase, lhsBaseIsProtocolSelf);
+  auto subject = appendRequirementSubject(firstType, sig);
+  switch (subject.kind) {
+  case RequirementSubject::GenericParameter:
+    appendOperator("Ri", Index(bit));
+    return appendOpWithGenericParamIndex("", subject.gpBase,
+                                         lhsBaseIsProtocolSelf);
+
+  case RequirementSubject::Substitution:
+    return appendOperator("RI", Index(bit));
+
+  case RequirementSubject::AssociatedType:
+    appendOperator("Rj", Index(bit));
+    return appendOpWithGenericParamIndex("", subject.gpBase,
+                                         lhsBaseIsProtocolSelf);
+
+  case RequirementSubject::AssociatedTypeAtDepth:
+    appendOperator("RJ", Index(bit));
+    return appendOpWithGenericParamIndex("", subject.gpBase,
+                                         lhsBaseIsProtocolSelf);
+  }
 }
 
 void ASTMangler::appendGenericSignatureParts(

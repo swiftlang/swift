@@ -1059,24 +1059,23 @@ ManglingError Remangler::mangleDependentGenericInverseConformanceRequirement(
   DEMANGLER_ASSERT(
       NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
 
-  // Determine the invertible protocol's mangling
-  const char* invertibleKind = nullptr; // INVERTIBLE-KIND
-  {
-    auto typeNode = node->getChild(1);
-    auto *identNode = typeNode->findByKind(Node::Kind::Identifier, 2);
-    DEMANGLER_ASSERT(identNode, node);
-    DEMANGLER_ASSERT(identNode->hasText(), node);
-
-    auto name = identNode->getText();
-    if (name.equals("Copyable"))
-      invertibleKind = "c";
-    else if (name.equals("Escapable"))
-      invertibleKind = "e";
-    else
-      return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
+  switch (NumMembersAndParamIdx.first) {
+  case -1:
+    Buffer << "RI";
+    mangleIndex(node->getChild(1)->getIndex());
+    return ManglingError::Success; // substitution
+  case 0:
+    Buffer << "Ri";
+    break;
+  case 1:
+    Buffer << "Rj";
+    break;
+  default:
+    Buffer << "RJ";
+    break;
   }
 
-  Buffer << "Ri" << invertibleKind;
+  mangleIndex(node->getChild(1)->getIndex());
   mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
   return ManglingError::Success;
 }
