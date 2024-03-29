@@ -273,7 +273,7 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
     // don't start with a digit and don't need to be quoted.
     Buffer << 'T';
     bool isFirstItem = true;
-    InvertibleProtocolSet inverses = InvertibleProtocolSet::full();
+    InvertibleProtocolSet inverses = InvertibleProtocolSet::allKnown();
     auto protocols = layout.getProtocols();
     for (auto *proto : protocols) {
       if (auto ip = proto->getInvertibleProtocolKind()) {
