@@ -7774,7 +7774,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
                          /*isPreconcurrency=*/false);
   }
 
-  InvertibleProtocolSet inverses = InvertibleProtocolSet::full();
+  InvertibleProtocolSet inverses = InvertibleProtocolSet::allKnown();
 
   for (auto *inherited : proto->getInheritedProtocols()) {
     if (auto ip = inherited->getInvertibleProtocolKind()) {
@@ -7782,7 +7782,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
       continue;
     }
 
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
       if (inherited->inheritsFrom(proto))
         inverses.remove(ip);
