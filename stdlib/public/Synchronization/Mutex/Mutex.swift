@@ -36,10 +36,10 @@
 @_staticExclusiveOnly
 public struct Mutex<Value: ~Copyable>: ~Copyable {
   @usableFromInline
-  let value: _Cell<Value>
+  let handle = _MutexHandle()
 
   @usableFromInline
-  let handle = _MutexHandle()
+  let value: _Cell<Value>
 
   /// Initializes a value of this mutex with the given initial state.
   ///

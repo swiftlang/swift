@@ -28,7 +28,11 @@ internal struct _Cell<Value: ~Copyable>: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   var rawAddress: Builtin.RawPointer {
-    Builtin.unprotectedAddressOfBorrow(self)
+#if $BuiltinAddressOfRawLayout
+    Builtin.addressOfRawLayout(self)
+#else
+    fatalError()
+#endif
   }
 
   @available(SwiftStdlib 6.0, *)
