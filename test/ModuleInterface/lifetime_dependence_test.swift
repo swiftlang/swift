@@ -26,18 +26,18 @@
 import lifetime_dependence
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: borrowing Swift.Array<Swift.Int>) -> _borrow(a) Self {
-// CHECK: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: consuming lifetime_dependence.AnotherView) -> _consume(a) Self {
+// CHECK: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: borrowing Swift.Array<Swift.Int>) -> dependsOn(a) Self {
+// CHECK: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: consuming lifetime_dependence.AnotherView) -> dependsOn(a) Self {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK: @inlinable public func derive(_ x: consuming lifetime_dependence.BufferView) ->  _consume(x) lifetime_dependence.BufferView {
+// CHECK: @inlinable public func derive(_ x: consuming lifetime_dependence.BufferView) ->  dependsOn(x) lifetime_dependence.BufferView {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK: @inlinable public func consumeAndCreate(_ view: consuming lifetime_dependence.BufferView) ->  _consume(view) lifetime_dependence.BufferView {
+// CHECK: @inlinable public func consumeAndCreate(_ view: consuming lifetime_dependence.BufferView) ->  dependsOn(view) lifetime_dependence.BufferView {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence.BufferView, _ that: consuming lifetime_dependence.BufferView) ->  _consume(this)  _consume(that) lifetime_dependence.BufferView {
+// CHECK: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence.BufferView, _ that: consuming lifetime_dependence.BufferView) ->  dependsOn(this)  dependsOn(that) lifetime_dependence.BufferView {
 // CHECK: #endif

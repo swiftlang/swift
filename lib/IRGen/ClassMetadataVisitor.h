@@ -76,6 +76,7 @@ public:
     asImpl().noteAddressPoint();
     asImpl().addEmbeddedSuperclass(classTy);
     asImpl().addDestructorFunction();
+    asImpl().addIVarDestroyer();
     addEmbeddedClassMembers(Target);
   }
 
@@ -87,6 +88,7 @@ public:
       asImpl().noteAddressPoint();
       asImpl().addSuperclass();
       asImpl().addDestructorFunction();
+      asImpl().addIVarDestroyer();
       addEmbeddedClassMembers(Target);
       return;
     }

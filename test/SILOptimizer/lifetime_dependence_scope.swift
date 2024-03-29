@@ -28,7 +28,7 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a borrow.
-  borrowing func getBV() -> _borrow(self) BV {
+  borrowing func getBV() -> dependsOn(self) BV {
     BV(p, c)
   }
 }
@@ -42,6 +42,6 @@ struct NC : ~Copyable {
 // CHECK:   [[R:%.*]] = apply %{{.*}}([[L]]) : $@convention(method) (@guaranteed NC) -> _scope(0) @owned BV
 // CHECK:   [[M:%.*]] = mark_dependence [nonescaping] [[R]] : $BV on %0 : $*NC
 // CHECK-LABEL: } // end sil function '$s4test13bv_get_mutate9containerAA2BVVAA2NCVzYls_tF'
-func bv_get_mutate(container: inout NC) -> _mutate(container) BV {
+func bv_get_mutate(container: inout NC) -> dependsOn(container) BV {
   container.getBV()
 }

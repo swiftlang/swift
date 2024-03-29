@@ -8822,7 +8822,7 @@ bool ModuleFile::maybeReadLifetimeDependenceSpecifier(
                                        lifetimeDependenceData);
 
   unsigned startIndex = 0;
-  auto pushData = [&](LifetimeDependenceKind kind) {
+  auto pushData = [&](ParsedLifetimeDependenceKind kind) {
     for (unsigned i = 0; i < numDeclParams + 1; i++) {
       if (lifetimeDependenceData[startIndex + i]) {
         specifierList.push_back(
@@ -8834,10 +8834,10 @@ bool ModuleFile::maybeReadLifetimeDependenceSpecifier(
   };
 
   if (hasInheritLifetimeParamIndices) {
-    pushData(LifetimeDependenceKind::Consume);
+    pushData(ParsedLifetimeDependenceKind::Inherit);
   }
   if (hasScopeLifetimeParamIndices) {
-    pushData(LifetimeDependenceKind::Borrow);
+    pushData(ParsedLifetimeDependenceKind::Scope);
   }
   return true;
 }
