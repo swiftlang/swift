@@ -732,19 +732,25 @@ extension ASTGenVisitor {
   }
 
   func generateObjCImplementationAttr(attribute node: AttributeSyntax) -> BridgedObjCImplementationAttr? {
-    let name: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
-      self.generateIdentifier($0)
-    }
+    let name: BridgedIdentifier? = self.generateSingleAttrOption(
+      attribute: node,
+      self.generateIdentifier,
+      valueIfOmitted: BridgedIdentifier()
+    )
     guard let name else {
-      // TODO: Diagnose.
+      // Should be diagnosed by `generateSingleAttrOption`.
       return nil
     }
+
+    let attrName = node.attributeName.as(IdentifierTypeSyntax.self)?.name.text
+    let isEarlyAdopter = attrName != "implementation"
 
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateSourceRange(node),
-      name: name
+      name: name,
+      isEarlyAdopter: isEarlyAdopter
     )
   }
 
@@ -1058,6 +1064,11 @@ extension ASTGenVisitor {
       }
       // TODO: Diagnose.
       return nil
+    }
+
+    if case .token(let tok) = arguments {
+      // Special case: was parsed as a token, not an an argument list
+      return valueGeneratorFunction(tok)
     }
 
     guard var arguments = arguments.as(LabeledExprListSyntax.self)?[...] else {
