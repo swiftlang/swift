@@ -130,16 +130,19 @@ public:
   }
 
   SILType remapType(SILType Ty) {
+    llvm::dbgs() << "\nES: >> remapType: " << Ty.getMangledName();
     CMS.makeTypeUsableFromInline(Ty.getASTType());
     return Ty;
   }
 
   CanType remapASTType(CanType Ty) {
+    llvm::dbgs() << "\nES: >> remapASTType: " << Ty.getString();
     CMS.makeTypeUsableFromInline(Ty);
     return Ty;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    llvm::dbgs() << "\nES: >> remapSubst: ";
     CMS.makeSubstUsableFromInline(Subs);
     return Subs;
   }
@@ -181,8 +184,11 @@ void CrossModuleOptimization::serializeFunctionsInModule() {
   for (SILFunction &F : M) {
     if (isVisible(F.getLinkage(), M.getOptions()) ||
         everything) {
+      llvm::dbgs() << "\n\nES: CMO: " << F.getName();
       if (canSerializeFunction(&F, canSerializeFlags, /*maxDepth*/ 64)) {
+        llvm::dbgs() << "\nES: CMO-START";
         serializeFunction(&F, canSerializeFlags);
+        llvm::dbgs() << "\nES: CMO-DONE";
       }
     }
   }
@@ -247,10 +253,13 @@ bool CrossModuleOptimization::canSerializeFunction(
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (!canSerializeInstruction(&inst, canSerializeFlags, maxDepth)) {
+        llvm::dbgs() << "\nES: CANT serialize inst: ";
+        inst.dump();
         return false;
       }
     }
   }
+  llvm::dbgs() << "\nES: CAN_SERIALIZE_FUNC: " << function->getName();
   canSerializeFlags[function] = true;
   return true;
 }
@@ -374,7 +383,6 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
     [this](Type rawSubType) {
       CanType subType = rawSubType->getCanonicalType();
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
-      
         if (conservative && subNT->getEffectiveAccess() < AccessLevel::Package) {
           return true;
         }
@@ -482,6 +490,10 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 
     if (function->getLinkage() == SILLinkage::Shared)
       return true;
+  } else if (function->getModule().getOptions().EnableSerializePackage &&
+             (function->getLinkage() == SILLinkage::Package ||
+              function->getLinkage() == SILLinkage::Public)) {
+    return true;
   }
 
   // Also serialize "small" non-generic functions.
@@ -501,16 +513,20 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                        const FunctionFlags &canSerializeFlags) {
-  if (function->isSerialized())
+  if (function->isSerialized()) {
+    llvm::dbgs() << "\nES: > sFunc: already serialized: " << function->getName();
     return;
-  
+  }
   if (!canSerializeFlags.lookup(function))
     return;
 
+  llvm::dbgs() << "\nES: > sFunc: in map; now serialize: " << function->getName();;
   function->setSerialized(IsSerialized);
 
   for (SILBasicBlock &block : *function) {
+    llvm::dbgs() << "\nES: > sFunc: visit inst: " << function->getName() << "\n";
     for (SILInstruction &inst : block) {
+      inst.dump();
       InstructionVisitor::makeTypesUsableFromInline(&inst, *this);
       serializeInstruction(&inst, canSerializeFlags);
     }
@@ -576,9 +592,50 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     return;
   }
   if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
+    // Serialize V tables if package-cmo is enabled
+    if (conservative && M.getOptions().EnableSerializePackage) {
+      if (auto classDecl = REAI->getClassDecl()) {
+        auto *vTable = M.lookUpVTable(classDecl);
+        if (vTable &&
+            !vTable->isSerialized() &&
+            classDecl->getEffectiveAccess() >= AccessLevel::Package) {
+          auto update = true;
+          for (auto &entry : vTable->getEntries()) {
+            if (!canUseFromInline(entry.getImplementation())) {
+              update = false;
+              break;
+            }
+          }
+          if (update) {
+            vTable->setSerialized(IsSerialized);
+          }
+          classDecl->walkSuperclasses([&](ClassDecl *superClassDecl) {
+            auto *vTable = M.lookUpVTable(superClassDecl);
+            if (vTable &&
+                !vTable->isSerialized() &&
+                superClassDecl->getEffectiveAccess() >= AccessLevel::Package) {
+              auto update = true;
+              for (auto &entry : vTable->getEntries()) {
+                if (!canUseFromInline(entry.getImplementation())) {
+                  update = false;
+                  break;
+                }
+              }
+              if (update) {
+                vTable->setSerialized(IsSerialized);
+                return TypeWalker::Action::Continue;
+              }
+            }
+            return TypeWalker::Action::Stop;
+          });
+        }
+      }
+    }
+    llvm::dbgs() << "\nES: >> sInst: ";
     makeDeclUsableFromInline(REAI->getField());
   }
 }
+
 
 void CrossModuleOptimization::serializeGlobal(SILGlobalVariable *global) {
   for (const SILInstruction &initInst : *global) {
@@ -609,8 +666,10 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
 
 /// Make a nominal type, including it's context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
-  if (decl->getEffectiveAccess() >= AccessLevel::Package)
+  if (decl->getEffectiveAccess() >= AccessLevel::Package) {
+    llvm::dbgs() << "\nES: >>>> makeDeclUFI: return (>= package): " << decl->getBaseIdentifier().str();
     return;
+  }
 
   // We must not modify decls which are defined in other modules.
   if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
@@ -650,9 +709,11 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     }
   }
   if (auto *nominalCtx = dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+    llvm::dbgs() << "\nES: >> makeDeclUFI: ";
     makeDeclUsableFromInline(nominalCtx);
   } else if (auto *extCtx = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
     if (auto *extendedNominal = extCtx->getExtendedNominal()) {
+      llvm::dbgs() << "\nES: >> makeDeclUFI: ";
       makeDeclUsableFromInline(extendedNominal);
     }
   } else if (decl->getDeclContext()->isLocalContext()) {
@@ -666,6 +727,7 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
     return;
 
   if (NominalTypeDecl *NT = type->getNominalOrBoundGenericNominal()) {
+    llvm::dbgs() << "\nES: >> makeTypeUFI: ";
     makeDeclUsableFromInline(NT);
   }
 
@@ -674,6 +736,7 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
     CanType subType = rawSubType->getCanonicalType();
     if (typesHandled.insert(subType.getPointer()).second) {
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
+        llvm::dbgs() << "\nES: >> makeTypeUFI: ";
         makeDeclUsableFromInline(subNT);
       }
     }
@@ -690,6 +753,7 @@ void CrossModuleOptimization::makeSubstUsableFromInline(
   for (ProtocolConformanceRef pref : substs.getConformances()) {
     if (pref.isConcrete()) {
       ProtocolConformance *concrete = pref.getConcrete();
+      llvm::dbgs() << "\nES: >> makeProtoUFI: ";
       makeDeclUsableFromInline(concrete->getProtocol());
     }
   }
@@ -699,7 +763,8 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
   void run() override {
 
     auto &M = *getModule();
-    if (M.getSwiftModule()->isResilient())
+    if (M.getSwiftModule()->isResilient() &&
+        !M.getOptions().EnableSerializePackage)
       return;
     if (!M.isWholeModule())
       return;

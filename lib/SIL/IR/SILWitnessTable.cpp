@@ -167,15 +167,20 @@ void SILWitnessTable::convertToDefinition(
 
 bool SILWitnessTable::conformanceIsSerialized(
     const RootProtocolConformance *conformance) {
+  auto pkgOptIn = conformance->getProtocol()->getASTContext().SILOpts.EnableSerializePackage;
   auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-  if (normalConformance && normalConformance->isResilient())
+  if (normalConformance && normalConformance->isResilient() && !pkgOptIn)
     return false;
 
-  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
+  auto accessLevelToSerialize = pkgOptIn ? AccessLevel::Package : AccessLevel::Public;
+  llvm::dbgs() << "\nES: proto conformance";
+  if (conformance->getProtocol()->getEffectiveAccess() < accessLevelToSerialize)
     return false;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  return nominal->getEffectiveAccess() >= AccessLevel::Public;
+  llvm::dbgs() << "\nES: -- serialize: " << nominal->getBaseIdentifier().str() <<
+  " if >= " << (accessLevelToSerialize == AccessLevel::Package ? "package" : "public");
+  return nominal->getEffectiveAccess() >= accessLevelToSerialize;
 }
 
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(

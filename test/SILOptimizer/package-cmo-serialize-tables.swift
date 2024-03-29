@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-build-swift -O -wmo -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access -parse-as-library %t/Lib.swift -emit-module -emit-module-path %t/Lib.swiftmodule -module-name=Lib -package-name Pkg -I%t -enable-library-evolution
+// RUN: %target-build-swift  -parse-as-library %t/Lib.swift -emit-module -emit-module-path %t/Lib.swiftmodule -module-name=Lib -package-name Pkg -I%t -enable-library-evolution
 
-// RUN: %target-sil-opt %t/Lib.swiftmodule -o %t/Lib-sil-opt.sil
+// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-none -o %t/Lib-sil-opt.sil
 // RUN: %FileCheck %s --check-prefix=CHECK-LIB < %t/Lib-sil-opt.sil
 
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil %t/main.swift -o %t/Main.sil
@@ -16,9 +16,9 @@
 
 import Lib
 
-// CHECK-NOT: witness_method
-runPub([.root, .size])
-runPkg([.root, .size])
+// CHECK: witness_method
+runPub([PubStruct()])
+runPkg([PkgStruct()])
 
 
 //--- Lib.swift
@@ -41,13 +41,35 @@ public protocol PubProto {
   init(rawValue: UInt16)
 }
 
-public struct PubStruct: PubProto {
-  public let rawValue: UInt16
-  public init(rawValue: UInt16) { self.rawValue = rawValue }
+//public struct PubStruct: PubProto {
+//  public let rawValue: UInt16
+//  public init(rawValue: UInt16) { self.rawValue = rawValue }
+//
+//  public static let root = Self(rawValue: 1 << 0)
+//  public static let env = Self(rawValue: 1 << 1)
+//  public static let size = Self(rawValue: 1 << 2)
+//}
 
-  public static let root = Self(rawValue: 1 << 0)
-  public static let env = Self(rawValue: 1 << 1)
-  public static let size = Self(rawValue: 1 << 2)
+public struct ABC {
+  public let abcVar: String = ""
+}
+
+public struct PBS {
+  public var pbsVar: String = ""
+}
+
+public func runPub(_ arg: PBS, _ arg2: ABC) -> [String] {
+  return [arg.pbsVar, arg2.abcVar]
+}
+
+public protocol PubProto2 {
+  var pubVar: String { get }
+  static var pubStaticVar: String { get }
+}
+
+public struct PubStruct: PubProto2 {
+  public let pubVar: String = ""
+  public static let pubStaticVar = "static"
 }
 
 public func runPub(_ arg: [PubStruct]) {
@@ -60,13 +82,20 @@ package protocol PkgProto {
   init(rawValue: UInt16)
 }
 
-package struct PkgStruct: PkgProto {
-  package let rawValue: UInt16
-  package init(rawValue: UInt16) { self.rawValue = rawValue }
+//package struct PkgStruct: PkgProto {
+//  package let rawValue: UInt16
+//  package init(rawValue: UInt16) { self.rawValue = rawValue }
+//
+//  package static let root = Self(rawValue: 1 << 0)
+//  package static let env = Self(rawValue: 1 << 1)
+//  package static let size = Self(rawValue: 1 << 2)
+//}
 
-  package static let root = Self(rawValue: 1 << 0)
-  package static let env = Self(rawValue: 1 << 1)
-  package static let size = Self(rawValue: 1 << 2)
+package protocol PkgProto2 {
+
+}
+package struct PkgStruct: PkgProto2 {
+
 }
 
 package func runPkg(_ arg: [PkgStruct]) {

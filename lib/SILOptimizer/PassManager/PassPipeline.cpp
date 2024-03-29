@@ -982,6 +982,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
     P.addSemanticARCOpts();
   }
 
+  llvm::dbgs() << "\nES: SILPass: add CMO";
   P.addCrossModuleOptimization();
 
   // It is important to serialize before any of the @_semantics
