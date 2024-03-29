@@ -432,7 +432,9 @@ final public class DebugStepInst : Instruction {}
 
 final public class SpecifyTestInst : Instruction {}
 
-final public class UnconditionalCheckedCastAddrInst : Instruction {
+final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAddrInstruction {
+  public var isTakeOfSrc: Bool { true }
+  public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
 }
 
