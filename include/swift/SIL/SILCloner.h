@@ -196,7 +196,7 @@ public:
         // If we found a type containing a local archetype, substitute
         // open existentials throughout the substitution map.
         Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-                          MakeAbstractConformanceForGenericType());
+                          MakeAbstractOrBuiltinConformanceForGenericType());
       }
     }
 
@@ -219,7 +219,7 @@ public:
     return Ty.subst(
       Builder.getModule(),
       QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType(),
+      MakeAbstractOrBuiltinConformanceForGenericType(),
       CanGenericSignature());
   }
   SILType getOpType(SILType Ty) {
@@ -239,7 +239,7 @@ public:
 
     return ty.subst(
       QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType()
+      MakeAbstractOrBuiltinConformanceForGenericType()
     )->getCanonicalType();
   }
 
@@ -352,7 +352,7 @@ public:
         conformance.subst(ty,
                           QueryTypeSubstitutionMapOrIdentity{
                                                         LocalArchetypeSubs},
-                          MakeAbstractConformanceForGenericType());
+                          MakeAbstractOrBuiltinConformanceForGenericType());
     }
 
     return asImpl().remapConformance(getASTTypeInClonedContext(ty),
