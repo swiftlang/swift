@@ -5623,7 +5623,8 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
       tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
 
     HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
-                                             tok::kw_enum);
+                                             tok::kw_enum, tok::kw_typealias)
+                              || P.Tok.isContextualKeyword("actor");
 
     // HACK: Bail if we encounter what could potentially be a regex literal.
     // This is necessary as:
