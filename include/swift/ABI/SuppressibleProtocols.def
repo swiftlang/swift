@@ -19,15 +19,13 @@
 //   Name: The name of the protocol, e.g., Copyable
 //   Bit: The bit in the set bitset of suppressible protocols that is used
 //        to indicate this.
-//   MangleChar: The character used for the name mangling to refer to this
-//               protocol.
 //===----------------------------------------------------------------------===//
 
 #ifndef SUPPRESSIBLE_PROTOCOL
 #  error Must define SUPPRESSIBLE_PROTOCOL macro before including this file
 #endif
 
-SUPPRESSIBLE_PROTOCOL(Copyable, 0, 'c')
-SUPPRESSIBLE_PROTOCOL(Escapable, 1, 'e')
+SUPPRESSIBLE_PROTOCOL(Copyable, 0)
+SUPPRESSIBLE_PROTOCOL(Escapable, 1)
 
 #undef SUPPRESSIBLE_PROTOCOL

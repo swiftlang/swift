@@ -13,8 +13,8 @@ public protocol P: ~Copyable { }
 
 public struct CallMe<U: ~Copyable> {
   public enum Maybe<T: ~Copyable>: ~Copyable {
-    // CHECK-LABEL: @"$s4test6CallMeV5MaybeOAARiczrlE4someyAEyx_qd__Gqd__cAGmr__lFWC"
-    // CHECK: @"$s4test6CallMeV5MaybeOAARiczrlE4noneyAEyx_qd__GAGmr__lFWC"
+    // CHECK-LABEL: @"$s4test6CallMeV5MaybeOAARi_zrlE4someyAEyx_qd__Gqd__cAGmr__lFWC"
+    // CHECK: @"$s4test6CallMeV5MaybeOAARi_zrlE4noneyAEyx_qd__GAGmr__lFWC"
     case none
     case some(T)
   }
@@ -46,11 +46,11 @@ public protocol Hello<Person>: ~Copyable {
   // CHECK: @"$s4test5HelloP10overloadedyyqd__lFTj"
   func overloaded<T>(_: borrowing T)
 
-  // CHECK: @"$s4test5HelloP10overloadedyyqd__Ricd__lFTj"
+  // CHECK: @"$s4test5HelloP10overloadedyyqd__Ri_d__lFTj"
   func overloaded<T: ~Copyable>(_: borrowing T)
 }
 
-// CHECK: $s4test2XQVAARiczrlE1AVMi
+// CHECK: $s4test2XQVAARi_zrlE1AVMi
 protocol Q: ~Copyable {
   associatedtype A: ~Copyable
 }
@@ -104,7 +104,7 @@ func useAtomicRepresentation() {
 struct Box<Wrapped: ~Copyable>: ~Copyable { }
 
 struct List<Element: ~Copyable>: ~Copyable {
-  // CHECK: $s4test4ListVAARiczrlE4NodeVwst
+  // CHECK: $s4test4ListVAARi_zrlE4NodeVwst
   struct Node: ~Copyable {
     var element: Element
     var next: Link

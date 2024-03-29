@@ -19,14 +19,11 @@
 #define SWIFT_AST_INVERTIBLEPROTOCOLKIND_H
 
 #include <stdint.h>
+#include <swift/ABI/SuppressibleProtocols.h>
 
 namespace swift {
 
-enum class InvertibleProtocolKind : uint8_t {
-#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) Id,
-#include "swift/AST/KnownProtocols.def"
-};
-
+typedef SuppressibleProtocolKind InvertibleProtocolKind;
 
 } // end namespace swift
 

@@ -469,7 +469,7 @@ public enum SinglePayloadNC_1<Element: Equatable>: ~Copyable {
 // CHECK-SAME:        ptr %Element,
 // CHECK-SAME:        ptr %Element.Equatable)
 // CHECK:         [[METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-// CHECK:         call swiftcc void @"$s24moveonly_value_functions18EmptyDeinitingNC_1VAARiczrlEfD"(
+// CHECK:         call swiftcc void @"$s24moveonly_value_functions18EmptyDeinitingNC_1VAARi_zrlEfD"(
 // CHECK-SAME:        ptr [[METADATA]])
 // CHECK:       }
 
