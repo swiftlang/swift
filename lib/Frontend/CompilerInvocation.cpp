@@ -2182,6 +2182,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       FEOpts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface)
     Opts.StopOptimizationAfterSerialization = true;
 
+  if (Args.getLastArg(OPT_emit_empty_object_file)) {
+    Opts.StopOptimizationAfterSerialization = true;
+  }
+
   // Propagate the typechecker's understanding of
   // -experimental-skip-*-function-bodies to SIL.
   Opts.SkipFunctionBodies = TCOpts.SkipFunctionBodies;
