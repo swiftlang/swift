@@ -872,17 +872,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
     if (auto feature = getExperimentalFeature(value)) {
-#ifdef NDEBUG
-      if (!buildingFromInterface && !isFeatureAvailableInProduction(*feature)) {
+      if (Opts.RestrictNonProductionExperimentalFeatures &&
+          !isFeatureAvailableInProduction(*feature)) {
         Diags.diagnose(SourceLoc(), diag::experimental_not_supported_in_production,
                        A->getValue());
         HadError = true;
       } else {
         Opts.enableFeature(*feature);
       }
-#else
-      Opts.enableFeature(*feature);
-#endif
 
       if (*feature == Feature::NoncopyableGenerics2)
         Opts.enableFeature(Feature::NoncopyableGenerics);
