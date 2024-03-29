@@ -170,22 +170,34 @@ def update_single_repository(pool_args):
                                                             repo_name,
                                                             checkout_target)
 
-            # The clean option restores a repository to pristine condition.
+            # The '--clean' and '--stash' options
+            # 1. clear the index and working tree ('--stash' stashes those
+            #   changes rather than discarding them)
+            # 2. delete ignored files
+            # 3. abort an ongoing rebase
             if should_clean or should_stash:
+
+                def run_for_repo_and_each_submodule_rec(cmd):
+                    shell.run(cmd, echo=True, prefix=prefix)
+                    shell.run(
+                        ["git", "submodule", "foreach", "--recursive"] + cmd,
+                        echo=True,
+                        prefix=prefix,
+                    )
+
                 if should_stash:
-                    shell.run(['git', 'stash'],
-                              echo=True, prefix=prefix)
+                    # Stash tracked and untracked changes.
+                    run_for_repo_and_each_submodule_rec(["git", "stash", "-u"])
                 elif should_clean:
-                    shell.run(['git', 'clean', '-fdx'],
-                              echo=True, prefix=prefix)
-                shell.run(['git', 'submodule', 'foreach', '--recursive',
-                           'git', 'clean', '-fdx'],
-                          echo=True, prefix=prefix)
-                shell.run(['git', 'submodule', 'foreach', '--recursive',
-                           'git', 'reset', '--hard', 'HEAD'],
-                          echo=True, prefix=prefix)
-                shell.run(['git', 'reset', '--hard', 'HEAD'],
-                          echo=True, prefix=prefix)
+                    # Delete tracked changes.
+                    run_for_repo_and_each_submodule_rec(
+                        ["git", "reset", "--hard", "HEAD"]
+                    )
+
+                # Delete untracked changes and ignored files.
+                run_for_repo_and_each_submodule_rec(["git", "clean", "-fdx"])
+                del run_for_repo_and_each_submodule_rec
+
                 # It is possible to reset --hard and still be mid-rebase.
                 try:
                     shell.run(['git', 'rebase', '--abort'],
@@ -609,13 +621,17 @@ repositories.
         help='Reset each branch to the remote state.',
         action='store_true')
     parser.add_argument(
-        '--clean',
-        help='Clean untracked files from each repository.',
-        action='store_true')
+        "--clean",
+        help="""Delete tracked and untracked changes, ignored files, and abort
+        an ongoing rebase, if any, before updating a repository.""",
+        action="store_true",
+    )
     parser.add_argument(
-        '--stash',
-        help='Stash untracked files from each repository.',
-        action='store_true')
+        "--stash",
+        help="""Stash tracked and untracked changes, delete ignored files, and
+        abort an ongoing rebase, if any, before updating a repository.""",
+        action="store_true",
+    )
     parser.add_argument(
         "--config",
         default=os.path.join(SCRIPT_DIR, os.pardir,
