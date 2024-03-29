@@ -73,9 +73,6 @@ KnownProtocolKind getKnownProtocolKind(InvertibleProtocolKind ip);
 void simple_display(llvm::raw_ostream &out,
                     const InvertibleProtocolKind &value);
 
-SuppressibleProtocolKind asSuppressible(InvertibleProtocolKind kind);
-InvertibleProtocolKind asInvertible(SuppressibleProtocolKind kind);
-
 } // end namespace swift
 
 #endif
