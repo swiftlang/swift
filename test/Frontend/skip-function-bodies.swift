@@ -158,19 +158,20 @@ func funcPublicWithDefer() {
 // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithDefer()"
 
 public func funcPublicWithNestedFuncAndTypealias() {
-  let NEVERTYPECHECK_outerLocal = "funcPublicWithNestedFuncAndTypealias()"
-  _blackHole(NEVERTYPECHECK_outerLocal)
+  let INLINENOTYPECHECK_outerLocal = "funcPublicWithNestedFuncAndTypealias()"
+  _blackHole(INLINENOTYPECHECK_outerLocal)
 
   typealias LocalType = Int
   func takesLocalType(_ x: LocalType) {
-    let NEVERTYPECHECK_innerLocal = "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
-    _blackHole(NEVERTYPECHECK_innerLocal)
+    let INLINENOTYPECHECK_innerLocal = "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
+    _blackHole(INLINENOTYPECHECK_innerLocal)
   }
   takesLocalType(0)
 }
 // CHECK-TEXTUAL-NOT: "funcPublicWithNestedFuncAndTypealias()"
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedFuncAndTypealias()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithNestedFuncAndTypealias()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedFuncAndTypealias()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedFuncAndTypealias()"
 
 // CHECK-TEXTUAL-NOT: "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
@@ -195,6 +196,26 @@ public func funcPublicWithNestedTypeEnum() {
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeEnum()"
 // CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeEnum()"
 // CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeEnum()"
+
+public func funcPublicWithNestedTypealias() {
+  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypealias()"
+  _blackHole(INLINENOTYPECHECK_local)
+  typealias TA = Int
+}
+// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypealias()"
+// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypealias()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypealias()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypealias()"
+
+public func funcPublicWithNestedTypeActor() {
+  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeActor()"
+  _blackHole(INLINENOTYPECHECK_local)
+  actor A {}
+}
+// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeActor()"
+// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeActor()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeActor()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeActor()"
 
 public func funcPublicWithNestedTypeStruct() {
   let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeStruct()"
