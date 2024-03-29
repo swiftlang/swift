@@ -7006,7 +7006,7 @@ public:
               "package-external function definition must be serialized");
       break;
     case SILLinkage::HiddenExternal:
-      require(F->isExternalDeclaration(),
+      require(F->isExternalDeclaration() || embedded,
               "hidden-external function cannot have a body");
       break;
     }
