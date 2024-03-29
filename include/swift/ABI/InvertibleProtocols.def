@@ -1,4 +1,4 @@
-//===--- SuppressibleProtocols.def - Suppressible protocol meta -*- C++ -*-===//
+//===--- InvertibleProtocols.def - invertible protocol meta -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,21 +11,21 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines macros used for macro-metaprogramming with ABI-defined
-// suppressible protocols.
+// invertible protocols.
 //
-// The SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) macro is used to specify
-// each suppressible protocol that's conceptually part of the ABI. The
+// The INVERTIBLE_PROTOCOL(Name, Bit) macro is used to specify each
+// each invertible protocol that's conceptually part of the ABI. The
 // arguments are:
 //   Name: The name of the protocol, e.g., Copyable
-//   Bit: The bit in the set bitset of suppressible protocols that is used
+//   Bit: The bit in the set bitset of invertible protocols that is used
 //        to indicate this.
 //===----------------------------------------------------------------------===//
 
-#ifndef SUPPRESSIBLE_PROTOCOL
-#  error Must define SUPPRESSIBLE_PROTOCOL macro before including this file
+#ifndef INVERTIBLE_PROTOCOL
+#  error Must define INVERTIBLE_PROTOCOL macro before including this file
 #endif
 
-SUPPRESSIBLE_PROTOCOL(Copyable, 0)
-SUPPRESSIBLE_PROTOCOL(Escapable, 1)
+INVERTIBLE_PROTOCOL(Copyable, 0)
+INVERTIBLE_PROTOCOL(Escapable, 1)
 
-#undef SUPPRESSIBLE_PROTOCOL
+#undef INVERTIBLE_PROTOCOL

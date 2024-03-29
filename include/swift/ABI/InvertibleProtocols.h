@@ -1,4 +1,4 @@
-//===--- SuppressibleProtocols.h - Suppressible protocol meta ---*- C++ -*-===//
+//===--- InvertibleProtocols.h - invertible protocol meta ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This header declares various types for suppressible protocols, such as
+// This header declares various types for invertible protocols, such as
 // Copyable.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_SUPPRESSIBLEPROTOCOLS_H
-#define SWIFT_ABI_SUPPRESSIBLEPROTOCOLS_H
+#ifndef SWIFT_ABI_INVERTIBLEPROTOCOLS_H
+#define SWIFT_ABI_INVERTIBLEPROTOCOLS_H
 
 #include <cstdint>
 #include <initializer_list>
@@ -24,34 +24,32 @@
 
 namespace swift {
 
-/// Describes a "suppressible" protocol, such as Copyable, which is assumed to
-/// hold for all types unless explicitly suppressed.
-enum class SuppressibleProtocolKind : uint8_t {
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit) Name = Bit,
-#include "swift/ABI/SuppressibleProtocols.def"
+/// Describes an "invertible" protocol, such as Copyable, which is assumed to
+/// hold for all types unless explicitly indicated otherwise.
+enum class InvertibleProtocolKind : uint8_t {
+#define INVERTIBLE_PROTOCOL(Name, Bit) Name = Bit,
+#include "swift/ABI/InvertibleProtocols.def"
 };
 
-typedef SuppressibleProtocolKind InvertibleProtocolKind;
-
-/// A set of suppressible protocols, whose bits correspond to the cases of
-/// SuppressibleProtocolKind.
-class SuppressibleProtocolSet {
+/// A set of invertible protocols, whose bits correspond to the cases of
+/// InvertibleProtocolKind.
+class InvertibleProtocolSet {
   using StorageType = uint16_t;
   
   /// The stored bits.
   StorageType bits;
 
   /// Retrieve the mask for this bit.
-  static StorageType getMask(SuppressibleProtocolKind kind) {
+  static StorageType getMask(InvertibleProtocolKind kind) {
     return 1 << static_cast<uint8_t>(kind);
   }
   
 public:
-  explicit constexpr SuppressibleProtocolSet(StorageType bits) : bits(bits) {}
-  constexpr SuppressibleProtocolSet() : bits(0) {}
+  explicit constexpr InvertibleProtocolSet(StorageType bits) : bits(bits) {}
+  constexpr InvertibleProtocolSet() : bits(0) {}
 
-  SuppressibleProtocolSet(
-      std::initializer_list<SuppressibleProtocolKind> elements
+  InvertibleProtocolSet(
+      std::initializer_list<InvertibleProtocolKind> elements
   ) : bits(0) {
     for (auto element : elements)
       insert(element);
@@ -63,24 +61,24 @@ public:
   /// Whether the set contains no protocols.
   bool empty() const { return bits == 0; }
 
-  /// Check whether the set contains the specific suppressible protocol.
-  bool contains(SuppressibleProtocolKind kind) const {
+  /// Check whether the set contains the specific invertible protocol.
+  bool contains(InvertibleProtocolKind kind) const {
     return bits & getMask(kind);
   }
 
-  /// Insert the suppressible protocol into the set.
-  void insert(SuppressibleProtocolKind kind) {
+  /// Insert the invertible protocol into the set.
+  void insert(InvertibleProtocolKind kind) {
     bits = bits | getMask(kind);
   }
 
-  /// Insert all of the suppressible protocols from the other set into this
+  /// Insert all of the invertible protocols from the other set into this
   /// one.
-  void insertAll(SuppressibleProtocolSet other) {
+  void insertAll(InvertibleProtocolSet other) {
     bits |= other.bits;
   }
 
-  /// Remove the given suppressible protocol from the set.
-  void remove(SuppressibleProtocolKind kind) {
+  /// Remove the given invertible protocol from the set.
+  void remove(InvertibleProtocolKind kind) {
     uint16_t mask = getMask(kind);
     bits = bits & ~mask;
   }
@@ -88,19 +86,19 @@ public:
   /// Clear out all of the protocols from the set.
   void clear() { bits = 0; }
 
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit)             \
+#define INVERTIBLE_PROTOCOL(Name, Bit)             \
   bool contains##Name() const {                      \
-    return contains(SuppressibleProtocolKind::Name); \
+    return contains(InvertibleProtocolKind::Name); \
   }
-#include "swift/ABI/SuppressibleProtocols.def"
+#include "swift/ABI/InvertibleProtocols.def"
 
-  /// Produce a suppressible protocol set containing all known suppressible
+  /// Produce a invertible protocol set containing all known invertible
   /// protocols.
-  static SuppressibleProtocolSet allKnown() {
-    SuppressibleProtocolSet result;
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit)           \
-    result.insert(SuppressibleProtocolKind::Name);
-#include "swift/ABI/SuppressibleProtocols.def"
+  static InvertibleProtocolSet allKnown() {
+    InvertibleProtocolSet result;
+#define INVERTIBLE_PROTOCOL(Name, Bit)           \
+    result.insert(InvertibleProtocolKind::Name);
+#include "swift/ABI/InvertibleProtocols.def"
     return result;
   }
 
@@ -108,7 +106,7 @@ public:
   ///
   /// This can occur when an older Swift runtime is working with metadata
   /// or mangled names generated by a newer compiler that has introduced
-  /// another kind of suppressible protocol. The Swift runtime will need to
+  /// another kind of invertible protocol. The Swift runtime will need to
   /// step lightly around protocol sets with unknown protocols.
   bool hasUnknownProtocols() const {
     return !(*this - allKnown()).empty();    
@@ -148,7 +146,7 @@ public:
 
   public:
     using difference_type = int;
-    using value_type = SuppressibleProtocolKind;
+    using value_type = InvertibleProtocolKind;
     using pointer = void;
     using reference = value_type;
     using iterator_category = std::input_iterator_tag;
@@ -172,8 +170,8 @@ public:
       return tmp;
     }
 
-    SuppressibleProtocolKind operator*() const {
-      return static_cast<SuppressibleProtocolKind>(currentBitIndex);
+    InvertibleProtocolKind operator*() const {
+      return static_cast<InvertibleProtocolKind>(currentBitIndex);
     }
 
     friend bool operator ==(iterator lhs, iterator rhs) {
@@ -195,47 +193,47 @@ public:
   iterator end() const { return iterator(0); }
 
   friend bool operator==(
-      SuppressibleProtocolSet lhs, SuppressibleProtocolSet rhs) {
+      InvertibleProtocolSet lhs, InvertibleProtocolSet rhs) {
     return lhs.bits == rhs.bits;
   }
 
   friend bool operator!=(
-      SuppressibleProtocolSet lhs, SuppressibleProtocolSet rhs) {
+      InvertibleProtocolSet lhs, InvertibleProtocolSet rhs) {
     return lhs.bits != rhs.bits;
   }
 
-  friend SuppressibleProtocolSet operator-(
-      SuppressibleProtocolSet lhs, SuppressibleProtocolSet rhs) {
-    return SuppressibleProtocolSet(lhs.bits & ~rhs.bits);
+  friend InvertibleProtocolSet operator-(
+      InvertibleProtocolSet lhs, InvertibleProtocolSet rhs) {
+    return InvertibleProtocolSet(lhs.bits & ~rhs.bits);
   }
 
-  SuppressibleProtocolSet &operator-=(SuppressibleProtocolSet rhs) {
+  InvertibleProtocolSet &operator-=(InvertibleProtocolSet rhs) {
     bits = bits & ~rhs.bits;
     return *this;
   }
 
-  friend SuppressibleProtocolSet operator|(
-      SuppressibleProtocolSet lhs, SuppressibleProtocolSet rhs) {
-    return SuppressibleProtocolSet(lhs.bits | rhs.bits);
+  friend InvertibleProtocolSet operator|(
+      InvertibleProtocolSet lhs, InvertibleProtocolSet rhs) {
+    return InvertibleProtocolSet(lhs.bits | rhs.bits);
   }
 
-  SuppressibleProtocolSet &operator|=(SuppressibleProtocolSet rhs) {
+  InvertibleProtocolSet &operator|=(InvertibleProtocolSet rhs) {
     bits |= rhs.bits;
     return *this;
   }
 };
 
-/// Retrieve the name for the given suppressible protocol.
+/// Retrieve the name for the given invertible protocol.
 static inline const char *
-getSuppressibleProtocolKindName(SuppressibleProtocolKind kind) {
+getInvertibleProtocolKindName(InvertibleProtocolKind kind) {
   switch (kind) {
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit)             \
-  case SuppressibleProtocolKind::Name: return #Name;
-#include "swift/ABI/SuppressibleProtocols.def"
+#define INVERTIBLE_PROTOCOL(Name, Bit)             \
+  case InvertibleProtocolKind::Name: return #Name;
+#include "swift/ABI/InvertibleProtocols.def"
   }
 
-  return "<unknown suppressible protocol kind>";
+  return "<unknown invertible protocol kind>";
 }
 
 } // end namespace swift
-#endif // SWIFT_ABI_SUPPRESSIBLEPROTOCOLS_H
+#endif // SWIFT_ABI_INVERTIBLEPROTOCOLS_H

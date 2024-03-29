@@ -425,7 +425,7 @@ namespace {
     unsigned NumGenericKeyArguments = 0;
     SmallVector<CanType, 2> ShapeClasses;
     SmallVector<GenericPackArgument, 2> GenericPackArguments;
-    SuppressibleProtocolSet ConditionalSuppressedProtocols;
+    InvertibleProtocolSet ConditionalInvertedProtocols;
 
     GenericSignatureHeaderBuilder(IRGenModule &IGM,
                                   ConstantStructBuilder &builder)
@@ -466,10 +466,10 @@ namespace {
                                NumGenericKeyArguments + ShapeClasses.size());
 
       bool hasTypePacks = !GenericPackArguments.empty();
-      bool hasConditionalSuppressedProtocols =
-          !ConditionalSuppressedProtocols.empty();
+      bool hasConditionalInvertedProtocols =
+          !ConditionalInvertedProtocols.empty();
       GenericContextDescriptorFlags flags(
-          hasTypePacks, hasConditionalSuppressedProtocols);
+          hasTypePacks, hasConditionalInvertedProtocols);
       b.fillPlaceholderWithInt(FlagsPP, IGM.Int16Ty,
                                flags.getIntValue());
     }
@@ -502,7 +502,7 @@ namespace {
         ContextDescriptorFlags(asImpl().getContextKind(),
                                !asImpl().getGenericSignature().isNull(),
                                asImpl().isUniqueDescriptor(),
-                               !asImpl().getSuppressedProtocols().empty(),
+                               !asImpl().getInvertedProtocols().empty(),
                                asImpl().getKindSpecificFlags())
           .getIntValue());
     }
@@ -524,7 +524,7 @@ namespace {
       asImpl().addGenericParameters();
       asImpl().addGenericRequirements();
       asImpl().addGenericPackShapeDescriptors();
-      asImpl().addConditionalSuppressedProtocols();
+      asImpl().addConditionalInvertedProtocols();
       asImpl().finishGenericParameters();
     }
     
@@ -557,20 +557,20 @@ namespace {
 
     /// Adds the set of suppressed protocols, which must be explicitly called
     /// by the concrete subclasses.
-    void addSuppressedProtocols() {
-      auto protocols = asImpl().getSuppressedProtocols();
+    void addInvertedProtocols() {
+      auto protocols = asImpl().getInvertedProtocols();
       if (protocols.empty())
         return;
 
       B.addInt(IGM.Int16Ty, protocols.rawBits());
     }
 
-    SuppressibleProtocolSet getConditionalSuppressedProtocols() {
-      return SuppressibleProtocolSet();
+    InvertibleProtocolSet getConditionalInvertedProtocols() {
+      return InvertibleProtocolSet();
     }
 
-    void addConditionalSuppressedProtocols() {
-      assert(asImpl().getConditionalSuppressedProtocols().empty() &&
+    void addConditionalInvertedProtocols() {
+      assert(asImpl().getConditionalInvertedProtocols().empty() &&
              "Subclass must implement this operation");
     }
 
@@ -601,8 +601,8 @@ namespace {
     }
 
     /// Retrieve the set of protocols that are suppressed in this context.
-    SuppressibleProtocolSet getSuppressedProtocols() {
-      return SuppressibleProtocolSet();
+    InvertibleProtocolSet getInvertedProtocols() {
+      return InvertibleProtocolSet();
     }
 
     uint16_t getKindSpecificFlags() {
@@ -1261,13 +1261,13 @@ namespace {
     }
 
     /// Retrieve the set of protocols that are suppressed by this type.
-    SuppressibleProtocolSet getSuppressedProtocols() {
-      SuppressibleProtocolSet result;
+    InvertibleProtocolSet getInvertedProtocols() {
+      InvertibleProtocolSet result;
       auto nominal = dyn_cast<NominalTypeDecl>(Type);
       if (!nominal)
         return result;
 
-      auto checkProtocol = [&](SuppressibleProtocolKind kind) {
+      auto checkProtocol = [&](InvertibleProtocolKind kind) {
         switch (nominal->canConformTo(kind)) {
         case TypeDecl::CanBeInvertible::Never:
         case TypeDecl::CanBeInvertible::Conditionally:
@@ -1279,21 +1279,21 @@ namespace {
         }
       };
 
-      for (auto kind : SuppressibleProtocolSet::allKnown())
+      for (auto kind : InvertibleProtocolSet::allKnown())
         checkProtocol(kind);
 
       return result;
     }
 
-    /// Retrieve the set of suppressible protocols to which this type
+    /// Retrieve the set of invertible protocols to which this type
     /// conditionally conforms.
-    SuppressibleProtocolSet getConditionalSuppressedProtocols() {
-      SuppressibleProtocolSet result;
+    InvertibleProtocolSet getConditionalInvertedProtocols() {
+      InvertibleProtocolSet result;
       auto nominal = dyn_cast<NominalTypeDecl>(Type);
       if (!nominal)
         return result;
 
-      auto checkProtocol = [&](SuppressibleProtocolKind kind) {
+      auto checkProtocol = [&](InvertibleProtocolKind kind) {
         switch (nominal->canConformTo(kind)) {
         case TypeDecl::CanBeInvertible::Never:
         case TypeDecl::CanBeInvertible::Always:
@@ -1305,19 +1305,19 @@ namespace {
         }
       };
 
-      for (auto kind : SuppressibleProtocolSet::allKnown())
+      for (auto kind : InvertibleProtocolSet::allKnown())
         checkProtocol(kind);
 
       return result;
     }
 
-    void addConditionalSuppressedProtocols() {
-      auto protocols = asImpl().getConditionalSuppressedProtocols();
+    void addConditionalInvertedProtocols() {
+      auto protocols = asImpl().getConditionalInvertedProtocols();
       if (protocols.empty())
         return;
 
       // Note the conditional suppressed protocols.
-      this->SignatureHeader->ConditionalSuppressedProtocols = protocols;
+      this->SignatureHeader->ConditionalInvertedProtocols = protocols;
 
       // The suppressed protocols with conditional conformances.
       B.addInt(IGM.Int16Ty, protocols.rawBits());
@@ -1335,7 +1335,7 @@ namespace {
       }
 
       // Emit the generic requirements for the conditional conformance
-      // to each suppressible protocol.
+      // to each invertible protocol.
       auto nominal = cast<NominalTypeDecl>(Type);
       auto genericSig = nominal->getGenericSignatureOfContext();
       ASTContext &ctx = nominal->getASTContext();
@@ -1473,7 +1473,7 @@ namespace {
       return Type->getGenericSignature();
     }
     
-    bool hasSuppressibleProtocols() {
+    bool hasInvertibleProtocols() {
       auto genericSig = asImpl().getGenericSignature();
       if (!genericSig)
         return false;
@@ -1704,7 +1704,7 @@ namespace {
     void layout() {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
-      addSuppressedProtocols();
+      addInvertedProtocols();
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1778,7 +1778,7 @@ namespace {
     void layout() {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
-      addSuppressedProtocols();
+      addInvertedProtocols();
     }
     
     ContextDescriptorKind getContextKind() {
@@ -1911,7 +1911,7 @@ namespace {
       addOverrideTable();
       addObjCResilientClassStubInfo();
       maybeAddCanonicalMetadataPrespecializations();
-      addSuppressedProtocols();
+      addInvertedProtocols();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -7027,7 +7027,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     return metadata;
 
   // Collect the inverse requirements on each of the generic parameters.
-  SmallVector<SuppressibleProtocolSet, 2>
+  SmallVector<InvertibleProtocolSet, 2>
       suppressed(sig.getGenericParams().size(), { });
   for (const auto &inverse : inverses) {
     // Determine which generic parameter this constraint applies to.
@@ -7037,9 +7037,9 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       continue;
 
     // Insert this suppression into the set for that generic parameter.
-    auto suppressibleKind = inverse.getKind();
+    auto invertibleKind = inverse.getKind();
     unsigned index = sig->getGenericParamOrdinal(genericParam);
-    suppressed[index].insert(suppressibleKind);
+    suppressed[index].insert(invertibleKind);
   }
 
   // Go through the generic parameters, emitting a requirement for each
@@ -7051,7 +7051,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     // Encode the suppressed protocols constraint.
     auto genericParam = sig.getGenericParams()[index];
     auto flags = GenericRequirementFlags(
-        GenericRequirementKind::SuppressedProtocols,
+        GenericRequirementKind::InvertedProtocols,
         /*key argument*/ false,
         genericParam->isParameterPack());
     addGenericRequirement(IGM, B, metadata, sig, flags,

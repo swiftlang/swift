@@ -2928,8 +2928,8 @@ struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
 
   bool isGeneric() const { return Flags.isGeneric(); }
   bool isUnique() const { return Flags.isUnique(); }
-  bool hasSuppressibleProtocols() const {
-    return Flags.hasSuppressibleProtocols();
+  bool hasInvertibleProtocols() const {
+    return Flags.hasInvertibleProtocols();
   }
   ContextDescriptorKind getKind() const { return Flags.getKind(); }
 
@@ -2940,14 +2940,14 @@ struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
   /// Get the module context for this context.
   const TargetModuleContextDescriptor<Runtime> *getModuleContext() const;
 
-  /// Retrieve the set of protocols that are suppressed by this type's
+  /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
   /// This type might still conditionally conform to any of the protocols
-  /// that are suppressed here, but that information is recorded in the
-  /// conditional suppressed protocols of the corresponding `GenericContext`.
-  const SuppressibleProtocolSet *
-  getSuppressedProtocols() const;
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet *
+  getInvertedProtocols() const;
 
   /// Is this context part of a C-imported module?
   bool isCImportedContext() const;
@@ -3250,14 +3250,14 @@ struct swift_ptrauth_struct_context_descriptor(OpaqueTypeDescriptor)
     TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
                                   TargetGenericContextDescriptorHeader,
                                   RelativeDirectPointer<const char>,
-                                  SuppressibleProtocolSet>
+                                  InvertibleProtocolSet>
 {
 private:
   using TrailingGenericContextObjects =
       swift::TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
                                            TargetGenericContextDescriptorHeader,
                                            RelativeDirectPointer<const char>,
-                                           SuppressibleProtocolSet>;
+                                           InvertibleProtocolSet>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3295,21 +3295,21 @@ public:
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
 
-  /// Retrieve the set of protocols that are suppressed by this type's
+  /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
   /// This type might still conditionally conform to any of the protocols
-  /// that are suppressed here, but that information is recorded in the
-  /// conditional suppressed protocols of the corresponding `GenericContext`.
-  const SuppressibleProtocolSet &
-  getSuppressedProtocols() const {
-    assert(this->hasSuppressibleProtocols());
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
     return
-      *this->template getTrailingObjects<SuppressibleProtocolSet>();
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
   }
   
-  size_t numTrailingObjects(OverloadToken<SuppressibleProtocolSet>) const {
-    return this->hasSuppressibleProtocols() ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4084,7 +4084,7 @@ class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
                               TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                              SuppressibleProtocolSet> {
+                              InvertibleProtocolSet> {
 private:
   using TrailingGenericContextObjects =
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
@@ -4101,7 +4101,7 @@ private:
                                          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                                         SuppressibleProtocolSet>;
+                                         InvertibleProtocolSet>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4451,21 +4451,21 @@ public:
     return box->token.get();
   }
 
-  /// Retrieve the set of protocols that are suppressed by this type's
+  /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
   /// This type might still conditionally conform to any of the protocols
-  /// that are suppressed here, but that information is recorded in the
-  /// conditional suppressed protocols of the corresponding `GenericContext`.
-  const SuppressibleProtocolSet &
-  getSuppressedProtocols() const {
-    assert(this->hasSuppressibleProtocols());
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
     return
-      *this->template getTrailingObjects<SuppressibleProtocolSet>();
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
   }
 
-  size_t numTrailingObjects(OverloadToken<SuppressibleProtocolSet>) const {
-    return this->hasSuppressibleProtocols() ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4498,7 +4498,7 @@ class swift_ptrauth_struct_context_descriptor(StructDescriptor)
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                             TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            SuppressibleProtocolSet> {
+                            InvertibleProtocolSet> {
 public:
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
@@ -4522,7 +4522,7 @@ private:
                                            MetadataListCount,
                                            MetadataListEntry,
                                            MetadataCachingOnceToken,
-                                           SuppressibleProtocolSet>;
+                                           InvertibleProtocolSet>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4609,21 +4609,21 @@ public:
     return box->token.get();
   }
 
-  /// Retrieve the set of protocols that are suppressed by this type's
+  /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
   /// This type might still conditionally conform to any of the protocols
-  /// that are suppressed here, but that information is recorded in the
-  /// conditional suppressed protocols of the corresponding `GenericContext`.
-  const SuppressibleProtocolSet &
-  getSuppressedProtocols() const {
-    assert(this->hasSuppressibleProtocols());
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
     return
-      *this->template getTrailingObjects<SuppressibleProtocolSet>();
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
   }
 
-  size_t numTrailingObjects(OverloadToken<SuppressibleProtocolSet>) const {
-    return this->hasSuppressibleProtocols() ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4645,7 +4645,7 @@ class swift_ptrauth_struct_context_descriptor(EnumDescriptor)
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                             TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            SuppressibleProtocolSet> {
+                            InvertibleProtocolSet> {
 public:
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
@@ -4669,7 +4669,7 @@ private:
                                         MetadataListCount,
                                         MetadataListEntry, 
                                         MetadataCachingOnceToken,
-                                        SuppressibleProtocolSet>;
+                                        InvertibleProtocolSet>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4770,21 +4770,21 @@ public:
     return box->token.get();
   }
 
-  /// Retrieve the set of protocols that are suppressed by this type's
+  /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
   /// This type might still conditionally conform to any of the protocols
-  /// that are suppressed here, but that information is recorded in the
-  /// conditional suppressed protocols of the corresponding `GenericContext`.
-  const SuppressibleProtocolSet &
-  getSuppressedProtocols() const {
-    assert(this->hasSuppressibleProtocols());
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
     return
-      *this->template getTrailingObjects<SuppressibleProtocolSet>();
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
   }
                
-  size_t numTrailingObjects(OverloadToken<SuppressibleProtocolSet>) const {
-    return this->hasSuppressibleProtocols() ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4833,24 +4833,24 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
 }
 
 template<typename Runtime>
-inline const SuppressibleProtocolSet *
-TargetContextDescriptor<Runtime>::getSuppressedProtocols() const {
-  if (!this->hasSuppressibleProtocols())
+inline const InvertibleProtocolSet *
+TargetContextDescriptor<Runtime>::getInvertedProtocols() const {
+  if (!this->hasInvertibleProtocols())
     return nullptr;
 
   switch (getKind()) {
   case ContextDescriptorKind::Class:
     return &llvm::cast<TargetClassDescriptor<Runtime>>(this)
-        ->getSuppressedProtocols();
+        ->getInvertedProtocols();
   case ContextDescriptorKind::Enum:
     return &llvm::cast<TargetEnumDescriptor<Runtime>>(this)
-        ->getSuppressedProtocols();
+        ->getInvertedProtocols();
   case ContextDescriptorKind::Struct:
     return &llvm::cast<TargetStructDescriptor<Runtime>>(this)
-        ->getSuppressedProtocols();
+        ->getInvertedProtocols();
   case ContextDescriptorKind::OpaqueType:
     return &llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
-        ->getSuppressedProtocols();
+        ->getInvertedProtocols();
   default:
     // We don't know about this kind of descriptor.
     return nullptr;

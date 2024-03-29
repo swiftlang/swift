@@ -13,7 +13,7 @@
 #ifndef SWIFT_AST_KNOWNPROTOCOLS_H
 #define SWIFT_AST_KNOWNPROTOCOLS_H
 
-#include "swift/ABI/SuppressibleProtocols.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/Config.h"
 
 namespace llvm {
@@ -50,13 +50,13 @@ llvm::StringRef getProtocolName(KnownProtocolKind kind);
 
 enum : uint8_t {
   // Use preprocessor trick to count all the invertible protocols.
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit) +1
+#define INVERTIBLE_PROTOCOL(Name, Bit) +1
   /// The number of invertible protocols.
   NumInvertibleProtocols =
-#include "swift/ABI/SuppressibleProtocols.def"
+#include "swift/ABI/InvertibleProtocols.def"
 };
 
-using InvertibleProtocolSet = SuppressibleProtocolSet;
+using InvertibleProtocolSet = InvertibleProtocolSet;
 
 /// Maps a KnownProtocol to the set of InvertibleProtocols, if a mapping exists.
 /// \returns None if the known protocol is not invertible.

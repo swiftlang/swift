@@ -1355,7 +1355,7 @@ checkGenericRequirement(
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
     SubstDependentWitnessTableFn substWitnessTable,
-    llvm::SmallVectorImpl<SuppressibleProtocolSet> &suppressed) {
+    llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
   assert(!req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1443,18 +1443,18 @@ checkGenericRequirement(
     return TYPE_LOOKUP_ERROR_FMT("can't have same-shape requirement where "
                                  "subject type is not a pack");
   }
-  case GenericRequirementKind::SuppressedProtocols: {
-    uint16_t index = req.getSuppressedProtocolsGenericParamIndex();
+  case GenericRequirementKind::InvertedProtocols: {
+    uint16_t index = req.getInvertedProtocolsGenericParamIndex();
     if (index == 0xFFFF)
       return TYPE_LOOKUP_ERROR_FMT("unable to suppress protocols");
 
     // Expand the suppression set so we can record these protocols.
     if (index >= suppressed.size()) {
-      suppressed.resize(index + 1, SuppressibleProtocolSet());
+      suppressed.resize(index + 1, InvertibleProtocolSet());
     }
 
     // Record these suppressed protocols for this generic parameter.
-    suppressed[index] |= req.getSuppressedProtocols();
+    suppressed[index] |= req.getInvertedProtocols();
     return std::nullopt;
   }
   }
@@ -1470,7 +1470,7 @@ checkGenericPackRequirement(
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
     SubstDependentWitnessTableFn substWitnessTable,
-    llvm::SmallVectorImpl<SuppressibleProtocolSet> &suppressed) {
+    llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
   assert(req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1611,18 +1611,18 @@ checkGenericPackRequirement(
     return std::nullopt;
   }
 
-  case GenericRequirementKind::SuppressedProtocols: {
-    uint16_t index = req.getSuppressedProtocolsGenericParamIndex();
+  case GenericRequirementKind::InvertedProtocols: {
+    uint16_t index = req.getInvertedProtocolsGenericParamIndex();
     if (index == 0xFFFF)
       return TYPE_LOOKUP_ERROR_FMT("unable to suppress protocols");
 
     // Expand the suppression set so we can record these protocols.
     if (index >= suppressed.size()) {
-      suppressed.resize(index + 1, SuppressibleProtocolSet());
+      suppressed.resize(index + 1, InvertibleProtocolSet());
     }
 
     // Record these suppressed protocols for this generic parameter.
-    suppressed[index] |= req.getSuppressedProtocols();
+    suppressed[index] |= req.getInvertedProtocols();
     return std::nullopt;
   }
   }
@@ -1633,12 +1633,12 @@ checkGenericPackRequirement(
 }
 
 static std::optional<TypeLookupError>
-checkSuppressibleRequirements(const Metadata *type,
-                              SuppressibleProtocolSet ignored);
+checkInvertibleRequirements(const Metadata *type,
+                              InvertibleProtocolSet ignored);
 
 static std::optional<TypeLookupError>
-checkSuppressibleRequirementsStructural(const Metadata *type,
-                                        SuppressibleProtocolSet ignored) {
+checkInvertibleRequirementsStructural(const Metadata *type,
+                                        InvertibleProtocolSet ignored) {
   switch (type->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::Struct:
@@ -1657,7 +1657,7 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
   case MetadataKind::Task:
   case MetadataKind::Job:
     // Not part of the user-visible type system; assumed to handle all
-    // suppressible requirements.
+    // invertible requirements.
     return std::nullopt;
 
   case MetadataKind::Tuple: {
@@ -1665,7 +1665,7 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
     auto tupleMetadata = cast<TupleTypeMetadata>(type);
     for (unsigned i = 0, n = tupleMetadata->NumElements; i != n; ++i) {
       if (auto error =
-              checkSuppressibleRequirements(&*tupleMetadata->getElement(i).Type,
+              checkInvertibleRequirements(&*tupleMetadata->getElement(i).Type,
                                             ignored))
         return error;
     }
@@ -1677,10 +1677,10 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
 
     // Determine the set of protocols that are suppressed by the function
     // type.
-    SuppressibleProtocolSet suppressed;
+    InvertibleProtocolSet suppressed;
     if (functionMetadata->hasExtendedFlags()) {
       suppressed = functionMetadata->getExtendedFlags()
-          .getSuppressedProtocols();
+          .getInvertedProtocols();
     }
 
     // Map the existing "noescape" bit as a suppressed protocol, when
@@ -1689,7 +1689,7 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
     case FunctionMetadataConvention::Swift:
       // Swift function types can be non-escaping, so honor the bit.
       if (!functionMetadata->isEscaping())
-        suppressed.insert(SuppressibleProtocolKind::Escapable);
+        suppressed.insert(InvertibleProtocolKind::Escapable);
       break;
 
     case FunctionMetadataConvention::Block:
@@ -1707,7 +1707,7 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
     auto missing = suppressed - ignored;
     if (!missing.empty()) {
       return TYPE_LOOKUP_ERROR_FMT(
-          "function type missing suppressible protocols %x", missing.rawBits());
+          "function type missing invertible protocols %x", missing.rawBits());
     }
 
     return std::nullopt;
@@ -1722,14 +1722,14 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
     // has suppressed a protocol that is not ignored, then the existential
     // does not meet the specified requirements.
     for (const auto& req : reqs) {
-      if (req.getKind() != GenericRequirementKind::SuppressedProtocols)
+      if (req.getKind() != GenericRequirementKind::InvertedProtocols)
         continue;
 
-      auto suppressed = req.getSuppressedProtocols();
+      auto suppressed = req.getInvertedProtocols();
       auto missing = suppressed - ignored;
       if (!missing.empty()) {
         return TYPE_LOOKUP_ERROR_FMT(
-            "existential type missing suppressible protocols %x",
+            "existential type missing invertible protocols %x",
             missing.rawBits());
       }
     }
@@ -1739,7 +1739,7 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
 
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
-    // Metatypes themselves can't have suppressible protocols.
+    // Metatypes themselves can't have invertible protocols.
     return std::nullopt;
 
   case MetadataKind::Existential:
@@ -1755,45 +1755,45 @@ checkSuppressibleRequirementsStructural(const Metadata *type,
   return std::nullopt;
 }
 
-/// Check that the given `type` meets all suppressible protocol requirements
+/// Check that the given `type` meets all invertible protocol requirements
 /// that haven't been explicitly suppressed by `ignored`.
 std::optional<TypeLookupError>
-checkSuppressibleRequirements(const Metadata *type, 
-                              SuppressibleProtocolSet ignored) {
+checkInvertibleRequirements(const Metadata *type, 
+                              InvertibleProtocolSet ignored) {
   auto contextDescriptor = type->getTypeContextDescriptor();
   if (!contextDescriptor)
-    return checkSuppressibleRequirementsStructural(type, ignored);
+    return checkInvertibleRequirementsStructural(type, ignored);
 
   // If no conformances are suppressed, then it conforms to everything.
-  if (!contextDescriptor->hasSuppressibleProtocols()) {
+  if (!contextDescriptor->hasInvertibleProtocols()) {
     return std::nullopt;
   }
 
   // If this type has suppressed conformances, but we can't find them...
   // bail out.
-  auto suppressedProtocols = contextDescriptor->getSuppressedProtocols();
-  if (!suppressedProtocols) {
+  auto InvertedProtocols = contextDescriptor->getInvertedProtocols();
+  if (!InvertedProtocols) {
     return TYPE_LOOKUP_ERROR_FMT("unable to find suppressed protocols");
   }
 
-  // Determine the set of suppressible conformances that the type has
+  // Determine the set of invertible conformances that the type has
   // suppressed but aren't being ignored. These are missing conformances
   // based on the primary definition of the type.
-  SuppressibleProtocolSet missingConformances = *suppressedProtocols - ignored;
+  InvertibleProtocolSet missingConformances = *InvertedProtocols - ignored;
   if (missingConformances.empty())
     return std::nullopt;
 
   // If the context descriptor is not generic, there are no conditional
   // conformances: fail.
   if (!contextDescriptor->isGeneric()) {
-    return TYPE_LOOKUP_ERROR_FMT("type missing suppressible conformances %x",
+    return TYPE_LOOKUP_ERROR_FMT("type missing invertible conformances %x",
                                  missingConformances.rawBits());
   }
 
   auto genericContext = contextDescriptor->getGenericContext();
   if (!genericContext ||
-      !genericContext->hasConditionalSuppressedProtocols()) {
-    return TYPE_LOOKUP_ERROR_FMT("type missing suppressible conformances %x",
+      !genericContext->hasConditionalInvertedProtocols()) {
+    return TYPE_LOOKUP_ERROR_FMT("type missing invertible conformances %x",
                                  missingConformances.rawBits());
   }
 
@@ -1801,23 +1801,23 @@ checkSuppressibleRequirements(const Metadata *type,
   // conditional conformances, then the nominal type does not satisfy these
   // suppressed conformances. We're done.
   auto conditionalSuppressed =
-      genericContext->getConditionalSuppressedProtocols();
+      genericContext->getConditionalInvertedProtocols();
   auto alwaysMissingConformances = missingConformances - conditionalSuppressed;
   if (!alwaysMissingConformances.empty()) {
-    return TYPE_LOOKUP_ERROR_FMT("type missing suppressible conformances %x",
+    return TYPE_LOOKUP_ERROR_FMT("type missing invertible conformances %x",
                                  alwaysMissingConformances.rawBits());
   }
 
   // Now we need to check the conditional conformances for each of the
   // missing conformances.
-  for (auto suppressibleKind : missingConformances) {
+  for (auto invertibleKind : missingConformances) {
     // Get the conditional requirements.
-    // Note: This will end up being quadratic in the number of suppressible
+    // Note: This will end up being quadratic in the number of invertible
     // protocols. That number is small (currently 2) and cannot be more than 16,
     // but if it's a problem we can switch to a different strategy.
     auto condReqs =
-        genericContext->getConditionalSuppressibleProtocolRequirementsFor(
-                                                             suppressibleKind);
+        genericContext->getConditionalInvertibleProtocolRequirementsFor(
+                                                             invertibleKind);
 
     // Check the conditional requirements.
     llvm::ArrayRef<GenericRequirementDescriptor> requirements(
@@ -1852,7 +1852,7 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     SubstGenericParameterOrdinalFn substGenericParamOrdinal,
     SubstDependentWitnessTableFn substWitnessTable) {
   // The suppressed conformances for each generic parameter.
-  llvm::SmallVector<SuppressibleProtocolSet, 4> allSuppressed;
+  llvm::SmallVector<InvertibleProtocolSet, 4> allSuppressed;
 
   for (const auto &req : requirements) {
     if (req.getFlags().isPackRequirement()) {
@@ -1872,7 +1872,7 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     }
   }
 
-  // Now, check all of the generic arguments for suppressible protocols.
+  // Now, check all of the generic arguments for invertible protocols.
   unsigned numGenericParams = genericParams.size();
   for (unsigned index = 0; index != numGenericParams; ++index) {
     // Non-key arguments don't need to be checked, because they are
@@ -1880,7 +1880,7 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     if (!genericParams[index].hasKeyArgument())
       continue;
 
-    SuppressibleProtocolSet suppressed;
+    InvertibleProtocolSet suppressed;
     if (index < allSuppressed.size())
       suppressed = allSuppressed[index];
 
@@ -1893,7 +1893,7 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
       }
 
       auto metadata = metadataOrPack.getMetadata();
-      if (auto error = checkSuppressibleRequirements(metadata, suppressed))
+      if (auto error = checkInvertibleRequirements(metadata, suppressed))
         return error;
 
       break;
@@ -1914,7 +1914,7 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
         llvm::ArrayRef<const Metadata *> elements(
             pack.getElements(), pack.getNumElements());
         for (auto element : elements) {
-          if (auto error = checkSuppressibleRequirements(element, suppressed))
+          if (auto error = checkInvertibleRequirements(element, suppressed))
             return error;
         }
       }
