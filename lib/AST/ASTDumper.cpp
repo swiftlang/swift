@@ -1084,6 +1084,16 @@ namespace {
 
       printFlag(D->isImplicit(), "implicit", DeclModifierColor);
       printFlag(D->isHoisted(), "hoisted", DeclModifierColor);
+
+      if (auto implAttr = D->getAttrs().getAttribute<ObjCImplementationAttr>()) {
+        StringRef label =
+            implAttr->isEarlyAdopter() ? "objc_impl" : "clang_impl";
+        if (implAttr->CategoryName.empty())
+          printFlag(label);
+        else
+          printFieldQuoted(implAttr->CategoryName.str(), label);
+      }
+
       printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
                 DeclModifierColor);
