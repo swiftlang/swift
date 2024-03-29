@@ -3304,7 +3304,7 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   }
 
   if (!skipInverses) {
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       // Unless the user wrote ~P in the syntactic inheritance clause, the
       // semantic inherited list includes P.
       if (!inverses.contains(ip))

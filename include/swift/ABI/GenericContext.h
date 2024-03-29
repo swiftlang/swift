@@ -21,7 +21,7 @@
 #include "swift/ABI/TargetLayout.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/MetadataRef.h"
-#include "swift/ABI/SuppressibleProtocols.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/ABI/TrailingObjects.h"
 #include "swift/Demangling/Demangle.h"
 
@@ -105,8 +105,8 @@ struct TargetGenericContextDescriptorHeader {
     return getNumArguments() > 0;
   }
 
-  bool hasConditionalSuppressedProtocols() const {
-    return Flags.hasConditionalSuppressedProtocols();
+  bool hasConditionalInvertedProtocols() const {
+    return Flags.hasConditionalInvertedProtocols();
   }
 };
 using GenericContextDescriptorHeader =
@@ -143,19 +143,19 @@ public:
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
 
-    /// The set of suppressible protocols whose check is suppressed, along
-    /// with the index of the generic parameter being suppressed.
+    /// The set of invertible protocols whose check is disabled, along
+    /// with the index of the generic parameter to which this applies.
     ///
     /// The index is technically redundant with the subject type, but its
     /// storage is effectively free because this union is 32 bits anyway. The
-    /// index 0xFFFF is reserved for "not a generic parameter", in case we
-    /// need to use that in the future.
+    /// index 0xFFFF is reserved for "not a generic parameter", in which case
+    /// the constraints are on the subject type.
     ///
-    /// Only valid if the requirement has SuppressedProtocols kind.
+    /// Only valid if the requirement has InvertedProtocols kind.
     struct {
       uint16_t GenericParamIndex;
-      SuppressibleProtocolSet Protocols;
-    } SuppressedProtocols;
+      InvertibleProtocolSet Protocols;
+    } InvertedProtocols;
   };
 
   constexpr GenericRequirementFlags getFlags() const {
@@ -223,16 +223,16 @@ public:
     return Layout;
   }
 
-  /// Retrieve the set of suppressed protocols.
-  SuppressibleProtocolSet getSuppressedProtocols() const {
-    assert(getKind() == GenericRequirementKind::SuppressedProtocols);
-    return SuppressedProtocols.Protocols;
+  /// Retrieve the set of inverted protocols.
+  InvertibleProtocolSet getInvertedProtocols() const {
+    assert(getKind() == GenericRequirementKind::InvertedProtocols);
+    return InvertedProtocols.Protocols;
   }
 
-  /// Retrieve the suppressible protocol kind.
-  uint16_t getSuppressedProtocolsGenericParamIndex() const {
-    assert(getKind() == GenericRequirementKind::SuppressedProtocols);
-    return SuppressedProtocols.GenericParamIndex;
+  /// Retrieve the invertible protocol kind.
+  uint16_t getInvertedProtocolsGenericParamIndex() const {
+    assert(getKind() == GenericRequirementKind::InvertedProtocols);
+    return InvertedProtocols.GenericParamIndex;
   }
 
   /// Determine whether this generic requirement has a known kind.
@@ -246,7 +246,7 @@ public:
     case GenericRequirementKind::SameConformance:
     case GenericRequirementKind::SameType:
     case GenericRequirementKind::SameShape:
-    case GenericRequirementKind::SuppressedProtocols:
+    case GenericRequirementKind::InvertedProtocols:
       return true;
     }
 
@@ -299,24 +299,24 @@ struct GenericPackShapeDescriptor {
 };
 
 /// A count for the number of requirements for the number of requirements
-/// for a given conditional conformance to a suppressible protocols.
-struct ConditionalSuppressibleProtocolsRequirementCount {
+/// for a given conditional conformance to a invertible protocols.
+struct ConditionalInvertibleProtocolsRequirementCount {
   uint16_t count;
 };
 
-/// A suppressible protocol set used for the conditional conformances in a
+/// A invertible protocol set used for the conditional conformances in a
 /// generic context.
-struct ConditionalSuppressibleProtocolSet: SuppressibleProtocolSet {
-  using SuppressibleProtocolSet::SuppressibleProtocolSet;
+struct ConditionalInvertibleProtocolSet: InvertibleProtocolSet {
+  using InvertibleProtocolSet::InvertibleProtocolSet;
 };
 
 /// A generic requirement for describing a conditional conformance to a
-/// suppressible protocol.
+/// invertible protocol.
 ///
 /// This type is equivalent to a `TargetGenericRequirementDescriptor`, and
 /// differs only because it needs to occur alongside
 template<typename Runtime>
-struct TargetConditionalSuppressibleProtocolRequirement: TargetGenericRequirementDescriptor<Runtime> { };
+struct TargetConditionalInvertibleProtocolRequirement: TargetGenericRequirementDescriptor<Runtime> { };
 
 /// An array of generic parameter descriptors, all
 /// GenericParamDescriptor::implicit(), which is by far
@@ -478,9 +478,9 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       TargetGenericRequirementDescriptor<Runtime>,
       GenericPackShapeHeader,
       GenericPackShapeDescriptor,
-      ConditionalSuppressibleProtocolSet,
-      ConditionalSuppressibleProtocolsRequirementCount,
-      TargetConditionalSuppressibleProtocolRequirement<Runtime>,
+      ConditionalInvertibleProtocolSet,
+      ConditionalInvertibleProtocolsRequirementCount,
+      TargetConditionalInvertibleProtocolRequirement<Runtime>,
       FollowingTrailingObjects...>
 {
 protected:
@@ -488,17 +488,17 @@ protected:
   using GenericContextHeaderType = TargetGenericContextHeaderType<Runtime>;
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
-  using GenericConditionalSuppressibleProtocolRequirement =
-    TargetConditionalSuppressibleProtocolRequirement<Runtime>;
+  using GenericConditionalInvertibleProtocolRequirement =
+    TargetConditionalInvertibleProtocolRequirement<Runtime>;
   using TrailingObjects = swift::ABI::TrailingObjects<Self,
     GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
     GenericPackShapeHeader,
     GenericPackShapeDescriptor,
-    ConditionalSuppressibleProtocolSet,
-    ConditionalSuppressibleProtocolsRequirementCount,
-    GenericConditionalSuppressibleProtocolRequirement,
+    ConditionalInvertibleProtocolSet,
+    ConditionalInvertibleProtocolsRequirementCount,
+    GenericConditionalInvertibleProtocolRequirement,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -528,45 +528,45 @@ public:
     return getFullGenericContextHeader();
   }
 
-  bool hasConditionalSuppressedProtocols() const {
+  bool hasConditionalInvertedProtocols() const {
     if (!asSelf()->isGeneric())
       return false;
 
-    return getGenericContextHeader().hasConditionalSuppressedProtocols();
+    return getGenericContextHeader().hasConditionalInvertedProtocols();
   }
 
-  const SuppressibleProtocolSet &
-  getConditionalSuppressedProtocols() const {
-    assert(hasConditionalSuppressedProtocols());
+  const InvertibleProtocolSet &
+  getConditionalInvertedProtocols() const {
+    assert(hasConditionalInvertedProtocols());
     return *this->template
-        getTrailingObjects<ConditionalSuppressibleProtocolSet>();
+        getTrailingObjects<ConditionalInvertibleProtocolSet>();
   }
 
-  /// Retrieve the counts for # of conditional suppressible protocols for each
-  /// conditional conformance to a suppressible protocol.
+  /// Retrieve the counts for # of conditional invertible protocols for each
+  /// conditional conformance to a invertible protocol.
   ///
   /// The counts are cumulative, so the first entry in the array is the
   /// number of requirements for the first conditional conformance. The
   /// second entry in the array is the number of requirements in the first
   /// and second conditional conformances. The last entry is, therefore, the
   /// total count of requirements in the structure.
-  llvm::ArrayRef<ConditionalSuppressibleProtocolsRequirementCount>
-  getConditionalSuppressibleProtocolRequirementCounts() const {
-    if (!asSelf()->hasConditionalSuppressedProtocols())
+  llvm::ArrayRef<ConditionalInvertibleProtocolsRequirementCount>
+  getConditionalInvertibleProtocolRequirementCounts() const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
       return {};
 
     return {
       this->template
-        getTrailingObjects<ConditionalSuppressibleProtocolsRequirementCount>(),
-      getNumConditionalSuppressibleProtocolsRequirementCounts()
+        getTrailingObjects<ConditionalInvertibleProtocolsRequirementCount>(),
+      getNumConditionalInvertibleProtocolsRequirementCounts()
     };
   }
 
   /// Retrieve the array of requirements for conditional conformances to
-  /// the ith conditional conformance to a suppressible protocol.
-  llvm::ArrayRef<GenericConditionalSuppressibleProtocolRequirement>
-  getConditionalSuppressibleProtocolRequirementsAt(unsigned i) const {
-    auto counts = getConditionalSuppressibleProtocolRequirementCounts();
+  /// the ith conditional conformance to a invertible protocol.
+  llvm::ArrayRef<GenericConditionalInvertibleProtocolRequirement>
+  getConditionalInvertibleProtocolRequirementsAt(unsigned i) const {
+    auto counts = getConditionalInvertibleProtocolRequirementCounts();
     assert(i < counts.size());
 
     unsigned startIndex = (i == 0) ? 0 : counts[i-1].count;
@@ -574,35 +574,35 @@ public:
 
     auto basePtr =
       this->template
-        getTrailingObjects<GenericConditionalSuppressibleProtocolRequirement>();
+        getTrailingObjects<GenericConditionalInvertibleProtocolRequirement>();
     return { basePtr + startIndex, basePtr + endIndex };
   }
 
   /// Retrieve the array of requirements for conditional conformances to
-  /// the ith conditional conformance to a suppressible protocol.
-  llvm::ArrayRef<GenericConditionalSuppressibleProtocolRequirement>
-  getConditionalSuppressibleProtocolRequirementsFor(
-      SuppressibleProtocolKind kind
+  /// the ith conditional conformance to a invertible protocol.
+  llvm::ArrayRef<GenericConditionalInvertibleProtocolRequirement>
+  getConditionalInvertibleProtocolRequirementsFor(
+      InvertibleProtocolKind kind
   ) const {
-    if (!asSelf()->hasConditionalSuppressedProtocols())
+    if (!asSelf()->hasConditionalInvertedProtocols())
       return { };
 
-    auto conditionallySuppressed = getConditionalSuppressedProtocols();
-    if (!conditionallySuppressed.contains(kind))
+    auto conditionallyInverted = getConditionalInvertedProtocols();
+    if (!conditionallyInverted.contains(kind))
       return { };
 
     // Count the number of "set" bits up to (but not including) the
     // bit we're looking at.
     unsigned targetBit = static_cast<uint8_t>(kind);
-    auto suppressedBits = conditionallySuppressed.rawBits();
+    auto invertedBits = conditionallyInverted.rawBits();
     unsigned priorBits = 0;
     for (unsigned i = 0; i != targetBit; ++i) {
-      if (suppressedBits & 0x01)
+      if (invertedBits & 0x01)
         ++priorBits;
-      suppressedBits = suppressedBits >> 1;
+      invertedBits = invertedBits >> 1;
     }
 
-    return getConditionalSuppressibleProtocolRequirementsAt(priorBits);
+    return getConditionalInvertibleProtocolRequirementsAt(priorBits);
   }
 
   const TargetGenericContext<Runtime> *getGenericContext() const {
@@ -687,28 +687,28 @@ protected:
   }
 
   size_t numTrailingObjects(
-      OverloadToken<ConditionalSuppressibleProtocolSet>
+      OverloadToken<ConditionalInvertibleProtocolSet>
   ) const {
-    return asSelf()->hasConditionalSuppressedProtocols() ? 1 : 0;
+    return asSelf()->hasConditionalInvertedProtocols() ? 1 : 0;
   }
 
-  unsigned getNumConditionalSuppressibleProtocolsRequirementCounts() const {
-    if (!asSelf()->hasConditionalSuppressedProtocols())
+  unsigned getNumConditionalInvertibleProtocolsRequirementCounts() const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
       return 0;
 
-    return countBitsUsed(getConditionalSuppressedProtocols().rawBits());
+    return countBitsUsed(getConditionalInvertedProtocols().rawBits());
   }
 
   size_t numTrailingObjects(
-      OverloadToken<ConditionalSuppressibleProtocolsRequirementCount>
+      OverloadToken<ConditionalInvertibleProtocolsRequirementCount>
   ) const {
-    return getNumConditionalSuppressibleProtocolsRequirementCounts();
+    return getNumConditionalInvertibleProtocolsRequirementCounts();
   }
 
   size_t numTrailingObjects(
-      OverloadToken<GenericConditionalSuppressibleProtocolRequirement>
+      OverloadToken<GenericConditionalInvertibleProtocolRequirement>
   ) const {
-    auto counts = getConditionalSuppressibleProtocolRequirementCounts();
+    auto counts = getConditionalInvertibleProtocolRequirementCounts();
     return counts.empty() ? 0 : counts.back().count;
   }
 

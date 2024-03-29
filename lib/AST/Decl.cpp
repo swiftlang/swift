@@ -1326,7 +1326,7 @@ static GenericSignature getPlaceholderGenericSignature(
       auto type = genericParam->getDeclaredInterfaceType();
       genericParams.push_back(type->castTo<GenericTypeParamType>());
 
-      for (auto ip : InvertibleProtocolSet::full()) {
+      for (auto ip : InvertibleProtocolSet::allKnown()) {
         auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
         requirements.emplace_back(RequirementKind::Conformance, type,
                                   proto->getDeclaredInterfaceType());

@@ -1087,7 +1087,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     inverses.insert(InvertibleProtocolKind::Escapable);
 
   bool hasSuppressedConformances = false;
-  for (auto ip : InvertibleProtocolSet::full()) {
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
     if (!inverses.contains(ip) ||
         (isa<ClassDecl>(this) &&
          !ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
@@ -1281,7 +1281,7 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
 
     // Triggers synthesis of a possibly conditional conformance.
     // For the unconditional ones, see NominalTypeDecl::prepareConformanceTable
-    for (auto ip : InvertibleProtocolSet::full())
+    for (auto ip : InvertibleProtocolSet::allKnown())
       trySynthesize(getKnownProtocolKind(ip));
 
     if (nominal->getASTContext().LangOpts.hasFeature(

@@ -22,7 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/InvertibleProtocolKind.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementKind.h"
 #include "swift/Basic/OptionSet.h"
@@ -462,7 +462,7 @@ void decodeRequirement(
         return;
 
       auto protocolKind =
-          static_cast<SuppressibleProtocolKind>(child->getChild(1)->getIndex());
+          static_cast<InvertibleProtocolKind>(child->getChild(1)->getIndex());
       inverseRequirements.push_back(
           Builder.createInverseRequirement(subjectType, protocolKind));
       continue;

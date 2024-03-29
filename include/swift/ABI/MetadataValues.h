@@ -25,7 +25,7 @@
 
 #include "swift/ABI/KeyPath.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
-#include "swift/ABI/SuppressibleProtocols.h"
+#include "swift/ABI/InvertibleProtocols.h"
 
 // FIXME: this include shouldn't be here, but removing it causes symbol
 // mangling mismatches on Windows for some reason?
@@ -1200,9 +1200,9 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a transferring result.
     HasTransferringResult  = 0x00000010U,
 
-    /// A SuppressibleProtocolSet in the high bits.
-    SuppressedProtocolShift = 16,
-    SuppressedProtocolMask = 0xFFFFU << SuppressedProtocolShift,
+    /// A InvertibleProtocolSet in the high bits.
+    InvertedProtocolshift = 16,
+    InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
   int_type Data;
 
@@ -1235,10 +1235,10 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withSuppressedProtocols(SuppressibleProtocolSet suppressed) const {
+  withInvertedProtocols(InvertibleProtocolSet inverted) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~SuppressedProtocolMask) |
-        (suppressed.rawBits() << SuppressedProtocolShift));
+        (Data & ~InvertedProtocolMask) |
+        (inverted.rawBits() << InvertedProtocolshift));
   }
   
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
@@ -1255,8 +1255,8 @@ public:
     return Data;
   }
 
-  SuppressibleProtocolSet getSuppressedProtocols() const {
-    return SuppressibleProtocolSet(Data >> SuppressedProtocolShift);
+  InvertibleProtocolSet getInvertedProtocols() const {
+    return InvertibleProtocolSet(Data >> InvertedProtocolshift);
   }
 
   static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
@@ -1704,14 +1704,14 @@ public:
   constexpr ContextDescriptorFlags(ContextDescriptorKind kind,
                                    bool isGeneric,
                                    bool isUnique,
-                                   bool hasSuppressibleProtocols,
+                                   bool hasInvertibleProtocols,
                                    uint16_t kindSpecificFlags)
     : ContextDescriptorFlags(ContextDescriptorFlags()
                                .withKind(kind)
                                .withGeneric(isGeneric)
                                .withUnique(isUnique)
-                               .withSuppressibleProtocols(
-                                 hasSuppressibleProtocols
+                               .withInvertibleProtocols(
+                                 hasInvertibleProtocols
                                )
                                .withKindSpecificFlags(kindSpecificFlags))
   {}
@@ -1731,9 +1731,9 @@ public:
     return (Value & 0x40u) != 0;
   }
 
-  /// Whether the context has information about suppressible protocols, which
+  /// Whether the context has information about invertible protocols, which
   /// will show up as a trailing field in the context descriptor.
-  constexpr bool hasSuppressibleProtocols() const {
+  constexpr bool hasInvertibleProtocols() const {
     return (Value & 0x20u) != 0;
   }
 
@@ -1758,11 +1758,11 @@ public:
                                   | (isUnique ? 0x40u : 0));
   }
 
-  constexpr ContextDescriptorFlags withSuppressibleProtocols(
-      bool hasSuppressibleProtocols
+  constexpr ContextDescriptorFlags withInvertibleProtocols(
+      bool hasInvertibleProtocols
   ) const {
     return ContextDescriptorFlags((Value & ~0x20u)
-                                  | (hasSuppressibleProtocols ? 0x20u : 0));
+                                  | (hasInvertibleProtocols ? 0x20u : 0));
   }
 
   constexpr ContextDescriptorFlags
@@ -2003,12 +2003,12 @@ public:
     : Value(value) {}
 
   constexpr GenericContextDescriptorFlags(
-      bool hasTypePacks, bool hasConditionalSuppressedProtocols
+      bool hasTypePacks, bool hasConditionalInvertedProtocols
   ) : GenericContextDescriptorFlags(
         GenericContextDescriptorFlags((uint16_t)0)
           .withHasTypePacks(hasTypePacks)
-          .withConditionalSuppressedProtocols(
-            hasConditionalSuppressedProtocols)) {}
+          .withConditionalInvertedProtocols(
+            hasConditionalInvertedProtocols)) {}
 
   /// Whether this generic context has at least one type parameter
   /// pack, in which case the generic context will have a trailing
@@ -2018,9 +2018,9 @@ public:
   }
 
   /// Whether this generic context has any conditional conformances to
-  /// suppressed protocols, in which case the generic context will have a
-  /// trailing SuppressibleProtocolSet and conditional requirements.
-  constexpr bool hasConditionalSuppressedProtocols() const {
+  /// inverted protocols, in which case the generic context will have a
+  /// trailing InvertibleProtocolSet and conditional requirements.
+  constexpr bool hasConditionalInvertedProtocols() const {
     return (Value & 0x2) != 0;
   }
 
@@ -2031,7 +2031,7 @@ public:
   }
 
   constexpr GenericContextDescriptorFlags
-  withConditionalSuppressedProtocols(bool value) const {
+  withConditionalInvertedProtocols(bool value) const {
     return GenericContextDescriptorFlags((uint16_t)(
       (Value & ~0x2) | (value ? 0x2 : 0)));
   }
@@ -2132,12 +2132,12 @@ enum class GenericRequirementKind : uint8_t {
   SameConformance = 3,
   /// A same-shape requirement between generic parameter packs.
   SameShape = 4,
-  /// A requirement stating which suppressible protocol checks are
-  /// suppressed.
+  /// A requirement stating which invertible protocol checks are
+  /// inverted.
   ///
   /// This is more of an "anti-requirement", specifing which checks don't need
   /// to happen for a given type.
-  SuppressedProtocols = 5,
+  InvertedProtocols = 5,
   /// A layout requirement.
   Layout = 0x1F,
 };

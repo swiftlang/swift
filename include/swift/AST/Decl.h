@@ -4405,7 +4405,7 @@ public:
   /// Returns null if the type is a class, or does not have a declared `deinit`.
   DestructorDecl *getValueTypeDestructor();
 
-  /// Does a conformance for a given suppressible protocol exist for this
+  /// Does a conformance for a given invertible protocol exist for this
   /// type declaration.
   CanBeInvertible::Result canConformTo(InvertibleProtocolKind kind) const;
 
