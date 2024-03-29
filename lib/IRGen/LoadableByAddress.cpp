@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "loadable-address"
+#include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -3432,6 +3433,29 @@ public:
     toDeleteBlockArg.push_back(std::make_pair(b, argIdx));
   }
 
+  bool isPotentiallyCArray(SILType ty) {
+    if (ty.isAddress() || ty.isClassOrClassMetatype()) {
+      return false;
+    }
+
+    auto canType = ty.getASTType();
+    if (canType->hasTypeParameter()) {
+      assert(genEnv && "Expected a GenericEnv");
+      canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    }
+
+    if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
+      assert(ty.isObject() &&
+             "Expected only two categories: address and object");
+      assert(!canType->hasTypeParameter());
+      const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
+      auto explosionSchema = TI.getSchema();
+      if (explosionSchema.size() > 15)
+        return true;
+    }
+    return false;
+  }
+
   bool isLargeLoadableType(SILType ty) {
     if (ty.isAddress() || ty.isClassOrClassMetatype()) {
       return false;
@@ -3449,7 +3473,11 @@ public:
       assert(!canType->hasTypeParameter());
       const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
       auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(*irgenModule);
-      return nativeSchemaOrigParam.size() > 15;
+      if (nativeSchemaOrigParam.size() > 15)
+        return true;
+      auto explosionSchema = TI.getSchema();
+      if (explosionSchema.size() > 15)
+        return true;
     }
     return false;
   }
@@ -3765,7 +3793,7 @@ protected:
       builder.createStore(bc->getLoc(), bc->getOperand(), opdAddr,
                           StoreOwnershipQualifier::Unqualified);
       assignment.mapValueToAddress(origValue, addr);
-
+      assignment.markForDeletion(bc);
       return;
     }
     auto opdAddr = assignment.getAddressForValue(bc->getOperand());
@@ -3936,7 +3964,9 @@ protected:
   }
 
   void visitDebugValueInst(DebugValueInst *dbg) {
-    if (!dbg->hasAddrVal() && overlapsWithOnStackDebugLoc(dbg->getOperand())) {
+    if (!dbg->hasAddrVal() &&
+        (assignment.isPotentiallyCArray(dbg->getOperand()->getType()) ||
+         overlapsWithOnStackDebugLoc(dbg->getOperand()))) {
       assignment.markForDeletion(dbg);
       return;
     }
