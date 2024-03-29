@@ -2868,9 +2868,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(type, depth + 1);
     Printer << ": ~";
     switch (Node->getChild(1)->getIndex()) {
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit) \
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
     case Bit: Printer << "Swift." << #Name; break;
-#include "swift/ABI/SuppressibleProtocols.def"
+#include "swift/ABI/InvertibleProtocols.def"
     default:
       Printer << "Swift.<bit " << Node->getChild(1)->getIndex() << ">";
       break;
