@@ -350,7 +350,7 @@ void InverseRequirement::expandDefaults(
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
   for (auto gp : gps) {
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       result.push_back({{RequirementKind::Conformance, gp,
                          proto->getDeclaredInterfaceType()},

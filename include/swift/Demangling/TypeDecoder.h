@@ -22,7 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/InvertibleProtocolKind.h"
+#include "swift/ABI/SuppressibleProtocols.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementKind.h"
 #include "swift/Basic/OptionSet.h"

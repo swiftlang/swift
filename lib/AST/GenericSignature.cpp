@@ -661,7 +661,7 @@ Type GenericSignatureImpl::getUpperBound(Type type,
   InvertibleProtocolSet inverses;
 
   if (!superclass && !hasExplicitAnyObject) {
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *kp = ctx.getProtocol(::getKnownProtocolKind(ip));
       if (!requiresProtocol(type, kp))
         inverses.insert(ip);
@@ -1257,7 +1257,7 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     if (getSuperclassBound(gp) || getConcreteType(gp))
       continue;
 
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
       // If we can derive a conformance to this protocol, then don't add an
@@ -1297,7 +1297,7 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
     inheritedProtos.push_back(inheritedProto);
   }
 
-  for (auto ip : InvertibleProtocolSet::full()) {
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
     auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
     inheritedProtos.push_back(otherProto);
   }
@@ -1313,7 +1313,7 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
   }
 
   for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
       requirements.emplace_back(RequirementKind::Conformance,
                                 assocTypeDecl->getDeclaredInterfaceType(),
@@ -1349,7 +1349,7 @@ void RequirementSignature::getRequirementsWithInverses(
         sig->getConcreteType(interfaceType))
       return;
 
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
       // If we can derive a conformance to this protocol, then don't add an

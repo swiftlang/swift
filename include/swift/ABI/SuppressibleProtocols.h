@@ -19,6 +19,7 @@
 #define SWIFT_ABI_SUPPRESSIBLEPROTOCOLS_H
 
 #include <cstdint>
+#include <initializer_list>
 #include <iterator>
 
 namespace swift {
@@ -29,6 +30,8 @@ enum class SuppressibleProtocolKind : uint8_t {
 #define SUPPRESSIBLE_PROTOCOL(Name, Bit) Name = Bit,
 #include "swift/ABI/SuppressibleProtocols.def"
 };
+
+typedef SuppressibleProtocolKind InvertibleProtocolKind;
 
 /// A set of suppressible protocols, whose bits correspond to the cases of
 /// SuppressibleProtocolKind.
@@ -47,6 +50,13 @@ public:
   explicit constexpr SuppressibleProtocolSet(StorageType bits) : bits(bits) {}
   constexpr SuppressibleProtocolSet() : bits(0) {}
 
+  SuppressibleProtocolSet(
+      std::initializer_list<SuppressibleProtocolKind> elements
+  ) : bits(0) {
+    for (auto element : elements)
+      insert(element);
+  }
+
   /// Retrieve the raw bits that describe this set.
   StorageType rawBits() const { return bits; }
 
@@ -61,6 +71,12 @@ public:
   /// Insert the suppressible protocol into the set.
   void insert(SuppressibleProtocolKind kind) {
     bits = bits | getMask(kind);
+  }
+
+  /// Insert all of the suppressible protocols from the other set into this
+  /// one.
+  void insertAll(SuppressibleProtocolSet other) {
+    bits |= other.bits;
   }
 
   /// Remove the given suppressible protocol from the set.
