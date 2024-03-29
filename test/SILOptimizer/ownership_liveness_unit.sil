@@ -274,6 +274,44 @@ bb0(%0 : @guaranteed $C):
   return %99 : $()
 }
 
+// CHECK-LABEL: testInteriorUnconditionalAddrCast: interior-liveness with: %1
+// CHECK: Interior liveness: %1 = argument of bb0 : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: regular user:   [[FIELD:%.*]] = ref_element_addr %1 : $D, #D.object
+// CHECK-NEXT: regular user:   unconditional_checked_cast_addr C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: regular user:   copy_addr [take] %4 to [init] [[FIELD]] : $*C
+// CHECK-NEXT: regular user:   unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: testInteriorUnconditionalAddrCast: interior-liveness with: %1
+
+// CHECK-LABEL: testInteriorUnconditionalAddrCast: interior_liveness_swift with: %1
+// CHECK: Interior liveness: %1 = argument of bb0 : $D
+// CHECK-NEXT: begin:      [[FIELD]] = ref_element_addr %1 : $D, #D.object
+// CHECK-NEXT: ends:       unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  copy_addr [take] %4 to [init] [[FIELD]] : $*C
+// CHECK-NEXT:             unconditional_checked_cast_addr C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT:             [[FIELD]] = ref_element_addr %1 : $D, #D.object
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: testInteriorUnconditionalAddrCast: interior_liveness_swift with: %1
+sil [ossa] @testInteriorUnconditionalAddrCast : $@convention(thin) (@guaranteed D) -> @out D {
+bb0(%0 : $*D, %1 : @guaranteed $D):
+  specify_test "interior-liveness %1"
+  specify_test "interior_liveness_swift %1"
+  %c1 = ref_element_addr %1 : $D, #D.object
+  unconditional_checked_cast_addr C in %c1 : $*C to D in %0 : $*D
+  %c2 = unchecked_addr_cast %0 : $*D to $*C
+  copy_addr [take] %c2 to [init] %c1 : $*C
+  unchecked_ref_cast_addr C in %c1 : $*C to D in %0 : $*D
+  %99 = tuple()
+  return %99 : $()
+}
+
 // CHECK-LABEL: testInteriorReborrow: interior-liveness with: %borrow
 // CHECK: Complete liveness
 // CHECK-NEXT: Unenclosed phis {

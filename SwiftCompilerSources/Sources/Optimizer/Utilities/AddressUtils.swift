@@ -127,7 +127,6 @@ extension AddressUseVisitor {
          is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst,
          is InitExistentialAddrInst, is OpenExistentialAddrInst,
          is ProjectBlockStorageInst, is UncheckedAddrCastInst,
-         is UnconditionalCheckedCastAddrInst,
          is MarkUninitializedInst, is DropDeinitInst,
          is CopyableToMoveOnlyWrapperAddrInst,
          is MoveOnlyWrapperToCopyableAddrInst,
