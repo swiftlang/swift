@@ -1268,7 +1268,7 @@ namespace {
         return result;
 
       auto checkProtocol = [&](SuppressibleProtocolKind kind) {
-        switch (nominal->canConformTo(asInvertible(kind))) {
+        switch (nominal->canConformTo(kind)) {
         case TypeDecl::CanBeInvertible::Never:
         case TypeDecl::CanBeInvertible::Conditionally:
           result.insert(kind);
@@ -1294,7 +1294,7 @@ namespace {
         return result;
 
       auto checkProtocol = [&](SuppressibleProtocolKind kind) {
-        switch (nominal->canConformTo(asInvertible(kind))) {
+        switch (nominal->canConformTo(kind)) {
         case TypeDecl::CanBeInvertible::Never:
         case TypeDecl::CanBeInvertible::Always:
           break;
@@ -1342,7 +1342,7 @@ namespace {
       unsigned index = 0;
       unsigned totalNumRequirements = 0;
       for (auto kind : protocols) {
-        auto proto = ctx.getProtocol(getKnownProtocolKind(asInvertible(kind)));
+        auto proto = ctx.getProtocol(getKnownProtocolKind(kind));
         SmallVector<ProtocolConformance *, 1> conformances;
         (void)nominal->lookupConformance(proto, conformances);
         auto conformance = conformances.front();
@@ -7051,7 +7051,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       continue;
 
     // Insert this suppression into the set for that generic parameter.
-    auto suppressibleKind = asSuppressible(inverse.getKind());
+    auto suppressibleKind = inverse.getKind();
     unsigned index = sig->getGenericParamOrdinal(genericParam);
     suppressed[index].insert(suppressibleKind);
   }

@@ -33,15 +33,15 @@ let global__old__: any MyProto = S()
 // CHECK: sil_global private @$s4test13global__new___Wz : $Builtin.Word
 
 // DEMANGLED: test.global__new__ : any test.MyProto<Self: ~Swift.Copyable>
-// CHECK: sil_global hidden [let] @$s4test13global__new__AA7MyProto_pRics_XPvp : $any MyProto & ~Copyable
+// CHECK: sil_global hidden [let] @$s4test13global__new__AA7MyProto_pRi_s_XPvp : $any MyProto & ~Copyable
 let global__new__: any MyProto & ~Copyable = S()
 
 // DEMANGLED: test.global__none__ : any test.Nothing<Self: ~Swift.Copyable, Self: ~Swift.Escapable>
-// CHECK: sil_global hidden [let] @$s4test14global__none__AA7Nothing_pRics_RiesXPvp : $any Nothing & ~Copyable & ~Escapable
+// CHECK: sil_global hidden [let] @$s4test14global__none__AA7Nothing_pRi_s_Ri0_sXPvp : $any Nothing & ~Copyable & ~Escapable
 let global__none__: any Nothing & ~Copyable & ~Escapable = S()
 
 // DEMANGLED: test.global__none2__ : any test.Empty & test.Nothing<Self: ~Swift.Copyable, Self: ~Swift.Escapable>
-// CHECK: sil_global hidden [let] @$s4test15global__none2__AA5Empty_AA7NothingpRics_RiesXPvp : $any Empty & Nothing & ~Copyable & ~Escapable
+// CHECK: sil_global hidden [let] @$s4test15global__none2__AA5Empty_AA7NothingpRi_s_Ri0_sXPvp : $any Empty & Nothing & ~Copyable & ~Escapable
 let global__none2__: any Nothing & ~Copyable & Empty & ~Escapable = S()
 
 // DEMANGLED: test.global__any1__ : Any
@@ -61,15 +61,15 @@ let global__any3__: Any = S()
 let global__any4__: any Copyable & Escapable = S()
 
 // DEMANGLED: test.global__inv1__ : any Any<Self: ~Swift.Copyable>
-// CHECK: sil_global hidden [let] @$s4test14global__inv1__ypRics_XPvp : $any ~Copyable
+// CHECK: sil_global hidden [let] @$s4test14global__inv1__ypRi_s_XPvp : $any ~Copyable
 let global__inv1__: any ~Copyable = S()
 
 // DEMANGLED: test.global__inv2__ : any Any<Self: ~Swift.Escapable>
-// CHECK: sil_global hidden [let] @$s4test14global__inv2__ypRies_XPvp : $any ~Escapable
+// CHECK: sil_global hidden [let] @$s4test14global__inv2__ypRi0_s_XPvp : $any ~Escapable
 let global__inv2__: any ~Escapable = S()
 
 // DEMANGLED: test.global__inv3__ : any Any<Self: ~Swift.Copyable, Self: ~Swift.Escapable>
-// CHECK: sil_global hidden [let] @$s4test14global__inv3__ypRics_RiesXPvp : $any ~Copyable & ~Escapable
+// CHECK: sil_global hidden [let] @$s4test14global__inv3__ypRi_s_Ri0_sXPvp : $any ~Copyable & ~Escapable
 let global__inv3__: any ~Escapable & ~Copyable = S()
 
 // DEMANGLED: test.global__anyObj1__ : Swift.AnyObject
@@ -86,14 +86,14 @@ let global__anyObj2__: any AnyObject = ClassDef()
 // CHECK: sil hidden [global_init] [ossa] @$s4test13global__old__AA7MyProto_pvau : $@convention(thin) () -> Builtin.RawPointer {
 
 // CHECK: sil private [global_init_once_fn] [ossa] @$s4test13global__new___WZ : $@convention(c) (Builtin.RawPointer) -> () {
-// CHECK: sil hidden [global_init] [ossa] @$s4test13global__new__AA7MyProto_pRics_XPvau : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK: sil hidden [global_init] [ossa] @$s4test13global__new__AA7MyProto_pRi_s_XPvau : $@convention(thin) () -> Builtin.RawPointer {
 
 
 // DEMANGLED: test.global__computed__.getter : any Any<Self: ~Swift.Copyable>
-// CHECK: sil hidden [ossa] @$s4test18global__computed__ypRics_XPvg : $@convention(thin) () -> @out any ~Copyable {
+// CHECK: sil hidden [ossa] @$s4test18global__computed__ypRi_s_XPvg : $@convention(thin) () -> @out any ~Copyable {
 
 // DEMANGLED: test.global__computed__.setter : any Any<Self: ~Swift.Copyable>
-// CHECK: sil hidden [ossa] @$s4test18global__computed__ypRics_XPvs : $@convention(thin) (@in any ~Copyable) -> () {
+// CHECK: sil hidden [ossa] @$s4test18global__computed__ypRi_s_XPvs : $@convention(thin) (@in any ~Copyable) -> () {
 var global__computed__: any ~Copyable {
   get { S() }
   set {}
@@ -106,7 +106,7 @@ public struct A<T: ~Copyable>: ~Copyable {
   // in a constrained extension.
 
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.foo() -> ()
-  // CHECK: sil [ossa] @$s4test1AVAARiczrlE3fooyyF : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> () {
+  // CHECK: sil [ossa] @$s4test1AVAARi_zrlE3fooyyF : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> () {
   public func foo() {}
 
   // DEMANGLED: test.A.weird() -> ()
@@ -114,36 +114,36 @@ public struct A<T: ~Copyable>: ~Copyable {
   public func weird() where T: Copyable {}
 
   // DEMANGLED: variable initialization expression of (extension in test):test.A< where A: ~Swift.Copyable>.property : Swift.Int
-  // CHECK: sil [transparent] [ossa] @$s4test1AVAARiczrlE8propertySivpfi : $@convention(thin) <T where T : ~Copyable> () -> Int {
+  // CHECK: sil [transparent] [ossa] @$s4test1AVAARi_zrlE8propertySivpfi : $@convention(thin) <T where T : ~Copyable> () -> Int {
 
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.property.getter : Swift.Int
-  // CHECK: sil [transparent] [serialized] [ossa] @$s4test1AVAARiczrlE8propertySivg : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> Int {
+  // CHECK: sil [transparent] [serialized] [ossa] @$s4test1AVAARi_zrlE8propertySivg : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> Int {
 
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.property.setter : Swift.Int
-  // CHECK: sil [transparent] [serialized] [ossa] @$s4test1AVAARiczrlE8propertySivs : $@convention(method) <T where T : ~Copyable> (Int, @inout A<T>) -> () {
+  // CHECK: sil [transparent] [serialized] [ossa] @$s4test1AVAARi_zrlE8propertySivs : $@convention(method) <T where T : ~Copyable> (Int, @inout A<T>) -> () {
 
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.property.modify : Swift.Int
-  // CHECK: sil [transparent] [serialized] [ossa] @$s4test1AVAARiczrlE8propertySivM : $@yield_once @convention(method) <T where T : ~Copyable> (@inout A<T>) -> @yields @inout Int {
+  // CHECK: sil [transparent] [serialized] [ossa] @$s4test1AVAARi_zrlE8propertySivM : $@yield_once @convention(method) <T where T : ~Copyable> (@inout A<T>) -> @yields @inout Int {
   public var property: Int = 0
 
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.computed.getter : Swift.String
-  // CHECK: sil [ossa] @$s4test1AVAARiczrlE8computedSSvg : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> @owned String {
+  // CHECK: sil [ossa] @$s4test1AVAARi_zrlE8computedSSvg : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> @owned String {
   public var computed: String {
     ""
   }
 
   // DEMANGLED: static (extension in test):test.A< where A: ~Swift.Copyable>.forceInits() -> test.A<A>
-  // CHECK: sil hidden [ossa] @$s4test1AVAARiczrlE10forceInitsACyxGyFZ : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
+  // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlE10forceInitsACyxGyFZ : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
   static func forceInits() -> Self {
     _ = Self(property: 100)
     return Self()
   }
 
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.init(property: Swift.Int) -> test.A<A>
-  // CHECK: sil hidden [ossa] @$s4test1AVAARiczrlE8propertyACyxGSi_tcfC : $@convention(method) <T where T : ~Copyable> (Int, @thin A<T>.Type) -> @owned A<T> {
+  // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlE8propertyACyxGSi_tcfC : $@convention(method) <T where T : ~Copyable> (Int, @thin A<T>.Type) -> @owned A<T> {
 
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.init() -> test.A<A>
-  // CHECK: sil hidden [ossa] @$s4test1AVAARiczrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
+  // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
 }
 
 extension A: Copyable {}
@@ -151,7 +151,7 @@ extension A: Copyable {}
 // <T: ~Copyable>
 extension A where T: ~Copyable {
   // DEMANGLED: (extension in test):test.A< where A: ~Swift.Copyable>.bar() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AVAARiczrlE3baryyF : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlE3baryyF : $@convention(method) <T where T : ~Copyable> (@guaranteed A<T>) -> () {
   func bar() {}
 
   // DEMANGLED: test.A.weird2() -> ()
@@ -162,7 +162,7 @@ extension A where T: ~Copyable {
 // <T: ~Copyable & NoncopyableProto>
 extension A where T: ~Copyable & NoncopyableProto {
   // DEMANGLED: (extension in test):test.A< where A: test.NoncopyableProto, A: ~Swift.Copyable>.dumb() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AVA2A16NoncopyableProtoRzRiczrlE4dumbyyF : $@convention(method) <T where T : NoncopyableProto, T : ~Copyable> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AVA2A16NoncopyableProtoRzRi_zrlE4dumbyyF : $@convention(method) <T where T : NoncopyableProto, T : ~Copyable> (@guaranteed A<T>) -> () {
   func dumb() {}
 }
 
@@ -220,7 +220,7 @@ struct C<T> {
   func foo() {}
 
   // DEMANGLED: test.C.something<A where A1: ~Swift.Copyable>() -> A1
-  // CHECK: sil hidden [ossa] @$s4test1CV9somethingqd__yRicd__lF : $@convention(method) <T><U where U : ~Copyable> (C<T>) -> @out U {
+  // CHECK: sil hidden [ossa] @$s4test1CV9somethingqd__yRi_d__lF : $@convention(method) <T><U where U : ~Copyable> (C<T>) -> @out U {
   func something<U: ~Copyable>() -> U {
     fatalError()
   }
@@ -282,7 +282,7 @@ public struct E<T: ~Copyable>: ~Copyable {
   public func __existential1__(_ t: consuming any ~Copyable) {}
 
   // DEMANGLE: (extension in test):test.E< where A: ~Swift.Copyable>.__existential2__(__owned any Any<Self: ~Swift.Copyable>) -> ()
-  // CHECK: sil [ossa] @$s4test1EVAARiczrlE16__existential2__yyypRics_XPnF : $@convention(method) <T where T : ~Copyable> (@in any ~Copyable, @guaranteed E<T>) -> () {
+  // CHECK: sil [ossa] @$s4test1EVAARi_zrlE16__existential2__yyypRi_s_XPnF : $@convention(method) <T where T : ~Copyable> (@in any ~Copyable, @guaranteed E<T>) -> () {
   public func __existential2__(_ t: consuming any ~Copyable) {}
 
   // DEMANGLED: test.E.something<A>() -> A1
@@ -293,7 +293,7 @@ public struct E<T: ~Copyable>: ~Copyable {
   }
 
   // DEMANGLED: (extension in test):test.E< where A: ~Swift.Copyable>.something<A>() -> A1
-  // CHECK: sil [ossa] @$s4test1EVAARiczrlE9somethingqd__ylF : $@convention(method) <T><U> (@guaranteed E<T>) -> @out U {
+  // CHECK: sil [ossa] @$s4test1EVAARi_zrlE9somethingqd__ylF : $@convention(method) <T><U> (@guaranteed E<T>) -> @out U {
   public func something<U>() -> U {
     fatalError()
   }
@@ -315,10 +315,10 @@ public struct E<T: ~Copyable>: ~Copyable {
   // NOTE: the implicit initializers still have inverses!
 
   // DEMANGLED: (extension in test):test.E< where A: ~Swift.Copyable>.init() -> test.E<A>
-  // CHECK: sil hidden [ossa] @$s4test1EVAARiczrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin E<T>.Type) -> @owned E<T> {
+  // CHECK: sil hidden [ossa] @$s4test1EVAARi_zrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin E<T>.Type) -> @owned E<T> {
 
   // DEMANGLED: (extension in test):test.E< where A: ~Swift.Copyable>.init(property: Swift.Int) -> test.E<A>
-  // CHECK: sil hidden [ossa] @$s4test1EVAARiczrlE8propertyACyxGSi_tcfC : $@convention(method) <T where T : ~Copyable> (Int, @thin E<T>.Type) -> @owned E<T> {
+  // CHECK: sil hidden [ossa] @$s4test1EVAARi_zrlE8propertyACyxGSi_tcfC : $@convention(method) <T where T : ~Copyable> (Int, @thin E<T>.Type) -> @owned E<T> {
 }
 
 func forceInit() {

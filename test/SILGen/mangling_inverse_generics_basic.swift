@@ -9,13 +9,13 @@
 
 struct Basic<T: ~Copyable> {
     // DEMANGLED: (extension in test):test.Basic< where A: ~Swift.Copyable>.cali2() -> ()
-    // CHECK: $s4test5BasicVAARiczrlE5cali2yyF
+    // CHECK: $s4test5BasicVAARi_zrlE5cali2yyF
     func cali2() {}
 }
 
 extension Basic where T: ~Copyable {
   // DEMANGLED: (extension in test):test.Basic< where A: ~Swift.Copyable>.cali1() -> ()
-  // CHECK: $s4test5BasicVAARiczrlE5cali1yyF
+  // CHECK: $s4test5BasicVAARi_zrlE5cali1yyF
   func cali1() {}
 }
 
@@ -45,7 +45,7 @@ extension _G_ {
       func foo() where T: Copyable {}
 
       // DEMANGLED: test._G_._H_._I_.foo< where A: ~Swift.Copyable>() -> ()
-      // CHECK: $s4test3_G_V3_H_V3_I_V3fooyyRiczrlF
+      // CHECK: $s4test3_G_V3_H_V3_I_V3fooyyRi_zrlF
       func foo() {}
     }
   }
@@ -62,15 +62,15 @@ struct Gloop<T: ~Copyable> {}
 extension Gloop where T: ~Copyable {
   struct Crash<B: ~Escapable> {
     // DEMANGLED: (extension in test):test.Gloop< where A: ~Swift.Copyable>.Crash.foo< where A1: ~Swift.Escapable>() -> ()
-    // CHECK: $s4test5GloopVAARiczrlE5CrashV3fooyyRied__rlF
+    // CHECK: $s4test5GloopVAARi_zrlE5CrashV3fooyyRi0_d__rlF
     func foo() {}
 
     // DEMANGLED: test.Gloop.Crash.foo< where A1: ~Swift.Escapable>() -> ()
-    // CHECK: $s4test5GloopV5CrashV3fooyyRied__rlF
+    // CHECK: $s4test5GloopV5CrashV3fooyyRi0_d__rlF
     func foo() where T: Copyable {}
 
     // DEMANGLED: (extension in test):test.Gloop< where A: ~Swift.Copyable>.Crash.foo() -> ()
-    // CHECK: $s4test5GloopVAARiczrlE5CrashV3fooyyF
+    // CHECK: $s4test5GloopVAARi_zrlE5CrashV3fooyyF
     func foo() where B: Escapable {}
 
     // DEMANGLED: test.Gloop.Crash.foo() -> ()
@@ -87,22 +87,22 @@ struct X<A: ~Copyable> {
     func g() where A: Copyable, B: Copyable {}
 
     // DEMANGLED: (extension in test):test.X.Y< where A1: ~Swift.Copyable>.g() -> ()
-    // CHECK: $s4test1XV1YVAARicd__rlE1gyyF
+    // CHECK: $s4test1XV1YVAARi_d__rlE1gyyF
     func g() where A: Copyable {}
 
     // DEMANGLED: (extension in test):test.X.Y< where A: ~Swift.Copyable>.g() -> ()
-    // CHECK: $s4test1XV1YVAARiczrlE1gyyF
+    // CHECK: $s4test1XV1YVAARi_zrlE1gyyF
     func g() where B: Copyable {}
 
     // DEMANGLED: (extension in test):test.X.Y< where A: ~Swift.Copyable, A1: ~Swift.Copyable>.g() -> ()
-    // CHECK: $s4test1XV1YVAARiczRicd__rlE1gyyF
+    // CHECK: $s4test1XV1YVAARi_zRi_d__rlE1gyyF
     func g() {}
   }
 }
 
 struct OverloadComputed<T: ~Copyable> {
   // DEMANGLED: extension in test):test.OverloadComputed< where A: ~Swift.Copyable>.obtain() -> A
-  // CHECK: $s4test16OverloadComputedVAARiczrlE6obtainxyF
+  // CHECK: $s4test16OverloadComputedVAARi_zrlE6obtainxyF
   func obtain() -> T { fatalError() }
 }
 extension OverloadComputed {
@@ -112,6 +112,6 @@ extension OverloadComputed {
 }
 extension OverloadComputed where T: ~Copyable {
   // DEMANGLED: (extension in test):test.OverloadComputed< where A: ~Swift.Copyable>.prop.getter : A
-  // CHECK: $s4test16OverloadComputedVAARiczrlE4propxvg
+  // CHECK: $s4test16OverloadComputedVAARi_zrlE4propxvg
   var prop: T { return obtain() }
 }

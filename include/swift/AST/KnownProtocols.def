@@ -136,7 +136,7 @@ PROTOCOL(AsyncIteratorProtocol)
 
 PROTOCOL(FloatingPoint)
 
-#define SUPPRESSIBLE_PROTOCOL(Name, Bit, MangleChar) \
+#define SUPPRESSIBLE_PROTOCOL(Name, Bit) \
     INVERTIBLE_PROTOCOL_WITH_NAME(Name, #Name)
 #include "swift/ABI/SuppressibleProtocols.def"
 
