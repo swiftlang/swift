@@ -23,8 +23,6 @@ public struct Cell<T: ~Copyable>: ~Copyable {
   // CHECK-NEXT:    [[POINTER:%.*]] = struct $UnsafeMutablePointer<T> ([[RAW_LAYOUT_ADDR]] : $Builtin.RawPointer)
   //                Calling 'UnsafeMutablePointer<T>.initialize(to:)'
   // CHECK:         {{%.*}} = apply {{%.*}}<T>([[VALUE]], [[POINTER]])
-  // CHECK-NEXT:    [[TUPLE:%.*]] = tuple ()
-  // CHECK-NEXT:    return [[TUPLE]] : $()
   // CHECK-LABEL: } // end sil function '$s4CellAAVAARiczrlEyAByxGxcfC'
   @_transparent
   public init(_ value: consuming T) {
