@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s \
-// RUN: -emit-sil  \
+// RUN: -emit-sil  -disable-availability-checking \
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
 // REQUIRES: asserts
@@ -82,13 +82,13 @@ struct Wrapper : ~Escapable {
     self._view = view
   }
 // TODO: Investigate why it was mangled as Yli and not YLi before
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyYLiF : $@convention(method) (@guaranteed Wrapper) -> _inherit(0) @owned BufferView {
-  borrowing func getView1() -> BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyKYLiF : $@convention(method) (@guaranteed Wrapper) -> _inherit(0)  (@owned BufferView, @error any Error) {
+  borrowing func getView1() throws -> BufferView {
     return _view
   }
 
-// CHECK:sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyYLiF : $@convention(method) (@owned Wrapper) -> _inherit(0) @owned BufferView {
-  consuming func getView2() -> BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyYaKYLiF : $@convention(method) @async (@owned Wrapper) -> _inherit(0)  (@owned BufferView, @error any Error) {
+  consuming func getView2() async throws -> BufferView {
     return _view
   }
 }
