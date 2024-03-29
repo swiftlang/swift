@@ -1478,7 +1478,8 @@ static bool diagnoseCycle(const CompilerInstance &instance,
 
   auto kindIsSwiftDependency = [&](const ModuleDependencyID &ID) {
     return ID.Kind == swift::ModuleDependencyKind::SwiftInterface ||
-           ID.Kind == swift::ModuleDependencyKind::SwiftBinary;
+           ID.Kind == swift::ModuleDependencyKind::SwiftBinary ||
+           ID.Kind == swift::ModuleDependencyKind::SwiftSource;
   };
 
   auto emitModulePath = [&](const std::vector<ModuleDependencyID> path,
