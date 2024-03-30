@@ -208,6 +208,10 @@ public:
     return SILIsolationInfo();
   }
 
+  static SILIsolationInfo getGlobalActorIsolated(Type globalActorType) {
+    return getActorIsolated(ActorIsolation::forGlobalActor(globalActorType));
+  }
+
   static SILIsolationInfo getTaskIsolated(SILValue value) {
     return {Kind::Task, value};
   }
@@ -901,8 +905,8 @@ private:
       // our transferring operand. If so, we can squelch this.
       if (auto functionIsolation =
               transferringOp->getUser()->getFunction()->getActorIsolation()) {
-        if (functionIsolation->isActorIsolated() &&
-            SILIsolationInfo::getActorIsolated(*functionIsolation) ==
+        if (functionIsolation.isActorIsolated() &&
+            SILIsolationInfo::getActorIsolated(functionIsolation) ==
                 SILIsolationInfo::get(transferringOp->getUser()))
           return;
       }
