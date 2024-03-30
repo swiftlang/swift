@@ -29,6 +29,14 @@ struct AddressWalkerState {
 static SILValue
 findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
                                        AddressWalkerState &state) {
+  // These are instructions which we are ok with looking through when
+  // identifying our allocation. It must always refer to the entire allocation.
+  auto isAlloc = [&](SILValue value) -> bool {
+    if (auto *ieai = dyn_cast<InitExistentialAddrInst>(value))
+      value = ieai->getOperand();
+    return value == SILValue(allocInst);
+  };
+
   // Walk from our allocation to one of our writes. Then make sure that the
   // write writes to our entire value.
   for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
@@ -38,21 +46,21 @@ findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
       continue;
 
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
-      if (copyAddr->getDest() == allocInst &&
+      if (isAlloc(copyAddr->getDest()) &&
           copyAddr->isInitializationOfDest()) {
         return copyAddr->getSrc();
       }
     }
 
     if (auto *si = dyn_cast<StoreInst>(&inst)) {
-      if (si->getDest() == allocInst &&
+      if (isAlloc(si->getDest()) &&
           si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
         return si->getSrc();
       }
     }
 
     if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst)) {
-      if (sbi->getDest() == allocInst)
+      if (isAlloc(sbi->getDest()))
         return sbi->getSrc();
     }
 
