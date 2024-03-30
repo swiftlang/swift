@@ -734,3 +734,41 @@ bb0:
   %54 = tuple ()
   return %54 : $()
 }
+
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_addr_temporary: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %2 = alloc_stack $Any
+// CHECK: Name: 'my arg'
+// CHECK: Root: %0 = argument of bb0
+// CHECK: end running test 1 of 1 on init_existential_addr_temporary: variable-name-inference with: @trace[0]
+sil [ossa] @init_existential_addr_temporary : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $Klass, var, name "my arg"
+  %1 = alloc_stack $Any
+  %2 = init_existential_addr %1 : $*Any, $Klass
+  store %0 to [init] %2 : $*Klass
+  debug_value [trace] %1 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %1 : $*Any
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_addr_temporary_copy_addr: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %2 = alloc_stack $Any
+// CHECK: Name: 'my arg'
+// CHECK: Root: %0 = argument of bb0
+// CHECK: end running test 1 of 1 on init_existential_addr_temporary_copy_addr: variable-name-inference with: @trace[0]
+sil [ossa] @init_existential_addr_temporary_copy_addr : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  specify_test "variable-name-inference @trace[0]"
+  debug_value %0 : $*Klass, var, name "my arg"
+  %1 = alloc_stack $Any
+  %2 = init_existential_addr %1 : $*Any, $Klass
+  copy_addr [take] %0 to [init] %2 : $*Klass
+  debug_value [trace] %1 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %1 : $*Any
+  %9999 = tuple ()
+  return %9999 : $()
+}
