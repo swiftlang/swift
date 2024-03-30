@@ -249,7 +249,10 @@ public:
   /// Push a node that signals the end of a new sequence of history nodes that
   /// should execute together. Must be explicitly ended by a push sequence
   /// end. Is non-rentrant, so one cannot have multiple sequence starts.
-  Node *pushHistorySequenceBoundary();
+  ///
+  /// \p loc the SILLocation that identifies the instruction that the "package"
+  /// of history nodes that this sequence boundary ends is associated with.
+  Node *pushHistorySequenceBoundary(SILLocation loc);
 
   /// Push onto the history list that \p value should be added into its own
   /// independent region.
@@ -325,9 +328,12 @@ private:
   /// Child node. Never set on construction.
   Node *child = nullptr;
 
-  // Either the element that we are adding/removing/modifying or the Node that
-  // we are merging into.
-  std::variant<Element, Node *> subject;
+  /// Contains:
+  ///
+  /// 1. Node * if we have a CFGHistoryJoin.
+  /// 2. A SILLocation if we have a SequenceBoundary.
+  /// 3. An element otherwise.
+  std::variant<Element, Node *, SILLocation> subject;
 
   /// Number of additional element arguments stored in the tail allocated array.
   unsigned numAdditionalElements;
@@ -339,6 +345,8 @@ private:
 
   Node(Kind kind, Node *parent)
       : kind(kind), parent(parent), subject(nullptr) {}
+  Node(Kind kind, Node *parent, SILLocation loc)
+      : kind(kind), parent(parent), subject(loc) {}
   Node(Kind kind, Node *parent, Element value)
       : kind(kind), parent(parent), subject(value), numAdditionalElements(0) {}
   Node(Kind kind, Node *parent, Element primaryElement,
@@ -404,6 +412,12 @@ public:
     if (kind != CFGHistoryJoin)
       return nullptr;
     return getFirstArgAsNode();
+  }
+
+  std::optional<SILLocation> getHistoryBoundaryLoc() const {
+    if (kind != SequenceBoundary)
+      return {};
+    return std::get<SILLocation>(subject);
   }
 };
 
@@ -671,12 +685,12 @@ public:
 
   /// Return a new Partition that has a single region containing the elements of
   /// \p indices.
-  static Partition singleRegion(ArrayRef<Element> indices,
+  static Partition singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                 IsolationHistory inputHistory);
 
   /// Return a new Partition that has each element of \p indices in their own
   /// region.
-  static Partition separateRegions(ArrayRef<Element> indices,
+  static Partition separateRegions(SILLocation loc, ArrayRef<Element> indices,
                                    IsolationHistory inputHistory);
 
   /// Test two partititons for equality by first putting them in canonical form
@@ -829,8 +843,8 @@ public:
   void printHistory(llvm::raw_ostream &os) const;
 
   /// See docs on \p history.pushHistorySequenceBoundary().
-  IsolationHistoryNode *pushHistorySequenceBoundary() {
-    return history.pushHistorySequenceBoundary();
+  IsolationHistoryNode *pushHistorySequenceBoundary(SILLocation loc) {
+    return history.pushHistorySequenceBoundary(loc);
   }
 
   bool isTransferred(Element val) const {
@@ -1043,6 +1057,11 @@ public:
     return asImpl().isClosureCaptured(elt, op);
   }
 
+  /// Some evaluators pass in mock instructions that one cannot call getLoc()
+  /// upon. So to allow for this, provide a routine that our impl can override
+  /// if they need to.
+  static SILLocation getLoc(SILInstruction *inst) { return Impl::getLoc(inst); }
+
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) const {
     if (shouldEmitVerboseLogging()) {
@@ -1061,7 +1080,7 @@ public:
 
     // Set the boundary so that as we push, this shows when to stop processing
     // for this PartitionOp.
-    p.pushHistorySequenceBoundary();
+    p.pushHistorySequenceBoundary(getLoc(op.getSourceInst()));
 
     switch (op.getKind()) {
     case PartitionOpKind::Assign:
@@ -1299,6 +1318,8 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   /// By default squelch errors.
   bool shouldTryToSquelchErrors() const { return true; }
+
+  static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
 };
 
 /// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special

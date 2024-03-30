@@ -49,6 +49,44 @@ struct MockedPartitionOpEvaluator final
   }
 
   bool shouldTryToSquelchErrors() const { return false; }
+
+  static SILLocation getLoc(SILInstruction *inst) {
+    return SILLocation::invalid();
+  }
+};
+
+} // namespace
+
+namespace {
+
+struct MockedPartitionOpEvaluatorWithFailureCallback final
+    : PartitionOpEvaluatorBaseImpl<
+          MockedPartitionOpEvaluatorWithFailureCallback> {
+  using FailureCallbackTy =
+      std::function<void(const PartitionOp &, unsigned, TransferringOperand *)>;
+  FailureCallbackTy failureCallback;
+
+  MockedPartitionOpEvaluatorWithFailureCallback(
+      Partition &workingPartition, TransferringOperandSetFactory &ptrSetFactory,
+      FailureCallbackTy failureCallback)
+      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
+        failureCallback(failureCallback) {}
+
+  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
+                                   TransferringOperand *transferringOp) const {
+    failureCallback(op, elt, transferringOp);
+  }
+
+  // Just say that we always have a disconnected value.
+  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
+    return SILIsolationInfo::getDisconnected();
+  }
+
+  bool shouldTryToSquelchErrors() const { return false; }
+
+  static SILLocation getLoc(SILInstruction *inst) {
+    return SILLocation::invalid();
+  }
 };
 
 } // namespace
@@ -70,6 +108,8 @@ SILInstruction *instSingletons[5] = {
     (SILInstruction *)0xBEDF0000, (SILInstruction *)0xBEDA0000,
     (SILInstruction *)0xBBDA0000,
 };
+
+SILLocation fakeLoc = SILLocation::invalid();
 
 // This test tests that if a series of merges is split between two partitions
 // p1 and p2, but also applied in its entirety to p3, then joining p1 and p2
@@ -198,8 +238,8 @@ TEST(PartitionUtilsTest, Join1) {
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 =
-      Partition::separateRegions(llvm::ArrayRef(data1), historyFactory.get());
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
 
   {
     MockedPartitionOpEvaluator eval(p1, factory);
@@ -211,8 +251,8 @@ TEST(PartitionUtilsTest, Join1) {
                 PartitionOp::Assign(Element(5), Element(2))});
   }
 
-  Partition p2 =
-      Partition::separateRegions(llvm::ArrayRef(data1), historyFactory.get());
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
@@ -240,8 +280,8 @@ TEST(PartitionUtilsTest, Join2) {
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 =
-      Partition::separateRegions(llvm::ArrayRef(data1), historyFactory.get());
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
 
   {
     MockedPartitionOpEvaluator eval(p1, factory);
@@ -255,8 +295,8 @@ TEST(PartitionUtilsTest, Join2) {
 
   Element data2[] = {Element(4), Element(5), Element(6),
                      Element(7), Element(8), Element(9)};
-  Partition p2 =
-      Partition::separateRegions(llvm::ArrayRef(data2), historyFactory.get());
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data2),
+                                            historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
@@ -288,8 +328,8 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 =
-      Partition::separateRegions(llvm::ArrayRef(data1), historyFactory.get());
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
 
   {
     MockedPartitionOpEvaluator eval(p1, factory);
@@ -303,8 +343,8 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 
   Element data2[] = {Element(4), Element(5), Element(6),
                      Element(7), Element(8), Element(9)};
-  Partition p2 =
-      Partition::separateRegions(llvm::ArrayRef(data2), historyFactory.get());
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data2),
+                                            historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
@@ -341,8 +381,8 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(15), Element(16), Element(17), Element(18), Element(19),
       Element(20), Element(21), Element(22), Element(23), Element(24),
       Element(25), Element(26), Element(27), Element(28), Element(29)};
-  Partition p1 =
-      Partition::separateRegions(llvm::ArrayRef(data1), historyFactory.get());
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p1, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(29)),
@@ -384,8 +424,8 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(30), Element(31), Element(32), Element(33), Element(34),
       Element(35), Element(36), Element(37), Element(38), Element(39),
       Element(40), Element(41), Element(42), Element(43), Element(44)};
-  Partition p2 =
-      Partition::separateRegions(llvm::ArrayRef(data2), historyFactory.get());
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data2),
+                                            historyFactory.get());
   {
     MockedPartitionOpEvaluator eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(15), Element(31)),
@@ -557,36 +597,6 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_TRUE(Partition::equals(p2, p3));
   EXPECT_TRUE(Partition::equals(p1, p3));
 }
-
-namespace {
-
-struct MockedPartitionOpEvaluatorWithFailureCallback final
-    : PartitionOpEvaluatorBaseImpl<
-          MockedPartitionOpEvaluatorWithFailureCallback> {
-  using FailureCallbackTy =
-      std::function<void(const PartitionOp &, unsigned, TransferringOperand *)>;
-  FailureCallbackTy failureCallback;
-
-  MockedPartitionOpEvaluatorWithFailureCallback(
-      Partition &workingPartition, TransferringOperandSetFactory &ptrSetFactory,
-      FailureCallbackTy failureCallback)
-      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
-        failureCallback(failureCallback) {}
-
-  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   TransferringOperand *transferringOp) const {
-    failureCallback(op, elt, transferringOp);
-  }
-
-  // Just say that we always have a disconnected value.
-  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
-    return SILIsolationInfo::getDisconnected();
-  }
-
-  bool shouldTryToSquelchErrors() const { return false; }
-};
-
-} // namespace
 
 // This test tests that consumption consumes entire regions as expected
 TEST(PartitionUtilsTest, TestConsumeAndRequire) {
