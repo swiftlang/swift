@@ -3,6 +3,9 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 protocol P {
   func speak()
 }
