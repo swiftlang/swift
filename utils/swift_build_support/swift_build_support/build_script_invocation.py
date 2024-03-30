@@ -695,6 +695,8 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmThreadsStdlib,
                             is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmSwiftSDK,
+                            is_enabled=self.args.build_wasmstdlib)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully

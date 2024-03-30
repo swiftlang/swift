@@ -83,6 +83,8 @@
             "remote": { "id": "apple/swift-nio-ssl" } },
         "swift-experimental-string-processing": {
             "remote": { "id": "apple/swift-experimental-string-processing" } },
+        "swift-sdk-generator": {
+            "remote": { "id": "apple/swift-sdk-generator" } },
         "swift-llvm-bindings": {
             "remote": { "id": "apple/swift-llvm-bindings" } },
         "llvm-project": {
@@ -149,6 +151,7 @@
                 "swift-markdown": "main",
                 "swift-nio": "2.31.2",
                 "swift-experimental-string-processing": "swift/main",
+                "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
                 "curl": "curl-8_5_0",
