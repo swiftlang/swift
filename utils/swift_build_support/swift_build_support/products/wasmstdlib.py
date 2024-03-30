@@ -50,9 +50,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
         # object files.
         self.cmake_options.define('CMAKE_AR:STRING', os.path.join(
             toolchain_path, 'bin', 'llvm-ar'))
-        # llvm-ranlib is not installed in the final toolchain, so use one in build dir
         self.cmake_options.define('CMAKE_RANLIB:STRING', os.path.join(
-            self._host_swift_build_dir(host_target), 'bin', 'llvm-ranlib'))
+            toolchain_path, 'bin', 'llvm-ranlib'))
         self.cmake_options.define(
             'SWIFT_NATIVE_CLANG_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
         self.cmake_options.define(
