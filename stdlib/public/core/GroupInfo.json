@@ -173,6 +173,7 @@
       "Integers.swift",
       "IntegerTypes.swift",
       "IntegerParsing.swift",
+      "LegacyInt128.swift",
       "StaticBigInt.swift",
       "UInt128.swift"],
     "Floating": [

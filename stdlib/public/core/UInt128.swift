@@ -28,21 +28,21 @@ public struct UInt128: Sendable {
   }
   
   @usableFromInline @_transparent
-  internal var low: UInt64 {
+  internal var _low: UInt64 {
     UInt64(truncatingIfNeeded: self)
   }
   
   @usableFromInline @_transparent
-  internal var high: UInt64 {
+  internal var _high: UInt64 {
     UInt64(truncatingIfNeeded: self &>> 64)
   }
   
   @usableFromInline @_transparent
-  internal init(low: UInt64, high: UInt64) {
+  internal init(_low: UInt64, _high: UInt64) {
 #if _endian(little)
-    self = unsafeBitCast((low, high), to: Self.self)
+    self = unsafeBitCast((_low, _high), to: Self.self)
 #else
-    self = unsafeBitCast((high, low), to: Self.self)
+    self = unsafeBitCast((_high, _low), to: Self.self)
 #endif
   }
   
@@ -53,17 +53,17 @@ public struct UInt128: Sendable {
   //  out the type as two `UInt64` fields--note that we have to be careful
   //  about endianness in this case.
 #if _endian(little)
-  @usableFromInline internal var low: UInt64
-  @usableFromInline internal var high: UInt64
+  @usableFromInline internal var _low: UInt64
+  @usableFromInline internal var _high: UInt64
 #else
-  @usableFromInline internal var high: UInt64
-  @usableFromInline internal var low: UInt64
+  @usableFromInline internal var _high: UInt64
+  @usableFromInline internal var _low: UInt64
 #endif
   
   @usableFromInline @_transparent
-  internal init(low: UInt64, high: UInt64) {
-    self.low = low
-    self.high = high
+  internal init(_low: UInt64, _high: UInt64) {
+    self._low = _low
+    self._high = _high
   }
   
   public var _value: Builtin.Int128 {
@@ -96,7 +96,7 @@ extension UInt128 {
   
   @inlinable
   public static var max: Self {
-    Self(low: .max, high: .max)
+    Self(_low: .max, _high: .max)
   }
 }
 
@@ -116,7 +116,7 @@ extension UInt128: ExpressibleByIntegerLiteral,
   public init?<T>(exactly source: T) where T: BinaryInteger {
     guard let high = UInt64(exactly: source >> 64) else { return nil }
     let low = UInt64(truncatingIfNeeded: source)
-    self.init(low: low, high: high)
+    self.init(_low: low, _high: high)
   }
   
   @inlinable
@@ -140,12 +140,12 @@ extension UInt128: ExpressibleByIntegerLiteral,
   public init<T>(truncatingIfNeeded source: T) where T: BinaryInteger {
     let high = UInt64(truncatingIfNeeded: source >> 64)
     let low = UInt64(truncatingIfNeeded: source)
-    self.init(low: low, high: high)
+    self.init(_low: low, _high: high)
   }
   
   @inlinable
   public init(_truncatingBits source: UInt) {
-    self.init(low: UInt64(source), high: .zero)
+    self.init(_low: UInt64(source), _high: .zero)
   }
 }
 
@@ -159,7 +159,7 @@ extension UInt128 {
     guard let low = UInt64(
       exactly: high == 0 ? source : source - 0x1.0p64*highAsFloat
     ) else { return nil }
-    self.init(low: low, high: high)
+    self.init(_low: low, _high: high)
   }
   
   @inlinable
@@ -192,8 +192,8 @@ extension UInt128: Comparable {
 extension UInt128: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(low)
-    hasher.combine(high)
+    hasher.combine(_low)
+    hasher.combine(_high)
   }
 }
 
@@ -353,7 +353,7 @@ extension UInt128: BinaryInteger {
   
   @inlinable
   public var trailingZeroBitCount: Int {
-    low == 0 ? 64 + high.trailingZeroBitCount : low.trailingZeroBitCount
+    _low == 0 ? 64 + _high.trailingZeroBitCount : _low.trailingZeroBitCount
   }
 }
 
@@ -397,17 +397,17 @@ extension UInt128: FixedWidthInteger, UnsignedInteger {
   
   @inlinable
   public var nonzeroBitCount: Int {
-    high.nonzeroBitCount &+ low.nonzeroBitCount
+    _high.nonzeroBitCount &+ _low.nonzeroBitCount
   }
   
   @inlinable
   public var leadingZeroBitCount: Int {
-    high == 0 ? 64 + low.leadingZeroBitCount : high.leadingZeroBitCount
+    _high == 0 ? 64 + _low.leadingZeroBitCount : _high.leadingZeroBitCount
   }
   
   @inlinable
   public var byteSwapped: Self {
-    return Self(low: high.byteSwapped, high: low.byteSwapped)
+    return Self(_low: _high.byteSwapped, _high: _low.byteSwapped)
   }
 }
 
