@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h  -cxx-interoperability-mode=upcoming-swift
 // RUN: %FileCheck %s < %t/functions.h
+
+import CxxStdlib
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
@@ -44,7 +46,11 @@ public func passTwoIntReturnIntNoArgLabelParamName(_ x2: CInt, _ y2: CInt) -> CI
 // CHECK:   return _impl::$s9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF(x2, y2);
 // CHECK: }
 
-public func passVoidReturnNever() -> Never { fatalError("passVoidReturnNever") }
+public func passVoidReturnNever() -> Never {
+  print("passVoidReturnNever")
+  fflush(nil) // before exit() call
+  exit(0)
+}
 
 // CHECK-LABEL: SWIFT_INLINE_THUNK void passVoidReturnNever() noexcept SWIFT_SYMBOL("s:9Functions19passVoidReturnNevers0E0OyF") SWIFT_NORETURN {
 // CHECK-NOT: return
