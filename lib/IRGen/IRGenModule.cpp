@@ -1973,7 +1973,7 @@ bool IRGenModule::finalize() {
   if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
     // We're asked to emit an empty IR module, check that that's actually true
     if (Module.global_size() != 0 || Module.size() != 0) {
-      Module.dump();
+      llvm::errs() << Module;
       llvm::report_fatal_error("Module is not empty");
     }
   }
