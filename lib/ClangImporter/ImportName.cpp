@@ -548,7 +548,7 @@ struct AnySwiftNameAttr {
   }
 };
 
-/// Aggregate struct for the common members of clang::SwiftVersionedAttr and
+/// Aggregate struct for the common members of clang::SwiftVersionedAdditionAttr and
 /// clang::SwiftVersionedRemovalAttr.
 ///
 /// For a SwiftVersionedRemovalAttr, the Attr member will be null.
@@ -671,8 +671,8 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
     for (auto *attr : decl->attrs()) {
       VersionedSwiftNameInfo info;
 
-      if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAttr>(attr)) {
-        auto added = decodeAttr(versionedAttr->getAttrToAdd());
+      if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAdditionAttr>(attr)) {
+        auto added = decodeAttr(versionedAttr->getAdditionalAttr());
         if (!added)
           continue;
 
