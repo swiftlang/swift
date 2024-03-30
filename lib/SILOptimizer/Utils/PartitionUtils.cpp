@@ -237,7 +237,7 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
 //                              MARK: Partition
 //===----------------------------------------------------------------------===//
 
-Partition Partition::singleRegion(ArrayRef<Element> indices,
+Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                   IsolationHistory inputHistory) {
   Partition p(inputHistory);
   if (!indices.empty()) {
@@ -249,7 +249,7 @@ Partition Partition::singleRegion(ArrayRef<Element> indices,
 
     // Place all of the operations until end of scope into one history
     // sequence.
-    p.pushHistorySequenceBoundary();
+    p.pushHistorySequenceBoundary(loc);
 
     // First create a region for repElement. We are going to merge all other
     // regions into its region.
@@ -269,14 +269,14 @@ Partition Partition::singleRegion(ArrayRef<Element> indices,
   return p;
 }
 
-Partition Partition::separateRegions(ArrayRef<Element> indices,
+Partition Partition::separateRegions(SILLocation loc, ArrayRef<Element> indices,
                                      IsolationHistory inputHistory) {
   Partition p(inputHistory);
   if (indices.empty())
     return p;
 
   // Place all operations in one history sequence.
-  p.pushHistorySequenceBoundary();
+  p.pushHistorySequenceBoundary(loc);
 
   auto maxIndex = Element(0);
   for (Element index : indices) {
@@ -954,10 +954,11 @@ IsolationHistory::pushNewElementRegion(Element element) {
   return getHead();
 }
 
-IsolationHistory::Node *IsolationHistory::pushHistorySequenceBoundary() {
+IsolationHistory::Node *
+IsolationHistory::pushHistorySequenceBoundary(SILLocation loc) {
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
-  head = new (mem) Node(Node::SequenceBoundary, head);
+  head = new (mem) Node(Node::SequenceBoundary, head, loc);
   return getHead();
 }
 

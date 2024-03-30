@@ -1460,7 +1460,8 @@ public:
     auto functionArguments = function->getArguments();
     if (functionArguments.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "    None.\n");
-      functionArgPartition = Partition::singleRegion({}, historyFactory.get());
+      functionArgPartition = Partition::singleRegion(SILLocation::invalid(), {},
+                                                     historyFactory.get());
       return;
     }
 
@@ -1489,8 +1490,8 @@ public:
       }
     }
 
-    functionArgPartition =
-        Partition::singleRegion(nonSendableJoinedIndices, historyFactory.get());
+    functionArgPartition = Partition::singleRegion(
+        SILLocation::invalid(), nonSendableJoinedIndices, historyFactory.get());
     for (Element elt : nonSendableSeparateIndices) {
       functionArgPartition->trackNewElement(elt);
     }
