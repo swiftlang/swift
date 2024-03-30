@@ -12,8 +12,8 @@ import PointerAuth
 // CHECK: end_access [[A1]] : $*Optional<UnsafeMutablePointer<SecureStruct>>
 // CHECK: switch_enum [[LD1]] : $Optional<UnsafeMutablePointer<SecureStruct>>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb2([[BBARG1:%.*]] : $UnsafeMutablePointer<SecureStruct>):
-// CHECK: [[F1:%.*]] = function_ref @$sSp7pointeexvlu : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK: [[PTR1:%.*]] = apply [[F1]]<SecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK: [[F1:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK: [[PTR1:%.*]] = apply [[F1]]<SecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK: [[RAW1:%.*]] = struct_extract [[PTR1]] : $UnsafePointer<SecureStruct>, #UnsafePointer._rawValue
 // CHECK: [[ADDR1:%.*]] = pointer_to_address [[RAW1]] : $Builtin.RawPointer to [strict] $*SecureStruct
 // CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[ADDR1]] : $*SecureStruct
@@ -31,8 +31,8 @@ func test_field_fn_read() -> Int32 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s25ptrauth_field_fptr_import05test_B12_fn_ptr_swapyyF :
 // CHECK:bb8([[UMP:%.*]] : $UnsafeMutablePointer<SecureStruct>):
-// CHECK:  [[F1:%.*]] = function_ref @$sSp7pointeexvau : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
-// CHECK:  [[P:%.*]] = apply [[F1]]<SecureStruct>([[UMP]]) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:  [[F1:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:  [[P:%.*]] = apply [[F1]]<SecureStruct>([[UMP]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:  [[EX1:%.*]] = struct_extract [[P]] : $UnsafeMutablePointer<SecureStruct>, #UnsafeMutablePointer._rawValue
 // CHECK:  [[ADDR:%.*]] = pointer_to_address [[EX1]] : $Builtin.RawPointer to [strict] $*SecureStruct
 // CHECK:  [[A1:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*SecureStruct
@@ -65,8 +65,8 @@ func test_field_fn_ptr_temp() -> Int32 {
 // CHECK: end_access [[A1]] : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>
 // CHECK: switch_enum [[LD1]] : $Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb2([[BBARG1:%.*]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct>):
-// CHECK: [[F1:%.*]] = function_ref @$sSp7pointeexvlu : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK: [[PTR1:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK: [[F1:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK: [[PTR1:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK: [[RAW1:%.*]] = struct_extract [[PTR1]] : $UnsafePointer<AddressDiscriminatedSecureStruct>, #UnsafePointer._rawValue
 // CHECK: [[ADDR1:%.*]] = pointer_to_address [[RAW1]] : $Builtin.RawPointer to [strict] $*AddressDiscriminatedSecureStruct
 // CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[ADDR1]] : $*AddressDiscriminatedSecureStruct
@@ -84,8 +84,8 @@ func test_addr_discriminated_field_fn_read() -> Int32 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s25ptrauth_field_fptr_import024test_addr_discriminated_B12_fn_ptr_swapyyF :
 // CHECK:bb8([[UMP:%.*]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct>):
-// CHECK:  [[F1:%.*]] = function_ref @$sSp7pointeexvau : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
-// CHECK:  [[P:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[UMP]]) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:  [[F1:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvau : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK:  [[P:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[UMP]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:  [[EX1:%.*]] = struct_extract [[P]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct>, #UnsafeMutablePointer._rawValue
 // CHECK:  [[ADDR:%.*]] = pointer_to_address [[EX1]] : $Builtin.RawPointer to [strict] $*AddressDiscriminatedSecureStruct
 // CHECK:  [[A1:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*AddressDiscriminatedSecureStruct
@@ -109,8 +109,8 @@ func test_addr_discriminated_field_fn_ptr_swap() {
 // CHECK: end_access [[A1]] : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>
 // CHECK: switch_enum [[LD1]] : $Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb2([[BBARG1:%.*]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct>):
-// CHECK: [[F1:%.*]] = function_ref @$sSp7pointeexvlu : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
-// CHECK: [[PTR1:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK: [[F1:%.*]] = function_ref @$sSpsRi_zrlE7pointeexvlu : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+// CHECK: [[PTR1:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK: [[RAW1:%.*]] = struct_extract [[PTR1]] : $UnsafePointer<AddressDiscriminatedSecureStruct>, #UnsafePointer._rawValue
 // CHECK: [[ADDR1:%.*]] = pointer_to_address [[RAW1]] : $Builtin.RawPointer to [strict] $*AddressDiscriminatedSecureStruct
 // CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[ADDR1]] : $*AddressDiscriminatedSecureStruct
