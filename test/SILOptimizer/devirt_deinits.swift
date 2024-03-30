@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -primary-file %s -parse-as-library -sil-verify-all -Xllvm -enable-deinit-devirtualizer -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -primary-file %s -parse-as-library -sil-verify-all -Xllvm -enable-deinit-devirtualizer -module-name=test -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test and check if the compiled executable works as expected.
 // RUN: %target-run-simple-swift(-Xllvm -enable-deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
