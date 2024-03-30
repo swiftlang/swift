@@ -85,7 +85,6 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_DISPATCH:BOOL', 'FALSE')
-        self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
         self.cmake_options.define(
             'SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_DLADDR:BOOL', 'FALSE')
@@ -97,6 +96,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_PATH_TO_STRING_PROCESSING_SOURCE:PATH',
                                   os.path.join(self.source_dir, '..',
                                                'swift-experimental-string-processing'))
+
+        self.add_extra_cmake_options()
 
         # Test configuration
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
@@ -119,6 +120,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.build_with_cmake([], self._build_variant, [],
                               prefer_native_toolchain=True)
 
+    def add_extra_cmake_options(self):
+        self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
+
     def test(self, host_target):
         build_root = os.path.dirname(self.build_dir)
         bin_paths = [
@@ -129,7 +133,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         wasmkit_build_path = os.path.join(
             build_root, '%s-%s' % ('wasmkit', host_target))
         wasmkit_bin_path = wasmkit.WasmKit.cli_file_path(wasmkit_build_path)
-        if not os.path.exists(wasmkit_bin_path):
+        if not os.path.exists(wasmkit_bin_path) or not self.should_test_executable():
             test_target = "check-swift-only_non_executable-wasi-wasm32-custom"
         else:
             test_target = "check-swift-wasi-wasm32-custom"
@@ -142,6 +146,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
                 '(Concurrency/Runtime/clock.swift|stdlib/StringIndex.swift)',
         }
         self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
+
+    def should_test_executable(self):
+        return True
 
     @property
     def _build_variant(self):
@@ -170,3 +177,20 @@ class WasmStdlib(cmake_product.CMakeProduct):
                 wasisysroot.WasmLLVMRuntimeLibs,
                 wasmkit.WasmKit,
                 swift.Swift]
+
+
+class WasmThreadsStdlib(WasmStdlib):
+    def should_test_executable(self):
+        # TODO(katei): Enable tests once WasmKit supports WASI threads
+        return False
+
+    def add_extra_cmake_options(self):
+        self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'pthreads')
+        self.cmake_options.define('SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS:STRING',
+                                  '-mthread-model;posix;-pthread;'
+                                  '-ftls-model=local-exec')
+        self.cmake_options.define('SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
+                                  '-Xcc;-matomics;-Xcc;-mbulk-memory;'
+                                  '-Xcc;-mthread-model;-Xcc;posix;'
+                                  '-Xcc;-pthread;-Xcc;-ftls-model=local-exec')
+        self.cmake_options.define('SWIFT_ENABLE_WASI_THREADS:BOOL', 'TRUE')
