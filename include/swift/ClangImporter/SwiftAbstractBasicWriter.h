@@ -99,6 +99,11 @@ public:
     // hit any of its attributes.
     llvm::report_fatal_error("Should never hit BTFTypeTagAttr serialization");
   }
+
+  void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
+    asImpl().writeDeclRef(info.getDecl());
+    asImpl().writeBool(info.isDeref());
+  }
 };
 
 }
