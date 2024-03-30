@@ -44,6 +44,11 @@ class WASILibc(product.Product):
         return False
 
     def build(self, host_target):
+        self._build(host_target)
+        self._build(host_target, thread_model='posix',
+                    target_triple='wasm32-wasip1-threads')
+
+    def _build(self, host_target, thread_model='single', target_triple='wasm32-wasi'):
         build_root = os.path.dirname(self.build_dir)
         llvm_build_bin_dir = os.path.join(
             '..', build_root, '%s-%s' % ('llvm', host_target), 'bin')
@@ -66,12 +71,14 @@ class WASILibc(product.Product):
             # https://github.com/llvm/llvm-project/commit/7dd387d2971d7759cadfffeb2082439f6c7ddd49
             '--old-file=check-symbols',
             '-C', self.source_dir,
-            'OBJDIR=' + os.path.join(self.build_dir, 'obj'),
+            'OBJDIR=' + os.path.join(self.build_dir, 'obj-' + thread_model),
             'SYSROOT=' + sysroot_build_dir,
             'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root),
             'CC=' + os.path.join(clang_tools_path, 'clang'),
             'AR=' + os.path.join(llvm_tools_path, 'llvm-ar'),
             'NM=' + os.path.join(llvm_tools_path, 'llvm-nm'),
+            'THREAD_MODEL=' + thread_model,
+            'TARGET_TRIPLE=' + target_triple,
         ])
 
     @classmethod
@@ -121,18 +128,31 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         return False
 
     def build(self, host_target):
+        self._build(host_target)
+
+    def _build(self, host_target, enable_wasi_threads=False):
         build_root = os.path.dirname(self.build_dir)
         llvm_build_bin_dir = os.path.join(
             '..', build_root, '%s-%s' % ('llvm', host_target), 'bin')
         llvm_tools_path = self.args.native_llvm_tools_path or llvm_build_bin_dir
         clang_tools_path = self.args.native_clang_tools_path or llvm_build_bin_dir
 
+        cmake_has_threads = 'TRUE' if enable_wasi_threads else 'FALSE'
+
         self.cmake_options.define('CMAKE_SYSROOT:PATH',
                                   WASILibc.sysroot_build_path(build_root, host_target))
+        enable_runtimes = ['libcxx', 'libcxxabi']
+        if not enable_wasi_threads:
+            # compiler-rt can be shared between wasi and wasip1-threads
+            enable_runtimes.append('compiler-rt')
         self.cmake_options.define('LLVM_ENABLE_RUNTIMES:STRING',
-                                  'libcxx;libcxxabi;compiler-rt')
-        self.cmake_options.define('LIBCXX_LIBDIR_SUFFIX:STRING', '/wasm32-wasi')
-        self.cmake_options.define('LIBCXXABI_LIBDIR_SUFFIX:STRING', '/wasm32-wasi')
+                                  ';'.join(enable_runtimes))
+
+        libdir_suffix = '/wasm32-wasi'
+        if enable_wasi_threads:
+            libdir_suffix = '/wasm32-wasip1-threads'
+        self.cmake_options.define('LIBCXX_LIBDIR_SUFFIX:STRING', libdir_suffix)
+        self.cmake_options.define('LIBCXXABI_LIBDIR_SUFFIX:STRING', libdir_suffix)
         self.cmake_options.define('CMAKE_STAGING_PREFIX:PATH', '/')
 
         self.cmake_options.define('COMPILER_RT_DEFAULT_TARGET_ARCH:STRING', 'wasm32')
@@ -157,19 +177,30 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
                                   os.path.join(clang_tools_path, 'clang'))
         self.cmake_options.define('CMAKE_CXX_COMPILER:STRING',
                                   os.path.join(clang_tools_path, 'clang++'))
+
+        c_flags = []
         # Explicitly disable exceptions even though it's usually implicitly disabled by
         # LIBCXX_ENABLE_EXCEPTIONS because the CMake feature check fails to detect
         # -fno-exceptions support in clang due to missing compiler-rt while configuring
         # as mono project.
-        self.cmake_options.define('CMAKE_CXX_FLAGS:STRING', '-fno-exceptions')
+        cxx_flags = ['-fno-exceptions']
+        if enable_wasi_threads:
+            c_flags.append('-pthread')
+            cxx_flags.append('-pthread')
+        self.cmake_options.define('CMAKE_C_FLAGS:STRING', ' '.join(c_flags))
+        self.cmake_options.define('CMAKE_CXX_FLAGS:STRING', ' '.join(cxx_flags))
 
-        self.cmake_options.define('CMAKE_C_COMPILER_TARGET:STRING', 'wasm32-wasi')
-        self.cmake_options.define('CMAKE_CXX_COMPILER_TARGET:STRING', 'wasm32-wasi')
+        if enable_wasi_threads:
+            target_triple = 'wasm32-wasip1-threads'
+        else:
+            target_triple = 'wasm32-wasi'
+        self.cmake_options.define('CMAKE_C_COMPILER_TARGET:STRING', target_triple)
+        self.cmake_options.define('CMAKE_CXX_COMPILER_TARGET:STRING', target_triple)
 
         self.cmake_options.define('CXX_SUPPORTS_CXX11:BOOL', 'TRUE')
 
-        self.cmake_options.define('LIBCXX_ENABLE_THREADS:BOOL', 'FALSE')
-        self.cmake_options.define('LIBCXX_HAS_PTHREAD_API:BOOL', 'FALSE')
+        self.cmake_options.define('LIBCXX_ENABLE_THREADS:BOOL', cmake_has_threads)
+        self.cmake_options.define('LIBCXX_HAS_PTHREAD_API:BOOL', cmake_has_threads)
         self.cmake_options.define('LIBCXX_HAS_EXTERNAL_THREAD_API:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXX_BUILD_EXTERNAL_THREAD_LIBRARY:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXX_HAS_WIN32_THREAD_API:BOOL', 'FALSE')
@@ -184,8 +215,8 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.cmake_options.define('LIBCXXABI_ENABLE_EXCEPTIONS:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXXABI_ENABLE_SHARED:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXXABI_SILENT_TERMINATE:BOOL', 'TRUE')
-        self.cmake_options.define('LIBCXXABI_ENABLE_THREADS:BOOL', 'FALSE')
-        self.cmake_options.define('LIBCXXABI_HAS_PTHREAD_API:BOOL', 'FALSE')
+        self.cmake_options.define('LIBCXXABI_ENABLE_THREADS:BOOL', cmake_has_threads)
+        self.cmake_options.define('LIBCXXABI_HAS_PTHREAD_API:BOOL', cmake_has_threads)
         self.cmake_options.define('LIBCXXABI_HAS_EXTERNAL_THREAD_API:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXXABI_BUILD_EXTERNAL_THREAD_LIBRARY:BOOL',
                                   'FALSE')
@@ -201,3 +232,16 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
     @classmethod
     def get_dependencies(cls):
         return [WASILibc, llvm.LLVM]
+
+
+class WasmThreadsLLVMRuntimeLibs(WasmLLVMRuntimeLibs):
+    def build(self, host_target):
+        self._build(host_target, enable_wasi_threads=True)
+
+        build_root = os.path.dirname(self.build_dir)
+        wasi_sysroot = WASILibc.sysroot_install_path(build_root)
+        # Copy compiler-rt os dirs to the WASI variant
+        os_dir = os.path.join(wasi_sysroot, 'lib', 'wasip1')
+        if os.path.exists(os_dir):
+            shell.rmtree(os_dir)
+        shell.copytree(os.path.join(wasi_sysroot, 'lib', 'wasi'), os_dir)
