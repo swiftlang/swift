@@ -28,6 +28,11 @@ enum class KnownProtocolKind : uint8_t {
 #include "swift/AST/KnownProtocols.def"
 };
 
+enum class RepressibleProtocolKind : uint8_t {
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name) Id,
+#include "swift/AST/KnownProtocols.def"
+};
+
 enum : uint8_t {
   // This uses a preprocessor trick to count all the protocols. The enum value
   // expression below expands to "+1+1+1...". (Note that the first plus
@@ -43,6 +48,14 @@ enum : unsigned { NumKnownProtocolKindBits =
 
 /// Retrieve the name of the given known protocol.
 llvm::StringRef getProtocolName(KnownProtocolKind kind);
+
+std::optional<RepressibleProtocolKind>
+getRepressibleProtocolKind(KnownProtocolKind kp);
+
+KnownProtocolKind getKnownProtocolKind(RepressibleProtocolKind ip);
+
+void simple_display(llvm::raw_ostream &out,
+                    const RepressibleProtocolKind &value);
 
 /// MARK: Invertible protocols
 ///
@@ -70,5 +83,28 @@ void simple_display(llvm::raw_ostream &out,
                     const InvertibleProtocolKind &value);
 
 } // end namespace swift
+
+namespace llvm {
+template <typename T, typename Enable>
+struct DenseMapInfo;
+template <>
+struct DenseMapInfo<swift::RepressibleProtocolKind> {
+  using RepressibleProtocolKind = swift::RepressibleProtocolKind;
+  using Impl = DenseMapInfo<uint8_t>;
+  static inline RepressibleProtocolKind getEmptyKey() {
+    return (RepressibleProtocolKind)Impl::getEmptyKey();
+  }
+  static inline RepressibleProtocolKind getTombstoneKey() {
+    return (RepressibleProtocolKind)Impl::getTombstoneKey();
+  }
+  static unsigned getHashValue(const RepressibleProtocolKind &Val) {
+    return Impl::getHashValue((uint8_t)Val);
+  }
+  static bool isEqual(const RepressibleProtocolKind &LHS,
+                      const RepressibleProtocolKind &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif
