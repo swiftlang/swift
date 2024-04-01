@@ -1375,9 +1375,11 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
     if (rootTRC) {
       TypeRefinementContext *TRC =
           rootTRC->findMostRefinedSubContext(loc, Context);
-      OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
-      if (MostRefined) {
-        *MostRefined = TRC;
+      if (TRC) {
+        OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
+        if (MostRefined) {
+          *MostRefined = TRC;
+        }
       }
     }
   }
