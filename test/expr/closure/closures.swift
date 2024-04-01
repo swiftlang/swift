@@ -1097,10 +1097,41 @@ public class TestRebindingSelfIsDisallowed {
       let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
     }
   }
-  
+
   func method() {
     let `self` = "self shouldn't become a string"
     let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
+  }
+
+  func testTypeNamedSelf() {
+    struct `self` {
+      static func staticMember() {}
+    }
+
+    doVoidStuff {
+      staticMember() // expected-error{{cannot find 'staticMember' in scope}}
+      self.staticMember()
+    }
+
+    doVoidStuffNonEscaping {
+      staticMember() // expected-error{{cannot find 'staticMember' in scope}}
+      self.staticMember()
+    }
+
+    doVoidStuff { [weak self] in
+      staticMember() // expected-error{{cannot find 'staticMember' in scope}}
+      self.staticMember()
+    }
+
+    doVoidStuffNonEscaping { [weak self] in
+      staticMember() // expected-error{{cannot find 'staticMember' in scope}}
+      self.staticMember()
+    }
+
+    doVoidStuff { [self] in
+      staticMember() // expected-error{{cannot find 'staticMember' in scope}}
+      self.staticMember()
+    }
   }
 }
 
@@ -1548,6 +1579,102 @@ final class AutoclosureTests {
         guard let self = self else { return }
         method() // expected-error{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}}
       }
+    }
+  }
+}
+
+class TestInvalidRebindingOutsideOfClosure {
+  func method() { }
+
+  func testInvalidRebindingCondition() {
+    guard case let self = TestInvalidRebindingOutsideOfClosure() else { return } // expected-warning {{'guard' condition is always true, body is unreachable}}
+
+    doVoidStuff { [self] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+
+    // Allowed in Swift 5 mode for source compatibility:
+    doVoidStuffNonEscaping { [self] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+    }
+
+    doVoidStuff() { [weak self] in
+      guard let self else { return }
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+    }
+
+    doVoidStuffNonEscaping() { [weak self] in
+      guard let self else { return }
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+    }
+  }
+
+  func testInvalidSelfWithBackticks() {
+    let `self` = TestInvalidRebindingOutsideOfClosure()
+
+    doVoidStuff { [self] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+
+    // Allowed in Swift 5 mode for source compatibility:
+    doVoidStuffNonEscaping { [self] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+    }
+    
+    doVoidStuff() { [weak self] in
+      guard let self else { return }
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+    }
+
+    doVoidStuffNonEscaping() { [weak self] in
+      guard let self else { return }
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+    }
+  }
+
+  func testInvalidSelfWithBackticks2() {
+    let `self` = self
+
+    doVoidStuff { [self] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-error{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+
+    // Allowed in Swift 5 mode for source compatibility:
+    doVoidStuffNonEscaping { [self] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+    
+    doVoidStuff() { [weak self] in
+      guard let self else { return }
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+
+    doVoidStuffNonEscaping() { [weak self] in
+      guard let self else { return }
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+  }
+
+}
+
+struct TestInvalidSelfCaptureInStruct {
+  func method() { }
+
+  func bar() {
+    // To maintain source compatibility, we continue allowing this in Swift 5 mode:
+    doVoidStuff { [self = TestInvalidSelfCaptureInStruct()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+      self.method()
+    }
+
+    doVoidStuffNonEscaping { [self = TestInvalidSelfCaptureInStruct()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+      self.method()
+    }
+
+    doVoidStuffNonEscaping { [self = TestInvalidSelfCaptureInStruct()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+      method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
+      self.method()
     }
   }
 }

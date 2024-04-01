@@ -399,7 +399,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   // In these cases, using the Swift 6 lookup behavior doesn't affect
   // how the body is type-checked, so it can be used in Swift 5 mode
   // without breaking source compatibility for non-escaping closures.
-  if (capturesSelfWeakly && Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+  if (capturesSelfWeakly && !Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
       !implicitSelfReferenceIsUnwrapped(selfDecl)) {
     return nullptr;
   }
@@ -416,10 +416,13 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   //
   // Other types of rebindings, like an arbitrary "let `self` = foo",
   // are never allowed to rebind self.
-  if (auto var = dyn_cast<VarDecl>(selfDecl)) {
-    if (!(var->isCaptureList() || var->getParentPatternStmt())) {
-      return nullptr;
-    }
+  auto selfVD = dyn_cast<VarDecl>(selfDecl);
+  if (!selfVD) {
+    return nullptr;
+  }
+
+  if (!(selfVD->isCaptureList() || selfVD->getParentPatternStmt())) {
+    return nullptr;
   }
 
   return selfDecl;
