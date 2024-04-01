@@ -6,6 +6,7 @@
 
 // FIXME(NCG): This produces `cannot suppress conformances here` errors due to
 // all the new <τ_0_0 where τ_0_0 : ~Copyable> clauses
-// XFAIL: !noncopyable_generics
+// rdar://124657305 (@substituted generic signatures need to either include inverses or the Copyable/Escapable conformances)
+// XFAIL: *
 
 var W = [UInt32](repeating: 0, count: 16)

@@ -15,8 +15,6 @@
 // RUN:    -I %t -source-filename=%s                                           \
 // RUN:    | %FileCheck -check-prefix=CHECK-PRINT %s
 
-// REQUIRES: noncopyable_generics
-
 // CHECK-NOT: UnknownCode
 
 // CHECK-PRINT-DAG: protocol Generator<Value> {

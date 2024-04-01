@@ -6,9 +6,7 @@
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
-// XFAIL: noncopyable_generics
-
-// REQUIRES: noncopyable_generics
+// XFAIL: *
 
 //==============================================================================
 //===========================DEPENDENCY-FREE TESTS=(BEGIN)===================={{
