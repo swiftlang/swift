@@ -1931,10 +1931,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // Unwrap optional try to get inner function calls.
   {
     auto nextExpr = valueE;
-    while(true) {
-      if (nextExpr == nullptr) {
-        break;
-      } else if (auto applyExpr = dyn_cast<ApplyExpr>(nextExpr)) {
+    while(nextExpr != nullptr) {
+      if (auto applyExpr = dyn_cast<ApplyExpr>(nextExpr)) {
         call = applyExpr;
         break;
       } else if (auto optionalTry = dyn_cast<OptionalTryExpr>(nextExpr)) {
