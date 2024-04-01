@@ -5694,6 +5694,8 @@ ERROR(incorrect_optional_any,none,
 ERROR(existential_requires_any,none,
       "use of %select{protocol |}2%0 as a type must be written %1",
       (Type, Type, bool))
+ERROR(inverse_requires_any,none,
+      "constraint that suppresses conformance requires 'any'", ())
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
