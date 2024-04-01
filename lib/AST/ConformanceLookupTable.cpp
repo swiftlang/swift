@@ -302,7 +302,14 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           bool anyObject = false;
           for (const auto &found :
                   getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject)) {
-            if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+            auto proto = dyn_cast<ProtocolDecl>(found.Item);
+            if (!proto)
+              continue;
+            auto kp = proto->getKnownProtocolKind();
+            assert(!found.isSuppressed ||
+                   kp.has_value() &&
+                       "suppressed conformance for non-known protocol!?");
+            if (!found.isSuppressed) {
               addProtocol(proto, found.Loc,
                           source.withUncheckedLoc(found.uncheckedLoc)
                                 .withPreconcurrencyLoc(found.preconcurrencyLoc));

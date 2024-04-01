@@ -3242,11 +3242,15 @@ class DeclDeserializer {
                        ArrayRef<uint64_t> rawInheritedIDs) {
     SmallVector<InheritedEntry, 2> inheritedTypes;
     for (auto rawID : rawInheritedIDs) {
-      // The first low bit indicates "@preconcurrency".
+      // The first low bit indicates "~" (suppression).
+      bool isSuppressed = rawID & 0x01;
+      rawID = rawID >> 1;
+
+      // The second low bit indicates "@preconcurrency".
       bool isPreconcurrency = rawID & 0x01;
       rawID = rawID >> 1;
 
-      // The second low bit indicates "@unchecked".
+      // The third low bit indicates "@unchecked".
       bool isUnchecked = rawID & 0x01;
       rawID = rawID >> 1;
 
@@ -3256,9 +3260,9 @@ class DeclDeserializer {
         MF.diagnoseAndConsumeError(maybeType.takeError());
         continue;
       }
-      inheritedTypes.push_back(
-          InheritedEntry(TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
-                         /*isRetroactive=*/false, isPreconcurrency));
+      inheritedTypes.push_back(InheritedEntry(
+          TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
+          /*isRetroactive=*/false, isPreconcurrency, isSuppressed));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);

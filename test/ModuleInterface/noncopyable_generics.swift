@@ -80,13 +80,13 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: public static func opaqueEscapable(_ s: some _NoEscapableP)
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: public struct ExplicitHello<T> : ~Copyable where T : ~Copyable {
+// CHECK-MISC-NEXT: public struct ExplicitHello<T> : ~Swift.Copyable where T : ~Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: extension {{.*}}.ExplicitHello : Swift.Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: public struct Hello<T> : ~Copyable, ~Escapable where T : ~Copyable, T : ~Escapable {
+// CHECK-MISC-NEXT: public struct Hello<T> : ~Swift.Copyable, ~Swift.Escapable where T : ~Copyable, T : ~Escapable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : ~Copyable {
@@ -119,12 +119,12 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: public func checkAnyObject<Result>(_ t: Result) where Result : AnyObject
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: public struct Outer<A> : ~Copyable where A : ~Copyable {
+// CHECK-MISC-NEXT: public struct Outer<A> : ~Swift.Copyable where A : ~Copyable {
 // CHECK-MISC-NEXT:   public func innerFn<B>(_ b: borrowing B) where B : ~Copyable
-// CHECK-MISC:   public struct InnerStruct<C> : ~Copyable where C : ~Copyable {
+// CHECK-MISC:   public struct InnerStruct<C> : ~Swift.Copyable where C : ~Copyable {
 // CHECK-MISC-NEXT:     public func g<D>(_ d: borrowing D) where D : ~Copyable
-// CHECK-MISC:   public struct InnerVariation1<D> : ~Copyable, ~Escapable where D : ~Copyable
-// CHECK-MISC:   public struct InnerVariation2<D> : ~Copyable, ~Escapable where D : ~Escapable
+// CHECK-MISC:   public struct InnerVariation1<D> : ~Swift.Copyable, ~Swift.Escapable where D : ~Copyable
+// CHECK-MISC:   public struct InnerVariation2<D> : ~Swift.Copyable, ~Swift.Escapable where D : ~Escapable
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: extension {{.*}}.Outer : Swift.Copyable {
@@ -185,7 +185,7 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public enum Either<Success, Failure> : ~Copyable where Failure : Swift.Error, Success : ~Copyable {
+// CHECK-NEXT: public enum Either<Success, Failure> : ~Swift.Copyable where Failure : Swift.Error, Success : ~Copyable {
 // CHECK: #endif
 
 /// This one is position dependent so we can ensure the associated type was printed correctly.
@@ -194,11 +194,11 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public enum Pair<L, R> : ~Copyable where L : ~Copyable, R : ~Copyable {
+// CHECK-NEXT: public enum Pair<L, R> : ~Swift.Copyable where L : ~Copyable, R : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public enum Maybe<Value> : ~Copyable where Value : ~Copyable {
+// CHECK-NEXT: public enum Maybe<Value> : ~Swift.Copyable where Value : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics

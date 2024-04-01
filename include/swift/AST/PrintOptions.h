@@ -388,6 +388,9 @@ struct PrintOptions {
   /// Suppress printing of `borrowing` and `consuming`.
   bool SuppressNoncopyableOwnershipModifiers = false;
 
+  /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
+  bool SuppressConformanceSuppression = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
