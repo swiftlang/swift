@@ -96,7 +96,7 @@ void (*swift::swift_task_checkIsolated_hook)(
     swift_task_checkIsolated_original original) = nullptr;
 
 extern "C" SWIFT_CC(swift)
-    bool _task_serialExecutor_checkIsolated(
+    void _task_serialExecutor_checkIsolated(
         HeapObject *executor,
         const Metadata *selfType,
         const SerialExecutorWitnessTable *wtable);
