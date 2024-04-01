@@ -286,6 +286,8 @@ Added: _$ss30KeyedEncodingContainerProtocolPsE6encode_6forKeyys6Int128V_0G0QztKF
 Added: _$ss6Int128V10bitPatternABs7UInt128V_tcfC
 Added: _$ss6Int128V11byteSwappedABvg
 Added: _$ss6Int128V11byteSwappedABvpMV
+Added: _$ss6Int128V12customMirrors0C0Vvg
+Added: _$ss6Int128V12customMirrors0C0VvpMV
 Added: _$ss6Int128V15_truncatingBitsABSu_tcfC
 Added: _$ss6Int128V15nonzeroBitCountSivg
 Added: _$ss6Int128V15nonzeroBitCountSivpMV
@@ -364,6 +366,8 @@ Added: _$ss6Int128VSzsMc
 Added: _$ss6Int128VSzsWP
 Added: _$ss6Int128Vs13SignedNumericsMc
 Added: _$ss6Int128Vs13SignedNumericsWP
+Added: _$ss6Int128Vs17CustomReflectablesMc
+Added: _$ss6Int128Vs17CustomReflectablesWP
 Added: _$ss6Int128Vs17FixedWidthIntegersMc
 Added: _$ss6Int128Vs17FixedWidthIntegersWP
 Added: _$ss6Int128Vs18AdditiveArithmeticsMc
@@ -419,6 +423,8 @@ Added: _$ss30KeyedEncodingContainerProtocolPsE6encode_6forKeyys7UInt128V_0G0QztK
 Added: _$ss7UInt128V10bitPatternABs6Int128V_tcfC
 Added: _$ss7UInt128V11byteSwappedABvg
 Added: _$ss7UInt128V11byteSwappedABvpMV
+Added: _$ss7UInt128V12customMirrors0C0Vvg
+Added: _$ss7UInt128V12customMirrors0C0VvpMV
 Added: _$ss7UInt128V15_truncatingBitsABSu_tcfC
 Added: _$ss7UInt128V15nonzeroBitCountSivg
 Added: _$ss7UInt128V15nonzeroBitCountSivpMV
@@ -520,6 +526,8 @@ Added: _$ss7UInt128VSxsMc
 Added: _$ss7UInt128VSxsWP
 Added: _$ss7UInt128VSzsMc
 Added: _$ss7UInt128VSzsWP
+Added: _$ss7UInt128Vs17CustomReflectablesMc
+Added: _$ss7UInt128Vs17CustomReflectablesWP
 Added: _$ss7UInt128Vs17FixedWidthIntegersMc
 Added: _$ss7UInt128Vs17FixedWidthIntegersWP
 Added: _$ss7UInt128Vs18AdditiveArithmeticsMc
