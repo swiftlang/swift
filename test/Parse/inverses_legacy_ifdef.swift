@@ -1,7 +1,7 @@
 // RUN: %swift-frontend -typecheck %s
 // RUN: %swift-frontend -typecheck %s -verify -DHAVE_NCGENERICS
 
-// XFAIL: noncopyable_generics
+
 
 /// This test checks that you can write ~Copyable in places that were illegal
 /// in Swift 5.9, as long as those illegal appearances are guarded within
