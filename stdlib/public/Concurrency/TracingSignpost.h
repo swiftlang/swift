@@ -140,8 +140,7 @@ inline void actor_dequeue(HeapObject *actor, Job *job) {
   }
 }
 
-inline void actor_state_changed(HeapObject *actor, Job *firstJob,
-                                bool needsPreprocessing, uint8_t state,
+inline void actor_state_changed(HeapObject *actor, Job *firstJob, uint8_t state,
                                 bool isDistributedRemote,
                                 bool isPriorityEscalated, uint8_t maxPriority) {
   ENSURE_LOGS();
@@ -150,8 +149,8 @@ inline void actor_state_changed(HeapObject *actor, Job *firstJob,
                          "actor=%p needsPreprocessing=%d "
                          "state=%u isDistributedRemote=%{bool}d "
                          "isPriorityEscalated=%{bool}d, maxPriority=%u",
-                         actor, needsPreprocessing, state, isDistributedRemote,
-                         isPriorityEscalated, maxPriority);
+                         actor, (firstJob != nullptr), state,
+                         isDistributedRemote, isPriorityEscalated, maxPriority);
 }
 
 inline void actor_note_job_queue(HeapObject *actor, Job *first,
