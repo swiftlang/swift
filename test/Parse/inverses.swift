@@ -102,3 +102,15 @@ typealias Z8 = ~Copyable & Hashable // expected-error {{composition cannot conta
 struct NotAProtocol {}
 
 struct Bad: ~NotAProtocol {} // expected-error {{type 'NotAProtocol' cannot be suppressed}}
+
+struct X<T: ~Copyable>: ~Copyable { }
+
+func typeInExpression() {
+  _ = [~Copyable]()  // expected-error{{type 'any Copyable' cannot be suppressed}}
+  _ = X<any ~Copyable>()
+
+  _ = X<any ~Copyable & Foo>()
+  _ = X<any Foo & ~Copyable>()
+
+  _ = X<(borrowing any ~Copyable) -> Void>()
+}
