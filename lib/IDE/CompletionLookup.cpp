@@ -979,10 +979,10 @@ bool isNonDesirableImportedDefaultArg(const ParamDecl *param) {
   auto baseName = func->getBaseName().getIdentifier().str();
   switch (kind) {
   case DefaultArgumentKind::EmptyArray:
-    return (baseName.endswith("Options"));
+    return (baseName.ends_with("Options"));
   case DefaultArgumentKind::EmptyDictionary:
-    return (baseName.endswith("Options") || baseName.endswith("Attributes") ||
-            baseName.endswith("UserInfo"));
+    return (baseName.ends_with("Options") || baseName.ends_with("Attributes") ||
+            baseName.ends_with("UserInfo"));
   default:
     llvm_unreachable("unhandled DefaultArgumentKind");
   }

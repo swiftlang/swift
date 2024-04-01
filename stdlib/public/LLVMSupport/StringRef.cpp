@@ -44,7 +44,7 @@ bool StringRef::starts_with_insensitive(StringRef Prefix) const {
       ascii_strncasecmp(Data, Prefix.Data, Prefix.Length) == 0;
 }
 
-bool StringRef::endswith_insensitive(StringRef Suffix) const {
+bool StringRef::ends_with_insensitive(StringRef Suffix) const {
   return Length >= Suffix.Length &&
       ascii_strncasecmp(end() - Suffix.Length, Suffix.Data, Suffix.Length) == 0;
 }

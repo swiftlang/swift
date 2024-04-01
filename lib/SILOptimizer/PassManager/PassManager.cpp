@@ -575,7 +575,7 @@ bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
   StringRef prefix("simplify-");
   for (const std::string &namePattern : SILDisablePass) {
     StringRef pattern(namePattern);
-    if (pattern.starts_with(prefix) && pattern.endswith(instName) &&
+    if (pattern.starts_with(prefix) && pattern.ends_with(instName) &&
         pattern.size() == prefix.size() + instName.size()) {
       return true;
     }

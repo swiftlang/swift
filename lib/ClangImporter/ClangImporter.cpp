@@ -458,7 +458,7 @@ static bool clangSupportsPragmaAttributeWithSwiftAttr() {
 
 static inline bool isPCHFilenameExtension(StringRef path) {
   return llvm::sys::path::extension(path)
-    .endswith(file_types::getExtension(file_types::TY_PCH));
+    .ends_with(file_types::getExtension(file_types::TY_PCH));
 }
 
 void importer::getNormalInvocationArguments(
@@ -7034,7 +7034,7 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
   if (!func->hasName())
     return false;
   auto id = func->getBaseName().userFacingName();
-  return id.starts_with("__") && id.endswith("Unsafe");
+  return id.starts_with("__") && id.ends_with("Unsafe");
 }
 
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,

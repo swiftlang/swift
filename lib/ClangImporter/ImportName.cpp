@@ -464,7 +464,7 @@ static StringRef stripLeadingK(StringRef name) {
 StringRef importer::stripNotification(StringRef name) {
   name = stripLeadingK(name);
   StringRef notification = "Notification";
-  if (name.size() <= notification.size() || !name.endswith(notification))
+  if (name.size() <= notification.size() || !name.ends_with(notification))
     return {};
   return name.drop_back(notification.size());
 }
@@ -1160,9 +1160,9 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
     StringRef suffixToStrip;
     StringRef origBaseName = baseName;
     if (adjustName && index == 0 && paramNames[0].empty()) {
-      if (baseName.endswith(ErrorSuffix))
+      if (baseName.ends_with(ErrorSuffix))
         suffixToStrip = ErrorSuffix;
-      else if (baseName.endswith(AltErrorSuffix))
+      else if (baseName.ends_with(AltErrorSuffix))
         suffixToStrip = AltErrorSuffix;
 
       if (!suffixToStrip.empty()) {
@@ -1438,7 +1438,7 @@ bool NameImporter::hasErrorMethodNameCollision(
   auto &ctx = method->getASTContext();
   if (paramIndex == 0 && !suffixToStrip.empty()) {
     StringRef name = chunks[0]->getName();
-    assert(name.endswith(suffixToStrip));
+    assert(name.ends_with(suffixToStrip));
     name = name.drop_back(suffixToStrip.size());
     chunks[0] = &ctx.Idents.get(name);
   } else if (paramIndex != 0) {

@@ -580,7 +580,7 @@ std::string swift::getSDKBuildVersion(StringRef Path) {
 std::string swift::getSDKName(StringRef Path) {
   std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
                                    "CanonicalName");
-  if (Name.empty() && Path.endswith(".sdk")) {
+  if (Name.empty() && Path.ends_with(".sdk")) {
     Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
   }
   return Name;

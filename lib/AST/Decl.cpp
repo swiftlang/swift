@@ -11782,7 +11782,7 @@ bool MacroDecl::isUniqueMacroName(StringRef name) {
     name = name.drop_back();
 
   // Check for fMu.
-  return name.endswith("fMu");
+  return name.ends_with("fMu");
 }
 
 bool MacroDecl::isUniqueMacroName(DeclBaseName name) {

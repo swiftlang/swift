@@ -39,7 +39,7 @@ using namespace swift;
 std::optional<EditorPlaceholderData>
 swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
   if (!PlaceholderText.starts_with("<#") ||
-      !PlaceholderText.endswith("#>"))
+      !PlaceholderText.ends_with("#>"))
     return std::nullopt;
 
   PlaceholderText = PlaceholderText.drop_front(2).drop_back(2);

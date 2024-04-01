@@ -685,8 +685,8 @@ class ModuleInterfaceLoaderImpl {
     if (!sdkPath.empty() &&
         hasPrefix(path::begin(interfacePath), path::end(interfacePath),
                   path::begin(sdkPath), path::end(sdkPath))) {
-      return !(StringRef(interfacePath).endswith(".private.swiftinterface") ||
-               StringRef(interfacePath).endswith(".package.swiftinterface"));
+      return !(StringRef(interfacePath).ends_with(".private.swiftinterface") ||
+               StringRef(interfacePath).ends_with(".package.swiftinterface"));
     }
     return false;
   }
@@ -734,8 +734,8 @@ class ModuleInterfaceLoaderImpl {
     if (sdkPath.empty() ||
         !hasPrefix(path::begin(interfacePath), path::end(interfacePath),
                    path::begin(sdkPath), path::end(sdkPath)) ||
-        StringRef(interfacePath).endswith(".private.swiftinterface") ||
-         StringRef(interfacePath).endswith(".package.swiftinterface"))
+        StringRef(interfacePath).ends_with(".private.swiftinterface") ||
+         StringRef(interfacePath).ends_with(".package.swiftinterface"))
       return std::nullopt;
 
     // If the module isn't target-specific, there's no fallback path.
@@ -1380,8 +1380,8 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(StringRef mo
 
   // When looking up the module for a private or package interface, strip
   // the '.private.' or '.package.'section of the base name
-  if (interfacePath.endswith(".private." + interfaceExt.str()) ||
-      interfacePath.endswith(".package." + interfaceExt.str())) {
+  if (interfacePath.ends_with(".private." + interfaceExt.str()) ||
+      interfacePath.ends_with(".package." + interfaceExt.str())) {
     auto newBaseName = llvm::sys::path::stem(llvm::sys::path::stem(interfacePath));
     modulePath = llvm::sys::path::parent_path(interfacePath);
     llvm::sys::path::append(modulePath, newBaseName + "." + newExt.str());
