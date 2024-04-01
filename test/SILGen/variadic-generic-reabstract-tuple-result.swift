@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
 
-// XFAIL: noncopyable_generics
+
 
 // rdar://110391963
 

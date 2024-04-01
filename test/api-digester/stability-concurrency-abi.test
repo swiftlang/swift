@@ -92,5 +92,5 @@ Func TaskLocal.withValueImpl(_:operation:file:line:) is a new API without @avail
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
-// XFAIL: noncopyable_generics
+
 
