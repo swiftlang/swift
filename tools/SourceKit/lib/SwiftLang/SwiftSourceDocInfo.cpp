@@ -1357,7 +1357,7 @@ getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
         Pieces.push_back(OrigSel.getIdentifierInfoForSlot(i));
       } else {
         StringRef T = Args[i];
-        Pieces.push_back(&Ctx.Idents.get(T.endswith(":") ? T.drop_back() : T));
+        Pieces.push_back(&Ctx.Idents.get(T.ends_with(":") ? T.drop_back() : T));
       }
     }
     return clang::DeclarationName(

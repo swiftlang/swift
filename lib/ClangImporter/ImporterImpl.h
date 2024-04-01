@@ -1821,7 +1821,7 @@ public:
   void setSinglePCHImport(std::optional<std::string> PCHFilename) {
     if (PCHFilename.has_value()) {
       assert(llvm::sys::path::extension(PCHFilename.value())
-                 .endswith(file_types::getExtension(file_types::TY_PCH)) &&
+                 .ends_with(file_types::getExtension(file_types::TY_PCH)) &&
              "Single PCH imported filename doesn't have .pch extension!");
     }
     SinglePCHImport = PCHFilename;

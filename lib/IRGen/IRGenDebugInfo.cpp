@@ -526,7 +526,7 @@ private:
 
     // Detect the main file.
     StringRef MainFileName = MainFile->getFilename();
-    if (MainFile && Filename.endswith(MainFileName)) {
+    if (MainFile && Filename.ends_with(MainFileName)) {
       SmallString<256> AbsThisFile, AbsMainFile;
       AbsThisFile = Filename;
       llvm::sys::fs::make_absolute(AbsThisFile);
@@ -578,7 +578,7 @@ private:
     } else {
       File = NormalizedFile;
       // Leave <compiler-generated> & friends as is, without directory.
-      if (!(File.starts_with("<") && File.endswith(">")))
+      if (!(File.starts_with("<") && File.ends_with(">")))
         Dir = CurDir;
       else
         Dir = llvm::sys::path::root_directory(CurDir);
@@ -2454,7 +2454,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   {
     auto B = llvm::sys::path::rbegin(Sysroot);
     auto E = llvm::sys::path::rend(Sysroot);
-    auto It = std::find_if(B, E, [](auto SDK) { return SDK.endswith(".sdk"); });
+    auto It = std::find_if(B, E, [](auto SDK) { return SDK.ends_with(".sdk"); });
     if (It != E)
       SDK = *It;
   }

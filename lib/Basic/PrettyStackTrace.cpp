@@ -30,7 +30,7 @@ void PrettyStackTraceStringAction::print(llvm::raw_ostream &out) const {
 void PrettyStackTraceFileContents::print(llvm::raw_ostream &out) const {
   out << "Contents of " << Buffer.getBufferIdentifier() << ":\n---\n"
       << Buffer.getBuffer();
-  if (!Buffer.getBuffer().endswith("\n"))
+  if (!Buffer.getBuffer().ends_with("\n"))
     out << '\n';
   out << "---\n";
 }

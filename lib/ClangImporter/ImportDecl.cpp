@@ -3392,8 +3392,8 @@ namespace {
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
             if ((file->getDir() == owningModule->Directory) &&
-                (filename.endswith("cmath") || filename.endswith("math.h") ||
-                 filename.endswith("stdlib.h") || filename.endswith("cstdlib"))) {
+                (filename.ends_with("cmath") || filename.ends_with("math.h") ||
+                 filename.ends_with("stdlib.h") || filename.ends_with("cstdlib"))) {
               return nullptr;
             }
           }
@@ -8433,9 +8433,9 @@ void ClangImporter::Implementation::importAttributes(
   // such as CGColorRelease(CGColorRef).
   if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
     if (FD->getNumParams() == 1 && FD->getDeclName().isIdentifier() &&
-         (FD->getName().endswith("Release") ||
-          FD->getName().endswith("Retain") ||
-          FD->getName().endswith("Autorelease")) &&
+         (FD->getName().ends_with("Release") ||
+          FD->getName().ends_with("Retain") ||
+          FD->getName().ends_with("Autorelease")) &&
         !FD->getAttr<clang::SwiftNameAttr>()) {
       if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>()){
         if (isCFTypeDecl(t->getDecl())) {

@@ -124,9 +124,9 @@ public:
     return str().starts_with(Prefix);
   }
 
-  /// endswith - Check if this string ends with the given \p Suffix.
-  bool endswith(StringRef Suffix) const {
-    return str().endswith(Suffix);
+  /// ends_with - Check if this string ends with the given \p Suffix.
+  bool ends_with(StringRef Suffix) const {
+    return str().ends_with(Suffix);
   }
 
   /// @}

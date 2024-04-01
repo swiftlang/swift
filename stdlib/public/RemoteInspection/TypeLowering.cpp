@@ -249,7 +249,7 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
   // Check if it's an integer first. The mangling of an integer type is
   // type ::= 'Bi' NATURAL '_'
   llvm::StringRef nameRef(Name);
-  if (nameRef.starts_with("Bi") && nameRef.endswith("_")) {
+  if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
     // Drop the front "Bi" and "_" end, check that what we're left with is a
     // bool.
     llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();

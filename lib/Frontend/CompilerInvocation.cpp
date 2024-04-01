@@ -115,7 +115,7 @@ getVersionedPrebuiltModulePath(std::optional<llvm::VersionTuple> sdkVer,
     llvm::sys::path::append(pathWithSDKVer, vs);
     if (llvm::sys::fs::exists(pathWithSDKVer)) {
       return pathWithSDKVer.str().str();
-    } else if (vs.endswith(".0")) {
+    } else if (vs.ends_with(".0")) {
       vs = vs.substr(0, vs.size() - 2);
     } else {
       return defaultPrebuiltPath.str();

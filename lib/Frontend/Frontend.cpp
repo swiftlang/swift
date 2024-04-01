@@ -867,7 +867,7 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
 
 static inline bool isPCHFilenameExtension(StringRef path) {
   return llvm::sys::path::extension(path)
-    .endswith(file_types::getExtension(file_types::TY_PCH));
+    .ends_with(file_types::getExtension(file_types::TY_PCH));
 }
 
 std::string CompilerInstance::getBridgingHeaderPath() const {

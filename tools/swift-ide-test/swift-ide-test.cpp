@@ -1736,7 +1736,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
 
   StringRef BufferText = FileBuf->getBuffer();
   // Drop a single newline character from the buffer.
-  if (BufferText.endswith("\n"))
+  if (BufferText.ends_with("\n"))
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);

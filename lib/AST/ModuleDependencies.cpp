@@ -535,7 +535,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     std::error_code EC;
     for (auto F = FS.dir_begin(RuntimeLibPath, EC);
          !EC && F != llvm::vfs::directory_iterator(); F.increment(EC)) {
-      if (F->path().endswith(".yaml"))
+      if (F->path().ends_with(".yaml"))
         CommonDependencyFiles.emplace_back(F->path().str());
     }
   }
