@@ -1826,10 +1826,37 @@ VarDecl *PreCheckExpression::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
   return methodSelf;
 }
 
+/// Check whether this expression refers to the ~ operator.
+static bool isTildeOperator(Expr *expr) {
+  auto nameMatches = [&](DeclName name) {
+    return name.isOperator() && name.getBaseName().getIdentifier().is("~");
+  };
+
+  if (auto overload = dyn_cast<OverloadedDeclRefExpr>(expr)) {
+    return llvm::any_of(overload->getDecls(), [=](auto *decl) -> bool {
+      return nameMatches(decl->getName());
+    });
+  }
+
+  if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+    return nameMatches(unresolved->getName().getFullName());
+  }
+
+  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+    return nameMatches(declRef->getDecl()->getName());
+  }
+
+  return false;
+}
+
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
+  // If it's already a type expression, return it.
+  if (auto typeExpr = dyn_cast<TypeExpr>(E))
+    return typeExpr;
+
   // Fold member types.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
@@ -2081,6 +2108,17 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
   
+  // Fold '~P' into a composition type.
+  if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(E)) {
+    if (isTildeOperator(unaryExpr->getFn())) {
+      if (auto operand = simplifyTypeExpr(unaryExpr->getOperand())) {
+        auto inverseTypeRepr = new (Ctx) InverseTypeRepr(
+            unaryExpr->getLoc(), operand->getTypeRepr());
+        return new (Ctx) TypeExpr(inverseTypeRepr);
+      }
+    }
+  }
+
   // Fold 'P & Q' into a composition type
   if (auto *binaryExpr = getCompositionExpr(E)) {
     // The protocols we are composing
