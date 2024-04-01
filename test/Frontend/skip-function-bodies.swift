@@ -2,9 +2,9 @@
 
 // Check skipped function bodies are neither typechecked nor SILgen'd when the
 // -experimental-skip-*-function-bodies-* flags are specified.
-// RUN: %target-swift-frontend -emit-sil %s > %t/NoSkip.sil
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-abi-5.10-triple %s > %t/NoSkip.sil
 // RUN: %target-swift-frontend -emit-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s > %t/Skip.noninlinable.sil
-// RUN: %target-swift-frontend -emit-sil -experimental-skip-non-inlinable-function-bodies-without-types -debug-forbid-typecheck-prefix NEVERTYPECHECK %s > %t/Skip.withouttypes.sil
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-abi-5.10-triple -experimental-skip-non-inlinable-function-bodies-without-types -debug-forbid-typecheck-prefix NEVERTYPECHECK %s > %t/Skip.withouttypes.sil
 
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-NO-SKIP --input-file %t/NoSkip.sil
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES,CHECK-SIL-SKIP-NONINLINE --input-file %t/Skip.noninlinable.sil
@@ -14,16 +14,16 @@
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-SKIP-ALL --input-file %t/Skip.all.sil
 
 // Emit module interfaces and check their contents, too.
-// RUN: %target-swift-emit-module-interface(%t/Skip.noninlinable.swiftinterface) %s -module-name Skip -experimental-skip-non-inlinable-function-bodies
+// RUN: %target-swift-emit-module-interface(%t/Skip.noninlinable.swiftinterface) %s -target %target-swift-abi-5.10-triple -module-name Skip -experimental-skip-non-inlinable-function-bodies
 // RUN: %target-swift-typecheck-module-from-interface(%t/Skip.noninlinable.swiftinterface) -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.noninlinable.swiftinterface
-// RUN: %target-swift-emit-module-interface(%t/Skip.all.swiftinterface) %s -module-name Skip -experimental-skip-all-function-bodies
+// RUN: %target-swift-emit-module-interface(%t/Skip.all.swiftinterface) %s -target %target-swift-abi-5.10-triple -module-name Skip -experimental-skip-all-function-bodies
 // RUN: %target-swift-typecheck-module-from-interface(%t/Skip.all.swiftinterface) -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.all.swiftinterface
 
 // Verify that the emitted interfaces match an interface emitted without any
 // body skipping flags.
-// RUN: %target-swift-emit-module-interface(%t/NoSkip.swiftinterface) %s  -module-name Skip
+// RUN: %target-swift-emit-module-interface(%t/NoSkip.swiftinterface) %s -target %target-swift-abi-5.10-triple -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/NoSkip.swiftinterface
 // RUN: diff -u %t/Skip.noninlinable.swiftinterface %t/NoSkip.swiftinterface
 // RUN: diff -u %t/Skip.all.swiftinterface %t/NoSkip.swiftinterface
