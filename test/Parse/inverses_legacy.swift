@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
+
 
 protocol Sando { func make() } // expected-note {{protocol requires function 'make()'}}
                                // expected-note@-1 {{type 'U' does not conform to inherited protocol 'Copyable'}}

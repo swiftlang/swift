@@ -4,7 +4,7 @@
 // RUN: mkdir -p %t/swiftmods %t/objcmods %t/objc
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// XFAIL: noncopyable_generics
+
 
 // Create a module A, then B that depends on A, replace A with an empty module,
 // and then try make a C that depends on B
