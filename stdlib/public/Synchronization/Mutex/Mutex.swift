@@ -53,106 +53,10 @@ public struct Mutex<Value: ~Copyable>: ~Copyable {
 }
 
 @available(SwiftStdlib 6.0, *)
+extension Mutex: @unchecked Sendable where Value: ~Copyable {}
+
+@available(SwiftStdlib 6.0, *)
 extension Mutex where Value: ~Copyable {
-  /// Attempts to acquire the lock and then calls the given closure if
-  /// successful.
-  ///
-  /// If the calling thread was successful in acquiring the lock, the
-  /// closure will be executed and then immediately after it will
-  /// release ownership of the lock. If we were unable to acquire the
-  /// lock, this will return `nil`.
-  ///
-  /// This method is equivalent to the following sequence of code:
-  ///
-  ///     guard mutex.tryLock() else {
-  ///       return nil
-  ///     }
-  ///     defer {
-  ///       mutex.unlock()
-  ///     }
-  ///     return try body(&value)
-  ///
-  /// - Warning: Recursive calls to `tryWithLock` within the
-  ///   closure parameter has behavior that is platform dependent.
-  ///   Some platforms may choose to panic the process, deadlock,
-  ///   or leave this behavior unspecified.
-  ///
-  /// - Parameter body: A closure with a parameter of `Value`
-  ///   that has exclusive access to the value being stored within
-  ///   this mutex. This closure is considered the critical section
-  ///   as it will only be executed if the calling thread acquires
-  ///   the lock.
-  ///
-  /// - Returns: The return value, if any, of the `body` closure parameter
-  ///   or nil if the lock couldn't be acquired.
-  @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public borrowing func tryWithLock<Result: ~Copyable & Sendable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> Result
-  ) throws(E) -> Result? {
-    guard handle.tryLock() else {
-      return nil
-    }
-
-    defer {
-      handle.unlock()
-    }
-
-    return try body(&value.address.pointee)
-  }
-
-  /// Attempts to acquire the lock and then calls the given closure if
-  /// successful.
-  ///
-  /// If the calling thread was successful in acquiring the lock, the
-  /// closure will be executed and then immediately after it will
-  /// release ownership of the lock. If we were unable to acquire the
-  /// lock, this will return `nil`.
-  ///
-  /// This method is equivalent to the following sequence of code:
-  ///
-  ///     guard mutex.tryLock() else {
-  ///       return nil
-  ///     }
-  ///     defer {
-  ///       mutex.unlock()
-  ///     }
-  ///     return try body(&value)
-  ///
-  /// - Note: This version of `tryWithLock` is unchecked because it does
-  ///   not enforce any sendability guarantees.
-  ///
-  /// - Warning: Recursive calls to `tryWithLockUnchecked` within the
-  ///   closure parameter has behavior that is platform dependent.
-  ///   Some platforms may choose to panic the process, deadlock,
-  ///   or leave this behavior unspecified.
-  ///
-  /// - Parameter body: A closure with a parameter of `Value`
-  ///   that has exclusive access to the value being stored within
-  ///   this mutex. This closure is considered the critical section
-  ///   as it will only be executed if the calling thread acquires
-  ///   the lock.
-  ///
-  /// - Returns: The return value, if any, of the `body` closure parameter
-  ///   or nil if the lock couldn't be acquired.
-  @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public borrowing func tryWithLockUnchecked<Result: ~Copyable, E: Error>(
-    _ body: (inout Value) throws(E) -> Result
-  ) throws(E) -> Result? {
-    guard handle.tryLock() else {
-      return nil
-    }
-
-    defer {
-      handle.unlock()
-    }
-
-    return try body(&value.address.pointee)
-  }
-
   /// Calls the given closure after acquring the lock and then releases
   /// ownership.
   ///
@@ -191,39 +95,46 @@ extension Mutex where Value: ~Copyable {
     return try body(&value.address.pointee)
   }
 
-  /// Calls the given closure after acquring the lock and then releases
-  /// ownership.
+  /// Attempts to acquire the lock and then calls the given closure if
+  /// successful.
+  ///
+  /// If the calling thread was successful in acquiring the lock, the
+  /// closure will be executed and then immediately after it will
+  /// release ownership of the lock. If we were unable to acquire the
+  /// lock, this will return `nil`.
   ///
   /// This method is equivalent to the following sequence of code:
   ///
-  ///     mutex.lock()
+  ///     guard mutex.tryLock() else {
+  ///       return nil
+  ///     }
   ///     defer {
   ///       mutex.unlock()
   ///     }
   ///     return try body(&value)
   ///
-  /// - Warning: Recursive calls to `withLockUnchecked` within the
+  /// - Warning: Recursive calls to `withLockIfAvailable` within the
   ///   closure parameter has behavior that is platform dependent.
   ///   Some platforms may choose to panic the process, deadlock,
   ///   or leave this behavior unspecified.
   ///
-  /// - Note: This version of `withLock` is unchecked because it does
-  ///   not enforce any sendability guarantees.
-  ///
   /// - Parameter body: A closure with a parameter of `Value`
   ///   that has exclusive access to the value being stored within
   ///   this mutex. This closure is considered the critical section
-  ///   as it will only be executed once the calling thread has
-  ///   acquired the lock.
+  ///   as it will only be executed if the calling thread acquires
+  ///   the lock.
   ///
-  /// - Returns: The return value, if any, of the `body` closure parameter.
+  /// - Returns: The return value, if any, of the `body` closure parameter
+  ///   or nil if the lock couldn't be acquired.
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func withLockUnchecked<Result: ~Copyable, E: Error>(
-    _ body: (inout Value) throws(E) -> Result
-  ) throws(E) -> Result {
-    handle.lock()
+  public borrowing func withLockIfAvailable<Result: ~Copyable & Sendable, E: Error>(
+    _ body: @Sendable (inout Value) throws(E) -> Result
+  ) throws(E) -> Result? {
+    guard handle.tryLock() else {
+      return nil
+    }
 
     defer {
       handle.unlock()
@@ -256,6 +167,3 @@ extension Mutex where Value == Void {
     handle.unlock()
   }
 }
-
-@available(SwiftStdlib 6.0, *)
-extension Mutex: @unchecked Sendable where Value: Sendable {}

@@ -24,7 +24,12 @@
 #define SWIFT_FUTEX_WAITERS FUTEX_WAITERS
 
 static inline __swift_uint32_t _swift_stdlib_gettid() {
-  static __thread tid = syscall(SYS_gettid);
+  static __thread tid = 0;
+
+  if (tid == 0) {
+    tid = syscall(SYS_gettid);
+  }
+
   return tid;
 }
 
