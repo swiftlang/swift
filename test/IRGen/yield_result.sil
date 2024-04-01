@@ -13,8 +13,8 @@ sil @coro_ret_pair : $@yield_once @convention(thin) () -> (@yields Builtin.Int64
 // CHECK-SAME:  [[CORO_ATTRIBUTES:#[0-9]+]]
 sil @test_simple : $@yield_once () -> (Builtin.Int64) {
 entry:
-  // CHECK-32:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$sBi64_IetAd_TC", ptr @malloc, ptr @free)
-  // CHECK-64:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$sBi64_IetAd_TC", ptr @malloc, ptr @free)
+  // CHECK-32:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$sBi64_IetAd_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
+  // CHECK-64:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$sBi64_IetAd_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
   // CHECK-NEXT:    [[BEGIN:%.*]] = call ptr @llvm.coro.begin(token [[ID]], ptr null)
 
   // CHECK-NEXT:    call swiftcc void @marker(i64 1000)
