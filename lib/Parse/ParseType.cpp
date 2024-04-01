@@ -312,7 +312,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   // Wrap in an InverseTypeRepr if needed.
   if (tildeLoc) {
     TypeRepr *repr;
-    if (EnabledNoncopyableGenerics)
+    if (canSuppressConformancesWithTilde())
       repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
     else
       repr =
