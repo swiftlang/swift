@@ -1,0 +1,39 @@
+#ifndef CUSTOM_LIBCPP_STRING
+#define CUSTOM_LIBCPP_STRING
+
+#include <__config>
+#include <string.h>
+
+CUSTOM_LIBCPP_BEGIN_NAMESPACE_STD
+
+template <class charT>
+class basic_string {
+public:
+    basic_string() = default;
+    basic_string(const charT* str) : size_(strlen(str)) {
+        this->str = new charT[size_];
+        memcpy(this->str, str, size_);
+        this->str[size_] = '\0';
+    }
+    basic_string(const basic_string<charT> &other) : size_(other.size_) {
+        this->str = new charT[size_];
+        memcpy(this->str, other.str, size_);
+        this->str[size_] = '\0';
+    }
+    ~basic_string() {
+        if (str)
+            delete[] str;
+    }
+
+    const charT* c_str() const { return str; }
+    size_t size() const { return size_; }
+private:
+    charT* str = nullptr;
+    size_t size_ = 0;
+};
+
+using string = basic_string<char>;
+
+CUSTOM_LIBCPP_END_NAMESPACE_STD
+
+#endif // CUSTOM_LIBCPP_STRING

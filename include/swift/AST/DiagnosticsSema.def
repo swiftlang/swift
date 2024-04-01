@@ -934,6 +934,13 @@ ERROR(need_cxx_interop_to_import_module,none,
       (Identifier))
 NOTE(enable_cxx_interop_docs,none,
      "visit https://www.swift.org/documentation/cxx-interop/project-build-setup to learn how to enable C++ interoperability", ())
+ERROR(need_custom_cxx_stdlib_to_import_module,none,
+      "module %0 uses system's C++ standard library, but "
+      "current compilation uses a custom C++ standard library",
+      (Identifier))
+ERROR(serialization_import_cant_deserialize_custom_cxx_stdlib_decl,Fatal,
+      "%0 from module %1 cannot be imported because it depends on a custom C++ standard library that is not available in the current compilation",
+      (const Decl *, const ModuleDecl *))
 
 ERROR(modularization_issue_decl_moved,Fatal,
       "reference to %select{top-level declaration|type}0 %1 broken by a context change; "

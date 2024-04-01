@@ -1273,6 +1273,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
   Opts.RequireCxxInteropToImportCxxInteropModule =
       !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
+  if (const auto *A = Args.getLastArg(OPT_cxx_stdlib_path)) {
+    // Normalize the C++ stdlib path so that it can be compared later.
+    SmallString<256> nativePath;
+    llvm::sys::path::native(A->getValue(), nativePath);
+    Opts.cxxInteropCustomLibcxxPath = nativePath.str();
+  }
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 

@@ -8099,14 +8099,27 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   SmallVector<Decl *, 16> members;
   members.reserve(rawMemberIDs.size());
+  bool hasSealed =
+      container->getModuleContext()->hasSealedCxxInteroperability();
+  bool reportDeserializationErrors =
+      hasSealed || !getContext().LangOpts.EnableDeserializationRecovery;
   for (DeclID rawID : rawMemberIDs) {
     Expected<Decl *> next = getDeclChecked(rawID);
     if (next) {
       assert(next.get() && "unchecked error deserializing next member");
       members.push_back(next.get());
     } else {
-      if (!getContext().LangOpts.EnableDeserializationRecovery)
-        fatal(next.takeError());
+      if (reportDeserializationErrors) {
+        if (hasSealed) {
+          getContext().Diags.diagnose(
+              getSourceLoc(),
+              diag::
+                  serialization_import_cant_deserialize_custom_cxx_stdlib_decl,
+              container, container->getModuleContext());
+          consumeError(next.takeError());
+        } else
+          fatal(next.takeError());
+      }
 
       Decl *suppliedMissingMember = handleErrorAndSupplyMissingMember(
           getContext(), container, next.takeError());

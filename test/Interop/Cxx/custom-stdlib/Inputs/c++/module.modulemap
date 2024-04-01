@@ -1,0 +1,24 @@
+module std___config [system] {
+    header "__config"
+    export *
+}
+
+module std_stdint_h [system] {
+    header "stdint.h"
+    export *
+}
+
+module std_cstdint [system] {
+    header "cstdint"
+    export *
+}
+
+module std_string [system] {
+    header "string"
+    export *
+}
+
+module custom_std [system] {
+    header "stdmodule.h"
+    export *
+}

@@ -855,6 +855,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
+  BLOCK_RECORD(options_block, HAS_SEALED_CXX_INTEROPERABILITY_ENABLED);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1122,6 +1123,12 @@ void Serializer::writeHeader() {
         options_block::HasCxxInteroperabilityEnabledLayout
             CxxInteroperabilityEnabled(Out);
         CxxInteroperabilityEnabled.emit(ScratchRecord);
+
+        if (M->hasSealedCxxInteroperability()) {
+          options_block::HasSealedCxxInteroperabilityEnabledLayout
+              SealedCxxInteroperabilityEnabled(Out);
+          SealedCxxInteroperabilityEnabled.emit(ScratchRecord);
+        }
       }
 
       if (Options.SerializeOptionsForDebugging) {

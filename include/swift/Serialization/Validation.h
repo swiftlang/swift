@@ -141,6 +141,7 @@ class ExtendedValidationInfo {
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
     unsigned AllowNonResilientAccess: 1;
+    unsigned HasSealedCxxInteroperability : 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -234,6 +235,12 @@ public:
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
+  }
+  bool hasSealedCxxInteroperability() const {
+    return Bits.HasSealedCxxInteroperability;
+  }
+  void setHasSealedCxxInteroperability(bool val) {
+    Bits.HasSealedCxxInteroperability = val;
   }
 };
 

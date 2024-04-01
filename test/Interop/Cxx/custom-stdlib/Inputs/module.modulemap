@@ -1,0 +1,9 @@
+module CxxHeader {
+    header "header.h"
+    export *
+}
+
+module CxxHeaderSystemStdlib {
+    header "header-system-stdlib.h"
+    export *
+}
