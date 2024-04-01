@@ -1107,7 +1107,7 @@ final public class TuplePackElementAddrInst: SingleValueInstruction {
 
 final public class PackElementGetInst: SingleValueInstruction {}
 
-final public class PackElementSetInst: SingleValueInstruction {}
+final public class PackElementSetInst: Instruction {}
 
 final public class DifferentiableFunctionInst: SingleValueInstruction {}
 
