@@ -7727,8 +7727,6 @@ ERROR(noncopyable_enums_do_not_support_indirect,none,
       "noncopyable enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
 ERROR(noncopyable_cast,none,
       "noncopyable types cannot be conditionally cast", ())
-ERROR(noncopyable_failable_init,none,
-      "noncopyable types cannot have failable initializers yet", ())
 ERROR(noncopyable_objc_enum, none,
       "noncopyable enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,

@@ -109,7 +109,7 @@ struct NeverCopyableDeinit<T: ~Copyable>: ~Copyable {
 }
 
 protocol Test: ~Copyable {
-  init?() // expected-error {{noncopyable types cannot have failable initializers yet}}
+  init?()
 }
 
 struct NoncopyableAndSendable: ~Copyable, Sendable {}
