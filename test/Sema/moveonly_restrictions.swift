@@ -6,13 +6,13 @@ class CopyableKlass {}
 
 @_moveOnly
 class MoveOnlyKlass { // expected-note 6{{class 'MoveOnlyKlass' has '~Copyable' constraint preventing 'Copyable' conformance}}
-    init?() {} // expected-error {{noncopyable types cannot have failable initializers yet}}
+    init?() {}
 }
 
 @_moveOnly
 struct MoveOnlyStruct { // expected-note {{struct 'MoveOnlyStruct' has '~Copyable' constraint preventing 'Copyable' conformance}}
-    init?(one: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
-    init!(two: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
+    init?(one: Bool) {}
+    init!(two: Bool) {}
 }
 
 class C {
@@ -78,19 +78,19 @@ enum EMoveOnly {
     case lhs(CopyableKlass)
     case rhs(MoveOnlyKlass)
 
-    init?() {} // expected-error {{noncopyable types cannot have failable initializers yet}}
+    init?() {}
 }
 
 extension EMoveOnly {
-    init!(three: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
+    init!(three: Bool) {}
 }
 
 extension MoveOnlyKlass {
-    convenience init?(three: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
+    convenience init?(three: Bool) {}
 }
 
 extension MoveOnlyStruct {
-    init?(three: Bool) {} // expected-error {{noncopyable types cannot have failable initializers yet}}
+    init?(three: Bool) {}
 }
 
 func foo() {
