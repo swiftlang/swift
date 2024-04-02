@@ -1022,12 +1022,14 @@ extension LifetimeDependenceDefUseWalker {
       assert(!mdi.isUnresolved && !mdi.isNonEscaping,
              "should be handled as a dependence by AddressUseVisitor")
     }
-    if operand.instruction is ReturnInst, !operand.value.isEscapable {
-      return returnedDependence(result: operand)
+    if operand.instruction is YieldInst {
+      if operand.value.isEscapable {
+        return leafUse(of: operand)
+      } else {
+        return yieldedDependence(result: operand)
+      }
     }
-    if operand.instruction is YieldInst, !operand.value.isEscapable {
-      return yieldedDependence(result: operand)
-    }
+    // Escaping an address
     return escapingDependence(on: operand)
   }
 
