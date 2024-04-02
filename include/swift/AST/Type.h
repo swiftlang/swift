@@ -126,17 +126,6 @@ public:
                                     ProtocolDecl *conformedProtocol) const;
 };
 
-/// Functor class suitable for use as a \c LookupConformanceFn that provides
-/// only abstract conformances, or builtin conformances for invertible protocols
-/// for generic types. Asserts that the replacement
-/// type is an opaque generic type.
-class MakeAbstractOrBuiltinConformanceForGenericType {
-public:
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
-};
-
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
 /// conformances from a generic signature.
 class LookUpConformanceInSignature {
