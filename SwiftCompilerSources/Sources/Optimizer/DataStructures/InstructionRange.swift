@@ -64,10 +64,8 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   static func beginningInstruction(for value: Value) -> Instruction {
-    if let def = value.definingInstruction {
+    if let def = value.definingInstructionOrTerminator {
       return def
-    } else if let result = TerminatorResult(value) {
-      return result.terminator
     }
     assert(Phi(value) != nil || value is FunctionArgument)
     return value.parentBlock.instructions.first!
