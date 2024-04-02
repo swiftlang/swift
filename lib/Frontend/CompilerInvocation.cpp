@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/ParseVersion.h"
@@ -855,10 +856,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
+    bool knownFeatureName = false;
     // Allow StrictConcurrency to have a value that corresponds to the
     // -strict-concurrency=<blah> settings.
     StringRef value = A->getValue();
     if (value.starts_with("StrictConcurrency")) {
+      knownFeatureName = true;
       auto decomposed = value.split("=");
       if (decomposed.first == "StrictConcurrency") {
         if (decomposed.second == "") {
@@ -872,6 +875,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
     if (auto feature = getExperimentalFeature(value)) {
+      knownFeatureName = true;
       if (Opts.RestrictNonProductionExperimentalFeatures &&
           !isFeatureAvailableInProduction(*feature)) {
         Diags.diagnose(SourceLoc(), diag::experimental_not_supported_in_production,
@@ -896,18 +900,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // maybe have extra arguments in the future.
     auto strRef = StringRef(A->getValue());
     if (strRef.starts_with("AvailabilityMacro=")) {
+      knownFeatureName = true;
       auto availability = strRef.split("=").second;
 
       Opts.AvailabilityMacros.push_back(availability.str());
+    }
+
+    if (!knownFeatureName) {
+      llvm::errs() << "error: unknown experimental feature "
+                   << QuotedString(value) << "\n";
+      exit(-1);
     }
   }
 
   // Map historical flags over to future features.
   for (const Arg *A : Args.filtered(OPT_enable_upcoming_feature)) {
-    // Ignore unknown features.
     auto feature = getUpcomingFeature(A->getValue());
-    if (!feature)
-      continue;
+    if (!feature) {
+      llvm::errs() << "error: unknown upcoming feature "
+                   << QuotedString(A->getValue()) << "\n";
+      exit(-1);
+    }
 
     // Check if this feature was introduced already in this language version.
     if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
