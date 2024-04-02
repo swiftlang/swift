@@ -562,4 +562,7 @@ SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
 SWIFT_REQUEST(TypeChecker, ObjCRequirementMapRequest,
               ObjCRequirementMap(const ProtocolDecl *proto),
               Cached, NoLocationInfo)
-
+SWIFT_REQUEST(TypeChecker, ImportDeclRequest,
+              std::optional<AttributedImport<ImportedModule>>(
+                  const SourceFile *sf, const ModuleDecl *mod),
+              Cached, NoLocationInfo)

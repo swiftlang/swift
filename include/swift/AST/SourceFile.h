@@ -418,6 +418,11 @@ public:
     ImportedUnderlyingModule = module;
   }
 
+  /// Finds the import declaration that effectively imports a given module in
+  /// this source file.
+  std::optional<AttributedImport<ImportedModule>>
+  findImport(const ModuleDecl *mod) const;
+
   /// Whether the given import has used @preconcurrency.
   bool hasImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import) const;
