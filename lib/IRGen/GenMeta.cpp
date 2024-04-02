@@ -6972,6 +6972,27 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     case RequirementKind::Conformance: {
       auto protocol = requirement.getProtocolDecl();
 
+      // If this is an invertible protocol, encode it as an inverted protocol
+      // check with all but this protocol masked off.
+      if (auto invertible = protocol->getInvertibleProtocolKind()) {
+        ++metadata.NumRequirements;
+
+        InvertibleProtocolSet mask(0xFFFF);
+        mask.remove(*invertible);
+
+        auto flags = GenericRequirementFlags(
+            GenericRequirementKind::InvertedProtocols,
+            /*key argument*/ false,
+            /* is parameter pack */false);
+        addGenericRequirement(IGM, B, metadata, sig, flags,
+                              requirement.getFirstType(),
+         [&]{
+          B.addInt16(0xFFFF);
+          B.addInt16(mask.rawBits());
+        });
+        break;
+      }
+
       // Marker protocols do not record generic requirements at all.
       if (protocol->isMarkerProtocol()) {
         break;

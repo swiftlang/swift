@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1470,6 +1471,10 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // valid conformance will be returned.
     auto Conformance = SM->checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
+      return false;
+
+    auto layout = TargetType->getExistentialLayout();
+    if (layout.getProtocols().size() != 1)
       return false;
 
     SILBuilderWithScope B(Inst);
