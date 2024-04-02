@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend %s -typecheck -verify -enable-experimental-cxx-interop -Xcc -std=c++17
-// RUN: %target-swift-frontend %s -typecheck -verify -cxx-interoperability-mode=swift-6 -Xcc -std=c++17
-// RUN: %target-swift-frontend %s -typecheck -verify -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++17
+// RUN: %target-swift-frontend %s -typecheck -verify -enable-experimental-cxx-interop
+// RUN: %target-swift-frontend %s -typecheck -verify -cxx-interoperability-mode=swift-6
+// RUN: %target-swift-frontend %s -typecheck -verify -cxx-interoperability-mode=upcoming-swift
 
 // REQUIRES: OS=macosx || OS=linux-gnu
 
