@@ -624,11 +624,7 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
     os << "disconnected";
     return;
   case Actor:
-    if (hasActorIsolation() && getActorIsolation()) {
-      getActorIsolation()->printForDiagnostics(os);
-    } else {
-      os << "actor-isolated";
-    }
+    getActorIsolation().printForDiagnostics(os);
     return;
   case Task:
     os << "task-isolated";

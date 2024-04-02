@@ -110,19 +110,18 @@ private:
   // clang-format off
   std::variant<
     // Used for actor isolated when we have ActorIsolation info from the AST.
-    std::optional<ActorIsolation>,
-    // Used for actor isolation when we infer the actor at the SIL level.
-    NominalTypeDecl *,
+    ActorIsolation,
     // The task isolated parameter when we find a task isolated value.
     SILValue
   > data;
   // clang-format on
 
-  SILIsolationInfo(Kind kind, std::optional<ActorIsolation> actorIsolation)
-      : kind(kind), data(actorIsolation) {}
-  SILIsolationInfo(Kind kind, NominalTypeDecl *decl) : kind(kind), data(decl) {}
+  SILIsolationInfo(ActorIsolation actorIsolation)
+      : kind(Actor), data(actorIsolation) {}
 
   SILIsolationInfo(Kind kind, SILValue value) : kind(kind), data(value) {}
+
+  SILIsolationInfo(Kind kind) : kind(kind), data() {}
 
 public:
   SILIsolationInfo() : kind(Kind::Unknown), data() {}
@@ -146,18 +145,11 @@ public:
 
   void printForDiagnostics(llvm::raw_ostream &os) const;
 
-  std::optional<ActorIsolation> getActorIsolation() const {
+  ActorIsolation getActorIsolation() const {
     assert(kind == Actor);
-    assert(std::holds_alternative<std::optional<ActorIsolation>>(data) &&
+    assert(std::holds_alternative<ActorIsolation>(data) &&
            "Doesn't have an actor isolation?!");
-    return std::get<std::optional<ActorIsolation>>(data);
-  }
-
-  NominalTypeDecl *getActorInstance() const {
-    assert(kind == Actor);
-    assert(std::holds_alternative<NominalTypeDecl *>(data) &&
-           "Doesn't have an actor instance?!");
-    return std::get<NominalTypeDecl *>(data);
+    return std::get<ActorIsolation>(data);
   }
 
   SILValue getTaskIsolatedValue() const {
@@ -167,23 +159,11 @@ public:
     return std::get<SILValue>(data);
   }
 
-  bool hasActorIsolation() const {
-    return kind == Actor &&
-           std::holds_alternative<std::optional<ActorIsolation>>(data);
-  }
-
-  bool hasActorInstance() const {
-    return kind == Actor && std::holds_alternative<NominalTypeDecl *>(data);
-  }
+  bool hasActorIsolation() const { return kind == Actor; }
 
   bool hasTaskIsolatedValue() const {
     return kind == Task && std::holds_alternative<SILValue>(data);
   }
-
-  /// If we actually have an actor decl, return that. Otherwise, see if we have
-  /// an actor isolation if we can find one in there. Returns nullptr if we
-  /// fail.
-  NominalTypeDecl *tryInferActorDecl() const;
 
   [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const;
 
@@ -191,21 +171,19 @@ public:
     return SILIsolationInfo::getActorIsolated(isolation);
   }
 
-  static SILIsolationInfo getDisconnected() { return {Kind::Disconnected, {}}; }
+  static SILIsolationInfo getDisconnected() { return {Kind::Disconnected}; }
 
   static SILIsolationInfo getActorIsolated(ActorIsolation actorIsolation) {
-    return {Kind::Actor, actorIsolation};
+    return {actorIsolation};
   }
 
-  /// Sometimes we may have something that is actor isolated or that comes from
-  /// a type. First try getActorIsolation and otherwise, just use the type.
-  static SILIsolationInfo getActorIsolated(NominalTypeDecl *nomDecl) {
-    auto actorIsolation = swift::getActorIsolation(nomDecl);
-    if (actorIsolation.isActorIsolated())
-      return getActorIsolated(actorIsolation);
-    if (nomDecl->isActor())
-      return {Kind::Actor, nomDecl};
-    return SILIsolationInfo();
+  static SILIsolationInfo getActorIsolated(NominalTypeDecl *typeDecl) {
+    if (typeDecl->isActor())
+      return {ActorIsolation::forActorInstanceSelf(typeDecl)};
+    auto isolation = swift::getActorIsolation(typeDecl);
+    if (isolation.isGlobalActor())
+      return {isolation};
+    return {};
   }
 
   static SILIsolationInfo getGlobalActorIsolated(Type globalActorType) {
