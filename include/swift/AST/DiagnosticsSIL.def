@@ -46,6 +46,9 @@ ERROR(bridging_objcbridgeable_broken,none,
 ERROR(sil_function_redefinition,none,
       "multiple definitions of symbol '%0'",
       (StringRef))
+NOTE(sil_function_redefinition_note,none,
+      "other definition here",
+      ())
 
 ERROR(invalid_sil_builtin,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
