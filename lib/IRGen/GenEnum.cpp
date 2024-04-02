@@ -165,6 +165,9 @@ static APInt zextOrSelf(const APInt &i, unsigned width) {
 EnumImplStrategy::EnumImplStrategy(IRGenModule &IGM,
                                    TypeInfoKind tik,
                                    IsFixedSize_t alwaysFixedSize,
+                                   IsTriviallyDestroyable_t triviallyDestroyable,
+                                   IsCopyable_t copyable,
+                                   IsBitwiseTakable_t bitwiseTakable,
                                    unsigned NumElements,
                                    std::vector<Element> &&eltsWithPayload,
                                    std::vector<Element> &&eltsWithNoPayload)
@@ -172,6 +175,8 @@ EnumImplStrategy::EnumImplStrategy(IRGenModule &IGM,
     ElementsWithNoPayload(std::move(eltsWithNoPayload)),
     IGM(IGM), TIK(tik), AlwaysFixedSize(alwaysFixedSize),
     ElementsAreABIAccessible(areElementsABIAccessible(ElementsWithPayload)),
+    TriviallyDestroyable(triviallyDestroyable), Copyable(copyable),
+    BitwiseTakable(bitwiseTakable),
     NumElements(NumElements) {
 }
 
@@ -379,11 +384,14 @@ namespace {
     SingletonEnumImplStrategy(IRGenModule &IGM,
                               TypeInfoKind tik,
                               IsFixedSize_t alwaysFixedSize,
+                              IsTriviallyDestroyable_t triviallyDestroyable,
+                              IsCopyable_t copyable,
+                              IsBitwiseTakable_t bitwiseTakable,
                               unsigned NumElements,
                               std::vector<Element> &&WithPayload,
                               std::vector<Element> &&WithNoPayload)
-      : EnumImplStrategy(IGM, tik, alwaysFixedSize,
-                         NumElements,
+      : EnumImplStrategy(IGM, tik, alwaysFixedSize, triviallyDestroyable,
+                         copyable, bitwiseTakable, NumElements,
                          std::move(WithPayload),
                          std::move(WithNoPayload))
     {
@@ -926,11 +934,14 @@ namespace {
     NoPayloadEnumImplStrategyBase(IRGenModule &IGM,
                                   TypeInfoKind tik,
                                   IsFixedSize_t alwaysFixedSize,
+                                  IsTriviallyDestroyable_t triviallyDestroyable,
+                                  IsCopyable_t copyable,
+                                  IsBitwiseTakable_t bitwiseTakable,
                                   unsigned NumElements,
                                   std::vector<Element> &&WithPayload,
                                   std::vector<Element> &&WithNoPayload)
-      : SingleScalarTypeInfo(IGM, tik, alwaysFixedSize,
-                             NumElements,
+      : SingleScalarTypeInfo(IGM, tik, alwaysFixedSize, triviallyDestroyable,
+                             copyable, bitwiseTakable, NumElements,
                              std::move(WithPayload),
                              std::move(WithNoPayload))
     {
@@ -1149,11 +1160,15 @@ namespace {
     NoPayloadEnumImplStrategy(IRGenModule &IGM,
                               TypeInfoKind tik,
                               IsFixedSize_t alwaysFixedSize,
+                              IsTriviallyDestroyable_t triviallyDestroyable,
+                              IsCopyable_t copyable,
+                              IsBitwiseTakable_t bitwiseTakable,
                               unsigned NumElements,
                               std::vector<Element> &&WithPayload,
                               std::vector<Element> &&WithNoPayload)
       : NoPayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
-                                      NumElements,
+                                      triviallyDestroyable, copyable,
+                                      bitwiseTakable, NumElements,
                                       std::move(WithPayload),
                                       std::move(WithNoPayload))
     {
@@ -1308,10 +1323,15 @@ namespace {
     CCompatibleEnumImplStrategy(IRGenModule &IGM,
                                 TypeInfoKind tik,
                                 IsFixedSize_t alwaysFixedSize,
+                                IsTriviallyDestroyable_t triviallyDestroyable,
+                                IsCopyable_t copyable,
+                                IsBitwiseTakable_t bitwiseTakable,
                                 unsigned NumElements,
                                 std::vector<Element> &&WithPayload,
                                 std::vector<Element> &&WithNoPayload)
       : NoPayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
+                                      triviallyDestroyable,
+                                      copyable, bitwiseTakable,
                                       NumElements,
                                       std::move(WithPayload),
                                       std::move(WithNoPayload))
@@ -1475,11 +1495,15 @@ namespace {
     PayloadEnumImplStrategyBase(IRGenModule &IGM,
                                 TypeInfoKind tik,
                                 IsFixedSize_t alwaysFixedSize,
+                                IsTriviallyDestroyable_t triviallyDestroyable,
+                                IsCopyable_t copyable,
+                                IsBitwiseTakable_t bitwiseTakable,
                                 unsigned NumElements,
                                 std::vector<Element> &&WithPayload,
                                 std::vector<Element> &&WithNoPayload,
                                 EnumPayloadSchema schema)
       : EnumImplStrategy(IGM, tik, alwaysFixedSize,
+                         triviallyDestroyable, copyable, bitwiseTakable,
                          NumElements,
                          std::move(WithPayload),
                          std::move(WithNoPayload)),
@@ -1928,11 +1952,15 @@ namespace {
     SinglePayloadEnumImplStrategy(IRGenModule &IGM,
                                   TypeInfoKind tik,
                                   IsFixedSize_t alwaysFixedSize,
+                                  IsTriviallyDestroyable_t triviallyDestroyable,
+                                  IsCopyable_t copyable,
+                                  IsBitwiseTakable_t bitwiseTakable,
                                   unsigned NumElements,
                                   std::vector<Element> &&WithPayload,
                                   std::vector<Element> &&WithNoPayload)
       : PayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
-                                    NumElements,
+                                    triviallyDestroyable, copyable,
+                                    bitwiseTakable, NumElements,
                                     std::move(WithPayload),
                                     std::move(WithNoPayload),
                                 getPreferredPayloadSchema(WithPayload.front())),
@@ -3814,11 +3842,15 @@ namespace {
                                  TypeInfoKind tik,
                                  IsFixedSize_t alwaysFixedSize,
                                  bool allowFixedLayoutOptimizations,
+                                 IsTriviallyDestroyable_t triviallyDestroyable,
+                                 IsCopyable_t copyable,
+                                 IsBitwiseTakable_t bitwiseTakable,
                                  unsigned NumElements,
                                  std::vector<Element> &&WithPayload,
                                  std::vector<Element> &&WithNoPayload)
       : PayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
-                                    NumElements,
+                                    triviallyDestroyable, copyable,
+                                    bitwiseTakable, NumElements,
                                     std::move(WithPayload),
                                     std::move(WithNoPayload),
                                     getPayloadSchema(WithPayload)),
@@ -3829,19 +3861,9 @@ namespace {
 
       // Check the payloads to see if we can take advantage of common layout to
       // optimize our value semantics.
-      bool allTriviallyDestroyable = true;
-      bool allBitwiseTakable = true;
       bool allSingleRefcount = true;
-      bool allCopyable = true;
       bool haveRefcounting = false;
       for (auto &elt : ElementsWithPayload) {
-        if (!elt.ti->isTriviallyDestroyable(ResilienceExpansion::Maximal))
-          allTriviallyDestroyable = false;
-        if (!elt.ti->isBitwiseTakable(ResilienceExpansion::Maximal))
-          allBitwiseTakable = false;
-        if (!elt.ti->isCopyable(ResilienceExpansion::Maximal))
-          allCopyable = false;
-
         // refcounting is only set in the else branches
         ReferenceCounting refcounting;
         if (!elt.ti->isSingleRetainablePointer(ResilienceExpansion::Maximal,
@@ -3862,7 +3884,8 @@ namespace {
 
       if (!ElementsAreABIAccessible) {
         CopyDestroyKind = ABIInaccessible;
-      } else if (allTriviallyDestroyable) {
+      } else if (this->EnumImplStrategy::TriviallyDestroyable ==
+                   IsTriviallyDestroyable) {
         assert(!allSingleRefcount && "TriviallyDestroyable *and* refcounted?!");
         CopyDestroyKind = TriviallyDestroyable;
       // FIXME: Memory corruption issues arise when enabling this for mixed
@@ -3870,7 +3893,8 @@ namespace {
       } else if (allSingleRefcount
                  && ElementsWithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedRefcounted;
-      } else if (allBitwiseTakable && allCopyable) {
+      } else if (this->EnumImplStrategy::BitwiseTakable == IsBitwiseTakable &&
+                 Copyable == IsCopyable) {
         CopyDestroyKind = BitwiseTakable;
       }
     }
@@ -5920,10 +5944,13 @@ namespace {
   {
   public:
     ResilientEnumImplStrategy(IRGenModule &IGM,
+                              IsCopyable_t copyable,
                               unsigned NumElements,
                               std::vector<Element> &&WithPayload,
                               std::vector<Element> &&WithNoPayload)
       : EnumImplStrategy(IGM, Opaque, IsFixedSize,
+                         IsNotTriviallyDestroyable, copyable,
+                         IsNotBitwiseTakable,
                          NumElements,
                          std::move(WithPayload),
                          std::move(WithNoPayload))
@@ -6321,9 +6348,24 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
   IsFixedSize_t alwaysFixedSize = IsFixedSize;
+  auto triviallyDestroyable = theEnum->getValueTypeDestructor()
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto copyable = !theEnum->canBeCopyable()
+    ? IsNotCopyable : IsCopyable;
+  auto bitwiseTakable = IsBitwiseTakable; // FIXME: will there be check here?
   bool allowFixedLayoutOptimizations = true;
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
+
+  // Note that the enum has a payload of the given type, so that the various
+  // flags can be updated.
+  auto notePayloadType = [&](const TypeInfo &payloadTI) {
+    triviallyDestroyable = triviallyDestroyable &
+      payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
+    copyable = copyable & payloadTI.isCopyable(ResilienceExpansion::Maximal);
+    bitwiseTakable = bitwiseTakable &
+      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+  };
 
   if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
     alwaysFixedSize = IsNotFixedSize;
@@ -6365,6 +6407,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // without recurring. The box won't affect loadability or fixed-ness.
     if (elt->isIndirect() || theEnum->isIndirect()) {
       auto *nativeTI = &TC.getNativeObjectTypeInfo();
+      notePayloadType(*nativeTI);
+      // FIXME: indirect noncopyable elements might need to check copyable
+      // on the element type as well.
       elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
@@ -6392,7 +6437,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // If the payload is empty, turn the case into a no-payload case, but
     // only if case numbering remains unchanged from all resilience domains
     // that can see the enum.
-    if (origArgTI->isKnownEmpty(accessScope)) {
+    if (origArgTI->isKnownEmpty(accessScope) &&
+        origArgTI->isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+      notePayloadType(*origArgTI);
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
     } else {
       // *Now* apply the substitutions and get the type info for the instance's
@@ -6402,6 +6449,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
           elt, TC.IGM.getSILModule(), TC.IGM.getMaximalTypeExpansionContext());
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
+      notePayloadType(*substArgTI);
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});
 
       if (!isResilient) {
@@ -6428,7 +6476,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
 
   if (isResilient) {
     return std::unique_ptr<EnumImplStrategy>(
-            new ResilientEnumImplStrategy(TC.IGM,
+            new ResilientEnumImplStrategy(TC.IGM, copyable,
                                          numElements,
                                          std::move(elementsWithPayload),
                                          std::move(elementsWithNoPayload)));
@@ -6437,7 +6485,8 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   // namespace-like enums must be imported as empty decls.
   if (theEnum->hasClangNode() && numElements == 0 && !theEnum->isObjC()) {
     return std::unique_ptr<EnumImplStrategy>(new SingletonEnumImplStrategy(
-        TC.IGM, tik, alwaysFixedSize, numElements,
+        TC.IGM, tik, alwaysFixedSize, triviallyDestroyable, copyable,
+        bitwiseTakable, numElements,
         std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
@@ -6447,7 +6496,8 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
     return std::unique_ptr<EnumImplStrategy>(
            new CCompatibleEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
-                                           numElements,
+                                           triviallyDestroyable, copyable,
+                                           bitwiseTakable, numElements,
                                            std::move(elementsWithPayload),
                                            std::move(elementsWithNoPayload)));
   }
@@ -6455,26 +6505,30 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   if (numElements <= 1)
     return std::unique_ptr<EnumImplStrategy>(
           new SingletonEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
-                                         numElements,
-                                         std::move(elementsWithPayload),
-                                         std::move(elementsWithNoPayload)));
+                                        triviallyDestroyable, copyable,
+                                        bitwiseTakable, numElements,
+                                        std::move(elementsWithPayload),
+                                        std::move(elementsWithNoPayload)));
   if (elementsWithPayload.size() > 1)
     return std::unique_ptr<EnumImplStrategy>(
            new MultiPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
                                             allowFixedLayoutOptimizations,
-                                            numElements,
+                                            triviallyDestroyable, copyable,
+                                            bitwiseTakable, numElements,
                                             std::move(elementsWithPayload),
                                             std::move(elementsWithNoPayload)));
   if (elementsWithPayload.size() == 1)
     return std::unique_ptr<EnumImplStrategy>(
            new SinglePayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
-                                             numElements,
+                                             triviallyDestroyable, copyable,
+                                             bitwiseTakable, numElements,
                                              std::move(elementsWithPayload),
                                              std::move(elementsWithNoPayload)));
 
   return std::unique_ptr<EnumImplStrategy>(
          new NoPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
-                                       numElements,
+                                       triviallyDestroyable, copyable,
+                                       bitwiseTakable, numElements,
                                        std::move(elementsWithPayload),
                                        std::move(elementsWithNoPayload)));
 }
@@ -6774,10 +6828,6 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
-  auto deinit = theEnum->getValueTypeDestructor()
-    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
   if (ElementsWithPayload.empty()) {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
     Alignment alignment(1);
@@ -6785,8 +6835,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                  Size(0), {},
                  alignment,
-                 deinit,
-                 copyable,
+                 TriviallyDestroyable,
+                 Copyable,
                  AlwaysFixedSize));
   } else {
     const TypeInfo &eltTI = *getSingleton();
@@ -6805,9 +6855,9 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
              alignment,
-             deinit & eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-             eltTI.isBitwiseTakable(ResilienceExpansion::Maximal),
-             copyable,
+             TriviallyDestroyable,
+             BitwiseTakable,
+             Copyable,
              enumAccessible));
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
@@ -6818,9 +6868,9 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
         fixedEltTI.getFixedSize(),
         fixedEltTI.getSpareBits(),
         alignment,
-        deinit & fixedEltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-        fixedEltTI.isBitwiseTakable(ResilienceExpansion::Maximal),
-        copyable);
+        TriviallyDestroyable,
+        BitwiseTakable,
+        Copyable);
     }
   }
 }
@@ -6850,15 +6900,11 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   Alignment alignment(tagSize.getValue());
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
-  auto deinit = theEnum->getValueTypeDestructor()
-    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                               enumTy, tagSize, std::move(spareBits),
                               alignment,
-                              deinit,
-                              copyable,
+                              TriviallyDestroyable,
+                              Copyable,
                               AlwaysFixedSize));
 }
 
@@ -6882,8 +6928,10 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   auto &rawTI = TC.getCompleteTypeInfo(
                                    theEnum->getRawType()->getCanonicalType());
   auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
-  assert(rawFixedTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)
+  assert(TriviallyDestroyable == IsTriviallyDestroyable
          && "c-compatible raw type isn't POD?!");
+  assert(Copyable == IsCopyable
+         && "c-compatible raw type isn't copyable?!");
   ExplosionSchema rawSchema = rawTI.getSchema();
   assert(rawSchema.size() == 1
          && "c-compatible raw type has non-single-scalar representation?!");
@@ -7257,10 +7305,8 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
           theEnum->getDeclaredInterfaceType(), bitwiseCopyableProtocol)) {
     return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
   }
-  auto copyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(
-                       new ResilientEnumTypeInfo(*this, enumTy, copyable,
+                       new ResilientEnumTypeInfo(*this, enumTy, Copyable,
                                                  abiAccessible));
 }
 
