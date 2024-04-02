@@ -622,6 +622,7 @@ function(_compile_swift_files
   endif()
 
   list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics2")
+  list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypes")
 
   if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
     list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")

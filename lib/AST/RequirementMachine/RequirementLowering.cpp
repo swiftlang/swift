@@ -378,11 +378,8 @@ static void desugarConformanceRequirement(
         // Only permit type-parameter subjects.
         errors.push_back(
             RequirementError::forInvalidRequirementSubject(req, loc));
-      } else if (subject->isParameterPack()) {
-        // Disallow parameter packs for now.
-        errors.push_back(RequirementError::forInvalidInverseSubject(req, loc));
       } else {
-        // Record inverse.
+        // Record and desugar inverses.
         auto &ctx = req.getFirstType()->getASTContext();
         for (auto ip : compositionType->getInverses())
           inverses.push_back({req.getFirstType(),
@@ -746,10 +743,29 @@ void swift::rewriting::applyInverses(
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
 
-  // Summarize the inverses and flag ones that are incorrect.
+  // No inverses to even validate.
+  if (inverseList.empty())
+    return;
+
+  const bool allowInverseOnAssocType =
+      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes);
+
+  // Summarize the inverses and diagnose ones that are incorrect.
   llvm::DenseMap<CanType, InvertibleProtocolSet> inverses;
   for (auto inverse : inverseList) {
     auto canSubject = inverse.subject->getCanonicalType();
+
+    // Inverses on associated types are experimental.
+    if (!allowInverseOnAssocType && canSubject->is<DependentMemberType>()) {
+      errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
+      continue;
+    }
+
+    // Noncopyable checking support for parameter packs is not implemented yet.
+    if (canSubject->isParameterPack()) {
+      errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
+      continue;
+    }
 
     // WARNING: possible quadratic behavior, but should be OK in practice.
     auto notInScope = llvm::none_of(gps, [=](Type t) {

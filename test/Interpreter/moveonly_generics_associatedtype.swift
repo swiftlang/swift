@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-sil %s -DBAD_COPY -verify -sil-verify-all -enable-experimental-feature NoncopyableGenerics
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics) | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -DBAD_COPY -verify -sil-verify-all -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature SuppressedAssociatedTypes
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature SuppressedAssociatedTypes) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature SuppressedAssociatedTypes) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: asserts

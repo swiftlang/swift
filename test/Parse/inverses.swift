@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature SuppressedAssociatedTypes
 
 protocol U {}
 
@@ -58,6 +58,7 @@ struct S: ~U, // expected-error {{type 'U' cannot be suppressed}}
           ~Copyable {}
 
 func greenBay<each T: ~Copyable>(_ r: repeat each T) {} // expected-error{{cannot suppress '~Copyable' on type 'each T'}}
+// expected-error@-1 {{'each T' required to be 'Copyable' but is marked with '~Copyable'}}
 
 typealias Clone = Copyable
 func dup<D: ~Clone>(_ d: D) {}
@@ -105,6 +106,7 @@ typealias Z8 = ~Copyable & Hashable // expected-error {{composition cannot conta
 struct NotAProtocol {}
 
 struct Bad: ~NotAProtocol {} // expected-error {{type 'NotAProtocol' cannot be suppressed}}
+
 
 struct X<T: ~Copyable>: ~Copyable { }
 
