@@ -432,7 +432,9 @@ final public class DebugStepInst : Instruction {}
 
 final public class SpecifyTestInst : Instruction {}
 
-final public class UnconditionalCheckedCastAddrInst : Instruction {
+final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAddrInstruction {
+  public var isTakeOfSrc: Bool { true }
+  public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
 }
 
@@ -526,9 +528,6 @@ final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocatio
     return operand.value as! AllocStackInst
   }
 }
-
-final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
-final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
@@ -700,12 +699,6 @@ class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class OpenPackElementInst : SingleValueInstruction {}
-final public class PackLengthInst : SingleValueInstruction {}
-final public class DynamicPackIndexInst : SingleValueInstruction {}
-final public class PackPackIndexInst : SingleValueInstruction {}
-final public class ScalarPackIndexInst : SingleValueInstruction {}
 
 final public class ObjCProtocolInst : SingleValueInstruction {}
 
@@ -1093,20 +1086,6 @@ final public class ObjectInst : SingleValueInstruction {
 final public class VectorInst : SingleValueInstruction {
 }
 
-final public class TuplePackExtractInst: SingleValueInstruction {
-  public var indexOperand: Operand { operands[0] }
-  public var tupleOperand: Operand { operands[1] }
-}
-
-final public class TuplePackElementAddrInst: SingleValueInstruction {
-  public var indexOperand: Operand { operands[0] }
-  public var tupleOperand: Operand { operands[1] }
-}
-
-final public class PackElementGetInst: SingleValueInstruction {}
-
-final public class PackElementSetInst: SingleValueInstruction {}
-
 final public class DifferentiableFunctionInst: SingleValueInstruction {}
 
 final public class LinearFunctionInst: SingleValueInstruction {}
@@ -1139,9 +1118,6 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
 final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
   public var capacity: Value { operand.value }
 }
-
-final public class AllocPackInst : SingleValueInstruction, Allocation {}
-final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
   final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
@@ -1360,6 +1336,36 @@ final public class DestructureStructInst : MultipleValueInstruction, UnaryInstru
 final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruction {
   public var `tuple`: Value { operand.value }
 }
+
+//===----------------------------------------------------------------------===//
+//                           parameter pack instructions
+//===----------------------------------------------------------------------===//
+
+final public class AllocPackInst : SingleValueInstruction, Allocation {}
+final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
+
+final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
+final public class DeallocPackMetadataInst : Instruction, Deallocation {}
+
+final public class OpenPackElementInst : SingleValueInstruction {}
+final public class PackLengthInst : SingleValueInstruction {}
+final public class DynamicPackIndexInst : SingleValueInstruction {}
+final public class PackPackIndexInst : SingleValueInstruction {}
+final public class ScalarPackIndexInst : SingleValueInstruction {}
+
+final public class TuplePackExtractInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
+}
+
+final public class TuplePackElementAddrInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
+}
+
+final public class PackElementGetInst: SingleValueInstruction {}
+
+final public class PackElementSetInst: Instruction {}
 
 //===----------------------------------------------------------------------===//
 //                            terminator instructions
