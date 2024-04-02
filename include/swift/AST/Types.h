@@ -3634,9 +3634,7 @@ public:
     return getExtInfo().isNoEscape();
   }
 
-  bool isSendable() const {
-    return getExtInfo().isSendable();
-  }
+  bool isSendable() const;
 
   bool isAsync() const { return getExtInfo().isAsync(); }
 
