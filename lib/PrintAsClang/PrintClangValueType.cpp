@@ -79,7 +79,7 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
   printCTypeName(os, typeDecl);
   os << " {\n";
   os << "  _Alignas(" << layout.alignment << ") ";
-  os << "char _storage[" << layout.size << "];\n";
+  os << "char _storage[" << std::max(layout.size, 1ULL) << "];\n";
   os << "};\n\n";
 }
 
@@ -199,14 +199,15 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.
   } else if (!typeDecl->isResilient()) {
+    if (isa<EnumDecl>(typeDecl)) {
+      auto elementTagMapping = interopContext.getIrABIDetails()
+          .getEnumTagMapping(cast<EnumDecl>(typeDecl));
+      if (elementTagMapping.empty()) {
+        return;
+      }
+    }
     typeSizeAlign =
         interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-    // typeSizeAlign can be null if this is not a fixed-layout type,
-    // e.g. it has resilient fields.
-    if (typeSizeAlign && typeSizeAlign->size == 0) {
-      // FIXME: How to represent 0 sized structs?
-      return;
-    }
   }
   bool isOpaqueLayout = !typeSizeAlign.has_value();
 
@@ -432,7 +433,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << cxx_synthesis::getCxxOpaqueStorageClassName() << " _storage;\n";
   } else {
     os << "alignas(" << typeSizeAlign->alignment << ") ";
-    os << "char _storage[" << typeSizeAlign->size << "];\n";
+    os << "char _storage[" << std::max(typeSizeAlign->size, 1ULL) << "];\n";
   }
   // Wrap up the value type.
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
