@@ -405,7 +405,8 @@ extension PartialApplyInst {
     if self.numArguments == 1 || self.numArguments == 2, 
        let fun = self.referencedFunction,
        fun.isReabstractionThunk,
-       self.callee.type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
+       self.arguments[0].type.isFunction,
+       self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
     {
       return true
     }

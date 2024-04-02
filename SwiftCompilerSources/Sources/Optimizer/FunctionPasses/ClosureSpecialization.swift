@@ -1,4 +1,4 @@
-//===--- AutodiffClosureSpecialization.swift ---------------------------===//
+//===--- ClosureSpecialization.swift ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,14 @@
 //
 //===-----------------------------------------------------------------------===//
 
+/// This file contains the closure-specialization optimizations for general and differentiable Swift.
+
+/// General Closure Specialization
+/// ------------------------------------
+/// TODO: Add description when the functionality is added.
+
 /// AutoDiff Closure Specialization
-/// ----------------------
+/// -------------------------------
 /// This optimization performs closure specialization tailored for the patterns seen in Swift Autodiff. In principle,
 /// the optimization does the same thing as the existing closure specialization pass. However, it is tailored to the
 /// patterns of Swift Autodiff.
@@ -100,12 +106,32 @@ private func log(_ message: @autoclosure () -> String) {
 }
 
 // =========== Entry point =========== //
-let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-specialize") {
+let generalClosureSpecialization = FunctionPass(name: "experimental-swift-based-closure-specialization") {
+  (function: Function, context: FunctionPassContext) in
+  // TODO: Implement general closure specialization optimization
+  print("NOT IMPLEMENTED")
+}
+
+let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-specialization") {
   (function: Function, context: FunctionPassContext) in
   // TODO: Pass is a WIP and current implementation is incomplete
   if !function.isAutodiffVJP {
     return
   }
+
+  print("Specializing closures in function: \(function.name)")
+  print("===============================================")
+  var callSites = gatherCallSites(in: function, context)
+
+  callSites.forEach { callSite in
+    print("PartialApply call site: \(callSite.applySite)")
+    print("Passed in closures: ")
+    for index in callSite.closureArgDescriptors.indices {
+      var closureArgDescriptor = callSite.closureArgDescriptors[index]
+      print("\(index+1). \(closureArgDescriptor.closureInfo.closure)")
+    }
+  }
+  print("\n")
 }
 
 // =========== Top-level functions ========== //
@@ -276,8 +302,8 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
       if !pai.isPullbackInResultOfAutodiffVJP,
           pai.isPartialApplyOfReabstractionThunk,
           pai.isSupportedClosure,
-          pai.callee.type.isNoEscapeFunction,
-          pai.callee.type.isThickFunction 
+          pai.arguments[0].type.isNoEscapeFunction,
+          pai.arguments[0].type.isThickFunction
       {
         rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: pai.uses)
         possibleMarkDependenceBases.insert(pai)
@@ -338,6 +364,7 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
       continue
     }
 
+    // TODO: Handling generic closures may be possible but is not yet implemented
     if pai.hasSubstitutions || !pai.calleeIsDynamicFunctionRef || !pai.isPullbackInResultOfAutodiffVJP {
       continue
     }
@@ -507,7 +534,7 @@ private func markConvertedAndReabstractedClosuresAsUsed(rootClosure: Value, conv
       convertedAndReabstractedClosures.insert(pai)
       return 
         markConvertedAndReabstractedClosuresAsUsed(rootClosure: rootClosure, 
-                                                   convertedAndReabstractedClosure: pai.callee, 
+                                                   convertedAndReabstractedClosure: pai.arguments[0], 
                                                    convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
     case let cvt as ConvertFunctionInst:
       convertedAndReabstractedClosures.insert(cvt)

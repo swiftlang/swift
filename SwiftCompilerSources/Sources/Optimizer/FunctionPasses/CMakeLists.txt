@@ -12,6 +12,7 @@ swift_compiler_sources(Optimizer
   AsyncDemotion.swift
   BooleanLiteralFolding.swift
   CleanupDebugSteps.swift
+  ClosureSpecialization.swift
   ComputeEscapeEffects.swift
   ComputeSideEffects.swift
   DeadStoreElimination.swift
@@ -30,5 +31,4 @@ swift_compiler_sources(Optimizer
   SimplificationPasses.swift
   StackPromotion.swift
   StripObjectHeaders.swift
-  AutodiffClosureSpecialization.swift
 )
