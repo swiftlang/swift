@@ -349,6 +349,10 @@ class PluginDiagnosticsEngine {
     guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress else {
       return nil
     }
+    // Ensure 'offset' is within the buffer.
+    guard offset <= exportedSourceFile.pointee.buffer.count else {
+      return nil
+    }
     return BridgedSourceLoc(raw: bufferBaseAddress).advanced(by: offset)
   }
 
