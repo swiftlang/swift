@@ -813,6 +813,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   if (!f->empty()) {
     diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
              f->getName());
+    if (f->hasLocation())
+      diagnose(f->getLocation(), diag::sil_function_redefinition_note);
     return;
   }
 
