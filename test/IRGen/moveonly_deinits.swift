@@ -373,3 +373,18 @@ public func testKlassEnumPairWithDeinit() {
         consumeKlassEnumPairWithDeinit(f)
     }
 }
+
+struct EmptyMoveOnlyWithDeinit: ~Copyable {
+  deinit {}
+}
+
+struct EnclosesEmptyMoveOnlyWithDeinit: ~Copyable {
+  var stored: EmptyMoveOnlyWithDeinit
+}
+
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits35testEnclosesEmptyMoveOnlyWithDeinityyF"()
+func testEnclosesEmptyMoveOnlyWithDeinit() {
+  // CHECK-NOT: ret
+  // CHECK: call swiftcc void @"$s16moveonly_deinits23EmptyMoveOnlyWithDeinitVfD"()
+  _ = EnclosesEmptyMoveOnlyWithDeinit(stored: EmptyMoveOnlyWithDeinit())
+}
