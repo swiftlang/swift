@@ -222,7 +222,7 @@ extension LifetimeDependence {
     if value.isEscapable {
       return nil
     }
-    if (value.definingInstruction as! FullApplySite).hasResultDependence {
+    if (value.definingInstructionOrTerminator as! FullApplySite).hasResultDependence {
       return nil
     }
     assert(value.ownership == .owned, "apply result must be owned")
