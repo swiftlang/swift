@@ -2116,40 +2116,38 @@ namespace {
       if (!normal)
         return;
 
-      SmallVector<Requirement, 2> condReqs;
-      {
-        // FIXME(kavon): probably need to emit the inverse requirements in the
-        //  metadata so the runtime knows not to check for Copyable? For now
-        //  filter them out.
-        auto origCondReqs = normal->getConditionalRequirements();
-        for (auto req : origCondReqs) {
-          if (req.getKind() == RequirementKind::Conformance &&
-              req.getProtocolDecl()->getInvertibleProtocolKind())
-            continue;
-          condReqs.push_back(req);
-        }
+      // Compute the inverse requirements from the generic signature where the
+      // conformance occurs.
+      SmallVector<Requirement, 2> scratchReqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      if (auto genericSig =
+              normal->getDeclContext()->getGenericSignatureOfContext()) {
+        genericSig->getRequirementsWithInverses(scratchReqs, inverses);
+        scratchReqs.clear();
       }
 
+      auto condReqs = normal->getConditionalRequirements();
       if (condReqs.empty()) {
         // For a protocol P that conforms to another protocol, introduce a
         // conditional requirement for that P's Self: P. This aligns with
         // SILWitnessTable::enumerateWitnessTableConditionalConformances().
         if (auto selfProto = normal->getDeclContext()->getSelfProtocolDecl()) {
           auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
-          condReqs.emplace_back(RequirementKind::Conformance, selfType,
-                                selfProto->getDeclaredInterfaceType());
+          scratchReqs.emplace_back(RequirementKind::Conformance, selfType,
+                                   selfProto->getDeclaredInterfaceType());
+          condReqs = scratchReqs;
         }
 
-        if (condReqs.empty())
+        if (condReqs.empty() && inverses.empty())
           return;
       }
 
-      Flags = Flags.withNumConditionalRequirements(condReqs.size());
-
       auto nominal = normal->getDeclContext()->getSelfNominalTypeDecl();
       auto sig = nominal->getGenericSignatureOfContext();
-      auto metadata = irgen::addGenericRequirements(IGM, B, sig, condReqs);
+      auto metadata = irgen::addGenericRequirements(
+          IGM, B, sig, condReqs, inverses);
 
+      Flags = Flags.withNumConditionalRequirements(metadata.NumRequirements);
       Flags = Flags.withNumConditionalPackDescriptors(
           metadata.GenericPackArguments.size());
 
@@ -4356,8 +4354,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
-        irgen::addGenericRequirements(*this, fields, signature,
-                                      signature.getRequirements());
+        irgen::addGenericRequirements(*this, fields, signature);
         return fields.finishAndCreateFuture();
       });
 }

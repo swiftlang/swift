@@ -4,6 +4,8 @@
 // REQUIRES: executable_test
 // REQUIRES: asserts
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // Needed due to limitations of autoclosures and noncopyable types.
 func eagerAssert(_ b: Bool, _ line: Int = #line) {

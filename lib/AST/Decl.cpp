@@ -1326,7 +1326,7 @@ static GenericSignature getPlaceholderGenericSignature(
       auto type = genericParam->getDeclaredInterfaceType();
       genericParams.push_back(type->castTo<GenericTypeParamType>());
 
-      for (auto ip : InvertibleProtocolSet::full()) {
+      for (auto ip : InvertibleProtocolSet::allKnown()) {
         auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
         requirements.emplace_back(RequirementKind::Conformance, type,
                                   proto->getDeclaredInterfaceType());
@@ -4968,22 +4968,22 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         std::nullopt);
 }
 
-static TypeDecl::CanBeInvertible::Result
-conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
-  auto *proto = decl->getASTContext().getProtocol(getKnownProtocolKind(ip));
+TypeDecl::CanBeInvertible::Result
+NominalTypeDecl::canConformTo(InvertibleProtocolKind ip) const {
+  auto *proto = getASTContext().getProtocol(getKnownProtocolKind(ip));
   assert(proto && "missing Copyable/Escapable from stdlib!");
 
   // Handle protocols specially, without building a GenericSignature.
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(this)) {
     return protoDecl->inheritsFrom(proto)
          ? TypeDecl::CanBeInvertible::Always
          : TypeDecl::CanBeInvertible::Never;
   }
 
-  Type selfTy = decl->getDeclaredInterfaceType();
+  Type selfTy = getDeclaredInterfaceType();
   assert(selfTy);
 
-  auto conformance = decl->getModuleContext()->lookupConformance(selfTy, proto,
+  auto conformance = getModuleContext()->lookupConformance(selfTy, proto,
       /*allowMissing=*/false);
 
   if (conformance.isInvalid())
@@ -4996,11 +4996,11 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
 }
 
 TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeCopyable() const {
-  return conformanceExists(this, InvertibleProtocolKind::Copyable);
+  return canConformTo(InvertibleProtocolKind::Copyable);
 }
 
 TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeEscapable() const {
-  return conformanceExists(this, InvertibleProtocolKind::Escapable);
+  return canConformTo(InvertibleProtocolKind::Escapable);
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

@@ -2865,10 +2865,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::DependentGenericInverseConformanceRequirement: {
     NodePointer type = Node->getChild(0);
-    NodePointer reqt = Node->getChild(1);
     print(type, depth + 1);
     Printer << ": ~";
-    print(reqt, depth + 1);
+    switch (Node->getChild(1)->getIndex()) {
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+    case Bit: Printer << "Swift." << #Name; break;
+#include "swift/ABI/InvertibleProtocols.def"
+    default:
+      Printer << "Swift.<bit " << Node->getChild(1)->getIndex() << ">";
+      break;
+    }
     return nullptr;
   }
   case Node::Kind::DependentGenericLayoutRequirement: {

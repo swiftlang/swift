@@ -1416,11 +1416,35 @@ getFunctionTypeFlags(CanFunctionType type) {
     break;
   }
 
+  // Compute the set of suppressed protocols.
+  InvertibleProtocolSet InvertedProtocols;
+  for (auto invertibleKind : InvertibleProtocolSet::allKnown()) {
+    switch (invertibleKind) {
+    case InvertibleProtocolKind::Copyable: {
+      // If the function type is noncopyable, note that in the suppressed
+      // protocols.
+      auto proto =
+        type->getASTContext().getProtocol(KnownProtocolKind::Copyable);
+      if (proto &&
+          proto->getParentModule()->lookupConformance(type, proto).isInvalid())
+        InvertedProtocols.insert(invertibleKind);
+      break;
+    }
+
+    case InvertibleProtocolKind::Escapable:
+      // We intentionally do not record the "escapable" bit here, because it's
+      // already in the normal function type flags. The runtime will
+      // introduce it as necessary.
+      break;
+    }
+  }
+
   auto isolation = type->getIsolation();
 
   auto extFlags = ExtendedFunctionTypeFlags()
                       .withTypedThrows(!type->getThrownError().isNull())
-                      .withTransferringResult(type->hasTransferringResult());
+                      .withTransferringResult(type->hasTransferringResult())
+                      .withInvertedProtocols(InvertedProtocols);
 
   if (isolation.isErased())
     extFlags = extFlags.withIsolatedAny();

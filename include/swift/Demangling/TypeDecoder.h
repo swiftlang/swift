@@ -22,7 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/InvertibleProtocolKind.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementKind.h"
 #include "swift/Basic/OptionSet.h"
@@ -456,38 +456,15 @@ void decodeRequirement(
     } else if (child->getKind() ==
           Demangle::Node::Kind::DependentGenericInverseConformanceRequirement) {
       // Type child
-      auto constraintNode = child->getChild(1);
+      auto constraintNode = child->getChild(0);
       if (constraintNode->getKind() != Demangle::Node::Kind::Type ||
           constraintNode->getNumChildren() != 1)
         return;
 
-      // Protocol child
-      auto protocolNode = constraintNode->getChild(0);
-      if (protocolNode->getKind() != Demangle::Node::Kind::Protocol ||
-          protocolNode->getNumChildren() != 2)
-        return;
-
-      auto moduleNode = protocolNode->getChild(0);
-      if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
-          moduleNode->getText() != "Swift")
-        return;
-
-      auto protocolNameNode = protocolNode->getChild(1);
-      if (protocolNameNode->getKind() != Demangle::Node::Kind::Identifier)
-        return;
-
-      auto protocolName = protocolNameNode->getText();
-      using OptInvertibleKind = std::optional<InvertibleProtocolKind>;
-      auto protocolKind = llvm::StringSwitch<OptInvertibleKind>(protocolName)
-#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
-          .Case(Name, InvertibleProtocolKind::Id)
-#include "swift/AST/KnownProtocols.def"
-          .Default(std::nullopt);
-      if (!protocolKind)
-        return;
-
+      auto protocolKind =
+          static_cast<InvertibleProtocolKind>(child->getChild(1)->getIndex());
       inverseRequirements.push_back(
-          Builder.createInverseRequirement(subjectType, *protocolKind));
+          Builder.createInverseRequirement(subjectType, protocolKind));
       continue;
     }
 

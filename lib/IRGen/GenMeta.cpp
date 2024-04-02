@@ -425,6 +425,7 @@ namespace {
     unsigned NumGenericKeyArguments = 0;
     SmallVector<CanType, 2> ShapeClasses;
     SmallVector<GenericPackArgument, 2> GenericPackArguments;
+    InvertibleProtocolSet ConditionalInvertedProtocols;
 
     GenericSignatureHeaderBuilder(IRGenModule &IGM,
                                   ConstantStructBuilder &builder)
@@ -465,7 +466,10 @@ namespace {
                                NumGenericKeyArguments + ShapeClasses.size());
 
       bool hasTypePacks = !GenericPackArguments.empty();
-      GenericContextDescriptorFlags flags(hasTypePacks);
+      bool hasConditionalInvertedProtocols =
+          !ConditionalInvertedProtocols.empty();
+      GenericContextDescriptorFlags flags(
+          hasTypePacks, hasConditionalInvertedProtocols);
       b.fillPlaceholderWithInt(FlagsPP, IGM.Int16Ty,
                                flags.getIntValue());
     }
@@ -498,7 +502,7 @@ namespace {
         ContextDescriptorFlags(asImpl().getContextKind(),
                                !asImpl().getGenericSignature().isNull(),
                                asImpl().isUniqueDescriptor(),
-                               asImpl().getVersion(),
+                               !asImpl().getInvertedProtocols().empty(),
                                asImpl().getKindSpecificFlags())
           .getIntValue());
     }
@@ -520,6 +524,7 @@ namespace {
       asImpl().addGenericParameters();
       asImpl().addGenericRequirements();
       asImpl().addGenericPackShapeDescriptors();
+      asImpl().addConditionalInvertedProtocols();
       asImpl().finishGenericParameters();
     }
     
@@ -546,10 +551,27 @@ namespace {
     
     void addGenericRequirements() {
       auto metadata =
-        irgen::addGenericRequirements(IGM, B,
-                            asImpl().getGenericSignature(),
-                            asImpl().getGenericSignature().getRequirements());
+        irgen::addGenericRequirements(IGM, B, asImpl().getGenericSignature());
       SignatureHeader->add(metadata);
+    }
+
+    /// Adds the set of suppressed protocols, which must be explicitly called
+    /// by the concrete subclasses.
+    void addInvertedProtocols() {
+      auto protocols = asImpl().getInvertedProtocols();
+      if (protocols.empty())
+        return;
+
+      B.addInt(IGM.Int16Ty, protocols.rawBits());
+    }
+
+    InvertibleProtocolSet getConditionalInvertedProtocols() {
+      return InvertibleProtocolSet();
+    }
+
+    void addConditionalInvertedProtocols() {
+      assert(asImpl().getConditionalInvertedProtocols().empty() &&
+             "Subclass must implement this operation");
     }
 
     void finishGenericParameters() {
@@ -578,10 +600,11 @@ namespace {
       irgen::addGenericPackShapeDescriptors(IGM, B, shapes, packArgs);
     }
 
-    uint8_t getVersion() {
-      return 0;
+    /// Retrieve the set of protocols that are suppressed in this context.
+    InvertibleProtocolSet getInvertedProtocols() {
+      return InvertibleProtocolSet();
     }
-    
+
     uint16_t getKindSpecificFlags() {
       return 0;
     }
@@ -853,10 +876,13 @@ namespace {
     }
 
     void addRequirementSignature() {
-      auto requirements = Proto->getRequirementSignature().getRequirements();
+      SmallVector<Requirement, 2> requirements;
+      SmallVector<InverseRequirement, 2> inverses;
+      Proto->getRequirementSignature().getRequirementsWithInverses(
+          Proto, requirements, inverses);
       auto metadata =
         irgen::addGenericRequirements(IGM, B, Proto->getGenericSignature(),
-                                      requirements);
+                                      requirements, inverses);
 
       B.fillPlaceholderWithInt(*NumRequirementsInSignature, IGM.Int32Ty,
                                metadata.NumRequirements);
@@ -1234,6 +1260,110 @@ namespace {
       asImpl().maybeAddMetadataInitialization();
     }
 
+    /// Retrieve the set of protocols that are suppressed by this type.
+    InvertibleProtocolSet getInvertedProtocols() {
+      InvertibleProtocolSet result;
+      auto nominal = dyn_cast<NominalTypeDecl>(Type);
+      if (!nominal)
+        return result;
+
+      auto checkProtocol = [&](InvertibleProtocolKind kind) {
+        switch (nominal->canConformTo(kind)) {
+        case TypeDecl::CanBeInvertible::Never:
+        case TypeDecl::CanBeInvertible::Conditionally:
+          result.insert(kind);
+          break;
+
+        case TypeDecl::CanBeInvertible::Always:
+          break;
+        }
+      };
+
+      for (auto kind : InvertibleProtocolSet::allKnown())
+        checkProtocol(kind);
+
+      return result;
+    }
+
+    /// Retrieve the set of invertible protocols to which this type
+    /// conditionally conforms.
+    InvertibleProtocolSet getConditionalInvertedProtocols() {
+      InvertibleProtocolSet result;
+      auto nominal = dyn_cast<NominalTypeDecl>(Type);
+      if (!nominal)
+        return result;
+
+      auto checkProtocol = [&](InvertibleProtocolKind kind) {
+        switch (nominal->canConformTo(kind)) {
+        case TypeDecl::CanBeInvertible::Never:
+        case TypeDecl::CanBeInvertible::Always:
+          break;
+
+        case TypeDecl::CanBeInvertible::Conditionally:
+          result.insert(kind);
+          break;
+        }
+      };
+
+      for (auto kind : InvertibleProtocolSet::allKnown())
+        checkProtocol(kind);
+
+      return result;
+    }
+
+    void addConditionalInvertedProtocols() {
+      auto protocols = asImpl().getConditionalInvertedProtocols();
+      if (protocols.empty())
+        return;
+
+      // Note the conditional suppressed protocols.
+      this->SignatureHeader->ConditionalInvertedProtocols = protocols;
+
+      // The suppressed protocols with conditional conformances.
+      B.addInt(IGM.Int16Ty, protocols.rawBits());
+
+      // Create placeholders for the counts of the conditional requirements
+      // for each conditional conformance to a supressible protocol.
+      unsigned numProtocols = countBitsUsed(protocols.rawBits());
+      using PlaceholderPosition =
+          ConstantAggregateBuilderBase::PlaceholderPosition;
+      SmallVector<PlaceholderPosition, 2> countPlaceholders;
+      for (unsigned i : range(0, numProtocols)) {
+        (void)i;
+        countPlaceholders.push_back(
+            B.addPlaceholderWithSize(IGM.Int16Ty));
+      }
+
+      // Emit the generic requirements for the conditional conformance
+      // to each invertible protocol.
+      auto nominal = cast<NominalTypeDecl>(Type);
+      auto genericSig = nominal->getGenericSignatureOfContext();
+      ASTContext &ctx = nominal->getASTContext();
+      unsigned index = 0;
+      unsigned totalNumRequirements = 0;
+      for (auto kind : protocols) {
+        auto proto = ctx.getProtocol(getKnownProtocolKind(kind));
+        SmallVector<ProtocolConformance *, 1> conformances;
+        (void)nominal->lookupConformance(proto, conformances);
+        auto conformance = conformances.front();
+
+        SmallVector<InverseRequirement, 2> inverses;
+        if (auto conformanceSig =
+                conformance->getDeclContext()->getGenericSignatureOfContext()) {
+          SmallVector<Requirement, 2> scratchReqs;
+          conformanceSig->getRequirementsWithInverses(scratchReqs, inverses);
+        }
+
+        auto metadata = irgen::addGenericRequirements(
+            IGM, B, genericSig, conformance->getConditionalRequirements(),
+            inverses);
+
+        totalNumRequirements += metadata.NumRequirements;
+        B.fillPlaceholderWithInt(countPlaceholders[index++], IGM.Int16Ty,
+                                 totalNumRequirements);
+      }
+    }
+
     /// Fill out all the aspects of the type identity.
     void computeIdentity() {
       // Remember the user-facing name.
@@ -1343,6 +1473,17 @@ namespace {
       return Type->getGenericSignature();
     }
     
+    bool hasInvertibleProtocols() {
+      auto genericSig = asImpl().getGenericSignature();
+      if (!genericSig)
+        return false;
+
+      SmallVector<Requirement, 2> requirements;
+      SmallVector<InverseRequirement, 2> inverses;
+      genericSig->getRequirementsWithInverses(requirements, inverses);
+      return !inverses.empty();
+    }
+      
     /// Fill in the fields of a TypeGenericContextDescriptorHeader.
     void addGenericParametersHeader() {
       asImpl().addMetadataInstantiationCache();
@@ -1563,6 +1704,7 @@ namespace {
     void layout() {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
+      addInvertedProtocols();
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1636,6 +1778,7 @@ namespace {
     void layout() {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
+      addInvertedProtocols();
     }
     
     ContextDescriptorKind getContextKind() {
@@ -1768,6 +1911,7 @@ namespace {
       addOverrideTable();
       addObjCResilientClassStubInfo();
       maybeAddCanonicalMetadataPrespecializations();
+      addInvertedProtocols();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -6778,8 +6922,18 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
 
 GenericArgumentMetadata irgen::addGenericRequirements(
                                    IRGenModule &IGM, ConstantStructBuilder &B,
+                                   GenericSignature sig) {
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverses;
+  sig->getRequirementsWithInverses(reqs, inverses);
+  return addGenericRequirements(IGM, B, sig, reqs, inverses);
+}
+
+GenericArgumentMetadata irgen::addGenericRequirements(
+                                   IRGenModule &IGM, ConstantStructBuilder &B,
                                    GenericSignature sig,
-                                   ArrayRef<Requirement> requirements) {
+                                   ArrayRef<Requirement> requirements,
+                                   ArrayRef<InverseRequirement> inverses) {
   assert(sig);
 
   GenericArgumentMetadata metadata;
@@ -6881,6 +7035,47 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       break;
     }
     }
+  }
+
+  if (inverses.empty())
+    return metadata;
+
+  // Collect the inverse requirements on each of the generic parameters.
+  SmallVector<InvertibleProtocolSet, 2>
+      suppressed(sig.getGenericParams().size(), { });
+  for (const auto &inverse : inverses) {
+    // Determine which generic parameter this constraint applies to.
+    auto genericParam =
+        sig.getReducedType(inverse.subject)->getAs<GenericTypeParamType>();
+    if (!genericParam)
+      continue;
+
+    // Insert this suppression into the set for that generic parameter.
+    auto invertibleKind = inverse.getKind();
+    unsigned index = sig->getGenericParamOrdinal(genericParam);
+    suppressed[index].insert(invertibleKind);
+  }
+
+  // Go through the generic parameters, emitting a requirement for each
+  // that suppresses checking of some protocols.
+  for (unsigned index : indices(suppressed)) {
+    if (suppressed[index].empty())
+      continue;
+
+    // Encode the suppressed protocols constraint.
+    auto genericParam = sig.getGenericParams()[index];
+    auto flags = GenericRequirementFlags(
+        GenericRequirementKind::InvertedProtocols,
+        /*key argument*/ false,
+        genericParam->isParameterPack());
+    addGenericRequirement(IGM, B, metadata, sig, flags,
+                          Type(genericParam),
+     [&]{ 
+      B.addInt16(index);
+      B.addInt16(suppressed[index].rawBits());
+    });
+
+    ++metadata.NumRequirements;
   }
 
   return metadata;
@@ -7177,16 +7372,19 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     addPaddingAfterGenericParamDescriptors(IGM, b, totalParamDescriptors);
 
     auto addRequirementDescriptors = [&](CanGenericSignature sig,
-                                      GenericSignatureHeaderBuilder &header) {
-      auto info = addGenericRequirements(IGM, b, sig, sig.getRequirements());
+                                         GenericSignatureHeaderBuilder &header,
+                                         bool suppressInverses) {
+      auto info = suppressInverses
+        ? addGenericRequirements(IGM, b, sig, sig.getRequirements(), { })
+        : addGenericRequirements(IGM, b, sig);
       header.add(info);
       header.finish(IGM, b);
     };
 
     // GenericRequirementDescriptor GenericRequirements[*];
-    addRequirementDescriptors(reqSig, reqHeader);
+    addRequirementDescriptors(reqSig, reqHeader, /*suppressInverses=*/false);
     if (genSig) {
-      addRequirementDescriptors(genSig, *genHeader);
+      addRequirementDescriptors(genSig, *genHeader, /*suppressInverses=*/true);
     }
 
     // The 'Self' parameter in an existential is not variadic

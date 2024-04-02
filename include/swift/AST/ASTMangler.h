@@ -596,6 +596,24 @@ protected:
                               GenericSignature contextSig,
                               BaseEntitySignature &base);
 
+  /// Describes how the subject of a requirement was mangled.
+  struct RequirementSubject {
+    enum Kind {
+      GenericParameter,
+      AssociatedType,
+      AssociatedTypeAtDepth,
+      Substitution
+    } kind;
+
+    /// Generic parameter at the base, if there is one. Valid for everything
+    /// except Substitution subjects.
+    GenericTypeParamType *gpBase = nullptr;
+  };
+
+  /// Append the subject of a generic requirement and state what kind it is.
+  RequirementSubject appendRequirementSubject(
+      CanType subjectType, GenericSignature sig);
+
   /// Append a requirement to the mangling.
   ///
   /// \param reqt The requirement to mangle
