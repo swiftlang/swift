@@ -853,9 +853,6 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());
       assert(concreteFormalType->isBridgeableObjectType());
-      auto *M = SGM.M.getSwiftModule();
-      auto conformances = M->collectExistentialConformances(
-          concreteFormalType, anyObjectTy);
       return B.createInitExistentialRef(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
           concreteValue, conformances);
@@ -864,6 +861,12 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     if (this->F.getLoweredFunctionType()->isPseudogeneric()) {
       if (anyObjectTy && concreteFormalType->is<ArchetypeType>()) {
         concreteFormalType = anyObjectTy;
+
+        // The original conformances are no good because they have the wrong
+        // (pseudogeneric) subject type.
+        auto *M = SGM.M.getSwiftModule();
+        conformances = M->collectExistentialConformances(
+            concreteFormalType, anyObjectTy);
         F = eraseToAnyObject;
       }
     }
