@@ -169,10 +169,13 @@
     "BuiltinMath.swift",
     {
     "Integers": [
+      "Int128.swift",
       "Integers.swift",
       "IntegerTypes.swift",
       "IntegerParsing.swift",
-      "StaticBigInt.swift"],
+      "LegacyInt128.swift",
+      "StaticBigInt.swift",
+      "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
@@ -244,7 +247,6 @@
     "LegacyABI.swift",
     "MigrationSupport.swift",
     "PtrAuth.swift",
-    "Int128.swift",
     "Duration.swift",
     "DurationProtocol.swift",
     "Instant.swift",
