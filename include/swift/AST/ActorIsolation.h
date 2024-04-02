@@ -111,6 +111,9 @@ public:
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
 
+  /// Create an ActorIsolation appropriate for a type that is self.
+  static ActorIsolation forActorInstanceSelf(NominalTypeDecl *decl);
+
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
     return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
