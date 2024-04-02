@@ -93,10 +93,7 @@ SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
     if (auto functionIsolation = arg->getFunction()->getActorIsolation()) {
       if (functionIsolation.isActorIsolated()) {
         if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
-          if (auto isolationInfo =
-                  SILIsolationInfo::getActorIsolated(nomDecl)) {
-            return isolationInfo;
-          }
+          return SILIsolationInfo::getActorIsolated(nomDecl);
         }
       }
     }
@@ -135,23 +132,6 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
   }
 }
 
-NominalTypeDecl *SILIsolationInfo::tryInferActorDecl() const {
-  if (hasActorIsolation()) {
-    auto actorIsolation = getActorIsolation();
-    if (auto *actor = actorIsolation->getActorOrNullPtr()) {
-      return actor;
-    }
-    return nullptr;
-  }
-
-  if (hasActorInstance()) {
-    auto actorDecl = getActorInstance();
-    return actorDecl;
-  }
-
-  return nullptr;
-}
-
 SILIsolationInfo SILIsolationInfo::merge(SILIsolationInfo other) const {
   // If we are greater than the other kind, then we are further along the
   // lattice. We ignore the change.
@@ -179,21 +159,9 @@ bool SILIsolationInfo::operator==(const SILIsolationInfo &other) const {
     return getTaskIsolatedValue() == other.getTaskIsolatedValue();
   case Actor:
     // First try to use actor isolation if we have them.
-    if (hasActorIsolation() && other.hasActorIsolation()) {
-      auto lhsIsolation = getActorIsolation();
-      auto rhsIsolation = other.getActorIsolation();
-      if (lhsIsolation && rhsIsolation)
-        return *lhsIsolation == *rhsIsolation;
-    }
-
-    // Otherwise, try to use the inferred actor decl.
-    auto *lhsDecl = tryInferActorDecl();
-    auto *rhsDecl = other.tryInferActorDecl();
-    if (lhsDecl && rhsDecl)
-      return lhsDecl == rhsDecl;
-
-    // Otherwise, false, they are not equal.
-    return false;
+    auto lhsIsolation = getActorIsolation();
+    auto rhsIsolation = other.getActorIsolation();
+    return lhsIsolation == rhsIsolation;
   }
 }
 
@@ -207,22 +175,8 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
     id.AddPointer(getTaskIsolatedValue());
     return;
   case Actor:
-    // We profile in integer cases here so that we can always distinguish in
-    // between the various cases and the non-case. Just being paranoid.
-    if (hasActorIsolation()) {
-      if (auto isolation = getActorIsolation()) {
-        id.AddInteger(1);
-        return isolation->Profile(id);
-      }
-    }
-
-    if (hasActorInstance()) {
-      id.AddInteger(2);
-      return id.AddPointer(getActorInstance());
-    }
-
-    id.AddInteger(3);
-    break;
+    getActorIsolation().Profile(id);
+    return;
   }
 }
 
