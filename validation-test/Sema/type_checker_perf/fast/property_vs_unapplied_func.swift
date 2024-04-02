@@ -16,12 +16,6 @@ struct DatabaseLog {
   }
 }
 
-extension Sequence {
-  public func count(
-    where predicate: (Element) throws -> Bool
-  ) rethrows -> Int { 0 }
-}
-
 
 func rdar47742750(arr1: [Int], arr2: [Int]?) {
   let _ = {
