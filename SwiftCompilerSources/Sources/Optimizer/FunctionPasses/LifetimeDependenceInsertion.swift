@@ -105,15 +105,13 @@ extension LifetimeDependentApply {
 /// dependent value within each scope.
 private func insertDependencies(for apply: LifetimeDependentApply,
   _ context: FunctionPassContext ) {
-  precondition(apply.applySite.results.count > 0,
-    "a lifetime-dependent instruction must have at least one result")
-
   let bases = findDependenceBases(of: apply, context)
-  let builder = Builder(after: apply.applySite, context)
   for dependentValue in apply.applySite.resultOrYields {
+    let builder = Builder(before: dependentValue.nextInstruction, context)
     insertMarkDependencies(value: dependentValue, initializer: nil,
                            bases: bases, builder: builder, context)
   }
+  let builder = Builder(after: apply.applySite, context)
   for resultOper in apply.applySite.indirectResultOperands {
     let accessBase = resultOper.value.accessBase
     guard let (initialAddress, initializingStore) =
