@@ -323,6 +323,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
 // Alias for NoncopyableGenerics
 EXPERIMENTAL_FEATURE(NoncopyableGenerics2, true)
 
+// Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
+EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
+
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 

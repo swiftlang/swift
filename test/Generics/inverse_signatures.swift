@@ -1,4 +1,9 @@
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
+// RUN: %target-swift-frontend \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
+// RUN:   -verify -typecheck %s -debug-generic-signatures \
+// RUN:   -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
 // CHECK-LABEL: (file).genericFn@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>
