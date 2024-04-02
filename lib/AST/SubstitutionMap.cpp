@@ -355,16 +355,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!type->isTypeParameter())
     return ProtocolConformanceRef::forInvalid();
 
-  // If the protocol is invertible, just do a global lookup. This avoids an
-  // infinite substitution issue by recognizing that these protocols are
-  // very simple (see rdar://119950540 for the general issue).
-  if (proto->getInvertibleProtocolKind()) {
-    auto substType = type.subst(*this);
-    if (!substType->isTypeParameter())
-      return proto->getModuleContext()->lookupConformance(substType, proto);
-    return ProtocolConformanceRef(proto);
-  }
-
   auto genericSig = getGenericSignature();
 
   auto getSignatureConformance =
@@ -394,6 +384,15 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!genericSig->requiresProtocol(type, proto)) {
     Type substType = type.subst(*this);
     return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
+  }
+
+  // If the protocol is invertible, fall back to a global lookup instead of
+  // evaluating a conformance path, to avoid an infinite substitution issue.
+  if (proto->getInvertibleProtocolKind()) {
+    auto substType = type.subst(*this);
+    if (!substType->isTypeParameter())
+      return proto->getModuleContext()->lookupConformance(substType, proto);
+    return ProtocolConformanceRef(proto);
   }
 
   auto path = genericSig->getConformancePath(type, proto);
