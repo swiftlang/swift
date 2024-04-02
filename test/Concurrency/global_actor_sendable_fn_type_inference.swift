@@ -10,3 +10,12 @@ func inferSendableFunctionType() {
     await closure() // okay
   }
 }
+
+class NonSendable {}
+
+func allowNonSendableCaptures() {
+  let nonSendable = NonSendable()
+  let _: @MainActor () -> Void = {
+    let _ = nonSendable // okay
+  }
+}
