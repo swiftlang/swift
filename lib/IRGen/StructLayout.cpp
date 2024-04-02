@@ -178,10 +178,10 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits.clear();
       IsFixedLayout = true;
       IsLoadable = true;
-      IsKnownTriviallyDestroyable = deinit;
-      IsKnownBitwiseTakable = IsBitwiseTakable;
-      IsKnownAlwaysFixedSize = IsFixedSize;
-      IsKnownCopyable = copyable;
+      IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
+      IsKnownBitwiseTakable = builder.isBitwiseTakable();
+      IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
+      IsKnownCopyable = copyable & builder.isCopyable();
       Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
     } else {
       MinimumAlign = builder.getAlignment();
