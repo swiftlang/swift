@@ -7102,3 +7102,29 @@ extension SingleValueDecodingContainer {
     )
   }
 }
+
+// Default implementations for types with stricter availability than SVEC & UEC
+// We need these to break ambiguity when an encoding container conforms to both.
+extension SingleValueEncodingContainer where Self: UnkeyedEncodingContainer {
+  @available(SwiftStdlib 6.0, *)
+  public mutating func encode(_ value: Int128) throws {
+    throw EncodingError.invalidValue(
+      value,
+      EncodingError.Context(
+        codingPath: codingPath,
+        debugDescription: "Encoder has not implemented support for Int128"
+      )
+    )
+  }
+  
+  @available(SwiftStdlib 6.0, *)
+  public mutating func encode(_ value: UInt128) throws {
+    throw EncodingError.invalidValue(
+      value,
+      EncodingError.Context(
+        codingPath: codingPath,
+        debugDescription: "Encoder has not implemented support for UInt128"
+      )
+    )
+  }
+}
