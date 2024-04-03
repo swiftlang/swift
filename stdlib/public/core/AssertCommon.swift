@@ -74,7 +74,7 @@ func _isStdlibDebugChecksEnabled() -> Bool {
 internal func _fatalErrorFlags() -> UInt32 {
   // The current flags are:
   // (1 << 0): Report backtrace on fatal error
-#if os(iOS) || os(tvOS) || os(watchOS)
+#if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
   return 0
 #else
   return _isDebugAssertConfiguration() ? 1 : 0

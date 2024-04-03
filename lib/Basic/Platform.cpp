@@ -37,6 +37,10 @@ bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
       triple.getEnvironment() == llvm::Triple::MacABI;
 }
 
+bool swift::tripleIsVisionSimulator(const llvm::Triple &triple) {
+  return triple.isXROS() && triple.isSimulatorEnvironment();
+}
+
 bool swift::tripleInfersSimulatorEnvironment(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::IOS:
@@ -123,6 +127,10 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
     return triple.isOSVersionLT(8, 0);
   }
 
+  if (triple.isXROS()) {
+    return triple.isOSVersionLT(1, 0);
+  }
+
   // Other platforms don't have Swift installed as part of the OS by default.
   return false;
 }
@@ -150,6 +158,12 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return DarwinPlatformKind::MacOS;
 
+  if (triple.isXROS()) {
+    if (tripleIsVisionSimulator(triple))
+      return DarwinPlatformKind::VisionOSSimulator;
+    return DarwinPlatformKind::VisionOS;
+  }
+
   llvm_unreachable("Unsupported Darwin platform");
 }
 
@@ -169,6 +183,10 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
     return "watchos";
   case DarwinPlatformKind::WatchOSSimulator:
     return "watchsimulator";
+  case DarwinPlatformKind::VisionOS:
+    return "xros";
+  case DarwinPlatformKind::VisionOSSimulator:
+    return "xrsimulator";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -180,7 +198,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
   case llvm::Triple::DriverKit:
-  case llvm::Triple::XROS:
   case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
@@ -208,6 +225,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
+  case llvm::Triple::XROS:
     return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
   case llvm::Triple::Linux:
     return triple.isAndroid() ? "android" : "linux";
@@ -512,6 +530,9 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     } else if (Major <= 9) {
       return floorFor64bits(llvm::VersionTuple(5, 7));
     }
+  }
+  else if (Triple.isXROS()) {
+    return std::nullopt;
   }
 
   return std::nullopt;

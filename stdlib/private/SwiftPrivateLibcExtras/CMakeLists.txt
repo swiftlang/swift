@@ -35,6 +35,7 @@ add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUIL
   SWIFT_MODULE_DEPENDS_IOS ${swift_private_libc_extras_darwin_depencencies}
   SWIFT_MODULE_DEPENDS_TVOS ${swift_private_libc_extras_darwin_depencencies}
   SWIFT_MODULE_DEPENDS_WATCHOS ${swift_private_libc_extras_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_XROS ${swift_private_libc_extras_darwin_depencencies}
   SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_private_libc_extras_darwin_depencencies}
   SWIFT_MODULE_DEPENDS_FREESTANDING "${SWIFT_FREESTANDING_TEST_DEPENDENCIES}"
   SWIFT_MODULE_DEPENDS_LINUX Glibc
