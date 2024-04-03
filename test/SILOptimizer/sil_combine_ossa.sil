@@ -1347,20 +1347,20 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
 }
 
 // CHECK-LABEL: sil [ossa] @enum_promotion_of_concrete_types
-// XHECK: bb0([[INT_PTR:%[0-9]+]]
-// XHECK-NEXT: [[ALLOCA1:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
-// XHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.none!enumelt
-// XHECK-NEXT: store [[ENUM1]] to [trivial] [[ALLOCA1]]
-// XHECK-NEXT: [[ALLOCA2:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
-// XHECK-NEXT: [[INT:%[0-9]+]] = load [trivial] [[INT_PTR]] : $*Builtin.Int1
-// XHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt, [[INT]] : $Builtin.Int1
-// XHECK-NEXT: store [[ENUM2]] to [trivial] [[ALLOCA2]] : $*FakeOptional<Builtin.Int1>
-// XHECK-NEXT: [[RESULT1:%[0-9]+]] = load [trivial] [[ALLOCA1]]
-// XHECK-NEXT: [[RESULT2:%[0-9]+]] = load [trivial] [[ALLOCA2]]
-// XHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ([[RESULT1]] : $FakeOptional<Builtin.Int1>, [[RESULT2]] : $FakeOptional<Builtin.Int1>)
-// XHECK-NEXT: dealloc_stack
-// XHECK-NEXT: dealloc_stack
-// XHECK-NEXT: return [[RESULT]]
+// CHECK: bb0([[INT_PTR:%[0-9]+]]
+// CHECK-NEXT: [[ALLOCA1:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
+// CHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.none!enumelt
+// CHECK-NEXT: store [[ENUM1]] to [trivial] [[ALLOCA1]]
+// CHECK-NEXT: [[ALLOCA2:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
+// CHECK-NEXT: [[INT:%[0-9]+]] = load [trivial] [[INT_PTR]] : $*Builtin.Int1
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt, [[INT]] : $Builtin.Int1
+// CHECK-NEXT: store [[ENUM2]] to [trivial] [[ALLOCA2]] : $*FakeOptional<Builtin.Int1>
+// CHECK-NEXT: [[RESULT1:%[0-9]+]] = load [trivial] [[ALLOCA1]]
+// CHECK-NEXT: [[RESULT2:%[0-9]+]] = load [trivial] [[ALLOCA2]]
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ([[RESULT1]] : $FakeOptional<Builtin.Int1>, [[RESULT2]] : $FakeOptional<Builtin.Int1>)
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return [[RESULT]]
 sil [ossa] @enum_promotion_of_concrete_types : $@convention(thin) (@in Builtin.Int1) -> (FakeOptional<Builtin.Int1>, FakeOptional<Builtin.Int1>) {
 bb0(%0 : $*Builtin.Int1):
   %1 = alloc_stack $FakeOptional<Builtin.Int1>
@@ -1384,24 +1384,24 @@ bb0(%0 : $*Builtin.Int1):
 }
 
 // CHECK-LABEL: sil [ossa] @enum_promotion_case2
-// XHECK: bb0([[B_PTR:%[0-9]+]]
-// XHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
-// XHECK-NEXT: [[B_PTR_COPY_FOR_ENUM:%.*]] = copy_value [[B_PTR]]
+// CHECK: bb0([[B_PTR:%[0-9]+]]
+// CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
+// CHECK-NEXT: [[B_PTR_COPY_FOR_ENUM:%.*]] = copy_value [[B_PTR]]
 // This copy is the copy that was between the init_enum_data_addr/inject_enum_addr
-// XHECK-NEXT: [[B_PTR_COPY_NOT_OBSTRUCTING:%.*]] = copy_value [[B_PTR]]
-// XHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR_COPY_FOR_ENUM]] : $B
-// XHECK-NEXT: store [[ENUM]] to [init] [[ALLOCA]]
-// XHECK-NEXT: [[RESULT:%[0-9]+]] = load [take] [[ALLOCA]]
-// XHECK-NEXT: dealloc_stack
-// XHECK-NEXT: destroy_value [[B_PTR]]
-// XHECK-NEXT: br bb1
-// XHECK: bb1:
-// XHECK-NEXT: // function_ref
-// XHECK-NEXT: function_ref
-// XHECK-NEXT: apply
-// XHECK-NEXT: destroy_value [[B_PTR_COPY_NOT_OBSTRUCTING]]
-// XHECK-NEXT: return [[RESULT]]
-// XHECK: } // end sil function 'enum_promotion_case2'
+// CHECK-NEXT: [[B_PTR_COPY_NOT_OBSTRUCTING:%.*]] = copy_value [[B_PTR]]
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR_COPY_FOR_ENUM]] : $B
+// CHECK-NEXT: store [[ENUM]] to [init] [[ALLOCA]]
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = load [take] [[ALLOCA]]
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: destroy_value [[B_PTR]]
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: destroy_value [[B_PTR_COPY_NOT_OBSTRUCTING]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'enum_promotion_case2'
 sil [ossa] @enum_promotion_case2 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : @owned $B):
   %2 = alloc_stack $FakeOptional<B>
@@ -1428,27 +1428,27 @@ bb1:
 
 // Negative test corresponding to the previous test.
 // CHECK-LABEL: sil [ossa] @no_enum_promotion_of_non_concrete_types
-// XHECK: bb0
-// XHECK-NEXT: alloc_stack $FakeOptional<T>
-// XHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
-// XHECK-NEXT: alloc_stack $FakeOptional<T>
-// XHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt
-// XHECK-NEXT: copy_addr
-// XHECK-NEXT: inject_enum_addr
-// XHECK-NEXT: cond_br
-// XHECK: bb1:
-// XHECK-NEXT: copy_addr
-// XHECK-NEXT: destroy_addr
-// XHECK-NEXT: br bb3
-// XHECK: bb2:
-// XHECK-NEXT: copy_addr
-// XHECK-NEXT: destroy_addr
-// XHECK-NEXT: br bb3
-// XHECK: bb3
-// XHECK-NEXT: tuple
-// XHECK-NEXT: dealloc_stack
-// XHECK-NEXT: dealloc_stack
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: alloc_stack $FakeOptional<T>
+// CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
+// CHECK-NEXT: alloc_stack $FakeOptional<T>
+// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: inject_enum_addr
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: br bb3
+// CHECK: bb3
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
 sil [ossa] @no_enum_promotion_of_non_concrete_types : $@convention(thin) <T> (@inout T, Builtin.Int1) -> @out FakeOptional<T> {
 bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
   %3 = alloc_stack $FakeOptional<T>

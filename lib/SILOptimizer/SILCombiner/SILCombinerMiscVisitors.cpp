@@ -945,9 +945,7 @@ static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
 /// We leave the cleaning up to mem2reg.
 SILInstruction *
 SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
-  if (IEAI->getFunction()->hasOwnership())
-    return nullptr;
-
+  auto *func = IEAI->getFunction();
   // Given an inject_enum_addr of a concrete type without payload, promote it to
   // a store of an enum. Mem2reg/load forwarding will clean things up for us. We
   // can't handle the payload case here due to the flow problems caused by the
@@ -1076,8 +1074,10 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     EnumInst *E =
       Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand()->getType().getObjectType());
-    Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(),
-                        StoreOwnershipQualifier::Unqualified);
+    auto storeQual = !func->hasOwnership()
+                         ? StoreOwnershipQualifier::Unqualified
+                         : StoreOwnershipQualifier::Trivial;
+    Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(), storeQual);
     return eraseInstFromFunction(*IEAI);
   }
 
@@ -1194,8 +1194,13 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     EnumInst *E = Builder.createEnum(
         DataAddrInst->getLoc(), en, DataAddrInst->getElement(),
         DataAddrInst->getOperand()->getType().getObjectType());
+    auto storeQual = !func->hasOwnership()
+                         ? StoreOwnershipQualifier::Unqualified
+                     : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                         ? StoreOwnershipQualifier::Trivial
+                         : StoreOwnershipQualifier::Init;
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
-                        StoreOwnershipQualifier::Unqualified);
+                        storeQual);
     // Cleanup.
     getInstModCallbacks().notifyWillBeDeleted(DataAddrInst);
     deleter.forceDeleteWithUsers(DataAddrInst);
@@ -1265,14 +1270,22 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         elemType.getObjectType(), &*Builder.getInsertionPoint(),
         Builder.getBuilderContext(), /*noUndef*/ true);
   } else {
-    enumValue = Builder.createLoad(DataAddrInst->getLoc(), AllocStack,
-                                   LoadOwnershipQualifier::Unqualified);
+    auto loadQual = !func->hasOwnership() ? LoadOwnershipQualifier::Unqualified
+                    : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                        ? LoadOwnershipQualifier::Trivial
+                        : LoadOwnershipQualifier::Take;
+    enumValue =
+        Builder.createLoad(DataAddrInst->getLoc(), AllocStack, loadQual);
   }
   EnumInst *E = Builder.createEnum(
       DataAddrInst->getLoc(), enumValue, DataAddrInst->getElement(),
       DataAddrInst->getOperand()->getType().getObjectType());
+  auto storeQual = !func->hasOwnership() ? StoreOwnershipQualifier::Unqualified
+                   : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                       ? StoreOwnershipQualifier::Trivial
+                       : StoreOwnershipQualifier::Init;
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
-                      StoreOwnershipQualifier::Unqualified);
+                      storeQual);
   Builder.createDeallocStack(DataAddrInst->getLoc(), AllocStack);
   eraseInstFromFunction(*DataAddrInst);
   return eraseInstFromFunction(*IEAI);
