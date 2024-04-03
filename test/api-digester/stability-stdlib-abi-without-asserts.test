@@ -50,6 +50,7 @@
 Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
 Func _diagnoseUnavailableCodeReached() is a new API without @available attribute
+Func _dlsym(handle:symbol:) is a new API without @available attribute
 
 // These functions are not actually added to the ABI, but they had been a part of
 // the ABI exposed by the runtime library, so this is not breakage.

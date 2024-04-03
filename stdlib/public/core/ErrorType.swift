@@ -178,12 +178,25 @@ public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 #endif
 
 /// Called to indicate that a typed error will be thrown.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+@_weakLinked
+#endif
 @_silgen_name("swift_willThrowTypedImpl")
 @available(SwiftStdlib 6.0, *)
 @usableFromInline
 func _willThrowTypedImpl<E: Error>(_ error: E)
 
 #if !$Embedded
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+@_extern(c, "dlsym")
+@usableFromInline
+func _dlsym(
+  handle: UnsafeMutableRawPointer?,
+  symbol: UnsafePointer<CChar>?
+) -> UnsafeMutableRawPointer?
+#endif
+
 /// Called when a typed error will be thrown.
 ///
 /// On new-enough platforms, this will call through to the runtime to invoke
@@ -196,6 +209,13 @@ func _willThrowTypedImpl<E: Error>(_ error: E)
 @_silgen_name("swift_willThrowTyped")
 public func _willThrowTyped<E: Error>(_ error: E) {
   if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    let hasSymbol = "swift_willThrowTypedImpl".utf8CString.withUnsafeBufferPointer { buffer in
+      _dlsym(handle: nil, symbol: buffer.baseAddress) != nil
+    }
+    guard hasSymbol else { return }
+#endif
+
     _willThrowTypedImpl(error)
   }
 }
