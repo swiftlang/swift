@@ -178,6 +178,11 @@ extension Builder {
       insertFunc(builder)
     }
   }
+
+  func destroyCapturedArgs(for paiOnStack: PartialApplyInst) {
+    precondition(paiOnStack.isOnStack, "Function must only be called for `partial_apply`s on stack!")
+    self.bridged.destroyCapturedArgs(paiOnStack.bridged)
+  }
 }
 
 extension Value {
@@ -395,23 +400,6 @@ extension LoadInst {
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
     }
-  }
-}
-
-extension PartialApplyInst {
-  var isPartialApplyOfReabstractionThunk: Bool {
-    // A partial_apply of a reabstraction thunk either has a single capture
-    // (a function) or two captures (function and dynamic Self type).
-    if self.numArguments == 1 || self.numArguments == 2, 
-       let fun = self.referencedFunction,
-       fun.isReabstractionThunk,
-       self.arguments[0].type.isFunction,
-       self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
-    {
-      return true
-    }
-    
-    return false
   }
 }
 

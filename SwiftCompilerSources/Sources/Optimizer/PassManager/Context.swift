@@ -353,11 +353,40 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: _bridged.mangleOutlinedVariable(function.bridged))
   }
 
+  func mangle(withClosureArgs closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
+    closureArgs.withBridgedValues { bridgedClosureArgsRef in
+      closureArgIndices.withBridgedArrayRef{bridgedClosureArgIndicesRef in 
+        String(taking: _bridged.mangleWithClosureArgs(
+          bridgedClosureArgsRef, 
+          bridgedClosureArgIndicesRef, 
+          applySiteCallee.bridged
+        ))
+      }
+    }
+  }
+
   func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
       _bridged.createGlobalVariable($0, type.bridged, isPrivate)
     }
     return gv.globalVar
+  }
+
+  /// Utility function that should be used by optimizations that generate new functions or specialized versions of
+  /// existing functions.
+  func createAndBuildSpecializedFunction(createFn: (FunctionPassContext) -> Function,
+                                         buildFn: (Function, FunctionPassContext) -> ()) -> Function 
+  {
+    let specializedFunction = createFn(self)
+    
+    let nestedFunctionPassContext = 
+        FunctionPassContext(_bridged: _bridged.initializeNestedPassContext(specializedFunction.bridged))
+
+    defer { _bridged.deinitializedNestedPassContext() }
+
+    buildFn(specializedFunction, nestedFunctionPassContext)
+
+    return specializedFunction
   }
 }
 
@@ -443,6 +472,13 @@ extension Builder {
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst), location: firstInst.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+  }
+
+  /// Creates a builder which inserts instructions into an empty function, using the location of the function itself.
+  init(atStartOf function: Function, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: function)
+    self.init(insertAt: .atStartOf(function), context.notifyInstructionChanged, 
+              context._bridged.asNotificationHandler())
   }
 
   init(staticInitializerOf global: GlobalVariable, _ context: some MutatingContext) {
@@ -628,7 +664,6 @@ extension Function {
     context.notifyEffectsChanged()
     bridged.setIsPerformanceConstraint(isPerformanceConstraint)
   }
-
 
   func fixStackNesting(_ context: FunctionPassContext) {
     context._bridged.fixStackNesting(bridged)

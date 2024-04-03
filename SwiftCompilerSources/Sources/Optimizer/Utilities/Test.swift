@@ -165,7 +165,8 @@ public func registerOptimizerTests() {
     linearLivenessTest,
     parseTestSpecificationTest,
     variableIntroducerTest,
-    gatherCallSitesTest
+    gatherCallSitesTest,
+    specializedFunctionSignatureAndBodyTest
   )
 
   // Finally register the thunk they all call through.

@@ -46,6 +46,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/Casting.h"
 #include <fstream>
 
 using namespace swift;
@@ -1939,6 +1940,68 @@ void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFun
   invocation->getPassManager()->invalidateAnalysis(destFn, SILAnalysis::InvalidationKind::Everything);
 }
 
+BridgedFunction BridgedPassContext::
+ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
+                                            const BridgedParameterInfo * _Nullable specializedBridgedParams,
+                                            SwiftInt paramCount,
+                                            BridgedFunction bridgedApplySiteCallee,
+                                            bool isSerialized)  const {
+  auto *applySiteCallee = bridgedApplySiteCallee.getFunction();
+  auto applySiteCalleeType = applySiteCallee->getLoweredFunctionType();
+
+  llvm::SmallVector<SILParameterInfo> specializedParams;
+  for (unsigned idx = 0; idx < paramCount; ++idx) {
+    specializedParams.push_back(specializedBridgedParams[idx].unbridged());
+  }
+
+  // The specialized function is always a thin function. This is important
+  // because we may add additional parameters after the Self parameter of
+  // witness methods. In this case the new function is not a method anymore.
+  auto extInfo = applySiteCalleeType->getExtInfo();
+  extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  auto ClonedTy = SILFunctionType::get(
+      applySiteCalleeType->getInvocationGenericSignature(), extInfo,
+      applySiteCalleeType->getCoroutineKind(),
+      applySiteCalleeType->getCalleeConvention(), specializedParams,
+      applySiteCalleeType->getYields(), applySiteCalleeType->getResults(),
+      applySiteCalleeType->getOptionalErrorResult(),
+      applySiteCalleeType->getPatternSubstitutions(),
+      applySiteCalleeType->getInvocationSubstitutions(),
+      applySiteCallee->getModule().getASTContext());
+
+  SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
+
+  // We make this function bare so we don't have to worry about decls in the
+  // SILArgument.
+  auto *specializedApplySiteCallee = functionBuilder.createFunction(
+      // It's important to use a shared linkage for the specialized function
+      // and not the original linkage.
+      // Otherwise the new function could have an external linkage (in case the
+      // original function was de-serialized) and would not be code-gen'd.
+      // It's also important to disconnect this specialized function from any
+      // classes (the classSubclassScope), because that may incorrectly
+      // influence the linkage.
+      getSpecializedLinkage(applySiteCallee, applySiteCallee->getLinkage()), specializedName.unbridged(),
+      ClonedTy, applySiteCallee->getGenericEnvironment(),
+      applySiteCallee->getLocation(), IsBare, applySiteCallee->isTransparent(),
+      isSerialized ? IsSerialized : IsNotSerialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, applySiteCallee->getEntryCount(),
+      applySiteCallee->isThunk(),
+      /*classSubclassScope=*/SubclassScope::NotApplicable,
+      applySiteCallee->getInlineStrategy(), applySiteCallee->getEffectsKind(),
+      applySiteCallee, applySiteCallee->getDebugScope());
+  
+  if (!applySiteCallee->hasOwnership()) {
+    specializedApplySiteCallee->setOwnershipEliminated();
+  }
+  
+  for (auto &Attr : applySiteCallee->getSemanticsAttrs())
+    specializedApplySiteCallee->addSemanticsAttr(Attr);
+  
+  return {specializedApplySiteCallee};
+}
+
 bool FullApplySite_canInline(BridgedInstruction apply) {
   return swift::SILInliner::canInlineApplySite(
       swift::FullApplySite(apply.unbridged()));
@@ -2068,5 +2131,41 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
 void SILPassManager::runSwiftModuleVerification() {
   for (SILFunction &f : *Mod) {
     runSwiftFunctionVerification(&f);
+  }
+}
+
+namespace swift {
+  class ClosureSpecializationCloner: public SILClonerWithScopes<ClosureSpecializationCloner> {
+    friend class SILInstructionVisitor<ClosureSpecializationCloner>;
+    friend class SILCloner<ClosureSpecializationCloner>;
+  public: 
+    using SuperTy = SILClonerWithScopes<ClosureSpecializationCloner>;
+    ClosureSpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
+  };
+} // namespace swift
+
+BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
+  closureSpecCloner(new ClosureSpecializationCloner(*emptySpecializedFunction.getFunction())) {}
+
+BridgedFunction BridgedSpecializationCloner::getCloned() const {
+  return { &closureSpecCloner->getBuilder().getFunction() };
+}
+
+BridgedBasicBlock BridgedSpecializationCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
+  return { closureSpecCloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+}
+
+void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const {
+  llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
+  auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
+  closureSpecCloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
+}
+
+void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {
+  if (auto *pai = llvm::dyn_cast<PartialApplyInst>(partialApply.unbridged()); pai->isOnStack()) {
+    auto b = unbridged();
+    return swift::insertDestroyOfCapturedArguments(pai, b); 
+  } else {
+    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
   }
 }
