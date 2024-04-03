@@ -40,3 +40,6 @@
 // RUN: not %swift -typecheck -target s390x-unknown-linux-gnu -Xcc -### %s 2>&1 | %FileCheck -check-prefix=S390X_CPU %s
 // S390X_CPU: "-target-cpu" "z13"
 
+// RUN: not %swiftc -typecheck -target x86_64-unknown-windows-msvc -target-cpu haswell -Xcc -### %s 2>&1 | %FileCheck -check-prefix X86_64 %s
+// X86_64: "-target-cpu" "haswell"
+// X86_64: "-tune-cpu" "haswell"
