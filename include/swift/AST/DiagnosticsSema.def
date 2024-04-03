@@ -2791,7 +2791,7 @@ ERROR(protocol_has_missing_requirements_versioned,none,
       (Type, Type, llvm::VersionTuple, llvm::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%kindonly0 requirement %0 cannot add constraint "
-      "'%1%select{:|:| ==|:}2 %3' on 'Self'",
+      "'%1%select{:|:| ==|:| has same shape as}2 %3' on 'Self'",
       (const ValueDecl *, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%kind0 has different argument labels "
@@ -7634,6 +7634,10 @@ ERROR(inverse_extension, none,
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
       (const ValueDecl *))
+ERROR(inverse_cannot_be_conditional_on_requirement, none,
+      "conditional conformance to suppressible %kind0 cannot depend on "
+      "'%1%select{:|:| ==|:| has same shape as}2 %3'",
+      (const ProtocolDecl *, StringRef, unsigned, StringRef))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
       "'%4'-conforming %kind3 has non-%4 type %0",

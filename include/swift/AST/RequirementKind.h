@@ -36,10 +36,11 @@ enum class RequirementKind : unsigned {
   Layout,
   /// A same-shape requirement shape(T) == shape(U), where T and U are pack
   /// parameters.
-  SameShape
+  SameShape,
 
   // Note: there is code that packs this enum in a 3-bit bitfield.  Audit users
   // when adding enumerators.
+  LAST_KIND=SameShape
 };
 
 } // namespace swift
