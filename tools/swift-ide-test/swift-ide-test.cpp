@@ -32,7 +32,6 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
-#include "swift/Basic/QuotedString.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
@@ -4357,20 +4356,12 @@ int main(int argc, char *argv[]) {
   for (const auto &featureArg : options::EnableExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureArg)) {
       InitInvok.getLangOptions().enableFeature(*feature);
-    } else {
-      llvm::errs() << "error: unknown experimental feature "
-                   << QuotedString(featureArg) << "\n";
-      exit(-1);
     }
   }
 
   for (const auto &featureArg : options::EnableUpcomingFeatures) {
     if (auto feature = getUpcomingFeature(featureArg)) {
       InitInvok.getLangOptions().enableFeature(*feature);
-    } else {
-      llvm::errs() << "error: unknown upcoming feature "
-                   << QuotedString(featureArg) << "\n";
-      exit(-1);
     }
   }
 
