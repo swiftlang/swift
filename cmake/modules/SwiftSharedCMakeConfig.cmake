@@ -297,11 +297,6 @@ macro(swift_common_cxx_warnings)
     endif()
   endif()
 
-  check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)
-  if(CXX_SUPPORTS_DOCUMENTATION_FLAG)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wdocumentation>)
-  endif()
-
   check_cxx_compiler_flag("-Werror -Wimplicit-fallthrough" CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
   if(CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wimplicit-fallthrough>)
