@@ -294,7 +294,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     if (((StringRef)LL).starts_with((llvm::Twine("ns") + RR).str()) ||
         ((StringRef)RR).starts_with((llvm::Twine("ns") + LL).str()))
       return true;
-    if (((StringRef)LL).endswith(RR) || ((StringRef)RR).endswith(LL))
+    if (((StringRef)LL).ends_with(RR) || ((StringRef)RR).ends_with(LL))
       return true;
     return false;
   }

@@ -290,7 +290,7 @@ public:
                     llvm::StringRef value = sa->getAttribute();
                     if ((value.starts_with("retain:") ||
                          value.starts_with("release:")) &&
-                        !value.endswith(":immortal"))
+                        !value.ends_with(":immortal"))
                       return true;
                   }
                   return false;

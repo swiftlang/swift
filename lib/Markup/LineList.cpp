@@ -96,9 +96,9 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
       unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
       StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes);
 
-      if (Cleaned.endswith("*/"))
+      if (Cleaned.ends_with("*/"))
         Cleaned = Cleaned.drop_back(2);
-      else if (Cleaned.endswith("/"))
+      else if (Cleaned.ends_with("/"))
         Cleaned = Cleaned.drop_back(1);
 
       swift::SourceLoc CleanedStartLoc =

@@ -1469,7 +1469,7 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   if (NewLinePos != StringRef::npos) {
     Text = Text.substr(0, NewLinePos);
   }
-  if (Text.endswith("*/")) {
+  if (Text.ends_with("*/")) {
     Text = Text.drop_back(2);
   }
   Text = Text.rtrim();
@@ -1687,7 +1687,7 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
 
   auto Text = OrigText.drop_front(3); // Drop "^/**" or "/*:"
 
-  if (!Text.endswith("*/"))
+  if (!Text.ends_with("*/"))
     return true;
 
   Text = Text.drop_back(2); // Drop "*/"

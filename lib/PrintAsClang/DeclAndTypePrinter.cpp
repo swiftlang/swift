@@ -2979,7 +2979,7 @@ DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
       sourceMgr.getImmediateExpansionRange(loc).getBegin();
   clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
 
-  if (!sourceMgr.getFilename(spellingLoc).endswith("/os/object.h"))
+  if (!sourceMgr.getFilename(spellingLoc).ends_with("/os/object.h"))
     return StringRef();
 
   return name;

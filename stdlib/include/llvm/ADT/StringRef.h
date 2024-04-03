@@ -272,14 +272,14 @@ namespace llvm {
 
     /// Check if this string ends with the given \p Suffix.
     [[nodiscard]]
-    bool endswith(StringRef Suffix) const {
+    bool ends_with(StringRef Suffix) const {
       return Length >= Suffix.Length &&
         compareMemory(end() - Suffix.Length, Suffix.Data, Suffix.Length) == 0;
     }
 
     /// Check if this string ends with the given \p Suffix, ignoring case.
     [[nodiscard]]
-    bool endswith_insensitive(StringRef Suffix) const;
+    bool ends_with_insensitive(StringRef Suffix) const;
 
     /// @}
     /// @name String Searching
@@ -657,7 +657,7 @@ namespace llvm {
     /// Returns true if this StringRef has the given suffix and removes that
     /// suffix.
     bool consume_back(StringRef Suffix) {
-      if (!endswith(Suffix))
+      if (!ends_with(Suffix))
         return false;
 
       *this = drop_back(Suffix.size());
@@ -667,7 +667,7 @@ namespace llvm {
     /// Returns true if this StringRef has the given suffix, ignoring case,
     /// and removes that suffix.
     bool consume_back_insensitive(StringRef Suffix) {
-      if (!endswith_insensitive(Suffix))
+      if (!ends_with_insensitive(Suffix))
         return false;
 
       *this = drop_back(Suffix.size());
