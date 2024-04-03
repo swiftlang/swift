@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: freestanding
 
 @preconcurrency @MainActor
 protocol P {
