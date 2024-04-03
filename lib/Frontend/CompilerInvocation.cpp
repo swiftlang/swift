@@ -2417,9 +2417,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_enable_move_inout_stack_protector, OPT_disable_stack_protector,
       Opts.EnableMoveInoutStackProtection);
   Opts.EnableImportPtrauthFieldFunctionPointers =
-      Args.hasArg(OPT_enable_import_ptrauth_field_function_pointers,
-                  OPT_disable_import_ptrauth_field_function_pointers,
-                  Opts.EnableImportPtrauthFieldFunctionPointers);
+      !Args.hasArg(OPT_disable_import_ptrauth_field_function_pointers);
   Opts.EnableLifetimeDependenceDiagnostics =
       Args.hasFlag(OPT_enable_lifetime_dependence_diagnostics,
                    OPT_disable_lifetime_dependence_diagnostics,
