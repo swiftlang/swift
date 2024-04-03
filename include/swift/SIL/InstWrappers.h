@@ -140,6 +140,7 @@ struct ConversionOperation {
     case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
     case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
     case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+    case SILInstructionKind::DropDeinitInst:
       return true;
     default:
       return false;

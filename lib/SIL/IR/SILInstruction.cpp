@@ -1882,6 +1882,10 @@ bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   return !noUsers;
 }
 
+bool DestroyValueInst::isFullDeinitialization() {
+  return !isa<DropDeinitInst>(lookThroughOwnershipInsts(getOperand()));
+}
+
 PartialApplyInst *
 DestroyValueInst::getNonescapingClosureAllocation() const {
   SILValue operand = getOperand();
