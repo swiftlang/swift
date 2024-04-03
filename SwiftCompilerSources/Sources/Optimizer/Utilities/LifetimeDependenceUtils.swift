@@ -766,11 +766,12 @@ extension LifetimeDependenceUseDefWalker {
 
 /// Walk down dependent values.
 ///
-/// Delegates value def-use walking to the ForwardingUseDefWalker and
-/// overrides copy, move, borrow, and mark_dependence.
+/// First classifies all values using OwnershipUseVisitor. Delegates forwarding uses to the ForwardingUseDefWalker.
+/// Transitively follows OwnershipTransitionInstructions (copy, move, borrow, and mark_dependence).  Transitively
+/// follows interior pointers using AddressUseVisitor. Handles stores to and loads from local variables using
+/// LocalVariableReachabilityCache.
 ///
-/// Ignores trivial values (~Escapable types are never
-/// trivial. Escapable types may only be lifetime-depenent values if
+/// Ignores trivial values (~Escapable types are never trivial. Escapable types may only be lifetime-depenent values if
 /// they are non-trivial).
 ///
 /// Skips uses within nested borrow scopes.
