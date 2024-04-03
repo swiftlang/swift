@@ -1,5 +1,8 @@
 // RUN: %target-build-swift -swift-version 5 %s -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -Xfrontend -verify
 
+// REQUIRES: concurrency
+// REQUIRES: OS=macosx
+
 class NonSendableKlass {} // expected-note 3{{class 'NonSendableKlass' does not conform to the 'Sendable' protocol}}
 
 @available(macOS 10.15, *)
