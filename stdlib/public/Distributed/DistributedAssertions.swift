@@ -153,7 +153,8 @@ extension DistributedActor {
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.9, *)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'distributed actor' instead")
-  public nonisolated func assumeIsolated<T>(
+  @_alwaysEmitIntoClient
+  public nonisolated func assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) rethrows -> T {
@@ -180,6 +181,16 @@ extension DistributedActor {
     #else
     fatalError("unsupported compiler")
     #endif
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @usableFromInline
+  @_silgen_name("$s11Distributed0A5ActorPAAE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKlF")
+  internal nonisolated func __abi__assumeIsolated<T : Sendable>(
+      _ operation: (isolated Self) throws -> T,
+      _ file: StaticString, _ line: UInt
+  ) rethrows -> T {
+    try assumeIsolated(operation, file: file, line: line)
   }
 }
 
