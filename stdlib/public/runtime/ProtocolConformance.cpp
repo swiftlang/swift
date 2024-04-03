@@ -1350,6 +1350,10 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
 }
 
 static std::optional<TypeLookupError>
+checkInvertibleRequirements(const Metadata *type,
+                              InvertibleProtocolSet ignored);
+
+static std::optional<TypeLookupError>
 checkGenericRequirement(
     const GenericRequirementDescriptor &req,
     llvm::SmallVectorImpl<const void *> &extraArguments,
@@ -1445,8 +1449,10 @@ checkGenericRequirement(
   }
   case GenericRequirementKind::InvertedProtocols: {
     uint16_t index = req.getInvertedProtocolsGenericParamIndex();
-    if (index == 0xFFFF)
-      return TYPE_LOOKUP_ERROR_FMT("unable to suppress protocols");
+    if (index == 0xFFFF) {
+      return checkInvertibleRequirements(subjectType,
+                                         req.getInvertedProtocols());
+    }
 
     // Expand the suppression set so we can record these protocols.
     if (index >= suppressed.size()) {
@@ -1613,8 +1619,18 @@ checkGenericPackRequirement(
 
   case GenericRequirementKind::InvertedProtocols: {
     uint16_t index = req.getInvertedProtocolsGenericParamIndex();
-    if (index == 0xFFFF)
-      return TYPE_LOOKUP_ERROR_FMT("unable to suppress protocols");
+    if (index == 0xFFFF) {
+      // Check that each pack element meets the invertible requirements.
+      for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+        const Metadata *elt = subjectType.getElements()[i];
+
+        if (auto error = checkInvertibleRequirements(
+                elt, req.getInvertedProtocols()))
+          return error;
+      }
+
+      return std::nullopt;
+    }
 
     // Expand the suppression set so we can record these protocols.
     if (index >= suppressed.size()) {
@@ -1631,10 +1647,6 @@ checkGenericPackRequirement(
   return TYPE_LOOKUP_ERROR_FMT("unknown generic requirement kind %u",
                                (unsigned)req.getKind());
 }
-
-static std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type,
-                              InvertibleProtocolSet ignored);
 
 static std::optional<TypeLookupError>
 checkInvertibleRequirementsStructural(const Metadata *type,

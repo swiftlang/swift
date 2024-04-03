@@ -125,8 +125,7 @@ func main() {
   attemptCall(Dog<Any>())
 
   // CHECK-FIXME: failed to cast (attemptCall)
-  typealias NoncopyableAny = ~Copyable
-  // FIXME crashes: attemptCall(Dog<any NoncopyableAny>())
+  // FIXME crashes: attemptCall(Dog<any ~Copyable>())
 
   // CHECK: cast succeeded
   test_radar124171788(.nothing)

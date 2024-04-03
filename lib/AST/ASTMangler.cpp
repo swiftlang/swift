@@ -2530,8 +2530,6 @@ void ASTMangler::appendModule(const ModuleDecl *module,
 /// Mangle the name of a protocol as a substitution candidate.
 void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
                                     bool allowStandardSubstitution) {
-  assert(!protocol->getInvertibleProtocolKind() &&
-          "only inverse requirements are mangled");
   assert(AllowMarkerProtocols || !protocol->isMarkerProtocol());
 
   if (allowStandardSubstitution && tryAppendStandardSubstitution(protocol))
