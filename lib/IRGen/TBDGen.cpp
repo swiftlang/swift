@@ -264,6 +264,10 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   case swift::PlatformKind::macCatalyst:
   case swift::PlatformKind::macCatalystApplicationExtension:
     return LinkerPlatformId::macCatalyst;
+  case swift::PlatformKind::visionOS:
+  case swift::PlatformKind::visionOSApplicationExtension:
+    return isSimulator ? LinkerPlatformId::xrOS_sim:
+                         LinkerPlatformId::xrOS;
   }
   llvm_unreachable("invalid platform kind");
 }

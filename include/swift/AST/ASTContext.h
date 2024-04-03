@@ -34,6 +34,7 @@
 #include "swift/Basic/BlockList.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -948,6 +949,12 @@ public:
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }
 
+  /// Test support utility for loading a platform remap file
+  /// in case an SDK is not specified to the compilation.
+  const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
+  getAuxiliaryDarwinPlatformRemapInfo(
+      clang::DarwinSDKInfo::OSEnvPair Kind) const;
+
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
@@ -1511,6 +1518,9 @@ private:
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;
   friend SILBoxType;
+
+public:
+  clang::DarwinSDKInfo *getDarwinSDKInfo() const;
 };
 
 } // end namespace swift

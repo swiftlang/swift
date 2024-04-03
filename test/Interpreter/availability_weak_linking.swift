@@ -34,7 +34,7 @@ import Foundation
 print("Running...")
 
 func useUnavailableObjCGlobal() {
-  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
     let g = UnavailableObjCGlobalVariable
     _blackHole(g)
   }
@@ -53,7 +53,7 @@ func useClassConformingToUnavailableObjCProtocol() {
   let o = ClassConformingToUnavailableObjCProtocol()
   o.someMethod()
 
-  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
     let oAsUP: UnavailableObjCProtocol = o as UnavailableObjCProtocol
     oAsUP.someMethod()
   }
@@ -76,7 +76,7 @@ func useClassThatWillBeExtendedToConformToUnavailableObjCProtocol() {
   let o = ClassThatWillBeExtendedToConformToUnavailableObjCProtocol()
   o.someMethod()
 
-  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
     let oAsUP: UnavailableObjCProtocol = o as UnavailableObjCProtocol
     oAsUP.someMethod()
   }
@@ -116,13 +116,13 @@ func printClassMetadataViaGeneric<T>() -> T {
 }
 
 func useUnavailableObjCClass() {
-  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
     let o = UnavailableObjCClass()
     o.someMethod()
   }
 
   for i in 0 ..< getInt(5) {
-    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
       let o: UnavailableObjCClass = printClassMetadataViaGeneric()
       _blackHole(o)
     }
@@ -132,14 +132,14 @@ func useUnavailableObjCClass() {
   let someObject: AnyObject = _opaqueIdentity(SomeClass() as AnyObject)
 
   for i in 0 ..< getInt(5) {
-    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
       let isUnavailable = someObject is UnavailableObjCClass
       _blackHole(isUnavailable)
     }
   }
 
   for i in 0 ..< getInt(5) {
-    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
       let asUnavailable = someObject as? UnavailableObjCClass
       _blackHole(asUnavailable)
     }
@@ -155,10 +155,10 @@ useUnavailableObjCClass()
 
 // Allow extending a weakly-linked class to conform to a protocol.
 protocol SomeSwiftProtocol { }
-@available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *)
+@available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *)
 extension UnavailableObjCClass : SomeSwiftProtocol {
 }
-@available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *)
+@available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *)
 extension UnavailableSwiftClass : SomeSwiftProtocol {
 }
 
@@ -181,7 +181,7 @@ func useClassConformingToUnavailableSwiftProtocol() {
   let o = ClassConformingToUnavailableSwiftProtocol()
   o.someMethod()
 
-  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
     let oAsUP: UnavailableSwiftProtocol = o as UnavailableSwiftProtocol
     oAsUP.someMethod()
   }
@@ -203,7 +203,7 @@ func useClassThatWillBeExtendedToConformToUnavailableSwiftProtocol() {
   let o = ClassThatWillBeExtendedToConformToUnavailableSwiftProtocol()
   o.someMethod()
 
-  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, visionOS 1066.0, *) {
     let oAsUP: UnavailableSwiftProtocol = o as UnavailableSwiftProtocol
     oAsUP.someMethod()
   }

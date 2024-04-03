@@ -99,6 +99,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-osx                 "10.13"           "minimum deployment target version for OS X"
     darwin-deployment-version-tvos                "11.0"            "minimum deployment target version for tvOS"
     darwin-deployment-version-watchos             "4.0"             "minimum deployment target version for watchOS"
+    darwin-deployment-version-xros                "1.0"             "minimum deployment target version for xrOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
     darwin-install-extract-symbols-use-just-built-dsymutil "1"       "whether we should extract symbols using the just built dsymutil"
     darwin-symroot-path-filters                   ""                "space-separated list of path patterns to consider for symbol generation"
@@ -499,6 +500,9 @@ function verify_host_is_supported() {
       | watchsimulator-arm64    \
       | watchos-armv7k          \
       | watchos-arm64_32        \
+      | xrsimulator-arm64  \
+      | xros-arm64         \
+      | xros-arm64e        \
       | wasi-wasm32             \
       | android-armv7           \
       | android-aarch64         \
@@ -586,7 +590,9 @@ function set_build_options_for_host() {
         appletvos-*         | \
         appletvsimulator-*  | \
         watchos-*           | \
-        watchsimulator-*)
+        watchsimulator-*    | \
+        xros-*              | \
+        xrsimulator-*)
             swift_cmake_options+=(
               -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
@@ -709,6 +715,27 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
                     cmake_osx_deployment_target=""
                     ;;
+                xrsimulator-arm64)
+                    SWIFT_HOST_TRIPLE="arm64-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}-simulator"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS_SIMULATOR"
+                    cmake_osx_deployment_target=""
+                    ;;
+                xros-arm64)
+                    SWIFT_HOST_TRIPLE="arm64-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                xros-arm64e)
+                    SWIFT_HOST_TRIPLE="arm64e-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS"
+                    cmake_osx_deployment_target=""
+                    ;;
             esac
 
             if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
@@ -734,6 +761,7 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_XROS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
@@ -766,6 +794,7 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                -DSWIFT_DARWIN_DEPLOYMENT_VERSION_XROS="${DARWIN_DEPLOYMENT_VERSION_XROS}"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 # This is needed to make sure to avoid using the wrong architecture
                 # in the compiler checks CMake performs
@@ -1364,6 +1393,12 @@ function common_cross_c_flags() {
             ;;
         watchos-*)
             echo -n " -arch ${arch} -target ${arch}-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+            ;;
+        xrsimulator-*)
+            echo -n " -arch ${arch}  -target ${arch}-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}-simulator"
+            ;;
+        xros-*)
+            echo -n " -arch ${arch}  -target ${arch}-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
             ;;
     esac
 
