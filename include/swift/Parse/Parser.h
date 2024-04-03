@@ -1239,12 +1239,19 @@ public:
     // the following token is something that can introduce a type. Thankfully
     // none of these tokens overlap with the set of tokens that can follow an
     // identifier in a type production.
-    return (Tok.is(tok::identifier) &&
-            peekToken().isAny(tok::at_sign, tok::kw_inout, tok::l_paren,
-                              tok::identifier, tok::l_square, tok::kw_Any,
-                              tok::kw_Self, tok::kw__, tok::kw_var,
-                              tok::kw_let)) ||
-           isLifetimeDependenceToken();
+    if (Tok.is(tok::identifier)) {
+      auto next = peekToken();
+      if (next.isAny(tok::at_sign, tok::kw_inout, tok::l_paren,
+                     tok::identifier, tok::l_square, tok::kw_Any,
+                     tok::kw_Self, tok::kw__, tok::kw_var,
+                     tok::kw_let))
+        return true;
+
+      if (next.is(tok::oper_prefix) && next.getText() == "~")
+        return true;
+    }
+
+    return isLifetimeDependenceToken();
   }
 
   struct ParsedTypeAttributeList {

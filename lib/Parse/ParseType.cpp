@@ -1567,6 +1567,15 @@ bool Parser::canParseType() {
     if (!canParseTypeIdentifier())
       return false;
     break;
+  case tok::oper_prefix:
+    if (Tok.getText() != "~") {
+      return false;
+    }
+
+    consumeToken();
+    if (!canParseTypeIdentifier())
+      return false;
+    break;
   case tok::kw_protocol:
     return canParseOldStyleProtocolComposition();
   case tok::l_paren: {

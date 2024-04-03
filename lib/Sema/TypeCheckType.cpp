@@ -170,6 +170,7 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::ImmediateOptionalTypeArgument:
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::CustomAttr:
+  case TypeResolverContext::Inverted:
     break;
   }
 
@@ -5150,6 +5151,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::GenericParameterInherited:
   case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
+  case TypeResolverContext::Inverted:
     doDiag = true;
     break;
   }
@@ -5740,9 +5742,29 @@ NeverNullType TypeResolver::buildMetatypeType(
 
 NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
                                                TypeResolutionOptions options) {
-  auto ty = resolveType(repr->getConstraint(), options);
+  auto subOptions = options.withoutContext(true)
+      .withContext(TypeResolverContext::Inverted);
+  auto ty = resolveType(repr->getConstraint(), subOptions);
   if (ty->hasError())
     return ErrorType::get(getASTContext());
+
+  // If the inverted type is an existential metatype, unwrap the existential
+  // metatype so we can look at the instance type. We'll re-wrap at the end.
+  ExistentialMetatypeType *existentialTy =
+      dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
+  if (existentialTy) {
+    ty = existentialTy->getInstanceType();
+  }
+
+  auto wrapInExistential = [existentialTy](Type type) -> Type {
+    if (!existentialTy)
+      return type;
+
+    std::optional<MetatypeRepresentation> repr;
+    if (existentialTy->hasRepresentation())
+      repr = existentialTy->getRepresentation();
+    return ExistentialMetatypeType::get(type, repr);
+  };
 
   if (auto kp = ty->getKnownProtocol()) {
     if (auto kind = getInvertibleProtocolKind(*kp)) {
@@ -5752,13 +5774,16 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
           !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
         diagnoseInvalid(repr, repr->getLoc(),
                         diag::escapable_requires_feature_flag);
-        return ErrorType::get(getASTContext());
+        return wrapInExistential(ErrorType::get(getASTContext()));
       }
 
-      return ProtocolCompositionType::getInverseOf(getASTContext(), *kind);
+      return wrapInExistential(
+          ProtocolCompositionType::getInverseOf(getASTContext(), *kind));
     }
   }
 
+  // Rewrap for diagnostic purposes.
+  ty = wrapInExistential(ty);
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());
 }
@@ -5916,6 +5941,23 @@ public:
     // Arbitrary protocol constraints are okay for 'any' types.
     if (isa<ExistentialTypeRepr>(T))
       return Action::SkipNode();
+
+    // Suppressed conformance needs to be within any/some.
+    if (auto inverse = dyn_cast<InverseTypeRepr>(T)) {
+      // Find an enclosing protocol composition, if there is one, so we
+      // can insert 'any' before that.
+      SourceLoc anyLoc = inverse->getTildeLoc();
+      if (!reprStack.empty()) {
+        if (isa<CompositionTypeRepr>(reprStack.back())) {
+          anyLoc = reprStack.back()->getStartLoc();
+        }
+      }
+
+      Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
+        .highlight(inverse->getConstraint()->getSourceRange())
+        .fixItInsert(anyLoc, "any ");
+      return Action::SkipNode();
+    }
 
     reprStack.push_back(T);
 

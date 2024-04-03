@@ -11,6 +11,6 @@ public protocol QNC<A>: ~Copyable {
 public struct NCStruct: ~Copyable { }
 
 
-public func testNoncopyableConcrete() -> (Any & ~Copyable).Type {
+public func testNoncopyableConcrete() -> any  ~Copyable.Type {
   return (any QNC<NCStruct>).self
 }
