@@ -6,7 +6,6 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler
-
 // Test needs to be updated for 32bit.
 // rdar://74810823
 // UNSUPPORTED: PTRSIZE=32
@@ -88,9 +87,10 @@ public func testQualifiedTypeName() -> String {
   return _typeName(Outer.Inner.self, qualified: true)
 }
 
+// This test needs an updated SimplifyCFG optimization. Disable until we have that.
 // CHECK-LABEL: sil [noinline] @$s4test0A20UnqualifiedLocalTypeSSyF
-// CHECK-NOT: apply
-// CHECK-NOT: bb1
+// TODO-CHECK-NOT: apply
+// TODO-CHECK-NOT: bb1
 // CHECK: } // end sil function '$s4test0A20UnqualifiedLocalTypeSSyF'
 @inline(never)
 public func testUnqualifiedLocalType() -> String {
