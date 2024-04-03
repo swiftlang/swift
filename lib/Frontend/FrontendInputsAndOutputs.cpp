@@ -171,7 +171,7 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
     StringRef extension) const {
   unsigned n = 0;
   (void)forEachPrimaryInput([&](const InputFile &input) -> bool {
-    if (llvm::sys::path::extension(input.getFileName()).endswith(extension))
+    if (llvm::sys::path::extension(input.getFileName()).ends_with(extension))
       ++n;
     return false;
   });

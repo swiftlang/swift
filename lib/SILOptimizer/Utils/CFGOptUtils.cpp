@@ -534,9 +534,9 @@ static bool isTrapNoReturnFunction(ApplyInst *ai) {
       MANGLE_SYM(s18_fatalErrorMessageyys12StaticStringV_AcCSutF));
   auto *fn = ai->getReferencedFunctionOrNull();
 
-  // We use endswith here since if we specialize fatal error we will always
+  // We use ends_with here since if we specialize fatal error we will always
   // prepend the specialization records to fatalName.
-  if (!fn || !fn->getName().endswith(fatalName))
+  if (!fn || !fn->getName().ends_with(fatalName))
     return false;
 
   return true;

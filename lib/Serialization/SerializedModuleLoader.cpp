@@ -1320,7 +1320,7 @@ bool swift::extractCompilerFlagsFromInterface(
       continue;
     auto spelling = ArgSaver.save(parse->getSpelling());
     auto &values = parse->getValues();
-    if (spelling.endswith("=")) {
+    if (spelling.ends_with("=")) {
       // Handle the case like -tbd-install_name=Foo. This should be rare because
       // most equal-separated arguments are alias to the separate form.
       assert(values.size() == 1);

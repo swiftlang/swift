@@ -69,7 +69,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 #include "PartsOfSpeech.def"
 
   // Identify gerunds, which always end in "ing".
-  if (word.endswith("ing") && word.size() > 4) {
+  if (word.ends_with("ing") && word.size() > 4) {
     StringRef possibleVerb = word.drop_back(3);
 
     // If what remains is a verb, we have a gerund.
@@ -417,7 +417,7 @@ static std::optional<StringRef> skipTypeSuffix(StringRef typeName) {
   }
 
   // _t.
-  if (typeName.size() > 2 && typeName.endswith("_t")) {
+  if (typeName.size() > 2 && typeName.ends_with("_t")) {
     return typeName.drop_back(2);
   }
   return std::nullopt;
@@ -555,7 +555,7 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
     if (firstWord == "By") {
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
-      if (nextWord.endswith("ing")) {
+      if (nextWord.ends_with("ing")) {
         return newName.substr(firstWord.size());
       }
     }
@@ -1404,27 +1404,27 @@ bool swift::omitNeedlessWords(
 
 std::optional<StringRef>
 swift::stripWithCompletionHandlerSuffix(StringRef name) {
-  if (name.endswith("WithCompletionHandler")) {
+  if (name.ends_with("WithCompletionHandler")) {
     return name.drop_back(strlen("WithCompletionHandler"));
   }
 
-  if (name.endswith("WithCompletion")) {
+  if (name.ends_with("WithCompletion")) {
     return name.drop_back(strlen("WithCompletion"));
   }
 
-  if (name.endswith("WithCompletionBlock")) {
+  if (name.ends_with("WithCompletionBlock")) {
     return name.drop_back(strlen("WithCompletionBlock"));
   }
 
-  if (name.endswith("WithBlock")) {
+  if (name.ends_with("WithBlock")) {
     return name.drop_back(strlen("WithBlock"));
   }
 
-  if (name.endswith("WithReplyTo")) {
+  if (name.ends_with("WithReplyTo")) {
     return name.drop_back(strlen("WithReplyTo"));
   }
 
-  if (name.endswith("WithReply")) {
+  if (name.ends_with("WithReply")) {
     return name.drop_back(strlen("WithReply"));
   }
 

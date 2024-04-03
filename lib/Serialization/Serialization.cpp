@@ -1147,7 +1147,7 @@ void Serializer::writeHeader() {
             // module defined in the framework.
             auto Next = std::next(Arg);
             if (Next != E &&
-                StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
+                StringRef(*Next).ends_with("unextended-module-overlay.yaml")) {
               ++Arg;
               continue;
             }
@@ -1326,7 +1326,7 @@ void Serializer::writeInputBlock() {
     // that clients can consume it.
     if (Options.ExplicitModuleBuild &&
         llvm::sys::path::extension(importedHeaderPath)
-            .endswith(file_types::getExtension(file_types::TY_PCH)))
+            .ends_with(file_types::getExtension(file_types::TY_PCH)))
       importedHeaderPath = clangImporter->getClangInstance()
                                .getASTReader()
                                ->getModuleManager()
