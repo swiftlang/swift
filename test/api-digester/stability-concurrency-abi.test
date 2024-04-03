@@ -90,6 +90,14 @@ Func Executor.enqueue(_:) is a new API without @available attribute
 // This function correctly inherits its availability from the TaskLocal struct.
 Func TaskLocal.withValueImpl(_:operation:file:line:) is a new API without @available attribute
 
+// The method is actually still there: '__abi_next' silgen_name("$sScG4nextxSgyYaF")
+Func TaskGroup.next() has been renamed to Func next(isolation:)
+Func TaskGroup.next() has mangled name changing from 'Swift.TaskGroup.next() async -> Swift.Optional<A>' to 'Swift.TaskGroup.next(isolation: isolated Swift.Optional<Swift.Actor>) async -> Swift.Optional<A>'
+
+// The method is actually still there: '__abi_next' silgen_name("$sScg4nextxSgyYaKF")
+Func ThrowingTaskGroup.next() has been renamed to Func next(isolation:)
+Func ThrowingTaskGroup.next() has mangled name changing from 'Swift.ThrowingTaskGroup.next() async throws -> Swift.Optional<A>' to 'Swift.ThrowingTaskGroup.next(isolation: isolated Swift.Optional<Swift.Actor>) async throws -> Swift.Optional<A>'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 // XFAIL: noncopyable_generics
