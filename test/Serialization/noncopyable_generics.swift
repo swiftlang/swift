@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/ncgenerics.swift                      \
 // RUN:     -enable-experimental-feature NoncopyableGenerics                   \
+// RUN:     -enable-experimental-feature SuppressedAssociatedTypes             \
 // RUN:     -emit-module -module-name ncgenerics                               \
 // RUN:     -o %t
 
@@ -11,6 +12,7 @@
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk)                  \
 // RUN:    -enable-experimental-feature NoncopyableGenerics                    \
+// RUN:     -enable-experimental-feature SuppressedAssociatedTypes             \
 // RUN:    -print-module -module-to-print=ncgenerics                           \
 // RUN:    -I %t -source-filename=%s                                           \
 // RUN:    | %FileCheck -check-prefix=CHECK-PRINT %s
