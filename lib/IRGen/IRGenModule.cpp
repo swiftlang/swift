@@ -1948,6 +1948,9 @@ bool IRGenModule::finalize() {
   // Finalize clang IR-generation.
   finalizeClangCodeGen();
 
+  if (DebugInfo)
+    DebugInfo->finalize();
+
   // If that failed, report failure up and skip the final clean-up.
   if (!ClangCodeGen->GetModule())
     return false;
@@ -1956,8 +1959,6 @@ bool IRGenModule::finalize() {
   emitAutolinkInfo();
   emitGlobalLists();
   emitUsedConditionals();
-  if (DebugInfo)
-    DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
 
   // Clean up DSOLocal & DLLImport attributes, they cannot be applied together.
