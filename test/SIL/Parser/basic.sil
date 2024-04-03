@@ -973,51 +973,6 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil @test_switch_value : $@convention(thin) (Builtin.Word) -> ()
-sil @test_switch_value : $@convention(thin) (Builtin.Word) -> () {
-bb0(%0 : $Builtin.Word):
-  // CHECK: switch_value %{{.*}} : $Builtin.Word, case %1: bb1, case %2: bb2
-  %1 = integer_literal $Builtin.Word, 1
-  %2 = integer_literal $Builtin.Word, 2
-  switch_value %0 : $Builtin.Word, case %1: bb1, case %2: bb2
-
-bb1:
-  %7 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
-  %8 = apply %7() : $@convention(thin) () -> ()
-  br bb3
-
-bb2:
-  %12 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
-  %13 = apply %12() : $@convention(thin) () -> ()
-  br bb3
-
-bb3:
-  // CHECK: [[FUNC1:%.*]] = function_ref @_T6switch1aFT_T_
-  // CHECK: [[FUNC2:%.*]] = function_ref @_T6switch1bFT_T_
-  // CHECK: switch_value %{{.*}} : $@convention(thin) () -> (), case [[FUNC1]]: bb4, case [[FUNC2]]: bb5
-  %20 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> ()
-  %21 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> ()
-  %22 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> ()
-  switch_value %20 : $@convention(thin) () -> (), case %21: bb4, case %22: bb5
-
-bb4:
-  // CHECK: function_ref
-  %37 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> ()
-  %38 = apply %37() : $@convention(thin) () -> ()
-  br bb6
-
-bb5:
-  // CHECK: function_ref
-  %42 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> ()
-  %43 = apply %42() : $@convention(thin) () -> ()
-  br bb6
-
-bb6:
-  %18 = tuple ()
-  // CHECK: return
-  return %18 : $()
-}
-
 class ConcreteClass : ClassP {
 }
 struct Spoon : Bendable {

@@ -781,3 +781,28 @@ bb0:
   %7 = tuple ()
   return %7 : $()
 }
+
+sil [ossa] @test_init_enum_switch_value : $@convention(thin) (@in_guaranteed Optional<T>, @in_guaranteed T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %stk = alloc_stack $Optional<T>
+  %2 = init_enum_data_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [init] %2 : $*T
+  inject_enum_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  switch_value %one : $Builtin.Word, case %one: bb1, case %two: bb2
+
+bb1:
+  destroy_addr %stk : $*Optional<T>
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb2:
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+

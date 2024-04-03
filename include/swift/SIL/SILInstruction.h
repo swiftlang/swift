@@ -10224,7 +10224,7 @@ public:
   std::optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
     for (unsigned i = 0; i < getNumCases(); ++i) {
       if (getCase(i).second == bb) {
-        return i + 1;
+        return i;
       }
     }
     return std::nullopt;

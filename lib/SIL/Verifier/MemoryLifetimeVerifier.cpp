@@ -228,6 +228,13 @@ bool MemoryLifetimeVerifier::isTrivialEnumSuccessor(SILBasicBlock *block,
   } else if (auto *switchEnumAddr = dyn_cast<SwitchEnumAddrInst>(term)) {
     elem = switchEnumAddr->getUniqueCaseForDestination(succ);
     enumTy = switchEnumAddr->getOperand()->getType();
+  } else if (auto *switchValue = dyn_cast<SwitchValueInst>(term)) {
+    auto destCase = switchValue->getUniqueCaseForDestination(succ);
+    assert(destCase.has_value());
+    auto caseValue =
+        cast<IntegerLiteralInst>(switchValue->getCase(*destCase).first);
+    auto testValue = dyn_cast<IntegerLiteralInst>(switchValue->getOperand());
+    return testValue ? testValue->getValue() != caseValue->getValue() : true;
   } else {
     return false;
   }
