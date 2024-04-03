@@ -10,6 +10,11 @@ sil_stage canonical
 
 import Builtin
 
+struct NCInt : ~Copyable {
+  var i: Builtin.Int64
+  deinit {}
+}
+
 enum FakeOptional<T> {
 case none
 case some(T)
@@ -243,7 +248,7 @@ exit(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
 }
 
 // =============================================================================
-// InteriorLiveness and visitAdjacentPhis
+// InteriorLiveness
 // =============================================================================
 
 // CHECK-LABEL: testInteriorRefElementEscape: interior-liveness with: %0
@@ -311,6 +316,40 @@ bb0(%0 : $*D, %1 : @guaranteed $D):
   %99 = tuple()
   return %99 : $()
 }
+
+// CHECK-LABEL: begin running test 1 of 2 on testInteriorDropDeinit: interior-liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $NCInt
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: lifetime-ending user:   [[DD:%.*]] = drop_deinit %0 : $NCInt
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   [[DD]] = drop_deinit %0 : $NCInt
+// CHECK-LABEL: end running test 1 of 2 on testInteriorDropDeinit: interior-liveness with: %0
+
+// CHECK-LABEL: begin running test 2 of 2 on testInteriorDropDeinit: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $NCInt
+// CHECK-NEXT: begin:      [[DD:%.*]] = drop_deinit %0 : $NCInt
+// CHECK-NEXT: ends:       [[DD]] = drop_deinit %0 : $NCInt
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   [[DD]] = drop_deinit %0 : $NCInt
+// CHECK-LABEL: end running test 2 of 2 on testInteriorDropDeinit: interior_liveness_swift with: %0
+sil [ossa] @testInteriorDropDeinit : $@convention(thin) (@owned NCInt) -> () {
+bb0(%0 : @owned $NCInt):
+  specify_test "interior-liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %nd = drop_deinit %0 : $NCInt
+  destroy_value %nd : $NCInt
+  %99 = tuple()
+  return %99 : $()
+}
+
+// =============================================================================
+// InteriorLiveness and visitAdjacentPhis
+// =============================================================================
 
 // CHECK-LABEL: testInteriorReborrow: interior-liveness with: %borrow
 // CHECK: Complete liveness

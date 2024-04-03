@@ -316,6 +316,12 @@ extension UncheckedValueCastInst : ConversionInstruction {
   public var canForwardOwnedValues: Bool { true }
 }
 
+extension DropDeinitInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { false }
+  public var canForwardOwnedValues: Bool { true }
+}
+
 // -----------------------------------------------------------------------------
 // other forwarding instructions
 
