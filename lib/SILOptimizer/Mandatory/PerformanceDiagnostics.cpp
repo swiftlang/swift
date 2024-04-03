@@ -810,15 +810,18 @@ private:
       SmallVector<SILFunction *, 8> constructorsAndDestructors;
 
       for (SILFunction &function : *module) {
-        auto func = function.getLocation().getAsASTNode<AbstractFunctionDecl>();
-        if (func) {
-          if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func)) {
-            constructorsAndDestructors.push_back(&function);
-            continue;
-          }
-          if (getMethodDispatch(func) == MethodDispatch::Class) {
-            vtableMembers.push_back(&function);
-            continue;
+        if (function.hasLocation()) {
+          auto func =
+              function.getLocation().getAsASTNode<AbstractFunctionDecl>();
+          if (func) {
+            if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func)) {
+              constructorsAndDestructors.push_back(&function);
+              continue;
+            }
+            if (getMethodDispatch(func) == MethodDispatch::Class) {
+              vtableMembers.push_back(&function);
+              continue;
+            }
           }
         }
 
