@@ -3794,12 +3794,24 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   if (!A->getIncomingPhiValues(Incoming) || Incoming.empty())
     return;
   
-  SILValue V = Incoming[0];
-  for (size_t Idx = 1, Size = Incoming.size(); Idx < Size; ++Idx) {
-    if (Incoming[Idx] != V)
+  SILValue V;
+  for (size_t Idx = 0; Idx < Incoming.size(); ++Idx) {
+    if (Incoming[Idx] == A) {
+      continue;
+    }
+    if (!V) {
+      V = Incoming[Idx];
+      continue;
+    }
+    if (Incoming[Idx] != V) {
       return;
+    }
   }
   
+  if (!V) {
+    return;
+  }
+
   // If the incoming values of all predecessors are equal usually this means
   // that the common incoming value dominates the BB. But: this might be not
   // the case if BB is unreachable. Therefore we still have to check it.
