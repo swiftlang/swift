@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -enable-import-ptrauth-field-function-pointers -O -emit-module -o %t/Module.swiftmodule %t/Module.swift -enable-experimental-feature Embedded -import-objc-header %t/header.h
+// RUN: %target-swift-frontend -O -emit-module -o %t/Module.swiftmodule %t/Module.swift -enable-experimental-feature Embedded -import-objc-header %t/header.h
 
-// RUN: %target-swift-frontend -enable-import-ptrauth-field-function-pointers -O -emit-ir %t/Main.swift -I%t -enable-experimental-feature Embedded -import-objc-header %t/header.h
+// RUN: %target-swift-frontend -O -emit-ir %t/Main.swift -I%t -enable-experimental-feature Embedded -import-objc-header %t/header.h
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
