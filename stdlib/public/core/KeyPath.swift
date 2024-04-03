@@ -375,8 +375,20 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
           return _openExistential(valueType, do: project2)
         }
 
-        if let result = _openExistential(curBase, do: project) {
+        let result = _openExistential(curBase, do: project)
+
+        if let result = result {
           return result
+        }
+
+        // Note: This should never be taken. The only time this will occur is if
+        // the API keypath is referencing has a nullability violation.
+        // In certain cases, `Value` has the same layout as `Value?` and the
+        // "nullptr" representation of `Value` is represented as `nil` for
+        // `Value?`. If we're returning a `Value`, but manage to get its `nil`
+        // representation, then the above check will fail.
+        if _slowPath(isLast) {
+          _preconditionFailure("Could not resolve KeyPath")
         }
       }
     }
