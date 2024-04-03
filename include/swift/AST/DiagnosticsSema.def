@@ -7630,6 +7630,9 @@ ERROR(inverse_but_also_conforms, none,
 ERROR(inverse_generic_but_also_conforms, none,
       "%0 required to be '%1' but is marked with '~%1'",
       (Type, StringRef))
+ERROR(inverse_associatedtype_restriction, none,
+      "cannot suppress '%0' requirement of an associated type",
+      (StringRef))
 ERROR(inverse_on_class, none,
       "classes cannot be '~%0'",
       (StringRef))
