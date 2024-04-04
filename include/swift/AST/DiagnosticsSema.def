@@ -1193,6 +1193,9 @@ REMARK(module_api_import_aliases,none,
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
 
+REMARK(skip_module_invalid,none,"skip invalid swiftmodule: %0", (StringRef))
+REMARK(skip_module_testable,none,"skip swiftmodule built with '-enable-testing': %0", (StringRef))
+
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
        "%select{shared library '%2'|executable '%2'|"
