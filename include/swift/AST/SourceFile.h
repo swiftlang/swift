@@ -629,6 +629,11 @@ public:
   /// enclosed in.
   SourceFile *getEnclosingSourceFile() const;
 
+  /// If this file has an enclosing source file (because it is the result of
+  /// expanding a macro or default argument), returns the node in the enclosing
+  /// file that this file's contents were expanded from.
+  ASTNode getNodeInEnclosingSourceFile() const;
+
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
