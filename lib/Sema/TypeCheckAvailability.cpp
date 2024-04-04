@@ -1279,7 +1279,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
     // the source file are guaranteed to be executing on at least the minimum
     // platform version for inlining.
     auto MinPlatformReq = AvailabilityContext::forInliningTarget(Context);
-    RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
+    RootTRC = TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
 
