@@ -28,6 +28,7 @@
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1874,8 +1875,19 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
 /// Determine whether the given protocol conformance contains a retroactive
 /// protocol conformance anywhere in it.
 static bool containsRetroactiveConformance(
-                                      const ProtocolConformance *conformance,
+                                      ProtocolConformanceRef conformanceRef,
                                       ModuleDecl *module) {
+  if (conformanceRef.isPack()) {
+    for (auto patternConf : conformanceRef.getPack()->getPatternConformances()) {
+      if (containsRetroactiveConformance(patternConf, module))
+        return true;
+    }
+
+    return false;
+  }
+
+  auto *conformance = conformanceRef.getConcrete();
+
   // If the root conformance is retroactive, it's retroactive.
   const RootProtocolConformance *rootConformance =
       conformance->getRootConformance();
@@ -1897,8 +1909,7 @@ static bool containsRetroactiveConformance(
       // for indexing purposes.
       continue;
     }
-    if (conformance.isConcrete() &&
-        containsRetroactiveConformance(conformance.getConcrete(), module)) {
+    if (containsRetroactiveConformance(conformance, module)) {
       return true;
     }
   }
@@ -1924,14 +1935,18 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
     };
 
     // Ignore abstract conformances.
-    if (!conformance.isConcrete())
+    if (!conformance.isConcrete() && !conformance.isPack())
       continue;
 
     // Skip non-retroactive conformances.
-    if (!containsRetroactiveConformance(conformance.getConcrete(), fromModule))
+    if (!containsRetroactiveConformance(conformance, fromModule))
       continue;
 
-    appendConcreteProtocolConformance(conformance.getConcrete(), sig);
+    if (conformance.isConcrete())
+      appendConcreteProtocolConformance(conformance.getConcrete(), sig);
+    else
+      appendPackProtocolConformance(conformance.getPack(), sig);
+
     appendOperator("g", Index(numProtocolRequirements));
   }
 }
@@ -4143,8 +4158,14 @@ void ASTMangler::appendAnyProtocolConformance(
     appendDependentProtocolConformance(conformancePath, opaqueSignature);
     appendType(conformingType, genericSig);
     appendOperator("HO");
-  } else {
+  } else if (conformance.isConcrete()) {
     appendConcreteProtocolConformance(conformance.getConcrete(), genericSig);
+  } else if (conformance.isPack()) {
+    appendPackProtocolConformance(conformance.getPack(), genericSig);
+  } else {
+    llvm::errs() << "Bad conformance in mangler: ";
+    conformance.dump(llvm::errs());
+    abort();
   }
 }
 
@@ -4197,6 +4218,32 @@ void ASTMangler::appendConcreteProtocolConformance(
     appendOperator("y");
 
   appendOperator("HC");
+}
+
+void ASTMangler::appendPackProtocolConformance(
+                                      const PackConformance *conformance,
+                                      GenericSignature sig) {
+  auto conformingType = conformance->getType();
+  auto patternConformances = conformance->getPatternConformances();
+  assert(conformingType->getNumElements() == patternConformances.size());
+
+  if (conformingType->getNumElements() == 0) {
+    appendOperator("y");
+  } else {
+    bool firstField = true;
+    for (unsigned i = 0, e = conformingType->getNumElements(); i < e; ++i) {
+      auto type = conformingType->getElementType(i);
+      auto conf = patternConformances[i];
+
+      if (auto *expansionTy = type->getAs<PackExpansionType>())
+        type = expansionTy->getPatternType();
+
+      appendAnyProtocolConformance(sig, type->getCanonicalType(), conf);
+      appendListSeparator(firstField);
+    }
+  }
+
+  appendOperator("HX");
 }
 
 void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
