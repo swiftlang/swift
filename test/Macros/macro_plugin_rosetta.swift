@@ -1,5 +1,6 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: CPU=arm64 && OS=macosx
+// REQUIRES: rosetta2_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
