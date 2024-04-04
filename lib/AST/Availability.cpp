@@ -350,6 +350,17 @@ static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
   if (!unavailableAttr->isUnconditionallyUnavailable())
     return false;
 
+  // Universally unavailable declarations are always unreachable.
+  if (unavailableAttr->Platform == PlatformKind::none)
+    return true;
+
+  // FIXME: Support zippered frameworks (rdar://125371621)
+  // If we have a target variant (e.g. we're building a zippered macOS
+  // framework) then the decl is only unreachable if it is unavailable for both
+  // the primary target and the target variant.
+  if (D->getASTContext().LangOpts.TargetVariant.has_value())
+    return false;
+
   return true;
 }
 
