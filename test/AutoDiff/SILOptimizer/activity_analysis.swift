@@ -594,7 +594,7 @@ struct HasCoroutineModifyAccessors: Differentiable {
 // expected-note @+1 {{when differentiating this function definition}}
 func testAccessorCoroutinesRead(_ x: HasCoroutineReadAccessors) -> Float {
   // We do not support differentiation of _read accessors
-  // expected-note @+1 {{cannot differentiate through a direct yield result}}
+  // expected-note @+1 {{cannot differentiate through a '_read' accessor}}
   return x.computed
 }
 
