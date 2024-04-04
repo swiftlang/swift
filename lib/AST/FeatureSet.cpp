@@ -683,6 +683,7 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
+UNINTERESTING_FEATURE(ExtensionImportVisibility)
 UNINTERESTING_FEATURE(IsolatedAny2)
 
 static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
