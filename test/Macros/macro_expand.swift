@@ -283,10 +283,10 @@ func testNested() {
 
   // PRETTY-DIAGS: 1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
   // PRETTY-DIAGS: macro_expand.swift:{{.*}}:39: note: expanded code originates here
-  // PRETTY-DIAGS: ─── macro expansion #stringify
-  // PRETTY-DIAGS: ─── macro expansion #assertAny
-  // PRETTY-DIAGS-NEXT: 1 │ assert(Nested())
-  // PRETTY-DIAGS-NEXT:   │        ╰─ error: cannot convert value
+  // PRETTY-DIAGS: --- macro expansion #stringify
+  // PRETTY-DIAGS: --- macro expansion #assertAny
+  // PRETTY-DIAGS-NEXT: 1 | assert(Nested())
+  // PRETTY-DIAGS-NEXT:   |        `- error: cannot convert value
 }
 #endif
 
