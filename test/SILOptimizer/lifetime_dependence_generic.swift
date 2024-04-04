@@ -4,6 +4,7 @@
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -parse-stdlib -module-name Swift
 
 // REQUIRES: asserts
