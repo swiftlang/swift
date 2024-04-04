@@ -4800,14 +4800,16 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
       if (aa.getASTType()->hasOpaqueArchetype())
         opaqueTypesSubstituted = aa.subst(inFunction->getModule(), replacer,
                                          replacer, CanGenericSignature(),
-                                         SubstFlags::SubstituteOpaqueArchetypes);
+                                         SubstFlags::SubstituteOpaqueArchetypes |
+                                         SubstFlags::PreservePackExpansionLevel);
 
       auto opaqueTypesSubstituted2 = bb;
       if (bb.getASTType()->hasOpaqueArchetype())
         opaqueTypesSubstituted2 =
             bb.subst(inFunction->getModule(), replacer, replacer,
                      CanGenericSignature(),
-                     SubstFlags::SubstituteOpaqueArchetypes);
+                     SubstFlags::SubstituteOpaqueArchetypes |
+                     SubstFlags::PreservePackExpansionLevel);
       if (opaqueTypesSubstituted == opaqueTypesSubstituted2)
         continue;
     }

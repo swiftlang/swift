@@ -1016,7 +1016,9 @@ static Type substOpaqueTypesWithUnderlyingTypesRec(
     llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
-  return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+  return ty.subst(replacer, replacer,
+                  SubstFlags::SubstituteOpaqueArchetypes |
+                  SubstFlags::PreservePackExpansionLevel);
 }
 
 /// Checks that \p dc has access to \p ty for the purposes of an opaque
@@ -1169,7 +1171,8 @@ static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
   return ref.subst(origType, replacer, replacer,
-                   SubstFlags::SubstituteOpaqueArchetypes);
+                   SubstFlags::SubstituteOpaqueArchetypes |
+                   SubstFlags::PreservePackExpansionLevel);
 }
 
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
