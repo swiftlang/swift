@@ -32,11 +32,6 @@ public class PublicContainsWeak {
 }
 
 @Observable
-class ContainsPackage {
-  package var contents: Int = 0
-}
-
-@Observable
 class ContainsUnowned {
   unowned var obj: AnyObject? = nil
 }
