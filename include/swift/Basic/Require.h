@@ -21,6 +21,8 @@
 
 #include "llvm/Support/raw_ostream.h"
 
+namespace swift {
+
 /// Checks the `condition` and if it's false abort with `message`.
 /// In contrast to `assert` and similar functions, `require` works in
 /// no-assert builds the same way as in debug builds.
@@ -29,6 +31,8 @@ inline void require(bool condition, const char *message) {
     llvm::errs() << message << '\n';
     abort();
   }
+}
+
 }
 
 #endif
