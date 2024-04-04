@@ -333,7 +333,7 @@ struct LiveRangeSummary {
 /// boundary. The client may later use that information to figure out how to
 /// "extend" a lifetime, for example by inserting copies.
 ///
-/// Consequently, a branch intruction may be marked as a non-lifetime-ending
+/// Consequently, a branch instruction may be marked as a non-lifetime-ending
 /// use, but modeled as as a use point in the predecessor block. This can
 /// confusingly result in liveness that ends *before* value's the lifetime ends:
 ///
