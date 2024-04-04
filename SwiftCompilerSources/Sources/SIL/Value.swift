@@ -138,6 +138,15 @@ extension Value {
     }
   }
 
+  public var definingInstructionOrTerminator: Instruction? {
+    if let def = definingInstruction {
+      return def
+    } else if let result = TerminatorResult(self) {
+      return result.terminator
+    }
+    return nil
+  }
+
   public var nextInstruction: Instruction {
     if self is Argument {
       return parentBlock.instructions.first!
