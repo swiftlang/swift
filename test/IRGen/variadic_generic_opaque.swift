@@ -40,3 +40,14 @@ func variadicG2<each T: Q>(_: repeat each T) -> some P {
 // CHECK: define private ptr @"get_witness_table 23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC"
 // CHECK: define private ptr @"get_witness_table 23variadic_generic_opaque1QRzlAA2G2VyAA2S1V_xQPGAA1PHPAfaBHPyHC_xAaBHD1_HX_HC"
 // CHECK: define private ptr @"get_witness_table Rvz23variadic_generic_opaque1QRzlAA2G2VyxxQp_QPGAA1PHPxAaBHD1__HX_HC"
+
+// Conditional same-shape requirement
+public struct Outer<each T> {
+  public struct Inner<each U> {}
+}
+
+extension Outer.Inner: P where (repeat (each T, each U)): Any {}
+
+func concreteOuterInner() -> some P {
+  Outer<Int>.Inner<String>()
+}
