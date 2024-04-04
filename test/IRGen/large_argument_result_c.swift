@@ -2,6 +2,11 @@
 
 // REQUIRES: PTRSIZE=64
 
+// Whether llvm can remove the first two memcmp's dependents on the ABI (arm64's
+// PCS, says stack arguments might be written to; x86-64 ABI copies indirect
+// parameters for the call)
+// REQUIRES: CPU=arm64 || CPU=arm64e
+
 // CHECK: define swiftcc void @"$s23large_argument_result_c7runTestyySo0A6_thingaF"(ptr {{.*}} %0)
 // CHECK:  [[CALL_ALLOCA:%.*]] = alloca <{ %Ts6UInt64V, %Ts6UInt64V, %Ts6UInt64V
 // CHECK:  [[TMP_ALLOCA:%.*]] = alloca %TSo11large_thinga, align 8
