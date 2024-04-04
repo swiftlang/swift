@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-abi-5.6-triple) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG
 // RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation -target %target-swift-abi-5.6-triple) | %FileCheck --check-prefixes=CHECK,CHECK-OPT %s
 
+// rdar://125628293
+// UNSUPPORTED: CPU=arm64_32
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
