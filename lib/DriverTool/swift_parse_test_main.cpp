@@ -200,7 +200,7 @@ static void _loadSwiftFilesRecursively(
          I != E; I.increment(err)) {
       _loadSwiftFilesRecursively(I->path(), buffers);
     }
-  } else if (path.endswith(".swift")) {
+  } else if (path.ends_with(".swift")) {
     if (auto buffer = llvm::MemoryBuffer::getFile(path)) {
       buffers.push_back(std::move(*buffer));
     }

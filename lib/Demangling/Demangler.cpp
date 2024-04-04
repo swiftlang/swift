@@ -84,6 +84,7 @@ static bool isRequirement(Node::Kind kind) {
     case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericConformanceRequirement:
+    case Node::Kind::DependentGenericInverseConformanceRequirement:
       return true;
     default:
       return false;
@@ -188,7 +189,7 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
 
   // Look for any of the known prefixes
   for (auto prefix : prefixes) {
-    if (mangledName.startswith(prefix))
+    if (mangledName.starts_with(prefix))
       return prefix.size();
   }
 
@@ -209,12 +210,12 @@ bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
 
 bool swift::Demangle::isObjCSymbol(llvm::StringRef mangledName) {
   StringRef nameWithoutPrefix = dropSwiftManglingPrefix(mangledName);
-  return nameWithoutPrefix.startswith("So") ||
-         nameWithoutPrefix.startswith("SC");
+  return nameWithoutPrefix.starts_with("So") ||
+         nameWithoutPrefix.starts_with("SC");
 }
 
 bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
-  return mangledName.startswith("_T");
+  return mangledName.starts_with("_T");
 }
 
 llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
@@ -1421,7 +1422,7 @@ NodePointer Demangler::demangleBuiltinType() {
         return nullptr;
       NodePointer EltType = popTypeAndGetChild();
       if (!EltType || EltType->getKind() != Node::Kind::BuiltinTypeName ||
-          !EltType->getText().startswith(BUILTIN_TYPE_NAME_PREFIX))
+          !EltType->getText().starts_with(BUILTIN_TYPE_NAME_PREFIX))
         return nullptr;
       CharVector name;
       name.append(BUILTIN_TYPE_NAME_VEC, *this);
@@ -1559,6 +1560,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
+  addChild(FuncType, popNode(Node::Kind::SelfLifetimeDependence));
   addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::IsolatedAnyFunctionType));
   addChild(FuncType, popNode(Node::Kind::TransferringResultFunctionType));
@@ -1569,7 +1571,6 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   }));
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
-  addChild(FuncType, popNode(Node::Kind::SelfLifetimeDependence));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
@@ -1602,6 +1603,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     return nullptr;
 
   unsigned FirstChildIdx = 0;
+  if (FuncType->getChild(FirstChildIdx)->getKind() ==
+      Node::Kind::SelfLifetimeDependence)
+    ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::GlobalActorFunctionType)
     ++FirstChildIdx;
@@ -1627,9 +1631,6 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind() ==
       Node::Kind::ParamLifetimeDependence)
-    ++FirstChildIdx;
-  if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::SelfLifetimeDependence)
     ++FirstChildIdx;
   auto ParameterType = FuncType->getChild(FirstChildIdx);
 
@@ -2319,6 +2320,11 @@ NodePointer Demangler::demangleImplFunctionType() {
       Param = addChild(Param, Transferring);
     ++NumTypesToAdd;
   }
+
+  if (nextIf('T')) {
+    type->addChild(createNode(Node::Kind::ImplTransferringResult), *this);
+  }
+
   while (NodePointer Result = demangleImplResultConvention(
                                                     Node::Kind::ImplResult)) {
     type = addChild(type, Result);
@@ -3128,9 +3134,9 @@ NodePointer Demangler::demangleLifetimeDependenceKind(bool isSelfDependence) {
     return createNode(Node::Kind::SelfLifetimeDependence,
                       (Node::IndexType)kind);
   }
-  auto node = createNode(Node::Kind::ParamLifetimeDependence);
-  node->addChild(createNode(Node::Kind::Index, unsigned(kind)), *this);
-  node->addChild(popTypeAndGetChild(), *this);
+  auto node = createWithChildren(Node::Kind::ParamLifetimeDependence,
+                                 createNode(Node::Kind::Index, unsigned(kind)),
+                                 popTypeAndGetChild());
   return createType(node);
 }
 
@@ -4085,8 +4091,9 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
 
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker } ConstraintKind;
+  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker, Inverse } ConstraintKind;
 
+  NodePointer inverseKind = nullptr;
   switch (nextChar()) {
     case 'v': ConstraintKind = PackMarker; TypeKind = Generic; break;
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
@@ -4105,6 +4112,20 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
     case 'h': ConstraintKind = SameShape; TypeKind = Generic; break;
+    case 'i': 
+      ConstraintKind = Inverse;
+      TypeKind = Generic;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
+    case 'I': 
+      ConstraintKind = Inverse;
+      TypeKind = Substitution;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
     default:  ConstraintKind = Protocol; TypeKind = Generic; pushBack(); break;
   }
 
@@ -4135,6 +4156,10 @@ NodePointer Demangler::demangleGenericRequirement() {
     return createWithChildren(
         Node::Kind::DependentGenericConformanceRequirement, ConstrTy,
         popProtocol());
+  case Inverse:
+    return createWithChildren(
+        Node::Kind::DependentGenericInverseConformanceRequirement,
+        ConstrTy, inverseKind);
   case BaseClass:
     return createWithChildren(
         Node::Kind::DependentGenericConformanceRequirement, ConstrTy,

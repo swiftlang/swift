@@ -18,6 +18,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace swift {
 class ModuleFile;
@@ -74,7 +75,7 @@ struct SerializedModuleBaseName {
                               llvm::vfs::FileSystem &fs) const;
 
   /// Returns the .package.swiftinterface path if its package-name also applies to
-  /// the the importing module. Returns an empty optional otherwise.
+  /// the importing module. Returns an empty optional otherwise.
   std::optional<std::string>
   getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
                                          ASTContext &ctx) const;
@@ -173,7 +174,7 @@ protected:
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
-    llvm::StringSet<> headerImports;
+    std::string headerImport;
   };
 
   static llvm::ErrorOr<BinaryModuleImports>
@@ -181,7 +182,6 @@ protected:
                      ModuleLoadingBehavior transitiveBehavior,
                      bool isFramework,
                      bool isRequiredOSSAModules,
-                     bool isRequiredNoncopyableGenerics,
                      StringRef SDKName,
                      StringRef packageName,
                      llvm::vfs::FileSystem *fileSystem,
@@ -211,7 +211,6 @@ public:
           bool isFramework);
 
   bool isRequiredOSSAModules() const;
-  bool isRequiredNoncopyableGenerics() const;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.
@@ -552,9 +551,10 @@ public:
 };
 
 /// Extract compiler arguments from an interface file buffer.
-bool extractCompilerFlagsFromInterface(StringRef interfacePath,
-                                       StringRef buffer, llvm::StringSaver &ArgSaver,
-                                       SmallVectorImpl<const char *> &SubArgs);
+bool extractCompilerFlagsFromInterface(
+    StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
+    SmallVectorImpl<const char *> &SubArgs,
+    std::optional<llvm::Triple> PreferredTarget = std::nullopt);
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);

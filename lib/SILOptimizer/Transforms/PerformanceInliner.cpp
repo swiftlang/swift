@@ -355,7 +355,7 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
   // branch tracing enum.
   if (auto *arg = dyn_cast<SILFunctionArgument>(val)) {
     if (auto *enumDecl = arg->getType().getEnumOrBoundGenericEnum()) {
-      return enumDecl->getName().str().startswith(
+      return enumDecl->getName().str().starts_with(
           LinearMapBranchTracingEnumPrefix);
     }
   }

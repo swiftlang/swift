@@ -1497,7 +1497,7 @@ ManglingError Remangler::mangleType(Node *node, unsigned depth) {
 template <size_t N> 
 static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   constexpr size_t prefixLength = N - 1;
-  if (!string.startswith(StringRef(data, prefixLength)))
+  if (!string.starts_with(StringRef(data, prefixLength)))
     return false;
   string = string.drop_front(prefixLength);
   return true;
@@ -1733,6 +1733,12 @@ ManglingError Remangler::mangleImplEscaping(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   // The old mangler does not encode @isolated(any).
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplTransferringResult(Node *node,
+                                                      unsigned depth) {
+  // The old mangler does not encode transferring result
   return ManglingError::Success;
 }
 
@@ -3027,4 +3033,10 @@ ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
 ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
   Buffer << "TwS";
   return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDependentGenericInverseConformanceRequirement(Node *node,
+                                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

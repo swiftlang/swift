@@ -1076,12 +1076,7 @@ public:
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
-        if (CD->hasLifetimeDependentReturn()) {
-          resultType = CD->getResultInterfaceType();
-          resultType = CD->mapTypeIntoContext(resultType);
-        } else {
-          resultType = TupleType::getEmpty(Ctx);
-        }
+        resultType = TupleType::getEmpty(Ctx);
       } else {
         resultType = TupleType::getEmpty(Ctx);
       }

@@ -578,7 +578,7 @@ bool AsyncConverter::walkToStmtPost(Stmt *S) {
     if (ClosedScopeWasWrappedInContinuation &&
         !Scopes.back().isWrappedInContination()) {
       // The nested scope was wrapped in a continuation but the current one
-      // isn't anymore. Add the '}' that corresponds to the the call to
+      // isn't anymore. Add the '}' that corresponds to the call to
       // withChecked(Throwing)Continuation.
       insertCustom(S->getEndLoc(), [&]() { OS << tok::r_brace << '\n'; });
     }
@@ -1650,7 +1650,7 @@ Identifier AsyncConverter::assignUniqueName(const Decl *D,
       return Ident;
   }
 
-  if (BoundName.startswith("$")) {
+  if (BoundName.starts_with("$")) {
     llvm::SmallString<8> NewName;
     NewName.append("val");
     NewName.append(BoundName.drop_front());

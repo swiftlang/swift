@@ -631,7 +631,7 @@ void SILBuilder::emitDestructureValueOperation(
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              bool poisonRefs,
-                                             bool operandWasMoved,
+                                             UsesMoveableValueDebugInfo_t moved,
                                              bool trace) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
@@ -640,15 +640,14 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
 
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, std::nullopt};
-  return insert(DebugValueInst::create(getSILDebugLocation(Loc, true), src,
-                                       getModule(),
-                                       *substituteAnonymousArgs(Name, Var, Loc),
-                                       poisonRefs, operandWasMoved, trace));
+  return insert(DebugValueInst::create(
+      getSILDebugLocation(Loc, true), src, getModule(),
+      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, moved, trace));
 }
 
-DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
-                                                 SILDebugVariable Var,
-                                                 bool wasMoved, bool trace) {
+DebugValueInst *SILBuilder::createDebugValueAddr(
+    SILLocation Loc, SILValue src, SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t moved, bool trace) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
 
@@ -658,7 +657,7 @@ DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
   DebugLocOverrideRAII LocOverride{*this, std::nullopt};
   return insert(DebugValueInst::createAddr(
       getSILDebugLocation(Loc, true), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), wasMoved, trace));
+      *substituteAnonymousArgs(Name, Var, Loc), moved, trace));
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,

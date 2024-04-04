@@ -34,6 +34,11 @@
 // imply the existence of earlier features.  (This only needs to apply to
 // suppressible features.)
 //
+// Sometimes, certain declarations will conflict with existing declarations
+// when printed with a suppressible feature disabled. The attribute
+// @_disallowFeatureSuppression can be used to suppress feature suppression on
+// a particular declaration.
+//
 // If suppressing a feature in general is problematic, but it's okay to
 // suppress it for specific declarations, the feature can be made
 // conditionally suppressible.  Declarations opt in to suppression with
@@ -164,10 +169,13 @@ LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros")
 SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
-LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
+CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
+LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
+SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
+LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -182,6 +190,7 @@ UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
+UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -216,6 +225,19 @@ EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
+/// Enables a module to allow non resilient access from other
+/// modules within a package if built from source.
+EXPERIMENTAL_FEATURE(AllowNonResilientAccessInPackage, false)
+
+/// Enables a client module within a package to bypass resilient
+/// access (at use site) to decls defined in another module within
+/// the same package.
+EXPERIMENTAL_FEATURE(ClientBypassResilientAccessInPackage, false)
+
+/// Enables serialization of package decls and bodies and performs
+/// CMO within a package.
+EXPERIMENTAL_FEATURE(PackageCMO, false)
+
 /// Whether to enable experimental layout string value witnesses
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnesses, true)
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnessesInstantiation, true)
@@ -236,7 +258,7 @@ EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
 EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
-EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure, true)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
@@ -275,9 +297,6 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
 
-/// Region Based Isolation testing using the TransferNonSendable pass
-EXPERIMENTAL_FEATURE(RegionBasedIsolation, true)
-
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
 EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
@@ -299,7 +318,13 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 EXPERIMENTAL_FEATURE(Embedded, true)
 
 /// Enables noncopyable generics
-EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+
+// Alias for NoncopyableGenerics
+EXPERIMENTAL_FEATURE(NoncopyableGenerics2, true)
+
+// Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
+EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
@@ -334,11 +359,28 @@ EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
 
+// Enable explicit isolation of closures.
+EXPERIMENTAL_FEATURE(ClosureIsolation, true)
+
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
 
+
 // Whether members of extensions respect the enclosing file's imports.
 EXPERIMENTAL_FEATURE(ExtensionImportVisibility, true)
+
+// Alias for IsolatedAny
+EXPERIMENTAL_FEATURE(IsolatedAny2, true)
+
+// Enable usability improvements for global-actor-isolated types.
+EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, false)
+
+// Enable @implementation on extensions of ObjC classes.
+EXPERIMENTAL_FEATURE(ObjCImplementation, true)
+
+// Enable @implementation on @_cdecl functions.
+EXPERIMENTAL_FEATURE(CImplementation, true)
+
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -48,30 +48,42 @@ using namespace swift::regionanalysisimpl;
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
-/// SILApplyCrossesIsolation determines if a SIL instruction is an isolation
-/// crossing apply expression. This is done by checking its correspondence to an
-/// ApplyExpr AST node, and then checking the internal flags of that AST node to
-/// see if the ActorIsolationChecker determined it crossed isolation.  It's
-/// possible this is brittle and a more nuanced check is needed, but this
-/// suffices for all cases tested so far.
-static bool isIsolationBoundaryCrossingApply(SILInstruction *inst) {
+std::optional<ApplyIsolationCrossing>
+regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
-    return apply->getIsolationCrossing().has_value();
+    if (auto crossing = apply->getIsolationCrossing())
+      return crossing;
+
   if (auto fas = FullApplySite::isa(inst)) {
-    if (bool(fas.getIsolationCrossing()))
-      return true;
+    if (auto crossing = fas.getIsolationCrossing())
+      return crossing;
   }
 
-  // We assume that any instruction that does not correspond to an ApplyExpr
-  // cannot cross an isolation domain.
-  return false;
+  return {};
 }
 
 namespace {
 
+struct UnderlyingTrackedValueInfo {
+  SILValue value;
+
+  /// Only used for addresses.
+  std::optional<ActorIsolation> actorIsolation;
+
+  explicit UnderlyingTrackedValueInfo(SILValue value) : value(value) {}
+
+  UnderlyingTrackedValueInfo(SILValue value,
+                             std::optional<ActorIsolation> actorIsolation)
+      : value(value), actorIsolation(actorIsolation) {}
+};
+
 struct UseDefChainVisitor
     : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
   bool isMerge = false;
+
+  /// The actor isolation that we found while walking from use->def. Always set
+  /// to the first one encountered.
+  std::optional<ActorIsolation> actorIsolation;
 
   SILValue visitAll(SILValue sourceAddr) {
     SILValue result = visit(sourceAddr);
@@ -142,9 +154,21 @@ struct UseDefChainVisitor
         // Index is always a merge.
         isMerge = true;
         break;
-      case ProjectionKind::Enum:
-        // Enum is never a merge since it always has a single field.
+      case ProjectionKind::Enum: {
+        // Enum is never a merge since it always has a single tuple field... but
+        // it can be actor isolated.
+        if (!bool(actorIsolation)) {
+          auto *uedi = cast<UncheckedTakeEnumDataAddrInst>(inst);
+          auto i = getActorIsolation(uedi->getEnumDecl());
+          // If our operand decl is actor isolated, then we want to stop looking
+          // through since it is Sendable.
+          if (i.isActorIsolated()) {
+            actorIsolation = i;
+            return SILValue();
+          }
+        }
         break;
+      }
       case ProjectionKind::Tuple: {
         // These are merges if we have multiple fields.
         auto *tti = cast<TupleElementAddrInst>(inst);
@@ -162,6 +186,17 @@ struct UseDefChainVisitor
       }
       case ProjectionKind::Struct:
         auto *sea = cast<StructElementAddrInst>(inst);
+
+        // See if our type is actor isolated.
+        if (!bool(actorIsolation)) {
+          auto i = getActorIsolation(sea->getStructDecl());
+          // If our parent type is actor isolated then we do not want to keep on
+          // walking up from use->def since the value is considered Sendable.
+          if (i.isActorIsolated()) {
+            actorIsolation = i;
+            return SILValue();
+          }
+        }
 
         // See if our result type is a sendable type. In such a case, we do not
         // want to look through the struct_element_addr since we do not want to
@@ -248,8 +283,6 @@ static bool isLookThroughIfResultNonSendable(SILInstruction *inst) {
   switch (inst->getKind()) {
   default:
     return false;
-  case SILInstructionKind::TupleElementAddrInst:
-  case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::RawPointerToRefInst:
     return true;
   }
@@ -264,13 +297,16 @@ static bool isLookThroughIfOperandNonSendable(SILInstruction *inst) {
   }
 }
 
-static bool isLookThroughIfOperandAndResultSendable(SILInstruction *inst) {
+static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   switch (inst->getKind()) {
   default:
     return false;
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedValueCastInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     return true;
   }
 }
@@ -293,7 +329,7 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
-      if (isLookThroughIfOperandAndResultSendable(svi)) {
+      if (isLookThroughIfOperandAndResultNonSendable(svi)) {
         if (isNonSendableType(svi->getType(), fn) &&
             isNonSendableType(svi->getOperand(0)->getType(), fn)) {
           temp = svi->getOperand(0);
@@ -329,21 +365,21 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
   }
 }
 
-static SILValue getUnderlyingTrackedValue(SILValue value) {
+static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
-    return getUnderlyingTrackedObjectValue(value);
+    return UnderlyingTrackedValueInfo(getUnderlyingTrackedObjectValue(value));
   }
 
   UseDefChainVisitor visitor;
   SILValue base = visitor.visitAll(value);
   assert(base);
   if (base->getType().isObject())
-    return getUnderlyingObject(base);
-  return base;
+    return {getUnderlyingObject(base), visitor.actorIsolation};
+  return {base, visitor.actorIsolation};
 }
 
 SILValue RegionAnalysisFunctionInfo::getUnderlyingTrackedValue(SILValue value) {
-  return ::getUnderlyingTrackedValue(value);
+  return ::getUnderlyingTrackedValue(value).value;
 }
 
 namespace {
@@ -423,10 +459,9 @@ using AsyncLetSourceValue =
 } // namespace
 
 static std::optional<AsyncLetSourceValue>
-findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
+findAsyncLetPartialApplyFromStart(SILValue value) {
   // If our operand is Sendable then we want to return nullptr. We only want to
   // return a value if we are not
-  SILValue value = bi->getOperand(1);
   auto fType = value->getType().castTo<SILFunctionType>();
   if (fType->isSendable())
     return {};
@@ -444,11 +479,30 @@ findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
 
   // We can also get a thin_to_thick_function here if we do not capture
   // anything. In such a case, we just do not process the partial apply get
-  if (auto *pai = dyn_cast<PartialApplyInst>(value))
-    return {{pai}};
-  return {{cast<ThinToThickFunctionInst>(value)}};
+  if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(value))
+    return {{ttfi}};
+
+  // Ok, we could still have a reabstraction thunk. In such a case, we want the
+  // partial_apply that we process to be the original partial_apply (or
+  // thin_to_thick)... so in that case process recursively.
+  auto *pai = cast<PartialApplyInst>(value);
+  if (auto *calleeFunction = pai->getCalleeFunction()) {
+    if (calleeFunction->isThunk() == IsReabstractionThunk) {
+      return findAsyncLetPartialApplyFromStart(pai->getArgument(0));
+    }
+  }
+
+  // Otherwise, this is the right partial_apply... apply it!
+  return {{pai}};
 }
 
+/// This recurses through reabstraction thunks.
+static std::optional<AsyncLetSourceValue>
+findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
+  return findAsyncLetPartialApplyFromStart(bi->getOperand(1));
+}
+
+/// This recurses through reabstraction thunks.
 static std::optional<AsyncLetSourceValue>
 findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
   auto *bi = cast<BuiltinInst>(FullApplySite(ai).getArgument(0));
@@ -458,15 +512,37 @@ findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
 }
 
 static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
-  auto *cfi = pai->getSingleUserOfType<ConvertFunctionInst>();
-  if (!cfi)
-    return false;
+  if (auto *fas = pai->getCalleeFunction())
+    if (fas->isThunk())
+      return false;
 
-  auto *cvt = cfi->getSingleUserOfType<ConvertEscapeToNoEscapeInst>();
-  if (!cvt)
-    return false;
+  // Look through reabstraction thunks.
+  SILValue result = pai;
+  while (true) {
+    SILValue iter = result;
 
-  auto *bi = cvt->getSingleUserOfType<BuiltinInst>();
+    if (auto *use = iter->getSingleUse()) {
+      if (auto *maybeThunk = dyn_cast<PartialApplyInst>(use->getUser())) {
+        if (auto *fas = maybeThunk->getCalleeFunction()) {
+          if (fas->isThunk()) {
+            iter = maybeThunk;
+          }
+        }
+      }
+    }
+
+    if (auto *cfi = iter->getSingleUserOfType<ConvertFunctionInst>())
+      iter = cfi;
+    if (auto *cvt = iter->getSingleUserOfType<ConvertEscapeToNoEscapeInst>())
+      iter = cvt;
+
+    if (iter == result)
+      break;
+
+    result = iter;
+  }
+
+  auto *bi = result->getSingleUserOfType<BuiltinInst>();
   if (!bi)
     return false;
 
@@ -477,31 +553,33 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
   return *kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer;
 }
 
-static bool isGlobalActorInit(SILFunction *fn) {
+static std::optional<ActorIsolation>
+getGlobalActorInitIsolation(SILFunction *fn) {
   auto block = fn->begin();
 
   // Make sure our function has a single block. We should always have a single
   // block today. Return nullptr otherwise.
   if (block == fn->end() || std::next(block) != fn->end())
-    return false;
+    return {};
 
   GlobalAddrInst *gai = nullptr;
   if (!match(cast<SILInstruction>(block->getTerminator()),
              m_ReturnInst(m_AddressToPointerInst(m_GlobalAddrInst(gai)))))
-    return false;
+    return {};
 
   auto *globalDecl = gai->getReferencedGlobal()->getDecl();
   if (!globalDecl)
-    return false;
+    return {};
 
-  return globalDecl->getGlobalActorAttr() != std::nullopt;
+  // See if our globalDecl is specifically guarded.
+  return getActorIsolation(globalDecl);
 }
 
 /// Returns true if this is a function argument that is able to be transferred
 /// in the body of our function.
 static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
   // Indirect out parameters cannot be an input transferring parameter.
-  if (arg->getArgumentConvention().isIndirectOutParameter())
+  if (arg->isIndirectResult() || arg->isIndirectErrorResult())
     return false;
 
   // If we have a function argument that is closure captured by a Sendable
@@ -520,6 +598,10 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
   // 2. If we have an async-let based Sendable closure, we want to allow
   // for the argument to be transferred in the async let's statement and
   // not emit an error.
+  //
+  // TODO: Once the async let refactoring change this will no longer be needed
+  // since closure captures will have transferring parameters and be
+  // non-Sendable.
   if (arg->isClosureCapture() &&
       arg->getFunction()->getLoweredFunctionType()->isSendable())
     return true;
@@ -527,6 +609,31 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
   // Otherwise, we only allow for the argument to be transferred if it is
   // explicitly marked as a strong transferring parameter.
   return arg->isTransferring();
+}
+
+//===----------------------------------------------------------------------===//
+//                           MARK: SILIsolationInfo
+//===----------------------------------------------------------------------===//
+
+void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
+  switch (Kind(*this)) {
+  case Unknown:
+    llvm::report_fatal_error("Printing unknown for diagnostics?!");
+    return;
+  case Disconnected:
+    os << "disconnected";
+    return;
+  case Actor:
+    if (hasActorIsolation() && getActorIsolation()) {
+      getActorIsolation()->printForDiagnostics(os);
+    } else {
+      os << "actor-isolated";
+    }
+    return;
+  case Task:
+    os << "task-isolated";
+    return;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -650,7 +757,7 @@ struct PartialApplyReachabilityDataflow {
 
 private:
   SILValue getRootValue(SILValue value) const {
-    return getUnderlyingTrackedValue(value);
+    return getUnderlyingTrackedValue(value).value;
   }
 
   unsigned getBitForValue(SILValue value) const {
@@ -884,10 +991,18 @@ void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
     unsigned argNum = [&]() -> unsigned {
       if (fai.isCalleeOperand(*op))
         return op->getOperandNumber();
-      return fai.getAppliedArgIndex(*op);
+      return fai.getAppliedArgIndexWithoutIndirectResults(*op);
     }();
-    assert(argNum < sourceApply->getArgs()->size());
-    foundExpr = getFoundExprForParam(sourceApply, argNum);
+
+    // If something funny happened and we get an arg num that is larger than our
+    // num args... just return nullptr so we emit an error using our initial
+    // foundExpr.
+    //
+    // TODO: We should emit a "I don't understand error" so this gets reported
+    // to us.
+    if (argNum < sourceApply->getArgs()->size()) {
+      foundExpr = getFoundExprForParam(sourceApply, argNum);
+    }
   }
 
   auto inferredArgType =
@@ -1037,7 +1152,8 @@ struct PartitionOpBuilder {
   TrackableValueID lookupValueID(SILValue value);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
 
-  TrackableValueID getActorIntroducingRepresentative();
+  TrackableValueID
+  getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
 
   void addAssignFresh(SILValue value) {
     currentInstPartitionOps.emplace_back(
@@ -1091,11 +1207,12 @@ struct PartitionOpBuilder {
 
   /// Mark \p value artifically as being part of an actor isolated region by
   /// introducing a new fake actor introducing representative and merging them.
-  void addActorIntroducingInst(SILValue value) {
+  void addActorIntroducingInst(SILValue value,
+                               SILIsolationInfo actorIsolation) {
     assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
            "merged values should already have been encountered");
 
-    auto elt = getActorIntroducingRepresentative();
+    auto elt = getActorIntroducingRepresentative(actorIsolation);
     currentInstPartitionOps.emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
     currentInstPartitionOps.emplace_back(
@@ -1353,6 +1470,7 @@ public:
     llvm::SmallVector<Element, 8> nonSendableJoinedIndices;
     llvm::SmallVector<Element, 8> nonSendableSeparateIndices;
     for (SILArgument *arg : functionArguments) {
+      // This will decide what the isolation region is.
       if (auto state = tryToTrackValue(arg)) {
         // If we can transfer our parameter, just add it to
         // nonSendableSeparateIndices.
@@ -1368,8 +1486,8 @@ public:
 
         // Otherwise, it is one of our merged parameters. Add it to the never
         // transfer list and to the region join list.
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
-        valueMap.addNeverTransferredValueID(state->getID());
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ";
+                   state->print(llvm::dbgs()); llvm::dbgs() << *arg);
         nonSendableJoinedIndices.push_back(state->getID());
       }
     }
@@ -1410,16 +1528,15 @@ private:
   }
 
   TrackableValue
-  getActorIntroducingRepresentative(SILInstruction *introducingInst) const {
-    return valueMap.getActorIntroducingRepresentative(introducingInst);
+  getActorIntroducingRepresentative(SILInstruction *introducingInst,
+                                    SILIsolationInfo actorIsolation) const {
+    return valueMap.getActorIntroducingRepresentative(introducingInst,
+                                                      actorIsolation);
   }
 
-  bool markValueAsActorDerived(SILValue value) {
-    return valueMap.markValueAsActorDerived(value);
-  }
-
-  void addNeverTransferredValueID(TrackableValueID valueID) {
-    valueMap.addNeverTransferredValueID(valueID);
+  bool mergeIsolationRegionInfo(SILValue value,
+                                SILIsolationInfo isolationRegion) {
+    return valueMap.mergeIsolationRegionInfo(value, isolationRegion);
   }
 
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false) {
@@ -1429,18 +1546,6 @@ private:
   TrackableValueID lookupValueID(SILValue value) {
     return valueMap.lookupValueID(value);
   }
-
-  void sortUniqueNeverTransferredValues() {
-    valueMap.sortUniqueNeverTransferredValues();
-  }
-
-  /// Get the vector of IDs that cannot be legally transferred at any point in
-  /// this function.
-  ArrayRef<TrackableValueID> getNeverTransferredValues() const {
-    return valueMap.getNonTransferrableElements();
-  }
-
-  // ===========================================================================
 
 public:
   /// Return the partition consisting of all function arguments.
@@ -1473,26 +1578,13 @@ public:
     llvm::report_fatal_error("all apply instructions should be covered");
   }
 
-  enum SILMultiAssignFlags : uint8_t {
-    None = 0x0,
-
-    /// Set to true if this SILMultiAssign call should assume that we are
-    /// creating a new value that is guaranteed to be propagating actor self.
-    ///
-    /// As an example, this is used when a partial_apply captures an actor. Even
-    /// though we are doing an assign fresh, we want to make sure that the
-    /// closure is viewed as coming from an actor.
-    PropagatesActorSelf = 0x1,
-  };
-  using SILMultiAssignOptions = OptionSet<SILMultiAssignFlags>;
-
   /// Require all non-sendable sources, merge their regions, and assign the
   /// resulting region to all non-sendable targets, or assign non-sendable
   /// targets to a fresh region if there are no non-sendable sources.
   template <typename TargetRange, typename SourceRange>
   void translateSILMultiAssign(const TargetRange &resultValues,
                                const SourceRange &sourceValues,
-                               SILMultiAssignOptions options = {}) {
+                               SILIsolationInfo isolationInfo = {}) {
     SmallVector<SILValue, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
@@ -1506,8 +1598,8 @@ public:
       if (auto value = tryToTrackValue(result)) {
         assignResults.push_back(value->getRepresentative().getValue());
         // TODO: Can we pass back a reference to value perhaps?
-        if (options.contains(SILMultiAssignFlags::PropagatesActorSelf)) {
-          markValueAsActorDerived(result);
+        if (isolationInfo) {
+          mergeIsolationRegionInfo(result, isolationInfo);
         }
       }
     }
@@ -1527,9 +1619,8 @@ public:
       // non-Sendable operands and we are supposed to mark value as actor
       // derived, introduce a fake element so we just propagate the actor
       // region.
-      if (assignOperands.size() &&
-          options.contains(SILMultiAssignFlags::PropagatesActorSelf)) {
-        builder.addActorIntroducingInst(assignOperands.back());
+      if (assignOperands.size() && isolationInfo) {
+        builder.addActorIntroducingInst(assignOperands.back(), isolationInfo);
       }
 
       return;
@@ -1555,6 +1646,17 @@ public:
     }
   }
 
+  /// Transfer the parameters of our partial_apply.
+  ///
+  /// Handling async let has three-four parts:
+  ///
+  /// %partial_apply = partial_apply()
+  /// %reabstraction = maybe reabstraction thunk of partial_apply
+  /// builtin "async let start"(%reabstraction | %partial_apply)
+  /// call %asyncLetGet()
+  ///
+  /// We transfer the captured parameters of %partial_apply at the async let
+  /// start and then untransfer them at async let get.
   void translateAsyncLetStart(BuiltinInst *bi) {
     // Just track the result of the builtin inst as an assign fresh. We do this
     // so we properly track the partial_apply get. We already transferred the
@@ -1562,7 +1664,10 @@ public:
     builder.addAssignFresh(bi);
   }
 
+  /// For discussion on how we handle async let, please see the comment on
+  /// translateAsyncLetStart.
   void translateAsyncLetGet(ApplyInst *ai) {
+    // This looks through reabstraction thunks.
     auto source = findAsyncLetPartialApplyFromGet(ai);
     assert(source.has_value());
 
@@ -1571,14 +1676,16 @@ public:
     if (source->is<ThinToThickFunctionInst *>())
       return;
 
-    // We should always be able to derive a partial_apply since we pattern
-    // matched against the actual function call to swift_asyncLet_get in our
-    // caller.
+    // If our partial_apply was Sendable, then Sema should have checked that
+    // none of our captures were non-Sendable and we should have emitted an
+    // error earlier.
+    assert(bool(source.value()) &&
+           "AsyncLet Get should always have a derivable partial_apply");
     auto *pai = source->get<PartialApplyInst *>();
-    assert(pai && "AsyncLet Get should always have a derivable partial_apply");
+    if (pai->getFunctionType()->isSendable())
+      return;
 
     ApplySite applySite(pai);
-
     // For each of our partial apply operands...
     for (auto pair : llvm::enumerate(applySite.getArgumentOperands())) {
       Operand &op = pair.value();
@@ -1612,6 +1719,7 @@ public:
   }
 
   void translateSILPartialApplyAsyncLetBegin(PartialApplyInst *pai) {
+    LLVM_DEBUG(llvm::dbgs() << "Translating Async Let Begin Partial Apply!\n");
     // Grab our partial apply and transfer all of its non-sendable
     // parameters. We do not merge the parameters since each individual capture
     // of the async let at the program level is viewed as still being in
@@ -1629,13 +1737,18 @@ public:
                             &op);
       }
     }
+
+    // Then mark our partial_apply result as being returned fresh.
+    builder.addAssignFresh(pai);
   }
 
   /// Handles the semantics for SIL applies that cross isolation.
   ///
   /// Semantically this causes all arguments of the applysite to be transferred.
-  void translateIsolatedPartialApply(PartialApplyInst *pai) {
+  void translateIsolatedPartialApply(PartialApplyInst *pai,
+                                     SILIsolationInfo actorIsolation) {
     ApplySite applySite(pai);
+    LLVM_DEBUG(llvm::dbgs() << "Translating Isolated Partial Apply!\n");
 
     // For each argument operand.
     for (auto &op : applySite.getArgumentOperands()) {
@@ -1653,25 +1766,13 @@ public:
     // values later, we will error, so it is safe to just create a new value.
     auto paiValue = tryToTrackValue(pai).value();
     SILValue rep = paiValue.getRepresentative().getValue();
-    markValueAsActorDerived(rep);
+    mergeIsolationRegionInfo(rep, actorIsolation);
     translateSILAssignFresh(rep);
   }
 
   void translateSILPartialApply(PartialApplyInst *pai) {
-    assert(!isIsolationBoundaryCrossingApply(pai));
-
-    // First check if our partial_apply is fed into an async let begin. If so,
-    // handle it especially.
-    //
-    // NOTE: If it is an async_let, then the closure itself will be Sendable. We
-    // treat passing in a value into the async Sendable closure as transferring
-    // it into the closure.
-    if (isAsyncLetBeginPartialApply(pai)) {
-      return translateSILPartialApplyAsyncLetBegin(pai);
-    }
-
-    // Then check if our partial apply is Sendable. In such a case, we will have
-    // emitted an earlier warning in Sema.
+    // First check if our partial apply is Sendable. In such a case, we will
+    // have emitted an earlier warning in Sema.
     //
     // DISCUSSION: The reason why we can treat values passed into an async let
     // as transferring safely but it is unsafe to do this for arbitrary Sendable
@@ -1686,32 +1787,30 @@ public:
     if (pai->getFunctionType()->isSendableType())
       return;
 
-    if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
-      if (ace->getActorIsolation().isActorIsolated()) {
-        return translateIsolatedPartialApply(pai);
+    // Then check if our partial_apply is fed into an async let begin. If so,
+    // handle it especially.
+    //
+    // NOTE: If it is an async_let, then the closure itself will be Sendable. We
+    // treat passing in a value into the async Sendable closure as transferring
+    // it into the closure.
+    if (isAsyncLetBeginPartialApply(pai)) {
+      return translateSILPartialApplyAsyncLetBegin(pai);
+    }
+
+    // See if we have a reabstraction thunk. In such a case, just do an assign.
+    if (auto *calleeFn = pai->getCalleeFunction()) {
+      if (calleeFn->isThunk() == IsReabstractionThunk) {
+        return translateSILAssign(pai);
       }
     }
 
-    SILMultiAssignOptions options;
-    for (auto &op : pai->getAllOperands()) {
-      if (auto value = tryToTrackValue(op.get())) {
-        if (value->isActorDerived()) {
-          options |= SILMultiAssignFlags::PropagatesActorSelf;
-        }
-      } else {
-        // We only treat Sendable values as propagating actor self if the
-        // partial apply has operand as an sil_isolated parameter.
-        ApplySite applySite(pai);
-        if (applySite.isArgumentOperand(op) &&
-            ApplySite(pai).getArgumentParameterInfo(op).hasOption(
-                SILParameterInfo::Isolated))
-          options |= SILMultiAssignFlags::PropagatesActorSelf;
-      }
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
+      return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(pai, applyResults);
-    translateSILMultiAssign(applyResults, pai->getOperandValues(), options);
+    translateSILMultiAssign(applyResults, pai->getOperandValues());
   }
 
   void translateSILBuiltin(BuiltinInst *bi) {
@@ -1728,18 +1827,6 @@ public:
   }
 
   void translateNonIsolationCrossingSILApply(FullApplySite fas) {
-    SILMultiAssignOptions options;
-
-    // If self is an actor and we are isolated to it, propagate actor self.
-    if (fas.hasSelfArgument()) {
-      auto &self = fas.getSelfArgumentOperand();
-      if (self.get()->getType().isActor() &&
-          fas.getArgumentParameterInfo(self).hasOption(
-              SILParameterInfo::Isolated)) {
-        options |= SILMultiAssignFlags::PropagatesActorSelf;
-      }
-    }
-
     // For non-self parameters, gather all of the transferring parameters and
     // gather our non-transferring parameters.
     SmallVector<SILValue, 8> nonTransferringParameters;
@@ -1761,7 +1848,7 @@ public:
     }
 
     // If our self parameter was transferring, transfer it. Otherwise, just
-    // stick it in the non seld operand values array and run multiassign on
+    // stick it in the non self operand values array and run multiassign on
     // it.
     if (fas.hasSelfArgument()) {
       auto &selfOperand = fas.getSelfArgumentOperand();
@@ -1777,21 +1864,28 @@ public:
       }
     }
 
+    // Add our callee to non-transferring parameters. This ensures that if it is
+    // actor isolated, that propagates into our results. This is especially
+    // important since our callee could be dynamically isolated and we cannot
+    // know that until we perform dataflow.
+    nonTransferringParameters.push_back(fas.getCallee());
+
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
 
     auto type = fas.getSubstCalleeSILType().castTo<SILFunctionType>();
+    auto isolationInfo = SILIsolationInfo::get(*fas);
 
     // If our result is not transferring, just do the normal multi-assign.
     if (!type->hasTransferringResult()) {
       return translateSILMultiAssign(applyResults, nonTransferringParameters,
-                                     options);
+                                     isolationInfo);
     }
 
     // If our result is transferring, then pass in empty as our results and then
     // perform assign fresh.
     ArrayRef<SILValue> empty;
-    translateSILMultiAssign(empty, nonTransferringParameters, options);
+    translateSILMultiAssign(empty, nonTransferringParameters, isolationInfo);
     for (SILValue result : applyResults) {
       if (auto value = tryToTrackValue(result)) {
         builder.addAssignFresh(value->getRepresentative().getValue());
@@ -1800,6 +1894,7 @@ public:
   }
 
   void translateSILApply(SILInstruction *inst) {
+    // Handles normal builtins and async let start.
     if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
       return translateSILBuiltin(bi);
     }
@@ -1807,8 +1902,8 @@ public:
     auto fas = FullApplySite::isa(inst);
     assert(bool(fas) && "Builtins should be handled above");
 
+    // Handle async let get.
     if (auto *f = fas.getCalleeFunction()) {
-      // Check against the actual SILFunction.
       if (f->getName() == "swift_asyncLet_get") {
         return translateAsyncLetGet(cast<ApplyInst>(*fas));
       }
@@ -1816,7 +1911,7 @@ public:
 
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
-    if (!isIsolationBoundaryCrossingApply(inst))
+    if (!getApplyIsolationCrossing(*fas))
       return translateNonIsolationCrossingSILApply(fas);
 
     if (auto cast = dyn_cast<ApplyInst>(inst))
@@ -1834,10 +1929,6 @@ public:
   ///
   /// Semantically this causes all arguments of the applysite to be transferred.
   void translateIsolationCrossingSILApply(FullApplySite applySite) {
-    ApplyExpr *sourceApply = applySite.getLoc().getAsASTNode<ApplyExpr>();
-    assert((sourceApply || bool(applySite.getIsolationCrossing())) &&
-           "only ApplyExpr's should cross isolation domains");
-
     // Require all operands first before we emit transferring.
     for (auto op : applySite.getArguments())
       if (auto value = tryToTrackValue(op))
@@ -1903,7 +1994,7 @@ public:
   }
 
   void translateSILLookThrough(SingleValueInstruction *svi) {
-    assert(svi->getNumOperands() == 1);
+    assert(svi->getNumRealOperands() == 1);
     auto srcID = tryToTrackValue(svi->getOperand(0));
     auto destID = tryToTrackValue(svi);
     assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
@@ -2146,11 +2237,11 @@ public:
       return;
 
     case TranslationSemantics::LookThrough:
-      assert(inst->getNumOperands() == 1);
+      assert(inst->getNumRealOperands() == 1);
       assert((isStaticallyLookThroughInst(inst) ||
               isLookThroughIfResultNonSendable(inst) ||
               isLookThroughIfOperandNonSendable(inst) ||
-              isLookThroughIfOperandAndResultSendable(inst)) &&
+              isLookThroughIfOperandAndResultNonSendable(inst)) &&
              "Out of sync... should return true for one of these categories!");
       return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
 
@@ -2202,8 +2293,11 @@ TrackableValueID PartitionOpBuilder::lookupValueID(SILValue value) {
   return translator->lookupValueID(value);
 }
 
-TrackableValueID PartitionOpBuilder::getActorIntroducingRepresentative() {
-  return translator->getActorIntroducingRepresentative(currentInst).getID();
+TrackableValueID PartitionOpBuilder::getActorIntroducingRepresentative(
+    SILIsolationInfo actorIsolation) {
+  return translator
+      ->getActorIntroducingRepresentative(currentInst, actorIsolation)
+      .getID();
 }
 
 bool PartitionOpBuilder::valueHasID(SILValue value, bool dumpIfHasNoID) {
@@ -2379,7 +2473,6 @@ CONSTANT_TRANSLATION(EndInitLetRefInst, LookThrough)
 CONSTANT_TRANSLATION(InitEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(OpenExistentialAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedRefCastInst, LookThrough)
-CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UpcastInst, LookThrough)
 CONSTANT_TRANSLATION(MoveValueInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUnresolvedNonCopyableValueInst, LookThrough)
@@ -2521,7 +2614,7 @@ CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(GetAsyncContinuationInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(ExtractExecutorInst, AssertingIfNonSendable)
-CONSTANT_TRANSLATION(FunctionExtractIsolationInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(FunctionExtractIsolationInst, Require)
 
 //===---
 // Existential Box
@@ -2598,39 +2691,6 @@ CONSTANT_TRANSLATION(VectorInst, Asserting)
 
 #undef CONSTANT_TRANSLATION
 
-#ifdef LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE
-#error "LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE already defined?!"
-#endif
-
-// If our result is non-Sendable, treat this as a lookthrough.
-// Otherwise, we are extracting a sendable field from a non-Sendable base
-// type. We need to track this as an assignment so that if we transferred
-//
-// the value we emit an error. Since we do not track uses of Sendable
-// values this is the best place to emit the error since we do not look
-// further to find the actual use site.
-//
-// TODO: We could do a better job here and attempt to find the actual
-// use
-// of the Sendable addr. That would require adding more logic though.
-#define LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(INST)              \
-  TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
-    assert(isLookThroughIfResultNonSendable(inst) && "Out of sync?!");         \
-    if (isNonSendableType(inst->getType())) {                                  \
-      return TranslationSemantics::LookThrough;                                \
-    }                                                                          \
-    return TranslationSemantics::Require;                                      \
-  }
-
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(TupleElementAddrInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(StructElementAddrInst)
-
-#undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE
-
-#ifdef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
-#error IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE already defined
-#endif
-
 #define IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(INST)                       \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
     if (!isNonSendableType(inst->getType())) {                                 \
@@ -2644,14 +2704,14 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 
 #undef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
 
-#ifdef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
-#error "CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT already defined"
+#ifdef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
+#error "LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND already defined"
 #endif
 
-#define CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(INST)               \
+#define LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(INST)                    \
                                                                                \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *cast) {        \
-    assert(isLookThroughIfOperandAndResultSendable(cast) && "Out of sync");    \
+    assert(isLookThroughIfOperandAndResultNonSendable(cast) && "Out of sync"); \
     bool isOperandNonSendable =                                                \
         isNonSendableType(cast->getOperand()->getType());                      \
     bool isResultNonSendable = isNonSendableType(cast->getType());             \
@@ -2670,11 +2730,14 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
     return TranslationSemantics::Ignored;                                      \
   }
 
-CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedTrivialBitCastInst)
-CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedBitwiseCastInst)
-CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTrivialBitCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedBitwiseCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedValueCastInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(TupleElementAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(StructElementAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
 
-#undef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
+#undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
 
 //===---
 // Custom Handling
@@ -2910,6 +2973,10 @@ bool BlockPartitionState::recomputeExitFromEntry(
         : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
           translator(translator) {}
 
+    SILIsolationInfo getIsolationRegionInfo(Element elt) const {
+      return translator.getValueMap().getIsolationRegion(elt);
+    }
+
     bool isClosureCaptured(Element elt, Operand *op) const {
       auto iter = translator.getValueForId(elt);
       if (!iter)
@@ -2922,8 +2989,8 @@ bool BlockPartitionState::recomputeExitFromEntry(
   };
   ComputeEvaluator eval(workingPartition, ptrSetFactory, translator);
   for (const auto &partitionOp : blockPartitionOps) {
-    // By calling apply without providing a `handleFailure` closure, errors
-    // will be suppressed
+    // By calling apply without providing any error handling callbacks, errors
+    // will be surpressed.  will be suppressed
     eval.apply(partitionOp);
   }
   LLVM_DEBUG(llvm::dbgs() << "    Working Partition: ";
@@ -3057,6 +3124,7 @@ void RegionAnalysisFunctionInfo::runDataflow() {
 
     for (auto *block : pofi->getReversePostOrder()) {
       auto &blockState = (*blockStates)[block];
+      blockState.isLive = true;
 
       LLVM_DEBUG(llvm::dbgs() << "Block: bb" << block->getDebugID() << "\n");
       if (!blockState.needsUpdate) {
@@ -3102,15 +3170,22 @@ void RegionAnalysisFunctionInfo::runDataflow() {
       }
     }
   }
-
-  // Now that we have finished processing, sort/unique our non transferred
-  // array.
-  translator->getValueMap().sortUniqueNeverTransferredValues();
 }
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Value Map
 //===----------------------------------------------------------------------===//
+
+SILInstruction *RegionAnalysisValueMap::maybeGetActorIntroducingInst(
+    Element trackableValueID) const {
+  if (auto value = getValueForId(trackableValueID)) {
+    auto rep = value->getRepresentative();
+    if (rep.hasRegionIntroducingInst())
+      return rep.getActorRegionIntroducingInst();
+  }
+
+  return nullptr;
+}
 
 std::optional<TrackableValue>
 RegionAnalysisValueMap::getValueForId(TrackableValueID id) const {
@@ -3133,11 +3208,20 @@ RegionAnalysisValueMap::maybeGetRepresentative(Element trackableValueID) const {
   return getValueForId(trackableValueID)->getRepresentative().maybeGetValue();
 }
 
-bool RegionAnalysisValueMap::isActorDerived(Element trackableValueID) const {
+SILIsolationInfo
+RegionAnalysisValueMap::getIsolationRegion(Element trackableValueID) const {
   auto iter = getValueForId(trackableValueID);
   if (!iter)
-    return false;
-  return iter->isActorDerived();
+    return {};
+  return iter->getValueState().getIsolationRegionInfo();
+}
+
+SILIsolationInfo
+RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
+  auto iter = equivalenceClassValuesToState.find(RepresentativeValue(value));
+  if (iter == equivalenceClassValuesToState.end())
+    return {};
+  return iter->getSecond().getIsolationRegionInfo();
 }
 
 /// If \p isAddressCapturedByPartialApply is set to true, then this value is
@@ -3145,7 +3229,8 @@ bool RegionAnalysisValueMap::isActorDerived(Element trackableValueID) const {
 /// may alias.
 TrackableValue RegionAnalysisValueMap::getTrackableValue(
     SILValue value, bool isAddressCapturedByPartialApply) const {
-  value = getUnderlyingTrackedValue(value);
+  auto info = getUnderlyingTrackedValue(value);
+  value = info.value;
 
   auto *self = const_cast<RegionAnalysisValueMap *>(this);
   auto iter = self->equivalenceClassValuesToState.try_emplace(
@@ -3162,6 +3247,13 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
 
   // First for addresses.
   if (value->getType().isAddress()) {
+    // If we were able to find this was actor isolated from finding our
+    // underlying object, use that. It is never wrong.
+    if (info.actorIsolation) {
+      iter.first->getSecond().mergeIsolationRegionInfo(
+          SILIsolationInfo::getActorIsolated(*info.actorIsolation));
+    }
+
     auto storage = AccessStorageWithBase::compute(value);
     if (storage.storage) {
       // Check if we have a uniquely identified address that was not captured
@@ -3175,18 +3267,21 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
       // so, add the actor derived flag.
       //
       // This is important so we properly handle setters.
-      if (isa<RefElementAddrInst>(storage.base)) {
-        if (storage.storage.getRoot()->getType().isActor()) {
-          iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
-        }
+      if (auto *rei = dyn_cast<RefElementAddrInst>(storage.base)) {
+        auto *nomDecl =
+            rei->getOperand()->getType().getNominalOrBoundGenericNominal();
+        iter.first->getSecond().mergeIsolationRegionInfo(
+            SILIsolationInfo::getActorIsolated(nomDecl));
       }
 
       // See if the memory base is a global_addr from a global actor protected global.
       if (auto *ga = dyn_cast<GlobalAddrInst>(storage.base)) {
         if (auto *global = ga->getReferencedGlobal()) {
           if (auto *globalDecl = global->getDecl()) {
-            if (getActorIsolation(globalDecl).isGlobalActor()) {
-              iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+            auto isolation = getActorIsolation(globalDecl);
+            if (isolation.isGlobalActor()) {
+              iter.first->getSecond().mergeIsolationRegionInfo(
+                  SILIsolationInfo::getActorIsolated(isolation));
             }
           }
         }
@@ -3194,29 +3289,119 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     }
   }
 
-  // Then see if we have a sendable value. By default we assume values are not
-  // sendable.
   if (auto *defInst = value.getDefiningInstruction()) {
-    // Though these values are technically non-Sendable, we can safely and
-    // consistently treat them as Sendable.
-    if (isa<ClassMethodInst, FunctionRefInst>(defInst)) {
+    // Treat function ref as either actor isolated or sendable.
+    if (auto *fri = dyn_cast<FunctionRefInst>(defInst)) {
+      auto isolation = fri->getReferencedFunction()->getActorIsolation();
+      if (isolation.isActorIsolated()) {
+        iter.first->getSecond().mergeIsolationRegionInfo(
+            SILIsolationInfo::getActorIsolated(isolation));
+        return {iter.first->first, iter.first->second};
+      }
+
+      // Otherwise, lets look at the AST and see if our function ref is from an
+      // autoclosure.
+      if (auto *autoclosure = fri->getLoc().getAsASTNode<AutoClosureExpr>()) {
+        if (auto *funcType = autoclosure->getType()->getAs<AnyFunctionType>()) {
+          if (funcType->hasGlobalActor()) {
+            if (funcType->hasGlobalActor()) {
+              iter.first->getSecond().mergeIsolationRegionInfo(
+                  SILIsolationInfo::getActorIsolated(
+                      ActorIsolation::forGlobalActor(
+                          funcType->getGlobalActor())));
+              return {iter.first->first, iter.first->second};
+            }
+          }
+
+          if (auto *resultFType =
+                  funcType->getResult()->getAs<AnyFunctionType>()) {
+            if (resultFType->hasGlobalActor()) {
+              iter.first->getSecond().mergeIsolationRegionInfo(
+                  SILIsolationInfo::getActorIsolated(
+                      ActorIsolation::forGlobalActor(
+                          resultFType->getGlobalActor())));
+              return {iter.first->first, iter.first->second};
+            }
+          }
+        }
+      }
+
+      iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+      return {iter.first->first, iter.first->second};
+    }
+
+    if (auto *cmi = dyn_cast<ClassMethodInst>(defInst)) {
+      if (auto *declRefExpr = cmi->getLoc().getAsASTNode<DeclRefExpr>()) {
+        // See if we are actor isolated. If so, treat this as non-Sendable so we
+        // propagate actor isolation.
+        if (auto isolation = getActorIsolation(declRefExpr->getDecl())) {
+          if (isolation.isActorIsolated()) {
+            iter.first->getSecond().mergeIsolationRegionInfo(
+                SILIsolationInfo::getActorIsolated(isolation));
+            return {iter.first->first, iter.first->second};
+          }
+        }
+      }
       iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
       return {iter.first->first, iter.first->second};
     }
   }
 
-  // Otherwise refer to the oracle.
-  if (!isNonSendableType(value->getType(), fn))
+  // Otherwise refer to the oracle. If we have a Sendable value, just return.
+  if (!isNonSendableType(value->getType(), fn)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
+  }
 
   // Check if our base is a ref_element_addr from an actor. In such a case,
   // mark this value as actor derived.
   if (isa<LoadInst, LoadBorrowInst>(iter.first->first.getValue())) {
     auto *svi = cast<SingleValueInstruction>(iter.first->first.getValue());
+
+    // See if we can use get underlying tracked value to find if it is actor
+    // isolated.
+    //
+    // TODO: Instead of using AccessStorageBase, just use our own visitor
+    // everywhere. Just haven't done it due to possible perturbations.
+    auto parentAddrInfo = getUnderlyingTrackedValue(svi);
+    if (parentAddrInfo.actorIsolation) {
+      iter.first->getSecond().mergeIsolationRegionInfo(
+          SILIsolationInfo::getActorIsolated(*parentAddrInfo.actorIsolation));
+    }
+
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
-    if (storage.storage && isa<RefElementAddrInst>(storage.base)) {
-      if (storage.storage.getRoot()->getType().isActor()) {
-        iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+    if (storage.storage) {
+      if (auto *reai = dyn_cast<RefElementAddrInst>(storage.base)) {
+        auto *nomDecl = reai->getOperand()
+                            ->getType()
+                            .getNominalOrBoundGenericNominal();
+        iter.first->getSecond().mergeIsolationRegionInfo(
+            SILIsolationInfo::getActorIsolated(nomDecl));
+      }
+    }
+  }
+
+  // See if we have a struct_extract from a global actor isolated type.
+  if (auto *sei = dyn_cast<StructExtractInst>(iter.first->first.getValue())) {
+    iter.first->getSecond().mergeIsolationRegionInfo(
+        SILIsolationInfo::getActorIsolated(sei->getStructDecl()));
+  }
+
+  // See if we have an unchecked_enum_data from a global actor isolated type.
+  if (auto *uedi =
+          dyn_cast<UncheckedEnumDataInst>(iter.first->first.getValue())) {
+    iter.first->getSecond().mergeIsolationRegionInfo(
+        SILIsolationInfo::getActorIsolated(uedi->getEnumDecl()));
+  }
+
+  // Handle a switch_enum from a global actor isolated type.
+  if (auto *arg = dyn_cast<SILPhiArgument>(iter.first->first.getValue())) {
+    if (auto *singleTerm = arg->getSingleTerminator()) {
+      if (auto *sei = dyn_cast<SwitchEnumInst>(singleTerm)) {
+        auto enumDecl =
+            sei->getOperand()->getType().getEnumOrBoundGenericEnum();
+        iter.first->getSecond().mergeIsolationRegionInfo(
+            SILIsolationInfo::getActorIsolated(enumDecl));
       }
     }
   }
@@ -3225,16 +3410,106 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   // returned value as being actor derived.
   if (auto applySite = FullApplySite::isa(iter.first->first.getValue())) {
     if (auto *calleeFunction = applySite.getCalleeFunction()) {
-      if (calleeFunction->isGlobalInit() && isGlobalActorInit(calleeFunction)) {
-        iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+      if (calleeFunction->isGlobalInit()) {
+        auto isolation = getGlobalActorInitIsolation(calleeFunction);
+        if (isolation && isolation->isGlobalActor()) {
+          iter.first->getSecond().mergeIsolationRegionInfo(
+              SILIsolationInfo::getActorIsolated(*isolation));
+        }
       }
     }
   }
 
-  // If our access storage is from a class, then see if we have an actor. In
-  // such a case, we need to add this id to the neverTransferred set.
+  // See if we have a non-transferring argument from a function. In such a case,
+  // mark the value as actor isolated if self is actor isolated and task
+  // isolated otherwise.
+  if (auto *fArg =
+          dyn_cast<SILFunctionArgument>(iter.first->first.getValue())) {
+    if (!isTransferrableFunctionArgument(fArg)) {
+      iter.first->getSecond().mergeIsolationRegionInfo(
+          SILIsolationInfo::get(fArg));
+      return {iter.first->first, iter.first->second};
+    }
+  }
+
+  // See if we have a convert function from a Sendable actor isolated function,
+  // we want to treat the result of the convert function as being actor isolated
+  // so that we cannot escape the value.
+  //
+  // NOTE: At this point, we already know that cfi's result is not sendable,
+  // since we would have exited above already.
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(iter.first->first.getValue())) {
+    SILValue operand = cfi->getOperand();
+    if (operand->getType().getAs<SILFunctionType>()->isSendable()) {
+      SILValue newValue = operand;
+      do {
+        operand = newValue;
+
+        newValue = lookThroughOwnershipInsts(operand);
+        if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(newValue)) {
+          newValue = ttfi->getOperand();
+        }
+
+        if (auto *cfi = dyn_cast<ConvertFunctionInst>(newValue)) {
+          newValue = cfi->getOperand();
+        }
+
+        if (auto *pai = dyn_cast<PartialApplyInst>(newValue)) {
+          newValue = pai->getCallee();
+        }
+      } while (newValue != operand);
+
+      if (auto *ai = dyn_cast<ApplyInst>(operand)) {
+        if (auto *callExpr = ai->getLoc().getAsASTNode<ApplyExpr>()) {
+          if (auto *callType = callExpr->getType()->getAs<AnyFunctionType>()) {
+            if (callType->hasGlobalActor()) {
+              iter.first->getSecond().mergeIsolationRegionInfo(
+                  SILIsolationInfo::getGlobalActorIsolated(
+                      callType->getGlobalActor()));
+              return {iter.first->first, iter.first->second};
+            }
+          }
+        }
+      }
+
+      if (auto *fri = dyn_cast<FunctionRefInst>(operand)) {
+        if (auto actorIsolation =
+                fri->getReferencedFunction()->getActorIsolation()) {
+          if (actorIsolation.isActorIsolated()) {
+            iter.first->getSecond().mergeIsolationRegionInfo(
+                SILIsolationInfo::getActorIsolated(actorIsolation));
+            return {iter.first->first, iter.first->second};
+          }
+        }
+
+        // See if the function ref statically is known to have actor isolation.
+        //
+        // TODO: We should make it so that the closure constructed has actor
+        // isolation.
+        if (auto value = tryToTrackValue(fri)) {
+          auto isolation = value->getIsolationRegionInfo();
+          if (isolation.isActorIsolated()) {
+            iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+            return {iter.first->first, iter.first->second};
+          }
+        }
+      }
+    }
+  }
 
   return {iter.first->first, iter.first->second};
+}
+
+std::optional<TrackableValue>
+RegionAnalysisValueMap::getTrackableValueForActorIntroducingInst(
+    SILInstruction *inst) const {
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.find(inst);
+  if (iter == self->equivalenceClassValuesToState.end())
+    return {};
+
+  // Otherwise, we need to compute our flags.
+  return {{iter->first, iter->second}};
 }
 
 std::optional<TrackableValue>
@@ -3246,7 +3521,7 @@ RegionAnalysisValueMap::tryToTrackValue(SILValue value) const {
 }
 
 TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
-    SILInstruction *introducingInst) const {
+    SILInstruction *introducingInst, SILIsolationInfo actorIsolation) const {
   auto *self = const_cast<RegionAnalysisValueMap *>(this);
   auto iter = self->equivalenceClassValuesToState.try_emplace(
       introducingInst,
@@ -3260,16 +3535,17 @@ TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
   // Otherwise, wire up the value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] =
       introducingInst;
-  iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+  iter.first->getSecond().mergeIsolationRegionInfo(actorIsolation);
   return {iter.first->first, iter.first->second};
 }
 
-bool RegionAnalysisValueMap::markValueAsActorDerived(SILValue value) {
-  value = getUnderlyingTrackedValue(value);
+bool RegionAnalysisValueMap::mergeIsolationRegionInfo(
+    SILValue value, SILIsolationInfo actorIsolation) {
+  value = getUnderlyingTrackedValue(value).value;
   auto iter = equivalenceClassValuesToState.find(value);
   if (iter == equivalenceClassValuesToState.end())
     return false;
-  iter->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+  iter->getSecond().mergeIsolationRegionInfo(actorIsolation);
   return true;
 }
 
@@ -3292,10 +3568,6 @@ TrackableValueID RegionAnalysisValueMap::lookupValueID(SILValue value) {
   return state.getID();
 }
 
-void RegionAnalysisValueMap::sortUniqueNeverTransferredValues() {
-  sortUnique(neverTransferredValueIDs);
-}
-
 void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
 #ifndef NDEBUG
   // Since this is just used for debug output, be inefficient to make nicer
@@ -3306,7 +3578,9 @@ void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
   }
   std::sort(temp.begin(), temp.end());
   for (auto p : temp) {
-    os << "%%" << p.first << ": " << p.second;
+    os << "%%" << p.first << ": ";
+    auto value = getValueForId(Element(p.first));
+    value->print(os);
   }
 #endif
 }

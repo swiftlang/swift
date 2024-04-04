@@ -145,6 +145,11 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch");
   }
 
+  friend bool operator!=(const Requirement &lhs,
+                         const Requirement &rhs) {
+    return !(lhs == rhs);
+  }
+
   /// Whether this requirement's types contain ErrorTypes.
   bool hasError() const;
 
@@ -257,11 +262,16 @@ struct InverseRequirement {
 
   InvertibleProtocolKind getKind() const;
 
+  /// Linear order on inverse requirements in a generic signature.
+  int compare(const InverseRequirement &other) const;
+
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.
   static void expandDefaults(ASTContext &ctx,
                              ArrayRef<Type> gps,
                              SmallVectorImpl<StructuralRequirement> &result);
+
+  void print(raw_ostream &os, const PrintOptions &opts, bool forInherited=false) const;
 };
 
 } // end namespace swift

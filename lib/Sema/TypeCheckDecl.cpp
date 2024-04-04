@@ -37,7 +37,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -333,6 +332,9 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
         (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Address))
       return false;
     return storage->isDynamic();
+  }
+  case AccessorKind::DistributedGet: {
+    return false;
   }
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
@@ -883,6 +885,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           case AccessorKind::Read:
           case AccessorKind::Modify:
           case AccessorKind::Get:
+          case AccessorKind::DistributedGet:
           case AccessorKind::Set: {
             // Coroutines and accessors are final if their storage is.
             auto storage = accessor->getStorage();
@@ -1073,6 +1076,9 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     // Check to see if it's one of the opaque accessors for the declaration.
     auto storage = accessor->getStorage();
+    if (accessor->getAccessorKind() == AccessorKind::DistributedGet) {
+      return true;
+    }
     if (!storage->requiresOpaqueAccessor(accessor->getAccessorKind()))
       return false;
   }
@@ -1658,6 +1664,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     switch (AD->getAccessorKind()) {
     case AccessorKind::Address:
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Read:
       break;
 
@@ -2099,6 +2106,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     switch (accessor->getAccessorKind()) {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
       return storage->getValueInterfaceType();
 
     // For setters and observers, set the old/new value parameter's type
@@ -2553,7 +2561,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
-      infoBuilder = infoBuilder.withConcurrent(AFD->isSendable());
+      infoBuilder = infoBuilder.withSendable(AFD->isSendable());
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
       // Defer bodies must not escape.
@@ -2870,9 +2878,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
 
     if (isDerivable) {
-      evaluateOrDefault(ctx.evaluator,
-                        ResolveValueWitnessesRequest{normal},
-                        evaluator::SideEffect());
+      normal->resolveValueWitnesses();
     }
   }
 
@@ -3088,9 +3094,6 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
     return deriveImplicitSendableConformance(evaluator, nominal);
   case KnownProtocolKind::BitwiseCopyable:
     return deriveImplicitBitwiseCopyableConformance(nominal);
-  case KnownProtocolKind::Escapable:
-  case KnownProtocolKind::Copyable:
-    return deriveConformanceForInvertible(evaluator, nominal, kp);
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }

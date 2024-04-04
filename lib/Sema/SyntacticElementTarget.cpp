@@ -193,9 +193,9 @@ SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
 }
 
 SyntacticElementTarget
-SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
-                                       bool ignoreWhereClause,
-                                       GenericEnvironment *packElementEnv) {
+SyntacticElementTarget::forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
+                                           bool ignoreWhereClause,
+                                           GenericEnvironment *packElementEnv) {
   SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
   return target;
 }
@@ -235,7 +235,7 @@ ContextualPattern SyntacticElementTarget::getContextualPattern() const {
                                                     uninitializedVar.index);
   }
 
-  if (isForEachStmt()) {
+  if (isForEachPreamble()) {
     return ContextualPattern::forRawPattern(forEachStmt.pattern,
                                             forEachStmt.dc);
   }
@@ -395,7 +395,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     }
     break;
   }
-  case Kind::forEachStmt: {
+  case Kind::forEachPreamble: {
     // We need to skip the where clause if requested, and we currently do not
     // type-check a for loop's BraceStmt as part of the SyntacticElementTarget,
     // so we need to skip it here.

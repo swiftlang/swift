@@ -20,8 +20,7 @@ protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any
 
 // CHECK: distributed actor $Greeter<ActorSystem>: Greeter,
 // CHECK-NEXT: Distributed._DistributedActorStub
-// CHECK-NEXT: where ActorSystem: DistributedActorSystem<any Codable>,
-// CHECK-NEXT: ActorSystem.ActorID: Codable
+// CHECK-NEXT: where ActorSystem: DistributedActorSystem<any Codable>
 // CHECK-NEXT: {
 // CHECK-NEXT: }
 

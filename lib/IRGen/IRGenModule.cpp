@@ -675,13 +675,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
-  SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
-  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftTaskOptionRecordTy = createStructType(
-      *this, "swift.task_option", {
+  SwiftTaskOptionRecordTy =
+    llvm::StructType::create(getLLVMContext(), "swift.task_option");
+  SwiftTaskOptionRecordPtrTy = SwiftTaskOptionRecordTy->getPointerTo(DefaultAS);
+  SwiftTaskOptionRecordTy->setBody({
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
   });
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
   SwiftTaskGroupTaskOptionRecordTy = createStructType(
       *this, "swift.task_group_task_option", {
     SwiftTaskOptionRecordTy,    // Base option record
@@ -701,6 +702,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
+  });
+  SwiftInitialSerialExecutorTaskOptionRecordTy =
+      createStructType(*this, "swift.serial_executor_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    SwiftExecutorTy,         // Executor
   });
   SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy =
       createStructType(*this, "swift.task_executor_task_option", {
@@ -1348,6 +1354,11 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (wt->getLinkage() == SILLinkage::Shared)
     return true;
 
+  // Check if this type is set to be explicitly externally visible
+  NominalTypeDecl *ConformingTy = wt->getConformingNominal();
+  if (PrimaryIGM->getSILModule().isExternallyVisibleDecl(ConformingTy))
+    return false;
+
   switch (wt->getConformingNominal()->getEffectiveAccess()) {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
@@ -1906,7 +1917,8 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 bool IRGenModule::finalize() {
   const char *ModuleHashVarName = "llvm.swift_module_hash";
   if (IRGen.Opts.OutputKind == IRGenOutputKind::ObjectFile &&
-      !Module.getGlobalVariable(ModuleHashVarName)) {
+      !Module.getGlobalVariable(ModuleHashVarName) &&
+      !getSILModule().getOptions().StopOptimizationAfterSerialization) {
     // Create a global variable into which we will store the hash of the
     // module (used for incremental compilation).
     // We have to create the variable now (before we emit the global lists).
@@ -1941,6 +1953,9 @@ bool IRGenModule::finalize() {
   // Finalize clang IR-generation.
   finalizeClangCodeGen();
 
+  if (DebugInfo)
+    DebugInfo->finalize();
+
   // If that failed, report failure up and skip the final clean-up.
   if (!ClangCodeGen->GetModule())
     return false;
@@ -1949,8 +1964,6 @@ bool IRGenModule::finalize() {
   emitAutolinkInfo();
   emitGlobalLists();
   emitUsedConditionals();
-  if (DebugInfo)
-    DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
 
   // Clean up DSOLocal & DLLImport attributes, they cannot be applied together.
@@ -1962,6 +1975,14 @@ bool IRGenModule::finalize() {
   for (auto &F : Module.functions())
     if (F.hasDLLImportStorageClass())
       F.setDSOLocal(false);
+
+  if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
+    // We're asked to emit an empty IR module, check that that's actually true
+    if (Module.global_size() != 0 || Module.size() != 0) {
+      llvm::errs() << Module;
+      llvm::report_fatal_error("Module is not empty");
+    }
+  }
 
   return true;
 }

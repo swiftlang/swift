@@ -197,7 +197,7 @@ std::optional<std::string> ModuleDependencyInfo::getBridgingHeader() const {
     return swiftSourceStorage->textualModuleDetails.bridgingHeaderFile;
   }
   default:
-    llvm_unreachable("Unexpected dependency kind");
+    return std::nullopt;
   }
 }
 
@@ -325,7 +325,7 @@ void ModuleDependencyInfo::addBridgingHeader(StringRef bridgingHeader) {
 }
 
 /// Add source files that the bridging header depends on.
-void ModuleDependencyInfo::addBridgingSourceFile(StringRef bridgingSourceFile) {
+void ModuleDependencyInfo::addHeaderSourceFile(StringRef bridgingSourceFile) {
   switch (getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {
     auto swiftInterfaceStorage =
@@ -337,7 +337,14 @@ void ModuleDependencyInfo::addBridgingSourceFile(StringRef bridgingSourceFile) {
   case swift::ModuleDependencyKind::SwiftSource: {
     auto swiftSourceStorage =
         cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-    swiftSourceStorage->textualModuleDetails.bridgingSourceFiles.push_back(bridgingSourceFile.str());
+    swiftSourceStorage->textualModuleDetails.bridgingSourceFiles.push_back(
+        bridgingSourceFile.str());
+    break;
+  }
+  case swift::ModuleDependencyKind::SwiftBinary: {
+    auto swiftBinaryStorage =
+        cast<SwiftBinaryModuleDependencyStorage>(storage.get());
+    swiftBinaryStorage->headerSourceFiles.push_back(bridgingSourceFile.str());
     break;
   }
   default:
@@ -380,21 +387,30 @@ void ModuleDependencyInfo::addSourceFile(StringRef sourceFile) {
 }
 
 /// Add (Clang) module on which the bridging header depends.
-void ModuleDependencyInfo::addBridgingModuleDependency(
+void ModuleDependencyInfo::addHeaderInputModuleDependency(
     StringRef module, llvm::StringSet<> &alreadyAddedModules) {
   switch (getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {
     auto swiftInterfaceStorage =
         cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
     if (alreadyAddedModules.insert(module).second)
-      swiftInterfaceStorage->textualModuleDetails.bridgingModuleDependencies.push_back(module.str());
+      swiftInterfaceStorage->textualModuleDetails.bridgingModuleDependencies
+          .push_back(module.str());
     break;
   }
   case swift::ModuleDependencyKind::SwiftSource: {
     auto swiftSourceStorage =
         cast<SwiftSourceModuleDependenciesStorage>(storage.get());
     if (alreadyAddedModules.insert(module).second)
-      swiftSourceStorage->textualModuleDetails.bridgingModuleDependencies.push_back(module.str());
+      swiftSourceStorage->textualModuleDetails.bridgingModuleDependencies
+          .push_back(module.str());
+    break;
+  }
+  case swift::ModuleDependencyKind::SwiftBinary: {
+    auto swiftBinaryStorage =
+        cast<SwiftBinaryModuleDependencyStorage>(storage.get());
+    if (alreadyAddedModules.insert(module).second)
+      swiftBinaryStorage->headerModuleDependencies.push_back(module.str());
     break;
   }
   default:
@@ -461,6 +477,10 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
       FS->status(LayoutFile);
     }
   }
+
+  // Add VFSOverlay file.
+  for (auto &Overlay: Opts.VFSOverlayFiles)
+    FS->status(Overlay);
 }
 
 void SwiftDependencyTracker::startTracking() {
@@ -515,7 +535,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     std::error_code EC;
     for (auto F = FS.dir_begin(RuntimeLibPath, EC);
          !EC && F != llvm::vfs::directory_iterator(); F.increment(EC)) {
-      if (F->path().endswith(".yaml"))
+      if (F->path().ends_with(".yaml"))
         CommonDependencyFiles.emplace_back(F->path().str());
     }
   }

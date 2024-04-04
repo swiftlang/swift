@@ -34,6 +34,7 @@ namespace trace {
 
 extern os_log_t ScanLog;
 extern swift::once_t LogsToken;
+extern bool TracingEnabled;
 
 void setupLogs(void *unused);
 
@@ -48,9 +49,9 @@ void setupLogs(void *unused);
 // optimized out.
 #define ENSURE_LOG(log)                                                        \
   do {                                                                         \
-    if (!SWIFT_RUNTIME_WEAK_CHECK(os_signpost_enabled))                        \
-      return {};                                                               \
     swift::once(LogsToken, setupLogs, nullptr);                                \
+    if (!TracingEnabled)                                                       \
+      return {};                                                               \
   } while (0)
 
 /// A struct that captures the state of a scan tracing signpost. When the scan

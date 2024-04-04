@@ -75,6 +75,7 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenClass.h"
+#include "GenConcurrency.h"
 #include "GenConstant.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
@@ -602,6 +603,28 @@ public:
   /// SIL value.
   Explosion getLoweredExplosion(SILValue v) {
     return getLoweredValue(v).getExplosion(*this, v->getType());
+  }
+
+  /// Get the lowered value for the given value of optional type in a
+  /// way that allows immediate peepholing.
+  OptionalExplosion getLoweredOptionalExplosion(SILValue v) {
+    assert(v->getType().getOptionalObjectType());
+
+    if (auto enumInst = dyn_cast<EnumInst>(v)) {
+      if (enumInst->hasOperand()) {
+        assert(enumInst->getElement() == IGM.Context.getOptionalSomeDecl());
+        return OptionalExplosion::forSome([&](Explosion &out) {
+          getLoweredExplosion(enumInst->getOperand(), out);
+        });
+      } else {
+        assert(enumInst->getElement() == IGM.Context.getOptionalNoneDecl());
+        return OptionalExplosion::forNone();
+      }
+    }
+
+    return OptionalExplosion::forOptional([&](Explosion &out) {
+      getLoweredExplosion(v, out);
+    });
   }
 
   /// Return the single member of the lowered explosion for the
@@ -1406,7 +1429,7 @@ public:
   void visitBeginApplyInst(BeginApplyInst *i);
   void visitEndApplyInst(EndApplyInst *i);
   void visitAbortApplyInst(AbortApplyInst *i);
-  void visitEndApply(BeginApplyInst *i, bool isAbort);
+  void visitEndApply(BeginApplyInst *i, EndApplyInst *ei = nullptr);
   
   void visitUnreachableInst(UnreachableInst *i);
   void visitBranchInst(BranchInst *i);
@@ -2423,8 +2446,10 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
       f->getLoweredFunctionType()->isPolymorphic())
     return;
 
-  // Do not emit bodies of public_external functions.
-  if (hasPublicVisibility(f->getLinkage()) && f->isAvailableExternally())
+  // Do not emit bodies of public_external or package_external functions.
+  if (hasPublicOrPackageVisibility(f->getLinkage(),
+                                   f->getASTContext().SILOpts.EnableSerializePackage) &&
+      f->isAvailableExternally())
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
@@ -2468,15 +2493,13 @@ void IRGenSILFunction::emitSILFunction() {
   }
 
   if (CurSILFn->isRuntimeAccessible())
-    IGM.addAccessibleFunction(CurSILFn);
+    IGM.addAccessibleFunction(
+        AccessibleFunction::forSILFunction(IGM, CurSILFn));
 
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
   if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
-    IGM.addAccessibleFunction(CurSILFn);
-
-    // TODO(distributed): for protocols emit a special accessor
   }
 
   // Configure the dominance resolver.
@@ -3519,49 +3542,69 @@ static Alignment getStackAllocationAlignment(IRGenSILFunction &IGF,
   return Alignment(MaximumAlignment);
 }
 
-/// Emit a call to a stack allocation builtin (stackAlloc() or stackDealloc().)
-///
-/// Returns whether or not `i` was such a builtin (true if so, false if it was
-/// some other builtin.)
-static bool emitStackAllocBuiltinCall(IRGenSILFunction &IGF,
-                                      swift::BuiltinInst *i) {
-  if (i->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
-      i->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
-    // Stack-allocate a buffer with the specified size/alignment.
-    auto loc = i->getLoc().getSourceLoc();
-    auto size = getStackAllocationSize(
-      IGF, i->getOperand(0), i->getOperand(1), loc);
-    auto align = getStackAllocationAlignment(IGF, i->getOperand(2), loc);
+static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
+                                  swift::BuiltinInst *i) {
+  // Stack-allocate a buffer with the specified size/alignment.
+  auto loc = i->getLoc().getSourceLoc();
+  auto size = getStackAllocationSize(
+    IGF, i->getOperand(0), i->getOperand(1), loc);
+  auto align = getStackAllocationAlignment(IGF, i->getOperand(2), loc);
 
-    auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
-                                              false, "temp_alloc");
-    IGF.setLoweredStackAddress(i, stackAddress);
+  auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
+                                            false, "temp_alloc");
+  IGF.setLoweredStackAddress(i, stackAddress);
+}
 
-    return true;
+static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
+                                    swift::BuiltinInst *i) {
+  // Deallocate a stack address previously allocated with the StackAlloc
+  // builtin above.
+  auto address = i->getOperand(0);
+  auto stackAddress = IGF.getLoweredStackAddress(address);
 
-  } else if (i->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
-    // Deallocate a stack address previously allocated with the StackAlloc
-    // builtin above.
-    auto address = i->getOperand(0);
-    auto stackAddress = IGF.getLoweredStackAddress(address);
-
-    if (stackAddress.getAddress().isValid()) {
-      IGF.emitDeallocateDynamicAlloca(stackAddress, false);
-    }
-
-    return true;
+  if (stackAddress.getAddress().isValid()) {
+    IGF.emitDeallocateDynamicAlloca(stackAddress, false);
   }
+}
 
-  return false;
+static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
+                                       swift::BuiltinInst *i) {
+  auto flags = IGF.getLoweredSingletonExplosion(i->getOperand(0));
+  auto serialExecutor = IGF.getLoweredOptionalExplosion(i->getOperand(1));
+  auto taskGroup = IGF.getLoweredOptionalExplosion(i->getOperand(2));
+  auto taskExecutor = IGF.getLoweredOptionalExplosion(i->getOperand(3));
+  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(4));
+
+  auto taskAndContext =
+    emitTaskCreate(IGF, flags, serialExecutor, taskGroup, taskExecutor,
+                   taskFunction, i->getSubstitutions());
+  Explosion out;
+  out.add(taskAndContext.first);
+  out.add(taskAndContext.second);
+  IGF.setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
   const BuiltinInfo &builtin = getSILModule().getBuiltinInfo(i->getName());
 
-  if (emitStackAllocBuiltinCall(*this, i)) {
-    return;
+  // Handle some builtins specially.
+  switch (builtin.ID) {
+  case BuiltinValueKind::StackAlloc:
+  case BuiltinValueKind::UnprotectedStackAlloc:
+    return emitBuiltinStackAlloc(*this, i);
+
+  case BuiltinValueKind::StackDealloc:
+    return emitBuiltinStackDealloc(*this, i);
+
+  case BuiltinValueKind::CreateAsyncTask:
+    return emitBuiltinCreateAsyncTask(*this, i);
+
+  default:
+    break;
   }
 
+  // Otherwise, collect all the values into a single explosion and forward
+  // over to the general path.
   auto argValues = i->getArguments();
   Explosion args;
   SmallVector<SILType, 4> argTypes;
@@ -4091,38 +4134,55 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
 
 void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
   if (isAsync()) {
-    emitCoroutineOrAsyncExit();
+    emitCoroutineOrAsyncExit(false);
     return;
   }
   Builder.CreateUnreachable();
 }
 
-void IRGenFunction::emitCoroutineOrAsyncExit() {
-  // The LLVM coroutine representation demands that there be a
-  // unique call to llvm.coro.end.
+void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
+  // LLVM's retcon lowering is a bit imcompatible with Swift
+  // model. Essentially it assumes that unwind destination is kind of terminal -
+  // it cannot return back to caller and must somehow terminate the process /
+  // thread. Therefore we are always use normal LLVM coroutine termination.
+  // However, for yield_once coroutines we need also specify undef results on
+  // unwind path. Eventually, we'd get rid of these crazy phis...
 
   // If the coroutine exit block already exists, just branch to it.
-  if (auto coroEndBB = CoroutineExitBlock) {
+  auto *coroEndBB = getCoroutineExitBlock();
+  auto *unwindBB = Builder.GetInsertBlock();
+
+  // If the coroutine exit block already exists, just branch to it.
+  if (coroEndBB) {
     Builder.CreateBr(coroEndBB);
+
+    if (!isAsync()) {
+      // If there are any result values we need to add undefs for all values
+      // coming from unwind block
+      for (auto &phi : coroutineResults)
+        cast<llvm::PHINode>(phi)->addIncoming(llvm::UndefValue::get(phi->getType()),
+                                              unwindBB);
+    }
+
     return;
   }
 
   // Otherwise, create it and branch to it.
-  auto coroEndBB = createBasicBlock("coro.end");
-  CoroutineExitBlock = coroEndBB;
+  coroEndBB = createBasicBlock("coro.end");
+  setCoroutineExitBlock(coroEndBB);
   Builder.CreateBr(coroEndBB);
-
-  // Emit the block.
   Builder.emitBlock(coroEndBB);
-  auto handle = getCoroutineHandle();
+
   if (isAsync())
     Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_async,
-                                {handle,
-                                 /*is unwind*/ Builder.getFalse()});
+                                { getCoroutineHandle(), Builder.getFalse()});
   else
+    // Do not bother about results here, normal result emission code would
+    // update token value.
     Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
-                                {handle,
-                                 /*is unwind*/ Builder.getFalse()});
+                                { getCoroutineHandle(), Builder.getFalse(),
+                                  llvm::ConstantTokenNone::get(Builder.getContext())});
+
   Builder.CreateUnreachable();
 }
 
@@ -4130,13 +4190,6 @@ static void emitReturnInst(IRGenSILFunction &IGF,
                            SILType resultTy,
                            Explosion &result,
                            CanSILFunctionType fnType) {
-  // If we're generating a coroutine, just call coro.end.
-  if (IGF.isCoroutine() && !IGF.isAsync()) {
-    assert(result.empty() &&
-           "coroutines do not currently support non-void returns");
-    IGF.emitCoroutineOrAsyncExit();
-    return;
-  }
   SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
                               IGF.getSILModule());
 
@@ -4150,6 +4203,24 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     }
     return llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   };
+
+  // If we're generating a coroutine, just call coro.end.
+  if (IGF.isCoroutine() && !IGF.isAsync()) {
+    if (fnType->getCoroutineKind() == SILCoroutineKind::YieldOnce) {
+      assert(IGF.CurSILFn->getLoweredFunctionType()->getLanguage() ==
+             SILFunctionLanguage::Swift);
+      auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
+        conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
+
+      emitYieldOnceCoroutineResult(IGF, result, funcResultType, resultTy);
+      return;
+    }
+
+    assert(result.empty() &&
+           "coroutines do not currently support non-void returns");
+    IGF.emitCoroutineOrAsyncExit(false);
+    return;
+  }
 
   // The invariant on the out-parameter is that it's always zeroed, so
   // there's nothing to do here.
@@ -4309,9 +4380,8 @@ void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
 }
 
 void IRGenSILFunction::visitUnwindInst(swift::UnwindInst *i) {
-  // Just call coro.end; there's no need to distinguish 'unwind'
-  // and 'return' at the LLVM level.
-  emitCoroutineOrAsyncExit();
+  // Call coro.end marking unwind return
+  emitCoroutineOrAsyncExit(true);
 }
 
 void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
@@ -4348,15 +4418,16 @@ void IRGenSILFunction::visitBeginApplyInst(BeginApplyInst *i) {
 }
 
 void IRGenSILFunction::visitEndApplyInst(EndApplyInst *i) {
-  visitEndApply(i->getBeginApply(), false);
+  visitEndApply(i->getBeginApply(), i);
 }
 
 void IRGenSILFunction::visitAbortApplyInst(AbortApplyInst *i) {
-  visitEndApply(i->getBeginApply(), true);
+  visitEndApply(i->getBeginApply());
 }
 
-void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
+void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
   const auto &coroutine = getLoweredCoroutine(i->getTokenResult());
+  bool isAbort = ei == nullptr;
 
   auto sig = Signature::forCoroutineContinuation(IGM, i->getOrigCalleeType());
 
@@ -4364,7 +4435,6 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   auto continuation = coroutine.Continuation;
   continuation = Builder.CreateBitCast(continuation,
                                        sig.getType()->getPointerTo());
-
 
   auto schemaAndEntity =
     getCoroutineResumeFunctionPointerAuth(IGM, i->getOrigCalleeType());
@@ -4374,10 +4444,21 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   auto callee = FunctionPointer::createSigned(i->getOrigCalleeType(),
                                               continuation, pointerAuth, sig);
 
-  Builder.CreateCall(callee, {
-    coroutine.Buffer.getAddress(),
-    llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
-  });
+  auto *call = Builder.CreateCall(callee, {
+      coroutine.Buffer.getAddress(),
+      llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
+    });
+
+  if (!isAbort) {
+    auto resultType = call->getType();
+    if (!resultType->isVoidTy()) {
+      Explosion e;
+      // FIXME: Do we need to handle ABI-related conversions here?
+      // It seems we cannot have C function convention for coroutines, etc.
+      extractScalarResults(*this, resultType, call, e);
+      setLoweredExplosion(ei, e);
+    }
+  }
 
   coroutine.Temporaries.destroyAll(*this);
 
@@ -5432,7 +5513,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     // If we were not moved return early. If this SILUndef was moved, then we
     // need to let it through so we can ensure the debug info invalidated.
-    if (!i->getUsesMoveableValueDebugInfo())
+    if (!i->usesMoveableValueDebugInfo())
       return;
   }
   bool IsInCoro = InCoroContext(*CurSILFn, *i);
@@ -5441,14 +5522,11 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   VarInfo->Name = getVarName(i, IsAnonymous);
   DebugTypeInfo DbgTy;
   SILType SILTy;
-  bool IsFragmentType = false;
   if (auto MaybeSILTy = VarInfo->Type) {
     // If there is auxiliary type info, use it
     SILTy = *MaybeSILTy;
   } else {
     SILTy = SILVal->getType();
-    if (VarInfo->DIExpr)
-      IsFragmentType = VarInfo->DIExpr.hasFragment();
   }
 
   auto RealTy = SILTy.getASTType();
@@ -5473,11 +5551,10 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Figure out the debug variable type
   if (VD) {
     DbgTy = DebugTypeInfo::getLocalVariable(VD, RealTy, getTypeInfo(SILTy),
-                                            IGM, IsFragmentType);
+                                            IGM);
   } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
     // Handle the cases that read from a SIL file
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy), IGM,
-                                           IsFragmentType);
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy), IGM);
   } else
     return;
 
@@ -5490,11 +5567,12 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (IsAddrVal) {
     auto &ti = getTypeInfo(SILVal->getType());
     Copy.emplace_back(emitShadowCopyIfNeeded(
-        getLoweredAddress(SILVal).getAddress(), ti.getStorageType(), i->getDebugScope(), *VarInfo,
-        IsAnonymous, i->getUsesMoveableValueDebugInfo()));
+        getLoweredAddress(SILVal).getAddress(), ti.getStorageType(),
+        i->getDebugScope(), *VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo()));
   } else {
     emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
-                           i->getUsesMoveableValueDebugInfo(), Copy);
+                           i->usesMoveableValueDebugInfo(), Copy);
   }
 
   bindArchetypes(DbgTy.getType());
@@ -5503,7 +5581,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   emitDebugVariableDeclaration(
       Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      Indirection, AddrDbgInstrKind(i->getUsesMoveableValueDebugInfo()));
+      Indirection, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
 }
 
 void IRGenSILFunction::visitDebugStepInst(DebugStepInst *i) {
@@ -5849,7 +5927,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       if (!Alloca->isStaticAlloca()) {
         // Store the address of the dynamic alloca on the stack.
         addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
-                              /*init*/ true, i->getUsesMoveableValueDebugInfo())
+                              /*init*/ true, i->usesMoveableValueDebugInfo())
                    .getAddress();
         Indirection =
             InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue;
@@ -5865,24 +5943,19 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   }
 
   SILType SILTy;
-  bool IsFragmentType = false;
   if (auto MaybeSILTy = VarInfo->Type) {
     // If there is auxiliary type info, use it
     SILTy = *MaybeSILTy;
   } else {
     SILTy = i->getType();
-    if (VarInfo->DIExpr)
-      IsFragmentType = VarInfo->DIExpr.hasFragment();
   }
   auto RealType = SILTy.getASTType();
   DebugTypeInfo DbgTy;
   if (Decl) {
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM,
-                                            IsFragmentType);
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
   } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
              !VarInfo->Name.empty()) {
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM,
-                                           IsFragmentType);
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
   } else
     return;
 
@@ -5890,7 +5963,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   if (IGM.DebugInfo) {
     emitDebugVariableDeclaration(
         addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, Indirection,
-        AddrDbgInstrKind(i->getUsesMoveableValueDebugInfo()));
+        AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
   }
 }
 
@@ -6139,7 +6212,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
   auto DbgTy =
-      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM, false);
+      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
 
   auto VarInfo = i->getVarInfo();
   if (!VarInfo)

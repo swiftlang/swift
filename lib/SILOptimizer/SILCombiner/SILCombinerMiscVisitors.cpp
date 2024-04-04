@@ -945,23 +945,11 @@ static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
 /// We leave the cleaning up to mem2reg.
 SILInstruction *
 SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
-  if (IEAI->getFunction()->hasOwnership())
-    return nullptr;
-
+  auto *func = IEAI->getFunction();
   // Given an inject_enum_addr of a concrete type without payload, promote it to
   // a store of an enum. Mem2reg/load forwarding will clean things up for us. We
   // can't handle the payload case here due to the flow problems caused by the
   // dependency in between the enum and its data.
-
-  // Disable this for empty typle type because empty tuple stack locations maybe
-  // uninitialized. And converting to value form loses tag information.
-  if (IEAI->getElement()->hasAssociatedValues()) {
-    SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
-        IEAI->getElement(), IEAI->getFunction());
-    if (elemType.isEmpty(*IEAI->getFunction())) {
-      return nullptr;
-    }
-  }
 
   assert(IEAI->getOperand()->getType().isAddress() && "Must be an address");
   Builder.setCurrentDebugScope(IEAI->getDebugScope());
@@ -1086,8 +1074,10 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     EnumInst *E =
       Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand()->getType().getObjectType());
-    Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(),
-                        StoreOwnershipQualifier::Unqualified);
+    auto storeQual = !func->hasOwnership()
+                         ? StoreOwnershipQualifier::Unqualified
+                         : StoreOwnershipQualifier::Trivial;
+    Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(), storeQual);
     return eraseInstFromFunction(*IEAI);
   }
 
@@ -1204,8 +1194,13 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     EnumInst *E = Builder.createEnum(
         DataAddrInst->getLoc(), en, DataAddrInst->getElement(),
         DataAddrInst->getOperand()->getType().getObjectType());
+    auto storeQual = !func->hasOwnership()
+                         ? StoreOwnershipQualifier::Unqualified
+                     : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                         ? StoreOwnershipQualifier::Trivial
+                         : StoreOwnershipQualifier::Init;
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
-                        StoreOwnershipQualifier::Unqualified);
+                        storeQual);
     // Cleanup.
     getInstModCallbacks().notifyWillBeDeleted(DataAddrInst);
     deleter.forceDeleteWithUsers(DataAddrInst);
@@ -1231,6 +1226,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   auto *AI = dyn_cast_or_null<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
   if (!AI)
     return nullptr;
+
   unsigned ArgIdx = 0;
   Operand *EnumInitOperand = nullptr;
   for (auto &Opd : AI->getArgumentOperands()) {
@@ -1249,19 +1245,47 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     return nullptr;
   }
 
+  SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
+      IEAI->getElement(), IEAI->getFunction());
+  auto *structDecl = elemType.getStructOrBoundGenericStruct();
+
+  // We cannot create a struct when it has unreferenceable storage.
+  if (elemType.isEmpty(*IEAI->getFunction()) && structDecl &&
+      findUnreferenceableStorage(structDecl, elemType, IEAI->getFunction())) {
+    return nullptr;
+  }
+
   // Localize the address access.
   Builder.setInsertionPoint(AI);
   auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
                                               EnumInitOperand->get()->getType());
   EnumInitOperand->set(AllocStack);
   Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
-  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack,
-                                   LoadOwnershipQualifier::Unqualified));
+  SILValue enumValue;
+
+  // If it is an empty type, apply may not initialize it.
+  // Create an empty value of the empty type and store it to a new local.
+  if (elemType.isEmpty(*IEAI->getFunction())) {
+    enumValue = createEmptyAndUndefValue(
+        elemType.getObjectType(), &*Builder.getInsertionPoint(),
+        Builder.getBuilderContext(), /*noUndef*/ true);
+  } else {
+    auto loadQual = !func->hasOwnership() ? LoadOwnershipQualifier::Unqualified
+                    : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                        ? LoadOwnershipQualifier::Trivial
+                        : LoadOwnershipQualifier::Take;
+    enumValue =
+        Builder.createLoad(DataAddrInst->getLoc(), AllocStack, loadQual);
+  }
   EnumInst *E = Builder.createEnum(
-      DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
+      DataAddrInst->getLoc(), enumValue, DataAddrInst->getElement(),
       DataAddrInst->getOperand()->getType().getObjectType());
+  auto storeQual = !func->hasOwnership() ? StoreOwnershipQualifier::Unqualified
+                   : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                       ? StoreOwnershipQualifier::Trivial
+                       : StoreOwnershipQualifier::Init;
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
-                      StoreOwnershipQualifier::Unqualified);
+                      storeQual);
   Builder.createDeallocStack(DataAddrInst->getLoc(), AllocStack);
   eraseInstFromFunction(*DataAddrInst);
   return eraseInstFromFunction(*IEAI);
@@ -1468,9 +1492,15 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     if (!CBI->getTrueArgs().empty() || !CBI->getFalseArgs().empty())
       return nullptr;
     auto EnumOperandTy = SEI->getEnumOperand()->getType();
-    // Type should be loadable
-    if (!EnumOperandTy.isLoadable(*SEI->getFunction()))
+    // Type should be loadable and copyable.
+    // TODO: Generalize to work without copying address-only or noncopyable
+    // values.
+    if (!EnumOperandTy.isLoadable(*SEI->getFunction())) {
       return nullptr;
+    }
+    if (EnumOperandTy.isMoveOnly()) {
+      return nullptr;
+    }
 
     // Result of the select_enum should be a boolean.
     if (SEI->getType() != CBI->getCondition()->getType())

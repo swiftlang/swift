@@ -157,7 +157,7 @@ static void addLinkRuntimeLibRPath(const ArgList &Args,
   // so we should make sure we add the rpaths last, after all user-specified
   // rpaths. This is currently true from this place, but we need to be
   // careful if this function is ever called before user's rpaths are emitted.
-  assert(DarwinLibName.endswith(".dylib") && "must be a dynamic library");
+  assert(DarwinLibName.ends_with(".dylib") && "must be a dynamic library");
 
   // Add @executable_path to rpath to support having the dylib copied with
   // the executable.
@@ -727,7 +727,7 @@ void toolchains::Darwin::addPlatformSpecificPluginFrontendArgs(
     llvm::sys::path::remove_filename(platformPath); // Developer
 
     StringRef platformName = llvm::sys::path::filename(platformPath);
-    if (platformName.endswith("Simulator.platform")){
+    if (platformName.ends_with("Simulator.platform")){
       StringRef devicePlatformName =
           platformName.drop_back(strlen("Simulator.platform"));
       llvm::sys::path::remove_filename(platformPath); // Platform

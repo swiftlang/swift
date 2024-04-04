@@ -556,6 +556,12 @@ def create_argument_parser():
            help='the maximum number of parallel dsymutil jobs to use when '
                 'extracting symbols. Tweak with caution, since dsymutil '
                 'is memory intensive.')
+    option('--extra-dsymutil-args', append,
+           type=argparse.ShellSplitType(),
+           help='Pass through extra options to dsymutil when extracting '
+                'symbols, in the form of comma separated options '
+                'like "--verbose,--verify-dwarf=none". Can '
+                'be called multiple times to add multiple such options.')
 
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
@@ -1101,10 +1107,6 @@ def create_argument_parser():
            default=True,
            help='Build Remote Mirror')
 
-    option('--build-swift-external-generic-metadata-builder', toggle_true,
-           default=True,
-           help='Build External Generic Metadata Builder')
-
     option('--build-swift-libexec', toggle_true,
            default=True,
            help='build auxiliary executables')
@@ -1347,9 +1349,9 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift distributed actors.')
 
-    option('--enable-experimental-noncopyable-generics', toggle_true,
+    option('--enable-experimental-nonescapable-types', toggle_true,
            default=False,
-           help='Enable experimental NoncopyableGenerics.')
+           help='Enable experimental NonescapableTypes.')
 
     option('--enable-experimental-string-processing', toggle_true,
            default=True,

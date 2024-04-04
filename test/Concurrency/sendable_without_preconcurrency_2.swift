@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -strict-concurrency=minimal -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
 // RUN: %target-swift-frontend -strict-concurrency=targeted -verify-additional-prefix targeted-complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
 // RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
-// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 

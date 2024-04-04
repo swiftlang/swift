@@ -269,9 +269,11 @@ struct ExplicitClangModuleInputInfo {
   ExplicitClangModuleInputInfo(
       std::string moduleMapPath, std::string modulePath,
       bool isFramework = false, bool isSystem = false,
+      bool isBridgingHeaderDependency = true,
       std::optional<std::string> moduleCacheKey = std::nullopt)
       : moduleMapPath(moduleMapPath), modulePath(modulePath),
         isFramework(isFramework), isSystem(isSystem),
+        isBridgingHeaderDependency(isBridgingHeaderDependency),
         moduleCacheKey(moduleCacheKey) {}
   // Path of the Clang module map file.
   std::string moduleMapPath;
@@ -281,6 +283,8 @@ struct ExplicitClangModuleInputInfo {
   bool isFramework = false;
   // A flag that indicates whether this module is a system module
   bool isSystem = false;
+  // A flag that indicates whether this is a module dependency of a textual header input
+  bool isBridgingHeaderDependency = true;
   // The cache key for clang module.
   std::optional<std::string> moduleCacheKey;
 };
@@ -367,7 +371,12 @@ private:
         swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey;
     std::optional<std::vector<std::string>> headerDependencyPaths;
     std::string clangModuleMapPath = "", clangModulePath = "";
-    bool isFramework = false, isSystem = false;
+    bool isFramework = false, isSystem = false,
+         // The default value is 'true' in case the build system does not yet
+         // support emitting this field, in which case we must be conservative and
+         // ensure all dependencies get '-fmodule-map-file', instead of strictly
+         // module dependencies of textual header inputs.
+         isBridgingHeaderDependency = true;
     for (auto &entry : *mapNode) {
       auto key = getScalaNodeText(entry.getKey());
       if (key == "prebuiltHeaderDependencyPaths") {
@@ -394,6 +403,8 @@ private:
           swiftModuleCacheKey = val.str();
         } else if (key == "clangModuleCacheKey") {
           clangModuleCacheKey = val.str();
+        } else if (key == "isBridgingHeaderDependency") {
+          isBridgingHeaderDependency = parseBoolValue(val);
         } else {
           // Being forgiving for future fields.
           continue;
@@ -423,6 +434,7 @@ private:
                                          clangModulePath,
                                          isFramework,
                                          isSystem,
+                                         isBridgingHeaderDependency,
                                          clangModuleCacheKey);
       clangModuleMap.try_emplace(moduleName, std::move(entry));
     }
@@ -486,19 +498,6 @@ struct RequireOSSAModules_t {
   explicit operator bool() const { return bool(value); }
 };
 
-/// Help prevent confusion between different bools being passed around.
-struct RequireNoncopyableGenerics_t {
-private:
-  bool value;
-public:
-  RequireNoncopyableGenerics_t(const ASTContext &ctx)
-    : RequireNoncopyableGenerics_t(ctx.LangOpts) {}
-  RequireNoncopyableGenerics_t(const LangOptions &opts)
-      : value(opts.hasFeature(Feature::NoncopyableGenerics)) {}
-
-  explicit operator bool() const { return value; }
-};
-
 class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   friend class ModuleInterfaceLoader;
   ASTContext &Ctx;
@@ -507,26 +506,22 @@ class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   std::string BackupInterfaceDir;
   ModuleInterfaceLoaderOptions Opts;
   RequireOSSAModules_t RequiresOSSAModules;
-  RequireNoncopyableGenerics_t RequireNCGenerics;
 
 public:
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
                                 StringRef prebuiltCacheDir,
                                 StringRef BackupInterfaceDir,
                                 ModuleInterfaceLoaderOptions opts,
-                                RequireOSSAModules_t requiresOSSAModules,
-                                RequireNoncopyableGenerics_t requireNCGenerics)
+                                RequireOSSAModules_t requiresOSSAModules)
       : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
         BackupInterfaceDir(BackupInterfaceDir),
-        Opts(opts), RequiresOSSAModules(requiresOSSAModules),
-        RequireNCGenerics(requireNCGenerics) {}
+        Opts(opts), RequiresOSSAModules(requiresOSSAModules) {}
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
                                 StringRef prebuiltCacheDir,
                                 ModuleInterfaceLoaderOptions opts,
-                                RequireOSSAModules_t requiresOSSAModules,
-                                RequireNoncopyableGenerics_t requireNCGenerics):
+                                RequireOSSAModules_t requiresOSSAModules):
     ModuleInterfaceCheckerImpl(Ctx, cacheDir, prebuiltCacheDir, StringRef(),
-                               opts, requiresOSSAModules, requireNCGenerics) {}
+                               opts, requiresOSSAModules) {}
   std::vector<std::string>
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) override;
@@ -602,7 +597,6 @@ public:
       bool SerializeDependencyHashes, bool TrackSystemDependencies,
       ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules,
-      RequireNoncopyableGenerics_t RequireNCGenerics,
       bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
@@ -643,7 +637,6 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation genericSubInvocation;
-  llvm::Triple ParentInvocationTarget;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -658,8 +651,7 @@ private:
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
                                      bool suppressRemarks,
-                                     RequireOSSAModules_t requireOSSAModules,
-                                     RequireNoncopyableGenerics_t requireNCGenerics);
+                                     RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
@@ -672,8 +664,7 @@ public:
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
       StringRef backupModuleInterfaceDir, bool serializeDependencyHashes,
-      bool trackSystemDependencies, RequireOSSAModules_t requireOSSAModules,
-      RequireNoncopyableGenerics_t requireNCGenerics);
+      bool trackSystemDependencies, RequireOSSAModules_t requireOSSAModules);
 
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(StringRef interfacePath,

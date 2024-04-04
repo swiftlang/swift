@@ -294,7 +294,7 @@ private:
   /// A monotonically increasing ID which is incremented whenever a
   /// BasicBlockBitfield, NodeBitfield, or OperandBitfield is constructed.  For
   /// details see SILBitfield::bitfieldID;
-  int64_t currentBitfieldID = 1;
+  uint64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
   /// May be reused when zombie functions are recovered.
@@ -346,6 +346,9 @@ private:
   /// This counter is incremented every time a BasicBlockData re-assigns new
   /// block indices.
   unsigned BlockListChangeIdx = 0;
+
+  /// The isolation of this function.
+  ActorIsolation actorIsolation = ActorIsolation::forUnspecified();
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -976,7 +979,7 @@ public:
   /// TODO: This needs a better name.
   bool hasSemanticsAttrThatStartsWith(StringRef S) {
     return count_if(getSemanticsAttrs(), [&S](const std::string &Attr) -> bool {
-      return StringRef(Attr).startswith(S);
+      return StringRef(Attr).starts_with(S);
     });
   }
 
@@ -1366,6 +1369,12 @@ public:
 
     return false;
   }
+
+  void setActorIsolation(ActorIsolation newActorIsolation) {
+    actorIsolation = newActorIsolation;
+  }
+
+  ActorIsolation getActorIsolation() const { return actorIsolation; }
 
   //===--------------------------------------------------------------------===//
   // Block List Access

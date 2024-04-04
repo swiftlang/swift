@@ -254,10 +254,12 @@ struct IsolationError {
 
   SourceLoc loc;
 
+  bool preconcurrency;
+  
   Diagnostic diag;
 
 public:
-  IsolationError(SourceLoc loc, Diagnostic diag) : loc(loc), diag(diag) {}
+  IsolationError(SourceLoc loc, bool preconcurrency, Diagnostic diag) : loc(loc), preconcurrency(preconcurrency), diag(diag) {}
 
 };
 

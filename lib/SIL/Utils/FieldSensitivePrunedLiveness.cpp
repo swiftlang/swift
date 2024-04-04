@@ -83,20 +83,20 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
     return;
   }
 
-  // If we have an enum, we add one for tracking if the base enum is set and use
-  // the remaining bits for the max sized payload. This ensures that if we have
-  // a smaller sized payload, we still get all of the bits set, allowing for a
-  // homogeneous representation.
   if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
     unsigned numElements = 0;
     for (auto *eltDecl : enumDecl->getAllElements()) {
       if (!eltDecl->hasAssociatedValues())
         continue;
       auto elt = type.getEnumElementType(eltDecl, mod, context);
-      numElements = std::max(numElements,
-                             unsigned(TypeSubElementCount(elt, mod, context)));
+      numElements += unsigned(TypeSubElementCount(elt, mod, context));
     }
     number = numElements + 1;
+    if (type.isValueTypeWithDeinit()) {
+      // 'self' has its own liveness represented as an additional field at the
+      // end of the structure.
+      ++number;
+    }
     return;
   }
 
@@ -190,19 +190,20 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
-    // In the case of enums, we note that our representation is:
-    //
-    //                   ---------|Enum| ---
-    //                  /                   \
-    //                 /                     \
-    //                v                       v
-    //  |Bits for Max Sized Payload|    |Discrim Bit|
-    //
-    // So our payload is always going to start at the current field number since
-    // we are the left most child of our parent enum. So we just need to look
-    // through to our parent enum.
     if (auto *enumData = dyn_cast<UncheckedTakeEnumDataAddrInst>(
             projectionDerivedFromRoot)) {
+      auto ty = enumData->getOperand()->getType();
+      auto *enumDecl = enumData->getEnumDecl();
+      for (auto *element : enumDecl->getAllElements()) {
+        if (!element->hasAssociatedValues())
+          continue;
+        if (element == enumData->getElement())
+          break;
+        auto context = TypeExpansionContext(*rootAddress->getFunction());
+        auto elementTy = ty.getEnumElementType(element, mod, context);
+        finalSubElementOffset +=
+            unsigned(TypeSubElementCount(elementTy, mod, context));
+      }
       projectionDerivedFromRoot = enumData->getOperand();
       continue;
     }
@@ -376,7 +377,9 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
 
 void TypeTreeLeafTypeRange::constructFilteredProjections(
     SILValue value, SILInstruction *insertPt, SmallBitVector &filterBitVector,
-    llvm::function_ref<bool(SILValue, TypeTreeLeafTypeRange)> callback) {
+    DominanceInfo *domTree,
+    llvm::function_ref<bool(SILValue, TypeTreeLeafTypeRange, NeedsDestroy_t)>
+        callback) {
   auto *fn = insertPt->getFunction();
   SILType type = value->getType();
 
@@ -408,7 +411,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
 
       auto newValue =
           builder.createStructElementAddr(insertPt->getLoc(), value, varDecl);
-      callback(newValue, TypeTreeLeafTypeRange(start, next));
+      callback(newValue, TypeTreeLeafTypeRange(start, next), NeedsDestroy);
       start = next;
     }
     if (type.isValueTypeWithDeinit()) {
@@ -419,30 +422,63 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
     return;
   }
 
-  // We only allow for enums that can be completely destroyed. If there is code
-  // where an enum should be partially destroyed, we need to treat the
-  // unchecked_take_enum_data_addr as a separate value whose liveness we are
-  // tracking.
   if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+    struct ElementRecord {
+      EnumElementDecl *element;
+      unsigned start;
+      unsigned next;
+    };
+    SmallVector<ElementRecord, 2> projectedElements;
     unsigned start = startEltOffset;
-
-    unsigned maxSubEltCount = 0;
     for (auto *eltDecl : enumDecl->getAllElements()) {
       if (!eltDecl->hasAssociatedValues())
         continue;
+
       auto nextType = type.getEnumElementType(eltDecl, fn);
-      maxSubEltCount =
-          std::max(maxSubEltCount, unsigned(TypeSubElementCount(nextType, fn)));
+      unsigned next = start + TypeSubElementCount(nextType, fn);
+      if (noneSet(filterBitVector, start, next)) {
+        start = next;
+        continue;
+      }
+
+      projectedElements.push_back({eltDecl, start, next});
+      start = next;
     }
 
-    // Add a bit for the case bit.
-    unsigned next = maxSubEltCount + 1;
+    // Add a bit for the discriminator.
+    unsigned next = start + 1;
 
-    // Make sure we are all set.
-    assert(allSet(filterBitVector, start, next));
+    if (!allSet(filterBitVector, start, next)) {
+      for (auto record : projectedElements) {
+        // Find a preexisting unchecked_take_enum_data_addr that dominates
+        // insertPt.
+        bool foundProjection = false;
+        for (auto *user : value->getUsers()) {
+          auto *utedai = dyn_cast<UncheckedTakeEnumDataAddrInst>(user);
+          if (!utedai) {
+            continue;
+          }
+          if (utedai->getElement() == record.element) {
+            continue;
+          }
+          if (!domTree->dominates(utedai, insertPt)) {
+            continue;
+          }
+
+          callback(utedai, TypeTreeLeafTypeRange(record.start, record.next),
+                   DoesNotNeedDestroy);
+          foundProjection = true;
+        }
+        assert(foundProjection ||
+               llvm::count_if(enumDecl->getAllElements(), [](auto *elt) {
+                 return elt->hasAssociatedValues();
+               }) == 1);
+      }
+      return;
+    }
 
     // Then just pass back our enum base value as the pointer.
-    callback(value, TypeTreeLeafTypeRange(start, next));
+    callback(value, TypeTreeLeafTypeRange(start, next), NeedsDestroy);
 
     // Then set start to next and assert we covered the entire end elt offset.
     start = next;
@@ -463,7 +499,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
 
       auto newValue =
           builder.createTupleElementAddr(insertPt->getLoc(), value, index);
-      callback(newValue, TypeTreeLeafTypeRange(start, next));
+      callback(newValue, TypeTreeLeafTypeRange(start, next), NeedsDestroy);
       start = next;
     }
     assert(start == endEltOffset);
@@ -473,18 +509,82 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
   llvm_unreachable("Not understand subtype");
 }
 
+void TypeTreeLeafTypeRange::get(
+    Operand *op, SILValue rootValue,
+    SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
+  auto projectedValue = op->get();
+  auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
+  if (!startEltOffset)
+    return;
+
+  // A drop_deinit only consumes the deinit bit of its operand.
+  if (isa<DropDeinitInst>(op->getUser())) {
+    auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
+    ranges.push_back({upperBound - 1, upperBound});
+    return;
+  }
+
+  // An `inject_enum_addr` only initializes the enum tag.
+  if (auto inject = dyn_cast<InjectEnumAddrInst>(op->getUser())) {
+    auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
+    // TODO: account for deinit component if enum has deinit.
+    assert(!projectedValue->getType().isValueTypeWithDeinit());
+    ranges.push_back({upperBound - 1, upperBound});
+    return;
+  }
+
+  if (auto *utedai = dyn_cast<UncheckedTakeEnumDataAddrInst>(op->getUser())) {
+    auto *selected = utedai->getElement();
+    auto *enumDecl = utedai->getEnumDecl();
+    unsigned numAtoms = 0;
+    for (auto *element : enumDecl->getAllElements()) {
+      if (!element->hasAssociatedValues()) {
+        continue;
+      }
+      auto elementTy = projectedValue->getType().getEnumElementType(
+          element, op->getFunction());
+      auto elementAtoms =
+          unsigned(TypeSubElementCount(elementTy, op->getFunction()));
+      if (element != selected) {
+        ranges.push_back({*startEltOffset + numAtoms,
+                          *startEltOffset + numAtoms + elementAtoms});
+      }
+      numAtoms += elementAtoms;
+    }
+    // TODO: account for deinit component if enum has deinit.
+    assert(!projectedValue->getType().isValueTypeWithDeinit());
+    ranges.push_back(
+        {*startEltOffset + numAtoms, *startEltOffset + numAtoms + 1});
+    return;
+  }
+
+  // Uses that borrow a value do not involve the deinit bit.
+  //
+  // FIXME: This shouldn't be limited to applies.
+  unsigned deinitBitOffset = 0;
+  if (op->get()->getType().isValueTypeWithDeinit() &&
+      op->getOperandOwnership() == OperandOwnership::Borrow &&
+      ApplySite::isa(op->getUser())) {
+    deinitBitOffset = 1;
+  }
+
+  ranges.push_back({*startEltOffset, *startEltOffset +
+                                         TypeSubElementCount(projectedValue) -
+                                         deinitBitOffset});
+}
+
 void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
-    SILValue rootValue, SILInstruction *insertPt,
+    SILValue rootValue, SILInstruction *insertPt, DominanceInfo *domTree,
     SmallBitVector &neededElements,
-    SmallVectorImpl<std::pair<SILValue, TypeTreeLeafTypeRange>>
+    SmallVectorImpl<std::tuple<SILValue, TypeTreeLeafTypeRange, NeedsDestroy_t>>
         &resultingProjections) {
   TypeTreeLeafTypeRange rootRange(rootValue);
   (void)rootRange;
   assert(rootRange.size() == neededElements.size());
 
-  StackList<std::pair<SILValue, TypeTreeLeafTypeRange>> worklist(
-      insertPt->getFunction());
-  worklist.push_back({rootValue, rootRange});
+  StackList<std::tuple<SILValue, TypeTreeLeafTypeRange, NeedsDestroy_t>>
+      worklist(insertPt->getFunction());
+  worklist.push_back({rootValue, rootRange, NeedsDestroy});
 
   // Temporary vector we use for our computation.
   SmallBitVector tmp(neededElements.size());
@@ -496,8 +596,10 @@ void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
 
   while (!worklist.empty()) {
     auto pair = worklist.pop_back_val();
-    auto value = pair.first;
-    auto range = pair.second;
+    SILValue value;
+    TypeTreeLeafTypeRange range;
+    NeedsDestroy_t needsDestroy;
+    std::tie(value, range, needsDestroy) = pair;
 
     tmp.reset();
     tmp.set(range.startEltOffset, range.endEltOffset);
@@ -514,7 +616,7 @@ void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
     // everything set in the range. In that case, we just add this range to the
     // result and continue.
     if (allInRange(tmp, range)) {
-      resultingProjections.emplace_back(value, range);
+      resultingProjections.emplace_back(value, range, needsDestroy);
       continue;
     }
 
@@ -522,9 +624,10 @@ void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
     // recursively process those ranges looking for subranges that have
     // completely set bits.
     range.constructFilteredProjections(
-        value, insertPt, neededElements,
-        [&](SILValue subType, TypeTreeLeafTypeRange range) -> bool {
-          worklist.push_back({subType, range});
+        value, insertPt, neededElements, domTree,
+        [&](SILValue subType, TypeTreeLeafTypeRange range,
+            NeedsDestroy_t needsDestroy) -> bool {
+          worklist.push_back({subType, range, needsDestroy});
           return true;
         });
   }
@@ -579,6 +682,7 @@ void FieldSensitivePrunedLiveBlocks::computeScalarUseBlockLiveness(
       case LiveWithin:
         markBlockLive(predBlock, bitNo, LiveOut);
         break;
+      case DeadToLiveEdge:
       case LiveOut:
         break;
       }
@@ -615,6 +719,7 @@ void FieldSensitivePrunedLiveBlocks::updateForUse(
       } else {
         LLVM_FALLTHROUGH;
       }
+    case DeadToLiveEdge:
     case Dead: {
       // This use block has not yet been marked live. Mark it and its
       // predecessor blocks live.
@@ -634,6 +739,8 @@ FieldSensitivePrunedLiveBlocks::getStringRef(IsLive isLive) const {
     return "Dead";
   case LiveWithin:
     return "LiveWithin";
+  case DeadToLiveEdge:
+    return "DeadToLiveEdge";
   case LiveOut:
     return "LiveOut";
   }
@@ -827,16 +934,15 @@ static FunctionTest FieldSensitiveSSAUseLivenessTest(
 
 template <typename LivenessWithDefs>
 bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
-    SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+    SILInstruction *inst, SmallBitVector const &bits) const {
   assert(asImpl().isInitialized());
 
-  PRUNED_LIVENESS_LOG(
-      llvm::dbgs() << "FieldSensitivePrunedLiveRange::isWithinBoundary!\n"
-                   << "Span: ";
-      span.print(llvm::dbgs()); llvm::dbgs() << '\n');
+  PRUNED_LIVENESS_LOG(llvm::dbgs()
+                      << "FieldSensitivePrunedLiveRange::isWithinBoundary!\n"
+                      << "Bits: " << bits << "\n");
 
   // If we do not have any span, return true since we have no counter examples.
-  if (span.empty()) {
+  if (bits.empty()) {
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "    span is empty! Returning true!\n");
     return true;
   }
@@ -846,13 +952,14 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   auto *block = inst->getParent();
 
   SmallVector<IsLive, 8> outVector;
-  getBlockLiveness(block, span, outVector);
+  getBlockLiveness(block, bits, outVector);
 
-  for (auto pair : llvm::enumerate(outVector)) {
-    unsigned bit = span.startEltOffset + pair.index();
+  for (auto bitAndIndex : llvm::enumerate(bits.set_bits())) {
+    unsigned bit = bitAndIndex.value();
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Visiting bit: " << bit << '\n');
     bool isLive = false;
-    switch (pair.value()) {
+    switch (outVector[bitAndIndex.index()]) {
+    case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
     case FieldSensitivePrunedLiveBlocks::Dead:
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "        Dead... continuing!\n");
       // We are only not within the boundary if all of our bits are dead. We
@@ -942,6 +1049,8 @@ static StringRef getStringRef(FieldSensitivePrunedLiveBlocks::IsLive isLive) {
     return "Dead";
   case FieldSensitivePrunedLiveBlocks::LiveWithin:
     return "LiveWithin";
+  case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
+    return "DeadToLiveEdge";
   case FieldSensitivePrunedLiveBlocks::LiveOut:
     return "LiveOut";
   }
@@ -972,8 +1081,8 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
       switch (pair.value()) {
       case FieldSensitivePrunedLiveBlocks::LiveOut:
         for (SILBasicBlock *succBB : block->getSuccessors()) {
-          if (getBlockLiveness(succBB, index) ==
-              FieldSensitivePrunedLiveBlocks::Dead) {
+          if (FieldSensitivePrunedLiveBlocks::isDead(
+                getBlockLiveness(succBB, index))) {
             PRUNED_LIVENESS_LOG(llvm::dbgs() << "Marking succBB as boundary edge: bb"
                                     << succBB->getDebugID() << '\n');
             boundary.getBoundaryEdgeBits(succBB).set(index);
@@ -989,6 +1098,9 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
         foundAnyNonDead = true;
         break;
       }
+      case FieldSensitivePrunedLiveBlocks::DeadToLiveEdge:
+        foundAnyNonDead = true;
+        LLVM_FALLTHROUGH;
       case FieldSensitivePrunedLiveBlocks::Dead:
         // We do not assert here like in the normal pruned liveness
         // implementation since we can have dead on some bits and liveness along
@@ -1178,7 +1290,7 @@ void findBoundaryInSSADefBlock(SILNode *ssaDef, unsigned bitNo,
   // defInst is null for argument defs.
   PRUNED_LIVENESS_LOG(llvm::dbgs() << "Searching using findBoundaryInSSADefBlock.\n");
   SILInstruction *defInst = dyn_cast<SILInstruction>(ssaDef);
-  for (SILInstruction &inst : llvm::reverse(*ssaDef->getParentBlock())) {
+  for (SILInstruction &inst : llvm::reverse(*getDefinedInBlock(ssaDef))) {
     PRUNED_LIVENESS_LOG(llvm::dbgs() << "Visiting: " << inst);
     if (&inst == defInst) {
       PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead def: " << *defInst);
@@ -1192,9 +1304,21 @@ void findBoundaryInSSADefBlock(SILNode *ssaDef, unsigned bitNo,
     }
   }
 
-  auto *deadArg = cast<SILArgument>(ssaDef);
-  PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead arg: " << *deadArg);
-  boundary.getDeadDefsBits(deadArg).set(bitNo);
+  if (auto *deadArg = dyn_cast<SILArgument>(ssaDef)) {
+    PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead arg: " << *deadArg);
+    boundary.getDeadDefsBits(deadArg).set(bitNo);
+    return;
+  }
+  
+  // If we searched the success branch of a try_apply and found no uses, then
+  // the try_apply itself is a dead def.
+  if (isa<TryApplyInst>(ssaDef)) {
+    PRUNED_LIVENESS_LOG(llvm::dbgs() << "    Found dead try_apply: " << *ssaDef);
+    boundary.getDeadDefsBits(ssaDef).set(bitNo);
+    return;
+  }
+  
+  llvm_unreachable("def not found?!");
 }
 
 //===----------------------------------------------------------------------===//

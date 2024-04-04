@@ -29,6 +29,14 @@ struct AddressWalkerState {
 static SILValue
 findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
                                        AddressWalkerState &state) {
+  // These are instructions which we are ok with looking through when
+  // identifying our allocation. It must always refer to the entire allocation.
+  auto isAlloc = [&](SILValue value) -> bool {
+    if (auto *ieai = dyn_cast<InitExistentialAddrInst>(value))
+      value = ieai->getOperand();
+    return value == SILValue(allocInst);
+  };
+
   // Walk from our allocation to one of our writes. Then make sure that the
   // write writes to our entire value.
   for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
@@ -38,17 +46,22 @@ findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
       continue;
 
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
-      if (copyAddr->getDest() == allocInst &&
+      if (isAlloc(copyAddr->getDest()) &&
           copyAddr->isInitializationOfDest()) {
         return copyAddr->getSrc();
       }
     }
 
     if (auto *si = dyn_cast<StoreInst>(&inst)) {
-      if (si->getDest() == allocInst &&
+      if (isAlloc(si->getDest()) &&
           si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
         return si->getSrc();
       }
+    }
+
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst)) {
+      if (isAlloc(sbi->getDest()))
+        return sbi->getSrc();
     }
 
     // If we do not identify the write... return SILValue(). We weren't able
@@ -128,6 +141,57 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
     if (auto *si = dyn_cast<StoreInst>(&inst)) {
       if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        // Check if we are updating the entire tuple value.
+        if (si->getDest() == allocInst) {
+          // If we already found a root address (meaning we were processing
+          // tuple_elt_addr), bail. We have some sort of unhandled mix of
+          // copy_addr and store.
+          if (foundRootAddress)
+            return SILValue();
+
+          // If we already found a destructure, return SILValue(). We are
+          // initializing twice.
+          if (foundDestructure)
+            return SILValue();
+
+          // We are looking for a pattern where we construct a tuple from
+          // destructured parts.
+          if (auto *ti = dyn_cast<TupleInst>(si->getSrc())) {
+            for (auto p : llvm::enumerate(ti->getOperandValues())) {
+              SILValue value = lookThroughOwnershipInsts(p.value());
+              if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+                      value->getDefiningInstruction())) {
+                // We should always go through the same dti.
+                if (foundDestructure && foundDestructure != dti)
+                  return SILValue();
+                if (!foundDestructure)
+                  foundDestructure = dti;
+
+                // If we have a mixmatch of indices, we cannot look through.
+                if (p.index() != dti->getIndexOfResult(value))
+                  return SILValue();
+                if (tupleValues[p.index()])
+                  return SILValue();
+                tupleValues[p.index()] = value;
+
+                // If we have completely covered the tuple, break.
+                --numEltsLeft;
+                if (!numEltsLeft)
+                  break;
+              }
+            }
+
+            // If we haven't completely covered the tuple, return SILValue(). We
+            // should completely cover the tuple.
+            if (numEltsLeft)
+              return SILValue();
+
+            // Otherwise, break since we are done.
+            break;
+          }
+        }
+
+        // If we store to a tuple_element_addr, update for a single value.
         if (auto *tei = dyn_cast<TupleElementAddrInst>(si->getDest())) {
           if (tei->getOperand() == allocInst) {
             unsigned i = tei->getFieldIndex();
@@ -183,7 +247,7 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
 SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     AllocationInst *allocInst) {
-  struct AddressWalker : public TransitiveAddressWalker<AddressWalker> {
+  struct AddressWalker final : public TransitiveAddressWalker<AddressWalker> {
     AddressWalkerState &state;
 
     AddressWalker(AddressWalkerState &state) : state(state) {}
@@ -192,6 +256,12 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
       if (use->getUser()->mayWriteToMemory())
         state.writes.insert(use->getUser());
       return true;
+    }
+
+    TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+        return TransitiveUseVisitation::OnlyUser;
+      return TransitiveUseVisitation::OnlyUses;
     }
 
     void onError(Operand *use) { state.foundError = true; }
@@ -214,7 +284,8 @@ VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
     return SILValue();
   LLVM_DEBUG(llvm::dbgs() << "Searching for debug info providing value for: "
                           << searchValue);
-  SILValue result = findDebugInfoProvidingValueHelper(searchValue);
+  ValueSet valueSet(searchValue->getFunction());
+  SILValue result = findDebugInfoProvidingValueHelper(searchValue, valueSet);
   if (result) {
     LLVM_DEBUG(llvm::dbgs() << "Result: " << result);
   } else {
@@ -223,12 +294,45 @@ VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
   return result;
 }
 
-SILValue
-VariableNameInferrer::findDebugInfoProvidingValueHelper(SILValue searchValue) {
+SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
+    SILValue incomingValue, ValueSet &visitedValues) {
+  // We use pushSnapShot to run recursively and if we fail to find a
+  // value, we just pop our list to the last snapshot end of list. If we
+  // succeed, we do not pop and just return recusive value. Our user
+  // will consume variableNamePath at this point.
+  LLVM_DEBUG(llvm::dbgs() << "Before pushing a snap shot!\n";
+             variableNamePath.print(llvm::dbgs()));
+
+  unsigned oldSnapShotIndex = variableNamePath.pushSnapShot();
+  LLVM_DEBUG(llvm::dbgs() << "After pushing a snap shot!\n";
+             variableNamePath.print(llvm::dbgs()));
+
+  if (SILValue recursiveValue =
+          findDebugInfoProvidingValueHelper(incomingValue, visitedValues)) {
+    LLVM_DEBUG(llvm::dbgs() << "Returned: " << recursiveValue);
+    variableNamePath.returnSnapShot(oldSnapShotIndex);
+    return recursiveValue;
+  }
+
+  variableNamePath.popSnapShot(oldSnapShotIndex);
+  LLVM_DEBUG(llvm::dbgs() << "After popping a snap shot!\n";
+             variableNamePath.print(llvm::dbgs()));
+  return SILValue();
+}
+
+SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
+    SILValue searchValue, ValueSet &visitedValues) {
   assert(searchValue);
 
   while (true) {
     assert(searchValue);
+
+    // If we already visited the value, return SILValue(). This prevents issues
+    // caused by looping phis. We treat this as a failure and visit the either
+    // phi values.
+    if (!visitedValues.insert(searchValue))
+      return SILValue();
+
     LLVM_DEBUG(llvm::dbgs() << "Value: " << *searchValue);
 
     if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
@@ -254,6 +358,13 @@ VariableNameInferrer::findDebugInfoProvidingValueHelper(SILValue searchValue) {
       return allocInst;
     }
 
+    // If we have a store_borrow, always look at the dest. We are going to see
+    // if we can determine if dest is a temporary alloc_stack.
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(searchValue)) {
+      searchValue = sbi->getDest();
+      continue;
+    }
+
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
       variableNamePath.push_back(globalAddrInst);
       return globalAddrInst;
@@ -276,6 +387,12 @@ VariableNameInferrer::findDebugInfoProvidingValueHelper(SILValue searchValue) {
       continue;
     }
 
+    if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(searchValue)) {
+      variableNamePath.push_back(uedi);
+      searchValue = uedi->getOperand();
+      continue;
+    }
+
     if (auto *tei = dyn_cast<TupleExtractInst>(searchValue)) {
       variableNamePath.push_back(tei);
       searchValue = tei->getOperand();
@@ -292,6 +409,23 @@ VariableNameInferrer::findDebugInfoProvidingValueHelper(SILValue searchValue) {
       variableNamePath.push_back(tei);
       searchValue = tei->getOperand();
       continue;
+    }
+
+    if (auto *e = dyn_cast<UncheckedTakeEnumDataAddrInst>(searchValue)) {
+      variableNamePath.push_back(e);
+      searchValue = e->getOperand();
+      continue;
+    }
+
+    // Enums only have a single possible parent and is used sometimes like a
+    // transformation (e.x.: constructing an optional). We want to look through
+    // them and add the case to the variableNamePath.
+    if (auto *e = dyn_cast<EnumInst>(searchValue)) {
+      if (e->hasOperand()) {
+        variableNamePath.push_back(e);
+        searchValue = e->getOperand();
+        continue;
+      }
     }
 
     if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
@@ -314,6 +448,27 @@ VariableNameInferrer::findDebugInfoProvidingValueHelper(SILValue searchValue) {
       if (fArg->getDecl()) {
         variableNamePath.push_back({fArg});
         return fArg;
+      }
+    }
+
+    // If we have a phi argument, visit each of the incoming values and pick the
+    // first one that gives us a name.
+    if (auto *phiArg = dyn_cast<SILPhiArgument>(searchValue)) {
+      if (auto *term = phiArg->getSingleTerminator()) {
+        if (auto *swi = dyn_cast<SwitchEnumInst>(term)) {
+          if (auto value = findDebugInfoProvidingValuePhiArg(swi->getOperand(),
+                                                             visitedValues))
+            return value;
+        }
+      }
+
+      SmallVector<SILValue, 8> incomingValues;
+      if (phiArg->getIncomingPhiValues(incomingValues)) {
+        for (auto value : incomingValues) {
+          if (auto resultValue =
+                  findDebugInfoProvidingValuePhiArg(value, visitedValues))
+            return resultValue;
+        }
       }
     }
 
@@ -409,7 +564,9 @@ VariableNameInferrer::findDebugInfoProvidingValueHelper(SILValue searchValue) {
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperAddrInst>(searchValue) ||
-        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue)) {
+        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
+        isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
+        isa<CopyableToMoveOnlyWrapperValueInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
@@ -473,6 +630,11 @@ void VariableNameInferrer::popSingleVariableName() {
       return;
     }
 
+    if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
+      resultingString += getNameFromDecl(uedi->getElement());
+      return;
+    }
+
     if (auto *sei = dyn_cast<StructElementAddrInst>(inst)) {
       resultingString += getNameFromDecl(sei->getField());
       return;
@@ -481,6 +643,16 @@ void VariableNameInferrer::popSingleVariableName() {
     if (auto *tei = dyn_cast<TupleElementAddrInst>(inst)) {
       llvm::raw_svector_ostream stream(resultingString);
       stream << tei->getFieldIndex();
+      return;
+    }
+
+    if (auto *uedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
+      resultingString += getNameFromDecl(uedi->getElement());
+      return;
+    }
+
+    if (auto *ei = dyn_cast<EnumInst>(inst)) {
+      resultingString += getNameFromDecl(ei->getElement());
       return;
     }
 

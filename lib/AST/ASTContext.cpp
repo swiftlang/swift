@@ -130,6 +130,12 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << getProtocolName(getKnownProtocolKind(value));
 }
 
+// Metadata stores a 16-bit field for invertible protocols. Trigger a build
+// error when we assign the 15th bit so we can think about what to do.
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+  static_assert(Bit < 15);
+#include "swift/ABI/InvertibleProtocols.def"
+
 namespace {
 enum class SearchPathKind : uint8_t {
   Import = 1 << 0,
@@ -1109,16 +1115,24 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // There must be a property named "pointee".
   auto identifier = ctx.getIdentifier("pointee");
   auto results = nominal->lookupDirect(identifier);
-  if (results.size() != 1) return nullptr;
+  for (auto result : results) {
+    // The property must have type T.
+    auto *property = dyn_cast<VarDecl>(result);
+    if (!property)
+      continue;
 
-  // The property must have type T.
-  auto *property = dyn_cast<VarDecl>(results[0]);
-  if (!property) return nullptr;
-  if (!property->getInterfaceType()->isEqual(sig.getGenericParams()[0]))
-    return nullptr;
+    if (!property->getInterfaceType()->isEqual(sig.getGenericParams()[0]))
+      continue;
 
-  cache = property;
-  return property;
+    if (property->getFormalAccess() != AccessLevel::Public)
+      continue;
+
+    cache = property;
+    return property;
+  }
+
+  llvm_unreachable("Could not find pointee property");
+  return nullptr;
 }
 
 VarDecl *
@@ -1543,119 +1557,6 @@ FuncDecl *ASTContext::getLessThanIntDecl() const {
 }
 FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
-}
-
-FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
-    AbstractFunctionDecl *thunk) const {
-  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
-  assert(systemTy && "No specific ActorSystem type found!");
-
-  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
-  assert(systemNominal && "No system nominal type found!");
-
-  for (auto result : systemNominal->lookupDirect(Id_makeInvocationEncoder)) {
-    auto *func = dyn_cast<FuncDecl>(result);
-    if (func && func->isDistributedActorSystemMakeInvocationEncoder()) {
-      return func;
-    }
-  }
-
-  return nullptr;
-}
-
-FuncDecl *
-ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
-    auto *func = dyn_cast<FuncDecl>(result);
-    if (func &&
-        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
-      return func;
-    }
-  }
-
-  return nullptr;
-}
-
-AbstractFunctionDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDecoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResultHandler(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{nominal},
-      nullptr);
-}
-
-FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-
-  llvm::SmallVector<ValueDecl *, 2> results;
-  nominal->lookupQualified(nominal, DeclNameRef(Id_doneRecording),
-                           SourceLoc(), NL_QualifiedDefault, results);
-  for (auto result : results) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-
-    if (fd->getParameters()->size() != 0)
-      continue;
-
-    if (fd->getResultInterfaceType()->isVoid() &&
-        fd->hasThrows() &&
-        !fd->hasAsync())
-      return fd;
-  }
-
-  return nullptr;
 }
 
 FuncDecl *ASTContext::getHashValueForDecl() const {
@@ -2705,7 +2606,7 @@ ASTContext::getBuiltinConformance(Type type, ProtocolDecl *protocol,
 }
 
 static bool collapseSpecializedConformance(Type type,
-                                           RootProtocolConformance *conformance,
+                                           NormalProtocolConformance *conformance,
                                            SubstitutionMap substitutions) {
   if (!conformance->getType()->isEqual(type))
     return false;
@@ -2720,7 +2621,7 @@ static bool collapseSpecializedConformance(Type type,
 
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
-                                      RootProtocolConformance *generic,
+                                      NormalProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
   // If the specialization is a no-op, use the root conformance instead.
   if (collapseSpecializedConformance(type, generic, substitutions)) {
@@ -4629,29 +4530,29 @@ SILFunctionType::SILFunctionType(
       !ext.getLifetimeDependenceInfo().empty();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
-  if (coroutineKind == SILCoroutineKind::None) {
-    assert(yields.empty());
-    NumAnyResults = normalResults.size();
-    NumAnyIndirectFormalResults = 0;
-    NumPackResults = 0;
-    for (auto &resultInfo : normalResults) {
-      if (resultInfo.isFormalIndirect())
-        NumAnyIndirectFormalResults++;
-      if (resultInfo.isPack())
-        NumPackResults++;
-    }
-    memcpy(getMutableResults().data(), normalResults.data(),
-           normalResults.size() * sizeof(SILResultInfo));
-  } else {
-    assert(normalResults.empty());
-    NumAnyResults = yields.size();
-    NumAnyIndirectFormalResults = 0;
+  assert((coroutineKind == SILCoroutineKind::None && yields.empty()) ||
+         coroutineKind != SILCoroutineKind::None);
+
+  NumAnyResults = normalResults.size();
+  NumAnyIndirectFormalResults = 0;
+  NumPackResults = 0;
+  for (auto &resultInfo : normalResults) {
+    if (resultInfo.isFormalIndirect())
+      NumAnyIndirectFormalResults++;
+    if (resultInfo.isPack())
+      NumPackResults++;
+  }
+  memcpy(getMutableResults().data(), normalResults.data(),
+         normalResults.size() * sizeof(SILResultInfo));
+  if (coroutineKind != SILCoroutineKind::None) {
+    NumAnyYieldResults = yields.size();
+    NumAnyIndirectFormalYieldResults = 0;
     NumPackResults = 0;
     for (auto &yieldInfo : yields) {
       if (yieldInfo.isFormalIndirect())
-        NumAnyIndirectFormalResults++;
+        NumAnyIndirectFormalYieldResults++;
       if (yieldInfo.isPack())
-        NumPackResults++;
+        NumPackYieldResults++;
     }
     memcpy(getMutableYields().data(), yields.data(),
            yields.size() * sizeof(SILYieldInfo));
@@ -4823,7 +4724,6 @@ CanSILFunctionType SILFunctionType::get(
     std::optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs, const ASTContext &ctx,
     ProtocolConformanceRef witnessMethodConformance) {
-  assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
   assert(!ext.isPseudogeneric() || genericSig ||
          coroutineKind != SILCoroutineKind::None);

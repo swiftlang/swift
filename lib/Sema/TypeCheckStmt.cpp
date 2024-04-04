@@ -1413,7 +1413,7 @@ public:
     GenericEnvironment *genericSignature =
         genericSigStack.empty() ? nullptr : genericSigStack.back();
 
-    if (TypeChecker::typeCheckForEachBinding(DC, S, genericSignature))
+    if (TypeChecker::typeCheckForEachPreamble(DC, S, genericSignature))
       return nullptr;
 
     // Type-check the body of the loop.
@@ -1723,6 +1723,10 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
         bool isSelf = false;
         if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
           isSelf = UDRE->getName().isSimpleName(ctx.Id_self);
+          // Result the result expression so that rest of the compilation
+          // pipeline handles initializers with lifetime dependence specifiers
+          // in the same way as other initializers.
+          RS->setResult(nullptr);
         }
         if (!isSelf) {
           ctx.Diags.diagnose(

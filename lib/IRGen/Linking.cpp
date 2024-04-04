@@ -518,7 +518,7 @@ std::string LinkEntity::mangleAsString() const {
   }
 
   case Kind::DistributedAccessor: {
-    std::string Result(getSILFunction()->getName());
+    std::string Result = getSILDeclRef().mangle();
     Result.append("TF");
     return Result;
   }
@@ -528,7 +528,7 @@ std::string LinkEntity::mangleAsString() const {
 
     auto thunk = dyn_cast<AbstractFunctionDecl>(DC);
     if (thunk && thunk->isDistributedThunk()) {
-      ASTMangler mangler;
+      IRGenMangler mangler;
       return mangler.mangleDistributedThunkRecord(thunk);
     }
 
@@ -554,6 +554,7 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
   switch (getKind()) {
   case Kind::DispatchThunk:
   case Kind::MethodDescriptor:
+  case Kind::DistributedAccessor:
     return SILDeclRef::Kind::Func;
   case Kind::DispatchThunkInitializer:
   case Kind::MethodDescriptorInitializer:
@@ -571,7 +572,10 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
 }
 
 SILDeclRef LinkEntity::getSILDeclRef() const {
-  return SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
+  auto ref = SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
+  if (getKind() == Kind::DistributedAccessor)
+    return ref.asDistributed();
+  return ref;
 }
 
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
@@ -1306,8 +1310,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return false;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
-  case Kind::SILFunction:
-  case Kind::DistributedAccessor: {
+  case Kind::SILFunction: {
     return getSILFunction()->isWeakImported(module);
   }
 
@@ -1369,6 +1372,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
+  case Kind::DistributedAccessor:
     return getDecl()->isWeakImported(module);
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
@@ -1480,6 +1484,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+  case Kind::DistributedAccessor:
     return getDecl()->getDeclContext();
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
@@ -1555,7 +1560,6 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getDeclContextForEmission();
 
-  case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord: {
     return getSILFunction()->getParentModule();
   }

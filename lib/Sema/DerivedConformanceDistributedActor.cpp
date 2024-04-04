@@ -19,6 +19,7 @@
 #include "TypeChecker.h"
 #include "swift/Strings.h"
 #include "TypeCheckDistributed.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/DistributedDecl.h"
@@ -55,8 +56,8 @@ bool DerivedConformance::canDeriveDistributedActorSystem(
   // Make sure ad-hoc requirements that we'll use in synthesis are present, before we try to use them.
   // This leads to better error reporting because we already have errors happening (missing witnesses).
   if (auto handlerType = getDistributedActorSystemResultHandlerType(nominal)) {
-    if (!C.getOnReturnOnDistributedTargetInvocationResultHandler(
-        handlerType->getAnyNominal()))
+    if (!getOnReturnOnDistributedTargetInvocationResultHandler(
+            handlerType->getAnyNominal()))
       return false;
   }
 
@@ -85,6 +86,9 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
 
   auto idType = getDistributedActorIDType(decl);
   auto actorSystemType = getDistributedActorSystemType(decl);
+
+  if (!idType || !actorSystemType)
+    return nullptr;
 
   // (id: Self.ID, using system: Self.ActorSystem)
   auto *params = ParameterList::create(
@@ -176,7 +180,7 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
   // call the ad-hoc `handler.onReturn`
   {
     // Find the ad-hoc requirement ensured function on the concrete handler:
-    auto onReturnFunc = C.getOnReturnOnDistributedTargetInvocationResultHandler(
+    auto onReturnFunc = getOnReturnOnDistributedTargetInvocationResultHandler(
         context->handlerParam->getInterfaceType()->getAnyNominal());
     assert(onReturnFunc && "did not find ad-hoc requirement witness!");
 
@@ -216,7 +220,6 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
     ParamDecl* handlerParam,
     ParamDecl* resultBufParam) {
   auto DC = parentFunc;
-  auto DAS = C.getDistributedActorSystemDecl();
   auto doInvokeLocalFuncIdent = C.getIdentifier("doInvokeOnReturn");
 
   // mock locations, we're a synthesized func and don't need real locations
@@ -240,7 +243,12 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
       ParameterList::create(C, {resultTyParamDecl});
 
   SmallVector<Requirement, 2> requirements;
-  for (auto p : getDistributedSerializationRequirementProtocols(systemNominal, DAS)) {
+
+  auto serializationLayout =
+      getDistributedActorSystemSerializationType(systemNominal)
+          ->getExistentialLayout();
+
+  for (auto p : serializationLayout.getProtocols()) {
     auto requirement =
         Requirement(RequirementKind::Conformance,
                     resultGenericParamDecl->getDeclaredInterfaceType(),
@@ -282,7 +290,6 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
   auto implicit = true;
   ASTContext &C = afd->getASTContext();
   auto DC = afd->getDeclContext();
-  auto DAS = C.getDistributedActorSystemDecl();
 
   // mock locations, we're a thunk and don't really need detailed locations
   const SourceLoc sloc = SourceLoc();
@@ -302,7 +309,7 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
   auto metatypeParam = params->get(2);
 
   auto serializationRequirementTypeTy =
-      getDistributedSerializationRequirementType(nominal, DAS);
+      getDistributedActorSystemSerializationType(nominal);
 
   auto serializationRequirementMetaTypeTy =
       ExistentialMetatypeType::get(serializationRequirementTypeTy);
@@ -389,9 +396,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
   auto resultHandlerType = getDistributedActorSystemResultHandlerType(system);
   auto unsafeRawPointerType = C.getUnsafeRawPointerType();
   auto anyTypeType = ExistentialMetatypeType::get(C.TheAnyType); // Any.Type
-
-  //  auto serializationRequirementType =
-  //  getDistributedSerializationRequirementType(system, DAS);
 
   // params:
   // - handler: Self.ResultHandler
@@ -580,7 +584,7 @@ deriveDistributedActorType_SerializationRequirement(
     return nullptr;
 
   if (auto systemNominal = systemTy->getAnyNominal())
-    return getDistributedSerializationRequirementType(systemNominal, DAS);
+    return getDistributedActorSystemSerializationType(systemNominal);
 
   return nullptr;
 }

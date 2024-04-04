@@ -3,15 +3,13 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct MBV : ~Copyable {
+struct MBV : ~Escapable, ~Copyable {
   let p: UnsafeMutableRawPointer
   let c: Int
 
@@ -39,7 +37,7 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  mutating func getMBV() -> _mutate(self) MBV {
+  mutating func getMBV() -> dependsOn(self) MBV {
     MBV(p, c)
   }
 }

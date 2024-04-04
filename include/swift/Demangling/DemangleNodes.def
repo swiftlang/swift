@@ -132,6 +132,7 @@ NODE(ImplEscaping)
 NODE(ImplConvention)
 NODE(ImplDifferentiabilityKind)
 NODE(ImplErasedIsolation)
+NODE(ImplTransferringResult)
 NODE(ImplParameterResultDifferentiability)
 NODE(ImplParameterTransferring)
 NODE(ImplFunctionAttribute)
@@ -392,6 +393,8 @@ NODE(OutlinedInitializeWithCopyNoValueWitness)
 NODE(OutlinedAssignWithTakeNoValueWitness)
 NODE(OutlinedAssignWithCopyNoValueWitness)
 NODE(OutlinedDestroyNoValueWitness)
+
+NODE(DependentGenericInverseConformanceRequirement)
 
 #undef CONTEXT_NODE
 #undef NODE

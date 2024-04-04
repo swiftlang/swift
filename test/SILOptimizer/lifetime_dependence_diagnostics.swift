@@ -1,16 +1,14 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
   @_unsafeNonescapableResult
@@ -20,18 +18,46 @@ struct BV {
   }
 }
 
-func bv_copy(_ bv: borrowing BV) -> _copy(bv) BV {
+func bv_copy(_ bv: borrowing BV) -> dependsOn(bv) BV {
   copy bv
 }
+
+struct NCInt: ~Copyable {
+  var i: Int
+}
+
+public struct NEInt: ~Escapable {
+  var i: Int
+
+  // Test yielding an address.
+  // CHECK-LABEL: sil hidden @$s4test5NEIntV5ipropSivM : $@yield_once @convention(method) (@inout NEInt) -> @yields @inout Int {
+  // CHECK: bb0(%0 : $*NEInt):
+  // CHECK: [[A:%.*]] = begin_access [modify] [static] %0 : $*NEInt
+  // CHECK: [[E:%.*]] = struct_element_addr [[A]] : $*NEInt, #NEInt.i
+  // CHECK: yield [[E]] : $*Int, resume bb1, unwind bb2
+  // CHECK: end_access [[A]] : $*NEInt
+  // CHECK: end_access [[A]] : $*NEInt
+  // CHECK-LABEL: } // end sil function '$s4test5NEIntV5ipropSivM'
+  var iprop: Int {
+    _read { yield i }
+    _modify { yield &i }
+  }
+
+  init(owner: borrowing NCInt) -> dependsOn(owner) Self {
+    self.i = owner.i
+  }
+}
+
+func takeClosure(_: () -> ()) {}
 
 // No mark_dependence is needed for a inherited scope.
 //
 // CHECK-LABEL: sil hidden @$s4test14bv_borrow_copyyAA2BVVADYlsF : $@convention(thin) (@guaranteed BV) -> _scope(1) @owned BV {
 // CHECK:      bb0(%0 : @noImplicitCopy $BV):
-// CHECK:        apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> _inherit(1) @owned BV // user: %4
+// CHECK:        apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> _inherit(1) @owned BV
 // CHECK-NEXT:   return %3 : $BV
 // CHECK-LABEL: } // end sil function '$s4test14bv_borrow_copyyAA2BVVADYlsF'
-func bv_borrow_copy(_ bv: borrowing BV) -> _borrow(bv) BV {
+func bv_borrow_copy(_ bv: borrowing BV) -> dependsOn(scoped bv) BV {
   bv_copy(bv) 
 }
 
@@ -44,6 +70,13 @@ func bv_borrow_copy(_ bv: borrowing BV) -> _borrow(bv) BV {
 // CHECK:         %{{.*}} = mark_dependence [nonescaping] [[R]] : $BV on %0 : $BV
 // CHECK-NEXT:    return %{{.*}} : $BV
 // CHECK-LABEL: } // end sil function '$s4test010bv_borrow_C00B0AA2BVVAEYls_tF'
-func bv_borrow_borrow(bv: borrowing BV) -> _borrow(bv) BV {
+func bv_borrow_borrow(bv: borrowing BV) -> dependsOn(scoped bv) BV {
   bv_borrow_copy(bv)
+}
+
+// This already has a mark_dependence [nonescaping] before diagnostics. If it triggers diagnostics again, it will fail
+// because lifetime dependence does not expect a dependence directly on an 'inout' address without any 'begin_access'
+// marker.
+func ncint_capture(ncInt: inout NCInt) {
+  takeClosure { _ = ncInt.i }
 }

@@ -638,7 +638,7 @@ bool Parser::startsWithEllipsis(Token Tok) {
   if (!Tok.isAnyOperator() && !Tok.isPunctuation())
     return false;
 
-  return Tok.getText().startswith("...");
+  return Tok.getText().starts_with("...");
 }
 
 SourceLoc Parser::consumeStartingEllipsis() {
@@ -1287,11 +1287,11 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 
   // If the base name is prefixed by "getter:" or "setter:", it's an
   // accessor.
-  if (baseName.startswith("getter:")) {
+  if (baseName.starts_with("getter:")) {
     result.IsGetter = true;
     result.IsFunctionName = false;
     baseName = baseName.substr(7);
-  } else if (baseName.startswith("setter:")) {
+  } else if (baseName.starts_with("setter:")) {
     result.IsSetter = true;
     result.IsFunctionName = false;
     baseName = baseName.substr(7);

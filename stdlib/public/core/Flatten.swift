@@ -38,6 +38,8 @@ public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
   }
 }
 
+extension FlattenSequence: Sendable where Base: Sendable {}
+
 extension FlattenSequence {
   @frozen // lazy-performance
   public struct Iterator {
@@ -53,6 +55,9 @@ extension FlattenSequence {
     }
   }
 }
+
+extension FlattenSequence.Iterator: Sendable
+  where Base.Iterator: Sendable, Base.Element.Iterator: Sendable {}
 
 extension FlattenSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element.Element
@@ -160,6 +165,9 @@ extension FlattenSequence where Base: Collection, Base.Element: Collection {
     }
   }
 }
+
+extension FlattenSequence.Index: Sendable
+  where Base.Index: Sendable, Base.Element.Index: Sendable {}
 
 extension FlattenSequence.Index: Equatable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance

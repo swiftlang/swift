@@ -136,8 +136,10 @@ PROTOCOL(AsyncIteratorProtocol)
 
 PROTOCOL(FloatingPoint)
 
-INVERTIBLE_PROTOCOL_WITH_NAME(Copyable, "Copyable")
-INVERTIBLE_PROTOCOL_WITH_NAME(Escapable, "Escapable")
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+    INVERTIBLE_PROTOCOL_WITH_NAME(Name, #Name)
+#include "swift/ABI/InvertibleProtocols.def"
+
 PROTOCOL_(BitwiseCopyable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)

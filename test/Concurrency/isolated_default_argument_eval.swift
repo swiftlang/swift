@@ -6,8 +6,12 @@
 @MainActor
 func requiresMainActor() -> Int { 0 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s30isolated_default_argument_eval19mainActorDefaultArg5valueS2i_tFfA_
+@discardableResult
 @MainActor
-func mainActorDefaultArg(value: Int = requiresMainActor()) {}
+func mainActorDefaultArg(value: Int = requiresMainActor()) -> Int {
+  value
+}
 
 @MainActor
 func mainActorMultiDefaultArg(x: Int = requiresMainActor(),
@@ -25,7 +29,7 @@ func mainActorMultiDefaultArg(x: Int = requiresMainActor(),
 func nonisolatedAsyncCaller() async {
   // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
   // CHECK: hop_to_executor {{.*}} : $MainActor
-  // CHECK: [[GET_VALUE:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval19mainActorDefaultArg5valueySi_tFfA_
+  // CHECK: [[GET_VALUE:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval19mainActorDefaultArg5valueS2i_tFfA_
   // CHECK-NEXT: apply [[GET_VALUE]]()
   // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
   await mainActorDefaultArg()
@@ -67,4 +71,21 @@ func passInoutWithDefault() async {
   // CHECK: apply [[FN]]([[INOUT_X]], [[ARG_VALUE]], [[Z]])
   // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
   await isolatedDefaultInoutMix(x: &x, y: argValue)
+}
+
+// default argument 0 of noSuspensionInDefaultArgGenerator(_:)
+// CHECK-LABEL: sil hidden [ossa] @$s30isolated_default_argument_eval33noSuspensionInDefaultArgGeneratoryySiFfA_
+// CHECK: [[NESTED_DEFAULT_REF:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval19mainActorDefaultArg5valueS2i_tFfA_ : $@convention(thin) () -> Int
+// CHECK-NEXT: [[NESTED_DEFAULT:%[0-9]+]] = apply [[NESTED_DEFAULT_REF]]() : $@convention(thin) () -> Int
+// CHECK: [[DEFAULT_REF:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval19mainActorDefaultArg5valueS2i_tF : $@convention(thin) (Int) -> Int
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DEFAULT_REF]]([[NESTED_DEFAULT]]) : $@convention(thin) (Int) -> Int
+// CHECK-NEXT: return [[RESULT]] : $Int
+
+// CHECK-LABEL: sil hidden [ossa] @$s30isolated_default_argument_eval33noSuspensionInDefaultArgGeneratoryySiF
+@MainActor func noSuspensionInDefaultArgGenerator(
+  _ x: Int = mainActorDefaultArg()
+) {}
+
+func testNoSuspensionInDefaultArgGenerator() async {
+  await noSuspensionInDefaultArgGenerator()
 }

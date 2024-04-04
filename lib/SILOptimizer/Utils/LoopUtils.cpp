@@ -260,7 +260,12 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
       return false;
     }
   }
-
+  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
+  // borrow scope. We currently assume that a set of dominated scope-ending uses
+  // can be found.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(I)) {
+    return !MD->isNonEscaping();
+  }
   // CodeGen can't build ssa for objc methods.
   if (auto *Method = dyn_cast<MethodInst>(I)) {
     if (Method->getMember().isForeign) {

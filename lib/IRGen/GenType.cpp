@@ -2862,6 +2862,8 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
                                IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(fieldTy))
         return SILType();
+      if (fieldTy.isMoveOnly() != t.isMoveOnly())
+        return SILType();
       return fieldTy;
     }
 

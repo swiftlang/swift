@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify \
 // RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -disable-experimental-parser-round-trip \
-// RUN: -enable-experimental-feature NoncopyableGenerics \
-// RUN:  -Xllvm -enable-lifetime-dependence-diagnostics=true
+// RUN: -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: asserts
 
@@ -64,15 +62,15 @@ func consume(_ o : consuming View) {}
 func use(_ o : borrowing MutableView) {}
 func consume(_ o : consuming MutableView) {}
 
-func getConsumingView(_ x: consuming View) -> _consume(x) View {
+func getConsumingView(_ x: consuming View) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
-func getBorrowingView(_ x: borrowing View) -> _borrow(x) View {
+func getBorrowingView(_ x: borrowing View) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
-func getBorrowingView(_ x: borrowing NCContainer) -> _borrow(x) View {
+func getBorrowingView(_ x: borrowing NCContainer) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
@@ -120,9 +118,6 @@ func test3(_ a: Array<Int>) {
   }
 }
 
-/*
-// Currently fails because the lifetime dependence util isn't analyzing a
-// def-use chain involving a stack temporary
 func test4(_ a: Array<Int>) {
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
@@ -132,7 +127,6 @@ func test4(_ a: Array<Int>) {
     consume(view)
   }
 }
-*/
 
 func test5(_ a: Array<Int>) {
   a.withUnsafeBytes {
@@ -143,8 +137,10 @@ func test5(_ a: Array<Int>) {
   }
 }
 
+// rdar://124651399
+// XFAIL: *
 func test6(_ a: Array<Int>) {
-  var p : View?
+  var p : View? // error: type 'View' does not conform to protocol 'Escapable'
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
     mutate(&x)
@@ -175,7 +171,6 @@ func test7(_ a: UnsafeRawBufferPointer) {
   mutate(&x)
 }
 
-/*
 // Currently fails because the lifetime dependence util isn't analyzing a
 // def-use chain involving a stack temporary
 func test8(_ a: Array<Int>) {
@@ -187,7 +182,6 @@ func test8(_ a: Array<Int>) {
     consume(view)
   }
 }
-*/
 
 struct Wrapper : ~Escapable {
   var _view: View

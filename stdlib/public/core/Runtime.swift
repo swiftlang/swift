@@ -139,11 +139,19 @@ func _stdlib_atomicInitializeARCRef(
   let desiredPtr = unmanaged.toOpaque()
   let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
+#if $TypedThrows
   let wonRace = withUnsafeMutablePointer(to: &expected) {
     _stdlib_atomicCompareExchangeStrongPtr(
       object: rawTarget, expected: $0, desired: desiredPtr
     )
   }
+#else
+  let wonRace = __abi_se0413_withUnsafeMutablePointer(to: &expected) {
+    _stdlib_atomicCompareExchangeStrongPtr(
+      object: rawTarget, expected: $0, desired: desiredPtr
+    )
+  }
+#endif
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
@@ -562,6 +570,9 @@ internal class __SwiftNativeNSArray {
   deinit {}
 }
 
+@available(*, unavailable)
+extension __SwiftNativeNSArray: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSMutableArrayBase)
@@ -574,6 +585,9 @@ internal class _SwiftNativeNSMutableArray {
   deinit {}
 }
 
+@available(*, unavailable)
+extension _SwiftNativeNSMutableArray: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSDictionaryBase)
@@ -584,6 +598,9 @@ internal class __SwiftNativeNSDictionary {
   deinit {}
 }
 
+@available(*, unavailable)
+extension __SwiftNativeNSDictionary: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSSetBase)
@@ -593,6 +610,9 @@ internal class __SwiftNativeNSSet {
   @objc public init(coder: AnyObject) {}
   deinit {}
 }
+
+@available(*, unavailable)
+extension __SwiftNativeNSSet: Sendable {}
 
 @objc
 @_swift_native_objc_runtime_base(__SwiftNativeNSEnumeratorBase)

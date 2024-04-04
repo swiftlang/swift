@@ -1,0 +1,48 @@
+
+struct User {
+  let firstName: String
+  let lastName: String?
+}
+
+extension User: Codable {
+}
+
+
+struct Generic<Value> {
+  var value: Value
+}
+
+extension Generic {
+}
+
+extension Generic: Codable where Value: Codable {
+
+    private enum CodingKeys: CodingKey {
+      case value
+    }
+
+    init(from decoder: any Decoder) throws {
+      let container: KeyedDecodingContainer<Generic<Value>.CodingKeys> = try decoder.container(keyedBy: Generic<Value>.CodingKeys.self)
+
+      self.value = try container.decode(Value.self, forKey: Generic<Value>.CodingKeys.value)
+
+    }
+
+    func encode(to encoder: any Encoder) throws {
+      var container = encoder.container(keyedBy: Generic<Value>.CodingKeys.self)
+
+      try container.encode(self.value, forKey: Generic.CodingKeys.value)
+    }
+}
+
+
+struct Outer {
+  struct Inner {
+    let value: Int
+  }
+}
+
+extension Outer.Inner: Codable {
+}
+
+

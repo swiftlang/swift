@@ -15,8 +15,17 @@
 import Swift
 import _Concurrency
 
-#if $Macros
+// Macros are disabled when Swift is built without swift-syntax.
+#if $Macros && hasAttribute(attached)
 
+/// Enables the attached to protocol to be resolved as remote distributed
+/// actor reference.
+///
+/// ### Requirements
+///
+/// The attached to type must be a protocol that refines the `DistributedActor`
+/// protocol. It must either specify a concrete `ActorSystem` or constrain it
+/// in such way that the system's `SerializationRequirement` is statically known.
 @attached(peer, names: prefixed(`$`)) // provides $Greeter concrete stub type
 @attached(extension, names: arbitrary) // provides extension for Greeter & _DistributedActorStub
 public macro _DistributedProtocol() =

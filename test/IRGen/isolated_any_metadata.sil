@@ -7,9 +7,9 @@ sil_stage canonical
 
 // CHECK-LABEL:        define{{.*}} swiftcc ptr @get_metadata
 // CHECK:              entry:
-// CHECK-ACCESSOR-NEXT:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$syyYAcMa"([[INT]] 0)
+// CHECK-ACCESSOR-NEXT:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$syyYbYAcMa"([[INT]] 0)
 // CHECK-ACCESSOR-NEXT:  [[METADATA:%.]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-DEMANGLE:       [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYAcMD")
+// CHECK-DEMANGLE:       [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYbYAcMD")
 // CHECK-NEXT:           ret ptr [[METADATA]]
 sil @get_metadata : $() -> @thick Any.Type {
 entry:
@@ -18,7 +18,7 @@ entry:
   return %result : $@thick Any.Type
 }
 
-// CHECK-ACCESSOR-LABEL: define{{.*}} swiftcc %swift.metadata_response @"$syyYAcMa"
-//   2214592512 == 0x84000000 == (ExtendedFlags | Escaping)
+// CHECK-ACCESSOR-LABEL: define{{.*}} swiftcc %swift.metadata_response @"$syyYbYAcMa"
+//   3288334336 == 0xc4000000 == (ExtendedFlags | Sendable | Escaping)
 //   2 == IsolatedAny
-// CHECK-ACCESSOR:         call ptr @swift_getExtendedFunctionTypeMetadata([[INT]] 2214592512, [[INT]] 0, ptr null, ptr null, ptr getelementptr inbounds {{.*}} @"$sytN"{{.*}}), ptr null, i32 2, ptr null)
+// CHECK-ACCESSOR:         call ptr @swift_getExtendedFunctionTypeMetadata([[INT]] 3288334336, [[INT]] 0, ptr null, ptr null, ptr getelementptr inbounds {{.*}} @"$sytN"{{.*}}), ptr null, i32 2, ptr null)

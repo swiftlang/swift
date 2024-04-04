@@ -692,7 +692,7 @@ importer::shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop) {
   // These appear as both properties and methods in ObjC and should be
   // imported as methods into Swift, as a sort of least-common-denominator
   // compromise.
-  if (!prop->getName().startswith("accessibility"))
+  if (!prop->getName().starts_with("accessibility"))
     return false;
   if (isAccessibilityConformingContext(prop->getDeclContext()))
     return true;

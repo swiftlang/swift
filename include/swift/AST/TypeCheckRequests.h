@@ -113,7 +113,7 @@ public:
 /// Request the superclass type for the given class.
 class SuperclassTypeRequest
     : public SimpleRequest<
-          SuperclassTypeRequest, Type(NominalTypeDecl *, TypeResolutionStage),
+          SuperclassTypeRequest, Type(ClassDecl *, TypeResolutionStage),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -123,7 +123,7 @@ private:
 
   // Evaluation.
   Type
-  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl,
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl,
            TypeResolutionStage stage) const;
 
 public:
@@ -1039,6 +1039,24 @@ public:
 /// Determine whether the given class is a distributed actor.
 class IsDistributedActorRequest :
     public SimpleRequest<IsDistributedActorRequest,
+        bool(NominalTypeDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Determine whether the given class is a distributed actor.
+class CanSynthesizeDistributedActorCodableConformanceRequest :
+    public SimpleRequest<CanSynthesizeDistributedActorCodableConformanceRequest,
         bool(NominalTypeDecl *),
         RequestFlags::Cached> {
 public:
@@ -4805,6 +4823,44 @@ private:
   friend SimpleRequest;
 
   ArrayRef<TypeDecl *> evaluate(Evaluator &evaluator, SourceFile *sf) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class ObjCRequirementMapRequest
+    : public SimpleRequest<ObjCRequirementMapRequest,
+                           ObjCRequirementMap(const ProtocolDecl *proto),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ObjCRequirementMap evaluate(Evaluator &evaluator,
+                              const ProtocolDecl *proto) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Finds the import declaration that effectively imports a given module in a
+/// source file.
+class ImportDeclRequest
+    : public SimpleRequest<ImportDeclRequest,
+                           std::optional<AttributedImport<ImportedModule>>(
+                               const SourceFile *sf, const ModuleDecl *mod),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<AttributedImport<ImportedModule>>
+  evaluate(Evaluator &evaluator, const SourceFile *sf,
+           const ModuleDecl *mod) const;
 
 public:
   bool isCached() const { return true; }

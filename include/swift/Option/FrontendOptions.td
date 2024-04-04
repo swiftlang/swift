@@ -306,6 +306,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "disable-objc-interop">,
     HelpText<"Disable Objective-C interop code generation and config directives">;
 
+  def enable_experimental_opaque_type_erasure :
+    Flag<["-"], "enable-experimental-opaque-type-erasure">,
+    HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
+
   def enable_objc_attr_requires_foundation_module :
     Flag<["-"], "enable-objc-attr-requires-foundation-module">,
     HelpText<"Enable requiring uses of @objc to require importing the "
@@ -372,7 +376,13 @@ def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
   Alias<debug_constraints_on_line>;
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
-  HelpText<"Disable per-name lazy member loading">;
+  HelpText<"Disable per-name lazy member loading (obsolete)">;
+
+def disable_named_lazy_import_as_member_loading :
+  Flag<["-"], "disable-named-lazy-import-as-member-loading">,
+  HelpText<"Import all of a type's import-as-member globals together, as Swift "
+           "5.10 and earlier did; temporary workaround for modules that are "
+           "sensitive to this change">;
 
 def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
   HelpText<"Enables dumping rewrite systems from the generics implementation">;
@@ -570,6 +580,10 @@ def enable_single_module_llvm_emission: Flag<["-"], "enable-single-module-llvm-e
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit LLVM IR into a single LLVM module in multithreaded mode.">;
 
+def emit_empty_object_file : Flag<["-"], "emit-empty-object-file">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Produce a valid but dummy object file when building a library module">;
+
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 
@@ -579,6 +593,10 @@ def stack_promotion_limit : Separate<["-"], "stack-promotion-limit">,
 
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
+
+def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
+  HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
+           "stderr">;
 
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
@@ -647,14 +665,6 @@ def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
 
-def enable_experimental_associated_type_inference :
-  Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference improvements">;
-
-def disable_experimental_associated_type_inference :
-  Flag<["-"], "disable-experimental-associated-type-inference">,
-  HelpText<"Disable experimental associated type inference improvements">;
-
 def enable_experimental_lifetime_dependence_inference :
   Flag<["-"], "enable-experimental-lifetime-dependence-inference">,
   HelpText<"Enable experimental lifetime dependence inference">;
@@ -694,10 +704,6 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
 def bypass_resilience : Flag<["-"], "bypass-resilience-checks">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Ignore all checks for module resilience.">;
-  
-def enable_experimental_opaque_type_erasure : Flag<["-"], "enable-experimental-opaque-type-erasure">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Type-erases opaque types that conform to @_typeEraser protocols">;
 
 def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -1223,12 +1229,16 @@ def enable_move_inout_stack_protector :
   Flag<["-"], "enable-move-inout-stack-protector">,
   HelpText<"Enable the stack protector by moving values to temporaries">;
 
-def enable_import_ptrauth_field_function_pointers :
-  Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
-  HelpText<"Enable import of custom ptrauth qualified field function pointers">;
 def disable_import_ptrauth_field_function_pointers :
   Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
   HelpText<"Disable import of custom ptrauth qualified field function pointers">;
+
+def enable_lifetime_dependence_diagnostics :
+  Flag<["-"], "enable-lifetime-dependence-diagnostics">,
+  HelpText<"Enable lifetime dependence diagnostics for Nonescapable types.">;
+def disable_lifetime_dependence_diagnostics :
+  Flag<["-"], "disable-lifetime-dependence-diagnostics">,
+  HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
 
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,
@@ -1249,6 +1259,12 @@ def enable_relative_protocol_witness_tables :
   HelpText<"Enable relative protocol witness tables">;
 def disable_relative_protocol_witness_tables :
   Flag<["-"], "disable-relative-protocol-witness-tables">,
+  HelpText<"Disable relative protocol witness tables">;
+def enable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "enable-fragile-relative-protocol-tables">,
+  HelpText<"Enable relative protocol witness tables">;
+def disable_fragile_resilient_protocol_witnesses :
+  Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
 def enable_new_llvm_pass_manager :
@@ -1304,6 +1320,16 @@ def experimental_spi_only_imports :
 def enable_ossa_complete_lifetimes :
   Flag<["-"], "enable-ossa-complete-lifetimes">,
   HelpText<"Require linear OSSA lifetimes after SILGen">;
+def disable_ossa_complete_lifetimes :
+  Flag<["-"], "disable-ossa-complete-lifetimes">,
+  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
+
+def enable_ossa_verify_complete :
+  Flag<["-"], "enable-ossa-verify-complete">,
+  HelpText<"Verify linear OSSA lifetimes after SILGen">;
+def disable_ossa_verify_complete :
+  Flag<["-"], "disable-ossa-verify-complete">,
+  HelpText<"Do not verify linear OSSA lifetimes after SILGen">;
 
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,

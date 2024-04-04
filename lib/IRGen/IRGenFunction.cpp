@@ -445,6 +445,20 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
 
 llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
                                                   StringRef failureMsg) {
+  if (IGM.DebugInfo && IGM.getOptions().isDebugInfoCodeView()) {
+    auto TrapLoc = getCurrentDebugLocation();
+    // Line 0 is invalid in CodeView, so create a new location that uses the
+    // line and column from the inlined location of the trap, that should
+    // correspond to its original source location.
+    if (TrapLoc.getLine() == 0 && TrapLoc.getInlinedAt()) {
+      auto DL = llvm::DILocation::getDistinct(
+          IGM.getLLVMContext(), TrapLoc.getInlinedAt()->getLine(),
+          TrapLoc.getInlinedAt()->getColumn(), TrapLoc.getScope(),
+          TrapLoc.getInlinedAt());
+      SetCurrentDebugLocation(DL);
+    }
+  }
+
   if (IGM.IRGen.Opts.shouldOptimize()) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass
@@ -709,7 +723,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
       // because the continuation result is not available yet. When the
       // continuation is later resumed, the task will get scheduled
       // starting from the suspension point.
-      emitCoroutineOrAsyncExit();
+      emitCoroutineOrAsyncExit(false);
     }
 
     Builder.emitBlock(contBB);

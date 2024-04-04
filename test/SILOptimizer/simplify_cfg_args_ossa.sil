@@ -790,3 +790,22 @@ bb8:
   %25 = tuple ()
   return %25 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @replace_with_incoming_value : $@convention(thin) () -> () {
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'replace_with_incoming_value'
+sil [ossa] @replace_with_incoming_value : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int32, 37
+  br bb1(%1 : $Builtin.Int32)
+
+bb1(%3 : $Builtin.Int32):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%3 : $Builtin.Int32)
+
+bb3:
+  %r = tuple()
+  return %r : $()
+}

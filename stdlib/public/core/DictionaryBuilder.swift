@@ -43,6 +43,9 @@ struct _DictionaryBuilder<Key: Hashable, Value> {
   }
 }
 
+@available(*, unavailable)
+extension _DictionaryBuilder: Sendable {}
+
 extension Dictionary {
   /// Creates a new dictionary with the specified capacity, then calls the given
   /// closure to initialize its contents.

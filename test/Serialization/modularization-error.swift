@@ -21,11 +21,11 @@
 // CHECK-WORKAROUND: LibWithXRef.swiftmodule:1:1: warning: reference to type 'MyType' broken by a context change; 'MyType' was expected to be in 'A', but now a candidate is found only in 'B'
 // CHECK-WORKAROUND-NEXT: A.MyType
 // CHECK-WORKAROUND-NEXT: ^
-// CHECK-WORKAROUND: <unknown>:0: note: the type was expected to be found in module 'A' at '
+// CHECK-WORKAROUND: note: the type was expected to be found in module 'A' at '
 // CHECK-WORKAROUND-SAME: A.swiftmodule'
-// CHECK-WORKAROUND: <unknown>:0: note: the type was actually found in module 'B' at '
+// CHECK-WORKAROUND: note: the type was actually found in module 'B' at '
 // CHECK-WORKAROUND-SAME: B.swiftmodule'
-// CHECK-WORKAROUND: <unknown>:0: note: attempting forced recovery enabled by -experimental-force-workaround-broken-modules
+// CHECK-WORKAROUND: note: attempting forced recovery enabled by -experimental-force-workaround-broken-modules
 // CHECK-WORKAROUND: func foo() -> some Proto
 
 /// Change MyType into a function.

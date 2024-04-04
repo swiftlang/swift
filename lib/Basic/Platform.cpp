@@ -225,7 +225,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     case llvm::Triple::Itanium:
       return "windows";
     default:
-      llvm_unreachable("unsupported Windows environment");
+      return "none";
     }
   case llvm::Triple::PS4:
     return "ps4";
@@ -580,7 +580,7 @@ std::string swift::getSDKBuildVersion(StringRef Path) {
 std::string swift::getSDKName(StringRef Path) {
   std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
                                    "CanonicalName");
-  if (Name.empty() && Path.endswith(".sdk")) {
+  if (Name.empty() && Path.ends_with(".sdk")) {
     Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
   }
   return Name;

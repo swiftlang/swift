@@ -1537,6 +1537,11 @@ public:
   std::optional<std::pair<AbstractionPattern, CanType>>
   getFunctionThrownErrorType(CanAnyFunctionType substFnInterfaceType) const;
 
+  /// For the abstraction pattern produced by `getFunctionThrownErrorType()`,
+  /// produce the effective thrown error type to be used when we don't have
+  /// a substituted error type.
+  CanType getEffectiveThrownErrorType() const;
+
   /// Given that the value being abstracted is a function type, return
   /// the abstraction pattern for one of its parameter types.
   AbstractionPattern getFunctionParamType(unsigned index) const;

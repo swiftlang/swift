@@ -87,8 +87,10 @@ public struct Builder {
   }
 
   public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
-                               isLexical: Bool = false, usesMoveableValueDebugInfo: Bool = false) -> AllocStackInst {
-    let dr = bridged.createAllocStack(type.bridged, hasDynamicLifetime, isLexical, usesMoveableValueDebugInfo)
+                               isLexical: Bool = false, isFromVarDecl: Bool = false,
+                               usesMoveableValueDebugInfo: Bool = false) -> AllocStackInst {
+    let dr = bridged.createAllocStack(type.bridged, hasDynamicLifetime, isLexical,
+                                      isFromVarDecl, usesMoveableValueDebugInfo)
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
 
@@ -420,6 +422,7 @@ public struct Builder {
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
     
+  @discardableResult
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)
       return notifyNew(endAccess.getAs(EndAccessInst.self))

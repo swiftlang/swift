@@ -239,6 +239,7 @@ extension ASTGenVisitor {
         .objCMembers,
         .objCNonLazyRealization,
         .preconcurrency,
+        .preInverseGenerics,
         .propertyWrapper,
         .requiresStoredPropertyInits,
         .resultBuilder,
@@ -255,8 +256,7 @@ extension ASTGenVisitor {
         .usableFromInline,
         .used,
         .warnUnqualifiedAccess,
-        .weakLinked,
-        .distributedThunkTarget:
+        .weakLinked:
 
         return self.generateSimpleDeclAttr(attribute: node, kind: attrKind)
 
@@ -345,6 +345,16 @@ extension ASTGenVisitor {
       return nil
     }
 
+    let inverted: Bool
+    switch node.attributeName {
+    case "_allowFeatureSuppression":
+      inverted = false
+    case "_disallowFeatureSuppression":
+      inverted = true
+    default:
+      return nil
+    }
+
     let features = args.compactMap(in: self) { arg -> BridgedIdentifier? in
       guard arg.label == nil,
             let declNameExpr = arg.expression.as(DeclReferenceExprSyntax.self),
@@ -361,6 +371,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateSourceRange(node),
+      inverted: inverted,
       features: features)
   }
 
@@ -388,7 +399,7 @@ extension ASTGenVisitor {
 
   func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
     guard
-      // `@_OriginallyDefinedIn` has special argument list syntax.
+      // `@available` has special argument list syntax.
       let args = node.arguments?.as(AvailabilityArgumentListSyntax.self)
     else {
       // TODO: Diagnose.
@@ -721,19 +732,25 @@ extension ASTGenVisitor {
   }
 
   func generateObjCImplementationAttr(attribute node: AttributeSyntax) -> BridgedObjCImplementationAttr? {
-    let name: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
-      self.generateIdentifier($0)
-    }
+    let name: BridgedIdentifier? = self.generateSingleAttrOption(
+      attribute: node,
+      self.generateIdentifier,
+      valueIfOmitted: BridgedIdentifier()
+    )
     guard let name else {
-      // TODO: Diagnose.
+      // Should be diagnosed by `generateSingleAttrOption`.
       return nil
     }
+
+    let attrName = node.attributeName.as(IdentifierTypeSyntax.self)?.name.text
+    let isEarlyAdopter = attrName != "implementation"
 
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateSourceRange(node),
-      name: name
+      name: name,
+      isEarlyAdopter: isEarlyAdopter
     )
   }
 
@@ -1047,6 +1064,11 @@ extension ASTGenVisitor {
       }
       // TODO: Diagnose.
       return nil
+    }
+
+    if case .token(let tok) = arguments {
+      // Special case: was parsed as a token, not an an argument list
+      return valueGeneratorFunction(tok)
     }
 
     guard var arguments = arguments.as(LabeledExprListSyntax.self)?[...] else {

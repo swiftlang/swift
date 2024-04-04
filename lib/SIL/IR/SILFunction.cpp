@@ -898,8 +898,10 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
       isAvailableExternally())
     return false;
 
-  // Otherwise, only public functions can be referenced.
-  return hasPublicVisibility(getLinkage());
+  // Otherwise, only public or package functions can be referenced.
+  // If it has a package linkage at this point, package CMO must
+  // have been enabled, so opt in for visibility.
+  return hasPublicOrPackageVisibility(getLinkage(), /*includePackage*/ true);
 }
 
 bool
@@ -938,6 +940,9 @@ SILFunction::isPossiblyUsedExternally() const {
 bool SILFunction::shouldBePreservedForDebugger() const {
   // Only preserve for the debugger at Onone.
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
+    return false;
+
+  if (isAvailableExternally())
     return false;
 
   if (hasSemanticsAttr("no.preserve.debugger"))

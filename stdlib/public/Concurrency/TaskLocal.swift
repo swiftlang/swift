@@ -26,7 +26,7 @@ import Swift
 ///
 ///     enum Example {
 ///         @TaskLocal
-///         static let traceID: TraceID?
+///         static var traceID: TraceID?
 ///     }
 ///
 /// ### Default values
@@ -37,7 +37,7 @@ import Swift
 ///
 ///     enum Example { 
 ///         @TaskLocal
-///         static let traceID: TraceID = TraceID.default
+///         static var traceID: TraceID = TraceID.default
 ///     }
 /// 
 /// The default value is returned whenever the task-local is read

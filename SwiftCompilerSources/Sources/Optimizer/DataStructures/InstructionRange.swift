@@ -60,16 +60,17 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   init(for value: Value, _ context: some Context) {
-    var begin: Instruction
+    self = InstructionRange(begin: InstructionRange.beginningInstruction(for: value), context)
+  }
+
+  static func beginningInstruction(for value: Value) -> Instruction {
     if let def = value.definingInstruction {
-      begin = def
+      return def
     } else if let result = TerminatorResult(value) {
-      begin = result.terminator
-    } else {
-      assert(Phi(value) != nil || value is FunctionArgument)
-      begin = value.parentBlock.instructions.first!
+      return result.terminator
     }
-    self = InstructionRange(begin: begin, context)
+    assert(Phi(value) != nil || value is FunctionArgument)
+    return value.parentBlock.instructions.first!
   }
 
   /// Insert a potential end instruction.

@@ -264,6 +264,16 @@ bb0(%ret_addr : $*T):
   apply undef<T>(%temporary) : $@convention(thin) <T> () -> @out T
   copy_addr [take] %temporary to [init] %ret_addr : $*T
   dealloc_stack %temporary : $*T
+
+  // Ensure that the following builtin instructions don't interfere with
+  // temp l value from getting rid of the temporary.
+  %empty = builtin "fence_release"() : $()
+  %ptr = address_to_pointer %ret_addr : $*T to $Builtin.RawPointer
+  %load = builtin "atomicload_monotonic_Int64"(%ptr : $Builtin.RawPointer) : $Builtin.Int64
+  %onetwoeight = integer_literal $Builtin.Int64, 128
+  %empty2 = builtin "atomicstore_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64) : $()
+  %add = builtin "atomicrmw_add_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64) : $Builtin.Int64
+  %cmpxchg = builtin "cmpxchg_monotonic_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64, %onetwoeight : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
   %15 = tuple ()
   return %15 : $()
 }

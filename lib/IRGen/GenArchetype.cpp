@@ -274,6 +274,33 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
       rootWTable = emitOpaqueTypeWitnessTableRef(IGF, opaqueRoot,
                                                  rootProtocol);
     }
+#ifndef NDEBUG
+    if (!rootWTable) {
+      llvm::errs()
+          << "Root witness table not bound in function.\n"
+          << "  The witness table could be missing entirely because it needs "
+             "to be passed to the function.\n"
+          << "  Or the witness table is present and not bound in which case "
+             "setScopedLocalTypeData or similar must be called.\n";
+      llvm::errs() << "Root archetype for conformance: " << rootArchetype
+                   << "\n";
+      rootArchetype->dump(llvm::errs());
+      llvm::errs() << "Root protocol without wtable: " << rootProtocol << "\n";
+      rootProtocol->dump(llvm::errs());
+      llvm::errs() << "Archetype for conformance: " << archetype << "\n";
+      archetype->dump(llvm::errs());
+      llvm::errs() << "Protocol for conformance: " << protocol << "\n";
+      protocol->dump(llvm::errs());
+      llvm::errs() << "Function:\n";
+      IGF.CurFn->print(llvm::errs());
+      if (auto localTypeData = IGF.getLocalTypeData()) {
+        llvm::errs() << "LocalTypeData:\n";
+        localTypeData->dump();
+      } else {
+        llvm::errs() << "No LocalTypeDataCache for this function!\n";
+      }
+    }
+#endif
     assert(rootWTable && "root witness table not bound in local context!");
   }
 

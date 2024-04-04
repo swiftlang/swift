@@ -747,7 +747,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     // ${MODULE}Version{Number,String} in ${Module}.h
     SmallString<32> VersionNameIdentPrefix { M.getName().str() };
     VersionNameIdentPrefix.append("Version");
-    if (BaseName.startswith(VersionNameIdentPrefix.str())) {
+    if (BaseName.starts_with(VersionNameIdentPrefix.str())) {
       return true;
     }
 

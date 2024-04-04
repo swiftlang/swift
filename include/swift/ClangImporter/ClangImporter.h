@@ -466,11 +466,12 @@ public:
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  /// Add dependency information for the bridging header.
+  /// Add dependency information for header dependencies
+  /// of a binary Swift module.
   ///
   /// \param moduleID the name of the Swift module whose dependency
   /// information will be augmented with information about the given
-  /// bridging header.
+  /// textual header inputs.
   ///
   /// \param clangScanningTool The clang dependency scanner.
   ///
@@ -478,10 +479,11 @@ public:
   /// about new Clang modules discovered along the way.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
-  bool addBridgingHeaderDependencies(
+  bool addHeaderDependencies(
       ModuleDependencyID moduleID,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       ModuleDependenciesCache &cache);
+
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
@@ -512,6 +514,9 @@ public:
 
   std::string getClangModuleHash() const;
 
+  /// Get clang import creation cc1 args for swift explicit module build.
+  std::vector<std::string> getSwiftExplicitModuleDirectCC1Args() const;
+
   /// If we already imported a given decl successfully, return the corresponding
   /// Swift decl as an Optional<Decl *>, but if we previously tried and failed
   /// to import said decl then return nullptr.
@@ -538,7 +543,7 @@ public:
   void printStatistics() const override;
 
   /// Dump Swift lookup tables.
-  void dumpSwiftLookupTables();
+  void dumpSwiftLookupTables() const override;
 
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.

@@ -8,3 +8,7 @@ var x = C()
 #endif
 #endif
 var y = x
+
+#if !_runtime(_multithreaded)
+  let z = xx // expected-error {{cannot find 'xx' in scope}}
+#endif

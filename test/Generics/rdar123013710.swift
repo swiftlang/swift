@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 public protocol P {
     associatedtype A
     associatedtype B: P
@@ -17,7 +15,7 @@ extension Never: Q, P { // expected-note 2{{through reference here}}
    public static func f() -> Any? { nil }
 }
 
-extension Q {
-   public var b: Never { fatalError() } // expected-note {{through reference here}}
+extension Q { // expected-note {{through reference here}}
+   public var b: Never { fatalError() } // expected-note 4{{through reference here}}
 }
 

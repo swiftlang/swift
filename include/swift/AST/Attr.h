@@ -66,7 +66,7 @@ class ModuleDecl;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
-class IdentTypeRepr;
+class UnqualifiedIdentTypeRepr;
 
 class alignas(1 << AttrAlignInBits) AttributeBase
     : public ASTAllocated<AttributeBase> {
@@ -184,17 +184,20 @@ protected:
       isUnchecked : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 1,
-      isCategoryNameInvalid : 1
+    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 2,
+      isCategoryNameInvalid : 1,
+      isEarlyAdopter : 1
     );
 
     SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
       isUnsafe : 1
     );
 
-    SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 32,
+    SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
       : NumPadBits,
-      NumFeatures : 32
+      Inverted : 1,
+
+      NumFeatures : 31
     );
   } Bits;
   // clang-format on
@@ -1771,7 +1774,8 @@ public:
   ///
   /// For an identifier type repr, return a pair of `nullptr` and the
   /// identifier.
-  std::pair<IdentTypeRepr *, DeclRefTypeRepr *> destructureMacroRef();
+  std::pair<UnqualifiedIdentTypeRepr *, DeclRefTypeRepr *>
+  destructureMacroRef();
 
   /// Whether the attribute has any arguments.
   bool hasArgs() const { return argList != nullptr; }
@@ -1862,8 +1866,8 @@ public:
   struct ActiveVersion {
     StringRef ModuleName;
     PlatformKind Platform;
-    bool IsSimulator;
     llvm::VersionTuple Version;
+    bool ForTargetVariant = false;
   };
 
   /// Returns non-optional if this attribute is active given the current platform.
@@ -2421,11 +2425,19 @@ public:
   Identifier CategoryName;
 
   ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
-                         SourceRange Range, bool Implicit = false,
+                         SourceRange Range, bool isEarlyAdopter = false,
+                         bool Implicit = false,
                          bool isCategoryNameInvalid = false)
       : DeclAttribute(DeclAttrKind::ObjCImplementation, AtLoc, Range, Implicit),
         CategoryName(CategoryName) {
     Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+    Bits.ObjCImplementationAttr.isEarlyAdopter = isEarlyAdopter;
+  }
+
+  /// Early adopters use the \c \@_objcImplementation spelling. For backwards
+  /// compatibility, issues with them are diagnosed as warnings, not errors.
+  bool isEarlyAdopter() const {
+    return Bits.ObjCImplementationAttr.isEarlyAdopter;
   }
 
   bool isCategoryNameInvalid() const {
@@ -2608,28 +2620,6 @@ public:
   }
 };
 
-/// The @_distributedThunkTarget(for:) attribute.
-class DistributedThunkTargetAttr final
-    : public DeclAttribute {
-
-  AbstractFunctionDecl *TargetFunction;
-
-public:
-  DistributedThunkTargetAttr(AbstractFunctionDecl *target)
-      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(),
-                      SourceRange(),
-                      /*Implicit=*/false),
-        TargetFunction(target) {}
-
-  AbstractFunctionDecl *getTargetFunction() const {
-    return TargetFunction;
-  }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::DistributedThunkTarget;
-  }
-};
-
 /// Predicate used to filter MatchingAttributeRange.
 template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
   ToAttributeKind() {}
@@ -2649,13 +2639,16 @@ class AllowFeatureSuppressionAttr final
       private llvm::TrailingObjects<AllowFeatureSuppressionAttr, Identifier> {
   friend TrailingObjects;
 
-  /// Create an implicit @objc attribute with the given (optional) name.
-  AllowFeatureSuppressionAttr(SourceLoc atLoc, SourceRange range,
-                              bool implicit, ArrayRef<Identifier> features);
+  AllowFeatureSuppressionAttr(SourceLoc atLoc, SourceRange range, bool implicit,
+                              bool inverted, ArrayRef<Identifier> features);
+
 public:
   static AllowFeatureSuppressionAttr *create(ASTContext &ctx, SourceLoc atLoc,
                                              SourceRange range, bool implicit,
+                                             bool inverted,
                                              ArrayRef<Identifier> features);
+
+  bool getInverted() const { return Bits.AllowFeatureSuppressionAttr.Inverted; }
 
   ArrayRef<Identifier> getSuppressedFeatures() const {
     return {getTrailingObjects<Identifier>(),
@@ -3042,6 +3035,9 @@ public:
   /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.
   static std::optional<TypeAttrKind> getAttrKindFromString(StringRef Str);
+
+  /// Returns true if type attributes of the given kind only appear in SIL.
+  static bool isSilOnly(TypeAttrKind TK);
 
   /// Return the name (like "autoclosure") for an attribute ID.
   static const char *getAttrName(TypeAttrKind kind);

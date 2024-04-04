@@ -239,13 +239,6 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
-  if (!dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isEscapable()) {
-    if (!isImplicit(check)) {
-      nominal->diagnose(diag::non_bitwise_copyable_type_nonescapable);
-    }
-    return true;
-  }
-
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {
       nominal->diagnose(diag::non_bitwise_copyable_type_class);
@@ -265,6 +258,14 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
   if (sd && sd->isCxxNonTrivial()) {
     if (!isImplicit(check)) {
       nominal->diagnose(diag::non_bitwise_copyable_type_cxx_nontrivial);
+    }
+    return true;
+  }
+
+  if (sd && sd->hasUnreferenceableStorage()) {
+    if (!isImplicit(check)) {
+      sd->diagnose(diag::non_bitwise_copyable_c_type_nontrivial);
+      sd->diagnose(diag::note_non_bitwise_copyable_c_type_add_attr);
     }
     return true;
   }

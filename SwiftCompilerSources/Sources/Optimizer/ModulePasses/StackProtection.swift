@@ -455,7 +455,7 @@ private extension AccessBase {
 
   var isStackAllocated: IsStackAllocatedResult {
     switch self {
-      case .stack:
+      case .stack, .storeBorrow:
         return .yes
       case .box, .global:
         return .no

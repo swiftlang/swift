@@ -561,7 +561,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Array semantic clients rely on the signature being as in the original
   // version.
   for (auto &Attr : F->getSemanticsAttrs()) {
-    if (!StringRef(Attr).startswith("array."))
+    if (!StringRef(Attr).starts_with("array."))
       NewF->addSemanticsAttr(Attr);
   }
 

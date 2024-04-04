@@ -1019,38 +1019,40 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
 /// A formal SIL reference to a value, suitable for use as a stored
 /// operand.
 class Operand {
+public:
+  enum { numCustomBits = 8 };
+  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+private:
   template <class, class> friend class SILBitfield;
 
-  /// The value used as this operand combined with three bits we use for
-  /// `customBits`.
-  llvm::PointerIntPair<SILValue, 3> TheValueAndThreeBits = {SILValue(), 0};
+  /// The value used as this operand.
+  SILValue TheValue;
 
-  /// The next operand in the use-chain. Note that the chain holds every use of
-  /// the current ValueBase, not just those of the designated result.
-  ///
-  /// We use 3 bits of the pointer for customBits.
-  llvm::PointerIntPair<Operand *, 3> NextUseAndThreeBits = {nullptr, 0};
+  /// The next operand in the use-chain.  Note that the chain holds
+  /// every use of the current ValueBase, not just those of the
+  /// designated result.
+  Operand *NextUse = nullptr;
 
   /// A back-pointer in the use-chain, required for fast patching
   /// of use-chains.
-  ///
-  /// We use 2 bits of the pointer for customBits.
-  llvm::PointerIntPair<Operand **, 3> BackAndThreeBits = {nullptr, 0};
+  Operand **Back = nullptr;
 
   /// The owner of this operand.
   /// FIXME: this could be space-compressed.
   SILInstruction *Owner;
 
-  /// Used by `OperandBitfield`
-  enum { numCustomBits = 8 };
+  uint64_t customBits : numCustomBits;
 
-  /// Used by `OperandBitfield`
-  int64_t lastInitializedBitfieldID = 0;
+  // For details see SILNode::lastInitializedBitfieldID
+  uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
 
 public:
-  Operand(SILInstruction *owner) : Owner(owner) {}
+  Operand(SILInstruction *owner)
+      : Owner(owner), customBits(0), lastInitializedBitfieldID(0) {}
   Operand(SILInstruction *owner, SILValue theValue)
-      : TheValueAndThreeBits(theValue), Owner(owner) {
+      : TheValue(theValue), Owner(owner),
+        customBits(0), lastInitializedBitfieldID(0) {
     insertIntoCurrent();
   }
 
@@ -1062,14 +1064,14 @@ public:
   Operand &operator=(Operand &&) = default;
 
   /// Return the current value being used by this operand.
-  SILValue get() const { return TheValueAndThreeBits.getPointer(); }
+  SILValue get() const { return TheValue; }
 
   /// Set the current value being used by this operand.
   void set(SILValue newValue) {
     // It's probably not worth optimizing for the case of switching
     // operands on a single value.
     removeFromCurrent();
-    TheValueAndThreeBits.setPointer(newValue);
+    TheValue = newValue;
     insertIntoCurrent();
   }
 
@@ -1083,9 +1085,9 @@ public:
   /// Remove this use of the operand.
   void drop() {
     removeFromCurrent();
-    TheValueAndThreeBits = {SILValue(), 0};
-    NextUseAndThreeBits = {nullptr, 0};
-    BackAndThreeBits = {nullptr, 0};
+    TheValue = SILValue();
+    NextUse = nullptr;
+    Back = nullptr;
     Owner = nullptr;
   }
 
@@ -1097,7 +1099,7 @@ public:
   SILInstruction *getUser() { return Owner; }
   const SILInstruction *getUser() const { return Owner; }
 
-  Operand *getNextUse() const { return NextUseAndThreeBits.getPointer(); }
+  Operand *getNextUse() const { return NextUse; }
 
   /// Return true if this operand is a type dependent operand.
   ///
@@ -1147,31 +1149,13 @@ public:
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 
-  unsigned getCustomBits() const {
-    unsigned bits = 0;
-    bits |= TheValueAndThreeBits.getInt();
-    bits |= NextUseAndThreeBits.getInt() << 3;
-    bits |= BackAndThreeBits.getInt() << 2;
-    return bits;
-  }
-
-  void setCustomBits(unsigned bits) {
-    assert(bits < 256 && "Can only store a byte?!");
-    TheValueAndThreeBits.setInt(bits & 0x7);
-    NextUseAndThreeBits.setInt((bits >> 3) & 0x7);
-    BackAndThreeBits.setInt((bits >> 6) & 0x3);
-  }
+  unsigned getCustomBits() const { return customBits; }
+  void setCustomBits(unsigned bits) {customBits = bits; }
 
   // Called when transferring basic blocks from one function to another.
   void resetBitfields() {
     lastInitializedBitfieldID = 0;
   }
-
-  void markAsDeleted() {
-    lastInitializedBitfieldID = -1;
-  }
-
-  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
 
   SILFunction *getFunction() const;
 
@@ -1180,29 +1164,20 @@ public:
 
 private:
   void removeFromCurrent() {
-    auto *back = getBack();
-    if (!back)
-      return;
-    auto *nextUse = getNextUse();
-    *back = nextUse;
-    if (nextUse)
-      nextUse->setBack(back);
+    if (!Back)
+       return;
+     *Back = NextUse;
+     if (NextUse)
+       NextUse->Back = Back;
   }
 
   void insertIntoCurrent() {
-    auto **firstUse = &get()->FirstUse;
-    setBack(firstUse);
-    setNextUse(*firstUse);
-    if (auto *nextUse = getNextUse())
-      nextUse->setBack(NextUseAndThreeBits.getAddrOfPointer());
-    get()->FirstUse = this;
+    Back = &TheValue->FirstUse;
+    NextUse = TheValue->FirstUse;
+    if (NextUse)
+      NextUse->Back = &NextUse;
+    TheValue->FirstUse = this;
   }
-
-  void setNextUse(Operand *op) { NextUseAndThreeBits.setPointer(op); }
-
-  Operand **getBack() const { return BackAndThreeBits.getPointer(); }
-
-  void setBack(Operand **newValue) { BackAndThreeBits.setPointer(newValue); }
 
   friend class ValueBase;
   friend class ValueBaseUseIterator;

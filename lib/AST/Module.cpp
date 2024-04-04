@@ -722,6 +722,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
   Bits.ModuleDecl.HasCxxInteroperability = 0;
+  Bits.ModuleDecl.AllowNonResilientAccess = 0;
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {
@@ -1178,9 +1179,7 @@ ASTNode SourceFile::getMacroExpansion() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
-  return ASTNode::getFromOpaqueValue(genInfo.astNode);
+  return getNodeInEnclosingSourceFile();
 }
 
 SourceRange SourceFile::getMacroInsertionRange() const {
@@ -1230,6 +1229,16 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
       *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
   auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
+}
+
+ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
+  if (Kind != SourceFileKind::MacroExpansion &&
+      Kind != SourceFileKind::DefaultArgument)
+    return nullptr;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  return ASTNode::getFromOpaqueValue(genInfo.astNode);
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -2296,7 +2305,7 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
         for (Identifier overlay: overlays) {
           // We don't present non-underscored overlays as part of the underlying
           // module, so ignore them.
-          if (!overlay.str().startswith("_"))
+          if (!overlay.hasUnderscoredNaming())
             continue;
           ModuleDecl *overlayMod =
               getASTContext().getModuleByName(overlay.str());
@@ -2571,6 +2580,38 @@ SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   Imports = getASTContext().AllocateCopy(imports);
 }
 
+std::optional<AttributedImport<ImportedModule>>
+SourceFile::findImport(const ModuleDecl *module) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ImportDeclRequest{this, module}, std::nullopt);
+}
+
+std::optional<AttributedImport<ImportedModule>>
+ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
+                            const ModuleDecl *module) const {
+  auto &ctx = sf->getASTContext();
+  auto imports = sf->getImports();
+
+  // Look to see if the owning module was directly imported.
+  for (const auto &import : imports) {
+    if (import.module.importedModule == module)
+      return import;
+  }
+
+  // Now look for transitive imports.
+  auto &importCache = ctx.getImportCache();
+  for (const auto &import : imports) {
+    auto &importSet = importCache.getImportSet(import.module.importedModule);
+    for (const auto &transitive : importSet.getTransitiveImports()) {
+      if (transitive.importedModule == module) {
+        return import;
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
 bool SourceFile::hasImportUsedPreconcurrency(
     AttributedImport<ImportedModule> import) const {
   return PreconcurrencyImportsUsed.count(import) != 0;
@@ -2777,56 +2818,66 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   return restrictiveImport;
 }
 
-SmallVector<CharSourceRange, 2>
-IfConfigRangeInfo::getRangesWithoutActiveBody(const SourceManager &SM) const {
-  SmallVector<CharSourceRange, 2> result;
-  if (ActiveBodyRange.isValid()) {
-    // Split the whole range by the active range.
-    result.emplace_back(SM, WholeRange.getStart(), ActiveBodyRange.getStart());
-    result.emplace_back(SM, ActiveBodyRange.getEnd(), WholeRange.getEnd());
-  } else {
-    // No active body, we just return the whole range.
-    result.push_back(WholeRange);
+CharSourceRange
+IfConfigClauseRangeInfo::getDirectiveRange(const SourceManager &SM) const {
+  return CharSourceRange(SM, DirectiveLoc, BodyLoc);
+}
+
+CharSourceRange
+IfConfigClauseRangeInfo::getBodyRange(const SourceManager &SM) const {
+  return CharSourceRange(SM, BodyLoc, EndLoc);
+}
+
+CharSourceRange
+IfConfigClauseRangeInfo::getWholeRange(const SourceManager &SM) const {
+  return CharSourceRange(SM, DirectiveLoc, EndLoc);
+}
+
+void SourceFile::recordIfConfigClauseRangeInfo(
+    const IfConfigClauseRangeInfo &range) {
+  IfConfigClauseRanges.Ranges.push_back(range);
+  IfConfigClauseRanges.IsSorted = false;
+}
+
+ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
+  if (!IfConfigClauseRanges.IsSorted) {
+    auto &SM = getASTContext().SourceMgr;
+    // Sort the ranges if we need to.
+    llvm::sort(
+        IfConfigClauseRanges.Ranges, [&](const IfConfigClauseRangeInfo &lhs,
+                                         const IfConfigClauseRangeInfo &rhs) {
+          return SM.isBeforeInBuffer(lhs.getStartLoc(), rhs.getStartLoc());
+        });
+
+    // Be defensive and eliminate duplicates in case we've parsed twice.
+    auto newEnd = llvm::unique(
+        IfConfigClauseRanges.Ranges, [&](const IfConfigClauseRangeInfo &lhs,
+                                         const IfConfigClauseRangeInfo &rhs) {
+          if (lhs.getStartLoc() != rhs.getStartLoc())
+            return false;
+          assert(lhs.getBodyRange(SM) == rhs.getBodyRange(SM) &&
+                 "range changed on a re-parse?");
+          return true;
+        });
+    IfConfigClauseRanges.Ranges.erase(newEnd,
+                                      IfConfigClauseRanges.Ranges.end());
+    IfConfigClauseRanges.IsSorted = true;
   }
-  return result;
+
+  return IfConfigClauseRanges.Ranges;
 }
 
-void SourceFile::recordIfConfigRangeInfo(IfConfigRangeInfo ranges) {
-  IfConfigRanges.Ranges.push_back(ranges);
-  IfConfigRanges.IsSorted = false;
-}
-
-ArrayRef<IfConfigRangeInfo>
-SourceFile::getIfConfigsWithin(SourceRange outer) const {
+ArrayRef<IfConfigClauseRangeInfo>
+SourceFile::getIfConfigClausesWithin(SourceRange outer) const {
   auto &SM = getASTContext().SourceMgr;
   assert(SM.getRangeForBuffer(BufferID).contains(outer.Start) &&
          "Range not within this file?");
 
-  if (!IfConfigRanges.IsSorted) {
-    // Sort the ranges if we need to.
-    llvm::sort(IfConfigRanges.Ranges, [&](IfConfigRangeInfo lhs,
-                                          IfConfigRangeInfo rhs) {
-      return SM.isBeforeInBuffer(lhs.getStartLoc(), rhs.getStartLoc());
-    });
-
-    // Be defensive and eliminate duplicates in case we've parsed twice.
-    auto newEnd = std::unique(
-        IfConfigRanges.Ranges.begin(), IfConfigRanges.Ranges.end(),
-        [&](const IfConfigRangeInfo &lhs, const IfConfigRangeInfo &rhs) {
-          if (lhs.getWholeRange() != rhs.getWholeRange())
-            return false;
-
-          assert(lhs == rhs && "Active ranges changed on a re-parse?");
-          return true;
-        });
-    IfConfigRanges.Ranges.erase(newEnd, IfConfigRanges.Ranges.end());
-    IfConfigRanges.IsSorted = true;
-  }
-
   // First let's find the first #if that is after the outer start loc.
-  auto ranges = llvm::ArrayRef(IfConfigRanges.Ranges);
+  auto ranges = getIfConfigClauseRanges();
   auto lower = llvm::lower_bound(
-      ranges, outer.Start, [&](IfConfigRangeInfo range, SourceLoc loc) {
+      ranges, outer.Start,
+      [&](const IfConfigClauseRangeInfo &range, SourceLoc loc) {
         return SM.isBeforeInBuffer(range.getStartLoc(), loc);
       });
   if (lower == ranges.end() ||
@@ -2835,7 +2886,8 @@ SourceFile::getIfConfigsWithin(SourceRange outer) const {
   }
   // Next let's find the first #if that's after the outer end loc.
   auto upper = llvm::upper_bound(
-      ranges, outer.End, [&](SourceLoc loc, IfConfigRangeInfo range) {
+      ranges, outer.End,
+      [&](SourceLoc loc, const IfConfigClauseRangeInfo &range) {
         return SM.isBeforeInBuffer(loc, range.getStartLoc());
       });
   return llvm::ArrayRef(lower, upper - lower);
@@ -3090,7 +3142,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
     scratch = ctx.SearchPathOpts.getSDKPath();
     path::append(scratch, a, b, c, d);
     path::append(scratch, e);
-    return path.startswith(scratch);
+    return path.starts_with(scratch);
   };
 
   /// Is \p modulePath from System/Library/PrivateFrameworks/?

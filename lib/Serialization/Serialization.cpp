@@ -55,6 +55,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Index/USRGeneration.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -837,7 +838,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
-  BLOCK_RECORD(control_block, HAS_NONCOPYABLE_GENERICS);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -854,6 +854,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, MODULE_PACKAGE_NAME);
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
+  BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -986,7 +987,6 @@ void Serializer::writeHeader() {
     control_block::ChannelLayout Channel(Out);
     control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
-    control_block::HasNoncopyableGenerics HasNoncopyableGenerics(Out);
 
     // Write module 'real name', which can be different from 'name'
     // in case module aliasing is used (-module-alias flag)
@@ -1041,9 +1041,6 @@ void Serializer::writeHeader() {
 
     IsOSSA.emit(ScratchRecord, Options.IsOSSA);
 
-    HasNoncopyableGenerics.emit(ScratchRecord,
-            getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics));
-
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
 
@@ -1088,6 +1085,11 @@ void Serializer::writeHeader() {
       if (M->isBuiltFromInterface()) {
         options_block::IsBuiltFromInterfaceLayout BuiltFromInterface(Out);
         BuiltFromInterface.emit(ScratchRecord);
+      }
+
+      if (M->allowNonResilientAccess()) {
+        options_block::AllowNonResilientAccess AllowNonResAcess(Out);
+        AllowNonResAcess.emit(ScratchRecord);
       }
 
       if (allowCompilerErrors()) {
@@ -1135,7 +1137,7 @@ void Serializer::writeHeader() {
         auto &Opts = Options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
           StringRef arg(*Arg);
-          if (arg.startswith("-ivfsoverlay")) {
+          if (arg.starts_with("-ivfsoverlay")) {
             // FIXME: This is a hack and calls for a better design.
             //
             // Filter out any -ivfsoverlay options that include an
@@ -1145,14 +1147,14 @@ void Serializer::writeHeader() {
             // module defined in the framework.
             auto Next = std::next(Arg);
             if (Next != E &&
-                StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
+                StringRef(*Next).ends_with("unextended-module-overlay.yaml")) {
               ++Arg;
               continue;
             }
-          } else if (arg.startswith("-fdebug-prefix-map=") ||
-              arg.startswith("-ffile-prefix-map=") ||
-              arg.startswith("-fcoverage-prefix-map=") ||
-              arg.startswith("-fmacro-prefix-map=")) {
+          } else if (arg.starts_with("-fdebug-prefix-map=") ||
+              arg.starts_with("-ffile-prefix-map=") ||
+              arg.starts_with("-fcoverage-prefix-map=") ||
+              arg.starts_with("-fmacro-prefix-map=")) {
             // We don't serialize any of the prefix map flags as these flags
             // contain absolute paths that are not usable on different
             // machines. These flags are not necessary to compile the
@@ -1324,7 +1326,7 @@ void Serializer::writeInputBlock() {
     // that clients can consume it.
     if (Options.ExplicitModuleBuild &&
         llvm::sys::path::extension(importedHeaderPath)
-            .endswith(file_types::getExtension(file_types::TY_PCH)))
+            .ends_with(file_types::getExtension(file_types::TY_PCH)))
       importedHeaderPath = clangImporter->getClangInstance()
                                .getASTReader()
                                ->getModuleManager()
@@ -2059,6 +2061,22 @@ getStableClangDeclPathComponentKind(
   llvm_unreachable("bad kind");
 }
 
+static Identifier getClangTemplateSpecializationXRefDiscriminator(
+    ASTContext &ctx, Identifier &name,
+    const clang::ClassTemplateSpecializationDecl *ctsd) {
+  auto it = name.str().find("<");
+  if (it == StringRef::npos)
+    return Identifier();
+  // Serialize a C++ class template specialization name as original
+  // class template name, and use its USR as the discriminator, that
+  // will let Swift find the correct specialization when this cross
+  // reference is deserialized.
+  name = ctx.getIdentifier(name.str().substr(0, it));
+  llvm::SmallString<128> buffer;
+  clang::index::generateUSRForDecl(ctsd, buffer);
+  return ctx.getIdentifier(buffer.str());
+}
+
 void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   using namespace decls_block;
 
@@ -2115,11 +2133,19 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
     bool isProtocolExt = DC->getParent()->getExtendedProtocolDecl();
 
+    Identifier name = generic->getName();
+    if (generic->hasClangNode()) {
+      if (auto *ctsd = dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+              generic->getClangDecl())) {
+        assert(discriminator.empty());
+        discriminator = getClangTemplateSpecializationXRefDiscriminator(
+            getASTContext(), name, ctsd);
+      }
+    }
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addDeclBaseNameRef(generic->getName()),
+                                        addDeclBaseNameRef(name),
                                         addDeclBaseNameRef(discriminator),
-                                        isProtocolExt,
-                                        generic->hasClangNode());
+                                        isProtocolExt, generic->hasClangNode());
     break;
   }
 
@@ -2289,10 +2315,19 @@ void Serializer::writeCrossReference(const Decl *D) {
       discriminator = containingFile->getDiscriminatorForPrivateDecl(type);
     }
 
-    XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addDeclBaseNameRef(type->getName()),
-                                        addDeclBaseNameRef(discriminator),
-                                        isProtocolExt, D->hasClangNode());
+    Identifier name = type->getName();
+    if (type->hasClangNode()) {
+      if (auto *ctsd = dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+              type->getClangDecl())) {
+        assert(discriminator.empty());
+        discriminator = getClangTemplateSpecializationXRefDiscriminator(
+            getASTContext(), name, ctsd);
+      }
+    }
+
+    XRefTypePathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclBaseNameRef(name),
+        addDeclBaseNameRef(discriminator), isProtocolExt, D->hasClangNode());
     return;
   }
 
@@ -2516,6 +2551,22 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
   }
 }
 
+void Serializer::writeLifetimeDependenceInfo(
+    LifetimeDependenceInfo lifetimeDependenceInfo, bool skipImplicit) {
+  if (skipImplicit && !lifetimeDependenceInfo.isExplicitlySpecified()) {
+    return;
+  }
+  using namespace decls_block;
+  SmallVector<bool> paramIndices;
+  lifetimeDependenceInfo.getConcatenatedData(paramIndices);
+
+  auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
+  LifetimeDependenceLayout::emitRecord(
+      Out, ScratchRecord, abbrCode,
+      lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
+      lifetimeDependenceInfo.hasScopeLifetimeParamIndices(), paramIndices);
+}
+
 #define SIMPLE_CASE(TYPENAME, VALUE) \
   case swift::TYPENAME::VALUE: return uint8_t(serialization::TYPENAME::VALUE);
 
@@ -2700,6 +2751,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::RestatedObjCConformance:
     case DeclAttrKind::ClangImporterSynthesizedType:
     case DeclAttrKind::PrivateImport:
+    case DeclAttrKind::AllowFeatureSuppression:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -2749,20 +2801,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                       theAttr->isImplicit(),
                                       theAttr->Name);
-      return;
-    }
-
-    case DeclAttrKind::AllowFeatureSuppression: {
-      auto *theAttr = cast<AllowFeatureSuppressionAttr>(DA);
-      auto abbrCode =
-        S.DeclTypeAbbrCodes[AllowFeatureSuppressionDeclAttrLayout::Code];
-
-      SmallVector<IdentifierID> ids;
-      for (auto id : theAttr->getSuppressedFeatures())
-        ids.push_back(S.addUniquedStringRef(id.str()));
-
-      AllowFeatureSuppressionDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), ids);
       return;
     }
 
@@ -2943,7 +2981,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.DeclTypeAbbrCodes[ObjCImplementationDeclAttrLayout::Code];
       ObjCImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
           abbrCode, theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
-          categoryNameID);
+          theAttr->isEarlyAdopter(), categoryNameID);
       return;
     }
 
@@ -3042,9 +3080,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
           S.addDeclRef(afd), pieces.size(), pieces);
       return;
-    }
-    case DeclAttrKind::DistributedThunkTarget: {
-      assert(false && "not implemented");
     }
 
     case DeclAttrKind::TypeEraser: {
@@ -3531,19 +3566,6 @@ private:
                                              rawErrorParameterIndex,
                                              rawErrorFlagParameterIndex,
                                              fac.completionHandlerFlagIsErrorOnZero());
-  }
-
-  void
-  writeLifetimeDependenceInfo(LifetimeDependenceInfo lifetimeDependenceInfo) {
-    using namespace decls_block;
-    SmallVector<bool> paramIndices;
-    lifetimeDependenceInfo.getConcatenatedData(paramIndices);
-
-    auto abbrCode = S.DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
-    LifetimeDependenceLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
-        lifetimeDependenceInfo.hasScopeLifetimeParamIndices(), paramIndices);
   }
 
   void writeGenericParams(const GenericParamList *genericParams) {
@@ -4352,7 +4374,7 @@ public:
                                  ->requiresClass(),
                                proto->isObjC(),
                                proto->hasSelfOrAssociatedTypeRequirements(),
-                               S.addTypeRef(proto->getSuperclass()),
+                               S.addDeclRef(proto->getSuperclassDecl()),
                                rawAccessLevel,
                                dependencyTypeIDs);
 
@@ -4543,10 +4565,13 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
-    auto fnType = ty->getAs<FunctionType>();
-    if (fnType && fnType->hasLifetimeDependenceInfo()) {
-      assert(!fnType->getLifetimeDependenceInfo().empty());
-      writeLifetimeDependenceInfo(fnType->getLifetimeDependenceInfo());
+    auto fnType = ty->getAs<AnyFunctionType>();
+    if (fnType) {
+      if (auto *lifetimeDependenceInfo =
+              fnType->getLifetimeDependenceInfoOrNull()) {
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
+                                      /*skipImplicit*/ true);
+      }
     }
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -4667,6 +4692,15 @@ public:
 
     // Write the body parameters.
     writeParameterList(fn->getParameters());
+
+    auto fnType = ty->getAs<AnyFunctionType>();
+    if (fnType) {
+      if (auto *lifetimeDependenceInfo =
+              fnType->getLifetimeDependenceInfoOrNull()) {
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
+                                      /*skipImplicit*/ true);
+      }
+    }
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -4830,10 +4864,13 @@ public:
     writeGenericParams(ctor->getGenericParams());
     writeParameterList(ctor->getParameters());
 
-    auto fnType = ty->getAs<FunctionType>();
-    if (fnType && fnType->hasLifetimeDependenceInfo()) {
-      assert(!fnType->getLifetimeDependenceInfo().empty());
-      writeLifetimeDependenceInfo(fnType->getLifetimeDependenceInfo());
+    auto fnType = ty->getAs<AnyFunctionType>();
+    if (fnType) {
+      if (auto *lifetimeDependenceInfo =
+              fnType->getLifetimeDependenceInfoOrNull()) {
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
+                                      /*skipImplicit*/ true);
+      }
     }
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
@@ -5195,6 +5232,11 @@ getRawSILResultInfoOptions(swift::SILResultInfo::Options options) {
     result |= SILResultInfoFlags::NotDifferentiable;
   }
 
+  if (options.contains(SILResultInfo::IsTransferring)) {
+    options -= SILResultInfo::IsTransferring;
+    result |= SILResultInfoFlags::IsTransferring;
+  }
+
   // If we still have any options set, then this code is out of sync. Signal an
   // error by returning none!
   if (bool(options))
@@ -5211,7 +5253,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
   T->print(OS);
-  assert(FullName.startswith(BUILTIN_TYPE_NAME_PREFIX));
+  assert(FullName.str().starts_with(BUILTIN_TYPE_NAME_PREFIX));
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
@@ -5571,6 +5613,11 @@ public:
         fnTy->hasTransferringResult());
 
     serializeFunctionTypeParams(fnTy);
+
+    if (auto *lifetimeDependenceInfo =
+            fnTy->getLifetimeDependenceInfoOrNull()) {
+      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
   }
 
   void visitGenericFunctionType(const GenericFunctionType *fnTy) {
@@ -5589,6 +5636,11 @@ public:
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
+
+    if (auto *lifetimeDependenceInfo =
+            fnTy->getLifetimeDependenceInfoOrNull()) {
+      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
   }
 
   void visitSILBlockStorageType(const SILBlockStorageType *storageTy) {
@@ -5672,11 +5724,16 @@ public:
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         fnTy->isUnimplementable(), fnTy->hasErasedIsolation(),
-        stableDiffKind, fnTy->hasErrorResult(), fnTy->hasTransferringResult(),
+        stableDiffKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
         invocationSigID, invocationSubstMapID, patternSubstMapID,
         clangTypeID, variableData);
+
+    if (auto *lifetimeDependenceInfo =
+            fnTy->getLifetimeDependenceInfoOrNull()) {
+      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
   }
 
   void visitArraySliceType(const ArraySliceType *sliceTy) {

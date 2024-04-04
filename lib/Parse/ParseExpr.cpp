@@ -14,21 +14,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/EditorPlaceholder.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
+#include "swift/Parse/Parser.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include <utility>
 
 using namespace swift;
 
@@ -478,7 +479,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   // 'any' followed by another identifier is an existential type.
   if (Tok.isContextualKeyword("any") &&
-      peekToken().is(tok::identifier) &&
+      (peekToken().is(tok::identifier) ||
+       peekToken().isContextualPunctuator("~")) &&
       !peekToken().isAtStartOfLine()) {
     ParserResult<TypeRepr> ty = parseType();
     auto *typeExpr = new (Context) TypeExpr(ty.get());
@@ -2010,11 +2012,6 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       consumeExtraToken(Token(tok::string_literal,
                               CharSourceRange(SourceMgr, TokenLoc, TokEnd).str(),
                               CommentLength));
-
-      // Make an unknown token to encapsulate the entire string segment and add
-      // such token to the context.
-      Token content(tok::string_segment,
-                    CharSourceRange(Segment.Loc, Segment.Length).str());
       break;
     }
         
@@ -2106,30 +2103,10 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
 
-  StringRef OpenDelimiterStr, OpenQuoteStr, CloseQuoteStr, CloseDelimiterStr;
-  unsigned DelimiterLength = Tok.getCustomDelimiterLen();
-  unsigned QuoteLength;
-  tok QuoteKind;
-  std::tie(QuoteLength, QuoteKind) =
-    Tok.isMultilineString() ? std::make_tuple(3, tok::multiline_string_quote)
-                            : std::make_tuple(1, Tok.getText().startswith("\'") ?
-                                          tok::single_quote: tok::string_quote);
-  unsigned CloseQuoteBegin = Tok.getLength() - DelimiterLength - QuoteLength;
-
-  OpenDelimiterStr = Tok.getRawText().take_front(DelimiterLength);
-  OpenQuoteStr = Tok.getRawText().substr(DelimiterLength, QuoteLength);
-  CloseQuoteStr = Tok.getRawText().substr(CloseQuoteBegin, QuoteLength);
-  CloseDelimiterStr = Tok.getRawText().take_back(DelimiterLength);
-
-  // Make unknown tokens to represent the open and close quote.
-  Token OpenQuote(QuoteKind, OpenQuoteStr);
-  Token CloseQuote(QuoteKind, CloseQuoteStr);
-
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
-    consumeExtraToken(Tok);
-    consumeTokenWithoutFeedingReceiver();
+    consumeToken();
 
     return makeParserResult(
         createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
@@ -2155,19 +2132,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     // Make the variable which will contain our temporary value.
     auto InterpolationVar =
-      new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
-                            /*NameLoc=*/SourceLoc(),
-                            Context.Id_dollarInterpolation, CurDeclContext);
-    InterpolationVar->setImplicit(true);
-    InterpolationVar->setUserAccessible(false);
-    
+        VarDecl::createImplicitStringInterpolationVar(CurDeclContext);
+
     Stmts.push_back(InterpolationVar);
 
     // Collect all string segments.
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
-    auto Body = BraceStmt::create(Context, Loc, Stmts, /*endLoc=*/Loc,
+    auto Body = BraceStmt::create(Context, /*LBLoc=*/SourceLoc(), Stmts,
+                                  /*RBLoc=*/SourceLoc(),
                                   /*implicit=*/true);
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }
@@ -2178,8 +2152,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   }
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
-                                      Loc, Loc.getAdvancedLoc(CloseQuoteBegin),
-                                      LiteralCapacity, InterpolationCount,
+                                      Loc, LiteralCapacity, InterpolationCount,
                                       AppendingExpr));
 }
 
@@ -2579,8 +2552,16 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     BacktrackingScope backtrack(*this);
 
     // Consume attributes.
-    while (Tok.is(tok::at_sign)) {
-      skipAnyAttribute();
+    auto parsingNonisolated = [this] {
+      return Context.LangOpts.hasFeature(Feature::ClosureIsolation) &&
+             Tok.isContextualKeyword("nonisolated");
+    };
+    while (Tok.is(tok::at_sign) || parsingNonisolated()) {
+      if (parsingNonisolated()) {
+        consumeToken();
+      } else {
+        skipAnyAttribute();
+      }
     }
 
     // Skip by a closure capture list if present.
@@ -2644,7 +2625,12 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     return makeParserSuccess();
   }
   ParserStatus status;
-  (void)parseDeclAttributeList(attributes);
+  // 'nonisolated' cannot be parameterized in a closure due to ambiguity with
+  // closure parameters.
+  const auto entryNonisolatedState =
+      std::exchange(EnableParameterizedNonisolated, false);
+  (void)parseClosureDeclAttributeList(attributes);
+  EnableParameterizedNonisolated = entryNonisolatedState;
 
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     SourceLoc lBracketLoc = consumeToken(tok::l_square);
@@ -2814,6 +2800,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     } else {
       // Parse identifier (',' identifier)*
       SmallVector<ParamDecl*, 4> elements;
+      const auto parameterListLoc = Tok.getLoc();
       bool HasNext;
       do {
         if (Tok.isNot(tok::identifier, tok::kw__, tok::code_complete)) {
@@ -2843,6 +2830,15 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       } while (HasNext);
 
       params = ParameterList::create(Context, elements);
+
+      if (Context.LangOpts.hasFeature(Feature::ClosureIsolation) && params &&
+          (params->size() > 0) && attributes.hasAttribute<NonisolatedAttr>()) {
+        diagnose(parameterListLoc,
+                 diag::nonisolated_closure_parameter_parentheses)
+            .fixItInsert(parameterListLoc, "(")
+            .fixItInsert(Tok.getLoc(), ")");
+        status.setIsParseError();
+      }
     }
 
     TypeRepr *thrownTypeRepr = nullptr;
@@ -2973,13 +2969,13 @@ ParserResult<Expr> Parser::parseExprClosure() {
   DeclAttributes attributes;
   SourceRange bracketRange;
   SmallVector<CaptureListEntry, 2> captureList;
-  VarDecl *capturedSelfDecl;
+  VarDecl *capturedSelfDecl = nullptr;
   ParameterList *params = nullptr;
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
-  TypeExpr *thrownType;
+  TypeExpr *thrownType = nullptr;
   SourceLoc arrowLoc;
-  TypeExpr *explicitResultType;
+  TypeExpr *explicitResultType = nullptr;
   SourceLoc inLoc;
   Status |= parseClosureSignatureIfPresent(
       attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,

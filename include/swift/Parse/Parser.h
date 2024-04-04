@@ -42,11 +42,8 @@ namespace llvm {
 }
 
 namespace swift {
-  class IdentTypeRepr;
-  class ErrorTypeRepr;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
-  class IDEInspectionCallbacksFactory;
   class DefaultArgumentInitializer;
   class DiagnosticEngine;
   class Expr;
@@ -54,11 +51,7 @@ namespace swift {
   class PersistentParserState;
   class RequirementRepr;
   class SILParserStateBase;
-  class ScopeInfo;
-  class SingleValueStmtExpr;
   class SourceManager;
-  class TupleType;
-  class TypeLoc;
   class UUID;
   
   struct EnumElementInfo;
@@ -121,6 +114,7 @@ class Parser {
   void operator=(const Parser&) = delete;
 
   bool IsInputIncomplete = false;
+  bool EnableParameterizedNonisolated = true; // HACK: for closures
   std::vector<Token> SplitTokens;
 
 public:
@@ -773,7 +767,7 @@ public:
 
   /// Check whether the current token starts with a multi-line string delimiter.
   bool startsWithMultilineStringDelimiter(Token Tok) {
-    return Tok.getText().ltrim('#').startswith("\"\"\"");
+    return Tok.getText().ltrim('#').starts_with("\"\"\"");
   }
 
   /// Returns true if token is an identifier with the given value.
@@ -1049,6 +1043,9 @@ public:
                                       bool IfConfigsAreDeclAttrs,
                                       PatternBindingInitializer *initContext);
 
+  /// Parse the optional attributes before a closure declaration.
+  ParserStatus parseClosureDeclAttributeList(DeclAttributes &Attributes);
+
   /// Parse the optional modifiers before a declaration.
   ParserStatus parseDeclModifierList(DeclAttributes &Attributes,
                                      SourceLoc &StaticLoc,
@@ -1160,7 +1157,8 @@ public:
                                       std::optional<AccessLevel> &Visibility);
 
   ParserResult<AllowFeatureSuppressionAttr>
-  parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc);
+  parseAllowFeatureSuppressionAttribute(bool inverted, SourceLoc atLoc,
+                                        SourceLoc loc);
 
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.
@@ -1215,7 +1213,7 @@ public:
       return true;
     if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
         (Tok.isContextualKeyword("_resultDependsOn") ||
-         Tok.isLifetimeDependenceToken()))
+         isLifetimeDependenceToken()))
       return true;
     return false;
   }
@@ -1227,23 +1225,33 @@ public:
     consumeToken();
   }
 
+  bool isLifetimeDependenceToken() {
+    if (!isInSILMode()) {
+      return Tok.isContextualKeyword("dependsOn");
+    }
+    return Tok.isContextualKeyword("_inherit") ||
+           Tok.isContextualKeyword("_scope");
+  }
+
   bool canHaveParameterSpecifierContextualKeyword() {
     // The parameter specifiers like `isolated`, `consuming`, `borrowing` are
     // also valid identifiers and could be the name of a type. Check whether
     // the following token is something that can introduce a type. Thankfully
     // none of these tokens overlap with the set of tokens that can follow an
     // identifier in a type production.
-    return Tok.is(tok::identifier)
-      && peekToken().isAny(tok::at_sign,
-                           tok::kw_inout,
-                           tok::l_paren,
-                           tok::identifier,
-                           tok::l_square,
-                           tok::kw_Any,
-                           tok::kw_Self,
-                           tok::kw__,
-                           tok::kw_var,
-                           tok::kw_let);
+    if (Tok.is(tok::identifier)) {
+      auto next = peekToken();
+      if (next.isAny(tok::at_sign, tok::kw_inout, tok::l_paren,
+                     tok::identifier, tok::l_square, tok::kw_Any,
+                     tok::kw_Self, tok::kw__, tok::kw_var,
+                     tok::kw_let))
+        return true;
+
+      if (next.is(tok::oper_prefix) && next.getText() == "~")
+        return true;
+    }
+
+    return isLifetimeDependenceToken();
   }
 
   struct ParsedTypeAttributeList {

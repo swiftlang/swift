@@ -18,6 +18,7 @@ target_link_libraries(swiftSerialization PRIVATE
   swiftClangImporter
   swiftOption
   swiftAST
-  swiftSIL)
+  swiftSIL
+  clangIndex)
 
 set_swift_llvm_is_available(swiftSerialization)

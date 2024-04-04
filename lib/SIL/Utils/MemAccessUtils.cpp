@@ -1595,7 +1595,7 @@ class AccessPathDefUseTraversal {
   // apply. For other storage, it is the same as accessPath.getRoot().
   //
   // 'base' is typically invalid, maning that all uses of 'storage' for the
-  // access path will be visited. When 'base' is set, the the visitor is
+  // access path will be visited. When 'base' is set, the visitor is
   // restricted to a specific access base, such as a particular
   // ref_element_addr.
   SILValue base;
@@ -2631,11 +2631,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
-    case BuiltinValueKind::CreateAsyncTaskInGroup:
-    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroup:
-    case BuiltinValueKind::CreateAsyncTaskWithExecutor:
-    case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
-    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::InitializeDefaultActor:
@@ -2672,6 +2667,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     // These builtins take a generic 'T' as their operand.
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::InjectEnumTag:
+    case BuiltinValueKind::AddressOfRawLayout:
       visitor(&builtin->getAllOperands()[0]);
       return;
 

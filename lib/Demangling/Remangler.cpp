@@ -1046,6 +1046,40 @@ Remangler::mangleDependentGenericConformanceRequirement(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDependentGenericInverseConformanceRequirement(
+                                                  Node *node, unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
+  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+
+  if (!Mangling.isSuccess()) {
+    return Mangling.error();
+  }
+
+  auto NumMembersAndParamIdx = Mangling.result();
+  DEMANGLER_ASSERT(
+      NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
+
+  switch (NumMembersAndParamIdx.first) {
+  case -1:
+    Buffer << "RI";
+    mangleIndex(node->getChild(1)->getIndex());
+    return ManglingError::Success; // substitution
+  case 0:
+    Buffer << "Ri";
+    break;
+  case 1:
+    Buffer << "Rj";
+    break;
+  default:
+    Buffer << "RJ";
+    break;
+  }
+
+  mangleIndex(node->getChild(1)->getIndex());
+  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDependentGenericParamCount(Node *node,
                                                           unsigned depth) {
   // handled inline in DependentGenericSignature
@@ -1781,6 +1815,12 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplTransferringResult(Node *node,
+                                                      unsigned depth) {
+  Buffer << 'T';
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplConvention(Node *node, unsigned depth) {
   char ConvCh = llvm::StringSwitch<char>(node->getText())
                   .Case("@callee_unowned", 'y')
@@ -1954,6 +1994,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         break;
       case Node::Kind::ImplErasedIsolation:
         Buffer << 'A';
+        break;
+      case Node::Kind::ImplTransferringResult:
+        Buffer << 'T';
         break;
       case Node::Kind::ImplConvention: {
         char ConvCh = llvm::StringSwitch<char>(Child->getText())

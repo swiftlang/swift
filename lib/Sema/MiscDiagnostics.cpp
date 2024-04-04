@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -256,7 +257,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Void to _ then warn, because that is redundant.
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(destExpr)) {
           if (auto CE = dyn_cast<CallExpr>(AE->getSrc())) {
-            if (isa_and_nonnull<FuncDecl>(CE->getCalledValue()) &&
+            if (getAsDecl<FuncDecl>(
+                    CE->getCalledValue(/*skipFunctionConversions=*/true)) &&
                 CE->getType()->isVoid()) {
               Ctx.Diags
                   .diagnose(DAE->getLoc(),
@@ -310,7 +312,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // FIXME: Duplicate labels on enum payloads should be diagnosed
       // when declared, not when called.
       if (auto *CE = dyn_cast_or_null<CallExpr>(E)) {
-        auto calledValue = CE->getCalledValue();
+        auto calledValue = CE->getCalledValue(/*skipFunctionConversions=*/true);
         if (calledValue && isa<EnumElementDecl>(calledValue)) {
           auto *args = CE->getArgs();
           SmallVector<Identifier, 4> scratch;
@@ -420,12 +422,88 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
+      auto partialConsumptionEnabled =
+          Ctx.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
       auto *subExpr = consumeExpr->getSubExpr();
-      if (auto *li = dyn_cast<LoadExpr>(subExpr))
-        subExpr = li->getSubExpr();
-      if (!isa<DeclRefExpr>(subExpr)) {
+      bool noncopyable =
+          subExpr->getType()->getCanonicalType()->isNoncopyable();
+
+      bool partial = false;
+      Expr *current = subExpr;
+      while (current) {
+        if (auto *dre = dyn_cast<DeclRefExpr>(current)) {
+          if (partial & !noncopyable) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_partial_copyable);
+            return;
+          }
+          // The chain of member_ref_exprs and load_exprs terminates at a
+          // declref_expr.  This is legal.
+          return;
+        }
+        // Look through loads.
+        if (auto *le = dyn_cast<LoadExpr>(current)) {
+          current = le->getSubExpr();
+          continue;
+        }
+        auto *mre = dyn_cast<MemberRefExpr>(current);
+        if (mre && partialConsumptionEnabled) {
+          auto *vd = dyn_cast<VarDecl>(mre->getMember().getDecl());
+          if (!vd) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_non_storage);
+            return;
+          }
+          partial = true;
+          AccessStrategy strategy = vd->getAccessStrategy(
+              mre->getAccessSemantics(), AccessKind::Read,
+              DC->getParentModule(), ResilienceExpansion::Minimal);
+          if (strategy.getKind() != AccessStrategy::Storage) {
+            if (noncopyable) {
+              Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                                 diag::consume_expression_non_storage);
+              Ctx.Diags.diagnose(
+                  mre->getLoc(),
+                  diag::note_consume_expression_non_storage_property);
+            } else {
+              Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                                 diag::consume_expression_partial_copyable);
+            }
+            return;
+          }
+          current = mre->getBase();
+          continue;
+        }
+        auto *ce = dyn_cast<CallExpr>(current);
+        if (ce && partialConsumptionEnabled) {
+          if (noncopyable) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_non_storage);
+            Ctx.Diags.diagnose(ce->getLoc(),
+                               diag::note_consume_expression_non_storage_call);
+          } else {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_partial_copyable);
+          }
+          return;
+        }
+        auto *se = dyn_cast<SubscriptExpr>(current);
+        if (se && partialConsumptionEnabled) {
+          if (noncopyable) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_non_storage);
+            Ctx.Diags.diagnose(
+                se->getLoc(),
+                diag::note_consume_expression_non_storage_subscript);
+          } else {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_expression_partial_copyable);
+          }
+          return;
+        }
         Ctx.Diags.diagnose(consumeExpr->getLoc(),
                            diag::consume_expression_not_passed_lvalue);
+        return;
       }
     }
 
@@ -709,9 +787,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             if (argList->isUnlabeledUnary())
               behavior = DiagnosticBehavior::Warning;
           } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
-            if (auto *TR =
-                    dyn_cast_or_null<MemberTypeRepr>(TE->getTypeRepr())) {
-              if (!isa<IdentTypeRepr>(TR->getRoot())) {
+            if (auto *QualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
+                    TE->getTypeRepr())) {
+              if (!isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot())) {
                 behavior = DiagnosticBehavior::Warning;
               }
             }
@@ -1386,6 +1464,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       auto fnExpr = call->getSemanticFn();
       if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(fnExpr))
         fnExpr = dotSyntax->getSemanticFn();
+
+      if (auto *FCE = dyn_cast<FunctionConversionExpr>(fnExpr))
+        fnExpr = FCE->getSubExpr();
 
       auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
       if (!DRE || !DRE->getDecl()->isOperator())
@@ -4595,6 +4676,10 @@ public:
             out << "getter: ";
             name = bestAccessor->getStorage()->getName();
             break;
+          case AccessorKind::DistributedGet:
+            out << "_distributed_getter: ";
+            name = bestAccessor->getStorage()->getName();
+            break;
 
           case AccessorKind::Set:
           case AccessorKind::WillSet:
@@ -5012,7 +5097,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
         return declRef->getDecl();
 
       if (auto *apply = dyn_cast<ApplyExpr>(E)) {
-        auto *decl = apply->getCalledValue();
+        auto *decl = apply->getCalledValue(/*skipFunctionConversions=*/true);
         if (isa_and_nonnull<AbstractFunctionDecl>(decl))
           return decl;
       }
@@ -5151,9 +5236,10 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     void diagnoseIfUnintendedInterpolation(CallExpr *segment,
                                            UnintendedInterpolationKind kind) {
-      if (interpolationWouldBeUnintended(segment->getCalledValue(), kind))
+      if (interpolationWouldBeUnintended(
+              segment->getCalledValue(/*skipFunctionConversions=*/true), kind))
         if (auto firstArg =
-              getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
+                getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
           diagnoseUnintendedInterpolation(firstArg, kind);
     }
 
@@ -5364,7 +5450,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
     KVOObserveCallWalker(ASTContext &ctx) : C(ctx) {}
 
     void maybeDiagnoseCallExpr(CallExpr *expr) {
-      auto fn = expr->getCalledValue();
+      auto fn = expr->getCalledValue(/*skipFunctionConversions=*/true);
       if (!fn)
         return;
       SmallVector<KeyPathExpr *, 1> keyPathArgs;
@@ -5373,6 +5459,11 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       auto isKeyPathLiteral = [&](Expr *argExpr) -> KeyPathExpr * {
         if (auto *DTBE = getAsExpr<DerivedToBaseExpr>(argExpr))
           argExpr = DTBE->getSubExpr();
+        // Sendable key path literals are represented as an existential
+        // protocol composition with `Sendable` protocol which has to be
+        // opened in certain scenarios i.e. to pass it to non-Sendable version.
+        if (auto *OEE = getAsExpr<OpenExistentialExpr>(argExpr))
+          argExpr = OEE->getExistentialValue();
         return getAsExpr<KeyPathExpr>(argExpr);
       };
 
@@ -5497,9 +5588,10 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       // Dig out the function declaration.
       if (auto Fn = BE->getFn()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
-          comparisonDecl = DSCE->getCalledValue();
+          comparisonDecl =
+              DSCE->getCalledValue(/*skipFunctionConversions=*/true);
         } else {
-          comparisonDecl = BE->getCalledValue();
+          comparisonDecl = BE->getCalledValue(/*skipFunctionConversions=*/true);
         }
       }
 
@@ -6235,105 +6327,4 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
   }
 
   return false;
-}
-
-//===----------------------------------------------------------------------===//
-//              Copyable Type Containing Move Only Type Visitor
-//===----------------------------------------------------------------------===//
-
-void swift::diagnoseCopyableTypeContainingMoveOnlyType(
-    NominalTypeDecl *copyableNominalType) {
-  auto &ctx = copyableNominalType->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return; // taken care of in conformance checking
-
-  // If we already have a move only type, just bail, we have no further work to
-  // do.
-  if (!copyableNominalType->canBeCopyable())
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "DiagnoseCopyableType for: "
-                          << copyableNominalType->getName() << '\n');
-
-  auto &DE = copyableNominalType->getASTContext().Diags;
-  auto emitError = [&copyableNominalType,
-                    &DE](PointerUnion<EnumElementDecl *, VarDecl *>
-                             topFieldToError,
-                         DeclBaseName parentName, DescriptiveDeclKind fieldKind,
-                         DeclBaseName fieldName) {
-    assert(!topFieldToError.isNull());
-    if (auto *eltDecl = topFieldToError.dyn_cast<EnumElementDecl *>()) {
-      DE.diagnoseWithNotes(
-          copyableNominalType->diagnose(
-              diag::noncopyable_within_copyable,
-              copyableNominalType),
-          [&]() {
-            eltDecl->diagnose(
-                diag::
-                    noncopyable_within_copyable_location,
-                fieldKind, parentName.userFacingName(),
-                fieldName.userFacingName());
-          });
-      return;
-    }
-
-    auto *varDecl = topFieldToError.get<VarDecl *>();
-    DE.diagnoseWithNotes(
-        copyableNominalType->diagnose(
-            diag::noncopyable_within_copyable,
-            copyableNominalType),
-        [&]() {
-          varDecl->diagnose(
-              diag::noncopyable_within_copyable_location,
-              fieldKind, parentName.userFacingName(),
-              fieldName.userFacingName());
-        });
-  };
-
-  // If we have a struct decl...
-  if (auto *structDecl = dyn_cast<StructDecl>(copyableNominalType)) {
-    // Visit each of the stored property var decls of the struct decl...
-    for (auto *fieldDecl : structDecl->getStoredProperties()) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Visiting struct field: " << fieldDecl->getName() << '\n');
-      if (!fieldDecl->getInterfaceType()->isNoncopyable())
-        continue;
-      emitError(fieldDecl, structDecl->getBaseName(),
-                fieldDecl->getDescriptiveKind(), fieldDecl->getBaseName());
-    }
-    // We completed our checking, just return.
-    return;
-  }
-
-  if (auto *enumDecl = dyn_cast<EnumDecl>(copyableNominalType)) {
-    // If we have an enum but we don't have any elements, just continue, we
-    // have nothing to check.
-    if (enumDecl->getAllElements().empty())
-      return;
-
-    // Otherwise for each element...
-    for (auto *enumEltDecl : enumDecl->getAllElements()) {
-      // If the element doesn't have any associated values, we have nothing to
-      // check, so continue.
-      if (!enumEltDecl->hasAssociatedValues())
-        continue;
-
-      LLVM_DEBUG(llvm::dbgs() << "Visiting enum elt decl: "
-                 << enumEltDecl->getName() << '\n');
-
-      // Otherwise, we have a case and need to check the types of the
-      // parameters of the case payload.
-      for (auto payloadParam : *enumEltDecl->getParameterList()) {
-        LLVM_DEBUG(llvm::dbgs() << "Visiting payload param: "
-                   << payloadParam->getName() << '\n');
-        if (payloadParam->getInterfaceType()->isNoncopyable()) {
-            emitError(enumEltDecl, enumDecl->getBaseName(),
-                      enumEltDecl->getDescriptiveKind(),
-                      enumEltDecl->getBaseName());
-        }
-      }
-    }    
-    // We have finished processing this enum... so return.
-    return;
-  }
 }

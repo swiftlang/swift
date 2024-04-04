@@ -277,7 +277,7 @@ ObjCSelectorFamily ObjCSelector::getSelectorFamily() const {
   // Clang ARC. We're not just calling that method here because it means
   // allocating a clang::IdentifierInfo, which requires a Clang ASTContext.
   auto hasPrefix = [](StringRef text, StringRef prefix) {
-    if (!text.startswith(prefix)) return false;
+    if (!text.starts_with(prefix)) return false;
     if (text.size() == prefix.size()) return true;
     assert(text.size() > prefix.size());
     return !clang::isLowercase(text[prefix.size()]);

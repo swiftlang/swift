@@ -1695,20 +1695,46 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
          locator.endsWith<LocatorPathElt::Witness>();
 }
 
-AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
+    FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue, OpenedTypeMap &replacements,
     ConstraintLocatorBuilder locator) {
 
-  return swift::adjustFunctionTypeForConcurrency(
-      fnType, decl, dc, numApplies, isMainDispatchQueue,
-      GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this},
-      [&](Type type) {
+  auto *adjustedTy = swift::adjustFunctionTypeForConcurrency(
+      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this},
+      ClosureIsolatedByPreconcurrency{*this}, [&](Type type) {
         if (replacements.empty())
           return type;
 
         return openType(type, replacements, locator);
       });
+
+  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto *DC = FD->getDeclContext();
+      // All global functions should be @Sendable
+      if (DC->isModuleScopeContext()) {
+        if (!adjustedTy->getExtInfo().isSendable()) {
+          adjustedTy =
+              adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
+        }
+      } else if (isPartialApplication(getConstraintLocator(locator))) {
+        if (baseType &&
+            (baseType->is<AnyMetatypeType>() || baseType->isSendableType())) {
+          auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
+          referenceTy =
+              referenceTy->withExtInfo(referenceTy->getExtInfo().withSendable())
+                  ->getAs<FunctionType>();
+
+          adjustedTy =
+              FunctionType::get(adjustedTy->getParams(), referenceTy,
+                                adjustedTy->getExtInfo().withSendable());
+        }
+      }
+    }
+  }
+
+  return adjustedTy->castTo<FunctionType>();
 }
 
 /// For every parameter in \p type that has an error type, replace that
@@ -1781,9 +1807,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(value, false, functionRefKind);
-      openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
-          origOpenedType, func, useDC, numApplies, false, replacements,
-          locator));
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType, /*baseType=*/Type(), func, useDC, numApplies, false,
+          replacements, locator);
     }
 
     // The reference implicitly binds 'self'.
@@ -1799,14 +1825,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
-    if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-      // All global functions should be @Sendable
-      if (funcDecl->getDeclContext()->isModuleScopeContext()) {
-        funcType =
-            funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
-      }
-    }
-
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
@@ -1818,9 +1836,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(
           funcDecl, false, functionRefKind);
-      openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
-          origOpenedType->castTo<FunctionType>(), funcDecl, useDC, numApplies,
-          false, replacements, locator));
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
+          useDC, numApplies, false, replacements, locator);
     }
 
     if (isForCodeCompletion() && openedType->hasError()) {
@@ -2033,23 +2051,6 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   assert(result.second);
   (void)result;
 
-  if (Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return typeVar;
-  }
-
-  // Add a constraint that generic parameters conform to Copyable.
-  // This lookup only can fail if the stdlib (i.e. the Swift module) has not
-  // been loaded because you've passed `-parse-stdlib` and are not building the
-  // stdlib itself (which would have `-module-name Swift` too).
-  if (!outerDC->getParentModule()->isBuiltinModule()) {
-    if (auto *copyable = getASTContext().getProtocol(KnownProtocolKind::Copyable)) {
-      addConstraint(
-          ConstraintKind::ConformsTo, typeVar,
-          copyable->getDeclaredInterfaceType(),
-          locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
-    }
-  }
-  
   return typeVar;
 }
 
@@ -2805,20 +2806,6 @@ ConstraintSystem::getTypeOfMemberReference(
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
 
-    if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-      if (isPartialApplication(locator) &&
-          (resolvedBaseTy->is<AnyMetatypeType>() ||
-           baseOpenedTy->isSendableType())) {
-        // Add @Sendable to functions without conditional conformances
-        functionType =
-            functionType
-                ->withExtInfo(functionType->getExtInfo().withConcurrent())
-                ->getAs<FunctionType>();
-      }
-      // Unapplied values should always be Sendable
-      info = info.withConcurrent();
-    }
-
     // We'll do other adjustment later, but we need to handle parameter
     // isolation to avoid assertions.
     if (fullFunctionType->getIsolation().isParameter())
@@ -2836,11 +2823,12 @@ ConstraintSystem::getTypeOfMemberReference(
     unsigned numApplies = getNumApplications(
         value, hasAppliedSelf, functionRefKind);
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<AnyFunctionType>(), value, useDC, numApplies,
-        isMainDispatchQueueMember(locator), replacements, locator);
+        origOpenedType->castTo<FunctionType>(), resolvedBaseTy, value, useDC,
+        numApplies, isMainDispatchQueueMember(locator), replacements, locator);
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<AnyFunctionType>(), subscript, useDC,
+        origOpenedType->castTo<FunctionType>(), resolvedBaseTy, subscript,
+        useDC,
         /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements, locator);
   } else if (auto var = dyn_cast<VarDecl>(value)) {
     // Adjust the function's result type, since that's the Var's actual type.
@@ -2890,6 +2878,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     return Type();
   }
 
@@ -2968,7 +2957,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
       type = adjustFunctionTypeForConcurrency(
-          FunctionType::get(indices, elementTy, info), subscript, useDC,
+          FunctionType::get(indices, elementTy, info), overload.getBaseType(),
+          subscript, useDC,
           /*numApplies=*/1, /*isMainDispatchQueue=*/false, emptyReplacements,
           locator);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
@@ -3016,7 +3006,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           decl, hasAppliedSelf, overload.getFunctionRefKind());
 
       type = adjustFunctionTypeForConcurrency(
-                 type->castTo<FunctionType>(), decl, useDC, numApplies,
+                 type->castTo<FunctionType>(), overload.getBaseType(), decl,
+                 useDC, numApplies,
                  /*isMainDispatchQueue=*/false, emptyReplacements, locator)
                  ->getResult();
     }
@@ -3418,26 +3409,26 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
-  bool concurrent = expr->getAttrs().hasAttribute<SendableAttr>();
+  bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
-      .withConcurrent(concurrent)
+      .withSendable(sendable)
       .build();
   }
 
   // Scan the body to determine the effects.
   auto body = expr->getBody();
   if (!body)
-    return ASTExtInfoBuilder().withConcurrent(concurrent).build();
+    return ASTExtInfoBuilder().withSendable(sendable).build();
 
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
       .withAsync(bool(findAsyncNode(expr)))
-      .withConcurrent(concurrent)
+      .withSendable(sendable)
       .build();
 }
 
@@ -3569,6 +3560,7 @@ void ConstraintSystem::bindOverloadType(
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
   case OverloadChoiceKind::KeyPathApplication:
     bindTypeOrIUO(openedType);
     return;
@@ -3825,6 +3817,15 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // base type just like TupleIndex does.
     adjustedRefType =
         getPatternTypeOfSingleUnlabeledPackExpansionTuple(choice.getBaseType());
+    refType = adjustedRefType;
+    break;
+  }
+
+  case OverloadChoiceKind::ExtractFunctionIsolation: {
+    // The type of `.isolation` is `(any Actor)?`
+    auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
+    adjustedRefType =
+        OptionalType::get(actor->getDeclaredExistentialType());
     refType = adjustedRefType;
     break;
   }
@@ -4466,6 +4467,7 @@ DeclName OverloadChoice::getName() const {
 
     case OverloadChoiceKind::MaterializePack:
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
       llvm_unreachable("no name!");
   }
 
@@ -5830,6 +5832,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
 
       case OverloadChoiceKind::TupleIndex:
       case OverloadChoiceKind::MaterializePack:
+      case OverloadChoiceKind::ExtractFunctionIsolation:
         // FIXME: Actually diagnose something here.
         break;
       }
@@ -5883,9 +5886,24 @@ void constraints::simplifyLocator(ASTNode &anchor,
       if (!elt)
         break;
 
+      // If the 3rd element is an PackElement, add the index of pack element
+      // within packs to locate the correct element.
+      std::optional<unsigned> eltPackIdx;
+      if (path.size() > 2) {
+        if (auto eltPack = path[2].getAs<LocatorPathElt::PackElement>()) {
+          eltPackIdx = eltPack->getIndex();
+        }
+      }
+
       // Extract application argument.
       if (auto *args = anchorExpr->getArgs()) {
-        if (elt->getArgIdx() < args->size()) {
+        if (eltPackIdx.has_value()) {
+          if (elt->getArgIdx() + eltPackIdx.value() < args->size()) {
+            anchor = args->getExpr(elt->getArgIdx() + eltPackIdx.value());
+            path = path.slice(3);
+            continue;
+          }
+        } else if (elt->getArgIdx() < args->size()) {
           anchor = args->getExpr(elt->getArgIdx());
           path = path.slice(2);
           continue;
@@ -7188,7 +7206,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
     }
   } else if (auto *var = target.getAsUninitializedVar()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else if (target.isForEachStmt()) {
+  } else if (target.isForEachPreamble()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else {
     // Emit a poor fallback message.
@@ -7973,6 +7991,16 @@ void constraints::dumpAnchor(ASTNode anchor, SourceManager *SM,
     if (SM) {
       out << '@';
       pattern->getLoc().print(out, *SM);
+    }
+  } else if (auto *decl = anchor.dyn_cast<Decl *>()) {
+    if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+      VD->dumpRef(out);
+    } else {
+      out << "<<" << Decl::getKindName(decl->getKind()) << ">>";
+      if (SM) {
+        out << "@";
+        decl->getLoc().print(out, *SM);
+      }
     }
   }
   // TODO(diagnostics): Implement the rest of the cases.

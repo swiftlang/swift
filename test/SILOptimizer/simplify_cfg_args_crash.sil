@@ -48,16 +48,33 @@ struct Pair {
 // CHECK-LABEL: @simplify_args_crash
 sil @simplify_args_crash : $@convention(thin) (Pair) -> () {
 bb0(%1 : $Pair):
-  // CHECK: [[SECOND:%.*]] = struct_extract %0 : $Pair, #Pair.second
-  // CHECK: [[FIRST:%.*]] = struct_extract %0 : $Pair, #Pair.first
-  // CHECK: br bb1([[FIRST]] : $C, [[SECOND]] : $C)
+// CHECK: bb0
+// CHECK-NEXT: br bb1
   br bb1(%1 : $Pair)
 
-// CHECK: bb1([[FIRST2:%.*]] : $C, [[SECOND2:%.*]] : $C):
 bb1(%2 : $Pair):
-  // CHECK: [[STRUCT:%.*]] = struct $Pair ([[FIRST2]] : $C, [[SECOND2]] : $C)
-  // CHECK: [[SECOND3:%.*]] = struct_extract [[STRUCT]] : $Pair, #Pair.second
-  // CHECK: [[FIRST3:%.*]] = struct_extract [[STRUCT]] : $Pair, #Pair.first
-  // CHECK: br bb1([[FIRST3]] : $C, [[SECOND3]] : $C)
   br bb1(%2 : $Pair)
 }
+
+// CHECK-LABEL: sil [ossa] @redundant_phi_unreachable : $@convention(thin) () -> () {
+// CHECK: bb1({{.*}}):
+// CHECK-LABEL: } // end sil function 'redundant_phi_unreachable'
+sil [ossa] @redundant_phi_unreachable : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int32, 37
+  br bb3
+
+bb1(%3 : $Builtin.Int32):
+  cond_br undef, bb2, bb4
+
+bb2:
+  br bb1(%3 : $Builtin.Int32)
+
+bb4:
+  br bb3
+
+bb3:
+  %r = tuple()
+  return %r : $()
+}
+

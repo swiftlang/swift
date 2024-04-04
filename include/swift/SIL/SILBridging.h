@@ -346,11 +346,12 @@ struct BridgedType {
   BRIDGED_INLINE bool isFunction() const;
   BRIDGED_INLINE bool isMetatype() const;
   BRIDGED_INLINE bool isNoEscapeFunction() const;
+  BRIDGED_INLINE bool containsNoEscapeFunction() const;
   BRIDGED_INLINE bool isAsyncFunction() const;
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   BRIDGED_INLINE bool isMoveOnly() const;
-  BRIDGED_INLINE bool isEscapable() const;
+  BRIDGED_INLINE bool isEscapable(BridgedFunction f) const;
   BRIDGED_INLINE bool isOrContainsObjectiveCClass() const;
   BRIDGED_INLINE bool isBuiltinInteger() const;
   BRIDGED_INLINE bool isBuiltinFloat() const;
@@ -823,6 +824,12 @@ struct BridgedInstruction {
     SwiftInt numFunctions;
   };
 
+  enum class CastConsumptionKind {
+    TakeAlways,
+    TakeOnSuccess,
+    CopyOnSuccess
+  };
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef CondFailInst_getMessage() const;
   BRIDGED_INLINE SwiftInt LoadInst_getLoadOwnership() const ;
   BRIDGED_INLINE BuiltinValueKind BuiltinInst_getID() const;
@@ -904,6 +911,9 @@ struct BridgedInstruction {
   BRIDGED_INLINE void LoadInst_setOwnership(SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getFailureBlock() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getSuccessBlock() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getFailureBlock() const;
+  BRIDGED_INLINE CastConsumptionKind CheckedCastAddrBranch_getConsumptionKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap ApplySite_getSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType ApplySite_getSubstitutedCalleeType() const;
   BRIDGED_INLINE SwiftInt ApplySite_getNumArguments() const;
@@ -1128,8 +1138,9 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondFail(BridgedValue condition,
                                                                        BridgedStringRef message) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIntegerLiteral(BridgedType type, SwiftInt value) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocStack(BridgedType type,
-                                          bool hasDynamicLifetime, bool isLexical, bool wasMoved) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createAllocStack(BridgedType type, bool hasDynamicLifetime, bool isLexical,
+                   bool isFromVarDecl, bool wasMoved) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocVector(BridgedValue capacity,
                                                                           BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDeallocStack(BridgedValue operand) const;

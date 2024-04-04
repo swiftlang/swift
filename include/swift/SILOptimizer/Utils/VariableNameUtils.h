@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_VARIABLENAMEUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_VARIABLENAMEUTILS_H
 
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
@@ -40,8 +41,76 @@ public:
   using Options = OptionSet<Flag>;
 
 private:
-  /// The stacklist that we use to process from use->
-  StackList<PointerUnion<SILInstruction *, SILValue>> variableNamePath;
+  template <typename T, unsigned smallSize>
+  class VariableNamePathArray {
+    SmallVector<T, smallSize> data;
+
+    unsigned lastSnapShotIndex = 0;
+    unsigned insertionPointIndex = 0;
+
+  public:
+    VariableNamePathArray() : data() {}
+
+    ArrayRef<T> getData() const {
+      assert(insertionPointIndex <= data.size());
+      return ArrayRef<T>(data).take_front(insertionPointIndex);
+    }
+
+    void print(llvm::raw_ostream &os) const {
+      os << "LastSnapShotIndex: " << lastSnapShotIndex << '\n';
+      os << "InsertionPointIndex: " << insertionPointIndex << '\n';
+    }
+
+    SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+    /// Pushes a snapshot and returns the old index.
+    unsigned pushSnapShot() & {
+      // After we run with a snapshot, we want:
+      //
+      // 1. lastSnapShotIndex to return to its value before the continuation
+      // ran.
+      // 2. The insertion point index becomes lastSnapShotIndex.
+      unsigned oldSnapShotIndex = lastSnapShotIndex;
+      lastSnapShotIndex = insertionPointIndex;
+      return oldSnapShotIndex;
+    }
+
+    void popSnapShot(unsigned oldIndex) & {
+      insertionPointIndex = lastSnapShotIndex;
+      lastSnapShotIndex = oldIndex;
+    }
+
+    void returnSnapShot(unsigned oldIndex) & { lastSnapShotIndex = oldIndex; }
+
+    void push_back(const T &newValue) & {
+      SWIFT_DEFER { assert(insertionPointIndex <= data.size()); };
+      if (insertionPointIndex == data.size()) {
+        data.push_back(newValue);
+        ++insertionPointIndex;
+        return;
+      }
+
+      data[insertionPointIndex] = newValue;
+      ++insertionPointIndex;
+    }
+
+    [[nodiscard]] T pop_back_val() & {
+      SWIFT_DEFER { assert(insertionPointIndex <= data.size()); };
+      assert(!lastSnapShotIndex &&
+             "Can only pop while lastSnapShotIndex is not set");
+      --insertionPointIndex;
+      return data[insertionPointIndex];
+    }
+
+    bool empty() const { return !insertionPointIndex; }
+  };
+
+  /// The stacklist that we use to print out variable names.
+  ///
+  /// Has to be a small vector since we push/pop the last segment start. This
+  /// lets us speculate when processing phis.
+  VariableNamePathArray<PointerUnion<SILInstruction *, SILValue>, 4>
+      variableNamePath;
 
   /// The root value of our string.
   ///
@@ -59,12 +128,12 @@ private:
 
 public:
   VariableNameInferrer(SILFunction *fn, SmallString<64> &resultingString)
-      : variableNamePath(fn), resultingString(resultingString) {}
+      : variableNamePath(), resultingString(resultingString) {}
 
   VariableNameInferrer(SILFunction *fn, Options options,
                        SmallString<64> &resultingString)
-      : variableNamePath(fn), resultingString(resultingString),
-        options(options) {}
+      : variableNamePath(), resultingString(resultingString), options(options) {
+  }
 
   /// Attempts to infer a name from just uses of \p searchValue.
   ///
@@ -133,7 +202,12 @@ private:
 
   /// Do not call this directly. Used just to improve logging for
   /// findDebugInfoProvidingValue.
-  SILValue findDebugInfoProvidingValueHelper(SILValue searchValue);
+  SILValue findDebugInfoProvidingValueHelper(SILValue searchValue,
+                                             ValueSet &visitedValues);
+
+  /// A special helper for handling phi values. Do not call this directly.
+  SILValue findDebugInfoProvidingValuePhiArg(SILValue incomingValue,
+                                             ValueSet &visitedValues);
 
   /// Given an initialized once allocation inst without a ValueDecl or a
   /// DebugVariable provided name, attempt to find a root value from its

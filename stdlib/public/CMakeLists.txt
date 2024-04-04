@@ -88,7 +88,7 @@ endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR OR SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
+if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # TODO: due to the use of `add_swift_target_library` rather than `add_library`
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
@@ -184,7 +184,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
-      "armv6m   armv6m-none-none-eabi     armv6-none-none-eabi"
+      "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
       "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
       "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
     )
@@ -206,8 +206,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
       # Without specifying the `windows` component LLVM refuses to
       # generate valid COFF object files.
-      "i686    i686-unknown-windows-coff   i686-unknown-windows-coff"
-      "x86_64  x86_64-unknown-windows-coff x86_64-unknown-windows-coff"
+      "i686    i686-unknown-windows-msvc   i686-unknown-windows-msvc"
+      "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
     )
   endif()
 
@@ -241,16 +241,16 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+
+  if(SWIFT_BUILD_CLANG_OVERLAYS)
+    add_subdirectory(ClangOverlays)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
   # In some internal Apple configurations we have the need
   # to build Core and Onone separately from the rest
   # of the stdlib
-  if(SWIFT_BUILD_CLANG_OVERLAYS)
-    add_subdirectory(ClangOverlays)
-  endif()
-
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     add_subdirectory(Differentiation)
   endif()

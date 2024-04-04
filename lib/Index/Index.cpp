@@ -47,6 +47,9 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
   case AccessorKind::Get:
     OS << "getter:" << ASD->getName();
     return false;
+  case AccessorKind::DistributedGet:
+    OS << "_distributed_getter:" << ASD->getName();
+    return false;
   case AccessorKind::Set:
     OS << "setter:" << ASD->getName();
     return false;

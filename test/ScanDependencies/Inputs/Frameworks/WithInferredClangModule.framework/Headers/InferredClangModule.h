@@ -1,0 +1,1 @@
+void funcInferred(void);

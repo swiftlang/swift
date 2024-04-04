@@ -3,15 +3,13 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
@@ -31,13 +29,12 @@ struct NC : ~Copyable {
     self.p = p
     self.i = i
   }
-  borrowing func getBV() -> _borrow(self) BV {
+  borrowing func getBV() -> dependsOn(self) BV {
     BV(p, i)
   }
 }
 
-@_nonescapable
-struct NE {
+struct NE : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
@@ -46,7 +43,7 @@ struct NE {
     self.p = p
     self.i = i
   }
-  borrowing func getBV() -> _borrow(self) BV {
+  borrowing func getBV() -> dependsOn(scoped self) BV {
     BV(p, i)
   }
 }

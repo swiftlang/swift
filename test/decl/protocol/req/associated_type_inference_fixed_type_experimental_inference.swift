@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
-// RUN: not %target-swift-frontend -typecheck -enable-experimental-associated-type-inference -dump-type-witness-systems %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck -dump-type-witness-systems %s 2>&1 | %FileCheck %s
 
 protocol P1 where A == Never {
   associatedtype A

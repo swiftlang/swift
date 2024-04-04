@@ -256,7 +256,7 @@ private:
         return Options.DisplayObjCModule;
       if (Context->getText() == Options.HidingCurrentModule)
         return false;
-      if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
+      if (Context->getText().starts_with(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
         return Options.DisplayDebuggerGeneratedModule;
     }
     return true;
@@ -425,6 +425,7 @@ private:
     case Node::Kind::ImplDifferentiabilityKind:
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplErasedIsolation:
+    case Node::Kind::ImplTransferringResult:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplParameterResultDifferentiability:
     case Node::Kind::ImplParameterTransferring:
@@ -644,6 +645,7 @@ private:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
     case Node::Kind::ParamLifetimeDependence:
     case Node::Kind::SelfLifetimeDependence:
+    case Node::Kind::DependentGenericInverseConformanceRequirement:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -975,6 +977,7 @@ private:
   void printImplFunctionType(NodePointer fn, unsigned depth) {
     NodePointer patternSubs = nullptr;
     NodePointer invocationSubs = nullptr;
+    NodePointer transferringResult = nullptr;
     enum State { Attrs, Inputs, Results } curState = Attrs;
     auto transitionTo = [&](State newState) {
       assert(newState >= curState);
@@ -988,7 +991,14 @@ private:
           }
           Printer << '(';
           continue;
-        case Inputs: Printer << ") -> ("; continue;
+        case Inputs:
+          Printer << ") -> ";
+          if (transferringResult) {
+            print(transferringResult, depth + 1);
+            Printer << " ";
+          }
+          Printer << "(";
+          continue;
         case Results: printer_unreachable("no state after Results");
         }
         printer_unreachable("bad state");
@@ -1010,6 +1020,8 @@ private:
         patternSubs = child;
       } else if (child->getKind() == Node::Kind::ImplInvocationSubstitutions) {
         invocationSubs = child;
+      } else if (child->getKind() == Node::Kind::ImplTransferringResult) {
+        transferringResult = child;
       } else {
         assert(curState == Attrs);
         print(child, depth + 1);
@@ -2748,6 +2760,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
     return nullptr;
+  case Node::Kind::ImplTransferringResult:
+    Printer << "transferring";
+    return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
     return nullptr;
@@ -2846,6 +2861,20 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(type, depth + 1);
     Printer << ": ";
     print(reqt, depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::DependentGenericInverseConformanceRequirement: {
+    NodePointer type = Node->getChild(0);
+    print(type, depth + 1);
+    Printer << ": ~";
+    switch (Node->getChild(1)->getIndex()) {
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+    case Bit: Printer << "Swift." << #Name; break;
+#include "swift/ABI/InvertibleProtocols.def"
+    default:
+      Printer << "Swift.<bit " << Node->getChild(1)->getIndex() << ">";
+      break;
+    }
     return nullptr;
   }
   case Node::Kind::DependentGenericLayoutRequirement: {

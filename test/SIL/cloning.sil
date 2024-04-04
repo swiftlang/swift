@@ -52,6 +52,67 @@ sil [ossa] @caller_begin_borrow_lexical : $@convention(thin) () -> () {
   return %res : $()
 }
 
+sil [ossa] [always_inline] @callee_alloc_box : $@convention(thin) () -> () {
+  %b1 = alloc_box ${ var X }
+  dealloc_box %b1 : ${ var X }
+  %b2 = alloc_box [dynamic_lifetime] ${ var X }
+  dealloc_box %b2 : ${ var X }
+  %b3 = alloc_box [reflection] ${ var X }
+  dealloc_box %b3 : ${ var X }
+  %b4 = alloc_box [pointer_escape] ${ var X }
+  dealloc_box %b4 : ${ var X }
+  %b5 = alloc_box [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b5 : ${ var X }
+  %b6 = alloc_box [dynamic_lifetime] [reflection] ${ var X }
+  dealloc_box %b6 : ${ var X }
+  %b7 = alloc_box [dynamic_lifetime] [pointer_escape] ${ var X }
+  dealloc_box %b7 : ${ var X }
+  %b8 = alloc_box [dynamic_lifetime] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b8 : ${ var X }
+  %b9 = alloc_box [reflection] [pointer_escape] ${ var X }
+  dealloc_box %b9 : ${ var X }
+  %b10 = alloc_box [reflection] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b10 : ${ var X }
+  %b11 = alloc_box [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b11 : ${ var X }
+  %b12 = alloc_box [reflection] [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b12 : ${ var X }
+  %b13 = alloc_box [dynamic_lifetime] [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b13 : ${ var X }
+  %b14 = alloc_box [dynamic_lifetime] [reflection] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b14 : ${ var X }
+  %b15 = alloc_box [dynamic_lifetime] [reflection] [pointer_escape] ${ var X }
+  dealloc_box %b15 : ${ var X }
+  %b16 = alloc_box [dynamic_lifetime] [reflection] [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b16 : ${ var X }
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_alloc_box{{.*}} {
+// CHECK:         alloc_box
+// CHECK:         alloc_box [dynamic_lifetime]
+// CHECK:         alloc_box [reflection]
+// CHECK:         alloc_box [pointer_escape]
+// CHECK:         alloc_box [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection]
+// CHECK:         alloc_box [dynamic_lifetime] [pointer_escape]
+// CHECK:         alloc_box [dynamic_lifetime] [moveable_value_debuginfo]
+// CHECK:         alloc_box [reflection] [pointer_escape]
+// CHECK:         alloc_box [reflection] [moveable_value_debuginfo]
+// CHECK:         alloc_box [pointer_escape] [moveable_value_debuginfo]
+// CHECK:         alloc_box [reflection] [pointer_escape] [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [pointer_escape] [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection] [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection] [pointer_escape]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection] [pointer_escape] [moveable_value_debuginfo]
+// CHECK-LABEL: } // end sil function 'caller_alloc_box'
+sil [ossa] @caller_alloc_box : $@convention(thin) () -> () {
+  %callee = function_ref @callee_alloc_box : $@convention(thin) () -> ()
+  %res = apply %callee() : $@convention(thin) () -> ()
+  return %res : $()
+}
+
 sil [ossa] @callee_alloc_stack : $@convention(thin) () -> () {
   %instance = alloc_stack $Builtin.NativeObject
   dealloc_stack %instance : $*Builtin.NativeObject
@@ -59,8 +120,16 @@ sil [ossa] @callee_alloc_stack : $@convention(thin) () -> () {
   dealloc_stack %instance2 : $*Builtin.NativeObject
   %instance3 = alloc_stack [lexical] $Builtin.NativeObject
   dealloc_stack %instance3 : $*Builtin.NativeObject
-  %instance4 = alloc_stack [dynamic_lifetime] [lexical] $Builtin.NativeObject
+  %instance5 = alloc_stack [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance5 : $*Builtin.NativeObject
+  %instance4 = alloc_stack [lexical] [dynamic_lifetime] $Builtin.NativeObject
   dealloc_stack %instance4 : $*Builtin.NativeObject
+  %instance6 = alloc_stack [dynamic_lifetime] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance6 : $*Builtin.NativeObject
+  %instance7 = alloc_stack [lexical] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance7 : $*Builtin.NativeObject
+  %instance8 = alloc_stack [lexical] [var_decl] [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance8 : $*Builtin.NativeObject
   %res = tuple ()
   return %res : $()
 }
@@ -69,7 +138,11 @@ sil [ossa] @callee_alloc_stack : $@convention(thin) () -> () {
 // CHECK: alloc_stack
 // CHECK: alloc_stack [dynamic_lifetime]
 // CHECK: alloc_stack [lexical]
+// CHECK: alloc_stack [var_decl]
 // CHECK: alloc_stack [dynamic_lifetime] [lexical]
+// CHECK: alloc_stack [dynamic_lifetime] [var_decl]
+// CHECK: alloc_stack [lexical] [var_decl]
+// CHECK: alloc_stack [dynamic_lifetime] [lexical] [var_decl]
 // CHECK-LABEL: } // end sil function 'caller_alloc_stack_lexical'
 sil [ossa] @caller_alloc_stack_lexical : $@convention(thin) () -> () {
   %callee_alloc_stack = function_ref @callee_alloc_stack : $@convention(thin) () -> ()

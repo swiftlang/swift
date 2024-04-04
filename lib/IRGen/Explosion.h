@@ -178,6 +178,16 @@ public:
     Values.clear();
   }
 
+  /// Do an operation while borrowing the values from this explosion.
+  template <class Fn>
+  void borrowing(Fn &&fn) {
+    auto savedNextValue = NextValue;
+    fn(*this);
+    assert(empty() &&
+           "didn't claim all values from the explosion during the borrow");
+    NextValue = savedNextValue;
+  }
+
   void print(llvm::raw_ostream &OS);
   void dump();
 };
@@ -263,6 +273,63 @@ public:
   ///   - the element type, if the schema contains exactly one element;
   ///   - an anonymous struct type concatenating those types, otherwise.
   llvm::Type *getScalarResultType(IRGenModule &IGM) const;
+};
+
+/// A peepholed explosion of an optional scalar value.
+class OptionalExplosion {
+public:
+  enum Kind {
+    /// The value is known statically to be `Optional.none`.
+    /// The explosion is empty.
+    None,
+
+    /// The value is known statically to be `Optional.some(x)`.
+    /// The explosion is the wrapped value `x`.
+    Some,
+
+    /// It is unknown statically what case the optional is in.
+    /// The explosion is an optional value.
+    Optional
+  };
+
+private:
+  Kind kind;
+  Explosion value;
+
+  OptionalExplosion(Kind kind) : kind(kind) {}
+
+public:
+  static OptionalExplosion forNone() {
+    return None;
+  }
+
+  template <class Fn>
+  static OptionalExplosion forSome(Fn &&fn) {
+    OptionalExplosion result(Some);
+    std::forward<Fn>(fn)(result.value);
+    return result;
+  }
+
+  template <class Fn>
+  static OptionalExplosion forOptional(Fn &&fn) {
+    OptionalExplosion result(Optional);
+    std::forward<Fn>(fn)(result.value);
+    return result;
+  }
+
+  Kind getKind() const { return kind; }
+  bool isNone() const { return kind == None; }
+  bool isSome() const { return kind == Some; }
+  bool isOptional() const { return kind == Optional; }
+
+  Explosion &getSomeExplosion() {
+    assert(kind == Some);
+    return value;
+  }
+  Explosion &getOptionalExplosion() {
+    assert(kind == Optional);
+    return value;
+  }
 };
 
 } // end namespace irgen

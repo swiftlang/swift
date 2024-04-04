@@ -247,6 +247,9 @@ enum class UnqualifiedLookupFlags {
   MacroLookup            = 1 << 7,
   /// This lookup should only return modules
   ModuleLookup           = 1 << 8,
+  /// This lookup should discard 'Self' requirements in protocol extension
+  /// 'where' clauses.
+  DisregardSelfBounds    = 1 << 9
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;

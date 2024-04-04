@@ -1238,7 +1238,7 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   // from the outlined function with the bridged result (only the suffix is
   // different: MethodNameTem...n_ vs MethodNameTem...b_).
   if (OutlinedName.size() == CurrentName.size() &&
-      CurrentName.startswith(
+      CurrentName.starts_with(
           StringRef(OutlinedName.c_str(), OutlinedName.size() - 2)))
     return false;
 

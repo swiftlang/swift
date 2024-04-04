@@ -14,7 +14,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/InverseMarking.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "clang/AST/DeclObjC.h"
@@ -28,62 +28,6 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
     if (Type type = value->getInterfaceType()) {
       return type.findIf(fn);
     }
-  }
-
-  return false;
-}
-
-/// \param isRelevantInverse the function used to inspect a mark corresponding
-/// to an inverse to determine whether it "has" an inverse that we care about.
-static bool hasInverse(
-    Decl *decl, InvertibleProtocolKind ip,
-    std::function<bool(InverseMarking::Mark const &)> isRelevantInverse) {
-
-  auto getTypeDecl = [](Type type) -> TypeDecl * {
-    if (auto genericTy = type->getAnyGeneric())
-      return genericTy;
-    if (auto gtpt = dyn_cast<GenericTypeParamType>(type))
-      return gtpt->getDecl();
-    return nullptr;
-  };
-
-  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto *nominal = extension->getSelfNominalTypeDecl())
-      return hasInverse(nominal, ip, isRelevantInverse);
-    return false;
-  }
-
-  auto hasInverseInType = [&](Type type) {
-    return type.findIf([&](Type type) -> bool {
-      if (auto *typeDecl = getTypeDecl(type))
-        return hasInverse(typeDecl, ip, isRelevantInverse);
-      return false;
-    });
-  };
-
-  if (auto *TD = dyn_cast<TypeDecl>(decl)) {
-    if (auto *alias = dyn_cast<TypeAliasDecl>(TD))
-      return hasInverseInType(alias->getUnderlyingType());
-
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(TD)) {
-      if (isRelevantInverse(NTD->hasInverseMarking(ip)))
-        return true;
-    }
-
-    if (auto *P = dyn_cast<ProtocolDecl>(TD)) {
-      // Check the protocol's associated types too.
-      return llvm::any_of(
-          P->getAssociatedTypeMembers(), [&](AssociatedTypeDecl *ATD) {
-            return isRelevantInverse(ATD->hasInverseMarking(ip));
-          });
-    }
-
-    return false;
-  }
-
-  if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-    if (VD->hasInterfaceType())
-      return hasInverseInType(VD->getInterfaceType());
   }
 
   return false;
@@ -186,6 +130,7 @@ UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor)
 UNINTERESTING_FEATURE(BuiltinUnprotectedStackAlloc)
 UNINTERESTING_FEATURE(BuiltinAllocVector)
+UNINTERESTING_FEATURE(BuiltinCreateTask)
 
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
@@ -255,10 +200,39 @@ static bool usesFeatureExtensionMacros(Decl *decl) {
 }
 
 static bool usesFeatureMoveOnly(Decl *decl) {
-  return hasInverse(decl, InvertibleProtocolKind::Copyable,
-                    [](auto &marking) -> bool {
-                      return marking.is(InverseMarking::Kind::LegacyExplicit);
-                    });
+  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto *nominal = extension->getExtendedNominal())
+      return usesFeatureMoveOnly(nominal);
+    return false;
+  }
+
+  auto hasInverseInType = [&](Type type) {
+    return type.findIf([&](Type type) -> bool {
+      if (auto *NTD = type->getAnyNominal()) {
+        if (NTD->getAttrs().hasAttribute<MoveOnlyAttr>())
+          return true;
+      }
+      return false;
+    });
+  };
+
+  if (auto *TD = dyn_cast<TypeDecl>(decl)) {
+    if (auto *alias = dyn_cast<TypeAliasDecl>(TD))
+      return hasInverseInType(alias->getUnderlyingType());
+
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(TD)) {
+      if (NTD->getAttrs().hasAttribute<MoveOnlyAttr>())
+        return true;
+    }
+
+    return false;
+  }
+
+  if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+    return hasInverseInType(VD->getInterfaceType());
+  }
+
+  return false;
 }
 
 static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
@@ -368,6 +342,10 @@ static bool usesFeatureExtern(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExternAttr>();
 }
 
+static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
+  return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
+}
+
 static bool usesFeatureExpressionMacroDefaultArguments(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto param : *func->getParameters()) {
@@ -381,6 +359,7 @@ static bool usesFeatureExpressionMacroDefaultArguments(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinStoreRaw)
+UNINTERESTING_FEATURE(BuiltinAddressOfRawLayout)
 
 // ----------------------------------------------------------------------------
 // MARK: - Upcoming Features
@@ -490,6 +469,8 @@ static bool usesFeatureLayoutPrespecialization(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(AccessLevelOnImport)
+UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
+UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
 UNINTERESTING_FEATURE(LayoutStringValueWitnesses)
 UNINTERESTING_FEATURE(LayoutStringValueWitnessesInstantiation)
 UNINTERESTING_FEATURE(DifferentiableProgramming)
@@ -497,6 +478,7 @@ UNINTERESTING_FEATURE(ForwardModeDifferentiation)
 UNINTERESTING_FEATURE(AdditiveArithmeticDerivedConformances)
 UNINTERESTING_FEATURE(SendableCompletionHandlers)
 UNINTERESTING_FEATURE(OpaqueTypeErasure)
+UNINTERESTING_FEATURE(PackageCMO)
 UNINTERESTING_FEATURE(ParserRoundTrip)
 UNINTERESTING_FEATURE(ParserValidation)
 UNINTERESTING_FEATURE(ParserDiagnostics)
@@ -523,25 +505,75 @@ static bool usesFeatureRawLayout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(Embedded)
+UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
-  auto checkInverseMarking = [](auto &marking) -> bool {
-    switch (marking.getKind()) {
-    case InverseMarking::Kind::None:
-    case InverseMarking::Kind::LegacyExplicit: // covered by other checks.
+  if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
+    return true;
+
+  if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
+    if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
+      auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
+
+      InvertibleProtocolSet inverses;
+      bool anyObject = false;
+      getDirectlyInheritedNominalTypeDecls(nominalDecl, inverses, anyObject);
+      if (!inverses.empty())
+        return true;
+    }
+
+    if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+      auto reqSig = proto->getRequirementSignature();
+
+      SmallVector<Requirement, 2> reqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      reqSig.getRequirementsWithInverses(proto, reqs, inverses);
+      if (!inverses.empty())
+        return true;
+    }
+
+    if (isa<AbstractFunctionDecl>(valueDecl) ||
+        isa<AbstractStorageDecl>(valueDecl)) {
+      if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
+            if (auto *nominalDecl = type->getAnyNominal()) {
+              if (isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
+                return usesFeatureNoncopyableGenerics(nominalDecl);
+            }
+            return false;
+          })) {
+        return true;
+      }
+    }
+  }
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto *nominal = ext->getExtendedNominal())
+      if (usesFeatureNoncopyableGenerics(nominal))
+        return true;
+  }
+
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+
+    // We have baked-in support for Sendable not needing to state inverses
+    // in its inheritance clause within interface files. So, it technically is
+    // not using the feature with respect to the concerns of an interface file.
+    if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
       return false;
 
-    case InverseMarking::Kind::Explicit:
-    case InverseMarking::Kind::Inferred:
-      return true;
-    }
-  };
+    proto->getRequirementSignature().getRequirementsWithInverses(
+        proto, reqs, inverseReqs);
+  } else if (auto *genCtx = decl->getAsGenericContext()) {
+    if (auto genericSig = genCtx->getGenericSignature())
+      genericSig->getRequirementsWithInverses(reqs, inverseReqs);
+  }
 
-  return hasInverse(decl, InvertibleProtocolKind::Copyable,
-                    checkInverseMarking) ||
-         hasInverse(decl, InvertibleProtocolKind::Escapable,
-                    checkInverseMarking);
+  return !inverseReqs.empty();
 }
+
+UNINTERESTING_FEATURE(NoncopyableGenerics2)
 
 static bool usesFeatureStructLetDestructuring(Decl *decl) {
   auto sd = dyn_cast<StructDecl>(decl);
@@ -640,6 +672,8 @@ static bool usesFeatureDynamicActorIsolation(Decl *decl) {
 
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
+UNINTERESTING_FEATURE(ClosureIsolation)
+
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {
     if (auto fnType = type->getAs<AnyFunctionType>()) {
@@ -650,6 +684,14 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(ExtensionImportVisibility)
+UNINTERESTING_FEATURE(IsolatedAny2)
+
+static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
+  return false;
+}
+
+UNINTERESTING_FEATURE(ObjCImplementation)
+UNINTERESTING_FEATURE(CImplementation)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
@@ -666,9 +708,14 @@ void FeatureSet::collectSuppressibleFeature(Feature feature,
                               operation == Insert);
 }
 
-static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
+static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
+                                           bool inverted) {
   auto attr = decl->getAttrs().getAttribute<AllowFeatureSuppressionAttr>();
-  if (!attr) return false;
+  if (!attr)
+    return false;
+
+  if (attr->getInverted() != inverted)
+    return false;
 
   for (auto suppressedFeature : attr->getSuppressedFeatures()) {
     if (suppressedFeature.is(featureName))
@@ -676,6 +723,14 @@ static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
   }
 
   return false;
+}
+
+static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, true);
+}
+
+static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, false);
 }
 
 /// Go through all the features used by the given declaration and
@@ -687,11 +742,15 @@ void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
   if (usesFeature##FeatureName(decl))                                          \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl))                                          \
-    collectSuppressibleFeature(Feature::FeatureName, operation);
+  if (usesFeature##FeatureName(decl)) {                                        \
+    if (disallowFeatureSuppression(#FeatureName, decl))                        \
+      collectRequiredFeature(Feature::FeatureName, operation);                 \
+    else                                                                       \
+      collectSuppressibleFeature(Feature::FeatureName, operation);             \
+  }
 #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
   if (usesFeature##FeatureName(decl)) {                                        \
-    if (shouldSuppressFeature(#FeatureName, decl))                             \
+    if (allowFeatureSuppression(#FeatureName, decl))                           \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
     else                                                                       \
       collectRequiredFeature(Feature::FeatureName, operation);                 \

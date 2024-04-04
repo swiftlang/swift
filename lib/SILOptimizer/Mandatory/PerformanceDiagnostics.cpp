@@ -519,6 +519,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
         diagnose(loc, diag::embedded_swift_value_deinit, impactType.getASTType());
         return true;
       }
+      if (isa<KeyPathInst>(inst)) {
+        diagnose(loc, diag::embedded_swift_keypath);
+        return true;
+      }
       if (!allowedMetadataUseInEmbeddedSwift(inst)) {
         PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
         if (impactType) {

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-experimental-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -147,8 +147,7 @@ func testGlobalActorIsolatedReferences() {
     subscript(v: Int) -> Bool { false }
   }
 
-  let dataKP = \Isolated.data
-  // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in the Swift 6 language mode}}
+  let dataKP = \Isolated.data // Ok
   let subscriptKP = \Isolated.[42]
   // expected-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
 
@@ -158,8 +157,7 @@ func testGlobalActorIsolatedReferences() {
   // expected-warning@-1 {{type 'KeyPath<Isolated, Bool>' does not conform to the 'Sendable' protocol}}
 
   func testNonIsolated() {
-    _ = \Isolated.data
-    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in the Swift 6 language mode}}
+    _ = \Isolated.data // Ok
   }
 
   @MainActor func testIsolated() {
@@ -216,4 +214,25 @@ do {
 
   let _: [PartialKeyPath<S>] = [\.a, \.b] // Ok
   let _: [any PartialKeyPath<S> & Sendable] = [\.a, \.b] // Ok
+}
+
+do {
+  func kp() -> KeyPath<String, Int> & Sendable {
+    fatalError()
+  }
+
+  func test() -> KeyPath<String, Int> {
+    true ? kp() : kp() // Ok
+  }
+
+  func forward<T>(_ v: T) -> T { v }
+  let _: KeyPath<String, Int> = forward(kp()) // Ok
+}
+
+do {
+  final class C<T> {
+    let immutable: String = ""
+  }
+
+  _ = \C<Int>.immutable as? ReferenceWritableKeyPath // Ok
 }

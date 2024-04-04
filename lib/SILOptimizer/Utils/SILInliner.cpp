@@ -207,13 +207,16 @@ public:
     // instructions in the caller.  That means this entire path is
     // unreachable.
     if (isa<ReturnInst>(terminator) || isa<UnwindInst>(terminator)) {
-      bool isNormal = isa<ReturnInst>(terminator);
-      auto returnBB = isNormal ? EndApplyReturnBB : AbortApplyReturnBB;
+      ReturnInst *retInst = dyn_cast<ReturnInst>(terminator);
+      auto *returnBB = retInst ? EndApplyReturnBB : AbortApplyReturnBB;
+      if (retInst && EndApply)
+        EndApply->replaceAllUsesWith(getMappedValue(retInst->getOperand()));
       if (returnBB) {
         Builder->createBranch(Loc, returnBB);
       } else {
         Builder->createUnreachable(Loc);
       }
+
       return true;
     }
 
@@ -724,15 +727,15 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                : Scope::None;
   auto scope = scopeForArgument(scopeForOwnership, callArg, index,
                                 Apply.getFunction(), getCalleeFunction());
-  bool isLexical;
+  IsLexical_t isLexical;
   switch (scope) {
   case Scope::None:
     return SILValue();
   case Scope::Bare:
-    isLexical = false;
+    isLexical = IsNotLexical;
     break;
   case Scope::Lexical:
-    isLexical = true;
+    isLexical = IsLexical;
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
@@ -743,16 +746,16 @@ SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
                                                unsigned index) {
   auto scope = scopeForArgument(Scope::None, callArg, index,
                                 Apply.getFunction(), getCalleeFunction());
-  bool isLexical;
+  IsLexical_t isLexical;
   switch (scope) {
   case Scope::None:
     return SILValue();
   case Scope::Bare:
     assert(false && "Non-lexical move produced during inlining!?");
-    isLexical = false;
+    isLexical = IsNotLexical;
     break;
   case Scope::Lexical:
-    isLexical = true;
+    isLexical = IsLexical;
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());

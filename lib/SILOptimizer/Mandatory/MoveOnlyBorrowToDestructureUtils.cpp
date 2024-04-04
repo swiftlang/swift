@@ -311,19 +311,22 @@ bool Implementation::gatherUses(SILValue value) {
         // normal use, so we fall through.
       }
 
-      auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(nextUse, getRootValue(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
-      blocksToUses.insert(nextUse->getParentBlock(),
-                          {nextUse,
-                           {liveness.getNumSubElements(), *leafRange,
-                            false /*is lifetime ending*/}});
-      liveness.updateForUse(nextUse->getUser(), *leafRange,
-                            false /*is lifetime ending*/);
+      for (auto leafRange : leafRanges) {
+        blocksToUses.insert(nextUse->getParentBlock(),
+                            {nextUse,
+                             {liveness.getNumSubElements(), leafRange,
+                              false /*is lifetime ending*/}});
+        liveness.updateForUse(nextUse->getUser(), leafRange,
+                              false /*is lifetime ending*/);
+      }
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
@@ -336,8 +339,9 @@ bool Implementation::gatherUses(SILValue value) {
         continue;
       }
 
-      auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(nextUse, getRootValue(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
       }
@@ -347,24 +351,28 @@ bool Implementation::gatherUses(SILValue value) {
       SILType type = nextUse->get()->getType();
       if (type.isTrivial(nextUse->getUser()->getFunction())) {
         LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
-        blocksToUses.insert(nextUse->getParentBlock(),
-                            {nextUse,
-                             {liveness.getNumSubElements(), *leafRange,
-                              false /*is lifetime ending*/}});
-        liveness.updateForUse(nextUse->getUser(), *leafRange,
-                              false /*is lifetime ending*/);
+        for (auto leafRange : leafRanges) {
+          blocksToUses.insert(nextUse->getParentBlock(),
+                              {nextUse,
+                               {liveness.getNumSubElements(), leafRange,
+                                false /*is lifetime ending*/}});
+          liveness.updateForUse(nextUse->getUser(), leafRange,
+                                false /*is lifetime ending*/);
+        }
         instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
         continue;
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Found lifetime ending use!\n");
       destructureNeedingUses.push_back(nextUse);
-      blocksToUses.insert(nextUse->getParentBlock(),
-                          {nextUse,
-                           {liveness.getNumSubElements(), *leafRange,
-                            true /*is lifetime ending*/}});
-      liveness.updateForUse(nextUse->getUser(), *leafRange,
-                            true /*is lifetime ending*/);
+      for (auto leafRange : leafRanges) {
+        blocksToUses.insert(nextUse->getParentBlock(),
+                            {nextUse,
+                             {liveness.getNumSubElements(), leafRange,
+                              true /*is lifetime ending*/}});
+        liveness.updateForUse(nextUse->getUser(), leafRange,
+                              true /*is lifetime ending*/);
+      }
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
@@ -375,20 +383,23 @@ bool Implementation::gatherUses(SILValue value) {
       // the switch dispatch. If the final pattern match ends up destructuring
       // the value, then SILGen emits that as a separate access.
       if (auto switchEnum = dyn_cast<SwitchEnumInst>(nextUse->getUser())) {
-        auto leafRange = TypeTreeLeafTypeRange::get(switchEnum->getOperand(),
-                                                    getRootValue());
-        if (!leafRange) {
+        SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+        TypeTreeLeafTypeRange::get(&switchEnum->getOperandRef(), getRootValue(),
+                                   leafRanges);
+        if (!leafRanges.size()) {
           LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
           return false;
         }
 
         LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
-        blocksToUses.insert(nextUse->getParentBlock(),
-                            {nextUse,
-                             {liveness.getNumSubElements(), *leafRange,
-                              false /*is lifetime ending*/}});
-        liveness.updateForUse(nextUse->getUser(), *leafRange,
-                              false /*is lifetime ending*/);
+        for (auto leafRange : leafRanges) {
+          blocksToUses.insert(nextUse->getParentBlock(),
+                              {nextUse,
+                               {liveness.getNumSubElements(), leafRange,
+                                false /*is lifetime ending*/}});
+          liveness.updateForUse(nextUse->getUser(), leafRange,
+                                false /*is lifetime ending*/);
+        }
         instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
         continue;
       }
@@ -405,19 +416,22 @@ bool Implementation::gatherUses(SILValue value) {
       });
 
       if (forwardedValues.empty()) {
-        auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
-        if (!leafRange) {
+        SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+        TypeTreeLeafTypeRange::get(nextUse, getRootValue(), leafRanges);
+        if (!leafRanges.size()) {
           LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
           return false;
         }
 
         LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
-        blocksToUses.insert(nextUse->getParentBlock(),
-                            {nextUse,
-                             {liveness.getNumSubElements(), *leafRange,
-                              false /*is lifetime ending*/}});
-        liveness.updateForUse(nextUse->getUser(), *leafRange,
-                              false /*is lifetime ending*/);
+        for (auto leafRange : leafRanges) {
+          blocksToUses.insert(nextUse->getParentBlock(),
+                              {nextUse,
+                               {liveness.getNumSubElements(), leafRange,
+                                false /*is lifetime ending*/}});
+          liveness.updateForUse(nextUse->getUser(), leafRange,
+                                false /*is lifetime ending*/);
+        }
         instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
         continue;
       }
@@ -442,8 +456,9 @@ bool Implementation::gatherUses(SILValue value) {
         continue;
       }
 
-      auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
-      if (!leafRange) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(nextUse, getRootValue(), leafRanges);
+      if (!leafRanges.size()) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
       }
@@ -451,21 +466,30 @@ bool Implementation::gatherUses(SILValue value) {
       // Otherwise, treat it as a normal use.
       LLVM_DEBUG(llvm::dbgs() << "        Treating borrow as "
                                  "a non lifetime ending use!\n");
-      blocksToUses.insert(nextUse->getParentBlock(),
-                          {nextUse,
-                           {liveness.getNumSubElements(), *leafRange,
-                            false /*is lifetime ending*/}});
-      liveness.updateForUse(nextUse->getUser(), *leafRange,
-                            false /*is lifetime ending*/);
+      for (auto leafRange : leafRanges) {
+        blocksToUses.insert(nextUse->getParentBlock(),
+                            {nextUse,
+                             {liveness.getNumSubElements(), leafRange,
+                              false /*is lifetime ending*/}});
+        liveness.updateForUse(nextUse->getUser(), leafRange,
+                              false /*is lifetime ending*/);
+      }
       // The liveness extends to the scope-ending uses of the borrow.
       BorrowingOperand(nextUse).visitScopeEndingUses([&](Operand *end) -> bool {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
         }
+        if (PhiOperand(end)) {
+          assert(end->getOperandOwnership() ==
+                 OperandOwnership::ForwardingConsume);
+          return false;
+        }
         LLVM_DEBUG(llvm::dbgs() << "        ++ Scope-ending use: ";
                    end->getUser()->print(llvm::dbgs()));
-        liveness.updateForUse(end->getUser(), *leafRange,
-                              false /*is lifetime ending*/);
+        for (auto leafRange : leafRanges) {
+          liveness.updateForUse(end->getUser(), leafRange,
+                                false /*is lifetime ending*/);
+        }
         return true;
       });
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
@@ -500,8 +524,10 @@ void Implementation::checkForErrorsOnSameInstruction() {
       if (!use->isConsuming())
         continue;
 
-      auto destructureUseSpan =
-          *TypeTreeLeafTypeRange::get(use, getRootValue());
+      SmallVector<TypeTreeLeafTypeRange, 2> destructureUseSpans;
+      TypeTreeLeafTypeRange::get(use, getRootValue(), destructureUseSpans);
+      assert(destructureUseSpans.size() == 1);
+      auto destructureUseSpan = destructureUseSpans[0];
       for (unsigned index : destructureUseSpan.getRange()) {
         if (usedBits[index]) {
           // If we get that we used the same bit twice, we have an error. We set
@@ -528,8 +554,10 @@ void Implementation::checkForErrorsOnSameInstruction() {
         if (use->isConsuming())
           continue;
 
-        auto destructureUseSpan =
-            *TypeTreeLeafTypeRange::get(use, getRootValue());
+        SmallVector<TypeTreeLeafTypeRange, 2> destructureUseSpans;
+        TypeTreeLeafTypeRange::get(use, getRootValue(), destructureUseSpans);
+        assert(destructureUseSpans.size() == 1);
+        auto destructureUseSpan = destructureUseSpans[0];
         for (unsigned index : destructureUseSpan.getRange()) {
           if (!usedBits[index])
             continue;
@@ -569,8 +597,10 @@ void Implementation::checkForErrorsOnSameInstruction() {
       if (!use->isConsuming())
         continue;
 
-      auto destructureUseSpan =
-          *TypeTreeLeafTypeRange::get(use, getRootValue());
+      SmallVector<TypeTreeLeafTypeRange, 2> destructureUseSpans;
+      TypeTreeLeafTypeRange::get(use, getRootValue(), destructureUseSpans);
+      assert(destructureUseSpans.size() == 1);
+      auto destructureUseSpan = destructureUseSpans[0];
       bool emittedError = false;
       for (unsigned index : destructureUseSpan.getRange()) {
         if (!usedBits[index])
@@ -603,8 +633,13 @@ void Implementation::checkDestructureUsesOnBoundary() const {
     LLVM_DEBUG(llvm::dbgs()
                << "    DestructureNeedingUse: " << *use->getUser());
 
-    auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use, getRootValue());
-    if (!liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
+    SmallVector<TypeTreeLeafTypeRange, 2> destructureUseSpans;
+    TypeTreeLeafTypeRange::get(use, getRootValue(), destructureUseSpans);
+    assert(destructureUseSpans.size() == 1);
+    auto destructureUseSpan = destructureUseSpans[0];
+    SmallBitVector destructureUseBits(liveness.getNumSubElements());
+    destructureUseSpan.setBits(destructureUseBits);
+    if (!liveness.isWithinBoundary(use->getUser(), destructureUseBits)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "        On boundary or within boundary! No error!\n");
       continue;
@@ -1163,8 +1198,10 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
         if (!seenOperands.count(&operand))
           continue;
 
-        auto span = *TypeTreeLeafTypeRange::get(&operand, getRootValue());
-
+        SmallVector<TypeTreeLeafTypeRange, 2> spans;
+        TypeTreeLeafTypeRange::get(&operand, getRootValue(), spans);
+        assert(spans.size() == 1);
+        auto span = spans[0];
         // All available values in our span should have the same value
         // associated with it.
         SILValue first = availableValues[span.startEltOffset];

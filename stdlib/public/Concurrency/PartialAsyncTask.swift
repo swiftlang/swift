@@ -22,14 +22,14 @@ internal func _swiftJobRun(_ job: UnownedJob,
                            _ executor: UnownedSerialExecutor) -> ()
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_job_run_on_task_executor")
 @usableFromInline
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ executor: UnownedTaskExecutor) -> ()
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_job_run_on_serial_and_task_executor")
 @usableFromInline
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
@@ -110,7 +110,7 @@ public struct UnownedJob: Sendable {
   }
 
   @_unavailableInEmbedded
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(on executor: UnownedTaskExecutor) {
@@ -118,7 +118,7 @@ public struct UnownedJob: Sendable {
   }
 
   @_unavailableInEmbedded
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,

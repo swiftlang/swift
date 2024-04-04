@@ -280,6 +280,10 @@ public:
   /// termination.
   bool PrintClangStats = false;
 
+  /// Indicates whether or not the Clang importer should dump lookup tables
+  /// upon termination.
+  bool DumpClangLookupTables = false;
+
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 
@@ -307,9 +311,6 @@ public:
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
-
-  /// Should we skip decls that cannot be referenced externally?
-  bool SkipNonExportableDecls = false;
 
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?
@@ -567,6 +568,7 @@ public:
   static bool doesActionGenerateIR(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
+  static bool doesActionBuildModuleFromInterface(ActionType);
   static bool needsProperModuleName(ActionType);
   static file_types::ID formatForPrincipalOutputFileForAction(ActionType);
 };

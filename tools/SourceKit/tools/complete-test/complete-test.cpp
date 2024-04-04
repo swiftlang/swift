@@ -126,12 +126,12 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.compilerArgs = args.slice(i + 1);
       break;
     }
-    if (opt == "-" || !opt.startswith("-")) {
+    if (opt == "-" || !opt.starts_with("-")) {
       options.sourceFile = args[i];
       continue;
     }
 
-    if (opt.startswith("--")) {
+    if (opt.starts_with("--")) {
       error = std::string("unrecognized option '") + args[i] + "'";
       return false;
     }

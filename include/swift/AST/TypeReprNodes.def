@@ -46,11 +46,8 @@ TYPEREPR(Error, TypeRepr)
 TYPEREPR(Attributed, TypeRepr)
 
 ABSTRACT_TYPEREPR(DeclRef, TypeRepr)
-  ABSTRACT_TYPEREPR(Ident, DeclRefTypeRepr)
-    TYPEREPR(SimpleIdent, IdentTypeRepr)
-    TYPEREPR(GenericIdent, IdentTypeRepr)
-  TYPEREPR(Member, DeclRefTypeRepr)
-
+  TYPEREPR(UnqualifiedIdent, DeclRefTypeRepr)
+  TYPEREPR(QualifiedIdent, DeclRefTypeRepr)
 TYPEREPR(Function, TypeRepr)
 TYPEREPR(Array, TypeRepr)
 TYPEREPR(Dictionary, TypeRepr)

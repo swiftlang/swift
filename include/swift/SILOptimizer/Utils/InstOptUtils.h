@@ -598,6 +598,23 @@ bool specializeClassMethodInst(ClassMethodInst *cm);
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
                                  bool isMandatory);
+
+bool tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder);
+bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee, SILBuilder Builder);
+bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
+                                KeyPathInst *kp, SILBuilder Builder);
+bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
+                                KeyPathInst *kp, SILBuilder Builder);
+
+/// Instantiate the specified type by recursively tupling and structing the
+/// unique instances of the empty types and undef "instances" of the non-empty
+/// types aggregated together at each level.
+SILValue createEmptyAndUndefValue(SILType ty, SILInstruction *insertionPoint,
+                                  SILBuilderContext &ctx, bool noUndef = false);
+
+/// Check if a struct or its fields can have unreferenceable storage.
+bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
+                                SILFunction *func);
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H

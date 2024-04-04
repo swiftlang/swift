@@ -184,6 +184,7 @@ extension WordPair: Hashable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension WordPair: CustomStringConvertible {
   /// A string that represents the contents of the word pair.
   @available(SwiftStdlib 6.0, *)
@@ -193,6 +194,7 @@ extension WordPair: CustomStringConvertible {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension WordPair: CustomDebugStringConvertible {
   /// A string that represents the contents of the word pair, suitable for
   /// debugging.

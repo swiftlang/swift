@@ -2847,7 +2847,7 @@ namespace {
       auto conformsToAttr =
           llvm::find_if(clangDecl->getAttrs(), [](auto *attr) {
             if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-              return swiftAttr->getAttribute().startswith("conforms_to:");
+              return swiftAttr->getAttribute().starts_with("conforms_to:");
             return false;
           });
       if (conformsToAttr == clangDecl->getAttrs().end())
@@ -3392,8 +3392,8 @@ namespace {
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
             if ((file->getDir() == owningModule->Directory) &&
-                (filename.endswith("cmath") || filename.endswith("math.h") ||
-                 filename.endswith("stdlib.h") || filename.endswith("cstdlib"))) {
+                (filename.ends_with("cmath") || filename.ends_with("math.h") ||
+                 filename.ends_with("stdlib.h") || filename.ends_with("cstdlib"))) {
               return nullptr;
             }
           }
@@ -8039,6 +8039,42 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      if (swiftAttr->getAttribute() == "_BitwiseCopyable") {
+        if (!SwiftContext.LangOpts.hasFeature(Feature::BitwiseCopyable))
+          continue;
+        auto *protocol =
+            SwiftContext.getProtocol(KnownProtocolKind::BitwiseCopyable);
+        auto *nominal = dyn_cast<NominalTypeDecl>(MappedDecl);
+        if (!nominal)
+          continue;
+        auto *module = nominal->getModuleContext();
+        // Don't synthesize a conformance if one already exists.
+        auto ty = nominal->getDeclaredInterfaceType();
+        if (module->lookupConformance(ty, protocol))
+          continue;
+        auto conformance = SwiftContext.getNormalConformance(
+            ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),
+            ProtocolConformanceState::Complete,
+            /*isUnchecked=*/false,
+            /*isPreconcurrency=*/false);
+        conformance->setSourceKindAndImplyingConformance(
+            ConformanceEntryKind::Synthesized, nullptr);
+
+        nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
+      }
+
+      if (swiftAttr->getAttribute() == "transferring") {
+        // Swallow this if the feature is not enabled.
+        if (!SwiftContext.LangOpts.hasFeature(
+                Feature::TransferringArgsAndResults))
+          continue;
+        auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl);
+        if (!funcDecl)
+          continue;
+        funcDecl->setTransferringResult();
+        continue;
+      }
+
       // Dig out a buffer with the attribute text.
       unsigned bufferID = getClangSwiftAttrSourceBuffer(
           swiftAttr->getAttribute());
@@ -8397,9 +8433,9 @@ void ClangImporter::Implementation::importAttributes(
   // such as CGColorRelease(CGColorRef).
   if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
     if (FD->getNumParams() == 1 && FD->getDeclName().isIdentifier() &&
-         (FD->getName().endswith("Release") ||
-          FD->getName().endswith("Retain") ||
-          FD->getName().endswith("Autorelease")) &&
+         (FD->getName().ends_with("Release") ||
+          FD->getName().ends_with("Retain") ||
+          FD->getName().ends_with("Autorelease")) &&
         !FD->getAttr<clang::SwiftNameAttr>()) {
       if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>()){
         if (isCFTypeDecl(t->getDecl())) {

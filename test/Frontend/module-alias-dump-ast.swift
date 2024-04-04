@@ -16,7 +16,7 @@
 // CHECK-AST-NOT: bind="XLogging"
 // CHECK-AST-NOT: module<XLogging>
 // CHECK-AST-NOT: decl="XLogging"
-// CHECK-AST: type_ident id="XLogging" bind="AppleLogging"
+// CHECK-AST: type_unqualified_ident id="XLogging" bind="AppleLogging"
 // CHECK-AST: module<AppleLogging>
 // CHECK-AST: decl="AppleLogging"
 

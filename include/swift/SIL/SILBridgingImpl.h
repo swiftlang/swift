@@ -258,6 +258,10 @@ bool BridgedType::isNoEscapeFunction() const {
   return unbridged().isNoEscapeFunction();
 }
 
+bool BridgedType::containsNoEscapeFunction() const {
+  return unbridged().containsNoEscapeFunction();
+}
+
 bool BridgedType::isAsyncFunction() const {
   return unbridged().isAsyncFunction();
 }
@@ -274,8 +278,8 @@ bool BridgedType::isMoveOnly() const {
   return unbridged().isMoveOnly();
 }
 
-bool BridgedType::isEscapable() const {
-  return unbridged().isEscapable();
+bool BridgedType::isEscapable(BridgedFunction f) const {
+  return unbridged().isEscapable(*f.getFunction());
 }
 
 bool BridgedType::isOrContainsObjectiveCClass() const {
@@ -1244,6 +1248,27 @@ BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getFailureBlock() const 
   return {getAs<swift::CheckedCastBranchInst>()->getFailureBB()};
 }
 
+BridgedBasicBlock BridgedInstruction::CheckedCastAddrBranch_getSuccessBlock() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getSuccessBB()};
+}
+
+BridgedBasicBlock BridgedInstruction::CheckedCastAddrBranch_getFailureBlock() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getFailureBB()};
+}
+
+BridgedInstruction::CastConsumptionKind BridgedInstruction::CheckedCastAddrBranch_getConsumptionKind() const {
+  static_assert((int)BridgedInstruction::CastConsumptionKind::TakeAlways ==
+                (int)swift::CastConsumptionKind::TakeAlways);
+  static_assert((int)BridgedInstruction::CastConsumptionKind::TakeOnSuccess ==
+                (int)swift::CastConsumptionKind::TakeOnSuccess);
+  static_assert((int)BridgedInstruction::CastConsumptionKind::CopyOnSuccess ==
+                (int)swift::CastConsumptionKind::CopyOnSuccess);
+
+  return static_cast<BridgedInstruction::CastConsumptionKind>(
+           getAs<swift::CheckedCastAddrBranchInst>()->getConsumptionKind());
+}
+
+
 BridgedSubstitutionMap BridgedInstruction::ApplySite_getSubstitutionMap() const {
   auto as = swift::ApplySite(unbridged());
   return as.getSubstitutionMap();
@@ -1460,10 +1485,15 @@ BridgedInstruction BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftI
 }
 
 BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
-                                    bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
-  return {unbridged().createAllocStack(regularLoc(), type.unbridged(),
-                                       std::nullopt, hasDynamicLifetime,
-                                       isLexical, wasMoved)};
+                                                    bool hasDynamicLifetime,
+                                                    bool isLexical,
+                                                    bool isFromVarDecl,
+                                                    bool wasMoved) const {
+  return {unbridged().createAllocStack(
+      regularLoc(), type.unbridged(), std::nullopt,
+      swift::HasDynamicLifetime_t(hasDynamicLifetime),
+      swift::IsLexical_t(isLexical), swift::IsFromVarDecl_t(isFromVarDecl),
+      swift::UsesMoveableValueDebugInfo_t(wasMoved))};
 }
 
 BridgedInstruction BridgedBuilder::createAllocVector(BridgedValue capacity, BridgedType type) const {

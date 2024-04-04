@@ -128,7 +128,7 @@ static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
     if (Callee->isIntrinsic())
       return false;
     // objc_msgSend stubs must be called, and can't have their address taken.
-    if (Callee->getName().startswith("objc_msgSend$"))
+    if (Callee->getName().starts_with("objc_msgSend$"))
       return false;
   }
   if (isCalleeOperand(CI, opIdx) &&
@@ -638,7 +638,7 @@ static bool mayMergeCallsToFunction(Function &F) {
   StringRef Name = F.getName();
 
   // Calls to dtrace probes must generate unique patchpoints.
-  if (Name.startswith("__dtrace"))
+  if (Name.starts_with("__dtrace"))
     return false;
 
   return true;

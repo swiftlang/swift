@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypes
 
 struct Turtle<T> {}
 extension Turtle where T: ~Copyable {} // expected-error {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
@@ -15,7 +16,7 @@ protocol HasAssoc {
   associatedtype A
 }
 extension HasAssoc where Self.A: ~Copyable {}
-// expected-error@-1 {{cannot add inverse constraint 'Self.A: ~Copyable' on generic parameter 'Self.A' defined in outer scope}}
+// expected-error@-1 {{cannot suppress '~Copyable' on generic parameter 'Self.A' defined in outer scope}}
 // expected-error@-2 {{'Self.A' required to be 'Copyable' but is marked with '~Copyable'}}
 
 class Box<T: ~Copyable> {}

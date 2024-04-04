@@ -1,9 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
@@ -11,8 +10,7 @@
 
 // Test LifetimeDependenceScopeFixup.
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
 
@@ -30,12 +28,12 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a borrow.
-  borrowing func getBV() -> _borrow(self) BV {
+  borrowing func getBV() -> dependsOn(self) BV {
     BV(p, c)
   }
 }
 
-// Rewrite the mark_dependence to depende on the incoming argument rather than the nested access.
+// Rewrite the mark_dependence to depend on the incoming argument rather than the nested access.
 //
 // CHECK-LABEL: sil hidden @$s4test13bv_get_mutate9containerAA2BVVAA2NCVzYls_tF : $@convention(thin) (@inout NC) -> _scope(1) @owned BV {
 // CHECK: bb0(%0 : $*NC):
@@ -44,6 +42,6 @@ struct NC : ~Copyable {
 // CHECK:   [[R:%.*]] = apply %{{.*}}([[L]]) : $@convention(method) (@guaranteed NC) -> _scope(0) @owned BV
 // CHECK:   [[M:%.*]] = mark_dependence [nonescaping] [[R]] : $BV on %0 : $*NC
 // CHECK-LABEL: } // end sil function '$s4test13bv_get_mutate9containerAA2BVVAA2NCVzYls_tF'
-func bv_get_mutate(container: inout NC) -> _mutate(container) BV {
+func bv_get_mutate(container: inout NC) -> dependsOn(container) BV {
   container.getBV()
 }

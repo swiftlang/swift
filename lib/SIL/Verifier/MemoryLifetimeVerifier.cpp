@@ -228,6 +228,13 @@ bool MemoryLifetimeVerifier::isTrivialEnumSuccessor(SILBasicBlock *block,
   } else if (auto *switchEnumAddr = dyn_cast<SwitchEnumAddrInst>(term)) {
     elem = switchEnumAddr->getUniqueCaseForDestination(succ);
     enumTy = switchEnumAddr->getOperand()->getType();
+  } else if (auto *switchValue = dyn_cast<SwitchValueInst>(term)) {
+    auto destCase = switchValue->getUniqueCaseForDestination(succ);
+    assert(destCase.has_value());
+    auto caseValue =
+        cast<IntegerLiteralInst>(switchValue->getCase(*destCase).first);
+    auto testValue = dyn_cast<IntegerLiteralInst>(switchValue->getOperand());
+    return testValue ? testValue->getValue() != caseValue->getValue() : true;
   } else {
     return false;
   }
@@ -757,11 +764,16 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         // Note that despite the name, unchecked_take_enum_data_addr does _not_
         // "take" the payload of the Swift.Optional enum. This is a terrible
         // hack in SIL.
-        SILValue enumAddr = cast<UncheckedTakeEnumDataAddrInst>(&I)->getOperand();
-        int enumIdx = locations.getLocationIdx(enumAddr);
-        if (enumIdx >= 0)
-          requireBitsSet(bits, enumAddr, &I);
-        requireNoStoreBorrowLocation(enumAddr, &I);
+        auto enumInst = cast<UncheckedTakeEnumDataAddrInst>(&I);
+        // For some enums, projecting the enum data requires masking out
+        // embedded tag bits, which invalidates the value as an enum.
+        if (enumInst->isDestructive()) {
+          SILValue enumAddr = enumInst->getOperand();
+          int enumIdx = locations.getLocationIdx(enumAddr);
+          if (enumIdx >= 0)
+            requireBitsSet(bits, enumAddr, &I);
+          requireNoStoreBorrowLocation(enumAddr, &I);
+        }
         break;
       }
       case SILInstructionKind::DestroyAddrInst: {

@@ -159,6 +159,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::InjectEnumTag:
     case BuiltinValueKind::ExtractFunctionIsolation:
+    case BuiltinValueKind::AddressOfRawLayout:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime
@@ -186,11 +187,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:
-    case BuiltinValueKind::CreateAsyncTaskInGroup:
-    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroup:
-    case BuiltinValueKind::CreateAsyncTaskWithExecutor:
-    case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
-    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor:
     case BuiltinValueKind::TaskRunInline:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     case BuiltinValueKind::ConvertTaskToJob:

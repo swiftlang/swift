@@ -486,6 +486,8 @@ namespace {
                                        SGFContext C);
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
+    RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                             SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
              CovariantFunctionConversionExpr *E,
              SGFContext C);
@@ -677,7 +679,7 @@ static BridgingConversion getBridgingConversion(Expr *E) {
 
   // If we peeked through an opening, and we didn't recognize a specific
   // pattern above involving the opaque value, make sure we use the opening
-  // as the final expression instead of accidentally look through it.
+  // as the final expression instead of accidentally looking through it.
   if (open)
     return {open, std::nullopt, 0};
 
@@ -1092,8 +1094,9 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                                 bool hasDynamicLifetime,
-                                                 bool isLexical,
+                                                 HasDynamicLifetime_t dynamic,
+                                                 IsLexical_t isLexical,
+                                                 IsFromVarDecl_t isFromVarDecl,
                                                  bool generateDebugInfo) {
   ty = ty.getObjectType();
   std::optional<SILDebugVariable> DbgVar;
@@ -1101,7 +1104,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
     if (auto *VD = loc.getAsASTNode<VarDecl>())
       DbgVar = SILDebugVariable(VD->isLet(), 0);
   auto *alloc =
-      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical, false
+      B.createAllocStack(loc, ty, DbgVar, dynamic, isLexical, isFromVarDecl,
+                         DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
                          ,
                          !generateDebugInfo
@@ -2105,6 +2109,14 @@ RValue RValueEmitter::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *
                                                    nonIsolatedType));
 }
 
+RValue RValueEmitter::visitExtractFunctionIsolationExpr(
+    ExtractFunctionIsolationExpr *E, SGFContext C) {
+  auto arg = SGF.emitRValue(E->getFunctionExpr());
+  auto result = SGF.emitExtractFunctionIsolation(
+      E, ArgumentSource(E, std::move(arg)), C);
+  return RValue(SGF, E, result);
+}
+
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   if (auto result = tryEmitAsBridgingConversion(SGF, E, false, C)) {
     return RValue(SGF, E, *result);
@@ -2828,51 +2840,23 @@ wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
 static std::optional<FunctionTypeInfo>
 tryGetSpecializedClosureTypeFromContext(CanAnyFunctionType closureType,
                                         const Conversion &conv) {
-  // NOTE: if you support new kinds of conversion here, make sure you can
-  // rewrite them in narrowClosureConvention below
-
-  if (conv.getKind() == Conversion::SubstToOrig) {
-    auto destType = cast<AnyFunctionType>(conv.getReabstractionSubstResultType());
-    auto origType = conv.getReabstractionOrigType();
-    auto expectedTy =
-      conv.getReabstractionLoweredResultType().castTo<SILFunctionType>();
-    return FunctionTypeInfo{origType, destType, expectedTy};
-  }
-
-  if (conv.getKind() == Conversion::Subtype) {
-    assert(closureType == conv.getBridgingSourceType());
-    auto destType = cast<AnyFunctionType>(conv.getBridgingResultType());
-    auto origType = AbstractionPattern(destType);
-    auto expectedTy =
-      conv.getBridgingLoweredResultType().castTo<SILFunctionType>();
+  // Note that the kinds of conversion we work on here have to be kinds
+  // that we can call withSourceType on later.
+  if (conv.getKind() == Conversion::Reabstract ||
+      conv.getKind() == Conversion::Subtype) {
+    // We don't care about the input type here; we'll be emitting that
+    // based on the closure.
+    auto destType = cast<AnyFunctionType>(conv.getResultType());
+    auto origType =
+      conv.getKind() == Conversion::Reabstract
+        ? conv.getReabstractionOutputOrigType()
+        : AbstractionPattern(destType);
+    auto expectedTy = conv.getLoweredResultType().castTo<SILFunctionType>();
     return FunctionTypeInfo{origType, destType, expectedTy};
   }
 
   // No other kinds of conversion.
   return std::nullopt;
-}
-
-/// Given that tryGetSpecializedClosureTypeFromContext was able to return
-/// specialized closure type information from the given contextual conversion,
-/// construct a new conversion that starts from the given type, which is a
-/// supertype of the previous closure type but a subtype of the final type.
-/// The conversion should end with the same type.
-static Conversion narrowClosureConversion(CanAnyFunctionType newClosureType,
-                                          const Conversion &conv) {
-  if (conv.getKind() == Conversion::SubstToOrig) {
-    return Conversion::getSubstToOrig(newClosureType,
-                                      conv.getReabstractionOrigType(),
-                                      conv.getReabstractionSubstResultType(),
-                                      conv.getReabstractionLoweredResultType());
-  }
-
-  if (conv.getKind() == Conversion::Subtype) {
-    return Conversion::getSubtype(newClosureType,
-                                  conv.getBridgingResultType(),
-                                  conv.getBridgingLoweredResultType());
-  }
-
-  llvm_unreachable("mismatch with tryGetSpecializedClosureTypeFromContext");
 }
 
 /// Whether the given abstraction pattern as an opaque thrown error.
@@ -2902,12 +2886,12 @@ static bool canEmitClosureFunctionUnderConversion(
   // interferes with the implementation of `reasync`.
   auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
-    .withConcurrent(false)
+    .withSendable(false)
     .withThrows(false, Type());
 
   auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
-    .withConcurrent(false)
+    .withSendable(false)
     .withThrows(false, Type());
 
   // If the converted type has erased isolation, remove the isolation from
@@ -2987,7 +2971,7 @@ RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
     auto erasedResult = emitClosureReference(e, erasureInfo);
 
     // Narrow the original conversion to start from the erased closure type.
-    auto convAfterErasure = narrowClosureConversion(erasedClosureType, conv);
+    auto convAfterErasure = conv.withSourceType(SGF, erasedClosureType);
 
     // Apply the narrowed conversion.
     return convAfterErasure.emit(SGF, e, erasedResult, SGFContext());
@@ -5407,28 +5391,6 @@ void SILGenFunction::emitAssignToPatternVars(
   TupleLValueAssigner(*this, loc, destLVs).emit(destType, std::move(src));
 }
 
-void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
-                                             ManagedValue optAddress,
-                                             unsigned depth) {
-  assert(optAddress.getType().isAddress() && "Expected an address here");
-  assert(depth < BindOptionalFailureDests.size());
-  auto failureDest =
-      BindOptionalFailureDests[BindOptionalFailureDests.size() - depth - 1];
-  assert(failureDest.isValid() && "too big to fail");
-
-  // Since we know that we have an address, we do not need to worry about
-  // ownership invariants. Instead just use a select_enum_addr.
-  SILBasicBlock *someBB = createBasicBlock();
-  SILValue hasValue = emitDoesOptionalHaveValue(loc, optAddress.getValue());
-
-  auto noneBB = Cleanups.emitBlockForCleanups(failureDest, loc);
-  B.createCondBranch(loc, hasValue, someBB, noneBB);
-
-  // Reset the insertion point at the end of hasValueBB so we can
-  // continue to emit code there.
-  B.setInsertionPoint(someBB);
-}
-
 ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
                                               ManagedValue optValue,
                                               unsigned depth) {
@@ -5439,6 +5401,11 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   SILBasicBlock *hasValueBB = createBasicBlock();
   SILBasicBlock *hasNoValueBB = createBasicBlock();
+
+  // For move checking purposes, binding always consumes the value whole.
+  if (optValue.getType().isMoveOnly() && optValue.getType().isAddress()) {
+    optValue = B.createOpaqueConsumeBeginAccess(loc, optValue);
+  }
 
   SILType optValueTy = optValue.getType();
   SwitchEnumBuilder SEB(B, loc, optValue);

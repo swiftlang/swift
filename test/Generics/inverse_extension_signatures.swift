@@ -19,7 +19,7 @@
 // CHECK-LABEL: .Outer.InnerStruct.init()@
 // CHECK: Generic signature: <A, C where A : Escapable, C : Escapable>
 
-// CHECK: (normal_conformance type="Outer<A>.InnerStruct<C>" protocol="Escapable")
+// CHECK: (builtin_conformance type="Outer<A>.InnerStruct<C>" protocol="Escapable")
 
 // CHECK-LABEL: .Outer.InnerVariation1@
 // CHECK: Generic signature: <A, D where A : Escapable, D : Escapable>
@@ -44,32 +44,6 @@
 
 // CHECK-LABEL: ExtensionDecl {{.*}} base=Outer.InnerVariation2
 // CHECK: Generic signature: <A, D where A : Escapable, D : Copyable>
-
-// CHECK-LABEL: ExtensionDecl line=0 base=Outer<A>.InnerStruct<C>
-// CHECK-NEXT: (normal_conformance type="Outer<A>.InnerStruct<C>" protocol="Copyable"
-// CHECK-NEXT:   (requirement "A" conforms_to "Copyable")
-// CHECK-NEXT:   (requirement "C" conforms_to "Copyable"))
-
-// CHECK-LABEL: ExtensionDecl line=0 base=Outer<A>.InnerVariation1<D>
-// CHECK-NEXT: (normal_conformance type="Outer<A>.InnerVariation1<D>" protocol="Copyable"
-// CHECK-NEXT:   (requirement "A" conforms_to "Copyable")
-// CHECK-NEXT:   (requirement "D" conforms_to "Copyable"))
-
-// CHECK-LABEL: ExtensionDecl line=0 base=Outer<A>.InnerVariation2<D>
-// CHECK-NEXT: (normal_conformance type="Outer<A>.InnerVariation2<D>" protocol="Escapable"
-// CHECK-NEXT:   (requirement "D" conforms_to "Escapable"))
-
-// CHECK-LABEL: ExtensionDecl line=0 base=Outer<A>
-// CHECK-NEXT: (normal_conformance type="Outer<A>" protocol="Copyable"
-// CHECK-NEXT:   (requirement "A" conforms_to "Copyable"))
-
-// CHECK-LABEL: ExtensionDecl line=0 base=Freestanding<T>
-// CHECK-NEXT: (normal_conformance type="Freestanding<T>" protocol="Escapable"
-// CHECK-NEXT:   (requirement "T" conforms_to "Escapable"))
-
-// CHECK-LABEL: ExtensionDecl line=0 base=Freestanding<T>
-// CHECK-NEXT: (normal_conformance type="Freestanding<T>" protocol="Copyable"
-// CHECK-NEXT:   (requirement "T" conforms_to "Copyable"))
   
 public struct Outer<A: ~Copyable> {
   public func innerFn<B: ~Copyable>(_ b: borrowing B) {}

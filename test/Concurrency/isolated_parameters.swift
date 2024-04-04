@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser
@@ -477,3 +477,16 @@ nonisolated func fromNonisolated(ns: NotSendable) async -> NotSendable {
 func invalidIsolatedClosureParam<A: AnyActor> (
   _: (isolated A) async throws -> Void // expected-error {{'isolated' parameter type 'A' does not conform to 'Actor' or 'DistributedActor'}}
 ) {}
+
+public func useDefaultIsolation(
+  _ isolation: isolated (any Actor)? = #isolation
+) {}
+
+public func useDefaultIsolationWithoutIsolatedParam(
+  _ isolation: (any Actor)? = #isolation
+) {}
+
+@MainActor func callUseDefaultIsolation() async {
+  useDefaultIsolation()
+  useDefaultIsolationWithoutIsolatedParam()
+}

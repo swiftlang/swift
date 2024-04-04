@@ -188,9 +188,10 @@ SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
 DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   OnProtocol | UserInaccessible | LongAttribute | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   70)
-DECL_ATTR(_objcImplementation, ObjCImplementation,
+DECL_ATTR(implementation, ObjCImplementation,
   OnExtension | OnAbstractFunction | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   72)
+DECL_ATTR_ALIAS(_objcImplementation, ObjCImplementation)
 DECL_ATTR(_optimize, Optimize,
   OnAbstractFunction | OnSubscript | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   73)
@@ -485,13 +486,15 @@ SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
 SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   155)
-DECL_ATTR(_distributedThunkTarget, DistributedThunkTarget,
-  OnAbstractFunction | UserInaccessible | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  156)
+// Unused '156': Used to be `_distributedThunkTarget` but completed implementation in Swift 6.0 does not need it after all
 DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
   157)
-LAST_DECL_ATTR(AllowFeatureSuppression)
+DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
+SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
+  OnAbstractFunction | OnSubscript | OnVar | OnExtension | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  158)
+LAST_DECL_ATTR(PreInverseGenerics)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

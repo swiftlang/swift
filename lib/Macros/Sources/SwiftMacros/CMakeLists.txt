@@ -16,6 +16,7 @@ add_swift_macro_library(SwiftMacros
   DistributedProtocolMacro.swift
   SWIFT_DEPENDENCIES
     SwiftDiagnostics
+    SwiftOperators
     SwiftSyntax
     SwiftSyntaxBuilder
     SwiftSyntaxMacros

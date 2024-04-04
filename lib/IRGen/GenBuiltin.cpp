@@ -230,6 +230,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskOptions = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
+    taskOptions = IGF.Builder.CreateIntToPtr(taskOptions,
+                                             IGF.IGM.SwiftTaskOptionRecordPtrTy);
 
     auto asyncLet = emitBuiltinStartAsyncLet(
         IGF,
@@ -249,6 +251,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
     auto localBuffer = args.claimNext();
+    taskOptions = IGF.Builder.CreateIntToPtr(taskOptions,
+                                             IGF.IGM.SwiftTaskOptionRecordPtrTy);
 
     auto asyncLet = emitBuiltinStartAsyncLet(
         IGF,
@@ -317,56 +321,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {
     emitTaskCancel(IGF, args.claimNext());
-    return;
-  }
-
-  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor) {
-
-    auto flags = args.claimNext();
-    auto taskGroup =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
-            ? args.claimNext()
-            : nullptr;
-
-    // ExecutorRef is two pointers: {Identity, Implementation}
-    std::pair<llvm::Value *, llvm::Value *> executorRef =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
-            ? std::pair(args.claimNext(), args.claimNext())
-            : std::pair(nullptr, nullptr);
-
-    // In embedded Swift, futureResultType is a thin metatype, not backed by any
-    // actual value.
-    llvm::Value *futureResultType =
-        llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
-    // FIXME: We pass a metatype of result type even if it's statically known to
-    // be discarded (`Void`) just to keep the existing behavior.
-    if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-      futureResultType = args.claimNext();
-    }
-    auto taskFunction = args.claimNext();
-    auto taskContext = args.claimNext();
-
-    auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, taskGroup, executorRef.first, executorRef.second,
-        futureResultType, taskFunction, taskContext, substitutions);
-
-    // Cast back to NativeObject/RawPointer.
-    auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });
-    newTask = IGF.Builder.CreateBitCast(newTask, IGF.IGM.RefCountedPtrTy);
-    auto newContext = IGF.Builder.CreateExtractValue(newTaskAndContext, { 1 });
-    newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
-    out.add(newTask);
-    out.add(newContext);
     return;
   }
 
@@ -716,7 +670,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     BuiltinName = BuiltinName.substr(underscore);
     
     // Accept singlethread if present.
-    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    bool isSingleThread = BuiltinName.starts_with("_singlethread");
     if (isSingleThread)
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
@@ -831,10 +785,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     BuiltinName = BuiltinName.substr(underscore);
     
     // Accept volatile and singlethread if present.
-    bool isVolatile = BuiltinName.startswith("_volatile");
+    bool isVolatile = BuiltinName.starts_with("_volatile");
     if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
     
-    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    bool isSingleThread = BuiltinName.starts_with("_singlethread");
     if (isSingleThread)
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
@@ -878,10 +832,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     BuiltinName = BuiltinName.substr(underscore);
 
     // Accept volatile and singlethread if present.
-    bool isVolatile = BuiltinName.startswith("_volatile");
+    bool isVolatile = BuiltinName.starts_with("_volatile");
     if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
 
-    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    bool isSingleThread = BuiltinName.starts_with("_singlethread");
     if (isSingleThread)
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
@@ -1183,6 +1137,17 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     ptr = IGF.Builder.CreateBitCast(ptr,
                               valueTy.second.getStorageType()->getPointerTo());
     Address array = valueTy.second.getAddressForPointer(ptr);
+
+    // If the count is statically known to be a constant 1, then just call the
+    // type's destroy instead of the array variant.
+    if (auto ci = dyn_cast<llvm::ConstantInt>(count)) {
+      if (ci->isOne()) {
+        bool isOutlined = false;
+        valueTy.second.destroy(IGF, array, valueTy.first, isOutlined);
+        return;
+      }
+    }
+
     valueTy.second.destroyArray(IGF, array, count, valueTy.first);
     return;
   }
@@ -1520,6 +1485,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     emitDestructiveInjectEnumTagCall(IGF, inputTy, tag,
                                      inputTi.getAddressForPointer(input));
+    return;
+  }
+
+  // LLVM must not see the address generated here as 'invariant' or immutable
+  // ever. A raw layout's address defies all formal access, so immutable looking
+  // uses may actually mutate the underlying value!
+  if (Builtin.ID == BuiltinValueKind::AddressOfRawLayout) {
+    auto addr = args.claimNext();
+    auto value = IGF.Builder.CreateBitCast(addr, IGF.IGM.Int8PtrTy);
+    out.add(value);
     return;
   }
 

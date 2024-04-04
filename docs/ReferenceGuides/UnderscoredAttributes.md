@@ -779,6 +779,11 @@ of a header as non-`Sendable` so that you can make spot exceptions with
 
 ## `@_objcImplementation(CategoryName)`
 
+A pre-stable form of `@implementation`. The main difference between them is that
+many things that are errors with `@implementation` are warnings with
+`@_objcImplementation`, which permitted workarounds for compiler bugs and 
+changes in compiler behavior.
+
 Declares an extension that defines an implementation for the Objective-C
 category `CategoryName` on the class in question, or for the main `@interface`
 if the argument list is omitted.
@@ -841,12 +846,6 @@ Notes:
 
 * We don't currently plan to support ObjC generics.
 
-* Eventually, we want the main `@_objcImplementation` extension to be able to
-  declare stored properties that aren't in the interface. We also want
-  `final` stored properties to be allowed to be resilent Swift types, but
-  it's not clear how to achieve that without boxing them in `__SwiftValue`
-  (which we might do as a stopgap).
-     
 * We should think about ObjC "direct" members, but that would probably
   require a way to spell this in Swift. 
 
@@ -1135,7 +1134,7 @@ doing a textual search.
 
 Like `@available`, this attribute indicates a decl is available only as an SPI.
 This implies several behavioral changes comparing to regular `@available`:
-1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+1. Type checker diagnoses when a client accidentally exposes such a symbol in library APIs.
 2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
 3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.
 

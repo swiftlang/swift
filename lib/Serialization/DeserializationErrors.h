@@ -367,16 +367,21 @@ private:
 
   XRefTracePath path;
 
+  /// Expected vs found type if the mismatch caused a decl to be rejected.
+  std::optional<std::pair<Type, Type>> mismatchingTypes;
+
 public:
   explicit ModularizationError(DeclName name, bool declIsType, Kind errorKind,
                                const ModuleDecl *expectedModule,
                                const ModuleFile *referenceModule,
                                const ModuleDecl *foundModule,
-                               XRefTracePath path):
+                               XRefTracePath path,
+                               std::optional<std::pair<Type, Type>> mismatchingTypes):
     name(name), declIsType(declIsType), errorKind(errorKind),
     expectedModule(expectedModule),
     referenceModule(referenceModule),
-    foundModule(foundModule), path(path) {}
+    foundModule(foundModule), path(path),
+    mismatchingTypes(mismatchingTypes) {}
 
   void diagnose(const ModuleFile *MF,
                 DiagnosticBehavior limit = DiagnosticBehavior::Fatal) const;

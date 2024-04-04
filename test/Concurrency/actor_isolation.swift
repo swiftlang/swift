@@ -2,8 +2,8 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-experimental-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature GlobalActorIsolatedTypesUsability %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -144,7 +144,7 @@ struct InferredFromContext {
   nonisolated var status: Bool = true // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}{{3-15=}}{{3-15=}}{{14-14=(unsafe)}}
   // expected-note@-1{{convert 'status' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
 
-  nonisolated let flag: Bool = false // expected-warning {{'nonisolated' is redundant on struct's stored properties; this is an error in the Swift 6 language mode}}{{3-15=}}
+  nonisolated let flag: Bool = false
 
   subscript(_ i: Int) -> Int { return i }
 
@@ -156,7 +156,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ anno: NoGlobalActorValueType) async {
   // these still do need an await in Swift 5
   _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
-  _ = await formance.counter
+  _ = formance.counter
   _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   _ = anno.counter // expected-warning {{non-sendable type 'NoGlobalActorValueType' passed in call to main actor-isolated property 'counter' cannot cross actor boundary}}
@@ -170,15 +170,13 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'polygon' cannot cross actor boundary}}
 }
 
-// check for instance members that do not need global-actor protection
-
 // expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in the Swift 6 language mode}}
 // expected-note@+1 2 {{consider making struct 'NoGlobalActorValueType' conform to the 'Sendable' protocol}}
 struct NoGlobalActorValueType {
-  @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in the Swift 6 language mode}}
+  @SomeGlobalActor var point: Point
   // expected-note@-1 {{initializer for property 'point' is global actor 'SomeGlobalActor'-isolated}}
 
-  @MainActor let counter: Int // expected-warning {{stored property 'counter' within struct cannot have a global actor; this is an error in the Swift 6 language mode}}
+  @MainActor let counter: Int
 
   @MainActor static var polygon: [Point] = []
 }
@@ -470,6 +468,8 @@ actor Crystal {
   await asyncGlobalActorFunc()
 }
 
+func crossIsolationBoundary(_ closure: () -> Void) async {}
+
 @available(SwiftStdlib 5.1, *)
 func testGlobalActorClosures() {
   let _: Int = acceptAsyncClosure { @SomeGlobalActor in
@@ -482,6 +482,15 @@ func testGlobalActorClosures() {
   }
 
   acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-warning {{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
+
+  @MainActor func test() async {
+    let closure = { @MainActor @Sendable in
+      MainActor.assertIsolated()
+    }
+
+    await crossIsolationBoundary(closure)
+    // expected-warning@-1 {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}
+  }
 }
 
 @available(SwiftStdlib 5.1, *)

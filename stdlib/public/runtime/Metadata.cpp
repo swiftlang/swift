@@ -403,18 +403,6 @@ namespace {
       return true;
     }
 
-    void verifyBuiltMetadata(const Metadata *original,
-                             const Metadata *candidate) {}
-
-    void verifyBuiltMetadata(const Metadata *original,
-                             const TypeContextDescriptor *description,
-                             const void *const *arguments) {
-      if (swift::runtime::environment::
-              SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER())
-        validateExternalGenericMetadataBuilder(original, description,
-                                               arguments);
-    }
-
     MetadataStateWithDependency tryInitialize(Metadata *metadata,
                                       PrivateMetadataState state,
                                PrivateMetadataCompletionContext *context) {
@@ -3261,7 +3249,7 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   // name. The old and new Swift libraries must be able to coexist in
   // the same process, and this avoids warnings due to the ObjC names
   // colliding.
-  bool addSuffix = string.startswith("_TtGCs");
+  bool addSuffix = string.starts_with("_TtGCs");
 
   size_t allocationSize = string.size() + 1;
   if (addSuffix)

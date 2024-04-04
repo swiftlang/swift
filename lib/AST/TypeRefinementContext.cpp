@@ -42,8 +42,8 @@ TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
 }
 
 TypeRefinementContext *
-TypeRefinementContext::createRoot(SourceFile *SF,
-                                  const AvailabilityContext &Info) {
+TypeRefinementContext::createForSourceFile(SourceFile *SF,
+                                           const AvailabilityContext &Info) {
   assert(SF);
 
   ASTContext &Ctx = SF->getASTContext();
@@ -51,15 +51,29 @@ TypeRefinementContext::createRoot(SourceFile *SF,
   SourceRange range;
   TypeRefinementContext *parentContext = nullptr;
   AvailabilityContext availabilityContext = Info;
-  if (auto parentExpansion = SF->getMacroExpansion()) {
+  switch (SF->Kind) {
+  case SourceFileKind::MacroExpansion:
+  case SourceFileKind::DefaultArgument: {
+    // Look up the parent context in the enclosing file that this file's
+    // root context should be nested under.
     if (auto parentTRC =
             SF->getEnclosingSourceFile()->getTypeRefinementContext()) {
       auto charRange = Ctx.SourceMgr.getRangeForBuffer(*SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
-      parentContext = parentTRC->findMostRefinedSubContext(
-          parentExpansion.getStartLoc(), Ctx);
-      availabilityContext = parentContext->getAvailabilityInfo();
+      auto originalNode = SF->getNodeInEnclosingSourceFile();
+      parentContext =
+          parentTRC->findMostRefinedSubContext(originalNode.getStartLoc(), Ctx);
+      if (parentContext)
+        availabilityContext = parentContext->getAvailabilityInfo();
     }
+    break;
+  }
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+  case SourceFileKind::Interface:
+    break;
+  case SourceFileKind::SIL:
+    llvm_unreachable("unexpected SourceFileKind");
   }
 
   return new (Ctx)

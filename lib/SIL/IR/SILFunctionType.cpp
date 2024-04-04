@@ -1254,12 +1254,15 @@ class DestructureResults {
   const Conventions &Convs;
   SmallVectorImpl<SILResultInfo> &Results;
   TypeExpansionContext context;
+  bool hasTransferringResult;
 
 public:
   DestructureResults(TypeExpansionContext context, TypeConverter &TC,
                      const Conventions &conventions,
-                     SmallVectorImpl<SILResultInfo> &results)
-      : TC(TC), Convs(conventions), Results(results), context(context) {}
+                     SmallVectorImpl<SILResultInfo> &results,
+                     bool hasTransferringResult)
+      : TC(TC), Convs(conventions), Results(results), context(context),
+        hasTransferringResult(hasTransferringResult) {}
 
   void destructure(AbstractionPattern origType, CanType substType) {
     // Recur into tuples.
@@ -1290,6 +1293,8 @@ public:
         SILPackType::ExtInfo extInfo(indirect);
         auto packType = SILPackType::get(TC.Context, extInfo, packElts);
         SILResultInfo result(packType, ResultConvention::Pack);
+        if (hasTransferringResult)
+          result = result.addingOption(SILResultInfo::IsTransferring);
         Results.push_back(result);
       });
       return;
@@ -1331,6 +1336,8 @@ public:
     
     SILResultInfo result(substResultTL.getLoweredType().getASTType(),
                          convention);
+    if (hasTransferringResult)
+      result = result.addingOption(SILResultInfo::IsTransferring);
     Results.push_back(result);
   }
 
@@ -1991,6 +1998,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
         convention = ParameterConvention::Direct_Guaranteed;
       }
       SILParameterInfo param(loweredTy.getASTType(), convention, options);
+      if (function.isAsyncLetClosure)
+        param = param.addingOption(SILParameterInfo::Transferring);
       inputs.push_back(param);
       break;
     }
@@ -2006,6 +2015,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
           /*mutable*/ true);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention, options);
+      if (function.isAsyncLetClosure)
+        param = param.addingOption(SILParameterInfo::Transferring);
       inputs.push_back(param);
       break;
     }
@@ -2021,6 +2032,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
           /*mutable*/ false);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention, options);
+      if (function.isAsyncLetClosure)
+        param = param.addingOption(SILParameterInfo::Transferring);
       inputs.push_back(param);
       break;
     }
@@ -2030,6 +2043,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto param = SILParameterInfo(
           ty.getASTType(), ParameterConvention::Indirect_InoutAliasable,
           options);
+      if (function.isAsyncLetClosure)
+        param = param.addingOption(SILParameterInfo::Transferring);
       inputs.push_back(param);
       break;
     }
@@ -2040,6 +2055,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto param = SILParameterInfo(ty.getASTType(),
                                     ParameterConvention::Indirect_In_Guaranteed,
                                     options);
+      if (function.isAsyncLetClosure)
+        param = param.addingOption(SILParameterInfo::Transferring);
       inputs.push_back(param);
       break;
     }
@@ -2359,8 +2376,8 @@ static CanSILFunctionType getSILFunctionType(
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
   {
-    DestructureResults destructurer(expansionContext, TC, conventions,
-                                    results);
+    DestructureResults destructurer(expansionContext, TC, conventions, results,
+                                    hasTransferringResult);
     destructurer.destructure(origResultType, substFormalResultType);
   }
 
@@ -2400,12 +2417,11 @@ static CanSILFunctionType getSILFunctionType(
   }
   auto silExtInfo = extInfoBuilder.withClangFunctionType(clangType)
                         .withIsPseudogeneric(pseudogeneric)
-                        .withConcurrent(isSendable)
+                        .withSendable(isSendable)
                         .withAsync(isAsync)
                         .withUnimplementable(unimplementable)
                         .withLifetimeDependenceInfo(
                             extInfoBuilder.getLifetimeDependenceInfo())
-                        .withTransferringResult(hasTransferringResult)
                         .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
@@ -2487,7 +2503,7 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   auto silExtInfo =
       SILExtInfoBuilder()
           .withRepresentation(SILFunctionTypeRepresentation::Thin)
-          .withConcurrent(substAccessorType->getExtInfo().isSendable())
+          .withSendable(substAccessorType->getExtInfo().isSendable())
           .build();
 
   return SILFunctionType::get(
@@ -3824,6 +3840,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
       case AccessorKind::ID:
+      case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
@@ -4713,6 +4730,9 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   } else {
     bridgedParams.push_back(selfParam);
   }
+
+  if (innerExtInfo.hasTransferringResult())
+    extInfo = extInfo.withTransferringResult();
 
   auto uncurried = CanAnyFunctionType::get(
       genericSig, llvm::ArrayRef(bridgedParams), bridgedResultType, extInfo);

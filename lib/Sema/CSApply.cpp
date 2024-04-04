@@ -3423,6 +3423,15 @@ namespace {
                                         packType));
       }
 
+      case OverloadChoiceKind::ExtractFunctionIsolation: {
+        auto isolationType = solution.getResolvedType(expr);
+        auto *extractExpr = new (cs.getASTContext())
+          ExtractFunctionIsolationExpr(base,
+                                       expr->getEndLoc(),
+                                       isolationType);
+        return cs.cacheType(extractExpr);
+      }
+
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
 
@@ -5372,6 +5381,10 @@ namespace {
       return E;
     }
 
+    Expr *visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E) {
+      llvm_unreachable("found ExtractFunctionIsolationExpr in CSApply");
+    }
+
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
@@ -6675,13 +6688,24 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   Type fromInstanceType = fromType;
   Type toInstanceType = toType;
 
-  // Look through metatypes
+  // For existential-to-existential coercions, open the source existential.
+  Type openedFromType;
+  if (fromType->isAnyExistentialType()) {
+    openedFromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
+                                                 dc->getGenericSignatureOfContext());
+  }
+
+  Type openedFromInstanceType = openedFromType;
+
+  // Look through metatypes.
   while ((fromInstanceType->is<UnresolvedType>() ||
           fromInstanceType->is<AnyMetatypeType>()) &&
          toInstanceType->is<ExistentialMetatypeType>()) {
     if (!fromInstanceType->is<UnresolvedType>())
-      fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getExistentialInstanceType();
+      fromInstanceType = fromInstanceType->getMetatypeInstanceType();
+    if (openedFromInstanceType && !openedFromInstanceType->is<UnresolvedType>())
+      openedFromInstanceType = openedFromInstanceType->getMetatypeInstanceType();
+    toInstanceType = toInstanceType->getMetatypeInstanceType();
   }
 
   ASTContext &ctx = cs.getASTContext();
@@ -6745,20 +6769,13 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   }
 
   // For existential-to-existential coercions, open the source existential.
-  if (fromType->isAnyExistentialType()) {
-    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
-                                           dc->getGenericSignatureOfContext());
-
+  if (openedFromType) {
     auto *archetypeVal = cs.cacheType(
-        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
-
-    fromInstanceType = fromType;
-    while (auto *metatypeType = fromInstanceType->getAs<MetatypeType>())
-      fromInstanceType = metatypeType->getInstanceType();
+        new (ctx) OpaqueValueExpr(expr->getSourceRange(), openedFromType));
 
     auto conformances =
         dc->getParentModule()
-          ->collectExistentialConformances(fromInstanceType->getCanonicalType(),
+          ->collectExistentialConformances(openedFromInstanceType->getCanonicalType(),
                                            toInstanceType->getCanonicalType(),
                                            /*allowMissing=*/true);
 
@@ -7349,7 +7366,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
     if (toEI.isSendable() && !fromEI.isSendable()) {
-      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withSendable());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
@@ -8312,6 +8329,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
 bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
+
   if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
     return false;
 
@@ -8936,6 +8954,24 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   return diagnosedAnyErrors;
 }
 
+/// Pattern match if an initializer has as its value a callee that returns
+/// transferring.
+static bool isTransferringInitializer(Expr *initializer) {
+  auto *await = dyn_cast<AwaitExpr>(initializer);
+  if (!await)
+    return false;
+
+  auto *call = dyn_cast<CallExpr>(await->getSubExpr());
+  if (!call)
+    return false;
+
+  auto *fType = call->getFn()->getType()->getAs<AnyFunctionType>();
+  if (!fType)
+    return false;
+
+  return fType->hasTransferringResult();
+}
+
 /// For the initializer of an `async let`, wrap it in an autoclosure and then
 /// a call to that autoclosure, so that the code for the child task is captured
 /// entirely within the autoclosure. This captures the semantics of the
@@ -8947,11 +8983,15 @@ static Expr *wrapAsyncLetInitializer(
   Type initializerType = initializer->getType();
   bool throws = TypeChecker::canThrow(cs.getASTContext(), initializer)
                   .has_value();
+  bool hasTransferringResult = isTransferringInitializer(initializer);
+  bool isSendable = !cs.getASTContext().LangOpts.hasFeature(
+      Feature::TransferringArgsAndResults);
   auto extInfo = ASTExtInfoBuilder()
-    .withAsync()
-    .withConcurrent()
-    .withThrows(throws, /*FIXME:*/Type())
-    .build();
+                     .withAsync()
+                     .withThrows(throws, /*FIXME:*/ Type())
+                     .withSendable(isSendable)
+                     .withTransferringResult(hasTransferringResult)
+                     .build();
 
   // Form the autoclosure expression. The actual closure here encapsulates the
   // child task.

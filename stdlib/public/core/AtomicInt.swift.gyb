@@ -60,6 +60,9 @@ public final class _stdlib_AtomicInt {
   }
 }
 
+@available(*, unavailable)
+extension _stdlib_AtomicInt: Sendable {}
+
 @usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,

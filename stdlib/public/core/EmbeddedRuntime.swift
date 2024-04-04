@@ -17,10 +17,15 @@ import SwiftShims
 public struct ClassMetadata {
   var superclassMetadata: UnsafeMutablePointer<ClassMetadata>?
 
-  // There is no way to express the actual calling convention on the heap desroy
+  // There is no way to express the actual calling convention on this
   // function (swiftcc with 'self') currently, so let's use UnsafeRawPointer
   // and a helper function in C (_swift_embedded_invoke_heap_object_destroy).
   var destroy: UnsafeRawPointer
+
+  // There is no way to express the actual calling convention on this
+  // function (swiftcc with 'self') currently, so let's use UnsafeRawPointer
+  // and a helper function in C (_swift_embedded_invoke_heap_object_optional_ivardestroyer).
+  var ivarDestroyer: UnsafeRawPointer?
 }
 
 public struct HeapObject {
@@ -116,6 +121,20 @@ func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, alloca
   free(object._rawValue)
 }
 
+@_cdecl("swift_deallocPartialClassInstance")
+public func swift_deallocPartialClassInstance(object: Builtin.RawPointer, metadata: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int) {
+  swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>(object), metadata: UnsafeMutablePointer<ClassMetadata>(metadata), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+}
+
+func swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>, metadata: UnsafeMutablePointer<ClassMetadata>, allocatedSize: Int, allocatedAlignMask: Int) {
+  var classMetadata = _swift_embedded_get_heap_object_metadata_pointer(object).assumingMemoryBound(to: ClassMetadata.self)
+  while classMetadata != metadata {
+    _swift_embedded_invoke_heap_object_optional_ivardestroyer(object, classMetadata)
+    guard let superclassMetadata = classMetadata.pointee.superclassMetadata else { break }
+    classMetadata = superclassMetadata
+  }
+}
+
 @_cdecl("swift_initStaticObject")
 public func swift_initStaticObject(metadata: Builtin.RawPointer, object: Builtin.RawPointer) -> Builtin.RawPointer {
   return swift_initStaticObject(metadata: UnsafeMutablePointer<ClassMetadata>(metadata), object: UnsafeMutablePointer<HeapObject>(object))._rawValue
@@ -144,6 +163,12 @@ func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object
 
 @_cdecl("swift_setDeallocating")
 public func swift_setDeallocating(object: Builtin.RawPointer) {
+}
+
+@_cdecl("swift_isUniquelyReferenced_native")
+public func swift_isUniquelyReferenced_native(object: Builtin.RawPointer) -> Bool {
+  if Int(Builtin.ptrtoint_Word(object)) == 0 { return false }
+  return swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<HeapObject>(object))
 }
 
 @_cdecl("swift_isUniquelyReferenced_nonNull_native")

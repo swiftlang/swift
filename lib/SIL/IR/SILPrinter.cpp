@@ -327,6 +327,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Get:
       OS << "!getter";
       break;
+    case AccessorKind::DistributedGet:
+      OS << "!_distributed_getter";
+      break;
     case AccessorKind::Set:
       OS << "!setter";
       break;
@@ -1388,6 +1391,11 @@ public:
             *this << V;
           break;
         }
+        case SILDIExprElement::TypeKind: {
+          const Type TypePtr = Arg.getAsType();
+          *this << "$";
+          TypePtr->print(PrintState.OS, PrintState.ASTOptions);
+        }
         }
       }
     }
@@ -1435,7 +1443,9 @@ public:
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
       *this << "[lexical] ";
-    if (AVI->getUsesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
+    if (AVI->isFromVarDecl())
+      *this << "[var_decl] ";
+    if (AVI->usesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
@@ -1489,7 +1499,7 @@ public:
       *this << "[pointer_escape] ";
     }
 
-    if (ABI->getUsesMoveableValueDebugInfo() &&
+    if (ABI->usesMoveableValueDebugInfo() &&
         !ABI->getAddressType().isMoveOnly()) {
       *this << "[moveable_value_debuginfo] ";
     }
@@ -1603,7 +1613,7 @@ public:
   }
 
   void visitEndApplyInst(EndApplyInst *AI) {
-    *this << Ctx.getID(AI->getOperand());
+    *this << Ctx.getID(AI->getOperand()) << " as " << AI->getType();
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -1887,7 +1897,7 @@ public:
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->poisonRefs())
       *this << "[poison] ";
-    if (DVI->getUsesMoveableValueDebugInfo() &&
+    if (DVI->usesMoveableValueDebugInfo() &&
         !DVI->getOperand()->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     if (DVI->hasTrace())
@@ -3735,7 +3745,7 @@ static void printSILLinearMapTypes(SILPrintContext &Ctx,
       continue;
 
     StringRef Name = cast<TypeDecl>(D)->getNameStr();
-    if (!Name.startswith("_AD__"))
+    if (!Name.starts_with("_AD__"))
       continue;
 
     D->print(OS, Options);

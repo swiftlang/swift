@@ -1,4 +1,6 @@
 // RUN: %target-sil-opt -test-runner %s \
+// RUN:     -module-name Swift \
+// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
@@ -8,6 +10,8 @@
 sil_stage canonical
 
 import Builtin
+
+@_marker public protocol Escapable {}
 
 enum FakeOptional<T> {
 case none
@@ -36,15 +40,13 @@ sil_vtable D {
   #D.field!read: @d_field_read
 }
 
-@_nonescapable
-struct NE {
+struct NE : ~Escapable {
   var d: D
   @_unsafeNonescapableResult
   init() { }
 }
 
-@_nonescapable
-struct NEWrap {
+struct NEWrap : ~Escapable {
   var ne: NE
   @_unsafeNonescapableResult
   init() { }
@@ -111,7 +113,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // CHECK-NEXT: Yield: (**%{{.*}}**, %{{.*}}) = begin_apply %{{.*}}(%{{.*}}) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
 // CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $C
 // CHECK-NEXT: begin:      (%{{.*}}, %{{.*}}) = begin_apply %{{.*}}(%{{.*}}) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
-// CHECK-NEXT: ends:       end_apply %{{.*}}
+// CHECK-NEXT: ends:       %{{.*}} = end_apply %{{.*}} as $()
 // CHECK: dependence_scope: lifetime_dependence_scope with: %yield_mark
 
   %zero = integer_literal $Builtin.Int1, 0
@@ -151,15 +153,17 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   
   %inout_arg_mark = mark_dependence [nonescaping] %inguaranteed_arg_mark : $C on %4 : $*D
   specify_test "lifetime_dependence_scope %inout_arg_mark"
+// @inout arguments are expected to have an access scope.
+// A direct dependence on an @inout argument is considered "Unknown".
+//
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
-// CHECK-NEXT: Caller:     %4 = argument of bb0 : $*D
+// CHECK-NEXT: Unknown:     %4 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:  %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %4 : $*D
-// CHECK-NEXT: Caller range
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
 
   destroy_value %inout_arg_mark : $C
   end_access %access : $*C
-  end_apply %token
+  end_apply %token as $()
   end_borrow %borrow : $D
   destroy_value %move : $D
   %99 = tuple()
@@ -240,7 +244,7 @@ bb0(%0 : @guaranteed $NE):
 
 // CHECK-LABEL: dependence_coroutine: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NE
-// CHECK-NEXT: Leaf use: operand #0 of   end_apply %{{.*}}
+// CHECK-NEXT: Leaf use: operand #0 of   %{{.*}} = end_apply %{{.*}} as $()
 // CHECK-NEXT: dependence_coroutine: lifetime_dependence_use with: %0
 sil [ossa] @dependence_coroutine : $@convention(thin) (@guaranteed NE) -> () {
 bb0(%0 : @guaranteed $NE):
@@ -248,7 +252,7 @@ bb0(%0 : @guaranteed $NE):
   %coroutine = function_ref @coroutine : $@yield_once @convention(method) (@guaranteed NE) -> @yields @guaranteed NE
   (%yield, %token) = begin_apply %coroutine(%0) : $@yield_once @convention(method) (@guaranteed NE) -> @yields @guaranteed NE
   %copy = copy_value %yield : $NE
-  end_apply %token
+  end_apply %token as $()
   destroy_value %copy : $NE
   %99 = tuple()
   return %99 : $()

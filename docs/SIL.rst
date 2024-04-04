@@ -3786,6 +3786,7 @@ alloc_stack
   sil-instruction ::= 'alloc_stack' alloc-stack-option* sil-type (',' debug-var-attr)*
   alloc-stack-option ::= '[dynamic_lifetime]'
   alloc-stack-option ::= '[lexical]'
+  alloc-stack-option ::= '[var_decl]'
   alloc-stack-option ::= '[moveable_value_debuginfo]'
 
   %1 = alloc_stack $T
@@ -3805,7 +3806,12 @@ The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
 
-The optional ``lexical`` attribute specifies that the storage corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
+local variable with a lexical lifetime in the Swift source, so special care
+must be taken when hoisting ``destroy_addr``s.  Compare to the ``var_decl``
+attribute.
+
+The optional ``var_decl`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
 
 The optional ``moveable_value_debuginfo`` attribute specifies that when emitting
@@ -4325,6 +4331,7 @@ from that of source variable.
   debug-info-expr   ::= di-expr-operand (':' di-expr-operand)*
   di-expr-operand   ::= di-expr-operator (':' sil-operand)*
   di-expr-operator  ::= 'op_fragment'
+  di-expr-operator  ::= 'op_tuple_fragment'
   di-expr-operator  ::= 'op_deref'
 
 SIL debug info expression (SIL DIExpression) is a powerful method to connect SSA
@@ -4371,6 +4378,10 @@ a field declaration -- which references the desired sub-field in source variable
 
 In the snippet above, source variable "the_struct" has an aggregate type ``$MyStruct`` and we use a SIL DIExpression with ``op_fragment`` operator to associate ``%1`` to the ``y`` member variable (via the ``#MyStruct.y`` directive) inside "the_struct".
 Note that the extra source location directive follows right after ``name "the_struct"`` indicate that "the_struct" was originally declared in line 8, but not until line 9 -- the current ``debug_value`` instruction's source location -- does member ``y`` got updated with SSA value ``%1``.
+
+For tuples, it works similarly, except we use ``op_tuple_fragment``, which takes two arguments: the tuple type and the index. If our struct was instead a tuple, we would have:
+
+  debug_value %1 : $Int, var, (name "the_tuple", loc "file.swift":8:7), type $(x: Int, y: Int), expr op_tuple_fragment:$(x: Int, y: Int):1, loc "file.swift":9:4
 
 It is worth noting that a SIL DIExpression is similar to
 `!DIExpression <https://www.llvm.org/docs/LangRef.html#diexpression>`_ in LLVM debug
@@ -6089,6 +6100,14 @@ executing the ``begin_apply``) were being "called" by the ``yield``:
   or move the value from that position before ending or aborting the
   coroutine.
 
+A coroutine optionally may produce normal results. These do not have
+``@yields`` annotation in the result type tuple.
+::
+  (%float, %token) = begin_apply %0() : $@yield_once () -> (@yields Float, Int)
+
+Normal results of a coroutine are produced by the corresponding ``end_apply``
+instruction.
+
 A ``begin_apply`` must be uniquely either ended or aborted before
 exiting the function or looping to an earlier portion of the function.
 
@@ -6118,9 +6137,9 @@ end_apply
 `````````
 ::
 
-  sil-instruction ::= 'end_apply' sil-value
+  sil-instruction ::= 'end_apply' sil-value 'as' sil-type
 
-  end_apply %token
+  end_apply %token as $()
 
 Ends the given coroutine activation, which is currently suspended at
 a ``yield`` instruction.  Transfers control to the coroutine and takes
@@ -6130,8 +6149,8 @@ when the coroutine reaches a ``return`` instruction.
 The operand must always be the token result of a ``begin_apply``
 instruction, which is why it need not specify a type.
 
-``end_apply`` currently has no instruction results.  If coroutines were
-allowed to have normal results, they would be producted by ``end_apply``.
+The result of ``end_apply`` is the normal result of the coroutine function (the
+operand of the ``return`` instruction)."
 
 When throwing coroutines are supported, there will need to be a
 ``try_end_apply`` instruction.
@@ -7026,18 +7045,25 @@ unchecked_take_enum_data_addr
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
 
-Invalidates an enum value, and takes the address of the payload for the given
-enum ``case`` in-place in memory. The referenced enum value is no longer valid,
-but the payload value referenced by the result address is valid and must be
-destroyed. It is undefined behavior if the referenced enum does not contain a
-value of the given ``case``. The result shares memory with the original enum
-value; the enum memory cannot be reinitialized as an enum until the payload has
-also been invalidated.
+Takes the address of the payload for the given enum ``case`` in-place in
+memory. It is undefined behavior if the referenced enum does not contain a
+value of the given ``case``. 
 
-(1.0 only)
+The result shares memory with the original enum value.  If an enum declaration
+is unconditionally loadable (meaning it's loadable regardless of any generic
+parameters), and it has more than one case with an associated value, then it
+may embed the enum tag within the payload area. If this is the case, then
+`unchecked_take_enum_data_addr` will clear the tag from the payload,
+invalidating the referenced enum value, but leaving the
+payload value referenced by the result address valid. In these cases,
+the enum memory cannot be reinitialized as an enum until the payload has also
+been invalidated.
 
-For the first payloaded case of an enum, ``unchecked_take_enum_data_addr``
-is guaranteed to have no side effects; the enum value will not be invalidated.
+If an enum has no more than one payload case, or if the declaration is ever
+address-only, then `unchecked_take_enum_data_addr` is guaranteed to be
+nondestructive, and the payload address can be accessed without invalidating
+the enum in these cases. The payload can be invalidated to invalidate the
+enum (assuming the enum does not have a `deinit` at the type level).
 
 select_enum
 ```````````
@@ -8375,7 +8401,7 @@ switch_value
   // FIXME: All destination labels currently must take no arguments
 
 Conditionally branches to one of several destination basic blocks based on a
-value of builtin integer or function type. If the operand value matches one of the ``case``
+value of builtin integer. If the operand value matches one of the ``case``
 values of the instruction, control is transferred to the corresponding basic
 block. If there is a ``default`` basic block, control is transferred to it if
 the value does not match any of the ``case`` values. It is undefined behavior

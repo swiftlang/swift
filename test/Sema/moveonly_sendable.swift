@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
-// XFAIL: noncopyable_generics
-
 // REQUIRES: concurrency
 
 
@@ -95,17 +93,17 @@ enum Wrong_NoncopyableOption<T> : Sendable { // expected-note {{consider making 
 func takeAnySendable(_ s: any Sendable) {}
 func takeSomeSendable(_ s: some Sendable) {} // expected-note {{generic parameter 'some Sendable' has an implicit Copyable requirement}}
 
-// expected-error@+1 {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+// expected-error@+1 {{return expression of type 'FileDescriptor' does not conform to 'Copyable'}}
 func mkSendable() -> Sendable { return FileDescriptor(id: 0) }
 
 func tryToCastIt(_ fd: borrowing FileDescriptor) {
-  let _: any Sendable = fd // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
-  let _: Sendable = fd // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  let _: any Sendable = fd // expected-error {{value of type 'FileDescriptor' does not conform to specified type 'Copyable'}}
+  let _: Sendable = fd // expected-error {{value of type 'FileDescriptor' does not conform to specified type 'Copyable'}}
 
-  takeAnySendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  takeAnySendable(fd) // expected-error {{argument type 'FileDescriptor' does not conform to expected type 'Copyable'}}
   takeSomeSendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be substituted for copyable generic parameter 'some Sendable' in 'takeSomeSendable'}}
 
-  let _ = fd as Sendable // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  let _ = fd as Sendable // expected-error {{cannot convert value of type 'FileDescriptor' to type 'any Sendable' in coercion}}
 
   let _ = fd as? Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
   // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
@@ -148,7 +146,7 @@ class Container<T> where T:Sendable {
 }
 
 func createContainer(_ fd: borrowing FileDescriptor) {
-  let _: Container<Sendable> = Container(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  let _: Container<Sendable> = Container(fd) // expected-error {{argument type 'FileDescriptor' does not conform to expected type 'Copyable'}}
   let _: Container<Sendable> = Container(CopyableStruct())
 }
 

@@ -209,7 +209,10 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool>
   EnableOSSACompleteLifetimes = llvm::cl::opt<bool>("enable-ossa-complete-lifetimes",
-                        llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
+                        llvm::cl::desc("Require linear OSSA lifetimes after SILGenCleanup."));
+  llvm::cl::opt<bool>
+  EnableOSSAVerifyComplete = llvm::cl::opt<bool>("enable-ossa-verify-complete",
+                        llvm::cl::desc("Verify linear OSSA lifetimes after SILGenCleanup."));
 
   llvm::cl::opt<bool>
   EnableObjCInterop = llvm::cl::opt<bool>("enable-objc-interop",
@@ -222,6 +225,10 @@ struct SILOptOptions {
   llvm::cl::list<std::string>
   ExperimentalFeatures = llvm::cl::list<std::string>("enable-experimental-feature",
                        llvm::cl::desc("Enable the given experimental feature."));
+
+  llvm::cl::list<std::string> UpcomingFeatures = llvm::cl::list<std::string>(
+      "enable-upcoming-feature",
+      llvm::cl::desc("Enable the given upcoming feature."));
 
   llvm::cl::opt<bool>
   EnableExperimentalConcurrency = llvm::cl::opt<bool>("enable-experimental-concurrency",
@@ -652,11 +659,20 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.BypassResilienceChecks;
   Invocation.getDiagnosticOptions().PrintDiagnosticNames =
       options.DebugDiagnosticNames;
+  for (auto &featureName : options.UpcomingFeatures) {
+    if (auto feature = getUpcomingFeature(featureName)) {
+      Invocation.getLangOptions().enableFeature(*feature);
+    } else {
+      llvm::errs() << "error: unknown upcoming feature "
+                   << QuotedString(featureName) << "\n";
+      exit(-1);
+    }
+  }
   for (auto &featureName : options.ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().enableFeature(*feature);
     } else {
-      llvm::errs() << "error: unknown feature "
+      llvm::errs() << "error: unknown experimental feature "
                    << QuotedString(featureName) << "\n";
       exit(-1);
     }
@@ -746,6 +762,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
+  SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
 
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;

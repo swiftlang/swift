@@ -935,40 +935,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsLayoutConstraint()
         << FormatOpts.ClosingQuotationMark;
     break;
-  case DiagnosticArgumentKind::ActorIsolation:
+  case DiagnosticArgumentKind::ActorIsolation: {
     assert(Modifier.empty() && "Improper modifier for ActorIsolation argument");
-    switch (auto isolation = Arg.getAsActorIsolation()) {
-    case ActorIsolation::ActorInstance:
-      Out << "actor-isolated";
-      break;
-
-    case ActorIsolation::GlobalActor: {
-      if (isolation.isMainActor()) {
-        Out << "main actor-isolated";
-      } else {
-        Type globalActor = isolation.getGlobalActor();
-        Out << "global actor " << FormatOpts.OpeningQuotationMark
-          << globalActor.getString()
-          << FormatOpts.ClosingQuotationMark << "-isolated";
-      }
-      break;
-    }
-
-    case ActorIsolation::Erased:
-      Out << "@isolated(any)";
-      break;
-
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::Unspecified:
-      Out << "nonisolated";
-      if (isolation == ActorIsolation::NonisolatedUnsafe) {
-        Out << "(unsafe)";
-      }
-      break;
-    }
+    auto isolation = Arg.getAsActorIsolation();
+    isolation.printForDiagnostics(Out, FormatOpts.OpeningQuotationMark);
     break;
-
+  }
   case DiagnosticArgumentKind::Diagnostic: {
     assert(Modifier.empty() && "Improper modifier for Diagnostic argument");
     auto diagArg = Arg.getAsDiagnostic();

@@ -789,7 +789,7 @@ private:
       SILValue value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
           loc, argrv.getValue());
       argrv = SGF.emitManagedRValueWithCleanup(value);
-      argrv = SGF.B.createMoveValue(loc, argrv, /*isLexical=*/true);
+      argrv = SGF.B.createMoveValue(loc, argrv, IsLexical);
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
@@ -824,7 +824,7 @@ private:
       // If we have an owned value, forward it into the
       // mark_unresolved_non_copyable_value to avoid an extra destroy_value.
       argrv = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, argrv);
-      argrv = SGF.B.createMoveValue(loc, argrv, true /*is lexical*/);
+      argrv = SGF.B.createMoveValue(loc, argrv, IsLexical);
       argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           loc, argrv,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -863,6 +863,7 @@ private:
 
     if (auto *allocStack = dyn_cast<AllocStackInst>(argrv.getValue())) {
       allocStack->setArgNo(ArgNo);
+      allocStack->setIsFromVarDecl();
       if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
               SGF.getModule()) &&
           SGF.F.getLifetime(pd, allocStack->getType()).isLexical())
@@ -1296,7 +1297,7 @@ void SILGenFunction::emitProlog(
 
   emitExpectedExecutor();
 
-  // IMPORTANT: This block should be the last one in `emitProlog`, 
+  // IMPORTANT: This block should be the last one in `emitProlog`,
   // since it terminates BB and no instructions should be insterted after it.
   // Emit an unreachable instruction if a parameter type is
   // uninhabited
@@ -1469,14 +1470,9 @@ uint16_t SILGenFunction::emitBasicProlog(
 
   std::optional<AbstractionPattern> origErrorType;
   if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
-    CanType substClosureType = origClosureType->getType()
-        .subst(origClosureType->getGenericSubstitutions())->getCanonicalType();
-    CanAnyFunctionType substClosureFnType =
-        cast<AnyFunctionType>(substClosureType);
-    if (auto optPair = origClosureType->getFunctionThrownErrorType(substClosureFnType)) {
-      origErrorType = optPair->first;
-      errorType = optPair->second;
-    }
+    origErrorType = origClosureType->getFunctionThrownErrorType();
+    if (origErrorType && !errorType)
+      errorType = origErrorType->getEffectiveThrownErrorType();
   } else if (errorType) {
     origErrorType = AbstractionPattern(genericSig.getCanonicalSignature(),
                                        (*errorType)->getCanonicalType());
@@ -1503,6 +1499,19 @@ uint16_t SILGenFunction::emitBasicProlog(
     if (throwsLoc.isValid())
       loc = throwsLoc;
     B.createDebugValue(loc, undef.getValue(), dbgVar);
+  }
+
+  for (auto &i : *B.getInsertionBB()) {
+    auto *alloc = dyn_cast<AllocStackInst>(&i);
+    if (!alloc)
+      continue;
+    auto varInfo = alloc->getVarInfo();
+    if (!varInfo || varInfo->ArgNo)
+      continue;
+    // The allocation has a varinfo but no argument number, which should not
+    // happen in the prolog. Unfortunately, some copies can generate wrong
+    // debug info, so we have to fix it here, by invalidating it.
+    alloc->invalidateVarInfo();
   }
 
   return ArgNo;

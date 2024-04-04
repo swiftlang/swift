@@ -22,19 +22,16 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    print((prefix ? "### " : "") + message())
   }
 }
 
 let lifetimeDependenceInsertionPass = FunctionPass(
   name: "lifetime-dependence-insertion")
 { (function: Function, context: FunctionPassContext) in
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-  log("Inserting lifetime dependence markers in \(function.name)")
+  log(prefix: false, "\n--- Inserting lifetime dependence markers in \(function.name)")
 
   for instruction in function.instructions {
     if let dependentApply = LifetimeDependentApply(instruction) {

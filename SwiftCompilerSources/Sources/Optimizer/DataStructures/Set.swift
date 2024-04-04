@@ -176,3 +176,55 @@ struct InstructionSet : IntrusiveSet {
     context.freeNodeSet(bridged)
   }
 }
+
+/// A set of operands.
+///
+/// This is an extremely efficient implementation which does not need memory
+/// allocations or hash lookups.
+///
+/// This type should be a move-only type, but unfortunately we don't have move-only
+/// types yet. Therefore it's needed to call `deinitialize()` explicitly to
+/// destruct this data structure, e.g. in a `defer {}` block.
+struct OperandSet : IntrusiveSet {
+
+  private let context: BridgedPassContext
+  private let bridged: BridgedOperandSet
+
+  init(_ context: some Context) {
+    self.context = context._bridged
+    self.bridged = self.context.allocOperandSet()
+  }
+
+  func contains(_ operand: Operand) -> Bool {
+    bridged.contains(operand.bridged)
+  }
+
+  /// Returns true if `inst` was not contained in the set before inserting.
+  @discardableResult
+  mutating func insert(_ operand: Operand) -> Bool {
+    bridged.insert(operand.bridged)
+  }
+
+  mutating func erase(_ operand: Operand) {
+    bridged.erase(operand.bridged)
+  }
+
+  var description: String {
+    let function = bridged.getFunction().function
+    var d = "{\n"
+    for inst in function.instructions {
+      for op in inst.operands {
+        if contains(op) {
+          d += op.description
+        }
+      }
+    }
+    d += "}\n"
+    return d
+  }
+
+  /// TODO: once we have move-only types, make this a real deinit.
+  mutating func deinitialize() {
+    context.freeOperandSet(bridged)
+  }
+}

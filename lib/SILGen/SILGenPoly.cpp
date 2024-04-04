@@ -7021,8 +7021,7 @@ void SILGenFunction::emitProtocolWitness(
 
     if (!F.isAsync()) {
       assert(isPreconcurrency);
-      auto executor = emitExecutor(loc, *enterIsolation, actorSelf);
-      emitPreconditionCheckExpectedExecutor(loc, *executor);
+      emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
     } else {
       emitHopToTargetActor(loc, enterIsolation, actorSelf);
     }
@@ -7247,12 +7246,10 @@ ManagedValue SILGenFunction::emitActorIsolationErasureThunk(
 
     buildThunkBody(
         thunkSGF, loc, AbstractionPattern(isolatedType), isolatedType,
-        AbstractionPattern(nonIsolatedType), nonIsolatedType,
-        expectedType, dynamicSelfType,
-        [&loc, &globalActor](SILGenFunction &thunkSGF) {
-          auto expectedExecutor =
-              thunkSGF.emitLoadGlobalActorExecutor(globalActor);
-          thunkSGF.emitPreconditionCheckExpectedExecutor(loc, expectedExecutor);
+        AbstractionPattern(nonIsolatedType), nonIsolatedType, expectedType,
+        dynamicSelfType, [&loc, &globalActor](SILGenFunction &thunkSGF) {
+          thunkSGF.emitPreconditionCheckExpectedExecutor(
+              loc, ActorIsolation::forGlobalActor(globalActor), std::nullopt);
         });
 
     SGM.emitLazyConformancesForFunction(thunk);

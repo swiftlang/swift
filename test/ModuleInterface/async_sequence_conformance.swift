@@ -4,15 +4,21 @@
 
 // REQUIRES: concurrency, OS=macosx
 
-// CHECK: @available(
-// CHECK-NEXT: public struct SequenceAdapte
+// CHECK: public struct SequenceAdapte
 @available(SwiftStdlib 5.1, *)
 public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-LABEL: public struct AsyncIterator
   // CHECK: @available{{.*}}macOS 10.15
   // CHECK-NEXT: public typealias Element = Base.Element
+
+  // CHECK: #if compiler(>=5.3) && $AssociatedTypeImplements
   // CHECK: @available(
-  // CHECK-NEXT: public typealias Failure = Base.Failure
+  // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
+  // CHECK-NEXT: #else
+  // CHECK-NOT: @_implements
+  // CHECK: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
+  // CHECK-NEXT: #endif
   public typealias Element = Base.Element
 
   public struct AsyncIterator: AsyncIteratorProtocol {
@@ -23,11 +29,11 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   public func makeAsyncIterator() -> AsyncIterator { AsyncIterator() }
 
   // CHECK: @available(
-  // CHECK-NEXT: public typealias Failure = Base.Failure
+  // CHECK: @_implements(_Concurrency.AsyncSequence, Failure)
+  // CHECK-SAME: public typealias __AsyncSequence_Failure = Base.Failure
 }
 
-// CHECK: @available(
-// CHECK-NEXT: public struct OtherSequenceAdapte
+// CHECK: public struct OtherSequenceAdapte
 @available(SwiftStdlib 5.1, *)
 public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK: public typealias Element = Base.Element
@@ -37,7 +43,8 @@ public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK-LABEL: public struct AsyncIterator
   // CHECK: @available{{.*}}macOS 10.15
   // CHECK: @available(
-  // CHECK-NEXT: public typealias Failure = Base.Failure
+  // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
   public typealias Element = Base.Element
 
   public struct Failure: Error { }
@@ -51,4 +58,17 @@ public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   public func makeAsyncIterator() -> AsyncIterator { AsyncIterator() }
 
   // CHECK-NOT: public typealias Failure
+}
+
+// CHECK: public struct MineOwnIterator
+@available(SwiftStdlib 5.1, *)
+public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
+  public mutating func next() async -> Element? { nil }
+  public func makeAsyncIterator() -> Self { self }
+
+  // CHECK:      @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
+  // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Swift.Never
+
+  // CHECK:      @_implements(_Concurrency.AsyncSequence, Failure)
+  // CHECK-SAME: public typealias __AsyncSequence_Failure = Swift.Never
 }

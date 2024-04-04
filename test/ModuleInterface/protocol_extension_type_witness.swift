@@ -1,8 +1,4 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name protocol_extension_type_witness -enable-experimental-associated-type-inference
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name protocol_extension_type_witness
-// RUN: %FileCheck %s < %t.swiftinterface
-
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name protocol_extension_type_witness -disable-experimental-associated-type-inference
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name protocol_extension_type_witness
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name protocol_extension_type_witness
 // RUN: %FileCheck %s < %t.swiftinterface
 

@@ -223,6 +223,16 @@ AssociatedTypeDecl *findDefaultedAssociatedType(
     DeclContext *dc, NominalTypeDecl *adoptee,
     AssociatedTypeDecl *assocType);
 
+/// Determine whether this witness has an `@_implements` attribute whose
+/// name matches that of the given requirement.
+bool witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
+                                             ValueDecl *requirement);
+
+/// Determine whether this witness has an `@_implements` attribute whose name
+/// and protocol match that of the requirement exactly.
+bool witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
+                                                 ValueDecl *requirement);
+
 }
 
 #endif // SWIFT_SEMA_PROTOCOL_H

@@ -1424,7 +1424,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
           continue;
       }
 
-      // Check if the the candidate has a suitable availability for the
+      // Check if the candidate has a suitable availability for the
       // calling context.
       if (isUnavailable(func)) {
         foundUnavailable = true;

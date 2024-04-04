@@ -448,8 +448,9 @@ void SILLinkerVisitor::process() {
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
     }
 
-    // TODO: This should probably be done as a separate SIL pass ("internalize")
-    if (Fn->getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (Fn->getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+        Fn->getModule().getASTContext().LangOpts.DebuggerSupport) {
+      // LLDB requires that functions with bodies are not external.
       Fn->setLinkage(stripExternalFromLinkage(Fn->getLinkage()));
     }
 

@@ -725,6 +725,13 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
         return IGM.getFunction(constant, NotForDefinition);
       });
 
+  // If we have global actor isolation for our constant, put the isolation onto
+  // the function.
+  if (auto isolation =
+          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
+    F->setActorIsolation(isolation);
+  }
+
   assert(F && "SILFunction should have been defined");
 
   emittedFunctions[constant] = F;
@@ -806,6 +813,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   if (!f->empty()) {
     diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
              f->getName());
+    if (f->hasLocation())
+      diagnose(f->getLocation(), diag::sil_function_redefinition_note);
     return;
   }
 
@@ -1216,6 +1225,13 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
 
   if (F->getLoweredFunctionType()->isPolymorphic())
     F->setGenericEnvironment(Types.getConstantGenericEnvironment(constant));
+
+  // If we have global actor isolation for our constant, put the isolation onto
+  // the function.
+  if (auto isolation =
+          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
+    F->setActorIsolation(isolation);
+  }
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
@@ -2106,7 +2122,7 @@ public:
         SGM.pendingForcedFunctions.pop_front();
       }
       while (!SGM.pendingConformances.empty()) {
-        SGM.getWitnessTable(SGM.pendingConformances.front());
+        (void)SGM.getWitnessTable(SGM.pendingConformances.front());
         SGM.pendingConformances.pop_front();
       }
     }

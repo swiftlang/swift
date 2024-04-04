@@ -106,16 +106,17 @@ public:
 class Walker : public ASTWalker {
   using Callback = std::function<void(TypeRepr *, WalkCheckpoint)>;
 
-  MemberTypeReprWalkingScheme scheme;
+  QualifiedIdentTypeReprWalkingScheme scheme;
   std::optional<WalkAction> action;
   Callback callback;
 
 public:
-  Walker(MemberTypeReprWalkingScheme scheme, std::optional<WalkAction> action,
-         Callback callback)
+  Walker(QualifiedIdentTypeReprWalkingScheme scheme,
+         std::optional<WalkAction> action, Callback callback)
       : scheme(scheme), action(action), callback(callback) {}
 
-  MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const override {
+  QualifiedIdentTypeReprWalkingScheme
+  getQualifiedIdentTypeReprWalkingScheme() const override {
     return scheme;
   }
 
@@ -220,14 +221,14 @@ class WalkVerifier {
   };
 
   TypeRepr *repr;
-  MemberTypeReprWalkingScheme scheme;
+  QualifiedIdentTypeReprWalkingScheme scheme;
 
   /// A contiguous series of `Component` substrings.
   llvm::SmallString<128> walkStr;
   llvm::SmallVector<Component, 20> components;
 
 public:
-  WalkVerifier(TypeRepr *repr, MemberTypeReprWalkingScheme scheme)
+  WalkVerifier(TypeRepr *repr, QualifiedIdentTypeReprWalkingScheme scheme)
       : repr(repr), scheme(scheme) {
     llvm::raw_svector_ostream os(this->walkStr);
     internal::Walker walker(
@@ -372,7 +373,7 @@ private:
 
 } // end namespace
 
-TEST(ASTWalker, MemberTypeReprWalkingScheme) {
+TEST(ASTWalker, QualifiedIdentTypeReprWalkingScheme) {
   TestContext C;
   auto &ctx = C.Ctx;
 
@@ -388,8 +389,9 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
   };
 
   {
-    auto *repr = MemberTypeRepr::create(
-        ctx, new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("A")),
+    auto *repr = QualifiedIdentTypeRepr::create(
+        ctx,
+        UnqualifiedIdentTypeRepr::create(ctx, dummyLoc, makeDeclNameRef("A")),
         dummyLoc, makeDeclNameRef("B"));
 
     EXPECT_EQ(TypeRepr_getString(repr), "A.B");
@@ -400,25 +402,26 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
     };
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::ASTOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive);
       EXPECT_EQ(verifier.getWalkString(), "pr(B)pr(A)po(A)po(B)");
       verify(verifier);
     }
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::SourceOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive);
       EXPECT_EQ(verifier.getWalkString(), "pr(A)pr(B)po(B)po(A)");
       verify(verifier);
     }
   }
 
   {
-    auto *repr = MemberTypeRepr::create(
+    auto *repr = QualifiedIdentTypeRepr::create(
         ctx,
-        MemberTypeRepr::create(
-            ctx, new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("A")),
-            dummyLoc, makeDeclNameRef("B")),
+        QualifiedIdentTypeRepr::create(ctx,
+                                       UnqualifiedIdentTypeRepr::create(
+                                           ctx, dummyLoc, makeDeclNameRef("A")),
+                                       dummyLoc, makeDeclNameRef("B")),
         dummyLoc, makeDeclNameRef("C"));
 
     EXPECT_EQ(TypeRepr_getString(repr), "A.B.C");
@@ -430,15 +433,15 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
     };
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::ASTOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive);
       EXPECT_EQ(verifier.getWalkString(), "pr(C)pr(B)pr(A)po(A)po(B)po(C)");
       verify(verifier);
     }
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::SourceOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive);
       EXPECT_EQ(verifier.getWalkString(), "pr(A)pr(B)pr(C)po(C)po(B)po(A)");
       verify(verifier);
     }
@@ -446,11 +449,13 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
 
   {
     auto *array = new (ctx) ArrayTypeRepr(
-        new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("A")),
+        UnqualifiedIdentTypeRepr::create(ctx, dummyLoc, makeDeclNameRef("A")),
         SourceRange());
 
-    auto *repr = MemberTypeRepr::create(
-        ctx, MemberTypeRepr::create(ctx, array, dummyLoc, makeDeclNameRef("B")),
+    auto *repr = QualifiedIdentTypeRepr::create(
+        ctx,
+        QualifiedIdentTypeRepr::create(ctx, array, dummyLoc,
+                                       makeDeclNameRef("B")),
         dummyLoc, makeDeclNameRef("C"));
 
     EXPECT_EQ(TypeRepr_getString(repr), "[A].B.C");
@@ -463,16 +468,16 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
     };
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::ASTOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive);
       EXPECT_EQ(verifier.getWalkString(),
                 "pr(C)pr(B)pr([A])pr(A)po(A)po([A])po(B)po(C)");
       verify(verifier);
     }
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::SourceOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive);
       EXPECT_EQ(verifier.getWalkString(),
                 "pr([A])pr(A)po(A)pr(B)pr(C)po(C)po(B)po([A])");
       verify(verifier);
@@ -480,20 +485,23 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
   }
 
   {
-    auto *repr = MemberTypeRepr::create(
+    auto *repr = QualifiedIdentTypeRepr::create(
         ctx,
-        MemberTypeRepr::create(
+        QualifiedIdentTypeRepr::create(
             ctx,
-            GenericIdentTypeRepr::create(
+            UnqualifiedIdentTypeRepr::create(
                 ctx, dummyLoc, makeDeclNameRef("A"),
-                {new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("W"))},
+                {UnqualifiedIdentTypeRepr::create(ctx, dummyLoc,
+                                                  makeDeclNameRef("W"))},
                 SourceRange()),
             dummyLoc, makeDeclNameRef("B"),
-            {new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("X")),
-             new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("Y"))},
+            {UnqualifiedIdentTypeRepr::create(ctx, dummyLoc,
+                                              makeDeclNameRef("X")),
+             UnqualifiedIdentTypeRepr::create(ctx, dummyLoc,
+                                              makeDeclNameRef("Y"))},
             SourceRange()),
         dummyLoc, makeDeclNameRef("C"),
-        {new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("Z"))},
+        {UnqualifiedIdentTypeRepr::create(ctx, dummyLoc, makeDeclNameRef("Z"))},
         SourceRange());
 
     EXPECT_EQ(TypeRepr_getString(repr), "A<W>.B<X, Y>.C<Z>");
@@ -509,8 +517,8 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
     };
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::ASTOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive);
       // clang-format off
       EXPECT_EQ(verifier.getWalkString(),
                 "pr(C)pr(B)pr(A)pr(W)po(W)po(A)pr(X)po(X)pr(Y)po(Y)po(B)pr(Z)po(Z)po(C)");
@@ -519,8 +527,8 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
     }
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::SourceOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive);
       // clang-format off
       EXPECT_EQ(verifier.getWalkString(),
                 "pr(A)pr(W)po(W)pr(B)pr(X)po(X)pr(Y)po(Y)pr(C)pr(Z)po(Z)po(C)po(B)po(A)");
@@ -531,23 +539,25 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
 
   {
     auto *array = new (ctx) ArrayTypeRepr(
-        MemberTypeRepr::create(
-            ctx, new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("Y")),
-            dummyLoc, makeDeclNameRef("Z")),
+        QualifiedIdentTypeRepr::create(ctx,
+                                       UnqualifiedIdentTypeRepr::create(
+                                           ctx, dummyLoc, makeDeclNameRef("Y")),
+                                       dummyLoc, makeDeclNameRef("Z")),
         SourceRange());
 
-    auto *repr = MemberTypeRepr::create(
+    auto *repr = QualifiedIdentTypeRepr::create(
         ctx,
-        MemberTypeRepr::create(
+        QualifiedIdentTypeRepr::create(
             ctx,
-            GenericIdentTypeRepr::create(
+            UnqualifiedIdentTypeRepr::create(
                 ctx, dummyLoc, makeDeclNameRef("A"),
-                {MemberTypeRepr::create(
+                {QualifiedIdentTypeRepr::create(
                      ctx,
-                     MemberTypeRepr::create(ctx,
-                                            new (ctx) SimpleIdentTypeRepr(
-                                                dummyLoc, makeDeclNameRef("V")),
-                                            dummyLoc, makeDeclNameRef("W")),
+                     QualifiedIdentTypeRepr::create(
+                         ctx,
+                         UnqualifiedIdentTypeRepr::create(ctx, dummyLoc,
+                                                          makeDeclNameRef("V")),
+                         dummyLoc, makeDeclNameRef("W")),
                      dummyLoc, makeDeclNameRef("X")),
                  array},
                 SourceRange()),
@@ -569,8 +579,8 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
     };
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::ASTOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive);
       // clang-format off
       EXPECT_EQ(verifier.getWalkString(),
                 "pr(C)pr(B)pr(A)pr(X)pr(W)pr(V)po(V)po(W)po(X)pr([Y.Z])pr(Z)pr(Y)po(Y)po(Z)po([Y.Z])po(A)po(B)po(C)");
@@ -579,8 +589,8 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
     }
 
     {
-      WalkVerifier verifier(repr,
-                            MemberTypeReprWalkingScheme::SourceOrderRecursive);
+      WalkVerifier verifier(
+          repr, QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive);
       // clang-format off
       EXPECT_EQ(verifier.getWalkString(),
                 "pr(A)pr(V)pr(W)pr(X)po(X)po(W)po(V)pr([Y.Z])pr(Y)pr(Z)po(Z)po(Y)po([Y.Z])pr(B)pr(C)po(C)po(B)po(A)");

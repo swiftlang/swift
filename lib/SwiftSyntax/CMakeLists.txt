@@ -72,6 +72,10 @@ endif()
 add_dependencies(swift-syntax-lib
   ${SWIFT_SYNTAX_MODULES})
 
+if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+    add_dependencies(swift-syntax-lib swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+endif()
+
 # Install Swift module interface files.
 foreach(module ${SWIFT_SYNTAX_MODULES})
   set(module_dir "${module}.swiftmodule")

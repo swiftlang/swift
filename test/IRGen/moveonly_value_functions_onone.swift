@@ -157,7 +157,7 @@ public enum OuterMultiPayloadNC_4<T>: ~Copyable {
 // CHECK:         [[OUTER_DEINITING_NC_1_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone18OuterDeinitingNC_1VfD"(
 // CHECK-SAME:        ptr [[OUTER_DEINITING_NC_1_METADATA]],
-// CHECK-SAME:        ptr{{.*}} %t)
+//           :        ptr{{.*}} %t)
 // CHECK:       }
 public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
   external_symbol()
@@ -176,7 +176,7 @@ public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone9OuterNC_1VyxGlWOh"(
-// CHECK-SAME:        ptr %o,
+//           :        ptr %o,
 // CHECK-SAME:        ptr %T)
 // CHECK:       }
 
@@ -230,7 +230,7 @@ public func takeOuterNC_1<T>(_ o: consuming OuterNC_1<T>) {
 //                ...
 //                ...
 // CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s30moveonly_value_functions_onone28InnerDeinitingDestructableNCVMa"(
-//           :        [[INT]] 0,
+//           :        i64 0,
 // CHECK-SAME:        ptr %T)
 // CHECK:         [[INNER_DEINITING_DESTRUCTABLE_NC_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone28InnerDeinitingDestructableNCVfD"(
@@ -301,12 +301,12 @@ public func takeOuterSinglePayloadNC_1<T>(_ e: consuming OuterSinglePayloadNC_1<
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         [[RESPONSE:%[^,]+]] = call swiftcc %swift.metadata_response @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVMa"(
-// CHECK-SAME:        [[INT]] 0,
+//           :        i64 0,
 // CHECK-SAME:        ptr %T)
 // CHECK:         [[METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK:         call swiftcc void @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVfD"(
 // CHECK-SAME:        ptr [[METADATA]],
-//                    ptr noalias nocapture swiftself dereferenceable(64) %0)
+//           :        ptr noalias nocapture swiftself dereferenceable(64) %0)
 // CHECK:       }
 public func takeOuterSinglePayloadNC_2<T>(_ e: consuming OuterSinglePayloadNC_2<T>) {}
 

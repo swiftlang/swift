@@ -447,7 +447,7 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 static void tryStdlibFixit(ASTContext &ctx,
                            StringRef moduleName,
                            SourceLoc loc) {
-  if (moduleName.startswith("std")) {
+  if (moduleName.starts_with("std")) {
     ctx.Diags.diagnose(loc, diag::did_you_mean_cxxstdlib)
       .fixItReplaceChars(loc, loc.getAdvancedLoc(3), "CxxStdlib");
   }
@@ -764,7 +764,7 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   ASTContext &ctx = topLevelModule->getASTContext();
   if (topLevelModule->inSamePackage(ctx.MainModule) &&
       topLevelModule->isBuiltFromInterface() &&
-      !topLevelModule->getModuleSourceFilename().endswith(".package.swiftinterface")) {
+      !topLevelModule->getModuleSourceFilename().ends_with(".package.swiftinterface")) {
       ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                          diag::in_package_module_not_compiled_from_source_or_package_interface,
                          topLevelModule->getBaseIdentifier(),

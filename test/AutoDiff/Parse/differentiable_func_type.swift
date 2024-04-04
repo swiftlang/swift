@@ -14,10 +14,10 @@ let c: @differentiable(reverse) (Float, @noDerivative Float) -> Float // okay
 // CHECK-NEXT: (type_attributed attrs="@differentiable(reverse) "
 // CHECK-NEXT:  (type_function
 // CHECK-NEXT:    (type_tuple
-// CHECK-NEXT:      (type_ident id="Float" unbound)
+// CHECK-NEXT:      (type_unqualified_ident id="Float" unbound)
 // CHECK-NEXT:      (type_attributed attrs="@noDerivative "
-// CHECK-NEXT:        (type_ident id="Float" unbound))
-// CHECK-NEXT:    (type_ident id="Float" unbound))))
+// CHECK-NEXT:        (type_unqualified_ident id="Float" unbound))
+// CHECK-NEXT:    (type_unqualified_ident id="Float" unbound))))
 
 let d: @differentiable(reverse) (Float) throws -> Float // okay
 // CHECK: (pattern_named "d"

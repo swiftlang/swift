@@ -187,7 +187,7 @@ private:
     }
     // drop swift-frontend executable path and leading `-frontend` from
     // command-line.
-    if (StringRef(FrontendArgs[0]).endswith("swift-frontend"))
+    if (StringRef(FrontendArgs[0]).ends_with("swift-frontend"))
       FrontendArgs.erase(FrontendArgs.begin());
     if (StringRef(FrontendArgs[0]).equals("-frontend"))
       FrontendArgs.erase(FrontendArgs.begin());

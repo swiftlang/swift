@@ -123,10 +123,14 @@ extension LazyFilterSequence : CollectionLikeSequence,
 //===----------------------------------------------------------------------===//
 
 public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeArray {
-  private var singleElement: Element? = nil
+  private var singleElement: Element?
   private var multipleElements: [Element] = []
 
   public init() {}
+
+  public init(element: Element) {
+    singleElement = element
+  }
 
   public var startIndex: Int { 0 }
   public var endIndex: Int {
@@ -134,13 +138,33 @@ public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeA
   }
 
   public subscript(_ index: Int) -> Element {
-    if index == 0 {
-      return singleElement!
+    _read {
+      if index == 0 {
+        yield singleElement!
+      } else {
+        yield multipleElements[index - 1]
+      }
     }
-    return multipleElements[index - 1]
+    _modify {
+      if index == 0 {
+        yield &singleElement!
+      } else {
+        yield &multipleElements[index - 1]
+      }
+    }
   }
 
-  public mutating func push(_ element: Element) {
+  public mutating func append(_ element: __owned Element) {
+    push(element)
+  }
+
+  public mutating func append<S: Sequence>(contentsOf newElements: __owned S) where S.Element == Element {
+    for element in newElements {
+      push(element)
+    }
+  }
+
+  public mutating func push(_ element: __owned Element) {
     guard singleElement != nil else {
       singleElement = element
       return

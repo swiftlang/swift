@@ -50,6 +50,7 @@ class DominanceInfo;
 class PostDominanceInfo;
 class BasicBlockSet;
 class NodeSet;
+class OperandSet;
 class ClonerWithFixedLocation;
 class SwiftPassInvocation;
 class FixedSizeSlabPayload;
@@ -155,6 +156,15 @@ struct BridgedNodeSet {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
 };
 
+struct BridgedOperandSet {
+  swift::OperandSet * _Nonnull set;
+
+  BRIDGED_INLINE bool contains(BridgedOperand operand) const;
+  BRIDGED_INLINE bool insert(BridgedOperand operand) const;
+  BRIDGED_INLINE void erase(BridgedOperand operand) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
+
 struct BridgedCloner {
   swift::ClonerWithFixedLocation * _Nonnull cloner;
 
@@ -214,6 +224,7 @@ struct BridgedPassContext {
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
+  bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
   SWIFT_IMPORT_UNSAFE swift::SILVTable * _Nullable specializeVTableForType(BridgedType type,
                                                                            BridgedFunction function) const;
@@ -244,6 +255,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE void freeBasicBlockSet(BridgedBasicBlockSet set) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNodeSet allocNodeSet() const;
   BRIDGED_INLINE void freeNodeSet(BridgedNodeSet set) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandSet allocOperandSet() const;
+  BRIDGED_INLINE void freeOperandSet(BridgedOperandSet set) const;
 
   // Stack nesting
 
@@ -330,6 +343,18 @@ struct BridgedPassContext {
 };
 
 bool FullApplySite_canInline(BridgedInstruction apply);
+
+enum class BridgedDynamicCastResult {
+  willSucceed,
+  maySucceed,
+  willFail
+};
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
+                                                    BridgedFunction function,
+                                                    bool sourceTypeIsExact);
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst);
 
 //===----------------------------------------------------------------------===//
 //                          Pass registration

@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 @_semantics("arc.immortal")
-final public class BasicBlock : CustomStringConvertible, HasShortDescription, Equatable {
+final public class BasicBlock : CustomStringConvertible, HasShortDescription, Hashable {
   public var next: BasicBlock? { bridged.getNext().block }
   public var previous: BasicBlock? { bridged.getPrevious().block }
 
@@ -69,6 +69,10 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
   public var name: String { "bb\(index)" }
 
   public static func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
 
   public var bridged: BridgedBasicBlock { BridgedBasicBlock(SwiftObject(self)) }
 }

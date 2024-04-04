@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 public enum E : E.R {
 // expected-error@-1 {{'E' has a raw type that depends on itself}}
 // expected-note@-2 2{{through reference here}}

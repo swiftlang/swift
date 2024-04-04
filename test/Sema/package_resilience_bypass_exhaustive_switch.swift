@@ -5,6 +5,7 @@
 // RUN:   -module-name Utils -swift-version 5 -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
+// RUN:   -experimental-allow-non-resilient-access \
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck %t/ClientDefault.swift -I %t -swift-version 5 -package-name mypkg -verify

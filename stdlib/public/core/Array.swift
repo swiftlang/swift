@@ -1254,7 +1254,6 @@ extension Array: RangeReplaceableCollection {
 
     if _slowPath(writtenUpTo == buf.endIndex) {
 
-#if !$Embedded
       // A shortcut for appending an Array: If newElements is an Array then it's
       // guaranteed that buf.initialize(from: newElements) already appended all
       // elements. It reduces code size, because the following code
@@ -1264,7 +1263,6 @@ extension Array: RangeReplaceableCollection {
         _internalInvariant(remainder.next() == nil)
         return
       }
-#endif
 
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode

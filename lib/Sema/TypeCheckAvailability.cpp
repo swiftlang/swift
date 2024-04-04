@@ -65,6 +65,8 @@ ExportContext::ExportContext(
 bool swift::isExported(const ValueDecl *VD) {
   if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     return false;
+  if (VD->isObjCMemberImplementation())
+    return false;
 
   // Is this part of the module's API or ABI?
   AccessScope accessScope =
@@ -682,6 +684,11 @@ private:
     if (isCurrentTRCContainedByDeploymentTarget())
       return false;
 
+    // A declaration inside of a local context always inherits the availability
+    // of the parent.
+    if (D->getDeclContext()->isLocalContext())
+      return false;
+
     // As a convenience, SPI decls and explicitly unavailable decls are
     // constrained to the deployment target. There's not much benefit to
     // checking these declarations at a lower availability version floor since
@@ -1272,7 +1279,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
     // the source file are guaranteed to be executing on at least the minimum
     // platform version for inlining.
     auto MinPlatformReq = AvailabilityContext::forInliningTarget(Context);
-    RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
+    RootTRC = TypeRefinementContext::createForSourceFile(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
 
@@ -1368,9 +1375,11 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
     if (rootTRC) {
       TypeRefinementContext *TRC =
           rootTRC->findMostRefinedSubContext(loc, Context);
-      OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
-      if (MostRefined) {
-        *MostRefined = TRC;
+      if (TRC) {
+        OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
+        if (MostRefined) {
+          *MostRefined = TRC;
+        }
       }
     }
   }
@@ -3496,6 +3505,20 @@ private:
     return call;
   }
 
+  /// Walks up to the first enclosing LoadExpr and returns it.
+  const LoadExpr *getEnclosingLoadExpr() const {
+    assert(!ExprStack.empty() && "must be called while visiting an expression");
+    ArrayRef<const Expr *> stack = ExprStack;
+    stack = stack.drop_back();
+
+    for (auto expr : llvm::reverse(stack)) {
+      if (auto loadExpr = dyn_cast<LoadExpr>(expr))
+        return loadExpr;
+    }
+
+    return nullptr;
+  }
+
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) {
     // We take over recursive walking of assignment expressions in order to
@@ -3523,10 +3546,20 @@ private:
   
   /// Walk a member reference expression, checking for availability.
   void walkMemberRef(MemberRefExpr *E) {
-    // Walk the base in a getter context.
-    // FIXME: We may need to look at the setter too, if we're going to do
-    // writeback. The AST should have this information.
-    walkInContext(E, E->getBase(), MemberAccessContext::Getter);
+    // Walk the base. If the access context is currently `Setter`, then we must
+    // be diagnosing the destination of an assignment. When recursing, diagnose
+    // any remaining member refs as if they were in an InOutExpr, since there is
+    // a writeback occurring through them as a result of the assignment.
+    //
+    //   someVar.x.y = 1
+    //           │ ╰─ MemberAccessContext::Setter
+    //           ╰─── MemberAccessContext::InOut
+    //
+    MemberAccessContext accessContext =
+        (AccessContext == MemberAccessContext::Setter)
+            ? MemberAccessContext::InOut
+            : AccessContext;
+    walkInContext(E, E->getBase(), accessContext);
 
     ConcreteDeclRef DR = E->getMember();
     // Diagnose for the member declaration itself.
@@ -3543,6 +3576,7 @@ private:
   /// availability.
   void maybeDiagKeyPath(KeyPathExpr *KP) {
     auto flags = DeclAvailabilityFlags();
+    auto declContext = Where.getDeclContext();
     if (KP->isObjC())
       flags = DeclAvailabilityFlag::ForObjCKeyPath;
 
@@ -3552,7 +3586,10 @@ private:
       case KeyPathExpr::Component::Kind::Subscript: {
         auto decl = component.getDeclRef();
         auto loc = component.getLoc();
-        diagnoseDeclRefAvailability(decl, loc, nullptr, flags);
+        auto range = component.getSourceRange();
+        if (diagnoseDeclRefAvailability(decl, loc, nullptr, flags))
+          break;
+        maybeDiagStorageAccess(decl.getDecl(), range, declContext);
         break;
       }
 
@@ -3575,7 +3612,12 @@ private:
 
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
-    walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
+    // If there is a LoadExpr in the stack, then this InOutExpr is not actually
+    // indicative of any mutation so the access context should just be Getter.
+    auto accessContext = getEnclosingLoadExpr() ? MemberAccessContext::Getter
+                                                : MemberAccessContext::InOut;
+
+    walkInContext(E, E->getSubExpr(), accessContext);
   }
 
   bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
@@ -4034,11 +4076,11 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   bool checkDeclRefTypeRepr(DeclRefTypeRepr *declRefTR) const {
     ArrayRef<AssociatedTypeDecl *> primaryAssociatedTypes;
 
-    if (auto *memberTR = dyn_cast<MemberTypeRepr>(declRefTR)) {
+    if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(declRefTR)) {
       // If the base is unavailable, don't go on to diagnose
       // the member since that will just produce a redundant
       // diagnostic.
-      if (diagnoseTypeReprAvailability(memberTR->getBase(), where, flags)) {
+      if (diagnoseTypeReprAvailability(qualIdentTR->getBase(), where, flags)) {
         return true;
       }
     }
@@ -4055,11 +4097,11 @@ class TypeReprAvailabilityWalker : public ASTWalker {
 
     bool foundAnyIssues = false;
 
-    if (auto *GTR = dyn_cast<GenericIdentTypeRepr>(declRefTR)) {
+    if (declRefTR->hasGenericArgList()) {
       auto genericFlags = flags;
       genericFlags -= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
-      for (auto *genericArg : GTR->getGenericArgs()) {
+      for (auto *genericArg : declRefTR->getGenericArgs()) {
         if (diagnoseTypeReprAvailability(genericArg, where, genericFlags))
           foundAnyIssues = true;
 

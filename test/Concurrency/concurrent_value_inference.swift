@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -enable-library-evolution -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -enable-library-evolution -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -enable-library-evolution -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

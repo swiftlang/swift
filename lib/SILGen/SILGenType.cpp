@@ -23,9 +23,9 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
@@ -260,6 +260,8 @@ public:
   }
 
   void emitVTable() {
+    PrettyStackTraceDecl("silgen emitVTable", theClass);
+
     // Imported types don't have vtables right now.
     if (theClass->hasClangNode())
       return;
@@ -398,6 +400,14 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
+    // TODO: here the requirement is thunk_decl of the protocol; it is a FUNC
+    // detect here that it is a func dec + thunk.
+    // walk up to DC, and find storage.
+    // e  requirementRef->getDecl()->dump()
+    //(func_decl implicit "distributedVariable()" interface type="<Self where Self : WorkerProtocol> (Self) -> () async throws -> String" access=internal nonisolated distributed_thunk
+    //  (parameter "self")
+    //  (parameter_list))
+
     auto reqDecl = requirementRef.getDecl();
 
     // Static functions can be witnessed by enum cases with payload
@@ -413,32 +423,37 @@ public:
     }
 
     auto reqAccessor = dyn_cast<AccessorDecl>(reqDecl);
+    /// If it is an accessor, or distributed_thunk that is witnessing an
+    /// accessor, we need to use the storage to get the witness.
+    ValueDecl *storage = nullptr;
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (auto witness = asDerived().getWitness(reqDecl)) {
-        auto newDecl = requirementRef.withDecl(witness.getDecl());
-        // Only import C++ methods as foreign. If the following
-        // Objective-C function is imported as foreign:
-        //   () -> String
-        // It will be imported as the following type:
-        //   () -> NSString
-        // But the first is correct, so make sure we don't mark this witness
-        // as foreign.
-        if (dyn_cast_or_null<clang::CXXMethodDecl>(
-                witness.getDecl()->getClangDecl()))
-          newDecl = newDecl.asForeign();
-        return addMethodImplementation(
-            requirementRef, getWitnessRef(newDecl, witness),
-            witness);
-      }
-
-      return asDerived().addMissingMethod(requirementRef);
+      if (!storage) {
+        if (auto witness = asDerived().getWitness(reqDecl)) {
+          auto newDecl = requirementRef.withDecl(witness.getDecl());
+          // Only import C++ methods as foreign. If the following
+          // Objective-C function is imported as foreign:
+          //   () -> String
+          // It will be imported as the following type:
+          //   () -> NSString
+          // But the first is correct, so make sure we don't mark this witness
+          // as foreign.
+          if (dyn_cast_or_null<clang::CXXMethodDecl>(
+                  witness.getDecl()->getClangDecl()))
+            newDecl = newDecl.asForeign();
+          return addMethodImplementation(
+              requirementRef, getWitnessRef(newDecl, witness), witness);
+        }
+        return asDerived().addMissingMethod(requirementRef);
+      } // else, fallthrough to the usual accessor handling!
+    } else {
+      // Otherwise, we need to map the storage declaration and then get
+      // the appropriate accessor for it.
+      storage = reqAccessor->getStorage();
     }
 
-    // Otherwise, we need to map the storage declaration and then get
-    // the appropriate accessor for it.
-    auto witness = asDerived().getWitness(reqAccessor->getStorage());
+    auto witness = asDerived().getWitness(storage);
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
@@ -450,8 +465,18 @@ public:
     }
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
-    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
+    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation()) {
       return asDerived().addMissingMethod(requirementRef);
+    }
+
+    // Here we notice a `distributed var` thunk requirement,
+    // and witness it with the distributed thunk -- the "getter thunk".
+    if (requirementRef.isDistributedThunk()) {
+
+      return addMethodImplementation(
+          requirementRef, getWitnessRef(requirementRef, witnessStorage->getDistributedThunk()),
+          witness);
+    }
 
     auto witnessAccessor =
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
@@ -528,6 +553,11 @@ public:
 
     PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
+
+    // Check whether the conformance is valid first.
+    Conformance->resolveValueWitnesses();
+    if (Conformance->isInvalid())
+      return nullptr;
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
@@ -1113,6 +1143,8 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
+    PrettyStackTraceDecl("silgen emitType", theType);
+
     SGM.emitLazyConformancesForType(theType);
 
     for (Decl *member : theType->getABIMembers()) {
@@ -1150,7 +1182,7 @@ public:
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::NonInherited)) {
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-        SGM.getWitnessTable(normal);
+        (void)SGM.getWitnessTable(normal);
     }
   }
 
@@ -1237,7 +1269,6 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
-    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
@@ -1287,6 +1318,8 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
+    PrettyStackTraceDecl("silgen emitExtension", e);
+
     // Arguably, we should divert to SILGenType::emitType() here if it's an
     // @_objcImplementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
@@ -1309,7 +1342,7 @@ public:
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All)) {
         if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
-          SGM.getWitnessTable(normal);
+          (void)SGM.getWitnessTable(normal);
       }
     }
   }
@@ -1413,7 +1446,6 @@ public:
       }
     }
 
-    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 

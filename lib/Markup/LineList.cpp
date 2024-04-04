@@ -68,9 +68,9 @@ static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
 
   S = S.drop_front(NumLeadingSpaces);
 
-  if (S.startswith(" * "))
+  if (S.starts_with(" * "))
     return NumLeadingSpaces + 3;
-  if (S.startswith(" *\n") || S.startswith(" *\r\n"))
+  if (S.starts_with(" *\n") || S.starts_with(" *\r\n"))
     return NumLeadingSpaces + 2;
   return 0;
 }
@@ -96,9 +96,9 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
       unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
       StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes);
 
-      if (Cleaned.endswith("*/"))
+      if (Cleaned.ends_with("*/"))
         Cleaned = Cleaned.drop_back(2);
-      else if (Cleaned.endswith("/"))
+      else if (Cleaned.ends_with("/"))
         Cleaned = Cleaned.drop_back(1);
 
       swift::SourceLoc CleanedStartLoc =

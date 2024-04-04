@@ -617,7 +617,7 @@ public:
     /// argument that was not rethrows/reasync-only in this context.
     ByDefaultClosure,
 
-    /// The the function is rethrows/reasync, and it was called with
+    /// The function is rethrows/reasync, and it was called with
     /// a throwing conformance as one of its generic arguments.
     ByConformance,
 
@@ -800,6 +800,24 @@ static bool isRethrowingDueToAsyncSequence(DeclContext *rethrowsDC) {
   return true;
 }
 
+/// Type-erase the opened archetypes in the given type, if there is one.
+static Type typeEraseOpenedArchetypes(Type type) {
+  if (!type || !type->hasOpenedExistential())
+    return type;
+
+  const OpenedArchetypeType *root = nullptr;
+  type.visit([&](Type type) {
+    if (auto opened = dyn_cast<OpenedArchetypeType>(type.getPointer())) {
+      root = opened->getRoot();
+    }
+  });
+
+  if (!root)
+    return type;
+
+  return constraints::typeEraseOpenedArchetypesWithRoot(type, root);
+}
+
 /// A type expressing the result of classifying whether a call or function
 /// throws or is async.
 class Classification {
@@ -928,7 +946,7 @@ public:
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
-    result.ThrownError = thrownError;
+    result.ThrownError = typeEraseOpenedArchetypes(thrownError);
     return result;
   }
 
@@ -1284,8 +1302,13 @@ public:
     if (!fnType) return Classification::forInvalidCode();
 
     auto fnRef = AbstractFunction::getAppliedFn(E);
-    auto conformances = fnRef.getSubstitutions().getConformances();
-    const auto hasAnyConformances = !conformances.empty();
+    auto substitutions = fnRef.getSubstitutions();
+    const bool hasAnyConformances =
+        llvm::any_of(substitutions.getConformances(),
+                     [](const ProtocolConformanceRef conformance) {
+                       auto *requirement = conformance.getRequirement();
+                       return !requirement->getInvertibleProtocolKind();
+                     });
 
     // If the function doesn't have any effects or conformances, we're done
     // here.
@@ -1329,21 +1352,21 @@ public:
       switch (auto polyKind = fnRef.getPolymorphicEffectKind(kind)) {
       case PolymorphicEffectKind::AsyncSequenceRethrows:
       case PolymorphicEffectKind::ByConformance: {
-        auto substitutions = fnRef.getSubstitutions();
-        auto requirements =
-            substitutions.getGenericSignature().getRequirements();
-        auto conformances = substitutions.getConformances();
+        auto requirements = substitutions.getGenericSignature()
+                                .withoutMarkerProtocols()
+                                .getRequirements();
         for (const auto &req : requirements) {
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 
-          auto conformanceRef = conformances.front();
-          conformances = conformances.drop_front();
-
           Type type = req.getFirstType().subst(substitutions);
+
+          auto conformanceRef = substitutions.lookupConformance(
+              req.getFirstType()->getCanonicalType(), req.getProtocolDecl());
+          assert(conformanceRef);
+
           result.merge(classifyConformance(type, conformanceRef, kind));
         }
-        assert(conformances.empty());
 
         // 'ByConformance' is a superset of 'ByClosure', so check for
         // closure arguments too.
@@ -3351,7 +3374,7 @@ private:
     }
 
     // Check throwing calls.
-    MaxThrowingKind = std::max(MaxThrowingKind, throwsKind);
+    MaxThrowingKind = std::max(MaxThrowingKind, throwsKind); // FIXME: why is the left Never for property?
 
     switch (throwsKind) {
     // Completely ignores sites that don't throw.

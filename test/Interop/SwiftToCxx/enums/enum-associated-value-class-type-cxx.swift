@@ -4,6 +4,9 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
 
+// rdar://124466216
+// UNSUPPORTED: CPU=armv7k
+
 public class C {
     public var x: Int
     public init(x: Int) { self.x = x }
@@ -12,6 +15,18 @@ public class C {
 public enum E {
     case c(C)
     case i(Int)
+}
+
+extension E {
+  public func matchesIntValue(_ value: Int) -> Bool {
+    switch self {
+    case .c:
+      return false
+
+    case .i(let mine):
+      return mine == value
+    }
+  }
 }
 
 // CHECK:      SWIFT_INLINE_THUNK E E::_impl_c::operator()(const C& val) const {
@@ -29,3 +44,6 @@ public enum E {
 // CHECK-NEXT:   char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:   return swift::_impl::implClassFor<C>::type::makeRetained(*reinterpret_cast<void **>(payloadFromDestruction));
 // CHECK-NEXT: }
+
+// CHECK: SWIFT_INLINE_THUNK bool E::matchesIntValue(swift::Int value) const {
+// CHECK-NEXT: return _impl::$s5Enums1EO15matchesIntValueySbSiF(value, _impl::swift_interop_passDirect_Enums_uint64_t_0_8_uint8_t_8_9(_getOpaquePointer()));

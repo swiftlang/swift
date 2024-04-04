@@ -560,6 +560,11 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
                                                        ConformanceDecls);
   for (auto D : SF->getTopLevelDecls())
     D->walk(ConformanceCollector);
+  // Visit macro expanded extensions
+  if (auto *synthesizedSF = SF->getSynthesizedFile())
+    for (auto D : synthesizedSF->getTopLevelDecls())
+      if (isa<ExtensionDecl>(D))
+        D->walk(ConformanceCollector);
 
   for (auto *CD : ConformanceDecls)
     Result.emplace_back(evaluateOrDefault(

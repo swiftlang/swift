@@ -415,7 +415,7 @@ protected:
   std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
-    if (!Text.substr(Pos).startswith(str)) return false;
+    if (!Text.substr(Pos).starts_with(str)) return false;
     Pos += str.size();
     return true;
   }

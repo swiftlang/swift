@@ -149,9 +149,9 @@ findTypeDeclWithAccessScope(TypeRepr *TR, AccessScope accessScope,
       return MacroWalking::ArgumentsAndExpansion;
     }
 
-    MemberTypeReprWalkingScheme
-    getMemberTypeReprWalkingScheme() const override {
-      return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+    QualifiedIdentTypeReprWalkingScheme
+    getQualifiedIdentTypeReprWalkingScheme() const override {
+      return QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive;
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {

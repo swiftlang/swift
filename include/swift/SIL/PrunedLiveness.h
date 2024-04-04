@@ -289,8 +289,9 @@ private:
 /// scope. Reborrows within nested borrows scopes are already summarized by the
 /// outer borrow scope.
 enum class InnerBorrowKind {
-  Contained, // any borrows are fully contained within this live range
-  Reborrowed // at least one immediately nested borrow is reborrowed
+  Contained,  // any borrows are fully contained within this live range
+  Reborrowed, // at least one immediately nested borrow is reborrowed
+  Escaped     // the end of the borrow scope is indeterminate
 };
 
 inline InnerBorrowKind meet(InnerBorrowKind lhs, InnerBorrowKind rhs) {

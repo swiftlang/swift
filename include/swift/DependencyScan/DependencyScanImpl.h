@@ -128,9 +128,14 @@ typedef struct {
   /// Clang module dependencies
   swiftscan_string_set_t *swift_overlay_module_dependencies;
 
-  /// (Clang) header dependencies of this binary module.
-  /// Typically pre-compiled bridging header.
-  swiftscan_string_set_t *header_dependencies;
+  /// (Clang) header (.h) dependency of this binary module.
+  swiftscan_string_ref_t header_dependency;
+
+  /// (Clang) module dependencies of the textual header inputs
+  swiftscan_string_set_t *header_dependencies_module_dependnecies;
+
+  /// Source files included by the header dependencies of this binary module
+  swiftscan_string_set_t *header_dependencies_source_files;
 
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;

@@ -349,16 +349,27 @@ void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
-      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return;
-
   for (auto gp : gps) {
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       result.push_back({{RequirementKind::Conformance, gp,
                          proto->getDeclaredInterfaceType()},
                          SourceLoc()});
     }
   }
+}
+
+/// Linear order on inverse requirements in a generic signature.
+int InverseRequirement::compare(const InverseRequirement &other) const {
+  int compareLHS =
+      compareDependentTypes(subject, other.subject);
+
+  if (compareLHS != 0)
+    return compareLHS;
+
+  int compareProtos =
+      TypeDecl::compare(protocol, other.protocol);
+  assert(compareProtos != 0 && "Duplicate conformance requirements");
+
+  return compareProtos;
 }

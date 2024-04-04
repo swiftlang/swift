@@ -60,6 +60,16 @@ function(_add_host_swift_compile_options name)
     $<$<COMPILE_LANGUAGE:Swift>:none>)
 
   target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
+  if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+    add_dependencies(${name} swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+    target_compile_options(${name} PRIVATE
+      $<$<COMPILE_LANGUAGE:Swift>:-sdk;${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH};>
+      $<$<COMPILE_LANGUAGE:Swift>:-resource-dir;${SWIFTLIB_DIR};>)
+    if(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID" AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+      swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-tools-directory;${tools_path};>)
+    endif()
+  endif()
   _add_host_variant_swift_sanitizer_flags(${name})
 
   target_compile_options(${name} PRIVATE

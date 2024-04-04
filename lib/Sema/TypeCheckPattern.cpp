@@ -172,7 +172,7 @@ static bool hasEnumElementOrStaticVarMember(DeclContext *DC, Type ty,
 }
 
 static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
-  // FIXME: Support MemberTypeRepr nodes with non-DeclRefTypeRepr bases.
+  // FIXME: Support QualifiedIdentTypeRepr nodes with non-DeclRefTypeRepr bases.
   /// Translates an expression to a \c DeclRefTypeRepr.
   class ExprToDeclRefTypeRepr
       : public ExprVisitor<ExprToDeclRefTypeRepr, DeclRefTypeRepr *> {
@@ -184,7 +184,7 @@ static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
     DeclRefTypeRepr *visitExpr(Expr *e) { return nullptr; }
 
     DeclRefTypeRepr *visitTypeExpr(TypeExpr *te) {
-      return dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr());
+      return dyn_cast_or_null<UnqualifiedIdentTypeRepr>(te->getTypeRepr());
     }
 
     DeclRefTypeRepr *visitDeclRefExpr(DeclRefExpr *dre) {
@@ -194,15 +194,16 @@ static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
         return nullptr;
       }
 
-      auto *repr =
-          new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->createNameRef());
+      auto *repr = UnqualifiedIdentTypeRepr::create(C, dre->getNameLoc(),
+                                                    td->createNameRef());
       repr->setValue(td, nullptr);
 
       return repr;
     }
 
     DeclRefTypeRepr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
-      return new (C) SimpleIdentTypeRepr(udre->getNameLoc(), udre->getName());
+      return UnqualifiedIdentTypeRepr::create(C, udre->getNameLoc(),
+                                              udre->getName());
     }
 
     DeclRefTypeRepr *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
@@ -211,7 +212,8 @@ static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
         return nullptr;
       }
 
-      return MemberTypeRepr::create(C, base, ude->getNameLoc(), ude->getName());
+      return QualifiedIdentTypeRepr::create(C, base, ude->getNameLoc(),
+                                            ude->getName());
     }
 
     DeclRefTypeRepr *
@@ -565,7 +567,7 @@ public:
     EnumElementDecl *referencedElement = nullptr;
     TypeExpr *baseTE = nullptr;
 
-    if (isa<IdentTypeRepr>(repr)) {
+    if (isa<UnqualifiedIdentTypeRepr>(repr)) {
       // Not qualified. Try looking up an enum element in context.
       referencedElement = lookupUnqualifiedEnumMemberElement(
           DC, repr->getNameRef(), repr->getLoc());
@@ -578,7 +580,7 @@ public:
     } else {
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
-      auto *qualIdentTR = cast<MemberTypeRepr>(repr);
+      auto *qualIdentTR = cast<QualifiedIdentTypeRepr>(repr);
 
       const auto options = TypeResolutionOptions(std::nullopt) |
                            TypeResolutionFlags::SilenceErrors;

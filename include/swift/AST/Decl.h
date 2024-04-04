@@ -32,7 +32,6 @@
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -96,7 +95,6 @@ namespace swift {
   class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
-  struct InverseMarking;
   class ParameterList;
   class ParameterTypeFlags;
   class Pattern;
@@ -600,7 +598,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -626,6 +624,9 @@ protected:
 
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
+
+    /// Whether we have computed a requirement signature.
+    HasRequirementSignature : 1,
 
     /// Whether we have a lazy-loaded requirement signature.
     HasLazyRequirementSignature : 1,
@@ -694,7 +695,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -750,7 +751,10 @@ protected:
     ObjCNameLookupCachePopulated : 1,
 
     /// Whether this module has been built with C++ interoperability enabled.
-    HasCxxInteroperability : 1
+    HasCxxInteroperability : 1,
+
+    /// Whether this module has been built with -experimental-allow-non-resilient-access.
+    AllowNonResilientAccess : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1856,6 +1860,36 @@ public:
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
 
+  /// Determine whether this extension context is in the same defining module as
+  /// the original nominal type context.
+  bool isInSameDefiningModule() const;
+
+  /// Determine whether this extension is equivalent to one that requires at
+  /// at least some constraints to be written in the source.
+  ///
+  /// This result will differ from `isConstrainedExtension()` when any of
+  /// the generic parameters of the type are invertible, e.g.,
+  /// \code
+  /// struct X<T: ~Copyable>: ~Copyable { }
+  ///
+  /// // Implies `T: Copyable`. This extension `!isWrittenWithConstraints()`
+  /// // and `isConstrainedExtension()`.
+  /// extension X { }
+  ///
+  /// // This extension `isWrittenWithConstraints()`
+  /// // and `!isConstrainedExtension()`.
+  /// extension X where T: ~Copyable { }
+  ///
+  /// // Implies `T: Copyable`. This extension `isWrittenWithConstraints()`
+  /// // and `isConstrainedExtension()`.
+  /// extension X where T: P { }
+  ///
+  /// // This extension `isWrittenWithConstraints()`
+  /// // and `isConstrainedExtension()`.
+  /// extension X where T: Q, T: ~Copyable { }
+  /// \endcode
+  bool isWrittenWithConstraints() const;
+
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid or
   /// \c isObjCImplementation() is false.
@@ -2780,6 +2814,12 @@ public:
   /// can be distributed.
   bool isDistributed() const;
 
+  /// Is this a '_distributed_get' accessor?
+  ///
+  /// These are special accessors used by distributed thunks, implementing
+  /// `distributed var get { }` accessors.
+  bool isDistributedGetAccessor() const;
+
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
@@ -2931,9 +2971,9 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
-  /// True if opted in for bypassing resilience within a package. Allowed only on
-  /// access from the \p accessingModule to a package decl in the defining
-  /// binary (not interface) module within the same package.
+  /// True if opted in to bypass a resilience check at the use site in the
+  /// \p accessingModule that references decls defined in a module
+  /// that allows non-resilient access within the same package.
   bool bypassResilienceInPackage(ModuleDecl *accessingModule) const;
 
   /// FIXME: This is deprecated.
@@ -3912,10 +3952,6 @@ public:
         TypeDecl::getOverriddenDecl());
   }
 
-  /// Determine whether this type has ~<target>` stated as
-  /// one of its inherited types.
-  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
-
   /// Retrieve the set of associated types overridden by this associated
   /// type.
   llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
@@ -4216,7 +4252,7 @@ public:
   ///
   /// This is used by deserialization of module files to report
   /// conformances.
-  void registerProtocolConformance(ProtocolConformance *conformance,
+  void registerProtocolConformance(NormalProtocolConformance *conformance,
                                    bool synthesized = false);
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
@@ -4369,6 +4405,10 @@ public:
   /// Returns null if the type is a class, or does not have a declared `deinit`.
   DestructorDecl *getValueTypeDestructor();
 
+  /// Does a conformance for a given invertible protocol exist for this
+  /// type declaration.
+  CanBeInvertible::Result canConformTo(InvertibleProtocolKind kind) const;
+
   /// "Does a conformance for Copyable exist for this type declaration?"
   ///
   /// This doesn't mean that all instance of this type are Copyable, because
@@ -4388,10 +4428,6 @@ public:
   /// If you need a more precise answer, ask this Decl's corresponding
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
-
-  /// Determine whether this type has ~<target>` stated on
-  /// itself, one of its inherited types or `Self` requirements.
-  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5071,6 +5107,35 @@ enum class KnownDerivableProtocolKind : uint8_t {
 
 using PrimaryAssociatedTypeName = std::pair<Identifier, SourceLoc>;
 
+/// A wrapper for a dictionary that maps Obj-C protocol requirement selectors to
+/// a list of function decls.
+class ObjCRequirementMap {
+public:
+  using FunctionList = TinyPtrVector<AbstractFunctionDecl *>;
+
+private:
+  using MethodKey = std::pair<ObjCSelector, char>;
+  llvm::SmallDenseMap<MethodKey, FunctionList, 4> storage;
+
+  static MethodKey getObjCMethodKey(AbstractFunctionDecl *func);
+
+public:
+  void addRequirement(AbstractFunctionDecl *requirement) {
+    storage[getObjCMethodKey(requirement)].push_back(requirement);
+  }
+
+  /// Retrieve the Objective-C requirements in this protocol that have the
+  /// given Objective-C method key.
+  FunctionList getRequirements(AbstractFunctionDecl *requirement) const {
+    auto key = getObjCMethodKey(requirement);
+    auto known = storage.find(key);
+    if (known == storage.end())
+      return {};
+
+    return known->second;
+  }
+};
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -5096,15 +5161,11 @@ class ProtocolDecl final : public NominalTypeDecl {
     /// The superclass decl and a bit to indicate whether the
     /// superclass was computed yet or not.
     llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
-
-    /// The superclass type and a bit to indicate whether the
-    /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  std::optional<RequirementSignature> RequirementSig;
+  RequirementSignature RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
@@ -5191,15 +5252,9 @@ public:
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
-  /// Retrieve the superclass of this protocol, or null if there is no superclass.
-  Type getSuperclass() const;
-
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
-
-  /// Set the superclass of this protocol.
-  void setSuperclass(Type superclass);
 
   /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
   /// saves loading the set of members in cases where there's no possibility of
@@ -5251,10 +5306,6 @@ public:
   /// Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
-
-  /// Determine whether this protocol has ~<target>` stated on
-  /// itself, one of its inherited types or `Self` requirements.
-  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
@@ -5303,6 +5354,10 @@ public:
   /// Determine if this is an invertible protocol and return its kind,
   /// i.e., for a protocol P, returns the kind if inverse constraint ~P exists.
   std::optional<InvertibleProtocolKind> getInvertibleProtocolKind() const;
+
+  /// Returns a dictionary that maps Obj-C protocol requirement selectors to a
+  /// list of function decls.
+  ObjCRequirementMap getObjCRequiremenMap() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -5419,7 +5474,7 @@ public:
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSig.has_value();
+    return Bits.ProtocolDecl.HasRequirementSignature;
   }
 
   void setRequirementSignature(RequirementSignature requirementSig);
@@ -6464,6 +6519,8 @@ public:
   }
 
   clang::PointerAuthQualifier getPointerAuthQualifier() const;
+
+  static VarDecl *createImplicitStringInterpolationVar(DeclContext *DC);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -8029,7 +8086,7 @@ class AccessorDecl final : public FuncDecl {
                  throws, throwsLoc, thrownTy, hasImplicitSelfDecl,
                  /*genericParams*/ nullptr, parent),
         AccessorKeywordLoc(accessorKeywordLoc), Storage(storage) {
-    assert(!async || accessorKind == AccessorKind::Get
+    assert(!async || (accessorKind == AccessorKind::Get || accessorKind == AccessorKind::DistributedGet)
            && "only get accessors can be async");
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
   }
@@ -8061,6 +8118,14 @@ public:
          TypeLoc thrownType, ParameterList *parameterList, Type fnRetType,
          DeclContext *parent, ClangNode clangNode = ClangNode());
 
+  static AccessorDecl *createImplicit(ASTContext &Context,
+                                  AccessorKind accessorKind,
+                                  AbstractStorageDecl *storage,
+                                  bool async,
+                                  bool throws, TypeLoc thrownType,
+                                  Type fnRetType,
+                                  DeclContext *parent);
+
   /// Create a parsed accessor.
   ///
   /// \param paramList A parameter list for e.g \c set(newValue), or \c nullptr
@@ -8089,6 +8154,7 @@ public:
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
+  bool isDistributedGetter() const { return getAccessorKind() == AccessorKind::DistributedGet; }
   bool isSetter() const { return getAccessorKind() == AccessorKind::Set; }
   bool isAnyAddressor() const {
     auto kind = getAccessorKind();

@@ -139,10 +139,10 @@ static void replaceUsesOfExtract(SingleValueInstruction *extract,
 // (struct_extract (load %base))
 //   ->
 // (load (struct_element_addr %base, #field)
-//
-// TODO: Consider handling LoadBorrowInst.
 static SILBasicBlock::iterator
 splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
+  auto *block = loadInst->getParentBlock();
+  auto *instBeforeLoad = loadInst->getPreviousInstruction();
   // Keep track of the next iterator after any newly added or to-be-deleted
   // instructions. This must be valid regardless of whether the pass immediately
   // deletes the instructions or simply records them for later deletion.
@@ -338,7 +338,22 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     ++nextII;
   }
   deleteAllDebugUses(*loadInst, pass.getCallbacks());
-  return killInstAndIncidentalUses(*loadInst, nextII, pass);
+  nextII = killInstAndIncidentalUses(*loadInst, nextII, pass);
+  /// A change has been made; and the load instruction is deleted.  The caller
+  /// should now process the instruction where the load was before.
+  ///
+  /// BEFORE TRANSFORM   |   AFTER TRANSFORM
+  ///    prequel_2       |      prequel_2
+  ///    prequel_1       |      prequel_1
+  ///    load            |  +-> ???
+  ///    sequel_1        |  |   ???
+  ///    sequel_2        |  |   ???
+  ///                       |
+  ///                       The instruction the caller should process next.
+  if (instBeforeLoad)
+    return instBeforeLoad->getNextInstruction()->getIterator();
+  else
+    return block->begin();
 }
 
 // Given a store within a single property struct, recursively form the parent

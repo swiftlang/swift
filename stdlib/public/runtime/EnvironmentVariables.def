@@ -81,13 +81,6 @@ VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32_t, 0,
 VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, bool, false,
          "Enable warnings when we fail to look up a type by name.")
 
-VARIABLE(SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER, uint8_t, 0,
-         "Validate the external metadata builder by running it in parallel "
-         "with the runtime's builder, and checking that they produce the same "
-         "output. Level 0 does no validation. Level 1 does silent validation "
-         "unless a validation failure occurs. Level 2 enables full debug "
-         "logging in the builder.")
-
 VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED, bool, true,
          "Enable use of prespecializations library.")
 

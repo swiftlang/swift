@@ -63,7 +63,7 @@ struct AliasAnalysis {
         let path = SmallProjectionPath(.anyValueFields)
         if let apply = inst as? ApplySite {
           // Workaround for quadratic complexity in ARCSequenceOpts.
-          // We need to use an ever lower budget to not get into noticable compile time troubles.
+          // We need to use an ever lower budget to not get into noticeable compile time troubles.
           let budget = complexityBudget / 10
           let effect = getOwnershipEffect(of: apply, for: obj, path: path, complexityBudget: budget, context)
           return effect.destroy
