@@ -375,7 +375,8 @@ public:
   /// the old object is actually no longer permitted to be destroyed.
   virtual void initializeWithTake(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T,
-                                  bool isOutlined) const = 0;
+                                  bool isOutlined,
+                                  bool zeroizeIfSensitive) const = 0;
 
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,

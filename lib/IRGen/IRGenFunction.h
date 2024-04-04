@@ -203,6 +203,8 @@ public:
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
 
+  void emitClearSensitive(Address address, llvm::Value *size);
+
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
 

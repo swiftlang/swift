@@ -555,7 +555,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
       typeLayoutEntry->initWithTake(IGF, dest, src);
     } else {
-      type.initializeWithTake(IGF, dest, src, concreteType, true);
+      type.initializeWithTake(IGF, dest, src, concreteType, true,
+                              /*zeroizeIfSensitive=*/ true);
     }
     dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.OpaqueTy);
     IGF.Builder.CreateRet(dest.getAddress());
