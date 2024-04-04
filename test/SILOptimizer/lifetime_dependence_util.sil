@@ -11,7 +11,15 @@ sil_stage canonical
 
 import Builtin
 
-@_marker public protocol Escapable {}
+@_marker protocol Copyable: ~Escapable {}
+@_marker protocol Escapable: ~Copyable {}
+
+struct NCNEInt: ~Copyable, ~Escapable {
+  var i: Builtin.Int64
+  @_unsafeNonescapableResult
+  init() {}
+  deinit {}
+}
 
 enum FakeOptional<T> {
 case none
@@ -321,6 +329,19 @@ bb0(%0 : @owned $NE):
   %2 = copyable_to_moveonlywrapper [owned] %1 : $NEWrap
   %3 = moveonlywrapper_to_copyable [owned] %2 : $@moveOnly NEWrap
   destroy_value %3 : $NEWrap
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on testInteriorDropDeinit: lifetime_dependence_use with: %0
+// CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NCNEInt
+// CHECK-NEXT: Leaf use: operand #0 of   destroy_value
+// CHECK-LABEL: end running test 1 of 1 on testInteriorDropDeinit: lifetime_dependence_use with: %0
+sil [ossa] @testInteriorDropDeinit : $@convention(thin) (@owned NCNEInt) -> () {
+bb0(%0 : @owned $NCNEInt):
+  specify_test "lifetime_dependence_use %0"
+  %nd = drop_deinit %0 : $NCNEInt
+  destroy_value %nd : $NCNEInt
   %99 = tuple()
   return %99 : $()
 }
