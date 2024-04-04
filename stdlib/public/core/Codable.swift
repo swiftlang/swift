@@ -7128,3 +7128,29 @@ extension SingleValueEncodingContainer where Self: UnkeyedEncodingContainer {
     )
   }
 }
+
+// Default implementations for types with stricter availability than SVDC & UDC
+// We need these to break ambiguity when an encoding container conforms to both.
+extension SingleValueDecodingContainer where Self: UnkeyedDecodingContainer {
+  @available(SwiftStdlib 6.0, *)
+  public func decode(_ type: Int128.Type) throws -> Int128 {
+    throw DecodingError.typeMismatch(
+      Int128.self,
+      DecodingError.Context(
+        codingPath: codingPath,
+        debugDescription: "Decoder has not implemented support for Int128"
+      )
+    )
+  }
+  
+  @available(SwiftStdlib 6.0, *)
+  public func decode(_ type: UInt128.Type) throws -> UInt128 {
+    throw DecodingError.typeMismatch(
+      UInt128.self,
+      DecodingError.Context(
+        codingPath: codingPath,
+        debugDescription: "Decoder has not implemented support for UInt128"
+      )
+    )
+  }
+}
