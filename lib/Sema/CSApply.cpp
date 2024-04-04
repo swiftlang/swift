@@ -6688,13 +6688,24 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   Type fromInstanceType = fromType;
   Type toInstanceType = toType;
 
-  // Look through metatypes
+  // For existential-to-existential coercions, open the source existential.
+  Type openedFromType;
+  if (fromType->isAnyExistentialType()) {
+    openedFromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
+                                                 dc->getGenericSignatureOfContext());
+  }
+
+  Type openedFromInstanceType = openedFromType;
+
+  // Look through metatypes.
   while ((fromInstanceType->is<UnresolvedType>() ||
           fromInstanceType->is<AnyMetatypeType>()) &&
          toInstanceType->is<ExistentialMetatypeType>()) {
     if (!fromInstanceType->is<UnresolvedType>())
-      fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getExistentialInstanceType();
+      fromInstanceType = fromInstanceType->getMetatypeInstanceType();
+    if (openedFromInstanceType && !openedFromInstanceType->is<UnresolvedType>())
+      openedFromInstanceType = openedFromInstanceType->getMetatypeInstanceType();
+    toInstanceType = toInstanceType->getMetatypeInstanceType();
   }
 
   ASTContext &ctx = cs.getASTContext();
@@ -6758,20 +6769,13 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   }
 
   // For existential-to-existential coercions, open the source existential.
-  if (fromType->isAnyExistentialType()) {
-    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
-                                           dc->getGenericSignatureOfContext());
-
+  if (openedFromType) {
     auto *archetypeVal = cs.cacheType(
-        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
-
-    fromInstanceType = fromType;
-    while (auto *metatypeType = fromInstanceType->getAs<MetatypeType>())
-      fromInstanceType = metatypeType->getInstanceType();
+        new (ctx) OpaqueValueExpr(expr->getSourceRange(), openedFromType));
 
     auto conformances =
         dc->getParentModule()
-          ->collectExistentialConformances(fromInstanceType->getCanonicalType(),
+          ->collectExistentialConformances(openedFromInstanceType->getCanonicalType(),
                                            toInstanceType->getCanonicalType(),
                                            /*allowMissing=*/true);
 

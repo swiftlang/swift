@@ -2185,14 +2185,24 @@ ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                        Member, Ty);
 }
 
+static void checkExistentialPreconditions(SILType ExistentialType,
+                                          CanType ConcreteType,
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+#ifndef NDEBUG
+  auto layout = ExistentialType.getASTType().getExistentialLayout();
+  assert(layout.getProtocols().size() == Conformances.size());
+
+  for (auto conformance : Conformances) {
+    assert(!conformance.isAbstract() || isa<ArchetypeType>(ConcreteType));
+  }
+#endif
+}
+
 InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILDebugLocation Loc, SILValue Existential, CanType ConcreteType,
     SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
-#ifndef NDEBUG
-  auto layout = Existential->getType().getASTType().getExistentialLayout();
-  assert(layout.getProtocols().size() == Conformances.size());
-#endif
+  checkExistentialPreconditions(Existential->getType(), ConcreteType, Conformances);
 
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -2212,10 +2222,7 @@ InitExistentialValueInst *InitExistentialValueInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
-#ifndef NDEBUG
-  auto layout = ExistentialType.getASTType().getExistentialLayout();
-  assert(layout.getProtocols().size() == Conformances.size());
-#endif
+  checkExistentialPreconditions(ExistentialType, ConcreteType, Conformances);
 
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -2233,10 +2240,7 @@ InitExistentialRefInst *InitExistentialRefInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F, ValueOwnershipKind forwardingOwnershipKind) {
-#ifndef NDEBUG
-  auto layout = ExistentialType.getASTType().getExistentialLayout();
-  assert(layout.getProtocols().size() == Conformances.size());
-#endif
+  checkExistentialPreconditions(ExistentialType, ConcreteType, Conformances);
 
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
