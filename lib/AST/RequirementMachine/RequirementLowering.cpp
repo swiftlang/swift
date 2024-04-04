@@ -971,30 +971,28 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     // DependentMemberType X, and the right hand side is the
     // underlying type of the typealias.
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
-      if (!typeAliasDecl->isGeneric()) {
-        // Ignore the typealias if we have an associated type with the same name
-        // in the same protocol. This is invalid anyway, but it's just here to
-        // ensure that we produce the same requirement signature on some tests
-        // with -requirement-machine-protocol-signatures=verify.
-        if (assocTypes.contains(typeAliasDecl->getName()))
-          continue;
+      if (typeAliasDecl->isGeneric())
+        continue;
 
-        // The structural type of a typealias will always be a TypeAliasType,
-        // so unwrap it to avoid a requirement that prints as 'Self.T == Self.T'
-        // in diagnostics.
-        auto underlyingType = typeAliasDecl->getStructuralType();
-        if (auto *aliasType = dyn_cast<TypeAliasType>(underlyingType.getPointer()))
-          underlyingType = aliasType->getSinglyDesugaredType();
+      // Ignore the typealias if we have an associated type with the same name
+      // in the same protocol. This is invalid anyway, but it's just here to
+      // ensure that we produce the same requirement signature on some tests
+      // with -requirement-machine-protocol-signatures=verify.
+      if (assocTypes.contains(typeAliasDecl->getName()))
+        continue;
 
-        if (underlyingType->is<UnboundGenericType>())
-          continue;
+      // The structural type of a typealias will always be a TypeAliasType,
+      // so unwrap it to avoid a requirement that prints as 'Self.T == Self.T'
+      // in diagnostics.
+      auto underlyingType = typeAliasDecl->getStructuralType();
+      if (underlyingType->is<UnboundGenericType>())
+        continue;
 
-        auto subjectType = DependentMemberType::get(
-            selfTy, typeAliasDecl->getName());
-        Requirement req(RequirementKind::SameType, subjectType,
-                        underlyingType);
-        result.push_back({req, typeAliasDecl->getLoc()});
-      }
+      auto subjectType = DependentMemberType::get(
+          selfTy, typeAliasDecl->getName());
+      Requirement req(RequirementKind::SameType, subjectType,
+                      underlyingType);
+      result.push_back({req, typeAliasDecl->getLoc()});
     }
   }
 
@@ -1053,21 +1051,28 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     return typeDecl->getDeclaredInterfaceType();
   };
 
+  auto isSuitableType = [&](TypeDecl *req) -> bool {
+    // Ignore generic types.
+    if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+      if (genReq->isGeneric())
+        return false;
+
+    // Ignore typealiases with UnboundGenericType, since they
+    // are like generic typealiases.
+    if (auto *typeAlias = dyn_cast<TypeAliasDecl>(req))
+      if (getStructuralType(typeAlias)->is<UnboundGenericType>())
+        return false;
+
+    return true;
+  };
+
   // Collect all typealiases from inherited protocols recursively.
   llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
   for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
     for (auto req : inheritedProto->getMembers()) {
       if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
-        // Ignore generic types.
-        if (auto genReq = dyn_cast<GenericTypeDecl>(req))
-          if (genReq->getGenericParams())
-            continue;
-
-        // Ignore typealiases with UnboundGenericType, since they
-        // are like generic typealiases.
-        if (auto *typeAlias = dyn_cast<TypeAliasDecl>(req))
-          if (getStructuralType(typeAlias)->is<UnboundGenericType>())
-            continue;
+        if (!isSuitableType(typeReq))
+          continue;
 
         inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
       }
@@ -1077,10 +1082,13 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
-    desugarRequirement(Requirement(RequirementKind::SameType,
-                                   getStructuralType(first),
-                                   getStructuralType(second)),
-                               SourceLoc(), result, ignoredInverses, errors);
+    auto firstType = getStructuralType(first);
+    auto secondType = getStructuralType(second);
+    assert(!firstType->is<UnboundGenericType>());
+    assert(!secondType->is<UnboundGenericType>());
+
+    desugarRequirement(Requirement(RequirementKind::SameType, firstType, secondType),
+                       SourceLoc(), result, ignoredInverses, errors);
   };
 
   // Local function to find the insertion point for the protocol's "where"
@@ -1206,25 +1214,31 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
       const auto name = inherited.first;
       for (auto found : proto->lookupDirect(name)) {
         // We only want concrete type declarations.
-        auto type = dyn_cast<TypeDecl>(found);
-        if (!type || isa<AssociatedTypeDecl>(type)) continue;
+        auto typeReq = dyn_cast<TypeDecl>(found);
+        if (!typeReq || isa<AssociatedTypeDecl>(typeReq)) continue;
 
         // Ignore nominal types. They're always invalid declarations.
-        if (isa<NominalTypeDecl>(type))
+        if (isa<NominalTypeDecl>(typeReq))
+          continue;
+
+        // Ignore generic type aliases.
+        if (!isSuitableType(typeReq))
           continue;
 
         // ... from the same module as the protocol.
-        if (type->getModuleContext() != proto->getModuleContext()) continue;
+        if (typeReq->getModuleContext() != proto->getModuleContext()) continue;
 
         // Ignore types defined in constrained extensions; their equivalence
         // to the associated type would have to be conditional, which we cannot
         // model.
-        if (auto ext = dyn_cast<ExtensionDecl>(type->getDeclContext())) {
+        if (auto ext = dyn_cast<ExtensionDecl>(typeReq->getDeclContext())) {
           // FIXME: isConstrainedExtension() can cause request cycles because it
           // computes a generic signature. getTrailingWhereClause() should be good
           // enough for protocol extensions, which cannot specify constraints in
           // any other way right now (eg, via requirement inference or by
           // extending a bound generic type).
+          //
+          // FIXME: Protocol extensions with noncopyable generics can!
           if (ext->getTrailingWhereClause()) continue;
         }
 
@@ -1237,19 +1251,19 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
                 dyn_cast<AssociatedTypeDecl>(inheritedType)) {
             // Infer a same-type requirement between the typealias' underlying
             // type and the inherited associated type.
-            recordInheritedTypeRequirement(inheritedAssocTypeDecl, type);
+            recordInheritedTypeRequirement(inheritedAssocTypeDecl, typeReq);
 
             // Warn that one should use where clauses for this.
             if (shouldWarnAboutRedeclaration) {
               auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
               auto fixItWhere = getProtocolWhereLoc();
-              ctx.Diags.diagnose(type,
+              ctx.Diags.diagnose(typeReq,
                                  diag::typealias_override_associated_type,
                                  name,
                                  inheritedFromProto->getDeclaredInterfaceType())
                 .fixItInsertAfter(fixItWhere.Loc,
-                                  getConcreteTypeReq(type, fixItWhere.Item))
-                .fixItRemove(type->getSourceRange());
+                                  getConcreteTypeReq(typeReq, fixItWhere.Item))
+                .fixItRemove(typeReq->getSourceRange());
               ctx.Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
                                  inheritedAssocTypeDecl);
 
@@ -1260,7 +1274,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
           }
 
           // Two typealiases that should be the same.
-          recordInheritedTypeRequirement(inheritedType, type);
+          recordInheritedTypeRequirement(inheritedType, typeReq);
         }
 
         // We can remove this entry.
