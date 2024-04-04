@@ -528,13 +528,10 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        getSwiftModule(), ResilienceExpansion::Maximal,
-        getSILModule().isWholeModule());
-    auto underlyingTy =
-        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
-            ->getCanonicalType();
-    return underlyingTy;
+    auto context = TypeExpansionContext::maximal(getSwiftModule(),
+                                                 getSILModule().isWholeModule());
+    return swift::substOpaqueTypesWithUnderlyingTypes(type, context,
+                                                      /*allowLoweredTypes=*/false);
   }
 
   return type;
@@ -545,13 +542,12 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type.getASTType()->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        getSwiftModule(), ResilienceExpansion::Maximal,
-        getSILModule().isWholeModule());
-    auto underlyingTy =
-        type.subst(getSILModule(), replacer, replacer, genericSig,
-                   SubstFlags::SubstituteOpaqueArchetypes);
-    return underlyingTy;
+    auto context = TypeExpansionContext::maximal(getSwiftModule(),
+                                                 getSILModule().isWholeModule());
+    return SILType::getPrimitiveType(
+      swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context,
+                                                 /*allowLoweredTypes=*/true),
+      type.getCategory());
   }
 
   return type;
@@ -563,15 +559,12 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        getSwiftModule(), ResilienceExpansion::Maximal,
-        getSILModule().isWholeModule());
-    auto substConformance = conformance.subst(
-        type, replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
-    auto underlyingTy =
-        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
-            ->getCanonicalType();
-    return std::make_pair(underlyingTy, substConformance);
+    auto context = TypeExpansionContext::maximal(getSwiftModule(),
+                                                 getSILModule().isWholeModule());
+    return std::make_pair(
+       swift::substOpaqueTypesWithUnderlyingTypes(type, context,
+                                                  /*allowLoweredTypes=*/false),
+       swift::substOpaqueTypesWithUnderlyingTypes(conformance, type, context));
   }
 
   return std::make_pair(type, conformance);
