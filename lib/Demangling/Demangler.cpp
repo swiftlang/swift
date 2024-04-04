@@ -996,6 +996,7 @@ recur:
       case 'p':
         return createWithChild(
             Node::Kind::ProtocolConformanceRefInProtocolModule, popProtocol());
+      case 'X': return demanglePackProtocolConformance();
 
       // Runtime records (type/protocol/conformance/function)
       case 'c':
@@ -1847,6 +1848,7 @@ NodePointer Demangler::popAnyProtocolConformance() {
   return popNode([](Node::Kind kind) {
     switch (kind) {
     case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::PackProtocolConformance:
     case Node::Kind::DependentProtocolConformanceRoot:
     case Node::Kind::DependentProtocolConformanceInherited:
     case Node::Kind::DependentProtocolConformanceAssociated:
@@ -1882,6 +1884,13 @@ NodePointer Demangler::demangleConcreteProtocolConformance() {
   NodePointer type = popNode(Node::Kind::Type);
   return createWithChildren(Node::Kind::ConcreteProtocolConformance,
                             type, conformanceRef, conditionalConformanceList);
+}
+
+NodePointer Demangler::demanglePackProtocolConformance() {
+  NodePointer patternConformanceList = popAnyProtocolConformanceList();
+
+  return createWithChild(Node::Kind::PackProtocolConformance,
+                         patternConformanceList);
 }
 
 NodePointer Demangler::popDependentProtocolConformance() {
