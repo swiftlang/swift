@@ -227,10 +227,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
 
-    if("${mod}" MATCHES "-macos$")
-      set(SWIFT_SDK_embedded_THREADING_PACKAGE darwin)
-    endif()
-
     add_swift_target_library_single(
       embedded-concurrency-${mod}
       swift_Concurrency
