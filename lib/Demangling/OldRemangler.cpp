@@ -242,7 +242,7 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
     return true;
 
   // Go ahead and initialize the substitution entry.
-  entry.setNode(node, /*treatAsIdentifier=*/ false);
+  entry = entryForNode(node);
 
   int Idx = findSubstitution(entry);
   if (Idx < 0)
