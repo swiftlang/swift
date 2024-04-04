@@ -566,6 +566,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// that method can't be called from a concurrent execution context like a child task.
   ///
   /// - Returns: The value returned by the next child task that completes.
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
@@ -573,6 +575,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   }
 
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   @_silgen_name("$sScG4nextxSgyYaF")
   internal mutating func __abi_next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
@@ -582,12 +585,16 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   /// Await all of the pending tasks added this group.
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while let _ = await next(isolation: isolation) {}
   }
+
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   @_silgen_name("$sScG22awaitAllRemainingTasksyyYaF")
-  internal mutating func __abi_awaitAllRemainingTasks() async {
+  internal mutating func awaitAllRemainingTasks() async {
     while let _ = await next(isolation: nil) {}
   }
 
@@ -719,6 +726,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   /// Await all the remaining tasks on this group.
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while true {
       do {
@@ -728,7 +737,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       } catch {}
     }
   }
+
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   internal mutating func awaitAllRemainingTasks() async {
     await awaitAllRemainingTasks(isolation: nil)
   }
@@ -1019,14 +1030,31 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Throws: The error thrown by the next child task that completes.
   ///
   /// - SeeAlso: `nextResult()`
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
 
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   @_silgen_name("$sScg4nextxSgyYaKF")
   internal mutating func __abi_next() async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
+  }
+
+  @_silgen_name("$sScg10nextResults0B0Oyxq_GSgyYaKF")
+  @usableFromInline
+  mutating func nextResultForABI() async throws -> Result<ChildTaskResult, Failure>? {
+    do {
+      guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
+        return nil
+      }
+
+      return .success(success)
+    } catch {
+      return .failure(error as! Failure) // as!-safe, because we are only allowed to throw Failure (Error)
+    }
   }
 
   /// Wait for the next child task to complete,
@@ -1065,22 +1093,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - SeeAlso: `next()`
   @_alwaysEmitIntoClient
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
-    return try! await __abi_nextResult()
+    return try! await nextResultForABI()
   }
 
-  @_silgen_name("$sScg10nextResults0B0Oyxq_GSgyYaKF")
-  @usableFromInline
-  mutating func __abi_nextResult() async throws -> Result<ChildTaskResult, Failure>? {
-    do {
-      guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
-        return nil
-      }
-
-      return .success(success)
-    } catch {
-      return .failure(error as! Failure) // as!-safe, because we are only allowed to throw Failure (Error)
-    }
-  }
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
   /// At the start of the body of a `withThrowingTaskGroup(of:returning:body:)` call,
@@ -1357,7 +1372,7 @@ func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_wait_next_throwing")
-func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+public func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")
