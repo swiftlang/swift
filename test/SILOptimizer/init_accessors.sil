@@ -18,7 +18,7 @@ struct Test {
 sil private [ossa] @$s14init_accessors4TestV1xSivi : $@convention(thin) (Int) -> @out Int {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = mark_uninitialized [out] %0 : $*Int
-  debug_value %1 : $Int, let, name "newValue", argno 1, implicit
+  debug_value %1 : $Int, let, name "newValue", argno 1
   %4 = begin_access [modify] [unknown] %2 : $*Int
   assign %1 to %4 : $*Int
   end_access %4 : $*Int
@@ -28,8 +28,8 @@ bb0(%0 : $*Int, %1 : $Int):
 
 sil hidden [ossa] @$s14init_accessors4TestV1xSivs : $@convention(method) (Int, @inout Test) -> () {
 bb0(%0 : $Int, %1 : $*Test):
-  debug_value %0 : $Int, let, name "newValue", argno 1, implicit
-  debug_value %1 : $*Test, var, name "self", argno 2, implicit, expr op_deref
+  debug_value %0 : $Int, let, name "newValue", argno 1
+  debug_value %1 : $*Test, var, name "self", argno 2, expr op_deref
   %4 = begin_access [modify] [unknown] %1 : $*Test
   %5 = struct_element_addr %4 : $*Test, #Test._x
   assign %0 to %5 : $*Int
