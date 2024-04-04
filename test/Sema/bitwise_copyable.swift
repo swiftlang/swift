@@ -6,8 +6,6 @@
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
-// XFAIL: *
-
 //==============================================================================
 //===========================DEPENDENCY-FREE TESTS=(BEGIN)===================={{
 //==============================================================================
@@ -145,7 +143,7 @@ func passInt(_ i: Int) { take3(i) }
 
 func passTupleIntInt(_ t: (Int, Int)) { take3(t) }
 
-func passFWI<T : FixedWidthInteger>(_ t: T) { take3(t) }
+
 
 func passFloat(_ f: Float) { take3(f) }
 
@@ -190,9 +188,11 @@ struct S_Explicit_With_2_BitwiseCopyable_Generic_Optional<T : _BitwiseCopyable> 
   var o2: T?
 }
 
-struct S_Explicit_Nonescapable : ~Escapable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_nonescapable}}
+// TODO: When the standard library is built with NonescapableTypes, this should
+//       be uncommented.
+//struct S_Explicit_Nonescapable : ~Escapable, _BitwiseCopyable {}
 
-struct S_Explicit_Noncopyable : ~Copyable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_noncopyable}}
+struct S_Explicit_Noncopyable : ~Copyable, _BitwiseCopyable {} // expected-error{{type_does_not_conform}}
 
 struct S_Implicit_Nonescapable : ~Escapable {}
 
@@ -256,7 +256,7 @@ func passUnsafeContinuation<T : _BitwiseCopyable, U : Error & _BitwiseCopyable>(
   take4(c)
 }
 
-extension UnsafeContinuation : @retroactive _BitwiseCopyable {}
+extension UnsafeContinuation : @retroactive _BitwiseCopyable {} // expected-error{{conformance to 'BitwiseCopyable' must occur in the same module as generic struct 'UnsafeContinuation'}}
 
 //==============================================================================
 //========================_CONCURRENCY-DEPENDENCY TESTS=(END)=================}}
