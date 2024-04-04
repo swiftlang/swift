@@ -703,6 +703,9 @@ protected:
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance,
                                         GenericSignature sig);
+  void appendPackProtocolConformance(
+                                     const PackConformance *conformance,
+                                     GenericSignature sig);
   void appendDependentProtocolConformance(const ConformancePath &path,
                                           GenericSignature sig);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
