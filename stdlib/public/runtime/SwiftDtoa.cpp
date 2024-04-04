@@ -343,6 +343,11 @@ static size_t nan_details(char *dest, size_t len, int negative, int quiet, uint6
 
 
 #if SWIFT_DTOA_BINARY16_SUPPORT
+// Format a C `float`
+size_t swift_dtoa_optimal_binary16(_Float16 d, char *dest, size_t length) {
+  return swift_dtoa_optimal_binary16_p(&d, dest, length);
+}
+
 // Format an IEEE 754 binary16 half-precision floating point value
 // into an optimal text form.
 

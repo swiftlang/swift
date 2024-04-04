@@ -238,6 +238,7 @@ extern "C" {
 
 #if SWIFT_DTOA_BINARY16_SUPPORT
 size_t swift_dtoa_optimal_binary16_p(const void *, char *dest, size_t length);
+size_t swift_dtoa_optimal_binary16(_Float16, char *dest, size_t length);
 #endif
 
 #if SWIFT_DTOA_BINARY32_SUPPORT
