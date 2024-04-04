@@ -77,3 +77,26 @@ extension _ArrayProtocol {
     return try _filter(isIncluded)
   }
 }
+
+// This would be an extension of `_ArrayProtocol` if it were public
+extension RandomAccessCollection where SubSequence == ArraySlice<Element> {
+  @_alwaysEmitIntoClient
+  public __consuming func suffix(_ maxLength: Int) -> [Element] {
+    let slice: SubSequence = suffix(maxLength)
+    return Array(slice)
+  }
+
+  @_alwaysEmitIntoClient
+  public __consuming func dropLast(_ k: Int = 1) -> [Element] {
+    let slice: SubSequence = dropLast(k)
+    return Array(slice)
+  }
+
+  @_alwaysEmitIntoClient
+  public __consuming func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    let slice: SubSequence = try prefix(while: predicate)
+    return Array(slice)
+  }
+}
