@@ -1627,6 +1627,7 @@ namespace  {
     UNINTERESTING_ATTR(CompilerInitialized)
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
     UNINTERESTING_ATTR(ExtractConstantsFromMembers)
+    UNINTERESTING_ATTR(Sensitive)
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)

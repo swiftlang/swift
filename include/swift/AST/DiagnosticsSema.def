@@ -1983,6 +1983,10 @@ ERROR(attr_static_exclusive_only_mutating,none,
 ERROR(attr_extractConstantsFromMembers_experimental,none,
       "@extractConstantsFromMembers requires '-enable-experimental-feature ExtractConstantsFromMembers'", ())
 
+// @sensitive
+ERROR(attr_sensitive_experimental,none,
+      "@sensitive requires '-enable-experimental-feature Sensitive'", ())
+
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))

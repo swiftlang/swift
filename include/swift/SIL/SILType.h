@@ -481,7 +481,13 @@ public:
   bool hasParameterizedExistential() const {
     return getASTType()->hasParameterizedExistential();
   }
-  
+
+  bool isSensitive() const {
+    if (auto *nom = getNominalOrBoundGenericNominal())
+      return nom->getAttrs().hasAttribute<SensitiveAttr>();
+    return false;
+  }
+
   /// Returns the representation used by an existential type. If the concrete
   /// type is provided, this may return a specialized representation kind that
   /// can be used for that type. Otherwise, returns the most general
