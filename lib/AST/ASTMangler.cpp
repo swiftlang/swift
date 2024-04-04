@@ -1872,6 +1872,31 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
   return conformance->isRetroactive();
 }
 
+template<typename Fn>
+static bool forEachConditionalConformance(const ProtocolConformance *conformance,
+                                          Fn fn) {
+  auto *rootConformance = conformance->getRootConformance();
+
+  auto subMap = conformance->getSubstitutionMap();
+  for (auto requirement : rootConformance->getConditionalRequirements()) {
+    if (requirement.getKind() != RequirementKind::Conformance)
+      continue;
+    ProtocolDecl *proto = requirement.getProtocolDecl();
+    auto conformance = subMap.lookupConformance(
+        requirement.getFirstType()->getCanonicalType(), proto);
+    if (conformance.isInvalid()) {
+      // This should only happen when mangling invalid ASTs, but that happens
+      // for indexing purposes.
+      continue;
+    }
+
+    if (fn(requirement.getFirstType().subst(subMap), conformance))
+      return true;
+  }
+
+  return false;
+}
+
 /// Determine whether the given protocol conformance contains a retroactive
 /// protocol conformance anywhere in it.
 static bool containsRetroactiveConformance(
@@ -1899,24 +1924,10 @@ static bool containsRetroactiveConformance(
 
   // If the conformance is conditional and any of the substitutions used to
   // satisfy the conditions are retroactive, it's retroactive.
-  auto subMap = conformance->getSubstitutionMap();
-  for (auto requirement : rootConformance->getConditionalRequirements()) {
-    if (requirement.getKind() != RequirementKind::Conformance)
-      continue;
-    ProtocolDecl *proto = requirement.getProtocolDecl();
-    auto conformance = subMap.lookupConformance(
-        requirement.getFirstType()->getCanonicalType(), proto);
-    if (conformance.isInvalid()) {
-      // This should only happen when mangling invalid ASTs, but that happens
-      // for indexing purposes.
-      continue;
-    }
-    if (containsRetroactiveConformance(conformance)) {
-      return true;
-    }
-  }
-
-  return false;
+  return forEachConditionalConformance(conformance,
+    [&](Type substType, ProtocolConformanceRef substConf) -> bool {
+      return containsRetroactiveConformance(substConf);
+    });
 }
 
 void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
@@ -4169,48 +4180,27 @@ void ASTMangler::appendAnyProtocolConformance(
 void ASTMangler::appendConcreteProtocolConformance(
                                       const ProtocolConformance *conformance,
                                       GenericSignature sig) {
-  auto module = conformance->getDeclContext()->getParentModule();
-
   // Conforming type.
   Type conformingType = conformance->getType();
   if (conformingType->hasArchetype())
     conformingType = conformingType->mapTypeOutOfContext();
-  appendType(conformingType->getCanonicalType(), sig);
+  appendType(conformingType->getReducedType(sig), sig);
 
   // Protocol conformance reference.
   appendProtocolConformanceRef(conformance->getRootConformance());
 
   // Conditional conformance requirements.
   bool firstRequirement = true;
-  for (const auto &conditionalReq : conformance->getConditionalRequirements()) {
-    switch (conditionalReq.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
-    case RequirementKind::Layout:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      continue;
-
-    case RequirementKind::Conformance: {
-      auto type = conditionalReq.getFirstType();
-      if (type->hasArchetype())
-        type = type->mapTypeOutOfContext();
-      CanType canType = type->getReducedType(sig);
-      auto proto = conditionalReq.getProtocolDecl();
-      
-      ProtocolConformanceRef conformance;
-      
-      if (canType->isTypeParameter() || canType->is<OpaqueTypeArchetypeType>()){
-        conformance = ProtocolConformanceRef(proto);
-      } else {
-        conformance = module->lookupConformance(canType, proto);
-      }
-      appendAnyProtocolConformance(sig, canType, conformance);
+  forEachConditionalConformance(conformance,
+    [&](Type substType, ProtocolConformanceRef substConf) -> bool {
+      if (substType->hasArchetype())
+        substType = substType->mapTypeOutOfContext();
+      CanType canType = substType->getReducedType(sig);
+      appendAnyProtocolConformance(sig, canType, substConf);
       appendListSeparator(firstRequirement);
-      break;
-    }
-    }
-  }
+      return false;
+    });
+
   if (firstRequirement)
     appendOperator("y");
 
