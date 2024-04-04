@@ -5364,10 +5364,10 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  SubstOptions flags = SubstFlags::SubstituteOpaqueArchetypes;
+  SubstOptions flags = (SubstFlags::SubstituteOpaqueArchetypes |
+                        SubstFlags::PreservePackExpansionLevel);
   if (allowLoweredTypes)
-    flags =
-        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
+    flags |= SubstFlags::AllowLoweredTypes;
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
