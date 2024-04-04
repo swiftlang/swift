@@ -365,6 +365,10 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
 
+
+// Whether members of extensions respect the enclosing file's imports.
+EXPERIMENTAL_FEATURE(ExtensionImportVisibility, true)
+
 // Alias for IsolatedAny
 EXPERIMENTAL_FEATURE(IsolatedAny2, true)
 
@@ -376,6 +380,7 @@ EXPERIMENTAL_FEATURE(ObjCImplementation, true)
 
 // Enable @implementation on @_cdecl functions.
 EXPERIMENTAL_FEATURE(CImplementation, true)
+
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
