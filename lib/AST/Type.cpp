@@ -4455,11 +4455,8 @@ case TypeKind::Id:
     auto sig = opaque->getDecl()->getGenericSignature();
     auto newSubMap =
       SubstitutionMap::get(sig,
-       [&](SubstitutableType *t) -> Type {
-         auto index = sig->getGenericParamOrdinal(cast<GenericTypeParamType>(t));
-         return newSubs[index];
-       },
-       LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
+        QueryReplacementTypeArray{sig, newSubs},
+        LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
     return OpaqueTypeArchetypeType::get(opaque->getDecl(),
                                         opaque->getInterfaceType(),
                                         newSubMap);
