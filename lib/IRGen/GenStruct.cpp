@@ -603,10 +603,17 @@ namespace {
                                 ParameterConvention::Direct_Unowned);
       SILResultInfo result(T.getASTType(), ResultConvention::Indirect);
 
+      auto clangFnType = T.getASTContext().getCanonicalClangFunctionType(
+          {ptrParam}, result, SILFunctionTypeRepresentation::CFunctionPointer);
+      auto extInfo = SILExtInfoBuilder()
+                         .withClangFunctionType(clangFnType)
+                         .withRepresentation(
+                             SILFunctionTypeRepresentation::CFunctionPointer)
+                         .build();
+
       return SILFunctionType::get(
           GenericSignature(),
-          SILFunctionType::ExtInfo().withRepresentation(
-              SILFunctionTypeRepresentation::CFunctionPointer),
+          extInfo,
           SILCoroutineKind::None,
           /*callee=*/ParameterConvention::Direct_Unowned,
           /*params*/ {ptrParam},
