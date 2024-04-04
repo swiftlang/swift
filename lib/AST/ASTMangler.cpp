@@ -1875,11 +1875,10 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
 /// Determine whether the given protocol conformance contains a retroactive
 /// protocol conformance anywhere in it.
 static bool containsRetroactiveConformance(
-                                      ProtocolConformanceRef conformanceRef,
-                                      ModuleDecl *module) {
+                                      ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isPack()) {
     for (auto patternConf : conformanceRef.getPack()->getPatternConformances()) {
-      if (containsRetroactiveConformance(patternConf, module))
+      if (containsRetroactiveConformance(patternConf))
         return true;
     }
 
@@ -1909,7 +1908,7 @@ static bool containsRetroactiveConformance(
       // for indexing purposes.
       continue;
     }
-    if (containsRetroactiveConformance(conformance, module)) {
+    if (containsRetroactiveConformance(conformance)) {
       return true;
     }
   }
@@ -1918,8 +1917,7 @@ static bool containsRetroactiveConformance(
 }
 
 void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
-                                               GenericSignature sig,
-                                               ModuleDecl *fromModule) {
+                                               GenericSignature sig) {
   if (subMap.empty()) return;
 
   unsigned numProtocolRequirements = 0;
@@ -1939,7 +1937,7 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
       continue;
 
     // Skip non-retroactive conformances.
-    if (!containsRetroactiveConformance(conformance, fromModule))
+    if (!containsRetroactiveConformance(conformance))
       continue;
 
     if (conformance.isConcrete())
@@ -1969,7 +1967,7 @@ void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) 
     subMap = type->getContextSubstitutionMap(module, nominal);
   }
 
-  appendRetroactiveConformances(subMap, sig, module);
+  appendRetroactiveConformances(subMap, sig);
 }
 
 void ASTMangler::appendSymbolicExtendedExistentialType(
@@ -1992,11 +1990,7 @@ void ASTMangler::appendSymbolicExtendedExistentialType(
     for (auto argType : genInfo.Generalization.getReplacementTypes())
       appendType(argType, sig, forDecl);
 
-    // What module should be used here?  The existential isn't anchored
-    // to any given module; we should just treat conformances as
-    // retroactive if they're "objectively" retroactive.
-    appendRetroactiveConformances(genInfo.Generalization, sig,
-                                  /*from module*/ nullptr);
+    appendRetroactiveConformances(genInfo.Generalization, sig);
   }
 
   appendOperator("Xj");
@@ -2187,7 +2181,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   }
   if (auto subs = fn->getInvocationSubstitutions()) {
     appendFlatGenericArgs(subs, sig, forDecl);
-    appendRetroactiveConformances(subs, sig, Mod);
+    appendRetroactiveConformances(subs, sig);
   }
   if (auto subs = fn->getPatternSubstitutions()) {
     appendGenericSignature(subs.getGenericSignature());
@@ -2196,7 +2190,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
         ? fn->getInvocationGenericSignature()
         : outerGenericSig;
     appendFlatGenericArgs(subs, sig, forDecl);
-    appendRetroactiveConformances(subs, sig, Mod);
+    appendRetroactiveConformances(subs, sig);
   }
 
   OpArgs.push_back('_');
@@ -2232,7 +2226,7 @@ void ASTMangler::appendOpaqueTypeArchetype(ArchetypeType *archetype,
     appendOpaqueDeclName(opaqueDecl);
     bool isFirstArgList = true;
     appendBoundGenericArgs(opaqueDecl, sig, subs, isFirstArgList, forDecl);
-    appendRetroactiveConformances(subs, sig, opaqueDecl->getParentModule());
+    appendRetroactiveConformances(subs, sig);
 
     appendOperator("Qo", Index(genericParam->getIndex()));
   } else {

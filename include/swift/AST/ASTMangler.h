@@ -443,8 +443,7 @@ protected:
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type, GenericSignature sig);
   void appendRetroactiveConformances(SubstitutionMap subMap,
-                                     GenericSignature sig,
-                                     ModuleDecl *fromModule);
+                                     GenericSignature sig);
   void appendImplFunctionType(SILFunctionType *fn, GenericSignature sig,
                               const ValueDecl *forDecl = nullptr);
   void appendOpaqueTypeArchetype(ArchetypeType *archetype,
