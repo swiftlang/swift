@@ -528,8 +528,7 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    auto context = TypeExpansionContext::maximal(getSwiftModule(),
-                                                 getSILModule().isWholeModule());
+    auto context = getMaximalTypeExpansionContext();
     return swift::substOpaqueTypesWithUnderlyingTypes(type, context,
                                                       /*allowLoweredTypes=*/false);
   }
@@ -542,8 +541,7 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type.getASTType()->hasOpaqueArchetype()) {
-    auto context = TypeExpansionContext::maximal(getSwiftModule(),
-                                                 getSILModule().isWholeModule());
+    auto context = getMaximalTypeExpansionContext();
     return SILType::getPrimitiveType(
       swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context,
                                                  /*allowLoweredTypes=*/true),
@@ -559,8 +557,7 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    auto context = TypeExpansionContext::maximal(getSwiftModule(),
-                                                 getSILModule().isWholeModule());
+    auto context = getMaximalTypeExpansionContext();
     return std::make_pair(
        swift::substOpaqueTypesWithUnderlyingTypes(type, context,
                                                   /*allowLoweredTypes=*/false),
