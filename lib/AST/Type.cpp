@@ -5351,23 +5351,6 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened,
   return opened;
 }
 
-CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
-                                                   TypeExpansionContext context,
-                                                   bool allowLoweredTypes) {
-  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
-      !ty->hasOpaqueArchetype())
-    return ty;
-
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      context.getContext(), context.getResilienceExpansion(),
-      context.isWholeModuleContext());
-  SubstOptions flags = (SubstFlags::SubstituteOpaqueArchetypes |
-                        SubstFlags::PreservePackExpansionLevel);
-  if (allowLoweredTypes)
-    flags |= SubstFlags::AllowLoweredTypes;
-  return ty.subst(replacer, replacer, flags)->getCanonicalType();
-}
-
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {
