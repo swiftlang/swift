@@ -172,7 +172,7 @@ final class Wallet {
   // CHECK:    destroy_value [[DD]] : $Ticket
 
   // CHECK-SIL-LABEL: sil hidden @$s4test6TicketO06changeB08inWalletyAA0E0CSg_tF : $@convention(method) (@guaranteed Optional<Wallet>, @owned Ticket) -> () {
-  // CHECK-SIL:    [[SELF_REF:%.*]] = alloc_stack [lexical] [var_decl] $Ticket, var, name "self", implicit 
+  // CHECK-SIL:    [[SELF_REF:%.*]] = alloc_stack [lexical] [var_decl] $Ticket, var, name "self"
   // CHECK-SIL:    switch_enum {{.*}} : $Optional<Wallet>, case #Optional.some!enumelt: {{.*}}, case #Optional.none!enumelt: [[NO_WALLET_BB:bb[0-9]+]]
   //
   // >> now we begin the destruction sequence, which involves pattern matching on self to destroy its innards

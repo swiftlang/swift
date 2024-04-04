@@ -149,7 +149,7 @@ actor BoringActor {
    // FIXME: the convenience init below is missing a hop after the call to arbitraryAsync (rdar://87485045)
 
    // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC10delegatingACSb_tYacfC : $@convention(method) @async (Bool, @thick SingleVarActor.Type) -> @owned SingleVarActor {
-   // CHECK:         [[SELF_ALLOC:%[0-9]+]] = alloc_stack [lexical] [var_decl] $SingleVarActor, let, name "self", implicit
+   // CHECK:         [[SELF_ALLOC:%[0-9]+]] = alloc_stack [lexical] [var_decl] $SingleVarActor, let, name "self"
    //           ** first hop is after the call to the synchronous init, right after initializing the allocation.
    // CHECK:         [[SYNC_FN:%[0-9]+]] = function_ref @$s4test14SingleVarActorC4syncACyt_tcfC : $@convention(method) (@thick SingleVarActor.Type) -> @owned SingleVarActor
    // CHECK:         [[INIT1:%[0-9]+]] = apply [[SYNC_FN]]({{%[0-9]+}}) : $@convention(method) (@thick SingleVarActor.Type) -> @owned SingleVarActor
