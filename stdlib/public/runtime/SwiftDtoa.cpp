@@ -72,6 +72,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#define __STDC_WANT_IEC_60559_TYPES_EXT__
+#include <float.h>
 
 #include "swift/Runtime/SwiftDtoa.h"
 
@@ -343,10 +345,12 @@ static size_t nan_details(char *dest, size_t len, int negative, int quiet, uint6
 
 
 #if SWIFT_DTOA_BINARY16_SUPPORT
-// Format a C `float`
+#if defined FLT16_MAX
+// Format a C `_Float16`
 size_t swift_dtoa_optimal_binary16(_Float16 d, char *dest, size_t length) {
   return swift_dtoa_optimal_binary16_p(&d, dest, length);
 }
+#endif
 
 // Format an IEEE 754 binary16 half-precision floating point value
 // into an optimal text form.
