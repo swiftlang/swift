@@ -23,14 +23,14 @@ import Swift
 /// or reordered with other volatile operations by the compiler. They may be
 /// reordered with non-volatile operations. For details, see
 /// <https://llvm.org/docs/LangRef.html#volatile-memory-accesses>.
-public struct UnsafeVolatilePointer<Pointee> {
+public struct VolatileMappedRegister<Pointee> {
   public var _rawPointer: Builtin.RawPointer
-  public init(bitPattern: UInt) {
-    _rawPointer = UnsafeRawPointer(bitPattern: bitPattern)!._rawValue
+  public init(unsafeBitPattern: UInt) {
+    _rawPointer = UnsafeRawPointer(bitPattern: unsafeBitPattern)!._rawValue
   }
 }
 
-extension UnsafeVolatilePointer where Pointee == UInt8 {
+extension VolatileMappedRegister where Pointee == UInt8 {
   /// Perform an 8-bit volatile load operation from the target pointer.
   ///
   /// Do not use for inter-thread synchronization.
@@ -48,7 +48,7 @@ extension UnsafeVolatilePointer where Pointee == UInt8 {
   }
 }
 
-extension UnsafeVolatilePointer where Pointee == UInt16 {
+extension VolatileMappedRegister where Pointee == UInt16 {
   /// Perform a 16-bit volatile load operation from the target pointer.
   ///
   /// Do not use for inter-thread synchronization.
@@ -66,7 +66,7 @@ extension UnsafeVolatilePointer where Pointee == UInt16 {
   }
 }
 
-extension UnsafeVolatilePointer where Pointee == UInt32 {
+extension VolatileMappedRegister where Pointee == UInt32 {
   /// Perform a 32-bit volatile load operation from the target pointer.
   ///
   /// Do not use for inter-thread synchronization.
@@ -84,7 +84,7 @@ extension UnsafeVolatilePointer where Pointee == UInt32 {
   }
 }
 
-extension UnsafeVolatilePointer where Pointee == UInt64 {
+extension VolatileMappedRegister where Pointee == UInt64 {
   /// Perform a 64-bit volatile load operation from the target pointer.
   ///
   /// Do not use for inter-thread synchronization.
