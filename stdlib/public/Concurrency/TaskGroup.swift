@@ -80,6 +80,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   // Run the withTaskGroup body.
   let result = await body(&group)
 
+  // TODO(concurrency): should get isolation from param from withThrowingTaskGroup
   await group.awaitAllRemainingTasks()
 
   Builtin.destroyTaskGroup(_group)
@@ -183,6 +184,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
     // Run the withTaskGroup body.
     let result = try await body(&group)
 
+    // TODO(concurrency): should get isolation from param from withThrowingTaskGroup
     await group.awaitAllRemainingTasks()
     Builtin.destroyTaskGroup(_group)
 
@@ -190,6 +192,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   } catch {
     group.cancelAll()
 
+    // TODO(concurrency): should get isolation from param from withThrowingTaskGroup
     await group.awaitAllRemainingTasks()
     Builtin.destroyTaskGroup(_group)
 
@@ -563,7 +566,18 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// that method can't be called from a concurrent execution context like a child task.
   ///
   /// - Returns: The value returned by the next child task that completes.
-  public mutating func next() async -> ChildTaskResult? {
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
+  public mutating func next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
+    // try!-safe because this function only exists for Failure == Never,
+    // and as such, it is impossible to spawn a throwing child task.
+    return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
+  }
+
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
+  @_silgen_name("$sScG4nextxSgyYaF")
+  internal mutating func __abi_next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
     return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
@@ -571,14 +585,22 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   /// Await all of the pending tasks added this group.
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
+  internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
+    while let _ = await next(isolation: isolation) {}
+  }
+
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   internal mutating func awaitAllRemainingTasks() async {
-    while let _ = await next() {}
+    while let _ = await next(isolation: nil) {}
   }
 
   /// Wait for all of the group's remaining tasks to complete.
   @_alwaysEmitIntoClient
-  public mutating func waitForAll() async {
-    await awaitAllRemainingTasks()
+  public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async {
+    await awaitAllRemainingTasks(isolation: isolation)
   }
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
@@ -703,14 +725,22 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   /// Await all the remaining tasks on this group.
   @usableFromInline
-  internal mutating func awaitAllRemainingTasks() async {
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
+  internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while true {
       do {
-        guard let _ = try await next() else {
+        guard let _ = try await next(isolation: isolation) else {
           return
         }
       } catch {}
     }
+  }
+
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
+  internal mutating func awaitAllRemainingTasks() async {
+    await awaitAllRemainingTasks(isolation: nil)
   }
 
   @usableFromInline
@@ -750,7 +780,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Throws: The *first* error that was thrown by a child task during draining all the tasks.
   ///           This first error is stored until all other tasks have completed, and is re-thrown afterwards.
   @_alwaysEmitIntoClient
-  public mutating func waitForAll() async throws {
+  public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async throws {
     var firstError: Error? = nil
 
     // Make sure we loop until all child tasks have completed
@@ -999,7 +1029,16 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Throws: The error thrown by the next child task that completes.
   ///
   /// - SeeAlso: `nextResult()`
-  public mutating func next() async throws -> ChildTaskResult? {
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
+  public mutating func next(isolation: isolated (any Actor)? = #isolation) async throws -> ChildTaskResult? {
+    return try await _taskGroupWaitNext(group: _group)
+  }
+
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
+  @_silgen_name("$sScg4nextxSgyYaKF")
+  internal mutating func __abi_next() async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
 
@@ -1052,7 +1091,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - SeeAlso: `next()`
   @_alwaysEmitIntoClient
-  public mutating func nextResult() async -> Result<ChildTaskResult, Failure>? {
+  public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
   }
 
@@ -1332,7 +1371,7 @@ func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_wait_next_throwing")
-func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+public func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")
