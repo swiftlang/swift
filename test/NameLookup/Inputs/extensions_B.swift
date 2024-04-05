@@ -1,10 +1,10 @@
 import extensions_A
 
-public extension X {
+extension X {
   public func XinB() { }
 }
 
-public extension Y {
+extension Y {
   public func YinB() { }
 }
 

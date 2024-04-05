@@ -1,11 +1,11 @@
-import extensions_A
+@_exported import extensions_A
 import extensions_B
 
-public extension X {
+extension X {
   public func XinC() { }
 }
 
-public extension Y {
+extension Y {
   public func YinC() { }
 }
 
