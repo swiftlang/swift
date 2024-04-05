@@ -201,8 +201,7 @@ public:
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<LifetimeDependenceInfo>
   fromTypeRepr(LifetimeDependentReturnTypeRepr *lifetimeDependentRepr,
-               SmallVectorImpl<SILParameterInfo> &params, bool hasSelfParam,
-               DeclContext *dc);
+               SmallVectorImpl<SILParameterInfo> &params, DeclContext *dc);
 
   /// Infer LifetimeDependenceInfo
   static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,

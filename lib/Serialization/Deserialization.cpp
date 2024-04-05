@@ -3645,7 +3645,7 @@ public:
     ctor->setParameters(bodyParams);
 
     auto lifetimeDependenceInfo =
-        MF.maybeReadLifetimeDependenceInfo(bodyParams->size());
+        MF.maybeReadLifetimeDependenceInfo(bodyParams->size() + 1);
 
     if (lifetimeDependenceInfo.has_value()) {
       ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
@@ -4221,8 +4221,8 @@ public:
     ParameterList *paramList = MF.readParameterList();
     fn->setParameters(paramList);
 
-    auto lifetimeDependenceInfo =
-        MF.maybeReadLifetimeDependenceInfo(paramList->size());
+    auto lifetimeDependenceInfo = MF.maybeReadLifetimeDependenceInfo(
+        fn->hasImplicitSelfDecl() ? paramList->size() + 1 : paramList->size());
 
     if (lifetimeDependenceInfo.has_value()) {
       ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
@@ -7590,8 +7590,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (!patternSubsOrErr)
     return patternSubsOrErr.takeError();
 
-  auto lifetimeDependenceInfo = MF.maybeReadLifetimeDependenceInfo(
-      extInfo.hasSelfParam() ? numParams : numParams + 1);
+  auto lifetimeDependenceInfo = MF.maybeReadLifetimeDependenceInfo(numParams);
 
   if (lifetimeDependenceInfo.has_value()) {
     extInfo = extInfo.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
