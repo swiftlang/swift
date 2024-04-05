@@ -34,37 +34,26 @@ set(SWIFT_SYNCHRONIZATION_GYB_SOURCES
   Atomics/AtomicStorage.swift.gyb
 )
 
-# Darwin dependencies and sources
-
-set(SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES)
-
-if(SWIFT_BUILD_SDK_OVERLAY)
-  set(SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES Darwin)
-endif()
+# Darwin sources
 
 set(SWIFT_SYNCHRONIZATION_DARWIN_SOURCES
   Mutex/DarwinImpl.swift
 )
 
-# Linux dependencies and sources
+# Linux sources
 
 set(SWIFT_SYNCHRONIZATION_LINUX_SOURCES
   Mutex/LinuxImpl.swift
+  Mutex/SpinLoopHint.swift
 )
 
-# Wasm dependencies and sources
+# Wasm sources
 
 set(SWIFT_SYNCHRONIZATION_WASM_SOURCES
   Mutex/WasmImpl.swift
 )
 
-# Windows dependencies and sources
-
-set(SWIFT_SYNCHRONIZATION_WINDOWS_DEPENDENCIES)
-
-if(SWIFT_BUILD_SDK_OVERLAY)
-  set(SWIFT_SYNCHRONIZATION_WINDOWS_DEPENDENCIES WinSDK)
-endif()
+# Windows sources
 
 set(SWIFT_SYNCHRONIZATION_WINDOWS_SOURCES
   Mutex/WindowsImpl.swift
@@ -76,6 +65,7 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-enable-experimental-feature" "RawLayout"
   "-enable-experimental-feature" "StaticExclusiveOnly"
   "-enable-experimental-feature" "TransferringArgsAndResults"
+  "-enable-experimental-feature" "Extern"
 )
 
 add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -100,15 +90,17 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     ${SWIFT_SYNCHRONIZATION_WINDOWS_SOURCES}
 
   SWIFT_MODULE_DEPENDS_OSX
-    ${SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES}
+    Darwin
   SWIFT_MODULE_DEPENDS_IOS
-    ${SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES}
+    Darwin
   SWIFT_MODULE_DEPENDS_TVOS
-    ${SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES}
+    Darwin
   SWIFT_MODULE_DEPENDS_WATCHOS
-    ${SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES}
+    Darwin
+  SWIFT_MODULE_DEPENDS_LINUX
+    Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS
-    ${SWIFT_SYNCHRONIZATION_WINDOWS_DEPENDENCIES}
+    WinSDK
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}

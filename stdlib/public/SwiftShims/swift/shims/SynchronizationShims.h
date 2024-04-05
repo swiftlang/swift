@@ -21,8 +21,6 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-#define SWIFT_FUTEX_WAITERS FUTEX_WAITERS
-
 static inline __swift_uint32_t _swift_stdlib_gettid() {
   static __thread tid = 0;
 
@@ -33,13 +31,17 @@ static inline __swift_uint32_t _swift_stdlib_gettid() {
   return tid;
 }
 
-static inline __swift_bool _swift_stdlib_wait(__swift_uint32_t *lock) {
+static inline __swift_bool _swift_stdlib_futex_lock(__swift_uint32_t *lock) {
   return syscall(SYS_futex, lock, FUTEX_LOCK_PI_PRIVATE,
                  /* val */ 0, // this value is ignored by this futex op
                  /* timeout */ NULL); // block indefinitely
 }
 
-static inline __swift_bool _swift_stdlib_wake(__swift_uint32_t *lock) {
+static inline __swift_bool _swift_stdlib_futex_trylock(__swift_uint32_t *lock) {
+  return syscall(SYS_futex, lock, FUTEX_TRYLOCK_PI);
+}
+
+static inline __swift_bool _swift_stdlib_futex_unlock(__swift_uint32_t *lock) {
   return syscall(SYS_futex, lock, FUTEX_UNLOCK_PI_PRIVATE);
 }
 
