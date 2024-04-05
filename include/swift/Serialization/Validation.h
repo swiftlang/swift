@@ -141,6 +141,7 @@ class ExtendedValidationInfo {
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
     unsigned AllowNonResilientAccess: 1;
+    unsigned SerializePackageEnabled: 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -208,6 +209,10 @@ public:
   bool allowNonResilientAccess() const { return Bits.AllowNonResilientAccess; }
   void setAllowNonResilientAccess(bool val) {
     Bits.AllowNonResilientAccess = val;
+  }
+  bool serializePackageEnabled() const { return Bits.SerializePackageEnabled; }
+  void setSerializePackageEnabled(bool val) {
+    Bits.SerializePackageEnabled = val;
   }
   bool isAllowModuleWithCompilerErrorsEnabled() {
     return Bits.IsAllowModuleWithCompilerErrorsEnabled;

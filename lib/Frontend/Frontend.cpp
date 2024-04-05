@@ -1401,6 +1401,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setHasCxxInteroperability();
     if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
+    if (Invocation.getSILOptions().EnableSerializePackage)
+      MainModule->setSerializePackageEnabled();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);

@@ -1091,6 +1091,11 @@ void Serializer::writeHeader() {
         AllowNonResAcess.emit(ScratchRecord);
       }
 
+      if (M->serializePackageEnabled()) {
+        options_block::SerializePackageEnabled SerializePackageEnabled(Out);
+        SerializePackageEnabled.emit(ScratchRecord);
+      }
+
       if (allowCompilerErrors()) {
         options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
             AllowErrors(Out);

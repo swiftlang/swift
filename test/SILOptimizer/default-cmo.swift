@@ -12,10 +12,9 @@
 import Module
 import ModuleTBD
 
-// CHECK-LABEL: sil_global public_external @$s6Module0A6StructV22privateFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
-
-public func callPublicFunctionPointer(_ x: Int) -> Int {
-  return Module.ModuleStruct.publicFunctionPointer(x)
+// CHECK-LABEL: sil_global public_external @$s6Module0A6StructV23pubStaticClosurePointeryS2icvpZ : $@callee_guaranteed (Int) -> Int
+public func callPublicClosurePointer(_ x: Int) -> Int {
+  return Module.ModuleStruct.pubStaticClosurePointer(x)
 }
 
 // CHECK-LABEL: sil @$s4Main25callPublicFunctionPointeryS2iF :
@@ -23,8 +22,8 @@ public func callPublicFunctionPointer(_ x: Int) -> Int {
 // CHECK:         load
 // CHECK:         apply
 // CHECK:       } // end sil function '$s4Main25callPublicFunctionPointeryS2iF'
-public func callPrivateFunctionPointer(_ x: Int) -> Int {
-  return Module.ModuleStruct.privateFunctionPointer(x)
+public func callPublicFunctionPointer(_ x: Int) -> Int {
+  return Module.ModuleStruct.pubStaticFuncPointer(x)
 }
 
 // CHECK-LABEL: sil @$s4Main24callPrivateCFuncInModuleSiyF : $@convention(thin) () -> Int {

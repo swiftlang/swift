@@ -2394,6 +2394,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
 
+  if (Args.hasArg(OPT_experimental_serialize_package) ||
+      LangOpts.hasFeature(Feature::SerializePackage)) {
+    Opts.EnableSerializePackage = true;
+  }
+
   if (Args.hasArg(OPT_ExperimentalPackageCMO) ||
       LangOpts.hasFeature(Feature::PackageCMO)) {
     if (!LangOpts.AllowNonResilientAccess) {

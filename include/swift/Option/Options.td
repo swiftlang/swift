@@ -528,6 +528,10 @@ def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-no
   Flags<[FrontendOption]>,
   HelpText<"Allow non-resilient access by generating all contents besides exportable decls">;
 
+def experimental_serialize_package : Flag<["-"], "experimental-serialize-package">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable serializing decls with package access level">;
+
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,

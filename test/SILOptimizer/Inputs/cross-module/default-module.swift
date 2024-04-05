@@ -54,13 +54,13 @@ package func pkgModuleKlassMember() -> Int {
 }
 
 public struct ModuleStruct {
-  public static var publicFunctionPointer: (Int) -> (Int) = incrementByThree
-  public static var privateFunctionPointer: (Int) -> (Int) = { $0 }
+  public static var pubStaticFuncPointer: (Int) -> (Int) = incrementByThree
+  public static var pubStaticClosurePointer: (Int) -> (Int) = { $0 }
 }
 
 package struct PkgModuleStruct {
-  package static var funcPointer: (Int) -> (Int) = pkgFunc
-  package static var closurePointer: (Int) -> (Int) = { $0 }
+  package static var pkgStaticFuncPointer: (Int) -> (Int) = pkgFunc
+  package static var pkgStaticClosurePointer: (Int) -> (Int) = { $0 }
 }
 
 public func callPrivateCFunc() -> Int {

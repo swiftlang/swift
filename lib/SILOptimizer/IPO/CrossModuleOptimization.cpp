@@ -806,7 +806,7 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
         everything = true;
         break;
     }
-
+    // ES TODO: check this with only serialize-package flag; wo package-cmo.
     if (!everything &&
         M.getOptions().CMOMode == swift::CrossModuleOptimizationMode::Off) {
       return;

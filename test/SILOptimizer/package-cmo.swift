@@ -12,13 +12,13 @@ import Module
 import ModuleTBD
 
 // CHECK-LABEL: sil_global public_external @$s6Module0A6StructV22privateFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
-public func callPrivateFunctionPointer(_ x: Int) -> Int {
-  return Module.ModuleStruct.privateFunctionPointer(x)
+public func callPubStaticClosurePointer(_ x: Int) -> Int {
+  return Module.ModuleStruct.pubStaticClosurePointer(x)
 }
 
 // CHECK-LABEL: sil_global package_external @$s6Module03PkgA6StructV14closurePointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
-package func callStaticPkgClosurePointer(_ x: Int) -> Int {
-  return Module.PkgModuleStruct.closurePointer(x)
+package func callPkgStaticClosurePointer(_ x: Int) -> Int {
+  return Module.PkgModuleStruct.pkgStaticClosurePointer(x)
 }
 
 // CHECK-LABEL: sil_global public_external [serialized] @$s6Module0A6StructV21publicFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int = {
@@ -38,7 +38,7 @@ package func callStaticPkgClosurePointer(_ x: Int) -> Int {
 // CHECK:         apply
 // CHECK:       } // end sil function '$s4Main25callPublicFunctionPointeryS2iF'
 public func callPublicFunctionPointer(_ x: Int) -> Int {
-  return Module.ModuleStruct.publicFunctionPointer(x)
+  return Module.ModuleStruct.pubStaticFuncPointer(x)
 }
 
 // CHECK-LABEL: sil package @$s4Main28callStaticPkgFunctionPointeryS2iF : $@convention(thin) (Int) -> Int {
@@ -47,7 +47,7 @@ public func callPublicFunctionPointer(_ x: Int) -> Int {
 // CHECK:         apply
 // CHECK:       } // end sil function '$s4Main28callStaticPkgFunctionPointeryS2iF'
 package func callStaticPkgFunctionPointer(_ x: Int) -> Int {
-  return Module.PkgModuleStruct.funcPointer(x)
+  return Module.PkgModuleStruct.pkgStaticFuncPointer(x)
 }
 
 // CHECK-LABEL: sil @$s4Main24callPrivateCFuncInModuleSiyF : $@convention(thin) () -> Int {

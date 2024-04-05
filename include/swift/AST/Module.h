@@ -721,6 +721,13 @@ public:
     Bits.ModuleDecl.AllowNonResilientAccess = flag;
   }
 
+  bool serializePackageEnabled() const {
+    return Bits.ModuleDecl.SerializePackageEnabled;
+  }
+  void setSerializePackageEnabled(bool flag = true) {
+    Bits.ModuleDecl.SerializePackageEnabled = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///

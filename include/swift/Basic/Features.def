@@ -233,8 +233,10 @@ EXPERIMENTAL_FEATURE(AllowNonResilientAccessInPackage, false)
 /// the same package.
 EXPERIMENTAL_FEATURE(ClientBypassResilientAccessInPackage, false)
 
-/// Enables serialization of package decls and bodies and performs
-/// CMO within a package.
+/// Enables serialization of package decls.
+EXPERIMENTAL_FEATURE(SerializePackage, false)
+
+/// Performs CMO within a package. This enables SerializPackage.
 EXPERIMENTAL_FEATURE(PackageCMO, false)
 
 /// Whether to enable experimental layout string value witnesses

@@ -2450,10 +2450,13 @@ public:
               "cannot access storage of resilient global");
     }
     if (F.isSerialized()) {
-      // If it has a package linkage at this point, package CMO must
-      // have been enabled, so opt in for visibility.
+      auto x = RefG->getModule().getOptions().EnableSerializePackage;
+      llvm::dbgs() << "\nES: PKG 1 OPT: " << (x ? "ON" : "OFF");
       require(RefG->isSerialized()
-              || hasPublicOrPackageVisibility(RefG->getLinkage(), /*includePackage*/ true),
+              // RefG should be visible if it has a package linkage and was
+              // serialized in its defining module.
+              || hasPublicOrPackageVisibility(RefG->getLinkage(),
+                                              RefG->getModule().getOptions().EnableSerializePackage),
               "alloc_global inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -2471,10 +2474,26 @@ public:
               "cannot access storage of resilient global");
     }
     if (F.isSerialized()) {
-      // If it has a package linkage at this point, package CMO must
-      // have been enabled, so opt in for visibility.
+      auto x = RefG->getModule().getOptions().EnableSerializePackage;
+      llvm::dbgs() << "\nES: PKG OPT: " << (x ? "ON" : "OFF") << ": " << RefG->getModule().getSwiftModule()->getBaseIdentifier().str();
+
+      auto y = RefG->getDecl()->getModuleContext()->getASTContext().SILOpts.EnableSerializePackage;
+      llvm::dbgs() << "\nES: ---- varDecl: PKG OPT: " << (y ? "ON" : "OFF") << ": "
+      << RefG->getDecl()->getBaseIdentifier().str() << ": "
+      << RefG->getDecl()->getModuleContext()->getBaseIdentifier().str();
+
+      if (!x) {
+        llvm::dbgs() << "\nES: RefG gVar\n";
+        RefG->dump();
+        llvm::dbgs() << "\nES: GAI inst\n";
+        GAI->dump();
+        llvm::dbgs() << "\nES: ----- inst\n";
+      }
       require(RefG->isSerialized()
-              || hasPublicOrPackageVisibility(RefG->getLinkage(), /*includePackage*/ true),
+              // RefG should be visible if it has a package linkage and was
+              // serialized in its defining module.
+              || hasPublicOrPackageVisibility(RefG->getLinkage(),
+                                              RefG->getModule().getOptions().EnableSerializePackage),
               "global_addr/value inside fragile function cannot "
               "reference a private or hidden symbol");
     }
