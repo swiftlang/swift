@@ -806,11 +806,13 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
         everything = true;
         break;
     }
+    llvm::outs() << "\nES: 1111";
     // ES TODO: check this with only serialize-package flag; wo package-cmo.
     if (!everything &&
         M.getOptions().CMOMode == swift::CrossModuleOptimizationMode::Off) {
       return;
     }
+    llvm::outs() << "\nES: 2222";
 
     CrossModuleOptimization CMO(M, conservative, everything);
 

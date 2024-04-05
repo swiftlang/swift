@@ -36,6 +36,19 @@
 // RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-NonRes.sil
 // RUN: %FileCheck %s --check-prefixes=CLIENT-NONRES,CLIENT-COMMON < %t/Client-NonRes.sil
 
+  
+/// Build Utils module non-resiliently
+// RUN: %target-swift-frontend -emit-module %t/Utils.swift \
+// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -package-name mypkg \
+// RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule
+
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -swift-version 5 -package-name mypkg -verify
+
+/// Check serialization in SILGEN with resilience not enabled.
+// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-NonRes.sil
+// RUN: %FileCheck %s --check-prefixes=UTILS-NONRES,UTILS-COMMON < %t/Utils-NonRes.sil
+
 
 //--- Utils.swift
 
