@@ -2,8 +2,8 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/UnavailableFunction.swiftmodule -module-name UnavailableFunction -strict-concurrency=complete %S/Inputs/UnavailableFunction.swift
 // RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null
 // RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=targeted
+// RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
 // RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=complete
-// RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

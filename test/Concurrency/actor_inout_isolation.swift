@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix minimal-targeted- -strict-concurrency=targeted
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix complete-tns- -verify-additional-prefix complete- -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix minimal-targeted- -strict-concurrency=targeted -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix complete-tns- -verify-additional-prefix complete- -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix complete-tns- -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
