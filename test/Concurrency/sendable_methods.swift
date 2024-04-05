@@ -260,3 +260,12 @@ do {
     }
   }
 }
+
+// rdar://125932231 - incorrect `error: type of expression is ambiguous without a type annotation`
+do {
+  class C {}
+
+  func test(c: C) -> (any Sendable)? {
+    true ? nil : c // Ok
+  }
+}
