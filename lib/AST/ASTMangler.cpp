@@ -28,6 +28,7 @@
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1871,20 +1872,11 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
   return conformance->isRetroactive();
 }
 
-/// Determine whether the given protocol conformance contains a retroactive
-/// protocol conformance anywhere in it.
-static bool containsRetroactiveConformance(
-                                      const ProtocolConformance *conformance,
-                                      ModuleDecl *module) {
-  // If the root conformance is retroactive, it's retroactive.
-  const RootProtocolConformance *rootConformance =
-      conformance->getRootConformance();
-  if (isRetroactiveConformance(rootConformance) &&
-      conformanceHasIdentity(rootConformance))
-    return true;
+template<typename Fn>
+static bool forEachConditionalConformance(const ProtocolConformance *conformance,
+                                          Fn fn) {
+  auto *rootConformance = conformance->getRootConformance();
 
-  // If the conformance is conditional and any of the substitutions used to
-  // satisfy the conditions are retroactive, it's retroactive.
   auto subMap = conformance->getSubstitutionMap();
   for (auto requirement : rootConformance->getConditionalRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
@@ -1897,18 +1889,49 @@ static bool containsRetroactiveConformance(
       // for indexing purposes.
       continue;
     }
-    if (conformance.isConcrete() &&
-        containsRetroactiveConformance(conformance.getConcrete(), module)) {
+
+    if (fn(requirement.getFirstType().subst(subMap), conformance))
       return true;
-    }
   }
 
   return false;
 }
 
+/// Determine whether the given protocol conformance contains a retroactive
+/// protocol conformance anywhere in it.
+static bool containsRetroactiveConformance(
+                                      ProtocolConformanceRef conformanceRef) {
+  if (!conformanceRef.isPack() && !conformanceRef.isConcrete())
+    return false;
+
+  if (conformanceRef.isPack()) {
+    for (auto patternConf : conformanceRef.getPack()->getPatternConformances()) {
+      if (containsRetroactiveConformance(patternConf))
+        return true;
+    }
+
+    return false;
+  }
+
+  auto *conformance = conformanceRef.getConcrete();
+
+  // If the root conformance is retroactive, it's retroactive.
+  const RootProtocolConformance *rootConformance =
+      conformance->getRootConformance();
+  if (isRetroactiveConformance(rootConformance) &&
+      conformanceHasIdentity(rootConformance))
+    return true;
+
+  // If the conformance is conditional and any of the substitutions used to
+  // satisfy the conditions are retroactive, it's retroactive.
+  return forEachConditionalConformance(conformance,
+    [&](Type substType, ProtocolConformanceRef substConf) -> bool {
+      return containsRetroactiveConformance(substConf);
+    });
+}
+
 void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
-                                               GenericSignature sig,
-                                               ModuleDecl *fromModule) {
+                                               GenericSignature sig) {
   if (subMap.empty()) return;
 
   unsigned numProtocolRequirements = 0;
@@ -1924,14 +1947,18 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
     };
 
     // Ignore abstract conformances.
-    if (!conformance.isConcrete())
+    if (!conformance.isConcrete() && !conformance.isPack())
       continue;
 
     // Skip non-retroactive conformances.
-    if (!containsRetroactiveConformance(conformance.getConcrete(), fromModule))
+    if (!containsRetroactiveConformance(conformance))
       continue;
 
-    appendConcreteProtocolConformance(conformance.getConcrete(), sig);
+    if (conformance.isConcrete())
+      appendConcreteProtocolConformance(conformance.getConcrete(), sig);
+    else
+      appendPackProtocolConformance(conformance.getPack(), sig);
+
     appendOperator("g", Index(numProtocolRequirements));
   }
 }
@@ -1954,7 +1981,7 @@ void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) 
     subMap = type->getContextSubstitutionMap(module, nominal);
   }
 
-  appendRetroactiveConformances(subMap, sig, module);
+  appendRetroactiveConformances(subMap, sig);
 }
 
 void ASTMangler::appendSymbolicExtendedExistentialType(
@@ -1977,11 +2004,7 @@ void ASTMangler::appendSymbolicExtendedExistentialType(
     for (auto argType : genInfo.Generalization.getReplacementTypes())
       appendType(argType, sig, forDecl);
 
-    // What module should be used here?  The existential isn't anchored
-    // to any given module; we should just treat conformances as
-    // retroactive if they're "objectively" retroactive.
-    appendRetroactiveConformances(genInfo.Generalization, sig,
-                                  /*from module*/ nullptr);
+    appendRetroactiveConformances(genInfo.Generalization, sig);
   }
 
   appendOperator("Xj");
@@ -2172,7 +2195,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   }
   if (auto subs = fn->getInvocationSubstitutions()) {
     appendFlatGenericArgs(subs, sig, forDecl);
-    appendRetroactiveConformances(subs, sig, Mod);
+    appendRetroactiveConformances(subs, sig);
   }
   if (auto subs = fn->getPatternSubstitutions()) {
     appendGenericSignature(subs.getGenericSignature());
@@ -2181,7 +2204,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
         ? fn->getInvocationGenericSignature()
         : outerGenericSig;
     appendFlatGenericArgs(subs, sig, forDecl);
-    appendRetroactiveConformances(subs, sig, Mod);
+    appendRetroactiveConformances(subs, sig);
   }
 
   OpArgs.push_back('_');
@@ -2217,7 +2240,7 @@ void ASTMangler::appendOpaqueTypeArchetype(ArchetypeType *archetype,
     appendOpaqueDeclName(opaqueDecl);
     bool isFirstArgList = true;
     appendBoundGenericArgs(opaqueDecl, sig, subs, isFirstArgList, forDecl);
-    appendRetroactiveConformances(subs, sig, opaqueDecl->getParentModule());
+    appendRetroactiveConformances(subs, sig);
 
     appendOperator("Qo", Index(genericParam->getIndex()));
   } else {
@@ -4141,60 +4164,71 @@ void ASTMangler::appendAnyProtocolConformance(
     appendDependentProtocolConformance(conformancePath, opaqueSignature);
     appendType(conformingType, genericSig);
     appendOperator("HO");
-  } else {
+  } else if (conformance.isConcrete()) {
     appendConcreteProtocolConformance(conformance.getConcrete(), genericSig);
+  } else if (conformance.isPack()) {
+    appendPackProtocolConformance(conformance.getPack(), genericSig);
+  } else {
+    llvm::errs() << "Bad conformance in mangler: ";
+    conformance.dump(llvm::errs());
+    abort();
   }
 }
 
 void ASTMangler::appendConcreteProtocolConformance(
                                       const ProtocolConformance *conformance,
                                       GenericSignature sig) {
-  auto module = conformance->getDeclContext()->getParentModule();
-
   // Conforming type.
   Type conformingType = conformance->getType();
   if (conformingType->hasArchetype())
     conformingType = conformingType->mapTypeOutOfContext();
-  appendType(conformingType->getCanonicalType(), sig);
+  appendType(conformingType->getReducedType(sig), sig);
 
   // Protocol conformance reference.
   appendProtocolConformanceRef(conformance->getRootConformance());
 
   // Conditional conformance requirements.
   bool firstRequirement = true;
-  for (const auto &conditionalReq : conformance->getConditionalRequirements()) {
-    switch (conditionalReq.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
-    case RequirementKind::Layout:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      continue;
-
-    case RequirementKind::Conformance: {
-      auto type = conditionalReq.getFirstType();
-      if (type->hasArchetype())
-        type = type->mapTypeOutOfContext();
-      CanType canType = type->getReducedType(sig);
-      auto proto = conditionalReq.getProtocolDecl();
-      
-      ProtocolConformanceRef conformance;
-      
-      if (canType->isTypeParameter() || canType->is<OpaqueTypeArchetypeType>()){
-        conformance = ProtocolConformanceRef(proto);
-      } else {
-        conformance = module->lookupConformance(canType, proto);
-      }
-      appendAnyProtocolConformance(sig, canType, conformance);
+  forEachConditionalConformance(conformance,
+    [&](Type substType, ProtocolConformanceRef substConf) -> bool {
+      if (substType->hasArchetype())
+        substType = substType->mapTypeOutOfContext();
+      CanType canType = substType->getReducedType(sig);
+      appendAnyProtocolConformance(sig, canType, substConf);
       appendListSeparator(firstRequirement);
-      break;
-    }
-    }
-  }
+      return false;
+    });
+
   if (firstRequirement)
     appendOperator("y");
 
   appendOperator("HC");
+}
+
+void ASTMangler::appendPackProtocolConformance(
+                                      const PackConformance *conformance,
+                                      GenericSignature sig) {
+  auto conformingType = conformance->getType();
+  auto patternConformances = conformance->getPatternConformances();
+  assert(conformingType->getNumElements() == patternConformances.size());
+
+  if (conformingType->getNumElements() == 0) {
+    appendOperator("y");
+  } else {
+    bool firstField = true;
+    for (unsigned i = 0, e = conformingType->getNumElements(); i < e; ++i) {
+      auto type = conformingType->getElementType(i);
+      auto conf = patternConformances[i];
+
+      if (auto *expansionTy = type->getAs<PackExpansionType>())
+        type = expansionTy->getPatternType();
+
+      appendAnyProtocolConformance(sig, type->getCanonicalType(), conf);
+      appendListSeparator(firstField);
+    }
+  }
+
+  appendOperator("HX");
 }
 
 void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {

@@ -4464,11 +4464,8 @@ case TypeKind::Id:
     auto sig = opaque->getDecl()->getGenericSignature();
     auto newSubMap =
       SubstitutionMap::get(sig,
-       [&](SubstitutableType *t) -> Type {
-         auto index = sig->getGenericParamOrdinal(cast<GenericTypeParamType>(t));
-         return newSubs[index];
-       },
-       LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
+        QueryReplacementTypeArray{sig, newSubs},
+        LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
     return OpaqueTypeArchetypeType::get(opaque->getDecl(),
                                         opaque->getInterfaceType(),
                                         newSubMap);
@@ -5361,23 +5358,6 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened,
   opened = OpenedArchetypeType::get(getCanonicalType(),
                                     parentSig.getCanonicalSignature());
   return opened;
-}
-
-CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
-                                                   TypeExpansionContext context,
-                                                   bool allowLoweredTypes) {
-  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
-      !ty->hasOpaqueArchetype())
-    return ty;
-
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      context.getContext(), context.getResilienceExpansion(),
-      context.isWholeModuleContext());
-  SubstOptions flags = SubstFlags::SubstituteOpaqueArchetypes;
-  if (allowLoweredTypes)
-    flags =
-        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
-  return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {

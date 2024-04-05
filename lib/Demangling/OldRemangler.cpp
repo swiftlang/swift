@@ -517,6 +517,12 @@ ManglingError Remangler::mangleConcreteProtocolConformance(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError Remangler::manglePackProtocolConformance(Node *node,
+                                                       unsigned depth) {
+  // Pack conformances aren't in the old mangling
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleAnyProtocolConformanceList(Node *node,
                                                           unsigned depth) {
   // Conformance lists aren't in the old mangling

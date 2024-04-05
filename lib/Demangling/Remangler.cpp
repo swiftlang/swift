@@ -2631,6 +2631,14 @@ ManglingError Remangler::mangleConcreteProtocolConformance(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::manglePackProtocolConformance(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleAnyProtocolConformanceList(node->getChild(0), depth + 1));
+  Buffer << "HX";
+  return ManglingError::Success;
+}
+
 ManglingError
 Remangler::mangleDependentProtocolConformanceRoot(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
@@ -2680,6 +2688,8 @@ ManglingError Remangler::mangleAnyProtocolConformance(Node *node,
   switch (node->getKind()) {
   case Node::Kind::ConcreteProtocolConformance:
     return mangleConcreteProtocolConformance(node, depth + 1);
+  case Node::Kind::PackProtocolConformance:
+    return manglePackProtocolConformance(node, depth + 1);
   case Node::Kind::DependentProtocolConformanceRoot:
     return mangleDependentProtocolConformanceRoot(node, depth + 1);
   case Node::Kind::DependentProtocolConformanceInherited:

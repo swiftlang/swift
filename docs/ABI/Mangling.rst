@@ -966,6 +966,7 @@ Property behaviors are implemented using private protocol conformances.
 
   any-protocol-conformance ::= concrete-protocol-conformance
   any-protocol-conformance ::= dependent-protocol-conformance
+  any-protocol-conformance ::= pack-protocol-conformance
 
   any-protocol-conformance-list ::= any-protocol-conformance '_' any-protocol-conformance-list
   any-protocol-conformance-list ::= empty-list
@@ -979,6 +980,8 @@ Property behaviors are implemented using private protocol conformances.
 
   dependent-associated-conformance ::= type protocol
   dependent-protocol-conformance ::= dependent-protocol-conformance opaque-type 'HO'
+
+  pack-protocol-conformance ::= any-protocol-conformance-list 'HX'
 
 A compact representation used to represent mangled protocol conformance witness
 arguments at runtime. The ``module`` is only specified for conformances that
