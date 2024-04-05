@@ -925,6 +925,9 @@ ERROR(cannot_import_embedded_module,none,
 ERROR(cannot_import_non_embedded_module,none,
       "module %0 cannot be imported in embedded Swift mode",
       (Identifier))
+ERROR(volatile_is_experimental,none,
+      "importing _Volatile module requires '-enable-experimental-feature Volatile'", ())
+
 ERROR(need_cxx_interop_to_import_module,none,
       "module %0 was built with C++ interoperability enabled, but "
       "current compilation does not enable C++ interoperability",

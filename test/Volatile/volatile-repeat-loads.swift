@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -Onone | %FileCheck %s
-// RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -O | %FileCheck %s
-// RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -Osize | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -enable-experimental-feature Volatile -Onone | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -enable-experimental-feature Volatile -O | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -enable-experimental-feature Volatile -Osize | %FileCheck %s
 
 import _Volatile
 
 public func test_volatilepointer() -> UInt8 {
-  let p = VolatileMappedRegister<UInt8>(bitPattern: 0xf000baaa)
+  let p = VolatileMappedRegister<UInt8>(unsafeBitPattern: 0xf000baaa)
   p.store(42)
   let a = p.load()
   let b = p.load()
