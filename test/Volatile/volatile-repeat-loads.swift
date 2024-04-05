@@ -6,7 +6,7 @@
 import _Volatile
 
 public func test_volatilepointer() -> UInt8 {
-  let p = VolatileMappedRegister<UInt8>(unsafeBitPattern: 0xf000baaa)
+  let p = VolatileMappedRegister<UInt8>(unsafeBitPattern: 0xf000baa9)
   p.store(42)
   let a = p.load()
   let b = p.load()

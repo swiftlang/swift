@@ -23,10 +23,14 @@ import Swift
 /// or reordered with other volatile operations by the compiler. They may be
 /// reordered with non-volatile operations. For details, see
 /// <https://llvm.org/docs/LangRef.html#volatile-memory-accesses>.
+@frozen
 public struct VolatileMappedRegister<Pointee> {
-  public var _rawPointer: Builtin.RawPointer
+  @usableFromInline
+  let _rawPointer: Builtin.RawPointer
+
+  @_transparent
   public init(unsafeBitPattern: UInt) {
-    _rawPointer = UnsafeRawPointer(bitPattern: unsafeBitPattern)!._rawValue
+     self._rawPointer = Builtin.inttoptr_Word(unsafeBitPattern._builtinWordValue)
   }
 }
 
