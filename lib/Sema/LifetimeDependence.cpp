@@ -318,8 +318,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
           : nullptr,
       scopeLifetimeParamIndices.any()
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
-          : nullptr,
-      /*isExplicit*/ true);
+          : nullptr);
 }
 
 // This utility is similar to its overloaded version that builds the
@@ -391,8 +390,7 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromTypeRepr(
           : nullptr,
       scopeLifetimeParamIndices.any()
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
-          : nullptr,
-      /*isExplicit*/ true);
+          : nullptr);
 }
 
 std::optional<LifetimeDependenceInfo>
