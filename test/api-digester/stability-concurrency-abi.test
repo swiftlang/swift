@@ -100,8 +100,14 @@ Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 // rdar://106833284 (ABI checker confused with overload getting deprecated)
 Func Executor.enqueue(_:) is a new API without @available attribute
 
-// This function correctly inherits its availability from the TaskLocal struct.
-Func TaskLocal.withValueImpl(_:operation:file:line:) is a new API without @available attribute
+// Adopt #isolation in TaskLocal.withValue APIs
+Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValue(_:operation:isolation:file:line:)
+Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, file: Swift.String, line: Swift.UInt) async throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1'
+Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () async throws -> τ_1_0 to () throws -> τ_1_0
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () throws -> τ_1_0 to () async throws -> τ_1_0
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 2 type change from Swift.String to (any _Concurrency.Actor)?
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 3 type change from Swift.UInt to Swift.String
 
 // The method is actually still there: '__abi_next' silgen_name("$sScG4nextxSgyYaF")
 Func TaskGroup.next() has been renamed to Func next(isolation:)
