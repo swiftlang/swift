@@ -7420,6 +7420,10 @@ static swift::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool.Pool,
                          sizeof(InitialAllocationPool.Pool)}};
 
+std::tuple<const void *, size_t> MetadataAllocator::InitialPoolLocation() {
+  return {InitialAllocationPool.Pool, sizeof(InitialAllocationPool.Pool)};
+}
+
 bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
 std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
