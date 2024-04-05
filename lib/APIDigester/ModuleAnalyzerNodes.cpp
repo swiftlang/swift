@@ -1633,7 +1633,9 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
       ReplaceOpaqueTypesWithUnderlyingTypes replacer(
           /*inContext=*/nullptr, ResilienceExpansion::Maximal,
           /*isWholeModuleContext=*/false);
-      T = T.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+      T = T.subst(replacer, replacer,
+                  SubstFlags::SubstituteOpaqueArchetypes |
+                  SubstFlags::PreservePackExpansionLevel)
           ->getCanonicalType();
     }
   }

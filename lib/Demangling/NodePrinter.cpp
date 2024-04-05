@@ -597,6 +597,7 @@ private:
     case Node::Kind::AnonymousContext:
     case Node::Kind::AnyProtocolConformanceList:
     case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::PackProtocolConformance:
     case Node::Kind::DependentAssociatedConformance:
     case Node::Kind::DependentProtocolConformanceAssociated:
     case Node::Kind::DependentProtocolConformanceInherited:
@@ -3114,12 +3115,31 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     printChildren(Node, depth);
     return nullptr;
   case Node::Kind::AnyProtocolConformanceList:
-    printChildren(Node, depth);
+    if (Node->getNumChildren() > 0) {
+      Printer << "(";
+      for (unsigned i = 0; i < Node->getNumChildren(); ++i) {
+        if (i > 0)
+          Printer << ", ";
+        print(Node->getChild(i), depth + 1);
+      }
+      Printer << ")";
+    }
     return nullptr;
   case Node::Kind::ConcreteProtocolConformance:
     Printer << "concrete protocol conformance ";
     if (Node->hasIndex())
       Printer << "#" << Node->getIndex() << " ";
+    print(Node->getChild(0), depth + 1);
+    Printer << " to ";
+    print(Node->getChild(1), depth + 1);
+    if (Node->getNumChildren() > 2 &&
+        Node->getChild(2)->getNumChildren() > 0) {
+      Printer << " with conditional requirements: ";
+      print(Node->getChild(2), depth + 1);
+    }
+    return nullptr;
+  case Node::Kind::PackProtocolConformance:
+    Printer << "pack protocol conformance ";
     printChildren(Node, depth);
     return nullptr;
   case Node::Kind::DependentAssociatedConformance:
@@ -3130,18 +3150,21 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "dependent associated protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::DependentProtocolConformanceInherited:
     Printer << "dependent inherited protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::DependentProtocolConformanceRoot:
     Printer << "dependent root protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::ProtocolConformanceRefInTypeModule:
