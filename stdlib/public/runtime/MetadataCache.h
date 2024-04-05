@@ -25,6 +25,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <optional>
+#include <tuple>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -45,6 +46,11 @@ public:
   MetadataAllocator() = delete;
 
   void Reset() {}
+
+  /// Get the location of the allocator's initial statically allocated pool.
+  /// The return values are start and size. If there is no statically allocated
+  /// pool, the return values are NULL, 0.
+  static std::tuple<const void *, size_t> InitialPoolLocation();
 
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment);
@@ -67,6 +73,9 @@ public:
 class MetadataAllocator {
 public:
   MetadataAllocator(uint16_t tag) {}
+  static std::tuple<const void *, size_t> InitialPoolLocation() {
+    return {nullptr, 0};
+  }
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment) {
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
