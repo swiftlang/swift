@@ -185,7 +185,7 @@ extension Optional {
   ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @inlinable
+  @_transparent
   public func map<U>(
     // FIXME: This needs to support typed throws.
     _ transform: (Wrapped) throws -> U
@@ -251,7 +251,7 @@ extension Optional {
   ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @inlinable
+  @_transparent
   public func flatMap<U>(
     // FIXME: This needs to support typed throws.
     _ transform: (Wrapped) throws -> U?
