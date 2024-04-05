@@ -1069,7 +1069,7 @@ private:
       llvm::DIFile *File, unsigned Line, unsigned SizeInBits,
       llvm::DINode::DIFlags Flags, StringRef UniqueID, StringRef Name) {
     // Forward declare this first because types may be recursive.
-    auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
+    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, Flags, UniqueID));
 
@@ -1290,7 +1290,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     // Default, since Swift doesn't allow specifying a custom alignment.
     unsigned AlignInBits = 0;
 
-    auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
+    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_enumeration_type, MangledName, Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName));
@@ -1344,7 +1344,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
     // A variant part should actually be a child to a DW_TAG_structure_type
     // according to the DWARF spec.
-    auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
+    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName));
@@ -1419,7 +1419,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
     // A variant part should actually be a child to a DW_TAG_structure_type
     // according to the DWARF spec.
-    auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
+    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName));
@@ -1631,7 +1631,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
                                       unsigned SizeInBits, unsigned AlignInBits,
                                       llvm::DINode::DIFlags Flags,
                                       StringRef MangledName) {
-    auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
+    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, MainFile, 0,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName));
@@ -1696,7 +1696,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     }
     // FIXME: assert that SizeInBits == OffsetInBits.
 
-    auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
+    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, MainFile, 0,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName));
@@ -2030,7 +2030,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       auto DerivedFrom = Superclass.isNull()
                              ? nullptr
                              : getOrCreateDesugaredType(Superclass, DbgTy);
-      auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
+      llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, L.File,
           FwdDeclLine, llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits,
           Flags));
@@ -2384,7 +2384,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
-          llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagFwdDecl);
+          llvm::dwarf::DW_LANG_Swift);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
           std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
@@ -2540,7 +2540,7 @@ void IRGenDebugInfoImpl::finalize() {
   // Finalize all replaceable forward declarations.
   auto finalize = [&](llvm::MDNode *FwdDeclType, llvm::MDNode *FullType,
                       llvm::MDString *UID = nullptr) {
-    llvm::TempMDNode FwdDecl(cast<llvm::MDNode>(FwdDeclType));
+    llvm::TempDICompositeType FwdDecl(cast<llvm::DICompositeType>(FwdDeclType));
     llvm::Metadata *Replacement = FullType ? FullType : FwdDeclType;
     llvm::Metadata *Replaced = DBuilder.replaceTemporary(
         std::move(FwdDecl), cast<llvm::MDNode>(Replacement));
