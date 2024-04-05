@@ -25,6 +25,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Option/Options.h"
+#include "swift/Serialization/Validation.h"
 
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/ArgList.h"
@@ -391,26 +392,13 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
+SerializedModuleLoaderBase::BinaryModuleImports
 SerializedModuleLoaderBase::getImportsOfModule(
-    Twine modulePath, ModuleLoadingBehavior transitiveBehavior,
-    bool isFramework, bool isRequiredOSSAModules, StringRef SDKName,
-    StringRef packageName, llvm::vfs::FileSystem *fileSystem,
-    PathObfuscator &recoverer) {
-  auto moduleBuf = fileSystem->getBufferForFile(modulePath);
-  if (!moduleBuf)
-    return moduleBuf.getError();
-
+    const ModuleFileSharedCore &loadedModuleFile,
+    ModuleLoadingBehavior transitiveBehavior, StringRef packageName) {
   llvm::StringSet<> importedModuleNames;
   std::string importedHeader = "";
-  // Load the module file without validation.
-  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
-  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
-      "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules,
-      SDKName, recoverer, loadedModuleFile);
-
-  for (const auto &dependency : loadedModuleFile->getDependencies()) {
+  for (const auto &dependency : loadedModuleFile.getDependencies()) {
     if (dependency.isHeader()) {
       assert(importedHeader.empty() &&
              "Unexpected more than one header dependency");
@@ -419,11 +407,11 @@ SerializedModuleLoaderBase::getImportsOfModule(
     }
 
     ModuleLoadingBehavior dependencyTransitiveBehavior =
-        loadedModuleFile->getTransitiveLoadingBehavior(
+        loadedModuleFile.getTransitiveLoadingBehavior(
             dependency,
             /*debuggerMode*/ false,
             /*isPartialModule*/ false, packageName,
-            loadedModuleFile->isTestable());
+            loadedModuleFile.isTestable());
     if (dependencyTransitiveBehavior > transitiveBehavior)
       continue;
 
@@ -437,41 +425,60 @@ SerializedModuleLoaderBase::getImportsOfModule(
     importedModuleNames.insert(moduleName);
   }
 
-  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames, importedHeader};
+  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames,
+                                                         importedHeader};
 }
 
 llvm::ErrorOr<ModuleDependencyInfo>
-SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
+SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
+                                           bool isTestableImport) {
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
+
+  // Read and valid module.
+  auto moduleBuf = Ctx.SourceMgr.getFileSystem()->getBufferForFile(modulePath);
+  if (!moduleBuf)
+    return moduleBuf.getError();
+
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
+
+  if (!Ctx.SearchPathOpts.NoScannerModuleValidation) {
+    // If failed to load, just ignore and return do not found.
+    if (loadInfo.status != serialization::Status::Valid) {
+      if (Ctx.LangOpts.EnableModuleLoadingRemarks)
+        Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_invalid,
+                           modulePath.str());
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    }
+
+    if (loadedModuleFile->isTestable() && !isTestableImport) {
+      if (Ctx.LangOpts.EnableModuleLoadingRemarks)
+        Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_testable,
+                           modulePath.str());
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    }
+  }
+
   // Some transitive dependencies of binary modules are not required to be
   // imported during normal builds.
   // TODO: This is worth revisiting for debugger purposes where
   //       loading the module is optional, and implementation-only imports
   //       from modules with testing enabled where the dependency is
   //       optional.
-  ModuleLoadingBehavior transitiveLoadingBehavior =
-      ModuleLoadingBehavior::Required;
-  auto binaryModuleImports = getImportsOfModule(
-      modulePath, transitiveLoadingBehavior, isFramework,
-      isRequiredOSSAModules(),
-      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
-      Ctx.SourceMgr.getFileSystem().get(),
-      Ctx.SearchPathOpts.DeserializedPathRecoverer);
-  if (!binaryModuleImports)
-    return binaryModuleImports.getError();
+  auto binaryModuleImports =
+      getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Required,
+                         Ctx.LangOpts.PackageName);
 
   // Lookup optional imports of this module also
-  auto binaryModuleOptionalImports = getImportsOfModule(
-      modulePath, ModuleLoadingBehavior::Optional, isFramework,
-      isRequiredOSSAModules(),
-      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
-      Ctx.SourceMgr.getFileSystem().get(),
-      Ctx.SearchPathOpts.DeserializedPathRecoverer);
-  if (!binaryModuleOptionalImports)
-    return binaryModuleImports.getError();
+  auto binaryModuleOptionalImports =
+      getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
+                         Ctx.LangOpts.PackageName);
 
-  auto importedModuleSet = binaryModuleImports.get().moduleImports;
+  auto importedModuleSet = binaryModuleImports.moduleImports;
   std::vector<std::string> importedModuleNames;
   importedModuleNames.reserve(importedModuleSet.size());
   llvm::transform(importedModuleSet.keys(),
@@ -480,8 +487,8 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
                      return N.str();
                   });
 
-  auto importedHeader = binaryModuleImports.get().headerImport;
-  auto &importedOptionalModuleSet = binaryModuleOptionalImports.get().moduleImports;
+  auto importedHeader = binaryModuleImports.headerImport;
+  auto &importedOptionalModuleSet = binaryModuleOptionalImports.moduleImports;
   std::vector<std::string> importedOptionalModuleNames;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))
@@ -790,7 +797,8 @@ bool SerializedModuleLoaderBase::findModule(
       auto result = findModuleFilesInDirectory(
           moduleID, absoluteBaseName, moduleInterfacePath,
           moduleInterfaceSourcePath, moduleBuffer, moduleDocBuffer,
-          moduleSourceInfoBuffer, skipBuildingInterface, isFramework);
+          moduleSourceInfoBuffer, skipBuildingInterface, isFramework,
+          isTestableDependencyLookup);
       if (!result)
         return true;
       if (result == std::errc::not_supported)
