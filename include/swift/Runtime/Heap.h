@@ -42,6 +42,9 @@ void *swift_slowAllocTyped(size_t bytes, size_t alignMask, MallocTypeId typeId);
 SWIFT_RUNTIME_EXPORT
 void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 
+SWIFT_RUNTIME_EXPORT
+void swift_clearSensitive(void *ptr, size_t bytes);
+
 /// Allocate and construct an instance of type \c T.
 ///
 /// \param args The arguments to pass to the constructor for \c T.
