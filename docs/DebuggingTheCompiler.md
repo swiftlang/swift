@@ -49,6 +49,7 @@ benefit of all Swift developers.
     - [Manually symbolication using LLDB](#manually-symbolication-using-lldb)
     - [Viewing allocation history, references, and page-level info](#viewing-allocation-history-references-and-page-level-info)
     - [Printing memory contents](#printing-memory-contents)
+    - [Windows Error Codes](#windows-error-codes)
 - [Debugging LLDB failures](#debugging-lldb-failures)
     - ["Types" Log](#types-log)
     - ["Expression" Log](#expression-log)
@@ -1058,6 +1059,36 @@ The following specifiers are available:
 * w - word (32-bit value)
 * g - giant word (64-bit value)
 
+## Windows Error Codes
+
+When debugging programs on Windows, sometimes one will run into an error message with a mysterious error code. E.x.:
+
+```
+note: command had no output on stdout or stderr
+error: command failed with exit status: 0xc0000135
+```
+
+These on windows are called HRESULT values. In the case above, the HRESULT is telling me that a DLL was not found. I discovered this
+by running the Microsoft provided [System Error Code Lookup Tool](https://learn.microsoft.com/en-us/windows/win32/debug/system-error-code-lookup-tool). After running
+this tool with the relevant error code on a windows machine, I got back the following result:
+
+```
+# for hex 0xc0000135 / decimal -1073741515
+  STATUS_DLL_NOT_FOUND                                           ntstatus.h   
+# The code execution cannot proceed because %hs was not
+# found. Reinstalling the program may fix this problem.
+# as an HRESULT: Severity: FAILURE (1), FACILITY_NULL (0x0), Code 0x135
+# for hex 0x135 / decimal 309
+  ERROR_NOTIFICATION_GUID_ALREADY_DEFINED                        winerror.h   
+# The specified file already has a notification GUID
+# associated with it.
+```
+
+Some relevant Microsoft documentation:
+
+* https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
+* https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/0642cb2f-2075-4469-918c-4441e69c548a
+* https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
 
 # Debugging LLDB failures
 
