@@ -20,7 +20,7 @@
 
 // - Scan main module and ensure that the "FooClient" recipe includes the modulemap for Foo's briding header's module dependencies
 // but not other dependencies
-// RUN: %target-swift-frontend -scan-dependencies %t/bridging_header_dep_module_map.swift -I %t/FooModuleDir -I %t/TestSwiftInterfaces -I %t/TestCHeaders -I %S/Inputs/CHeaders -o %t/deps.json
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface %t/bridging_header_dep_module_map.swift -I %t/FooModuleDir -I %t/TestSwiftInterfaces -I %t/TestCHeaders -I %S/Inputs/CHeaders -o %t/deps.json
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
 // Given the following dependency graph:
