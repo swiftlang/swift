@@ -2,6 +2,9 @@
 
 // REQUIRES: PTRSIZE=64
 
+// Windows has a different ABI (not byval)
+// UNSUPPORTED: OS=windows-msvc
+
 // Whether llvm can remove the first two memcmp's dependents on the ABI (arm64's
 // PCS, says stack arguments might be written to; x86-64 ABI copies indirect
 // parameters for the call)
