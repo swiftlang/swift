@@ -199,6 +199,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
   set(SWIFT_STDLIB_CONCURRENCY_TRACING FALSE)
+  set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
+  set(SWIFT_STDLIB_HAS_ASL FALSE)
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -220,9 +222,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
     endif()
     
+    set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
+
     add_swift_target_library_single(
       embedded-concurrency-${mod}
       swift_Concurrency
