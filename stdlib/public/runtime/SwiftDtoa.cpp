@@ -72,8 +72,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define __STDC_WANT_IEC_60559_TYPES_EXT__
-#include <float.h>
 
 #include "swift/Runtime/SwiftDtoa.h"
 
