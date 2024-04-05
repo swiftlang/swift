@@ -181,10 +181,27 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// the operation closure.
   @inlinable
   @discardableResult
-  @_unsafeInheritExecutor
-  @backDeployed(before: SwiftStdlib 5.8)
-  public func withValue<R>(_ valueDuringOperation: Value, operation: () async throws -> R,
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
+  public func withValue<R>(_ valueDuringOperation: Value,
+                           operation: () async throws -> R,
+                           isolation: isolated (any Actor)? = #isolation,
                            file: String = #fileID, line: UInt = #line) async rethrows -> R {
+    return try await withValueImpl(
+      valueDuringOperation,
+      operation: operation,
+      isolation: isolation,
+      file: file, line: line)
+  }
+
+  @usableFromInline
+  @discardableResult
+  @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+  @available(SwiftStdlib 5.1, *)
+  @_silgen_name("$ss9TaskLocalC9withValue_9operation4file4lineqd__x_qd__yYaKXESSSutYaKlF")
+  internal func __abi_withValue<R>(_ valueDuringOperation: Value,
+                                   operation: () async throws -> R,
+                                   file: String = #fileID, line: UInt = #line) async rethrows -> R {
     return try await withValueImpl(valueDuringOperation, operation: operation, file: file, line: line)
   }
 
@@ -208,9 +225,11 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// - withValueImpl contains the calls to _taskLocalValuePush/Pop
   @inlinable
   @discardableResult
-  @_unsafeInheritExecutor
-  @backDeployed(before: SwiftStdlib 5.9)
-  internal func withValueImpl<R>(_ valueDuringOperation: __owned Value, operation: () async throws -> R,
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 6.0)
+  internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
+                                 operation: () async throws -> R,
+                                 isolation: isolated (any Actor)?,
                                  file: String = #fileID, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
@@ -220,6 +239,24 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
     return try await operation()
   }
+
+  @inlinable
+  @discardableResult
+  @_unsafeInheritExecutor
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
+  internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
+                                 operation: () async throws -> R,
+                                 file: String = #fileID, line: UInt = #line) async rethrows -> R {
+    // check if we're not trying to bind a value from an illegal context; this may crash
+    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
+
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    defer { _taskLocalValuePop() }
+
+    return try await operation()
+  }
+
 
   /// Binds the task-local to the specific value for the duration of the
   /// synchronous operation.

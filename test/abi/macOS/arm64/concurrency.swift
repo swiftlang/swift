@@ -311,3 +311,11 @@ Added: _$sScfsE13checkIsolatedyyF
 Added: _$sScf13checkIsolatedyyFTj
 // method descriptor for Swift.SerialExecutor.checkIsolated() -> ()
 Added: _$sScf13checkIsolatedyyFTq
+
+// #isolated adoption in TaskLocal.withValue
+// Swift.TaskLocal.withValueImpl<A>(_: __owned A, operation: () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
+Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__yYaKXEScA_pSgYiSSSutYaKlF
+Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
+// Swift.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
+Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF
+Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
