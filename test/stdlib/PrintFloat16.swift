@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 // rdar://77087867
 // UNSUPPORTED: CPU=arm64_32 && OS=watchos
@@ -10,20 +11,6 @@
 import StdlibUnittest
 
 let PrintTests = TestSuite("FloatingPointPrinting")
-//
-//  // An earlier version of Swift's floating-point `.description` logic
-//  // used potentially locale-sensitive C library functions, hence
-//  // this logic to help verify that the output does not depend on
-//  // the C locale.
-//  PrintTests.setUp {
-//    if let localeArgIndex = CommandLine.arguments.firstIndex(of: "--locale") {
-//      let locale = CommandLine.arguments[localeArgIndex + 1]
-//      expectEqual("ru_RU.UTF-8", locale)
-//      setlocale(LC_ALL, locale)
-//    } else {
-//      setlocale(LC_ALL, "")
-//    }
-//  }
 
 // Check that all floating point types
 // are CustomStringConvertible
@@ -31,10 +18,12 @@ PrintTests.test("CustomStringConvertible") {
   func hasDescription(_ any: Any) {
     expectTrue(any is CustomStringConvertible)
   }
-  if #available(SwiftStdlib 6.0, *) {
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+  if #available(SwiftStdlib 5.3, *) {
     hasDescription(Float16(1.0))
     hasDescription(CFloat16(1.0))
   }
+#endif
   hasDescription(Float(1.0))
   hasDescription(Double(1.0))
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -50,10 +39,12 @@ PrintTests.test("CustomDebugStringConvertible") {
   func hasDebugDescription(_ any: Any) {
     expectTrue(any is CustomDebugStringConvertible)
   }
-  if #available(SwiftStdlib 6.0, *) {
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+  if #available(SwiftStdlib 5.3, *) {
     hasDebugDescription(Float16(1.0))
     hasDebugDescription(CFloat16(1.0))
   }
+#endif
   hasDebugDescription(Float(1.0))
   hasDebugDescription(Double(1.0))
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -63,11 +54,8 @@ PrintTests.test("CustomDebugStringConvertible") {
   hasDebugDescription(CDouble(1.0))
 }
 
-#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64)
-@available(SwiftStdlib 6.0, *) // Float16/intel
-#else
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 @available(SwiftStdlib 5.8, *) // Regex
-#endif
 func testFinite(_ bitPattern: UInt16) {
   let value = Float16(bitPattern: bitPattern)
   let string = value.description
@@ -124,13 +112,11 @@ func testFinite(_ bitPattern: UInt16) {
     )
   }
 }
+#endif
 
 PrintTests.test("Printable_Float16") {
-#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64)
-  guard #available(SwiftStdlib 6.0, *) else { return } // Float16/intel
-#else
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
   guard #available(SwiftStdlib 5.8, *) else { return } // Regex
-#endif
   for bitPattern in UInt16.zero ..< 0x7c00 {
     testFinite(bitPattern)
     testFinite(0x8000 | bitPattern)
@@ -158,6 +144,7 @@ PrintTests.test("Printable_Float16") {
     expectEqual(Float16(bitPattern: bitPattern).debugDescription, expected)
     expectEqual(Float16(bitPattern: 0x8000 | bitPattern).debugDescription, "-\(expected)")
   }
+#endif
 }
 
 runAllTests()
