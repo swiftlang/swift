@@ -176,7 +176,7 @@ static locale_t getCLocale() {
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
                                       _Float16 Value, bool Debug) {
-  return swift_dtoa_optimal_binary16(Value, Buffer, BufferLength);
+  return swift_dtoa_optimal_binary16_p(&Value, Buffer, BufferLength);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
