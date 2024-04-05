@@ -559,7 +559,7 @@ extension MyActor {
 
 func testBadImplicitGlobalActorClosureCall() async {
   { @MainActor in  }() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls function of type '@MainActor () -> ()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1{{calls function of type '@MainActor @Sendable () -> ()' from outside of its actor context are implicitly asynchronous}}
 }
 
 
