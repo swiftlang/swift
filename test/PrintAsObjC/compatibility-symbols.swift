@@ -8,4 +8,6 @@
 // Make sure that any macros or typedefs added to the Clang compatibility header are reflected in
 // the `comptibility-symbols` file that is installed in the toolchain.
 
-// CHECK: "symbols": []
+// Use a regex match here to allow the Clang symbol graph to be pretty-printed or condensed
+
+// CHECK: "symbols":{{ ?}}[]
