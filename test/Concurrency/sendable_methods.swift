@@ -229,23 +229,6 @@ do {
   }
 }
 
-do {
-  struct Test {
-    static func fn() {}
-    static func otherFn() {}
-  }
-
-  func fnRet(cond: Bool) -> () -> Void {
-    cond ? Test.fn : Test.otherFn // Ok
-  }
-
-  func forward<T>(_: T) -> T {
-  }
-
-  let _: () -> Void = forward(Test.fn) // Ok
-}
-
-
 func test_initializer_ref() {
   func test<T>(_: @Sendable (T, T) -> Array<T>) {
   }

@@ -1071,16 +1071,6 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
     if (unwrappedIUO)
       *unwrappedIUO = solution->getFixedScore().Data[SK_ForceUnchecked] > 0;
 
-    // Make sure that Sendable vs. no-Sendable mismatches are
-    // failures here to establish subtyping relationship
-    // (unlike in the solver where they are warnings until Swift 6).
-    if (kind == ConstraintKind::Subtype) {
-      if (llvm::any_of(solution->Fixes, [](const auto *fix) {
-            return fix->getKind() == FixKind::AddSendableAttribute;
-          }))
-        return false;
-    }
-
     return true;
   }
 
