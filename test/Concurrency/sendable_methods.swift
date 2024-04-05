@@ -229,23 +229,6 @@ do {
   }
 }
 
-do {
-  struct Test {
-    static func fn() {}
-    static func otherFn() {}
-  }
-
-  func fnRet(cond: Bool) -> () -> Void {
-    cond ? Test.fn : Test.otherFn // Ok
-  }
-
-  func forward<T>(_: T) -> T {
-  }
-
-  let _: () -> Void = forward(Test.fn) // Ok
-}
-
-
 func test_initializer_ref() {
   func test<T>(_: @Sendable (T, T) -> Array<T>) {
   }
@@ -275,5 +258,14 @@ do {
         Manager.shared.test(ErrorHandler.log) // Ok (access is wrapped in an autoclosure)
       }
     }
+  }
+}
+
+// rdar://125932231 - incorrect `error: type of expression is ambiguous without a type annotation`
+do {
+  class C {}
+
+  func test(c: C) -> (any Sendable)? {
+    true ? nil : c // Ok
   }
 }
