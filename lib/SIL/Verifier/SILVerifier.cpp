@@ -2474,20 +2474,26 @@ public:
               "cannot access storage of resilient global");
     }
     if (F.isSerialized()) {
-      auto x = RefG->getModule().getOptions().EnableSerializePackage;
-      llvm::dbgs() << "\nES: PKG OPT: " << (x ? "ON" : "OFF") << ": " << RefG->getModule().getSwiftModule()->getBaseIdentifier().str();
-
-      auto y = RefG->getDecl()->getModuleContext()->getASTContext().SILOpts.EnableSerializePackage;
-      llvm::dbgs() << "\nES: ---- varDecl: PKG OPT: " << (y ? "ON" : "OFF") << ": "
-      << RefG->getDecl()->getBaseIdentifier().str() << ": "
-      << RefG->getDecl()->getModuleContext()->getBaseIdentifier().str();
-
-      if (!x) {
-        llvm::dbgs() << "\nES: RefG gVar\n";
-        RefG->dump();
-        llvm::dbgs() << "\nES: GAI inst\n";
-        GAI->dump();
-        llvm::dbgs() << "\nES: ----- inst\n";
+      if (RefG->getModule().getSwiftModule()->getBaseIdentifier().str() == "Lib" ||
+          RefG->getModule().getSwiftModule()->getBaseIdentifier().str() == "Utils" ||
+          RefG->getModule().getSwiftModule()->getBaseIdentifier().str() == "Main") {
+        auto x1 = RefG->getModule().getSwiftModule()->getBaseIdentifier().str();
+        auto x2 = RefG->getModule().getOptions().EnableSerializePackage;
+        llvm::dbgs() << "\nES: RefG: module: " << x1 << (x2 ? " -flag true" : " - flag false");
+        
+        auto y1 = RefG->getDecl()->getModuleContext()->getBaseIdentifier().str();
+        auto y2 = RefG->getDecl()->getBaseIdentifier().str();
+        auto y3 = RefG->getDecl()->getModuleContext()->getASTContext().SILOpts.EnableSerializePackage;
+        llvm::dbgs() << "\nES: RefG: varDecl: " << y1 <<
+        " --  module: " << y2 << (y3 ? " -flag true" : " - flag false");
+        
+        if (!x2) {
+          llvm::dbgs() << "\nES: RefG\n";
+          RefG->dump();
+          llvm::dbgs() << "\nES: GAI inst\n";
+          GAI->dump();
+          llvm::dbgs() << "\nES: ----- inst\n";
+        }
       }
       require(RefG->isSerialized()
               // RefG should be visible if it has a package linkage and was
