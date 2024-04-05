@@ -17,19 +17,19 @@ extension Atomic where Value == UInt32 {
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specifc error value.
   borrowing func futexLock() -> Bool {
-    _swift_stdlib_futex_lock(address)
+    _swift_stdlib_futex_lock(.init(rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specifc error value.
   borrowing func futexTryLock() -> Bool {
-    _swift_stdlib_futex_trylock(address)
+    _swift_stdlib_futex_trylock(.init(rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   borrowing func futexUnlock() -> Bool {
-    _swift_stdlib_futex_unlock(address)
+    _swift_stdlib_futex_unlock(.init(rawAddress))
   }
 }
 
@@ -207,7 +207,7 @@ extension _MutexHandle {
       failureOrdering: .relaxed
     ).exchanged {
       // Locked!
-      return
+      return true
     }
 
     // The quick atomic op failed, ask the kernel to see if it can acquire the
