@@ -593,7 +593,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  @_silgen_name("$sScG22awaitAllRemainingTasksyyYaF")
   internal mutating func awaitAllRemainingTasks() async {
     while let _ = await next(isolation: nil) {}
   }
