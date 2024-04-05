@@ -79,7 +79,7 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
   printCTypeName(os, typeDecl);
   os << " {\n";
   os << "  _Alignas(" << layout.alignment << ") ";
-  os << "char _storage[" << std::max(layout.size, 1ULL) << "];\n";
+  os << "char _storage[" << std::max(layout.size, static_cast<IRABIDetailsProvider::SizeType>(1)) << "];\n";
   os << "};\n\n";
 }
 
@@ -433,7 +433,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << cxx_synthesis::getCxxOpaqueStorageClassName() << " _storage;\n";
   } else {
     os << "alignas(" << typeSizeAlign->alignment << ") ";
-    os << "char _storage[" << std::max(typeSizeAlign->size, 1ULL) << "];\n";
+    os << "char _storage[" << std::max(typeSizeAlign->size, static_cast<IRABIDetailsProvider::SizeType>(1)) << "];\n";
   }
   // Wrap up the value type.
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
