@@ -332,13 +332,13 @@ Decl::getSemanticUnavailableAttr(bool ignoreAppExtensions) const {
       std::nullopt);
 }
 
-static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
+bool Decl::isUnreachableAtRuntime() const {
   // Don't trust unavailability on declarations from clang modules.
-  if (isa<ClangModuleUnit>(D->getDeclContext()->getModuleScopeContext()))
+  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
     return false;
 
   auto unavailableAttrAndDecl =
-      D->getSemanticUnavailableAttr(/*ignoreAppExtensions=*/true);
+      getSemanticUnavailableAttr(/*ignoreAppExtensions=*/true);
   if (!unavailableAttrAndDecl)
     return false;
 
@@ -348,6 +348,17 @@ static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
   // target.
   auto *unavailableAttr = unavailableAttrAndDecl->first;
   if (!unavailableAttr->isUnconditionallyUnavailable())
+    return false;
+
+  // Universally unavailable declarations are always unreachable.
+  if (unavailableAttr->Platform == PlatformKind::none)
+    return true;
+
+  // FIXME: Support zippered frameworks (rdar://125371621)
+  // If we have a target variant (e.g. we're building a zippered macOS
+  // framework) then the decl is only unreachable if it is unavailable for both
+  // the primary target and the target variant.
+  if (getASTContext().LangOpts.TargetVariant.has_value())
     return false;
 
   return true;
@@ -368,7 +379,7 @@ bool Decl::isAvailableDuringLowering() const {
       UnavailableDeclOptimization::Complete)
     return true;
 
-  return !shouldStubOrSkipUnavailableDecl(this);
+  return !isUnreachableAtRuntime();
 }
 
 bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
@@ -378,7 +389,7 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
       UnavailableDeclOptimization::Stub)
     return false;
 
-  return shouldStubOrSkipUnavailableDecl(this);
+  return isUnreachableAtRuntime();
 }
 
 bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
