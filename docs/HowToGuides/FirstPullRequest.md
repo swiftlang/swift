@@ -135,12 +135,13 @@ show a helpful "Compare & Pull Request" button.
 
 ## Asking for code review
 
-Collaborators and code owners are automatically requested for review per the
-[CODEOWNERS](/.github/CODEOWNERS) file. If no one is automatically requested for
-review, @mention and ask a suggested person under **Reviewers** to review your
-changes. If no reviewer suggestions are shown either, please
-[message][contributor-experience] the Contributor Experience Workgroup on the
-Swift forums to sort out review requests for you.
+Reviews are automatically requested from collaborators and code owners per the
+[CODEOWNERS](/.github/CODEOWNERS) file upon opening a non-draft pull request.
+If this doesn't happen, @mention and ask a suggested person under **Reviewers**
+to review your changes in a comment. If no suggestions are shown either, please
+@mention and ask a
+[Contributor Experience Workgroup](https://www.swift.org/contributor-experience-workgroup/#membership)
+member to sort out review requests for you.
 
 You are welcome to invite other people for review as well — say, someone you
 had an active discussion with on how to implement your change.
