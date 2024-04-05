@@ -90,23 +90,7 @@ void SubstitutionEntry::deepHash(Node *node) {
 }
 
 bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
-  if (lhs->getKind() != rhs->getKind())
-    return false;
-  if (lhs->hasIndex()) {
-    if (!rhs->hasIndex())
-      return false;
-    if (lhs->getIndex() != rhs->getIndex())
-      return false;
-  } else if (lhs->hasText()) {
-    if (!rhs->hasText())
-      return false;
-    if (lhs->getText() != rhs->getText())
-      return false;
-  } else if (rhs->hasIndex() || rhs->hasText()) {
-    return false;
-  }
-
-  if (lhs->getNumChildren() != rhs->getNumChildren())
+  if (!lhs->isSimilarTo(rhs))
     return false;
 
   for (auto li = lhs->begin(), ri = rhs->begin(), le = lhs->end();
