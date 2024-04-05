@@ -2550,7 +2550,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
-    std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
+    auto lifetimeDependenceInfo = AFD->getLifetimeDependenceInfo();
 
     // (Args...) -> Result
     Type funcTy;
@@ -2571,7 +2571,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withTransferringResult();
       }
 
-      lifetimeDependenceInfo = LifetimeDependenceInfo::get(AFD, resultTy);
       if (lifetimeDependenceInfo.has_value()) {
         infoBuilder =
             infoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
@@ -3097,4 +3096,19 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }
+}
+
+std::optional<LifetimeDependenceInfo>
+LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
+                                        AbstractFunctionDecl *decl) const {
+  Type resultTy;
+  if (auto fn = dyn_cast<FuncDecl>(decl)) {
+    resultTy = fn->getResultInterfaceType();
+  } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+    resultTy = ctor->getResultInterfaceType();
+  } else {
+    return std::nullopt;
+  }
+
+  return LifetimeDependenceInfo::get(decl, resultTy);
 }
