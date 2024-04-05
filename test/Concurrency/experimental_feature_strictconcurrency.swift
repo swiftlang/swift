@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency=complete -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify -verify-additional-prefix region-isolation- -enable-upcoming-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency -emit-sil -o /dev/null -verify %s -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency=complete -emit-sil -o /dev/null -verify %s -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -disable-availability-checking -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify %s -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -disable-availability-checking -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify -verify-additional-prefix region-isolation- %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

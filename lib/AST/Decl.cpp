@@ -11370,6 +11370,10 @@ ActorIsolation::forActorInstanceSelf(ValueDecl *decl) {
   return ActorIsolation(ActorInstance, dc->getSelfNominalTypeDecl(), 0);
 }
 
+ActorIsolation ActorIsolation::forActorInstanceSelf(NominalTypeDecl *selfDecl) {
+  return ActorIsolation(ActorInstance, selfDecl, 0);
+}
+
 NominalTypeDecl *ActorIsolation::getActor() const {
   assert(getKind() == ActorInstance ||
          getKind() == GlobalActor);

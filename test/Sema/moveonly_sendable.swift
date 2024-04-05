@@ -1,6 +1,8 @@
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking -disable-region-based-isolation-with-strict-concurrency -verify-additional-prefix complete-
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 
 struct CopyableStruct {}
@@ -18,7 +20,8 @@ enum MaybeFile { // should implicitly conform
 }
 
 @_moveOnly
-struct NotSendableMO { // expected-note 2{{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
+struct NotSendableMO { // expected-note {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
+  // expected-complete-note @-1 {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
   var ref: Ref
 }
 
@@ -50,7 +53,7 @@ func processFiles(_ a: A, _ anotherFile: borrowing FileDescriptor) async {
   _ = A(.available(anotherFile))
 
   let ns = await a.getRef() // expected-warning {{non-sendable type 'NotSendableMO' returned by call to actor-isolated function cannot cross actor boundary}}
-  await takeNotSendable(ns) // expected-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
+  await takeNotSendable(ns) // expected-complete-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
 
   switch (await a.giveFileDescriptor()) {
   case let .available(fd):

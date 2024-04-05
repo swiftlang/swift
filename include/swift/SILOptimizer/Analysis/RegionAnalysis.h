@@ -162,7 +162,7 @@ public:
   }
 
   ActorIsolation getActorIsolation() const {
-    return regionInfo.getActorIsolation().value();
+    return regionInfo.getActorIsolation();
   }
 
   void mergeIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
