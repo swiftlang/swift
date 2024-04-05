@@ -3701,10 +3701,12 @@ bool ValueDecl::isSemanticallyFinal() const {
       return true;
   }
 
-  // As are members of actor types.
-  if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
-    if (classDecl->isAnyActor())
-      return true;
+  // As are methods/accessors of actor types.
+  if (!isa<TypeDecl>(this)) {
+    if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
+      if (classDecl->isAnyActor())
+        return true;
+    }
   }
 
   // For everything else, the same as 'final'.
