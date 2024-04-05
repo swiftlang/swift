@@ -32,7 +32,7 @@ class LockSingleConsumerStack<Element> {
     let new = NodePtr.allocate(capacity: 1)
     new.initialize(to: Node(value: value, next: nil))
 
-    _last.withLockUnchecked {
+    _last.withLock {
       new.pointee.next = $0
       $0 = new
     }
