@@ -29,6 +29,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/LibPrespecialized.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
 #include "swift/Threading/Mutex.h"
@@ -346,6 +347,8 @@ void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
     const void *records, uintptr_t recordsSize) {
   assert(recordsSize % sizeof(TypeMetadataRecord) == 0
          && "weird-sized type metadata section?!");
+
+  libPrespecializedImageLoaded();
 
   // If we have a section, enqueue the type metadata for lookup.
   auto recordBytes = reinterpret_cast<const char *>(records);
