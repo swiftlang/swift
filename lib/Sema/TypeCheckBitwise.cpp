@@ -232,13 +232,6 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
   assert(dc->getParentModule()->getASTContext().getProtocol(
       KnownProtocolKind::BitwiseCopyable));
 
-  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isNoncopyable()) {
-    if (!isImplicit(check)) {
-      nominal->diagnose(diag::non_bitwise_copyable_type_noncopyable);
-    }
-    return true;
-  }
-
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {
       nominal->diagnose(diag::non_bitwise_copyable_type_class);
