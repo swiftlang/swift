@@ -1,4 +1,4 @@
-import extensions_A
+@_exported import extensions_A
 import extensions_B
 
 extension X {
