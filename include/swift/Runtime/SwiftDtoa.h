@@ -77,6 +77,7 @@
 #ifndef SWIFT_DTOA_H
 #define SWIFT_DTOA_H
 
+#define __STDC_WANT_IEC_60559_TYPES_EXT__ // FLT16_MAX
 #include <float.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -238,6 +239,10 @@ extern "C" {
 
 #if SWIFT_DTOA_BINARY16_SUPPORT
 size_t swift_dtoa_optimal_binary16_p(const void *, char *dest, size_t length);
+#if defined FLT16_MAX
+// If `_Float16` is defined, provide this convenience wrapper.
+size_t swift_dtoa_optimal_binary16(_Float16, char *dest, size_t length);
+#endif
 #endif
 
 #if SWIFT_DTOA_BINARY32_SUPPORT
