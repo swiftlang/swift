@@ -281,18 +281,36 @@ extension CheckedContinuation {
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
-@available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @inlinable
 @_unavailableInEmbedded
+@available(SwiftStdlib 5.1, *)
+#if !$Embedded
+@backDeployed(before: SwiftStdlib 6.0)
+#endif
 public func withCheckedContinuation<T>(
-    function: String = #function,
-    _ body: (CheckedContinuation<T, Never>) -> Void
+  isolation: isolated (any Actor)? = #isolation,
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Never>) -> Void
 ) async -> T {
   return await withUnsafeContinuation {
     body(CheckedContinuation(continuation: $0, function: function))
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+@_unavailableInEmbedded
+@_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
+internal func __abi_withCheckedContinuation<T>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Never>) -> Void
+) async -> T {
+  return await withUnsafeContinuation {
+    body(CheckedContinuation(continuation: $0, function: function))
+  }
+}
+
 
 /// Invokes the passed in closure with a checked continuation for the current task.
 ///
@@ -322,13 +340,30 @@ public func withCheckedContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
-@available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @inlinable
 @_unavailableInEmbedded
+@available(SwiftStdlib 5.1, *)
+#if !$Embedded
+@backDeployed(before: SwiftStdlib 6.0)
+#endif
 public func withCheckedThrowingContinuation<T>(
-    function: String = #function,
-    _ body: (CheckedContinuation<T, Error>) -> Void
+  isolation: isolated (any Actor)? = #isolation,
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Error>) -> Void
+) async throws -> T {
+  return try await withUnsafeThrowingContinuation {
+    body(CheckedContinuation(continuation: $0, function: function))
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+@_unavailableInEmbedded
+@_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
+internal func __abi_withCheckedThrowingContinuation<T>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> T {
   return try await withUnsafeThrowingContinuation {
     body(CheckedContinuation(continuation: $0, function: function))
