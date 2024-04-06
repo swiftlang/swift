@@ -3294,7 +3294,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                              AbstractionPattern origType)
         : TC(TC), forExpansion(forExpansion), origType(origType) {
       if (auto origEltType = origType.getVanishingTupleElementPatternType())
-        origType = *origEltType;
+        this->origType = *origEltType;
     }
 
     // AST function types are turned into SIL function types:
