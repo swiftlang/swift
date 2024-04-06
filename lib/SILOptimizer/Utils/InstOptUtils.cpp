@@ -238,11 +238,7 @@ bool swift::hasOnlyEndOfScopeOrEndOfLifetimeUses(SILInstruction *inst) {
       // Include debug uses only in Onone mode.
       if (isDebugUser && inst->getFunction()->getEffectiveOptimizationMode() <=
                              OptimizationMode::NoOptimization)
-        if (auto DbgVarInst = DebugVarCarryingInst(user)) {
-          auto VarInfo = DbgVarInst.getVarInfo();
-          if (VarInfo && !VarInfo->Implicit)
-            return false;
-        }
+        return false;
     }
   }
   return true;
@@ -1848,8 +1844,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   }
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,
-  // we need to make sure any of its related `debug_value` instruction
-  // is preserved.
+  // we need to make sure any of its related `debug_value` instructions
+  // are preserved.
   if (auto *STI = dyn_cast<StructInst>(I)) {
     auto STVal = STI->getResult(0);
     llvm::ArrayRef<VarDecl *> FieldDecls =
@@ -1872,6 +1868,31 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         // Create a new debug_value
         SILBuilder(STI, DbgInst->getDebugScope())
           .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+      }
+    }
+  }
+  // Similarly, if a `tuple` SIL instruction is "unwrapped" and removed,
+  // we need to make sure any of its related `debug_value` instructions
+  // are preserved.
+  if (auto *TTI = dyn_cast<TupleInst>(I)) {
+    auto TTVal = TTI->getResult(0);
+    for (Operand *U : getDebugUses(TTVal)) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      auto VarInfo = DbgInst->getVarInfo();
+      if (!VarInfo)
+        continue;
+      TupleType *TT = TTI->getTupleType();
+      for (auto i : indices(TT->getElements())) {
+        SILDebugVariable NewVarInfo = *VarInfo;
+        auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(TT, i);
+        NewVarInfo.DIExpr.append(FragDIExpr);
+
+        if (!NewVarInfo.Type)
+          NewVarInfo.Type = TTI->getType();
+
+        // Create a new debug_value
+        SILBuilder(TTI, DbgInst->getDebugScope())
+          .createDebugValue(DbgInst->getLoc(), TTI->getElement(i), NewVarInfo);
       }
     }
   }

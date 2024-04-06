@@ -73,7 +73,7 @@ sil @builtin32_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[INIT_COPY:%.*]] = copy_value [[ARG]] : $AggStruct
 // CHECK:   [[MARKED_VALUE:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[INIT_COPY]] : $AggStruct
 // CHECK:   [[DESTRUCTURE_COPY:%.*]] = copy_value [[MARKED_VALUE]] : $AggStruct
-// CHECK:   debug_value [[MARKED_VALUE]] : $AggStruct, let, name "self", argno 1, implicit
+// CHECK:   debug_value [[MARKED_VALUE]] : $AggStruct, let, name "self", argno 1
 // CHECK:   destroy_value [[MARKED_VALUE]] : $AggStruct
 // CHECK:   [[DESTRUCTURE_COPY_1:%.*]] = destructure_struct [[DESTRUCTURE_COPY]] : $AggStruct
 // CHECK:   return [[DESTRUCTURE_COPY_1]] : $KlassPair
@@ -82,7 +82,7 @@ sil [ossa] @test_access_single_child_field_consume : $@convention(method) (@guar
 bb0(%0 : @guaranteed $AggStruct):
   %1 = copy_value %0 : $AggStruct
   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct
-  debug_value %2 : $AggStruct, let, name "self", argno 1, implicit
+  debug_value %2 : $AggStruct, let, name "self", argno 1
   %4 = begin_borrow %2 : $AggStruct
   %5 = struct_extract %4 : $AggStruct, #AggStruct.pair
   %6 = copy_value %5 : $KlassPair
@@ -96,7 +96,7 @@ bb0(%0 : @guaranteed $AggStruct):
 // CHECK:   [[INIT_COPY:%.*]] = copy_value [[ARG]] : $AggStruct
 // CHECK:   [[MARKED_VALUE:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[INIT_COPY]] : $AggStruct
 // CHECK:   [[DESTRUCTURE_COPY:%.*]] = copy_value [[MARKED_VALUE]] : $AggStruct
-// CHECK:   debug_value [[MARKED_VALUE]] : $AggStruct, let, name "self", argno 1, implicit
+// CHECK:   debug_value [[MARKED_VALUE]] : $AggStruct, let, name "self", argno 1
 // CHECK:   destroy_value [[MARKED_VALUE]] : $AggStruct
 // CHECK:   [[DESTRUCTURE_COPY_1:%.*]] = destructure_struct [[DESTRUCTURE_COPY]] : $AggStruct
 // CHECK:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[DESTRUCTURE_COPY_1]] : $KlassPair
@@ -107,7 +107,7 @@ sil [ossa] @test_access_grandfield_consume : $@convention(method) (@guaranteed A
 bb0(%0 : @guaranteed $AggStruct):
   %1 = copy_value %0 : $AggStruct
   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct
-  debug_value %2 : $AggStruct, let, name "self", argno 1, implicit
+  debug_value %2 : $AggStruct, let, name "self", argno 1
   %4 = begin_borrow %2 : $AggStruct
   %5 = struct_extract %4 : $AggStruct, #AggStruct.pair
   %6 = copy_value %5 : $KlassPair
