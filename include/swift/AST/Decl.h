@@ -1306,6 +1306,11 @@ public:
   std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
 
+  /// Returns true if code associated with this declaration should be considerd
+  /// unreachable at runtime because the declaration is unavailable in all
+  /// execution contexts in which the code may run.
+  bool isUnreachableAtRuntime() const;
+
   /// Returns true if this declaration should be considered available during
   /// SIL/IR lowering. A declaration would not be available during lowering if,
   /// for example, it is annotated as unavailable with `@available` and
