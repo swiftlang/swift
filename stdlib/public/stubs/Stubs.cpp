@@ -173,16 +173,10 @@ static locale_t getCLocale() {
 #endif
 #endif // SWIFT_STDLIB_HAS_LOCALE
 
-// TODO: replace this with a float16 implementation instead of calling _float.
-// Argument type will have to stay float, though; only the formatting changes.
-// Note, return type is __swift_ssize_t, not uint64_t as with the other
-// formatters. We'd use this type there if we could, but it's ABI so we can't
-// go back and change it.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
-                                      float Value, bool Debug) {
-  __fp16 v = Value;
-  return swift_dtoa_optimal_binary16_p(&v, Buffer, BufferLength);
+                                      _Float16 Value, bool Debug) {
+  return swift_dtoa_optimal_binary16_p(&Value, Buffer, BufferLength);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
