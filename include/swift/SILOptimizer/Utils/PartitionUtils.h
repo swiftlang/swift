@@ -655,6 +655,8 @@ public:
     return source.get<SILInstruction *>();
   }
 
+  bool hasSourceInst() const { return source.is<SILInstruction *>(); }
+
   Operand *getSourceOp() const { return source.get<Operand *>(); }
 
   SILLocation getSourceLoc() const { return getSourceInst()->getLoc(); }
@@ -1095,6 +1097,11 @@ public:
   /// if they need to.
   static SILLocation getLoc(SILInstruction *inst) { return Impl::getLoc(inst); }
 
+  /// Some evaluators pass in mock operands that one cannot call getLoc()
+  /// upon. So to allow for this, provide a routine that our impl can override
+  /// if they need to.
+  static SILLocation getLoc(Operand *op) { return Impl::getLoc(op); }
+
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) const {
     if (shouldEmitVerboseLogging()) {
@@ -1113,7 +1120,9 @@ public:
 
     // Set the boundary so that as we push, this shows when to stop processing
     // for this PartitionOp.
-    p.pushHistorySequenceBoundary(getLoc(op.getSourceInst()));
+    SILLocation loc = op.hasSourceInst() ? getLoc(op.getSourceInst())
+                                         : getLoc(op.getSourceOp());
+    p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
     case PartitionOpKind::Assign:
@@ -1356,6 +1365,7 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   bool shouldTryToSquelchErrors() const { return true; }
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
+  static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
 };
 
 /// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special

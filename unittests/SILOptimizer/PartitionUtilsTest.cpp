@@ -53,6 +53,8 @@ struct MockedPartitionOpEvaluator final
   static SILLocation getLoc(SILInstruction *inst) {
     return SILLocation::invalid();
   }
+
+  static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
 };
 
 } // namespace
@@ -87,6 +89,8 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
   static SILLocation getLoc(SILInstruction *inst) {
     return SILLocation::invalid();
   }
+
+  static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
 };
 
 } // namespace
