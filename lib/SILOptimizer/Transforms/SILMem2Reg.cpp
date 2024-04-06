@@ -349,7 +349,12 @@ static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
   auto varInfo = *dvai->getVarInfo();
   if (isa<DebugValueInst>(dvai)) {
     auto &diExpr = varInfo.DIExpr;
-    if (diExpr)
+    // FIXME: There should always be a DIExpr starting with an op_deref here
+    // The debug_value is attached to a pointer type, and those don't exist
+    // in Swift, so they should always be dereferenced.
+    // However, this rule is broken in a lot of spaces, so we have to leave
+    // this check to recover from wrong info
+    if (diExpr && diExpr.startsWithDeref())
       diExpr.eraseElement(diExpr.element_begin());
   }
 
