@@ -317,6 +317,9 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
+/// Enables importing the Volatile module
+EXPERIMENTAL_FEATURE(Volatile, true)
+
 /// Enables noncopyable generics
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
 

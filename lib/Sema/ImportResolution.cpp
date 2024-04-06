@@ -397,6 +397,15 @@ ImportResolver::getModule(ImportPath::Module modulePath) {
     }
   }
 
+  // Only allow importing "Volatile" with Feature::Volatile or Feature::Embedded
+  if (!ctx.LangOpts.hasFeature(Feature::Volatile) &&
+      !ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    if (ctx.getRealModuleName(moduleID.Item).str() == "_Volatile") {
+      ctx.Diags.diagnose(SourceLoc(), diag::volatile_is_experimental);
+      return nullptr;
+    }
+  }
+
   // If the imported module name is the same as the current module,
   // skip the Swift module loader and use the Clang module loader instead.
   // This allows a Swift module to extend a Clang module of the same name.

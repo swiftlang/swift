@@ -505,6 +505,7 @@ static bool usesFeatureRawLayout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(Embedded)
+UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
