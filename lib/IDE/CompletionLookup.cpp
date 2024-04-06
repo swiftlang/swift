@@ -1073,8 +1073,8 @@ bool CompletionLookup::addCallArgumentPatterns(
     Builder.addCallArgument(argName, bodyName,
                             eraseArchetypes(paramTy, genericSig), contextTy,
                             isVariadic, isInOut, isIUO, isAutoclosure,
-                            /*UseUnderscoreLabel=*/false,
-                            /*IsLabeledTrailingClosure=*/false, hasDefault);
+                            /*IsLabeledTrailingClosure=*/false,
+                            /*IsForOperator=*/false, hasDefault);
 
     modifiedBuilder = true;
     needComma = true;
@@ -2560,7 +2560,8 @@ void CompletionLookup::addAssignmentOperator(Type RHSType) {
   Type contextTy;
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     contextTy = typeContext->getDeclaredTypeInContext();
-  builder.addCallArgument(Identifier(), RHSType, contextTy);
+  builder.addCallArgument(Identifier(), RHSType, contextTy,
+                          /*IsForOperator=*/true);
 }
 
 void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
@@ -2584,7 +2585,8 @@ void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
     Type contextTy;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       contextTy = typeContext->getDeclaredTypeInContext();
-    builder.addCallArgument(Identifier(), RHSType, contextTy);
+    builder.addCallArgument(Identifier(), RHSType, contextTy,
+                            /*IsForOperator=*/true);
   }
   if (resultType)
     addTypeAnnotation(builder, resultType);
@@ -2913,8 +2915,9 @@ void CompletionLookup::addCallArgumentCompletionResults(
     Builder.addCallArgument(Arg->getLabel(), Identifier(), Arg->getPlainType(),
                             ContextType, Arg->isVariadic(), Arg->isInOut(),
                             /*IsIUO=*/false, Arg->isAutoClosure(),
-                            /*UseUnderscoreLabel=*/true,
-                            isLabeledTrailingClosure, /*HasDefault=*/false);
+                            isLabeledTrailingClosure,
+                            /*IsForOperator=*/false,
+                            /*HasDefault=*/false);
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
     auto Ty = Arg->getPlainType();
     if (Arg->isInOut()) {
