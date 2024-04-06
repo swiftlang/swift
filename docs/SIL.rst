@@ -4297,7 +4297,6 @@ less verbose.
    debug-var-attr ::= 'let'
    debug-var-attr ::= 'name' string-literal
    debug-var-attr ::= 'argno' integer-literal
-   debug-var-attr ::= 'implicit'
 
 There are a number of attributes that provide details about the source
 variable that is being described, including the name of the

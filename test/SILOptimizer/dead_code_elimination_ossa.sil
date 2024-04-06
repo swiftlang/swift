@@ -426,7 +426,7 @@ exit:
 // MO.deinit
 sil hidden [ossa] @testDropDeinit : $@convention(method) (@owned MO) -> () {
 bb0(%0 : @owned $MO):
-  debug_value %0 : $MO, let, name "self", argno 1, implicit
+  debug_value %0 : $MO, let, name "self", argno 1
   %61 = drop_deinit %0 : $MO
   end_lifetime %61 : $MO
   %63 = tuple ()

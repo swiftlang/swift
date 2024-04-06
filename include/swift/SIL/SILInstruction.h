@@ -1849,12 +1849,10 @@ class TailAllocatedDebugVariable {
       int_type HasValue : 1;
       /// True if this is a let-binding.
       int_type Constant : 1;
-      /// True if this variable is created by compiler
-      int_type Implicit : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
-      int_type NameLength : 13;
+      int_type NameLength : 14;
       /// The source function argument position from left to right
       /// starting with 1 or 0 if this is a local variable.
       int_type ArgNo : 16;
@@ -1876,9 +1874,6 @@ public:
   StringRef getName(const char *buf) const;
   bool isLet() const { return Bits.Data.Constant; }
 
-  bool isImplicit() const { return Bits.Data.Implicit; }
-  void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
-
   std::optional<SILDebugVariable>
   get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType = {},
       std::optional<SILLocation> DeclLoc = {},
@@ -1890,8 +1885,8 @@ public:
     StringRef name = getName(buf);
     if (VD && name.empty())
       name = VD->getName().str();
-    return SILDebugVariable(name, isLet(), getArgNo(), isImplicit(), AuxVarType,
-                            DeclLoc, DeclScope, DIExprElements);
+    return SILDebugVariable(name, isLet(), getArgNo(), AuxVarType, DeclLoc,
+                            DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,

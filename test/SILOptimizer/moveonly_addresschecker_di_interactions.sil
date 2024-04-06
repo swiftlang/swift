@@ -41,7 +41,7 @@ bb0(%0 : $*_Node<T>, %1 : @owned $_Box<T>):
   %2 = alloc_stack [lexical] $_Node<T>, var, name "value"
   %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*_Node<T>
   copy_addr [take] %0 to [init] %3 : $*_Node<T>
-  debug_value %1 : $_Box<T>, let, name "self", argno 2, implicit
+  debug_value %1 : $_Box<T>, let, name "self", argno 2
   %6 = mark_uninitialized [rootself] %1 : $_Box<T>
   %7 = begin_borrow %6 : $_Box<T>
   %8 = begin_access [read] [static] %3 : $*_Node<T>
