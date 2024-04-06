@@ -3101,14 +3101,5 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
 std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
                                         AbstractFunctionDecl *decl) const {
-  Type resultTy;
-  if (auto fn = dyn_cast<FuncDecl>(decl)) {
-    resultTy = fn->getResultInterfaceType();
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    resultTy = ctor->getResultInterfaceType();
-  } else {
-    return std::nullopt;
-  }
-
-  return LifetimeDependenceInfo::get(decl, resultTy);
+  return LifetimeDependenceInfo::get(decl);
 }

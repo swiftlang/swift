@@ -140,22 +140,23 @@ void LifetimeDependenceInfo::getConcatenatedData(
   }
 }
 
-static bool hasEscapableResultOrYield(AbstractFunctionDecl *afd,
-                                      Type resultType) {
-  Type resultTypeInContext = afd->mapTypeIntoContext(resultType);
-  std::optional<Type> yieldTyInContext;
-
+static bool hasEscapableResultOrYield(AbstractFunctionDecl *afd) {
   if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
     if (accessor->isCoroutine()) {
-      yieldTyInContext = accessor->getStorage()->getValueInterfaceType();
-      yieldTyInContext = accessor->mapTypeIntoContext(*yieldTyInContext);
+      auto yieldTyInContext = accessor->mapTypeIntoContext(
+          accessor->getStorage()->getValueInterfaceType());
+      return yieldTyInContext->isEscapable();
     }
   }
-  if (resultTypeInContext->isEscapable() &&
-      (!yieldTyInContext.has_value() || (*yieldTyInContext)->isEscapable())) {
-    return true;
+
+  Type resultType;
+  if (auto fn = dyn_cast<FuncDecl>(afd)) {
+    resultType = fn->getResultInterfaceType();
+  } else {
+    auto ctor = cast<ConstructorDecl>(afd);
+    resultType = ctor->getResultInterfaceType();
   }
-  return false;
+  return afd->mapTypeIntoContext(resultType)->isEscapable();
 }
 
 static LifetimeDependenceKind getLifetimeDependenceKindFromDecl(
@@ -172,8 +173,7 @@ static LifetimeDependenceKind getLifetimeDependenceKindFromDecl(
 }
 
 std::optional<LifetimeDependenceInfo>
-LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
-                                     bool allowIndex) {
+LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
   auto *mod = afd->getModuleContext();
@@ -184,7 +184,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
   auto lifetimeDependentRepr =
       cast<LifetimeDependentReturnTypeRepr>(afd->getResultTypeRepr());
 
-  if (hasEscapableResultOrYield(afd, resultType)) {
+  if (hasEscapableResultOrYield(afd)) {
     diags.diagnose(lifetimeDependentRepr->getLoc(),
                    diag::lifetime_dependence_invalid_return_type);
     return std::nullopt;
@@ -389,7 +389,7 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromTypeRepr(
 }
 
 std::optional<LifetimeDependenceInfo>
-LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
+LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
   auto *mod = afd->getModuleContext();
@@ -403,7 +403,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     return std::nullopt;
   }
 
-  if (hasEscapableResultOrYield(afd, resultType)) {
+  if (hasEscapableResultOrYield(afd)) {
     return std::nullopt;
   }
 
@@ -423,7 +423,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     }
   }
 
-  if (afd->getKind() != DeclKind::Constructor && afd->hasImplicitSelfDecl()) {
+  if (!cd && afd->hasImplicitSelfDecl()) {
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->isEscapable()) {
       if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
@@ -475,7 +475,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
       continue;
     }
     if (candidateParam) {
-      if (afd->getKind() == DeclKind::Constructor && afd->isImplicit()) {
+      if (cd && afd->isImplicit()) {
         diags.diagnose(
             returnLoc,
             diag::lifetime_dependence_cannot_infer_ambiguous_candidate,
@@ -493,7 +493,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   }
 
   if (!candidateParam && !hasParamError) {
-    if (afd->getKind() == DeclKind::Constructor && afd->isImplicit()) {
+    if (cd && afd->isImplicit()) {
       diags.diagnose(returnLoc,
                      diag::lifetime_dependence_cannot_infer_no_candidates,
                      "on implicit initializer");
@@ -508,13 +508,13 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
 }
 
 std::optional<LifetimeDependenceInfo>
-LifetimeDependenceInfo::get(AbstractFunctionDecl *afd, Type resultType,
-                            bool allowIndex) {
+LifetimeDependenceInfo::get(AbstractFunctionDecl *afd) {
+  assert(isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd));
   auto *returnTypeRepr = afd->getResultTypeRepr();
   if (isa_and_nonnull<LifetimeDependentReturnTypeRepr>(returnTypeRepr)) {
-    return LifetimeDependenceInfo::fromTypeRepr(afd, resultType, allowIndex);
+    return LifetimeDependenceInfo::fromTypeRepr(afd);
   }
-  return LifetimeDependenceInfo::infer(afd, resultType);
+  return LifetimeDependenceInfo::infer(afd);
 }
 
 LifetimeDependenceInfo

@@ -138,6 +138,13 @@ class LifetimeDependenceInfo {
                                                  unsigned index,
                                                  LifetimeDependenceKind kind);
 
+  /// Builds LifetimeDependenceInfo from a swift decl
+  static std::optional<LifetimeDependenceInfo>
+  fromTypeRepr(AbstractFunctionDecl *afd);
+
+  /// Infer LifetimeDependenceInfo
+  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd);
+
 public:
   LifetimeDependenceInfo()
       : inheritLifetimeParamIndices(nullptr),
@@ -186,26 +193,17 @@ public:
   /// Builds LifetimeDependenceInfo from a swift decl, either from the explicit
   /// lifetime dependence specifiers or by inference based on types and
   /// ownership modifiers.
-  static std::optional<LifetimeDependenceInfo>
-  get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
+  static std::optional<LifetimeDependenceInfo> get(AbstractFunctionDecl *decl);
 
   /// Builds LifetimeDependenceInfo from the bitvectors passes as parameters.
   static LifetimeDependenceInfo
   get(ASTContext &ctx, const SmallBitVector &inheritLifetimeIndices,
       const SmallBitVector &scopeLifetimeIndices);
 
-  /// Builds LifetimeDependenceInfo from a swift decl
-  static std::optional<LifetimeDependenceInfo>
-  fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
-
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<LifetimeDependenceInfo>
   fromTypeRepr(LifetimeDependentReturnTypeRepr *lifetimeDependentRepr,
                SmallVectorImpl<SILParameterInfo> &params, DeclContext *dc);
-
-  /// Infer LifetimeDependenceInfo
-  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
-                                                     Type resultType);
 };
 
 } // namespace swift
