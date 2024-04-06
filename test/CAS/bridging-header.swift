@@ -1,3 +1,4 @@
+// REQUIRES: objc_interop
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
@@ -64,13 +65,28 @@
 // RUN: %target-swift-frontend  -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %t/test.swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule
 
+/// Importing binary module with bridging header built from CAS from a regluar build.
+/// This should succeed even it is also importing a bridging header that shares same header dependencies (with proper header guard).
 // RUN: %target-swift-frontend -typecheck -module-name User -swift-version 5 \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap \
-// RUN:   -I %t %t/user.swift
+// RUN:   -I %t %t/user.swift -import-objc-header %t/Bridging2.h
+
+/// Importing binary module with bridging header built from CAS from a cached build. This should work without additional bridging header deps.
+// RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   %t/user.swift -o %t/deps2.json -swift-version 5 -cache-compile-job -cas-path %t/cas \
+// RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t
+
+// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps2.json > %t/map2.json
+// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map2.json > %t/map2.casid
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json User > %t/User.cmd
+// RUN: %target-swift-frontend  -cache-compile-job -module-name User -O -cas-path %t/cas \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -disable-implicit-swift-modules \
+// RUN:   -explicit-swift-module-map-file @%t/map2.casid @%t/User.cmd %t/user.swift \
+// RUN:   -emit-module -o %t/User.swiftmodule
 
 //--- test.swift
-import B
 public func test() {
     b()
 }
@@ -84,14 +100,31 @@ func user() {
   test()
 }
 
+extension A {
+    public func testA() {}
+}
+
+
 //--- Bridging.h
 #include "Foo.h"
+#include "Foo2.h"
+
+//--- Bridging2.h
+#include "Foo.h"
+#include "Foo2.h"
 
 //--- Foo.h
 #import "a.h"
 
+//--- Foo2.h
+#pragma once
+int Foo = 0;
+
 //--- a.h
 #include "b.h"
+struct A {
+  int a;
+};
 
 //--- b.h
 void b(void);

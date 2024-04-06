@@ -1703,8 +1703,13 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+  // Prefer importing the header directly if the header content matches by
+  // checking size and mod time. This allows correct import if some no-modular
+  // headers are already imported into clang importer. If mod time is zero, then
+  // the module should be built from CAS and there is no mod time to verify.
   if (headerFile && (*headerFile)->getSize() == expectedSize &&
-      (*headerFile)->getModificationTime() == expectedModTime) {
+      (expectedModTime == 0 ||
+       (*headerFile)->getModificationTime() == expectedModTime)) {
     return importBridgingHeader(header, adapter, diagLoc, false, true);
   }
 
