@@ -289,6 +289,11 @@ public:
   /// parameter.
   bool isTransferringParameter() const;
 
+  void printIsolationInfo(SmallString<64> &outString) const {
+    llvm::raw_svector_ostream os(outString);
+    getIsolationRegionInfo().printForDiagnostics(os);
+  }
+
   void print(llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
     valueState.print(os);
