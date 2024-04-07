@@ -556,6 +556,12 @@ class DeadFunctionAndGlobalElimination {
         auto *fd = getBaseMethod(
             cast<AbstractFunctionDecl>(entry.getMethod().getDecl()));
 
+        // In Embedded Swift, we don't expect SILFunction without definitions on
+        // vtable entries. Having one means the base method was DCE'd already,
+        // so let's avoid marking it alive in the subclass vtable either.
+        bool embedded = Module->getOptions().EmbeddedSwift;
+        if (embedded && !F->isDefinition()) { continue; }
+        
         if (// We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
