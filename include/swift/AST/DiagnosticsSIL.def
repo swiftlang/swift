@@ -973,7 +973,7 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 //
 
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
-      "transferring %0 may cause a race",
+      "transferring %0 may cause a data race",
       (Identifier))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
