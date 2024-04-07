@@ -25,7 +25,7 @@ func methodTestTransferringResult() async {
 func methodTestTransferringArg() async {
   let x = MyType()
   let s = NSObject()
-  let _ = x.getResultWithTransferringArgument(s)  // expected-error {{transferring 's' may cause a race}}
+  let _ = x.getResultWithTransferringArgument(s)  // expected-error {{transferring 's' may cause a data race}}
   // expected-note @-1 {{'s' used after being passed as a transferring parameter; Later uses could race}}
   useValue(s) // expected-note {{use here could race}}
 }
@@ -45,14 +45,14 @@ func funcTestTransferringResult() async {
   // Just to show that without the transferring param, we generate diagnostics.
   let x2 = NSObject()
   let y2 = returnNSObjectFromGlobalFunction(x2)
-  await transferToMain(x2) // expected-error {{transferring 'x2' may cause a race}}
+  await transferToMain(x2) // expected-error {{transferring 'x2' may cause a data race}}
   // expected-note @-1 {{transferring disconnected 'x2' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   useValue(y2) // expected-note {{use here could race}}
 }
 
 func funcTestTransferringArg() async {
   let x = NSObject()
-  transferNSObjectToGlobalFunction(x) // expected-error {{transferring 'x' may cause a race}}
+  transferNSObjectToGlobalFunction(x) // expected-error {{transferring 'x' may cause a data race}}
   // expected-note @-1 {{'x' used after being passed as a transferring parameter; Later uses could race}}
   useValue(x) // expected-note {{use here could race}}
 }

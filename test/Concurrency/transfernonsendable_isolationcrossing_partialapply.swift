@@ -40,7 +40,7 @@ actor ProtectsNonSendable {
     // TODO: This is wrong, we should get an error saying that nsArg is task
     // isolated since this is nonisolated.
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = nsArg // expected-warning {{transferring 'nsArg' may cause a race}}
+      isolatedSelf.ns = nsArg // expected-warning {{transferring 'nsArg' may cause a data race}}
       // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -49,7 +49,7 @@ actor ProtectsNonSendable {
     let l = NonSendableKlass()
     doSomething(l, nsArg)
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a race}}
+      isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a data race}}
       // expected-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -68,7 +68,7 @@ actor ProtectsNonSendable {
 
     // This is not safe since we use l later.
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a race}}
+      isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a data race}}
       // expected-note @-1 {{disconnected 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
 
@@ -86,7 +86,7 @@ func normalFunc_testLocal_1() {
 func normalFunc_testLocal_2() {
   let x = NonSendableKlass()
   let _ = { @MainActor in
-    useValue(x) // expected-warning {{transferring 'x' may cause a race}}
+    useValue(x) // expected-warning {{transferring 'x' may cause a data race}}
     // expected-note @-1 {{disconnected 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
   useValue(x) // expected-note {{use here could race}}
@@ -98,7 +98,7 @@ func normalFunc_testLocal_2() {
 // diagnostic.
 func transferBeforeCaptureErrors() async {
   let x = NonSendableKlass()
-  await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
+  await transferToCustom(x) // expected-warning {{transferring 'x' may cause a data race}}
   // expected-note @-1 {{transferring disconnected 'x' to global actor 'CustomActor'-isolated callee could cause races in between callee global actor 'CustomActor'-isolated and local nonisolated uses}}
   let _ = { @MainActor in // expected-note {{use here could race}}
     useValue(x)
