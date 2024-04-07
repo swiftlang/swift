@@ -1325,9 +1325,9 @@ func varSendableNonTrivialLetTupleFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'test' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
-  let z = test.1
+  let z = test.1 // expected-tns-note {{use here could race}}
   useValue(z)
-  useValue(test) // expected-tns-note {{use here could race}}
+  useValue(test)
 }
 
 func varNonSendableNonTrivialLetTupleFieldTest() async {
@@ -1335,11 +1335,8 @@ func varNonSendableNonTrivialLetTupleFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'test' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
-  let z = test.2
-  // The SIL emitted for the assignment of the tuple is just a jumble of
-  // instructions that are not semantically significant. The result is that we
-  // need a useValue here to actual provide something for the pass to chew on.
-  useValue(z)  // expected-tns-note {{use here could race}}
+  let z = test.2 // expected-tns-note {{use here could race}}
+  useValue(z)
   useValue(test)
 }
 
