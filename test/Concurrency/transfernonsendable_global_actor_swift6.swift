@@ -44,21 +44,21 @@ var booleanFlag: Bool { false }
 
   let erased: () -> Void = closure
 
-  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a race}}
+  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a data race}}
   // expected-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
 }
 
 @MainActor func synchronousActorIsolatedFunctionError() async {
   let erased: () -> Void = mainActorFunction
 
-  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a race}}
+  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a data race}}
   // expected-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
 }
 
 @MainActor func synchronousActorIsolatedGenericFunctionError<T>(_ t: T) async {
   let erased: (T) -> Void = useValueMainActor
 
-  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a race}}
+  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a data race}}
   // expected-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
 }
 
@@ -70,7 +70,7 @@ var booleanFlag: Bool { false }
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a race}}
+  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a data race}}
   // expected-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
 }
 
@@ -82,6 +82,6 @@ var booleanFlag: Bool { false }
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a race}}
+  await useValueAsync(erased) // expected-error {{transferring 'erased' may cause a data race}}
   // expected-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
 }
