@@ -226,7 +226,6 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   default:
     return false;
   case SILInstructionKind::BeginAccessInst:
-  case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::BridgeObjectToRefInst:
@@ -249,7 +248,6 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
-  case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::ProjectBlockStorageInst:
@@ -269,6 +267,12 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::InitExistentialValueInst:
     return true;
+  case SILInstructionKind::MoveValueInst:
+    // Look through if it isn't from a var decl.
+    return !cast<MoveValueInst>(inst)->isFromVarDecl();
+  case SILInstructionKind::BeginBorrowInst:
+    // Look through if it isn't from a var decl.
+    return !cast<BeginBorrowInst>(inst)->isFromVarDecl();
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
     assert(cast);
@@ -2460,7 +2464,6 @@ CONSTANT_TRANSLATION(TupleInst, Assign)
 // and whose operand and result are guaranteed to be mapped to the same
 // underlying region.
 CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
-CONSTANT_TRANSLATION(BeginBorrowInst, LookThrough)
 CONSTANT_TRANSLATION(BorrowedFromInst, LookThrough)
 CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
@@ -2473,7 +2476,6 @@ CONSTANT_TRANSLATION(InitEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(OpenExistentialAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedRefCastInst, LookThrough)
 CONSTANT_TRANSLATION(UpcastInst, LookThrough)
-CONSTANT_TRANSLATION(MoveValueInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUnresolvedNonCopyableValueInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUnresolvedReferenceBindingInst, LookThrough)
 CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperValueInst, LookThrough)
@@ -2741,6 +2743,20 @@ LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitMoveValueInst(MoveValueInst *mvi) {
+  if (mvi->isFromVarDecl())
+    return TranslationSemantics::Assign;
+  return TranslationSemantics::LookThrough;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitBeginBorrowInst(BeginBorrowInst *bbi) {
+  if (bbi->isFromVarDecl())
+    return TranslationSemantics::Assign;
+  return TranslationSemantics::LookThrough;
+}
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
   if (ri->getFunction()->getLoweredFunctionType()->hasTransferringResult()) {
