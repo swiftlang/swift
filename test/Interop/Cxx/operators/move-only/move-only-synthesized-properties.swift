@@ -1,6 +1,8 @@
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-5.9)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature NoncopyableGenerics -D HAS_NONCOPYABLE_GENERICS)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-5.9 -O)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-6 -O)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -O)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -O -enable-experimental-feature NoncopyableGenerics -D HAS_NONCOPYABLE_GENERICS)

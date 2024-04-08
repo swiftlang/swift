@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -D USE_CUSTOM_STRING_API)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API)
 //
 // REQUIRES: executable_test
 
@@ -412,7 +412,6 @@ StdStringTestSuite.test("pass as an argument") {
     expectEqual(res[0], 97)
 }
 
-#if SUPPORTS_DEFAULT_ARGUMENTS
 StdStringTestSuite.test("pass as a default argument") {
     let res = takesStringWithDefaultArg()
     expectEqual(res.size(), 3)
@@ -420,7 +419,6 @@ StdStringTestSuite.test("pass as a default argument") {
     expectEqual(res[1], 98)
     expectEqual(res[2], 99)
 }
-#endif
 #endif
 
 runAllTests()
