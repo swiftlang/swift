@@ -1859,10 +1859,6 @@ bool Parser::isStartOfConditionalStmtBody() {
     return true;
   }
 
-  if (Tok.is(tok::l_paren)) {
-    return false;
-  }
-  
   if (Tok.is(tok::r_brace) || Tok.is(tok::r_paren)) {
     // A right brace or parenthesis cannot start a statement body, nor can the condition list continue afterwards. So, this must be the statement body.
     // This covers cases like `if true, { if true, { } }` or `( if true, { print(0) } )`. While the latter is not valid code, it improves diagnostics.
