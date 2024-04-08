@@ -247,10 +247,6 @@ ERROR(conforms_to_ambiguous,none,
 ERROR(conforms_to_not_protocol,none,
       "%0 %1 referenced in protocol conformance '%2' is not a protocol", (DescriptiveDeclKind, ValueDecl *, StringRef))
 
-ERROR(move_only_requires_move_only,none,
-      "use of noncopyable C++ type '%0' requires -enable-experimental-move-only",
-      (StringRef))
-
 ERROR(failed_base_method_call_synthesis,none,
       "failed to synthesize call to the base method %0 of type %0",
       (ValueDecl *, ValueDecl *))
