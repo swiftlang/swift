@@ -187,12 +187,23 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
               : DescriptiveDeclKind::Struct;
 
    case DeclKind::Class: {
-     bool isActor = cast<ClassDecl>(this)->isActor();
-     return cast<ClassDecl>(this)->getGenericParams()
-                ? (isActor ? DescriptiveDeclKind::GenericActor
-                           : DescriptiveDeclKind::GenericClass)
-                : (isActor ? DescriptiveDeclKind::Actor
-                           : DescriptiveDeclKind::Class);
+     auto clazz = cast<ClassDecl>(this);
+     bool isAnyActor = clazz->isAnyActor();
+     bool isGeneric = clazz->getGenericParams();
+
+     auto kind = isGeneric ? DescriptiveDeclKind::GenericClass
+                           : DescriptiveDeclKind::Class;
+
+     if (isAnyActor) {
+       if (clazz->isDistributedActor()) {
+         kind = isGeneric ? DescriptiveDeclKind::GenericDistributedActor
+                          : DescriptiveDeclKind::DistributedActor;
+       } else {
+         kind = isGeneric ? DescriptiveDeclKind::GenericActor
+                          : DescriptiveDeclKind::Actor;
+       }
+     }
+     return kind;
    }
 
    case DeclKind::Var: {
@@ -332,11 +343,13 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Struct, "struct");
   ENTRY(Class, "class");
   ENTRY(Actor, "actor");
+  ENTRY(DistributedActor, "distributed actor");
   ENTRY(Protocol, "protocol");
   ENTRY(GenericEnum, "generic enum");
   ENTRY(GenericStruct, "generic struct");
   ENTRY(GenericClass, "generic class");
   ENTRY(GenericActor, "generic actor");
+  ENTRY(GenericDistributedActor, "generic distributed actor");
   ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(StaticSubscript, "static subscript");
