@@ -1227,7 +1227,7 @@ void UseState::initializeLiveness(
     auto accessPathWithBase =
         AccessPathWithBase::computeInScope(li->getOperand());
     if (auto *beginAccess =
-            dyn_cast<BeginAccessInst>(accessPathWithBase.base)) {
+            dyn_cast_or_null<BeginAccessInst>(accessPathWithBase.base)) {
       for (auto *endAccess : beginAccess->getEndAccesses()) {
         liveness.updateForUse(endAccess, livenessInstAndValue.second,
                               false /*lifetime ending*/);
@@ -1247,7 +1247,7 @@ void UseState::initializeLiveness(
       auto accessPathWithBase =
           AccessPathWithBase::computeInScope(lbi->getOperand());
       if (auto *beginAccess =
-              dyn_cast<BeginAccessInst>(accessPathWithBase.base)) {
+              dyn_cast_or_null<BeginAccessInst>(accessPathWithBase.base)) {
         for (auto *endAccess : beginAccess->getEndAccesses()) {
           liveness.updateForUse(endAccess, livenessInstAndValue.second,
                                 false /*lifetime ending*/);
@@ -2003,7 +2003,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     // TODO: Make this a we don't understand error.
     assert(accessPath.isValid() && "Invalid access path?!");
 
-    auto *bai = dyn_cast<BeginAccessInst>(accessPathWithBase.base);
+    auto *bai = dyn_cast_or_null<BeginAccessInst>(accessPathWithBase.base);
 
     if (!bai) {
       LLVM_DEBUG(llvm::dbgs()
@@ -3333,7 +3333,7 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
     if (auto *li = dyn_cast<LoadInst>(copyInst.first)) {
       // Convert this to its take form.
       auto accessPath = AccessPathWithBase::computeInScope(li->getOperand());
-      if (auto *access = dyn_cast<BeginAccessInst>(accessPath.base))
+      if (auto *access = dyn_cast_or_null<BeginAccessInst>(accessPath.base))
         access->setAccessKind(SILAccessKind::Modify);
       li->setOwnershipQualifier(LoadOwnershipQualifier::Take);
       changed = true;
@@ -3343,7 +3343,7 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
     if (auto *copy = dyn_cast<CopyAddrInst>(copyInst.first)) {
       // Convert this to its take form.
       auto accessPath = AccessPathWithBase::computeInScope(copy->getSrc());
-      if (auto *access = dyn_cast<BeginAccessInst>(accessPath.base))
+      if (auto *access = dyn_cast_or_null<BeginAccessInst>(accessPath.base))
         access->setAccessKind(SILAccessKind::Modify);
       copy->setIsTakeOfSrc(IsTake);
       continue;
