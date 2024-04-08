@@ -90,6 +90,7 @@
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/DCE.h"
 
 #include <thread>
 
@@ -329,7 +330,14 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
           MPM.addPass(InstrProfiling(options, false));
         });
   }
-
+  if (Opts.shouldOptimize()) {
+    PB.registerPipelineStartEPCallback(
+        [](ModulePassManager &MPM, OptimizationLevel level) {
+          // Run this before SROA to avoid un-neccessary expansion of dead
+          // loads.
+          MPM.addPass(createModuleToFunctionPassAdaptor(DCEPass()));
+        });
+  }
   bool isThinLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Thin;
   bool isFullLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Full;
   if (!Opts.shouldOptimize() || Opts.DisableLLVMOptzns) {
