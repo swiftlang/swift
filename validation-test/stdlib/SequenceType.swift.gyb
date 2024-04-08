@@ -1,7 +1,8 @@
 // -*- swift -*-
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
-
+// rdar://125917150
+// UNSUPPORTED: freestanding
 % import os.path
 % import gyb
 
