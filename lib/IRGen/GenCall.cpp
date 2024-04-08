@@ -31,6 +31,7 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
@@ -3962,6 +3963,26 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
   swiftTI.deallocateStack(IGF, tempAlloc, swiftType);
 }
 
+Address getForwardableAlloca(const TypeInfo &TI, bool isForwardableArgument,
+                             Explosion &in) {
+  if (!isForwardableArgument)
+    return Address();
+
+  auto *load = dyn_cast<llvm::LoadInst>(*in.begin());
+  if (!load)
+    return Address();
+
+  auto *gep = dyn_cast<llvm::GetElementPtrInst>(load->getPointerOperand());
+  if (!gep)
+    return Address();
+
+  auto *alloca = dyn_cast<llvm::AllocaInst>(getUnderlyingObject(gep));
+  if (!alloca)
+    return Address();
+
+  return TI.getAddressForPointer(alloca);
+}
+
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                                  TemporarySet &temporaries,
@@ -4020,6 +4041,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
     SILType paramType = silConv.getSILType(
         params[i - firstParam], IGF.IGM.getMaximalTypeExpansionContext());
+
+    bool isForwardableArgument = IGF.isForwardableArgument(i - firstParam);
 
     // In Swift, values that are foreign references types will always be
     // pointers. Additionally, we only import functions which use foreign
@@ -4082,8 +4105,17 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                          Alignment(ABIAlign.getQuantity()));
         }
       }
-
-      ti.initialize(IGF, in, addr, isOutlined);
+      Address forwardFromAddr = getForwardableAlloca(ti, isForwardableArgument,
+                                                     in);
+      // Try to forward the address from a `load` instruction "immediately"
+      // preceeding the apply.
+      if (isForwardableArgument && forwardFromAddr.isValid()) {
+        ti.initializeWithTake(IGF, addr, forwardFromAddr,
+                              paramType.getAddressType(), isOutlined);
+        (void)in.claim(ti.getSchema().size());
+      } else {
+        ti.initialize(IGF, in, addr, isOutlined);
+      }
 
       out.add(addr.getAddress());
       break;
