@@ -32,6 +32,9 @@ struct ConstructorWithParam {
 struct CopyAndMoveConstructor {
   CopyAndMoveConstructor(const CopyAndMoveConstructor &) = default;
   CopyAndMoveConstructor(CopyAndMoveConstructor &&) = default;
+
+  int value = 123;
+  int *ptr = nullptr;
 };
 
 struct Base {};
