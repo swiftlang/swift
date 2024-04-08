@@ -78,6 +78,19 @@ Protocol SerialExecutor has added inherited protocol Copyable
 Protocol SerialExecutor has added inherited protocol Escapable
 Protocol AsyncSequence is now without @rethrows
 
+// #isolated adoption in with...Continuation
+// api-digester is not aware of silgen_name trickery we do to keep this ABI compatible
+Func withCheckedContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
+Func withCheckedContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, Swift.Never>) -> () to Swift.String
+Func withCheckedThrowingContinuation(function:_:) has been renamed to Func withCheckedThrowingContinuation(isolation:function:_:)
+Func withCheckedThrowingContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedThrowingContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A' to '_Concurrency.withCheckedThrowingContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A'
+Func withCheckedThrowingContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
+Func withCheckedThrowingContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>) -> () to Swift.String
+
+// #isolated was adopted and the old methods kept: $ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF
+Func withCheckedContinuation(function:_:) has been renamed to Func withCheckedContinuation(isolation:function:_:)
+Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency.withCheckedContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
+
 // SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations
 Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 
@@ -87,8 +100,22 @@ Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 // rdar://106833284 (ABI checker confused with overload getting deprecated)
 Func Executor.enqueue(_:) is a new API without @available attribute
 
-// This function correctly inherits its availability from the TaskLocal struct.
-Func TaskLocal.withValueImpl(_:operation:file:line:) is a new API without @available attribute
+// Adopt #isolation in TaskLocal.withValue APIs
+Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValue(_:operation:isolation:file:line:)
+Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, file: Swift.String, line: Swift.UInt) async throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1'
+Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () async throws -> τ_1_0 to () throws -> τ_1_0
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () throws -> τ_1_0 to () async throws -> τ_1_0
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 2 type change from Swift.String to (any _Concurrency.Actor)?
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 3 type change from Swift.UInt to Swift.String
+
+// The method is actually still there: '__abi_next' silgen_name("$sScG4nextxSgyYaF")
+Func TaskGroup.next() has been renamed to Func next(isolation:)
+Func TaskGroup.next() has mangled name changing from 'Swift.TaskGroup.next() async -> Swift.Optional<A>' to 'Swift.TaskGroup.next(isolation: isolated Swift.Optional<Swift.Actor>) async -> Swift.Optional<A>'
+
+// The method is actually still there: '__abi_next' silgen_name("$sScg4nextxSgyYaKF")
+Func ThrowingTaskGroup.next() has been renamed to Func next(isolation:)
+Func ThrowingTaskGroup.next() has mangled name changing from 'Swift.ThrowingTaskGroup.next() async throws -> Swift.Optional<A>' to 'Swift.ThrowingTaskGroup.next(isolation: isolated Swift.Optional<Swift.Actor>) async throws -> Swift.Optional<A>'
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
