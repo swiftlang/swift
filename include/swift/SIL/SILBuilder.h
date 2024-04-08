@@ -262,7 +262,11 @@ public:
   /// scopes. To avoid a verification error later in the pipeline, drop all
   /// variables without a proper source location.
   bool shouldDropVariable(SILDebugVariable Var, SILLocation Loc) {
-    return !Var.ArgNo && Loc.isSynthesizedAST();
+    if (Var.ArgNo)
+      return false;
+    if (Var.Loc)
+      return Var.Loc->isSynthesizedAST();
+    return Loc.isSynthesizedAST();
   }
 
 

@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s | %FileCheck --check-prefix=CHECK-MEM2REG %s
 sil_stage canonical
 
 import Builtin
@@ -51,5 +52,14 @@ bb0(%0 : $Int64, %1 : $Int64):
   store %1 to %15 : $*Int64, loc "sroa.swift":10:17, scope 2
   // CHECK-SROA: store %1 to %[[ALLOC_Y]]
   dealloc_stack %4 : $*MyStruct, loc "sroa.swift":8:9, scope 2
+  // Make sure function arguments' SSA values are properly connected to both source variables
+  // CHECK-MEM2REG: debug_value %0 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9
+  // CHECK-MEM2REG-SAME: type $*MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-MEM2REG: debug_value %0 : $Int64, let, (name "my_copy", loc "sroa.swift":7:10
+  // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-MEM2REG: debug_value %1 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9
+  // CHECK-MEM2REG-SAME: type $*MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-MEM2REG: debug_value %1 : $Int64, let, (name "my_copy", loc "sroa.swift":7:10
+  // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.y
   return %0 : $Int64, loc "sroa.swift":11:5, scope 2
 } // end sil function 'foo'
