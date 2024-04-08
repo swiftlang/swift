@@ -44,7 +44,7 @@ ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial() && getType().isObject())
     return *this;
 
   if (getType().isObject()) {

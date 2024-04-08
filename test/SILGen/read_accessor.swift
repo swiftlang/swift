@@ -152,13 +152,16 @@ struct TestKeyPath {
 //   Key-path getter for TestKeyPath.readable
 // CHECK-LABEL: sil shared [thunk] [ossa] @$s13read_accessor11TestKeyPathV8readableSSvpACTK
 // CHECK:       bb0(%0 : $*String, %1 : $*TestKeyPath):
-// CHECK-NEXT:    [[SELF:%.*]] = load [trivial] %1
+// CHECK-NEXT:    [[TMP:%[^,]+]] = alloc_stack
+// CHECK-NEXT:    copy_addr %1 to [init] [[TMP]]
+// CHECK-NEXT:    [[SELF:%.*]] = load [trivial] [[TMP]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[READ:%.*]] = function_ref @$s13read_accessor11TestKeyPathV8readableSSvr
 // CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READ]]([[SELF]])
 // CHECK-NEXT:    [[COPY:%.*]] = copy_value [[VALUE]]
 // CHECK-NEXT:    end_apply [[TOKEN]]
 // CHECK-NEXT:    store [[COPY]] to [init] %0 : $*String
+// CHECK-NEXT:    dealloc_stack [[TMP]]
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK-LABEL: } // end sil function '$s13read_accessor11TestKeyPathV8readableSSvpACTK'
