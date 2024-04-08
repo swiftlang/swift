@@ -999,8 +999,10 @@ void IsolationHistory::pushRemoveLastElementFromRegion(Element element) {
 
 void IsolationHistory::pushRemoveElementFromRegion(
     Element otherElementInOldRegion, Element element) {
-  head = new (factory->allocator) Node(Node::RemoveElementFromRegion, head,
-                                       element, {otherElementInOldRegion});
+  unsigned size = Node::totalSizeToAlloc<Element>(1);
+  void *mem = factory->allocator.Allocate(size, alignof(Node));
+  head = new (mem) Node(Node::RemoveElementFromRegion, head, element,
+                        {otherElementInOldRegion});
 }
 
 void IsolationHistory::pushMergeElementRegions(Element elementToMergeInto,
@@ -1027,8 +1029,9 @@ void IsolationHistory::pushCFGHistoryJoin(Node *otherNode) {
 
   // Otherwise, create a node that joins our true head and other node as a side
   // path we can follow.
-  head = new (factory->allocator)
-      Node(Node(Node::CFGHistoryJoin, head, otherNode));
+  unsigned size = Node::totalSizeToAlloc<Element>(0);
+  void *mem = factory->allocator.Allocate(size, alignof(Node));
+  head = new (mem) Node(Node(Node::CFGHistoryJoin, head, otherNode));
 }
 
 IsolationHistory::Node *IsolationHistory::pop() {
