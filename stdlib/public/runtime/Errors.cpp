@@ -313,7 +313,8 @@ reportOnCrash(uint32_t flags, const char *message)
     else
       current = ::strdup(message);
   } while (!std::atomic_compare_exchange_strong_explicit(&kFatalErrorMessage,
-                                                         &previous, current,
+                                                         &previous,
+                                                         static_cast<const char *>(current),
                                                          std::memory_order_release,
                                                          SWIFT_MEMORY_ORDER_CONSUME));
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
