@@ -25,6 +25,12 @@ final class NaiveQueueExecutor: TaskExecutor {
     }
   }
 
+  public func apiTest(serialExecutor: any SerialExecutor, _ job: consuming ExecutorJob) {
+    job.runSynchronously(
+      isolatedTo: serialExecutor.asUnownedSerialExecutor(),
+      taskExecutor: self.asUnownedTaskExecutor())
+  }
+
 }
 
 actor ThreaddyTheDefaultActor {
