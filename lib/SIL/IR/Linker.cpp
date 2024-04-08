@@ -102,7 +102,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F,
                                                   bool setToSerializable) {
   SILLinkage linkage = F->getLinkage();
   assert((!setToSerializable || F->hasValidLinkageForFragileRef() ||
-         hasSharedVisibility(linkage) || Mod.getOptions().EmbeddedSwift) &&
+         hasSharedVisibility(linkage) || F->isExternForwardDeclaration()) &&
          "called function has wrong linkage for serialized function");
                                          
   if (!F->isExternalDeclaration()) {
