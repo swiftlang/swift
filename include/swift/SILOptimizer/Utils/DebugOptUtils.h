@@ -48,6 +48,14 @@ inline void deleteAllDebugUses(SILInstruction *inst,
 /// new `debug_value` instruction before \p I is deleted.
 void salvageDebugInfo(SILInstruction *I);
 
+/// Transfer debug info associated with the store-like instruction \p SI to a
+/// new `debug_value` instruction before \p SI is deleted.
+/// \param SI The store instruction being deleted
+/// \param SrcVal The old source, where the debuginfo should be propagated to
+/// \param DestVal The old destination, where the debuginfo was
+void salvageStoreDebugInfo(SILInstruction *SI,
+                           SILValue SrcVal, SILValue DestVal);
+
 /// Transfer debug information associated with the result of \p load to the
 /// load's address operand.
 ///
