@@ -290,7 +290,7 @@ bool AbstractionPattern::isNoncopyable(CanType substTy) const {
     
   auto isDefinitelyCopyable = [&](CanType t) -> bool {
     auto result = copyable->getParentModule()
-      ->checkConformanceWithoutContext(substTy, copyable,
+      ->checkConformanceWithoutContext(t, copyable,
                                        /*allowMissing=*/false);
     return result.has_value() && !result.value().isInvalid();
   };
