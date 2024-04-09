@@ -7636,8 +7636,8 @@ ERROR(copyable_illegal_deinit, none,
       (const ValueDecl *))
 ERROR(inverse_cannot_be_conditional_on_requirement, none,
       "conditional conformance to suppressible %kind0 cannot depend on "
-      "'%1%select{:|:| ==|:| has same shape as}2 %3'",
-      (const ProtocolDecl *, StringRef, unsigned, StringRef))
+      "'%noformat1%select{:|:| ==|:| has same shape as}2 %noformat3'",
+      (const ProtocolDecl *, Type, unsigned, Type))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
       "'%4'-conforming %kind3 has non-%4 type %0",

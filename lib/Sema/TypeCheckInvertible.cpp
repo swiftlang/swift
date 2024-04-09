@@ -154,12 +154,13 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
       // In theory, it could depend on any invertible protocol, but it may be
       // confusing if we permitted that and this simplifies the model a bit.
       for (auto req : condReqs) {
-        std::optional<StringRef> illegalSecondTypeStr;
+        Type illegalSecondType;
 
         // If we are diagnosing, fill-in the second-type string of this req.
         switch (req.getKind()) {
         case RequirementKind::Layout:
-          illegalSecondTypeStr = req.getLayoutConstraint().getString();
+          assert(req.getLayoutConstraint()->isClass());
+          illegalSecondType = ctx.getAnyObjectType();
           break;
         case RequirementKind::Conformance:
           if (req.getProtocolDecl() == thisProto
@@ -169,19 +170,19 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
         case RequirementKind::Superclass:
         case RequirementKind::SameType:
         case RequirementKind::SameShape:
-          illegalSecondTypeStr = req.getSecondType().getString();
+          illegalSecondType = req.getSecondType();
           break;
         }
 
         static_assert((unsigned)RequirementKind::LAST_KIND == 4,
                       "update %select in diagnostic!");
-        if (illegalSecondTypeStr) {
-          ctx.Diags.diagnose(conformanceLoc,
+        if (illegalSecondType) {
+          auto t = ctx.Diags.diagnose(conformanceLoc,
                              diag::inverse_cannot_be_conditional_on_requirement,
                              thisProto,
-                             req.getFirstType().getString(),
+                             req.getFirstType(),
                              static_cast<unsigned>(req.getKind()),
-                             *illegalSecondTypeStr);
+                             illegalSecondType);
         }
       }
     }
