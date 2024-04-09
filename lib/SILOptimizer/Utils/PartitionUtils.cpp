@@ -626,18 +626,8 @@ void Partition::print(llvm::raw_ostream &os) const {
   for (auto [regionNo, elementNumbers] : multimap.getRange()) {
     auto iter = regionToTransferredOpMap.find(regionNo);
     bool isTransferred = iter != regionToTransferredOpMap.end();
-    bool isClosureCaptured = false;
-    if (isTransferred) {
-      isClosureCaptured = llvm::any_of(iter->second->range(),
-                                       [](const TransferringOperand *operand) {
-                                         return operand->isClosureCaptured();
-                                       });
-    }
-
     if (isTransferred) {
       os << '{';
-      if (isClosureCaptured)
-        os << '*';
     } else {
       os << '(';
     }
@@ -647,8 +637,6 @@ void Partition::print(llvm::raw_ostream &os) const {
       os << (j++ ? " " : "") << i;
     }
     if (isTransferred) {
-      if (isClosureCaptured)
-        os << '*';
       os << '}';
     } else {
       os << ')';
@@ -668,19 +656,10 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
   for (auto [regionNo, elementNumbers] : multimap.getRange()) {
     auto iter = regionToTransferredOpMap.find(regionNo);
     bool isTransferred = iter != regionToTransferredOpMap.end();
-    bool isClosureCaptured = false;
-    if (isTransferred) {
-      isClosureCaptured = llvm::any_of(iter->second->range(),
-                                       [](const TransferringOperand *operand) {
-                                         return operand->isClosureCaptured();
-                                       });
-    }
 
     os << "Region: " << regionNo << ". ";
     if (isTransferred) {
       os << '{';
-      if (isClosureCaptured)
-        os << '*';
     } else {
       os << '(';
     }
@@ -690,8 +669,6 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
       os << (j++ ? " " : "") << i;
     }
     if (isTransferred) {
-      if (isClosureCaptured)
-        os << '*';
       os << '}';
     } else {
       os << ')';
@@ -1016,7 +993,8 @@ void IsolationHistory::pushMergeElementRegions(Element elementToMergeInto,
 
 // Push that \p other should be merged into this region.
 void IsolationHistory::pushCFGHistoryJoin(Node *otherNode) {
-  if (!otherNode)
+  // If otherNode is nullptr or represents our same history, do not merge.
+  if (!otherNode || otherNode == head)
     return;
 
   // If we do not have any history, just take on the history of otherNode. We
