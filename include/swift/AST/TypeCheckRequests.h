@@ -3025,7 +3025,7 @@ public:
 
 /// Checks if the Distributed module is available.
 class DistributedModuleIsAvailableRequest
-    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
+    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(const ValueDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3034,7 +3034,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  bool evaluate(Evaluator &evaluator, const ValueDecl *decl) const;
 
 public:
   // Cached.

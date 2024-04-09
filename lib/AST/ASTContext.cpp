@@ -5866,18 +5866,6 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
   assert(parentSig || !constraint->hasTypeParameter() &&
          "Interface type here requires a parent signature");
 
-  // The opened archetype signature for a protocol type is identical
-  // to the protocol's own canonical generic signature if there aren't any
-  // outer generic parameters to worry about.
-  if (parentSig.isNull()) {
-    if (const auto protoTy = dyn_cast<ProtocolType>(constraint)) {
-      return protoTy->getDecl()->getGenericSignature().getCanonicalSignature();
-    }
-  }
-
-  // Otherwise we need to build a generic signature that captures any outer
-  // generic parameters. This ensures that we keep e.g. generic superclass
-  // existentials contained in a well-formed generic context.
   auto canParentSig = parentSig.getCanonicalSignature();
   auto key = std::make_pair(constraint, canParentSig.getPointer());
   auto found = getImpl().ExistentialSignatures.find(key);

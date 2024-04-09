@@ -343,6 +343,8 @@ public:
 
   void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
 
+  void visitSensitiveAttr(SensitiveAttr *attr);
+
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
@@ -448,6 +450,13 @@ void AttributeChecker::visitExtractConstantsFromMembersAttr(ExtractConstantsFrom
   if (!Ctx.LangOpts.hasFeature(Feature::ExtractConstantsFromMembers)) {
     diagnoseAndRemoveAttr(attr,
                           diag::attr_extractConstantsFromMembers_experimental);
+  }
+}
+
+void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Sensitive)) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_sensitive_experimental);
   }
 }
 

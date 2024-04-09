@@ -14,6 +14,13 @@
 
 import Distributed
 
+// ==== Example Distributed Actors ----------------------------------------------
+
+@available(SwiftStdlib 5.7, *)
+public distributed actor FakeRoundtripActorSystemDistributedActor {
+  public typealias ActorSystem = FakeRoundtripActorSystem
+}
+
 // ==== Fake Address -----------------------------------------------------------
 
 public struct ActorAddress: Hashable, Sendable, Codable {

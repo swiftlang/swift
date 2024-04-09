@@ -231,6 +231,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // === Type:
   StructDecl *RCT = C.getRemoteCallTargetDecl();
+  assert(RCT && "Missing RemoteCalLTarget declaration");
   Type remoteCallTargetTy = RCT->getDeclaredInterfaceType();
 
   // === __isRemoteActor(self)

@@ -154,9 +154,8 @@ public func getSubmoduleKlassMemberTBD() -> Int {
 }
 
 // CHECK-LABEL: sil package @$s4Main29getPkgSubmoduleKlassMemberTBDSiyF : $@convention(thin) () -> Int {
-// FIXME: should not contain function_ref/apply
-// CHECK:     function_ref
-// CHECK:     apply
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main29getPkgSubmoduleKlassMemberTBDSiyF'
 package func getPkgSubmoduleKlassMemberTBD() -> Int {
   return ModuleTBD.pkgSubmoduleKlassMember()

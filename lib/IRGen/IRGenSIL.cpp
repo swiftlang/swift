@@ -3704,6 +3704,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       *this, origCalleeType, substCalleeType, calleeLV, selfValue,
       site.getSubstitutionMap(), &witnessMetadata);
 
+  if (site.hasIndirectSILResults()) {
+    emission->setIndirectReturnAddress(getLoweredAddress(site.getIndirectSILResults()[0]));
+  }
+
   emission->begin();
 
   // Lower the arguments and return value in the callee's generic context.
@@ -5422,7 +5426,7 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
     // the lifetime of the alloca.
     IRBuilder::SavedInsertionPointRAII insertRAII(this->Builder, insertPt);
     addrTI.initializeWithTake(*this, dest, forwardAddr, i->getDest()->getType(),
-                              false);
+                              false, /*zeroizeIfSensitive=*/ true);
     (void)source.claimAll();
     return;
   }
@@ -7321,7 +7325,8 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
         Builder.CreateBitCast(ptr, ti.getStorageType()->getPointerTo()));
       if (operand->getType().isAddress()) {
         ti.initializeWithTake(*this, addr, getLoweredAddress(operand),
-                              operand->getType(), false);
+                              operand->getType(), false,
+                              /*zeroizeIfSensitive=*/ true);
       } else {
         Explosion operandValue = getLoweredExplosion(operand);
         cast<LoadableTypeInfo>(ti).initialize(*this, operandValue, addr, false);
@@ -7743,7 +7748,8 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   Address dest = loweredDest.getAnyAddress();
   if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {
-      addrTI.initializeWithTake(*this, dest, src, addrTy, false);
+      addrTI.initializeWithTake(*this, dest, src, addrTy, false,
+                                /*zeroizeIfSensitive=*/ true);
     } else {
       addrTI.initializeWithCopy(*this, dest, src, addrTy, false);
     }
@@ -7766,7 +7772,8 @@ void IRGenSILFunction::visitExplicitCopyAddrInst(
   Address dest = loweredDest.getAnyAddress();
   if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {
-      addrTI.initializeWithTake(*this, dest, src, addrTy, false);
+      addrTI.initializeWithTake(*this, dest, src, addrTy, false,
+                                /*zeroizeIfSensitive=*/ true);
     } else {
       addrTI.initializeWithCopy(*this, dest, src, addrTy, false);
     }
