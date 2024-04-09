@@ -200,7 +200,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          SourceLoc, bool, bool),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
-              bool(ModuleDecl *), Cached, NoLocationInfo)
+              bool(const ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               Type(llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
                    unsigned, TypeResolutionStage),
