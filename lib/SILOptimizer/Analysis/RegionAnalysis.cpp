@@ -3001,6 +3001,8 @@ bool BlockPartitionState::recomputeExitFromEntry(
   exitPartition = workingPartition;
   LLVM_DEBUG(llvm::dbgs() << "    Exit Partition: ";
              exitPartition.print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "    Updated Partition: "
+                          << (exitUpdated ? "yes\n" : "no\n"));
   return exitUpdated;
 }
 
