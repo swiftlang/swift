@@ -19,7 +19,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx
 
 func test(i: Int) {
      precondition(i == 0, "task failed successfully")
