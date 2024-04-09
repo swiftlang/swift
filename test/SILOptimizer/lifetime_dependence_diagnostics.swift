@@ -23,7 +23,29 @@ func bv_copy(_ bv: borrowing BV) -> dependsOn(bv) BV {
 }
 
 struct NCInt: ~Copyable {
-  var value: Int
+  var i: Int
+}
+
+public struct NEInt: ~Escapable {
+  var i: Int
+
+  // Test yielding an address.
+  // CHECK-LABEL: sil hidden @$s4test5NEIntV5ipropSivM : $@yield_once @convention(method) (@inout NEInt) -> @yields @inout Int {
+  // CHECK: bb0(%0 : $*NEInt):
+  // CHECK: [[A:%.*]] = begin_access [modify] [static] %0 : $*NEInt
+  // CHECK: [[E:%.*]] = struct_element_addr [[A]] : $*NEInt, #NEInt.i
+  // CHECK: yield [[E]] : $*Int, resume bb1, unwind bb2
+  // CHECK: end_access [[A]] : $*NEInt
+  // CHECK: end_access [[A]] : $*NEInt
+  // CHECK-LABEL: } // end sil function '$s4test5NEIntV5ipropSivM'
+  var iprop: Int {
+    _read { yield i }
+    _modify { yield &i }
+  }
+
+  init(owner: borrowing NCInt) -> dependsOn(owner) Self {
+    self.i = owner.i
+  }
 }
 
 func takeClosure(_: () -> ()) {}
@@ -56,5 +78,5 @@ func bv_borrow_borrow(bv: borrowing BV) -> dependsOn(scoped bv) BV {
 // because lifetime dependence does not expect a dependence directly on an 'inout' address without any 'begin_access'
 // marker.
 func ncint_capture(ncInt: inout NCInt) {
-  takeClosure { _ = ncInt.value }
+  takeClosure { _ = ncInt.i }
 }
