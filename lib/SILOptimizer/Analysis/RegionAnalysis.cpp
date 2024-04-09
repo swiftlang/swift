@@ -3292,28 +3292,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
       }
 
-      // Then see if the memory base is a ref_element_addr from an address. If
-      // so, add the actor derived flag.
-      //
-      // This is important so we properly handle setters.
-      if (auto *rei = dyn_cast<RefElementAddrInst>(storage.base)) {
-        auto *nomDecl =
-            rei->getOperand()->getType().getNominalOrBoundGenericNominal();
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(rei, nomDecl));
-      }
-
-      // See if the memory base is a global_addr from a global actor protected global.
-      if (auto *ga = dyn_cast<GlobalAddrInst>(storage.base)) {
-        if (auto *global = ga->getReferencedGlobal()) {
-          if (auto *globalDecl = global->getDecl()) {
-            auto isolation = getActorIsolation(globalDecl);
-            if (isolation.isGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getActorIsolated(ga, isolation));
-            }
-          }
-        }
+      if (auto isolation = SILIsolationInfo::get(storage.base)) {
+        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
       }
     }
   }

@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -81,12 +82,37 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  // We assume that any instruction that does not correspond to an ApplyExpr
-  // cannot cross an isolation domain.
+  // See if the memory base is a ref_element_addr from an address. If so, add
+  // the actor derived flag.
+  //
+  // This is important so we properly handle setters.
+  if (auto *rei = dyn_cast<RefElementAddrInst>(inst)) {
+    auto *nomDecl =
+        rei->getOperand()->getType().getNominalOrBoundGenericNominal();
+    return SILIsolationInfo::getActorIsolated(rei, nomDecl);
+  }
+
+  // Check if we have a global_addr inst.
+  if (auto *ga = dyn_cast<GlobalAddrInst>(inst)) {
+    if (auto *global = ga->getReferencedGlobal()) {
+      if (auto *globalDecl = global->getDecl()) {
+        auto isolation = swift::getActorIsolation(globalDecl);
+        if (isolation.isGlobalActor()) {
+          return SILIsolationInfo::getActorIsolated(ga, isolation);
+        }
+      }
+    }
+  }
+
   return SILIsolationInfo();
 }
 
 SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
+  // Transferring is always disconnected.
+  if (!arg->isIndirectResult() && !arg->isIndirectErrorResult() &&
+      arg->isTransferring())
+    return SILIsolationInfo::getDisconnected();
+
   // If we have self and our function is actor isolated, all of our arguments
   // should be marked as actor isolated.
   if (auto *self = arg->getFunction()->maybeGetSelfArgument()) {
