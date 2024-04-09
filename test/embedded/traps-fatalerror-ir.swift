@@ -23,5 +23,7 @@ public func test() {
 
 // CHECK-NOMESSAGE:      define {{.*}}void @"$s4main4testyyF"(){{.*}} {
 // CHECK-NOMESSAGE-NEXT: entry:
+// CHECK-NOMESSAGE-NEXT:   tail call void asm sideeffect "", "n"(i32 0)
+// CHECK-NOMESSAGE-NEXT:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE-NEXT:   unreachable
 // CHECK-NOMESSAGE-NEXT: }
