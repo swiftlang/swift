@@ -7898,7 +7898,7 @@ ERROR(lifetime_dependence_invalid_return_type, none,
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
       "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
  ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
-       "cannot infer lifetime dependence %0, no parameters found that are "
+       "cannot infer lifetime dependence %0, no parameters found that are either "
        "~Escapable or Escapable with a borrowing ownership", (StringRef))
  ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
        "expected nil or self as return values in an initializer with "

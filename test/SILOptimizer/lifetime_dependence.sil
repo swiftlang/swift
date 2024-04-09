@@ -18,7 +18,7 @@ class C {}
 
 struct Nonescapable: ~Escapable {}
 
-sil @c_dependence : $@convention(thin) (@guaranteed C) -> _scope(1) @owned Nonescapable
+sil @c_dependence : $@convention(thin) (@guaranteed C) -> _scope(0) @owned Nonescapable
 
 // Test that SILType.isEscpable does not crash on a generic box when NoncopyableGenerics is enabled.
 sil shared [serialized] [ossa] @testLocalFunc : $@convention(thin) <T, U> (@guaranteed <τ_0_0> { var τ_0_0 } <U>) -> () {
@@ -31,8 +31,8 @@ bb0(%1 : @closureCapture @guaranteed $<τ_0_0> { var τ_0_0 } <U>):
 sil [ossa] @test_mark_dependence_store : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
   %stk = alloc_stack [var_decl] $Nonescapable
-  %f = function_ref @c_dependence : $@convention(thin) (@guaranteed C) -> _scope(1) @owned Nonescapable
-  %c = apply %f(%0) : $@convention(thin) (@guaranteed C) -> _scope(1) @owned Nonescapable
+  %f = function_ref @c_dependence : $@convention(thin) (@guaranteed C) -> _scope(0) @owned Nonescapable
+  %c = apply %f(%0) : $@convention(thin) (@guaranteed C) -> _scope(0) @owned Nonescapable
 
   %md = mark_dependence [nonescaping] %c : $Nonescapable on %0 : $C
   store %md to [init] %stk : $*Nonescapable
