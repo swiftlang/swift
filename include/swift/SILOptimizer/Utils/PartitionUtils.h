@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
@@ -689,7 +690,7 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  llvm::SmallDenseMap<Region, TransferringOperandSet *, 2>
+  llvm::SmallMapVector<Region, TransferringOperandSet *, 2>
       regionToTransferredOpMap;
 
   /// Label each index with a non-negative (unsigned) label if it is associated

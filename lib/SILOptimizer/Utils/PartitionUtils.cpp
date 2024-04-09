@@ -332,15 +332,15 @@ void Partition::markTransferred(Element val,
   // Otherwise, we already have this value in the map. Try to insert it.
   auto iter1 = elementToRegionMap.find(val);
   assert(iter1 != elementToRegionMap.end());
-  auto iter2 = regionToTransferredOpMap.try_emplace(iter1->second,
-                                                    transferredOperandSet);
+  auto iter2 =
+      regionToTransferredOpMap.insert({iter1->second, transferredOperandSet});
 
   // If we did insert, just return. We were not tracking any state.
   if (iter2.second)
     return;
 
   // Otherwise, we need to merge the sets.
-  iter2.first->getSecond() = iter2.first->second->merge(transferredOperandSet);
+  iter2.first->second = iter2.first->second->merge(transferredOperandSet);
 }
 
 bool Partition::undoTransfer(Element val) {
@@ -525,11 +525,11 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
         // mergedRegion is transferred in result.
         auto sndIter = snd.regionToTransferredOpMap.find(sndRegionNumber);
         if (sndIter != snd.regionToTransferredOpMap.end()) {
-          auto resultIter = result.regionToTransferredOpMap.try_emplace(
-              resultRegion, sndIter->second);
+          auto resultIter = result.regionToTransferredOpMap.insert(
+              {resultRegion, sndIter->second});
           if (!resultIter.second) {
-            resultIter.first->getSecond() =
-                resultIter.first->getSecond()->merge(sndIter->second);
+            resultIter.first->second =
+                resultIter.first->second->merge(sndIter->second);
           }
         }
         continue;
@@ -574,11 +574,10 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
     result.pushNewElementRegion(sndEltNumber);
     auto sndIter = snd.regionToTransferredOpMap.find(sndRegionNumber);
     if (sndIter != snd.regionToTransferredOpMap.end()) {
-      auto fstIter = result.regionToTransferredOpMap.try_emplace(
-          sndRegionNumber, sndIter->second);
+      auto fstIter = result.regionToTransferredOpMap.insert(
+          {sndRegionNumber, sndIter->second});
       if (!fstIter.second)
-        fstIter.first->getSecond() =
-            fstIter.first->second->merge(sndIter->second);
+        fstIter.first->second = fstIter.first->second->merge(sndIter->second);
     }
     if (result.fresh_label <= sndRegionNumber)
       result.fresh_label = Region(sndEltNumber + 1);
@@ -629,7 +628,7 @@ void Partition::print(llvm::raw_ostream &os) const {
     bool isTransferred = iter != regionToTransferredOpMap.end();
     bool isClosureCaptured = false;
     if (isTransferred) {
-      isClosureCaptured = llvm::any_of(iter->getSecond()->range(),
+      isClosureCaptured = llvm::any_of(iter->second->range(),
                                        [](const TransferringOperand *operand) {
                                          return operand->isClosureCaptured();
                                        });
@@ -671,7 +670,7 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
     bool isTransferred = iter != regionToTransferredOpMap.end();
     bool isClosureCaptured = false;
     if (isTransferred) {
-      isClosureCaptured = llvm::any_of(iter->getSecond()->range(),
+      isClosureCaptured = llvm::any_of(iter->second->range(),
                                        [](const TransferringOperand *operand) {
                                          return operand->isClosureCaptured();
                                        });
@@ -700,7 +699,7 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
     os << "\n";
     os << "TransferInsts:\n";
     if (isTransferred) {
-      for (auto op : iter->getSecond()->data()) {
+      for (auto op : iter->second->data()) {
         os << "    ";
         op->print(os);
       }
@@ -821,7 +820,7 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
   if (iter != regionToTransferredOpMap.end()) {
     auto operand = iter->second;
     regionToTransferredOpMap.erase(iter);
-    regionToTransferredOpMap.try_emplace(fstRegion, operand);
+    regionToTransferredOpMap.insert({fstRegion, operand});
   }
 
   assert(is_canonical_correct());
