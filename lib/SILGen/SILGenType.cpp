@@ -630,7 +630,12 @@ public:
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerialized = Serialized;
     if (witnessSerialized &&
-        fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+        // If package optimization is enabled, this is false;
+        // witness thunk should get a `shared` linkage in the
+        // else block below.
+        fixmeWitnessHasLinkageThatNeedsToBePublic(
+            witnessRef,
+            witnessRef.getASTContext().SILOpts.EnableSerializePackage)) {
       witnessLinkage = SILLinkage::Public;
       witnessSerialized = IsNotSerialized;
     } else {
