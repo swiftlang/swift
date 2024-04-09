@@ -544,6 +544,10 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
   bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, Decl *D) {
     assert(D);
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (!shouldIndex(VD, /*IsRef*/ true))
+        return true;
+    }
     auto Match = std::find_if(Info.Relations.begin(), Info.Relations.end(),
                               [D](IndexRelation R) { return R.decl == D; });
     if (Match != Info.Relations.end()) {
