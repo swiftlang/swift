@@ -4,6 +4,7 @@
 // REQUIRES: concurrency_runtime
 // REQUIRES: freestanding
 // UNSUPPORTED: threading_none
+// REQUIRES: rdar126145652
 
 @_spi(_TaskToThreadModel) import _Concurrency
 import StdlibUnittest
