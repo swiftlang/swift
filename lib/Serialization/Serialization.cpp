@@ -2552,10 +2552,7 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
 }
 
 void Serializer::writeLifetimeDependenceInfo(
-    LifetimeDependenceInfo lifetimeDependenceInfo, bool skipImplicit) {
-  if (skipImplicit && !lifetimeDependenceInfo.isExplicitlySpecified()) {
-    return;
-  }
+    LifetimeDependenceInfo lifetimeDependenceInfo) {
   using namespace decls_block;
   SmallVector<bool> paramIndices;
   lifetimeDependenceInfo.getConcatenatedData(paramIndices);
@@ -4569,8 +4566,7 @@ public:
     if (fnType) {
       if (auto *lifetimeDependenceInfo =
               fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
-                                      /*skipImplicit*/ true);
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
       }
     }
 
@@ -4697,8 +4693,7 @@ public:
     if (fnType) {
       if (auto *lifetimeDependenceInfo =
               fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
-                                      /*skipImplicit*/ true);
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
       }
     }
 
@@ -4868,8 +4863,7 @@ public:
     if (fnType) {
       if (auto *lifetimeDependenceInfo =
               fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
-                                      /*skipImplicit*/ true);
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
       }
     }
 

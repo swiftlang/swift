@@ -20,17 +20,17 @@ struct BufferView : ~Escapable {
     } 
     self.ptr = ptr
   }
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(2) @owned BufferView {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
   init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> dependsOn(a) Self {
     self.ptr = ptr
     return self
   }
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVYlitcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @thin BufferView.Type) -> _inherit(2) @owned BufferView {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVYlitcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @thin BufferView.Type) -> _inherit(1) @owned BufferView {
   init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper) -> dependsOn(a) Self {
     self.ptr = ptr
     return self
   }
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVYliSaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(2) _scope(3) @owned BufferView {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVYliSaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(1) _scope(2) @owned BufferView {
   init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper, _ b: borrowing Array<Int>) -> dependsOn(a) dependsOn(b) Self {
     self.ptr = ptr
     return self
@@ -56,17 +56,17 @@ func testBasic() {
   }
 }
 
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers6deriveyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers6deriveyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(0) @owned BufferView {
 func derive(_ x: borrowing BufferView) -> dependsOn(scoped x) BufferView {
   return BufferView(x.ptr)
 }
 
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView {
 func consumeAndCreate(_ x: consuming BufferView) -> dependsOn(x) BufferView {
   return BufferView(x.ptr)
 }
 
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat1yAA10BufferViewVADYls_ADYlstF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _scope(1, 2) @owned BufferView {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat1yAA10BufferViewVADYls_ADYlstF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _scope(0, 1) @owned BufferView {
 func deriveThisOrThat1(_ this: borrowing BufferView, _ that: borrowing BufferView) -> dependsOn(scoped this, that) BufferView {
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(this.ptr)
@@ -74,7 +74,7 @@ func deriveThisOrThat1(_ this: borrowing BufferView, _ that: borrowing BufferVie
   return BufferView(that.ptr)
 }
 
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVADYls_ADnYlitF : $@convention(thin) (@guaranteed BufferView, @owned BufferView) -> _inherit(2) _scope(1) @owned BufferView {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVADYls_ADnYlitF : $@convention(thin) (@guaranteed BufferView, @owned BufferView) -> _inherit(1) _scope(0) @owned BufferView {
 func deriveThisOrThat2(_ this: borrowing BufferView, _ that: consuming BufferView) -> dependsOn(scoped this) dependsOn(that) BufferView {
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(this.ptr)
@@ -108,12 +108,12 @@ struct Container : ~Escapable {
  }
 }
 
-// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getConsumingViewyAA06BufferG0VAA9ContainerVnYliF : $@convention(thin) (@owned Container) -> _inherit(1) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getConsumingViewyAA06BufferG0VAA9ContainerVnYliF : $@convention(thin) (@owned Container) -> _inherit(0) @owned BufferView {
 func getConsumingView(_ x: consuming Container) -> dependsOn(x) BufferView {
   return BufferView(x.ptr)
 }
 
-// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getBorrowingViewyAA06BufferG0VAA9ContainerVYlsF : $@convention(thin) (@guaranteed Container) -> _scope(1) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getBorrowingViewyAA06BufferG0VAA9ContainerVYlsF : $@convention(thin) (@guaranteed Container) -> _scope(0) @owned BufferView {
 func getBorrowingView(_ x: borrowing Container) -> dependsOn(scoped x) BufferView {
   return BufferView(x.ptr)
 }

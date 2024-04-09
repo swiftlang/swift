@@ -12,17 +12,17 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
     self.c = c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChYlicfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _inherit(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChYlicfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _inherit(0) @owned BufferView {
   init(_ otherBV: borrowing BufferView) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2CYlicfC : $@convention(method) (@owned BufferView, @thin BufferView.Type) -> _inherit(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2CYlicfC : $@convention(method) (@owned BufferView, @thin BufferView.Type) -> _inherit(0) @owned BufferView {
   init(_ otherBV: consuming BufferView) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(2) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
   init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
     self.ptr = ptr
     self.c = a.count
@@ -49,7 +49,7 @@ func testBasic() {
   }
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(0) @owned BufferView {
 func derive(_ x: borrowing BufferView) -> BufferView {
   return BufferView(x.ptr, x.c)
 }
@@ -58,7 +58,7 @@ func derive(_ unused: Int, _ x: borrowing BufferView) -> BufferView {
   return BufferView(x.ptr, x.c)
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView {
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView {
   return BufferView(x.ptr, x.c)
 }
@@ -77,7 +77,7 @@ struct Wrapper : ~Escapable {
       yield &_view
     }
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperVyAcA10BufferViewVYlicfC : $@convention(method) (@owned BufferView, @thin Wrapper.Type) -> _inherit(1) @owned Wrapper {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperVyAcA10BufferViewVYlicfC : $@convention(method) (@owned BufferView, @thin Wrapper.Type) -> _inherit(0) @owned Wrapper {
   init(_ view: consuming BufferView) {
     self._view = view
   }
@@ -128,7 +128,7 @@ struct GenericBufferView<Element> : ~Escapable {
   let baseAddress: Pointer
   let count: Int
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5count9dependsOnACyxGSV_Siqd__hYlstclufC : $@convention(method) <Element><Storage> (UnsafeRawPointer, Int, @in_guaranteed Storage, @thin GenericBufferView<Element>.Type) -> _scope(3) @owned GenericBufferView<Element> {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5count9dependsOnACyxGSV_Siqd__hYlstclufC : $@convention(method) <Element><Storage> (UnsafeRawPointer, Int, @in_guaranteed Storage, @thin GenericBufferView<Element>.Type) -> _scope(2) @owned GenericBufferView<Element> {
   init<Storage>(baseAddress: Pointer,
                 count: Int,
                 dependsOn: borrowing Storage) {
@@ -152,7 +152,7 @@ struct GenericBufferView<Element> : ~Escapable {
       }
     }
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> _inherit(0) @owned GenericBufferView<Element> {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> _inherit(1) @owned GenericBufferView<Element> {
   subscript(bounds: FakeRange<Pointer>) -> Self {
     get {
       GenericBufferView(
@@ -163,7 +163,7 @@ struct GenericBufferView<Element> : ~Escapable {
   }
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(1) (@owned BufferView, @owned BufferView) {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(0) (@owned BufferView, @owned BufferView) {
 func tupleLifetimeDependence(_ x: borrowing BufferView) -> (BufferView, BufferView) {
   return (BufferView(x.ptr, x.c), BufferView(x.ptr, x.c))
 }
