@@ -291,7 +291,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       if (isOutlined || T.hasLocalArchetype()) {
         Address destValue = projectValue(IGF, dest);
         Address srcValue = projectValue(IGF, src);
@@ -976,7 +977,8 @@ public:
   }
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
     if (isOutlined || T.hasLocalArchetype()) {
       // memcpy the existential container. This is safe because: either the
       // value is stored inline and is therefore by convention bitwise takable

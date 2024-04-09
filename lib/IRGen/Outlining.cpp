@@ -402,7 +402,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
          const TypeInfo &ti) {
         if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
-          ti.initializeWithTake(IGF, dest, src, T, true);
+          ti.initializeWithTake(IGF, dest, src, T, true, /*zeroizeIfSensitive=*/ true);
         } else {
           emitInitializeWithTakeCall(IGF, T, dest, src);
         }

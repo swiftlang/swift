@@ -90,7 +90,7 @@ void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
 void TypeInfo::initialize(IRGenFunction &IGF, Address dest, Address src,
                           IsTake_t isTake, SILType T, bool isOutlined) const {
   if (isTake) {
-    initializeWithTake(IGF, dest, src, T, isOutlined);
+    initializeWithTake(IGF, dest, src, T, isOutlined, /*zeroizeIfSensitive=*/ true);
   } else {
     initializeWithCopy(IGF, dest, src, T, isOutlined);
   }
@@ -149,7 +149,8 @@ TypeInfo::nativeParameterValueSchema(IRGenModule &IGM) const {
 /// move-initialization, except the old object will not be destroyed.
 void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF, Address destAddr,
                                        Address srcAddr, SILType T,
-                                       bool isOutlined) const {
+                                       bool isOutlined,
+                                       bool zeroizeIfSensitive) const {
   assert(isBitwiseTakable(ResilienceExpansion::Maximal)
         && "non-bitwise-takable type must override default initializeWithTake");
   
@@ -175,7 +176,8 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                           bool isOutlined) const {
   // Use memcpy if that's legal.
   if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
-    return initializeWithTake(IGF, destAddr, srcAddr, T, isOutlined);
+    return initializeWithTake(IGF, destAddr, srcAddr, T, isOutlined,
+                              /*zeroizeIfSensitive=*/ false);
   }
 
   // Otherwise explode and re-implode.
@@ -1297,7 +1299,8 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr, SILType T,
-                            bool isOutlined) const override {
+                            bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 

@@ -104,7 +104,8 @@ public:
   }
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
     emitInitializeWithTakeCall(IGF, T, dest, src);
   }
 
