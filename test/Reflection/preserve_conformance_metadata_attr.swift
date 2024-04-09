@@ -10,6 +10,8 @@
 
 // RUN: %target-swift-reflection-dump %t/PreservedConformances | %FileCheck %s
 
+// REQUIRES: rdar125919025
+
 import PreservedConformanceProtocols
 
 struct internalTestEntity : TestEntity {
