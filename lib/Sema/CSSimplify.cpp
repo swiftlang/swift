@@ -10256,13 +10256,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                 if (req.getKind() != RequirementKind::Conformance)
                   return false;
 
-                if (auto protocolTy =
-                        req.getSecondType()->template getAs<ProtocolType>()) {
-                  return req.getFirstType()->hasTypeVariable() &&
-                         protocolTy->getDecl()->isSpecificProtocol(
-                             KnownProtocolKind::Sendable);
-                }
-                return false;
+                return (req.getFirstType()->hasTypeVariable() &&
+                        req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::Sendable));
               })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
