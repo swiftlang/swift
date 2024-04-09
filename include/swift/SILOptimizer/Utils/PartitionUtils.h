@@ -209,6 +209,14 @@ public:
   /// Attempt to infer the isolation region info for \p arg.
   static SILIsolationInfo get(SILFunctionArgument *arg);
 
+  static SILIsolationInfo get(SILValue value) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(value))
+      return get(fArg);
+    if (auto *inst = dyn_cast<SingleValueInstruction>(value))
+      return get(inst);
+    return {};
+  }
+
   bool hasSameIsolation(ActorIsolation actorIsolation) const;
 
   /// Returns true if \p this and \p other have the same isolation. It allows
