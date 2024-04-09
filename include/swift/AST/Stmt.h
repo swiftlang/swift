@@ -654,9 +654,7 @@ public:
     return Condition.dyn_cast<ConditionalPatternBindingInfo *>();
   }
 
-  Expr *getExprOrNull() const {
-    return Condition.dyn_cast<Expr *>();
-  }
+  Expr *getExprOrNull() const { return Condition.dyn_cast<Expr *>(); }
 
   ConditionalPatternBindingInfo *getPatternBinding() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");

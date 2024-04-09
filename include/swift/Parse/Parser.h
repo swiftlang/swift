@@ -1962,7 +1962,7 @@ public:
   /// this parameter is \c true, the function returns \c false such that an
   /// expression can be parsed.
   bool isStartOfStmt(bool preferExpr);
-  
+
   bool isStartOfConditionalStmtBody();
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
@@ -1978,8 +1978,11 @@ public:
   ParserResult<Stmt> parseStmtDiscard();
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus
-  parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result, Diag<> DefaultID, StmtKind ParentKind, StringRef &BindingKindStr);
-  ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID, StmtKind ParentKind);
+  parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
+                            Diag<> DefaultID, StmtKind ParentKind,
+                            StringRef &BindingKindStr);
+  ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
+                                  StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
   ParserResult<PoundHasSymbolInfo> parseStmtConditionPoundHasSymbol();
   ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo,

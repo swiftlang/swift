@@ -208,282 +208,290 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
   // Parse the parameter list.
   bool isClosure = paramContext == ParameterContextKind::Closure;
-  return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
-                      /*AllowSepAfterLast=*/Context.LangOpts.hasFeature(Feature::TrailingComma),
-                      diag::expected_rparen_parameter,
-                      [&]() -> ParserStatus {
-    ParsedParameter param;
-    ParserStatus status;
-    SourceLoc StartLoc = Tok.getLoc();
+  return parseList(
+      tok::r_paren, leftParenLoc, rightParenLoc,
+      /*AllowSepAfterLast=*/Context.LangOpts.hasFeature(Feature::TrailingComma),
+      diag::expected_rparen_parameter, [&]() -> ParserStatus {
+        ParsedParameter param;
+        ParserStatus status;
+        SourceLoc StartLoc = Tok.getLoc();
 
-    unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
+        unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
 
-    // Attributes.
-    if (paramContext != ParameterContextKind::EnumElement) {
-      auto AttrStatus = parseDeclAttributeList(param.Attrs);
-      if (AttrStatus.hasCodeCompletion()) {
-        if (this->CodeCompletionCallbacks)
-          this->CodeCompletionCallbacks->setAttrTargetDeclKind(DeclKind::Param);
-        status.setHasCodeCompletionAndIsError();
-      }
-    }
-
-    {
-      // ('inout' | '__shared' | '__owned' | isolated)?
-      bool hasSpecifier = false;
-      while (isParameterSpecifier()) {
-        // is this token the identifier of an argument label? `inout` is a
-        // reserved keyword but the other modifiers are not.
-        if (!Tok.is(tok::kw_inout)) {
-          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
-            if (Tok.is(tok::colon))
-              return true;  // isolated :
-
-            return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
-          });
-
-          if (partOfArgumentLabel)
-            break;
-        }
-        
-        if (Tok.isContextualKeyword("isolated")) {
-          // did we already find an 'isolated' type modifier?
-          if (param.IsolatedLoc.isValid()) {
-            diagnose(Tok, diag::parameter_specifier_repeated)
-              .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
+        // Attributes.
+        if (paramContext != ParameterContextKind::EnumElement) {
+          auto AttrStatus = parseDeclAttributeList(param.Attrs);
+          if (AttrStatus.hasCodeCompletion()) {
+            if (this->CodeCompletionCallbacks)
+              this->CodeCompletionCallbacks->setAttrTargetDeclKind(
+                  DeclKind::Param);
+            status.setHasCodeCompletionAndIsError();
           }
-
-          // consume 'isolated' as type modifier
-          param.IsolatedLoc = consumeToken();
-          continue;
         }
 
-        if (Tok.isContextualKeyword("_const")) {
-          param.CompileConstLoc = consumeToken();
-          continue;
-        }
+        {
+          // ('inout' | '__shared' | '__owned' | isolated)?
+          bool hasSpecifier = false;
+          while (isParameterSpecifier()) {
+            // is this token the identifier of an argument label? `inout` is a
+            // reserved keyword but the other modifiers are not.
+            if (!Tok.is(tok::kw_inout)) {
+              bool partOfArgumentLabel =
+                  lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+                    if (Tok.is(tok::colon))
+                      return true; // isolated :
 
-        if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
-            Tok.isContextualKeyword("transferring")) {
-          if (param.TransferringLoc.isValid()) {
-            diagnose(Tok, diag::parameter_specifier_repeated)
-                .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
-          }
+                    return Tok.canBeArgumentLabel() &&
+                           peekToken().is(tok::colon);
+                  });
 
-          param.TransferringLoc = consumeToken();
-          continue;
-        }
+              if (partOfArgumentLabel)
+                break;
+            }
 
-        if (!hasSpecifier) {
-          // These cases are handled later when mapping to ParamDecls for
-          // better fixits.
-          if (Tok.is(tok::kw_inout)) {
-            param.SpecifierKind = ParamDecl::Specifier::InOut;
-            param.SpecifierLoc = consumeToken();
-          } else if (Tok.isContextualKeyword("borrowing")) {
-            param.SpecifierKind = ParamDecl::Specifier::Borrowing;
-            param.SpecifierLoc = consumeToken();
-          } else if (Tok.isContextualKeyword("consuming")) {
-            param.SpecifierKind = ParamDecl::Specifier::Consuming;
-            param.SpecifierLoc = consumeToken();
-          } else if (Tok.isContextualKeyword("__shared")) {
-            param.SpecifierKind = ParamDecl::Specifier::LegacyShared;
-            param.SpecifierLoc = consumeToken();
-          } else if (Tok.isContextualKeyword("__owned")) {
-            param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
-            param.SpecifierLoc = consumeToken();
-          }
+            if (Tok.isContextualKeyword("isolated")) {
+              // did we already find an 'isolated' type modifier?
+              if (param.IsolatedLoc.isValid()) {
+                diagnose(Tok, diag::parameter_specifier_repeated)
+                    .fixItRemove(Tok.getLoc());
+                consumeToken();
+                continue;
+              }
 
-          hasSpecifier = true;
-        } else {
-          // Redundant specifiers are fairly common, recognize, reject, and
-          // recover from this gracefully.
-          diagnose(Tok, diag::parameter_specifier_repeated)
-            .fixItRemove(Tok.getLoc());
-          consumeToken();
-        }
-      }
-    }
-    
-    // If let or var is being used as an argument label, allow it but
-    // generate a warning.
-    if (!isClosure &&
-        (Tok.isAny(tok::kw_let, tok::kw_var) ||
-         (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
-          Tok.isAny(tok::kw_inout)))) {
-      diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
-        .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
-    }
+              // consume 'isolated' as type modifier
+              param.IsolatedLoc = consumeToken();
+              continue;
+            }
 
-    if (startsParameterName(isClosure)) {
-      // identifier-or-none for the first name
-      param.FirstNameLoc = consumeArgumentLabel(param.FirstName,
-                                                /*diagnoseDollarPrefix=*/!isClosure);
+            if (Tok.isContextualKeyword("_const")) {
+              param.CompileConstLoc = consumeToken();
+              continue;
+            }
 
-      // identifier-or-none? for the second name
-      if (Tok.canBeArgumentLabel())
-        param.SecondNameLoc = consumeArgumentLabel(param.SecondName,
-                                                   /*diagnoseDollarPrefix=*/true);
+            if (Context.LangOpts.hasFeature(
+                    Feature::TransferringArgsAndResults) &&
+                Tok.isContextualKeyword("transferring")) {
+              if (param.TransferringLoc.isValid()) {
+                diagnose(Tok, diag::parameter_specifier_repeated)
+                    .fixItRemove(Tok.getLoc());
+                consumeToken();
+                continue;
+              }
 
-      // Operators, closures, and enum elements cannot have API names.
-      if ((paramContext == ParameterContextKind::Operator ||
-           paramContext == ParameterContextKind::Closure ||
-           paramContext == ParameterContextKind::EnumElement) &&
-          !param.FirstName.empty() &&
-          param.SecondNameLoc.isValid()) {
-        enum KeywordArgumentDiagnosticContextKind {
-          Operator    = 0,
-          Closure     = 1,
-          EnumElement = 2,
-        } diagContextKind;
+              param.TransferringLoc = consumeToken();
+              continue;
+            }
 
-        switch (paramContext) {
-        case ParameterContextKind::Operator:
-          diagContextKind = Operator;
-          break;
-        case ParameterContextKind::Closure:
-          diagContextKind = Closure;
-          break;
-        case ParameterContextKind::EnumElement:
-          diagContextKind = EnumElement;
-          break;
-        default:
-          llvm_unreachable("Unhandled parameter context kind!");
-        }
-        diagnose(param.FirstNameLoc, diag::parameter_operator_keyword_argument,
-                 unsigned(diagContextKind))
-          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
-        param.FirstName = param.SecondName;
-        param.FirstNameLoc = param.SecondNameLoc;
-        param.SecondName = Identifier();
-        param.SecondNameLoc = SourceLoc();
-      }
+            if (!hasSpecifier) {
+              // These cases are handled later when mapping to ParamDecls for
+              // better fixits.
+              if (Tok.is(tok::kw_inout)) {
+                param.SpecifierKind = ParamDecl::Specifier::InOut;
+                param.SpecifierLoc = consumeToken();
+              } else if (Tok.isContextualKeyword("borrowing")) {
+                param.SpecifierKind = ParamDecl::Specifier::Borrowing;
+                param.SpecifierLoc = consumeToken();
+              } else if (Tok.isContextualKeyword("consuming")) {
+                param.SpecifierKind = ParamDecl::Specifier::Consuming;
+                param.SpecifierLoc = consumeToken();
+              } else if (Tok.isContextualKeyword("__shared")) {
+                param.SpecifierKind = ParamDecl::Specifier::LegacyShared;
+                param.SpecifierLoc = consumeToken();
+              } else if (Tok.isContextualKeyword("__owned")) {
+                param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
+                param.SpecifierLoc = consumeToken();
+              }
 
-      // (':' type)?
-      if (consumeIf(tok::colon)) {
-
-        auto type = parseType(diag::expected_parameter_type);
-        status |= type;
-        param.Type = type.getPtrOrNull();
-
-        // If we didn't parse a type, then we already diagnosed that the type
-        // was invalid.  Remember that.
-        if (type.isNull() && !type.hasCodeCompletion())
-          param.isInvalid = true;
-      } else if (paramContext != Parser::ParameterContextKind::Closure) {
-        diagnose(Tok, diag::expected_parameter_colon);
-        param.isInvalid = true;
-      }
-    } else {
-      // Otherwise, we have invalid code.  Check to see if this looks like a
-      // type.  If so, diagnose it as a common error.
-      bool isBareType = false;
-      {
-        BacktrackingScope backtrack(*this);
-        isBareType = canParseType() && Tok.isAny(tok::comma, tok::r_paren,
-                                                 tok::equal);
-      }
-
-      if (isBareType && paramContext == ParameterContextKind::EnumElement) {
-        auto type = parseType(diag::expected_parameter_type);
-        status |= type;
-        param.Type = type.getPtrOrNull();
-        param.FirstName = Identifier();
-        param.FirstNameLoc = SourceLoc();
-        param.SecondName = Identifier();
-        param.SecondNameLoc = SourceLoc();
-      } else if (isBareType && !Tok.is(tok::code_complete)) {
-        // Otherwise, if this is a bare type, then the user forgot to name the
-        // parameter, e.g. "func foo(Int) {}"
-        // Don't enter this case if the element could only be parsed as a bare
-        // type because a code completion token is positioned here. In this case
-        // the user is about to type the parameter label and we shouldn't
-        // suggest types.
-        SourceLoc typeStartLoc = Tok.getLoc();
-        auto type = parseType(diag::expected_parameter_type);
-        status |= type;
-        param.Type = type.getPtrOrNull();
-
-        // If this is a closure declaration, what is going
-        // on is most likely argument destructuring, we are going
-        // to diagnose that after all of the parameters are parsed.
-        if (param.Type) {
-          // Mark current parameter type as invalid so it is possible
-          // to diagnose it as destructuring of the closure parameter list.
-          param.isPotentiallyDestructured = true;
-          if (!isClosure) {
-            // Unnamed parameters must be written as "_: Type".
-            diagnose(typeStartLoc, diag::parameter_unnamed)
-                .fixItInsert(typeStartLoc, "_: ");
-          } else {
-            // Unnamed parameters were accidentally possibly accepted after
-            // SE-110 depending on the kind of declaration.  We now need to
-            // warn about the misuse of this syntax and offer to
-            // fix it.
-            // An exception to this rule is when the type is declared with type sugar
-            // Reference: https://github.com/apple/swift/issues/54133
-            if (isa<OptionalTypeRepr>(param.Type)
-                || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
-                diagnose(typeStartLoc, diag::parameter_unnamed)
-                    .fixItInsert(typeStartLoc, "_: ");
+              hasSpecifier = true;
             } else {
-                diagnose(typeStartLoc, diag::parameter_unnamed)
-                    .warnUntilSwiftVersion(6)
-                    .fixItInsert(typeStartLoc, "_: ");
+              // Redundant specifiers are fairly common, recognize, reject, and
+              // recover from this gracefully.
+              diagnose(Tok, diag::parameter_specifier_repeated)
+                  .fixItRemove(Tok.getLoc());
+              consumeToken();
             }
           }
         }
-      } else {
-        // Otherwise, we're not sure what is going on, but this doesn't smell
-        // like a parameter.
-        diagnose(Tok, diag::expected_parameter_name);
-        param.isInvalid = true;
-        param.FirstNameLoc = Tok.getLoc();
-        TokReceiver->registerTokenKindChange(param.FirstNameLoc,
-                                             tok::identifier);
-        status.setIsParseError();
-      }
-    }
 
-    // If this parameter had an ellipsis, check it has a TypeRepr.
-    if (Tok.isEllipsis()) {
-      if (param.Type == nullptr && !param.isInvalid) {
-        diagnose(Tok, diag::untyped_pattern_ellipsis);
-        consumeToken();
-      }
-    }
+        // If let or var is being used as an argument label, allow it but
+        // generate a warning.
+        if (!isClosure &&
+            (Tok.isAny(tok::kw_let, tok::kw_var) ||
+             (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
+              Tok.isAny(tok::kw_inout)))) {
+          diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
+              .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
+        }
 
-    // ('=' expr) or ('==' expr)?
-    bool isEqualBinaryOperator =
-        Tok.isBinaryOperator() && Tok.getText() == "==";
-    if (Tok.is(tok::equal) || isEqualBinaryOperator) {
-      SourceLoc EqualLoc = Tok.getLoc();
+        if (startsParameterName(isClosure)) {
+          // identifier-or-none for the first name
+          param.FirstNameLoc =
+              consumeArgumentLabel(param.FirstName,
+                                   /*diagnoseDollarPrefix=*/!isClosure);
 
-      if (isEqualBinaryOperator) {
-        diagnose(Tok, diag::expected_assignment_instead_of_comparison_operator)
-            .fixItReplace(EqualLoc, "=");
-      }
+          // identifier-or-none? for the second name
+          if (Tok.canBeArgumentLabel())
+            param.SecondNameLoc =
+                consumeArgumentLabel(param.SecondName,
+                                     /*diagnoseDollarPrefix=*/true);
 
-      status |= parseDefaultArgument(
-          *this, defaultArgs, defaultArgIndex, param.DefaultArg,
-          param.hasInheritedDefaultArg, paramContext);
-    }
+          // Operators, closures, and enum elements cannot have API names.
+          if ((paramContext == ParameterContextKind::Operator ||
+               paramContext == ParameterContextKind::Closure ||
+               paramContext == ParameterContextKind::EnumElement) &&
+              !param.FirstName.empty() && param.SecondNameLoc.isValid()) {
+            enum KeywordArgumentDiagnosticContextKind {
+              Operator = 0,
+              Closure = 1,
+              EnumElement = 2,
+            } diagContextKind;
 
-    // If we haven't made progress, don't add the parameter.
-    if (Tok.getLoc() == StartLoc) {
-      // If we took a default argument index for this parameter, but didn't add
-      // one, then give it back.
-      if (defaultArgs) --defaultArgs->NextIndex;
-      return status;
-    }
+            switch (paramContext) {
+            case ParameterContextKind::Operator:
+              diagContextKind = Operator;
+              break;
+            case ParameterContextKind::Closure:
+              diagContextKind = Closure;
+              break;
+            case ParameterContextKind::EnumElement:
+              diagContextKind = EnumElement;
+              break;
+            default:
+              llvm_unreachable("Unhandled parameter context kind!");
+            }
+            diagnose(param.FirstNameLoc,
+                     diag::parameter_operator_keyword_argument,
+                     unsigned(diagContextKind))
+                .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
+            param.FirstName = param.SecondName;
+            param.FirstNameLoc = param.SecondNameLoc;
+            param.SecondName = Identifier();
+            param.SecondNameLoc = SourceLoc();
+          }
 
-    params.push_back(param);
-    return status;
-  });
+          // (':' type)?
+          if (consumeIf(tok::colon)) {
+
+            auto type = parseType(diag::expected_parameter_type);
+            status |= type;
+            param.Type = type.getPtrOrNull();
+
+            // If we didn't parse a type, then we already diagnosed that the
+            // type was invalid.  Remember that.
+            if (type.isNull() && !type.hasCodeCompletion())
+              param.isInvalid = true;
+          } else if (paramContext != Parser::ParameterContextKind::Closure) {
+            diagnose(Tok, diag::expected_parameter_colon);
+            param.isInvalid = true;
+          }
+        } else {
+          // Otherwise, we have invalid code.  Check to see if this looks like a
+          // type.  If so, diagnose it as a common error.
+          bool isBareType = false;
+          {
+            BacktrackingScope backtrack(*this);
+            isBareType = canParseType() &&
+                         Tok.isAny(tok::comma, tok::r_paren, tok::equal);
+          }
+
+          if (isBareType && paramContext == ParameterContextKind::EnumElement) {
+            auto type = parseType(diag::expected_parameter_type);
+            status |= type;
+            param.Type = type.getPtrOrNull();
+            param.FirstName = Identifier();
+            param.FirstNameLoc = SourceLoc();
+            param.SecondName = Identifier();
+            param.SecondNameLoc = SourceLoc();
+          } else if (isBareType && !Tok.is(tok::code_complete)) {
+            // Otherwise, if this is a bare type, then the user forgot to name
+            // the parameter, e.g. "func foo(Int) {}" Don't enter this case if
+            // the element could only be parsed as a bare type because a code
+            // completion token is positioned here. In this case the user is
+            // about to type the parameter label and we shouldn't suggest types.
+            SourceLoc typeStartLoc = Tok.getLoc();
+            auto type = parseType(diag::expected_parameter_type);
+            status |= type;
+            param.Type = type.getPtrOrNull();
+
+            // If this is a closure declaration, what is going
+            // on is most likely argument destructuring, we are going
+            // to diagnose that after all of the parameters are parsed.
+            if (param.Type) {
+              // Mark current parameter type as invalid so it is possible
+              // to diagnose it as destructuring of the closure parameter list.
+              param.isPotentiallyDestructured = true;
+              if (!isClosure) {
+                // Unnamed parameters must be written as "_: Type".
+                diagnose(typeStartLoc, diag::parameter_unnamed)
+                    .fixItInsert(typeStartLoc, "_: ");
+              } else {
+                // Unnamed parameters were accidentally possibly accepted after
+                // SE-110 depending on the kind of declaration.  We now need to
+                // warn about the misuse of this syntax and offer to
+                // fix it.
+                // An exception to this rule is when the type is declared with
+                // type sugar Reference:
+                // https://github.com/apple/swift/issues/54133
+                if (isa<OptionalTypeRepr>(param.Type) ||
+                    isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
+                  diagnose(typeStartLoc, diag::parameter_unnamed)
+                      .fixItInsert(typeStartLoc, "_: ");
+                } else {
+                  diagnose(typeStartLoc, diag::parameter_unnamed)
+                      .warnUntilSwiftVersion(6)
+                      .fixItInsert(typeStartLoc, "_: ");
+                }
+              }
+            }
+          } else {
+            // Otherwise, we're not sure what is going on, but this doesn't
+            // smell like a parameter.
+            diagnose(Tok, diag::expected_parameter_name);
+            param.isInvalid = true;
+            param.FirstNameLoc = Tok.getLoc();
+            TokReceiver->registerTokenKindChange(param.FirstNameLoc,
+                                                 tok::identifier);
+            status.setIsParseError();
+          }
+        }
+
+        // If this parameter had an ellipsis, check it has a TypeRepr.
+        if (Tok.isEllipsis()) {
+          if (param.Type == nullptr && !param.isInvalid) {
+            diagnose(Tok, diag::untyped_pattern_ellipsis);
+            consumeToken();
+          }
+        }
+
+        // ('=' expr) or ('==' expr)?
+        bool isEqualBinaryOperator =
+            Tok.isBinaryOperator() && Tok.getText() == "==";
+        if (Tok.is(tok::equal) || isEqualBinaryOperator) {
+          SourceLoc EqualLoc = Tok.getLoc();
+
+          if (isEqualBinaryOperator) {
+            diagnose(Tok,
+                     diag::expected_assignment_instead_of_comparison_operator)
+                .fixItReplace(EqualLoc, "=");
+          }
+
+          status |= parseDefaultArgument(
+              *this, defaultArgs, defaultArgIndex, param.DefaultArg,
+              param.hasInheritedDefaultArg, paramContext);
+        }
+
+        // If we haven't made progress, don't add the parameter.
+        if (Tok.getLoc() == StartLoc) {
+          // If we took a default argument index for this parameter, but didn't
+          // add one, then give it back.
+          if (defaultArgs)
+            --defaultArgs->NextIndex;
+          return status;
+        }
+
+        params.push_back(param);
+        return status;
+      });
 }
 
 static TypeRepr *
@@ -1253,24 +1261,23 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
-  ParserStatus ListStatus =
-    parseList(tok::r_paren, LPLoc, RPLoc,
-              /*AllowSepAfterLast=*/Context.LangOpts.hasFeature(Feature::TrailingComma),
-              diag::expected_rparen_tuple_pattern_list,
-              [&] () -> ParserStatus {
-    // Parse the pattern tuple element.
-    ParserStatus EltStatus;
-    std::optional<TuplePatternElt> elt;
-    std::tie(EltStatus, elt) = parsePatternTupleElement();
-    if (EltStatus.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    if (!elt)
-      return makeParserError();
+  ParserStatus ListStatus = parseList(
+      tok::r_paren, LPLoc, RPLoc,
+      /*AllowSepAfterLast=*/Context.LangOpts.hasFeature(Feature::TrailingComma),
+      diag::expected_rparen_tuple_pattern_list, [&]() -> ParserStatus {
+        // Parse the pattern tuple element.
+        ParserStatus EltStatus;
+        std::optional<TuplePatternElt> elt;
+        std::tie(EltStatus, elt) = parsePatternTupleElement();
+        if (EltStatus.hasCodeCompletion())
+          return makeParserCodeCompletionStatus();
+        if (!elt)
+          return makeParserError();
 
-    // Add this element to the list.
-    elts.push_back(*elt);
-    return makeParserSuccess();
-  });
+        // Add this element to the list.
+        elts.push_back(*elt);
+        return makeParserSuccess();
+      });
 
   return makeParserResult(
            ListStatus,

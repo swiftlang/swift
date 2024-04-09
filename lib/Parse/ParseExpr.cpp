@@ -3299,12 +3299,14 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
   StructureMarkerRAII ParsingExprList(*this, Tok);
   
   leftLoc = consumeToken(leftTok);
-  return parseList(rightTok, leftLoc, rightLoc, /*AllowSepAfterLast=*/Context.LangOpts.hasFeature(Feature::TrailingComma),
-                   rightTok == tok::r_paren ? diag::expected_rparen_expr_list
-                                            : diag::expected_rsquare_expr_list,
-                   [&] () -> ParserStatus {
-    return parseExprListElement(rightTok, isArgumentList, leftLoc, elts);
-  });
+  return parseList(
+      rightTok, leftLoc, rightLoc,
+      /*AllowSepAfterLast=*/Context.LangOpts.hasFeature(Feature::TrailingComma),
+      rightTok == tok::r_paren ? diag::expected_rparen_expr_list
+                               : diag::expected_rsquare_expr_list,
+      [&]() -> ParserStatus {
+        return parseExprListElement(rightTok, isArgumentList, leftLoc, elts);
+      });
 }
 
 static bool isStartOfLabelledTrailingClosure(Parser &P) {

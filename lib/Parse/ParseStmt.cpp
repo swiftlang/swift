@@ -1833,49 +1833,59 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   return Status;
 }
 
-/// Returns `true` if the current token represents the start of a conditional statement body.
+/// Returns `true` if the current token represents the start of a conditional
+/// statement body.
 bool Parser::isStartOfConditionalStmtBody() {
   Parser::BacktrackingScope Backtrack(*this);
-  
+
   if (!Tok.is(tok::l_brace)) {
-    // Statement bodies always start with a '{'. If there is no '{', we can't be at the statement body.
+    // Statement bodies always start with a '{'. If there is no '{', we can't be
+    // at the statement body.
     return false;
   }
-  
+
   skipSingle();
-  
+
   if (Tok.is(tok::eof)) {
-    // There's nothing else in the source file that could be the statement body, so this must be it.
+    // There's nothing else in the source file that could be the statement body,
+    // so this must be it.
     return true;
   }
-  
+
   if (Tok.is(tok::semi)) {
-    // We can't have a semicolon between the condition and the statement body, so this must be the statement body.
+    // We can't have a semicolon between the condition and the statement body,
+    // so this must be the statement body.
     return true;
   }
-  
+
   if (Tok.is(tok::kw_else)) {
-    // If the current token is an `else` keyword, this must be the statement body of an `if` statement since conditions can't be followed by `else`.
+    // If the current token is an `else` keyword, this must be the statement
+    // body of an `if` statement since conditions can't be followed by `else`.
     return true;
   }
 
   if (Tok.is(tok::r_brace) || Tok.is(tok::r_paren)) {
-    // A right brace or parenthesis cannot start a statement body, nor can the condition list continue afterwards. So, this must be the statement body.
-    // This covers cases like `if true, { if true, { } }` or `( if true, { print(0) } )`. While the latter is not valid code, it improves diagnostics.
+    // A right brace or parenthesis cannot start a statement body, nor can the
+    // condition list continue afterwards. So, this must be the statement body.
+    // This covers cases like `if true, { if true, { } }` or `( if true, {
+    // print(0) } )`. While the latter is not valid code, it improves
+    // diagnostics.
     return true;
   }
-  
+
   if (Tok.isAtStartOfLine()) {
-    // If the current token is at the start of a line, it is most likely a statement body. The only exceptions are:
+    // If the current token is at the start of a line, it is most likely a
+    // statement body. The only exceptions are:
     if (Tok.is(tok::comma)) {
-      // If newline begins with ',' it must be a condition trailing comma, so this can't be the statement body, e.g.
-      // if true, { true }
-      // , true { print("body") }
+      // If newline begins with ',' it must be a condition trailing comma, so
+      // this can't be the statement body, e.g. if true, { true } , true {
+      // print("body") }
       return false;
     }
     if (Tok.is(tok::oper_binary_spaced)) {
-      // If current token is a binary operator this can't be the statement body since an `if` expression can't be the left-hand side of an operator, e.g.
-      // if true, { true }
+      // If current token is a binary operator this can't be the statement body
+      // since an `if` expression can't be the left-hand side of an operator,
+      // e.g. if true, { true }
       // != nil
       // {
       //   print("body")
@@ -1885,7 +1895,8 @@ bool Parser::isStartOfConditionalStmtBody() {
     // Excluded the above exceptions, this must be the statement body.
     return true;
   } else {
-    // If the current token isn't at the start of a line and isn't `EOF`, `;`, `else`, `)` or `}` this can't be the statement body.
+    // If the current token isn't at the start of a line and isn't `EOF`, `;`,
+    // `else`, `)` or `}` this can't be the statement body.
     return false;
   }
 }
@@ -1903,8 +1914,9 @@ bool Parser::isStartOfConditionalStmtBody() {
 /// The use of expr-basic here disallows trailing closures, which are
 /// problematic given the curly braces around the if/while body.
 ///
-ParserStatus Parser::parseStmtCondition(StmtCondition &Condition, Diag<> DefaultID, StmtKind ParentKind) {
-  
+ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
+                                        Diag<> DefaultID, StmtKind ParentKind) {
+
   ParserStatus Status;
   Condition = StmtCondition();
 
@@ -1924,14 +1936,16 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition, Diag<> Default
       if (ParentKind == StmtKind::Guard && Tok.is(tok::kw_else)) {
         break;
       }
-      // Condition terminator is start of statement body for `if` or `while` statements.
-      // Missing `else` is a common mistake for `guard` statements so we fall back to lookahead for a body.
+      // Condition terminator is start of statement body for `if` or `while`
+      // statements. Missing `else` is a common mistake for `guard` statements
+      // so we fall back to lookahead for a body.
       if (isStartOfConditionalStmtBody()) {
         break;
       }
     }
 
-    Status |= parseStmtConditionElement(result, DefaultID, ParentKind, BindingKindStr);
+    Status |= parseStmtConditionElement(result, DefaultID, ParentKind,
+                                        BindingKindStr);
     if (Status.isErrorOrHasCompletion())
       break;
 
@@ -2013,7 +2027,8 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
       Condition = Context.AllocateCopy(ConditionElems);
     } else {
-      Status |= parseStmtCondition(Condition, diag::expected_condition_if, StmtKind::If);
+      Status |= parseStmtCondition(Condition, diag::expected_condition_if,
+                                   StmtKind::If);
       if (Status.isErrorOrHasCompletion())
         return recoverWithCond(Status, Condition);
     }
@@ -2105,7 +2120,8 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
     Condition = Context.AllocateCopy(ConditionElems);
   } else {
-    Status |= parseStmtCondition(Condition, diag::expected_condition_guard, StmtKind::Guard);
+    Status |= parseStmtCondition(Condition, diag::expected_condition_guard,
+                                 StmtKind::Guard);
     if (Status.isErrorOrHasCompletion()) {
       // FIXME: better recovery
       return recoverWithCond(Status, Condition);
@@ -2165,7 +2181,8 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
     Condition = Context.AllocateCopy(ConditionElems);
   } else {
-    Status |= parseStmtCondition(Condition, diag::expected_condition_while, StmtKind::While);
+    Status |= parseStmtCondition(Condition, diag::expected_condition_while,
+                                 StmtKind::While);
     if (Status.isErrorOrHasCompletion())
       return recoverWithCond(Status, Condition);
   }
