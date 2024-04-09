@@ -6,7 +6,7 @@
 // REQUIRES: optimized_stdlib
 
 // rdar://124539686
-// UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=arm64e, CPU=arm64
 
 import StdlibUnittest
 import StdlibUnicodeUnittest
