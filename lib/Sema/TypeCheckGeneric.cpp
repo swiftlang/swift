@@ -792,18 +792,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       parentSig = extendedNominal->getGenericSignatureOfContext();
       genericParams = nullptr;
     }
-
-    // Re-use the signature of the type being extended by default.
-    // For tuple extensions, always build a new signature to get
-    // the right sugared types, since we don't want to expose the
-    // name of the generic parameter of BuiltinTupleDecl itself.
-    if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
-        !isa<BuiltinTupleDecl>(extendedNominal) &&
-        false/*!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)*/) {
-      // FIXME: Recover this optimization even with NoncopyableGenerics on.
-      return parentSig;
-    }
-
   } else {
     llvm_unreachable("Unknown generic declaration kind");
   }
