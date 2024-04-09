@@ -135,3 +135,14 @@ class ImplementsDictionaryLoader3: DictionaryLoader {
 class ImplementsDictionaryLoader4: DictionaryLoader {
   func loadDictionary(completionHandler: @escaping ([String: Int]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : Int]?) -> Void) -> ()'}}
 }
+
+class ImplementsFloatLoader: FloatLoader {
+  public func loadFloat(completionHandler: @escaping (Float) -> Void) {}
+}
+
+class ImplementsFloatLoader2: FloatLoader {
+  public func loadFloat(withCompletionHandler completionHandler: @escaping (Float) -> Void) {}
+  // expected-warning@-1 {{instance method 'loadFloat(withCompletionHandler:)' nearly matches optional requirement 'loadFloat(completionHandler:)' of protocol 'FloatLoader'}}
+  // expected-note@-2 {{rename to 'loadFloat(completionHandler:)' to satisfy this requirement}}
+  // expected-note@-3 {{move 'loadFloat(withCompletionHandler:)' to an extension to silence this warning}}
+}

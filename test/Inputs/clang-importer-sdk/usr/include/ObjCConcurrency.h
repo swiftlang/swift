@@ -359,4 +359,9 @@ MAIN_ACTOR
 - (void)loadDictionaryWithCompletionHandler:(void (^)(NSDictionary <NSString *, NSNumber *> * _Nullable))completionHandler;
 @end
 
+@protocol FloatLoader
+@optional
+- (void)loadFloatWithCompletionHandler:(void (^)(float))completionHandler;
+@end
+
 #pragma clang assume_nonnull end
