@@ -4249,7 +4249,9 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);
-    if(ctx.LangOpts.hasFeature(Feature::GroupActorErrors)){ checker.diagnoseIsolationErrors(); }
+    if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
+      checker.diagnoseIsolationErrors();
+    }
   }
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     if (auto superInit = ctor->getSuperInitCall())
