@@ -93,6 +93,17 @@
  #define SWIFT_DTOA_BINARY16_SUPPORT 1
 #endif
 
+/// Does this platform support needs to pass _Float16 as a float in
+/// C function?
+#ifndef SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
+// Windows does not define FLT16_MAX even though it supports _Float16 as argument.
+# if (!defined(FLT16_MAX) || defined(__wasm__)) && !defined(_WIN32)
+#  define SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT 1
+# else
+#  define SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT 0
+# endif
+#endif
+
 //
 // IEEE 754 Binary32 support (also known as "single-precision")
 //
@@ -239,7 +250,7 @@ extern "C" {
 
 #if SWIFT_DTOA_BINARY16_SUPPORT
 size_t swift_dtoa_optimal_binary16_p(const void *, char *dest, size_t length);
-#if defined FLT16_MAX
+#if !SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
 // If `_Float16` is defined, provide this convenience wrapper.
 size_t swift_dtoa_optimal_binary16(_Float16, char *dest, size_t length);
 #endif
