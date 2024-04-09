@@ -5875,7 +5875,7 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
     return found->second;
 
   auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      canParentSig, type->getASTContext())
+      canParentSig, *this)
     ->castTo<GenericTypeParamType>();
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           constraint);
