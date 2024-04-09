@@ -152,7 +152,8 @@ public:
   }
 
   void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                          SILType T, bool isOutlined) const override {
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
     bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
   }
 

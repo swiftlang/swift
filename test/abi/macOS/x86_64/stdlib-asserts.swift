@@ -60,3 +60,5 @@ Added: _OBJC_CLASS_$__TtCs20__StaticArrayStorage
 Added: _OBJC_METACLASS_$__TtCs20__StaticArrayStorage
 
 // Runtime Symbols
+Added: _swift_clearSensitive
+

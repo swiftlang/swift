@@ -817,7 +817,7 @@ void IRGenFunction::emitResumeAsyncContinuationReturning(
   Address destAddr = valueTI.getAddressForPointer(destPtr);
 
   valueTI.initializeWithTake(*this, destAddr, srcAddr, valueTy,
-                             /*outlined*/ false);
+                             /*outlined*/ false, /*zeroizeIfSensitive=*/ true);
 
   auto call = Builder.CreateCall(
       throwing ? IGM.getContinuationThrowingResumeFunctionPointer()
@@ -834,3 +834,19 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
       {continuation, error});
   call->setCallingConv(IGM.SwiftCC);
 }
+
+void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
+  // If our deployment target doesn't contain the new swift_clearSensitive,
+  // fall back to memset_s
+  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(IGM.Context);
+  auto clearSensitiveAvail = IGM.Context.getClearSensitiveAvailability();
+  if (!deploymentAvailability.isContainedIn(clearSensitiveAvail)) {
+    Builder.CreateCall(IGM.getMemsetSFunctionPointer(),
+                         {address.getAddress(), size,
+                          llvm::ConstantInt::get(IGM.Int32Ty, 0), size});
+    return;
+  }
+  Builder.CreateCall(IGM.getClearSensitiveFunctionPointer(),
+                         {address.getAddress(), size});
+}
+

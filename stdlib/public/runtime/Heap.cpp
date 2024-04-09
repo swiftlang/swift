@@ -21,6 +21,7 @@
 #include "swift/shims/RuntimeShims.h"
 #include <algorithm>
 #include <stdlib.h>
+#include <string.h>
 #if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
 #include "swift/Basic/Lazy.h"
 #include <malloc/malloc.h>
@@ -145,4 +146,11 @@ static void swift_slowDeallocImpl(void *ptr, size_t alignMask) {
 
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
   swift_slowDeallocImpl(ptr, alignMask);
+}
+
+void swift::swift_clearSensitive(void *ptr, size_t bytes) {
+  // TODO: use memset_s if available
+  // Though, it shouldn't make too much difference because the optimizer cannot remove
+  // the following memset without inlining this library function.
+  memset(ptr, 0, bytes);
 }

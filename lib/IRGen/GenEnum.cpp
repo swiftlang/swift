@@ -187,7 +187,7 @@ void EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
   if (TIK >= Loadable)
     return initialize(IGF, params, dest, isOutlined);
   Address src = TI->getAddressForPointer(params.claimNext());
-  TI->initializeWithTake(IGF, dest, src, T, isOutlined);
+  TI->initializeWithTake(IGF, dest, src, T, isOutlined, /*zeroizeIfSensitive=*/ true);
 }
 
 bool EnumImplStrategy::isReflectable() const { return true; }
@@ -619,7 +619,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       if (!getSingleton()) return;
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
@@ -627,7 +628,7 @@ namespace {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->initializeWithTake(
-            IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
+            IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined, zeroizeIfSensitive);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
       }
@@ -1110,7 +1111,8 @@ namespace {
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {}
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       // No-payload enums are always POD, so we can always initialize by
       // primitive copy.
       llvm::Value *val = IGF.Builder.CreateLoad(src);
@@ -3277,7 +3279,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
@@ -5109,7 +5112,7 @@ namespace {
 
           if (isTake)
             payloadTI.initializeWithTake(IGF, destData, srcData, PayloadT,
-                                         isOutlined);
+                                         isOutlined, /*zeroizeIfSensitive=*/ true);
           else
             payloadTI.initializeWithCopy(IGF, destData, srcData, PayloadT,
                                          isOutlined);
@@ -5183,7 +5186,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
@@ -6121,7 +6125,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       emitInitializeWithTakeCall(IGF, T,
                                  dest, src);
     }
@@ -6571,8 +6576,10 @@ namespace {
       return Strategy.initializeWithCopy(IGF, dest, src, T, isOutlined);
     }
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      return Strategy.initializeWithTake(IGF, dest, src, T, isOutlined);
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      return Strategy.initializeWithTake(IGF, dest, src, T, isOutlined,
+                                         zeroizeIfSensitive);
     }
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {

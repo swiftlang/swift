@@ -694,6 +694,10 @@ static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(CImplementation)
 
+static bool usesFeatureSensitive(Decl *decl) {
+  return decl->getAttrs().hasAttribute<SensitiveAttr>();
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

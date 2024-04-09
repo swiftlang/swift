@@ -67,10 +67,16 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     builder.addHeapHeader();
   }
 
-  auto deinit = (decl && decl->getValueTypeDestructor())
+  auto triviallyDestroyable = (decl && decl->getValueTypeDestructor())
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = (decl && !decl->canBeCopyable())
     ? IsNotCopyable : IsCopyable;
+  IsBitwiseTakable_t bitwiseTakable = IsBitwiseTakable;
+
+  if (decl && decl->getAttrs().hasAttribute<SensitiveAttr>()) {
+    triviallyDestroyable = IsNotTriviallyDestroyable;
+    bitwiseTakable = IsNotBitwiseTakable;
+  }
 
   // Handle a raw layout specification on a struct.
   RawLayoutAttr *rawLayout = nullptr;
@@ -79,8 +85,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
   }
   if (rawLayout && type) {
     auto sd = cast<StructDecl>(decl);
-    IsKnownTriviallyDestroyable = deinit;
-    IsKnownBitwiseTakable = IsBitwiseTakable;
+    IsKnownTriviallyDestroyable = triviallyDestroyable;
+    IsKnownBitwiseTakable = bitwiseTakable;
     SpareBits.clear();
     assert(!copyable);
     IsKnownCopyable = copyable;
@@ -178,7 +184,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits.clear();
       IsFixedLayout = true;
       IsLoadable = true;
-      IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
+      IsKnownTriviallyDestroyable = triviallyDestroyable & builder.isTriviallyDestroyable();
       IsKnownBitwiseTakable = builder.isBitwiseTakable();
       IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
       IsKnownCopyable = copyable & builder.isCopyable();
@@ -190,8 +196,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits = builder.getSpareBits();
       IsFixedLayout = builder.isFixedLayout();
       IsLoadable = builder.isLoadable();
-      IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
-      IsKnownBitwiseTakable = builder.isBitwiseTakable();
+      IsKnownTriviallyDestroyable = triviallyDestroyable & builder.isTriviallyDestroyable();
+      IsKnownBitwiseTakable = bitwiseTakable & builder.isBitwiseTakable();
       IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
       IsKnownCopyable = copyable & builder.isCopyable();
       if (typeToFill) {

@@ -82,7 +82,7 @@ namespace {
     } \
     void initializeWithTake(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
-                            bool isOutlined) const override { \
+                            bool isOutlined, bool zeroizeIfSensitive) const override { \
       IGF.emit##Nativeness##Name##TakeInit(destAddr, srcAddr); \
     } \
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr, \

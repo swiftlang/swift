@@ -494,6 +494,15 @@ DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
 SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
   OnAbstractFunction | OnSubscript | OnVar | OnExtension | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   158)
+
+// Declares that a struct contains "sensitive" data. It enforces that the contents of such a struct value
+// is zeroed out at the end of its lifetime. In other words: the content of such a value is not observable
+// in memory after the value's lifetime.
+// TODO: enable @sensitive also for other nominal types than structs, e.g. for enums
+SIMPLE_DECL_ATTR(sensitive, Sensitive,
+  OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  159)
+
 LAST_DECL_ATTR(PreInverseGenerics)
 
 #undef DECL_ATTR_ALIAS

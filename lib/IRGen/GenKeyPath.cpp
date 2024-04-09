@@ -536,7 +536,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       // buffer.
       if (&component == operands[index.Operand].LastUser) {
         ti.initializeWithTake(IGF, destAddr, srcAddresses[index.Operand], ty,
-                              false);
+                              false, /*zeroizeIfSensitive=*/ true);
       } else {
         ti.initializeWithCopy(IGF, destAddr, srcAddresses[index.Operand], ty,
                               false);
@@ -1364,7 +1364,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::emitKeyPathArgument(
         IGF.Builder.CreateBitCast(ptr, ti.getStorageType()->getPointerTo()));
     if (operandTy.isAddress()) {
       ti.initializeWithTake(IGF, addr, ti.getAddressForPointer(indiceValues.claimNext()),
-                            operandTy, false);
+                            operandTy, false, /*zeroizeIfSensitive=*/ true);
     } else {
       cast<LoadableTypeInfo>(ti).initialize(IGF, indiceValues, addr, false);
     }
