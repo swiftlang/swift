@@ -109,6 +109,23 @@ public struct UnownedJob: Sendable {
     _swiftJobRun(self, executor)
   }
 
+  /// Run this job isolated to the passed task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter executor: the task executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
   @_unavailableInEmbedded
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
@@ -117,6 +134,24 @@ public struct UnownedJob: Sendable {
     _swiftJobRunOnTaskExecutor(self, executor)
   }
 
+  /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter serialExecutor: the executor this job will be semantically running on.
+  /// - Parameter taskExecutor: the task executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(on:)``
   @_unavailableInEmbedded
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
@@ -285,6 +320,58 @@ extension ExecutorJob {
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
     _swiftJobRun(UnownedJob(self), executor)
+  }
+
+  /// Run this job on the passed in task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter executor: the executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  __consuming public func runSynchronously(on executor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(UnownedJob(self), executor)
+  }
+
+  /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter serialExecutor: the executor this job will be semantically running on.
+  /// - Parameter taskExecutor: the task executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(on:)``
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  __consuming public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
+                               taskExecutor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
   }
 }
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -598,9 +685,9 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
+  isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> T {
   return await Builtin.withUnsafeContinuation {
@@ -634,9 +721,9 @@ public func withUnsafeContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
+  isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> T {
   return try await Builtin.withUnsafeThrowingContinuation {

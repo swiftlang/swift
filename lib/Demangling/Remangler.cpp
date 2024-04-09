@@ -59,36 +59,6 @@ bool SubstitutionEntry::identifierEquals(Node *lhs, Node *rhs) {
   return true;
 }
 
-void SubstitutionEntry::deepHash(Node *node) {
-  if (treatAsIdentifier) {
-    combineHash((size_t) Node::Kind::Identifier);
-    assert(node->hasText());
-    switch (node->getKind()) {
-    case Node::Kind::InfixOperator:
-    case Node::Kind::PrefixOperator:
-    case Node::Kind::PostfixOperator:
-      for (char c : node->getText()) {
-        combineHash((unsigned char)translateOperatorChar(c));
-      }
-      return;
-    default:
-      break;
-    }
-  } else {
-    combineHash((size_t) node->getKind());
-  }
-  if (node->hasIndex()) {
-    combineHash(node->getIndex());
-  } else if (node->hasText()) {
-    for (char c : node->getText()) {
-      combineHash((unsigned char) c);
-    }
-  }
-  for (Node *child : *node) {
-    deepHash(child);
-  }
-}
-
 bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
   if (!lhs->isSimilarTo(rhs))
     return false;
@@ -98,8 +68,106 @@ bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
     if (!deepEquals(*li, *ri))
       return false;
   }
-  
+
   return true;
+}
+
+static inline size_t combineHash(size_t currentHash, size_t newValue) {
+  return 33 * currentHash + newValue;
+}
+
+/// Calculate the hash for a node.
+size_t RemanglerBase::hashForNode(Node *node,
+                                  bool treatAsIdentifier) {
+  size_t hash = 0;
+
+  if (treatAsIdentifier) {
+    hash = combineHash(hash, (size_t)Node::Kind::Identifier);
+    assert(node->hasText());
+    switch (node->getKind()) {
+    case Node::Kind::InfixOperator:
+    case Node::Kind::PrefixOperator:
+    case Node::Kind::PostfixOperator:
+      for (char c : node->getText()) {
+        hash = combineHash(hash, (unsigned char)translateOperatorChar(c));
+      }
+      return hash;
+    default:
+      break;
+    }
+  } else {
+    hash = combineHash(hash, (size_t) node->getKind());
+  }
+  if (node->hasIndex()) {
+    hash = combineHash(hash, node->getIndex());
+  } else if (node->hasText()) {
+    for (char c : node->getText()) {
+      hash = combineHash(hash, (unsigned char) c);
+    }
+  }
+  for (Node *child : *node) {
+    SubstitutionEntry entry = entryForNode(child, treatAsIdentifier);
+    hash = combineHash(hash, entry.hash());
+  }
+
+  return hash;
+}
+
+/// Rotate a size_t by N bits
+static inline size_t rotate(size_t value, size_t shift) {
+  const size_t bits = sizeof(size_t) * 8;
+  return (value >> shift) | (value << (bits - shift));
+}
+
+/// Compute a hash value from a node *pointer*.
+/// Used for look-ups in HashHash.  The numbers in here were determined
+/// experimentally.
+static inline size_t nodeHash(Node *node) {
+  // Multiply by a magic number
+  const size_t nodePrime = ((size_t)node) * 2043;
+
+  // We rotate by a different amount because the alignment of Node
+  // changes depending on the machine's pointer size
+  switch (sizeof(size_t)) {
+  case 4:
+    return rotate(nodePrime, 11);
+  case 8:
+    return rotate(nodePrime, 12);
+  case 16:
+    return rotate(nodePrime, 13);
+  default:
+    return rotate(nodePrime, 12);
+  }
+}
+
+/// Construct a SubstitutionEntry for a given node.
+/// This will look in the HashHash to see if we already know the hash
+/// (which avoids recursive hashing on the Node tree).
+SubstitutionEntry RemanglerBase::entryForNode(Node *node,
+                                              bool treatAsIdentifier) {
+  const size_t ident = treatAsIdentifier ? 4 : 0;
+  const size_t hash = nodeHash(node) + ident;
+
+  // Use linear probing with a limit
+  for (size_t n = 0; n < HashHashMaxProbes; ++n) {
+    const size_t ndx = (hash + n) & (HashHashCapacity - 1);
+    SubstitutionEntry entry = HashHash[ndx];
+
+    if (entry.isEmpty()) {
+      size_t entryHash = hashForNode(node, treatAsIdentifier);
+      entry.setNode(node, treatAsIdentifier, entryHash);
+      HashHash[ndx] = entry;
+      return entry;
+    } else if (entry.matches(node, treatAsIdentifier)) {
+      return entry;
+    }
+  }
+
+  // Hash table is full at this hash value
+  SubstitutionEntry entry;
+  size_t entryHash = hashForNode(node, treatAsIdentifier);
+  entry.setNode(node, treatAsIdentifier, entryHash);
+  return entry;
 }
 
 // Find a substitution and return its index.
@@ -340,7 +408,7 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
     return true;
 
   // Go ahead and initialize the substitution entry.
-  entry.setNode(node, treatAsIdentifier);
+  entry = entryForNode(node, treatAsIdentifier);
 
   int Idx = findSubstitution(entry);
   if (Idx < 0)
