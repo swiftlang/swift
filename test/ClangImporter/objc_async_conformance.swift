@@ -116,3 +116,22 @@ class C6: C5, ServiceProvider {
 extension ImplementsLoadable: @retroactive Loadable {
   public func loadStuff(withOtherIdentifier otherIdentifier: Int, reply: @escaping () -> Void) {}
 }
+
+class ImplementsDictionaryLoader1: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: NSNumber]?) -> Void) {}
+}
+
+// expected-error@+1 {{type 'ImplementsDictionaryLoader2' does not conform to protocol 'DictionaryLoader'}}
+class ImplementsDictionaryLoader2: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: Any]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : Any]?) -> Void) -> ()'}}
+}
+
+// expected-error@+1 {{type 'ImplementsDictionaryLoader3' does not conform to protocol 'DictionaryLoader'}}
+class ImplementsDictionaryLoader3: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: NSNumber?]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : NSNumber?]?) -> Void) -> ()'}}
+}
+
+// expected-error@+1 {{type 'ImplementsDictionaryLoader4' does not conform to protocol 'DictionaryLoader'}}
+class ImplementsDictionaryLoader4: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: Int]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : Int]?) -> Void) -> ()'}}
+}

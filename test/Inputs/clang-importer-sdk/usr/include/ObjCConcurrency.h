@@ -355,4 +355,8 @@ MAIN_ACTOR
 - (void)loadStuffWithGroupID:(NSInteger)groupID reply:(void (^)())reply;
 @end
 
+@protocol DictionaryLoader
+- (void)loadDictionaryWithCompletionHandler:(void (^)(NSDictionary <NSString *, NSNumber *> * _Nullable))completionHandler;
+@end
+
 #pragma clang assume_nonnull end
