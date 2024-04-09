@@ -10020,6 +10020,18 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
+std::optional<LifetimeDependenceInfo>
+AbstractFunctionDecl::getLifetimeDependenceInfo() const {
+  if (!isa<FuncDecl>(this) && !isa<ConstructorDecl>(this)) {
+    return std::nullopt;
+  }
+
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      LifetimeDependenceInfoRequest{const_cast<AbstractFunctionDecl *>(this)},
+      std::nullopt);
+}
+
 void FuncDecl::setResultInterfaceType(Type type) {
   getASTContext().evaluator.cacheOutput(ResultTypeRequest{this},
                                         std::move(type));

@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -disable-lifetime-dependence-diagnostics
+// RUN:   -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler

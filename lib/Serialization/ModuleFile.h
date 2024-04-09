@@ -1076,7 +1076,7 @@ public:
   // Reads lifetime dependence specifier from decl if present
   bool maybeReadLifetimeDependenceSpecifier(
       SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
-      unsigned numDeclParams);
+      unsigned numDeclParams, bool hasSelf);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadInlinableBodyText();

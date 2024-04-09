@@ -2550,7 +2550,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
-    std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
+    auto lifetimeDependenceInfo = AFD->getLifetimeDependenceInfo();
 
     // (Args...) -> Result
     Type funcTy;
@@ -2571,7 +2571,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withTransferringResult();
       }
 
-      lifetimeDependenceInfo = LifetimeDependenceInfo::get(AFD, resultTy);
       if (lifetimeDependenceInfo.has_value()) {
         infoBuilder =
             infoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
@@ -3097,4 +3096,10 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }
+}
+
+std::optional<LifetimeDependenceInfo>
+LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
+                                        AbstractFunctionDecl *decl) const {
+  return LifetimeDependenceInfo::get(decl);
 }

@@ -521,7 +521,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %pai : $@callee_owned () -> ()
 }
 
-sil @foo_dependence : $@convention(thin) (@guaranteed Foo) -> _scope(1) @owned Nonescapable
+sil @foo_dependence : $@convention(thin) (@guaranteed Foo) -> _scope(0) @owned Nonescapable
 sil @use_nonescapable : $@convention(thin) (@guaranteed Nonescapable) -> ()
 
 // Test that the pass does not crash when it sees a mark_dependence on an alloc_box base that does not have a partial_apply value.
@@ -537,8 +537,8 @@ bb0:
   store %13 to [init] %8 : $*Foo
   %16 = load_borrow %8 : $*Foo
 
-  %17 = function_ref @foo_dependence : $@convention(thin) (@guaranteed Foo) -> _scope(1) @owned Nonescapable
-  %18 = apply %17(%16) : $@convention(thin) (@guaranteed Foo) -> _scope(1) @owned Nonescapable
+  %17 = function_ref @foo_dependence : $@convention(thin) (@guaranteed Foo) -> _scope(0) @owned Nonescapable
+  %18 = apply %17(%16) : $@convention(thin) (@guaranteed Foo) -> _scope(0) @owned Nonescapable
 
   %19 = mark_dependence [unresolved] %18 : $Nonescapable on %6 : ${ let Foo }
   %20 = move_value [var_decl] %19 : $Nonescapable
