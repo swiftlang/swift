@@ -48,6 +48,7 @@ struct LibPrespecializedData {
 const LibPrespecializedData<InProcess> *getLibPrespecializedData();
 Metadata *getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                        const void *const *arguments);
+void libPrespecializedImageLoaded();
 
 } // namespace swift
 

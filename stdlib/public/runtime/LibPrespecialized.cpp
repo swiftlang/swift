@@ -17,6 +17,8 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
 
+#include <atomic>
+
 #if SWIFT_STDLIB_HAS_DLADDR && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #define USE_DLOPEN 1
@@ -27,6 +29,8 @@
 #endif
 
 using namespace swift;
+
+static std::atomic<bool> disablePrespecializedMetadata = false;
 
 static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
   if (!runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED())
@@ -157,10 +161,23 @@ isPotentialPrespecializedPointer(LibPrespecializedState &prespecialized,
 
 static bool disableForValidation = false;
 
+void
+swift::libPrespecializedImageLoaded() {
+  #if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  // A newly loaded image might have caused us to load images that are
+  // overriding images in the shared cache.  If we do that, turn off
+  // prespecialized metadata.
+  if (dyld_shared_cache_some_image_overridden())
+    disablePrespecializedMetadata.store(true, std::memory_order_release);
+  #endif
+}
+
 Metadata *
 swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                     const void *const *arguments) {
-  if (disableForValidation)
+  if (SWIFT_UNLIKELY(
+        disableForValidation
+        || disablePrespecializedMetadata.load(std::memory_order_acquire)))
     return nullptr;
 
   auto &prespecialized = LibPrespecialized.get();
