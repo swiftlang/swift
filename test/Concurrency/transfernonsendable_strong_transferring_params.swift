@@ -160,7 +160,7 @@ actor MyActor {
   func assignTransferringIntoActor2(_ x: transferring Klass) async {
     field = x
     await transferToMain(x) // expected-warning {{transferring 'x' may cause a data race}}
-    // expected-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
   }
 }
 
