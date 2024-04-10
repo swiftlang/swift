@@ -2281,15 +2281,21 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     auto *store =
         argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
     auto *storeBorrow = dyn_cast<StoreBorrowInst>(store);
-    apply.insertAfterApplication([&](SILBuilder &callBuilder) {
-      if (storeBorrow) {
-        callBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
-      }
-      if (borrow != argValue) {
-        callBuilder.emitEndBorrowOperation(callLoc, borrow);
-      }
-      callBuilder.createDeallocStack(callLoc, allocInst);
-    });
+    PrunedLivenessBoundary applyBoundary;
+    SmallVector<SILBasicBlock *, 4> discoveredBlocks;
+    apply.computeApplicationBoundary(applyBoundary, discoveredBlocks);
+    applyBoundary.visitInsertionPoints(
+        [&](auto iter) {
+          SILBuilderWithScope callBuilder(iter);
+          if (storeBorrow) {
+            callBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
+          }
+          if (borrow != argValue) {
+            callBuilder.emitEndBorrowOperation(callLoc, borrow);
+          }
+          callBuilder.createDeallocStack(callLoc, allocInst);
+        },
+        pass.deBlocks);
     if (storeBorrow) {
       operand->set(storeBorrow);
     } else {
