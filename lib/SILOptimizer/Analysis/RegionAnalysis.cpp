@@ -36,6 +36,7 @@
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -615,6 +616,12 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
     os << "disconnected";
     return;
   case Actor:
+    if (SILValue instance = getActorInstance()) {
+      if (auto name = VariableNameInferrer::inferName(instance)) {
+        os << "'" << *name << "'-isolated";
+        return;
+      }
+    }
     getActorIsolation().printForDiagnostics(os);
     return;
   case Task:

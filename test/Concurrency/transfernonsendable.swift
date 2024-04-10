@@ -83,14 +83,14 @@ extension Actor {
   func warningIfCallingGetter() async {
     await self.klass.asyncCall() // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
     // expected-tns-warning @-1 {{transferring 'self.klass' may cause a data race}}
-    // expected-tns-note @-2 {{transferring actor-isolated 'self.klass' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
+    // expected-tns-note @-2 {{transferring 'self'-isolated 'self.klass' to nonisolated callee could cause races between nonisolated and 'self'-isolated uses}}
   }
 
   func warningIfCallingAsyncOnFinalField() async {
     // Since we are calling finalKlass directly, we emit a warning here.
     await self.finalKlass.asyncCall() // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
     // expected-tns-warning @-1 {{transferring 'self.finalKlass' may cause a data race}}
-    // expected-tns-note @-2 {{transferring actor-isolated 'self.finalKlass' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
+    // expected-tns-note @-2 {{transferring 'self'-isolated 'self.finalKlass' to nonisolated callee could cause races between nonisolated and 'self'-isolated uses}}
   }
 
   // We do not warn on this since we warn in the caller of our getter instead.
@@ -104,7 +104,7 @@ extension FinalActor {
     // Since our whole class is final, we emit the error directly here.
     await self.klass.asyncCall() // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
     // expected-tns-warning @-1 {{transferring 'self.klass' may cause a data race}}
-    // expected-tns-note @-2 {{transferring actor-isolated 'self.klass' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
+    // expected-tns-note @-2 {{transferring 'self'-isolated 'self.klass' to nonisolated callee could cause races between nonisolated and 'self'-isolated uses}}
   }
 }
 
@@ -401,7 +401,7 @@ extension Actor {
     await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     // expected-tns-warning @-2 {{transferring 'closure' may cause a data race}}
-    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-3 {{transferring 'self'-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
   }
 
   func simpleClosureCaptureSelfThroughTuple2() async {
@@ -412,7 +412,7 @@ extension Actor {
     await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     // expected-tns-warning @-2 {{transferring 'closure' may cause a data race}}
-    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-3 {{transferring 'self'-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
   }
 
   func simpleClosureCaptureSelfThroughOptional() async {
@@ -423,7 +423,7 @@ extension Actor {
     await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     // expected-tns-warning @-2 {{transferring 'closure' may cause a data race}}
-    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-3 {{transferring 'self'-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
   }
 }
 
@@ -512,7 +512,7 @@ extension Actor {
     await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     // expected-tns-warning @-2 {{transferring 'closure' may cause a data race}}
-    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-3 {{transferring 'self'-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
   }
 
   // Make sure that we properly propagate actor derived from klass into field's
@@ -525,7 +525,7 @@ extension Actor {
     await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     // expected-tns-warning @-2 {{transferring 'closure' may cause a data race}}
-    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-3 {{transferring 'self'-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
   }
 }
 
@@ -1439,7 +1439,7 @@ actor ActorWithSetter {
     let x = NonSendableKlass()
     self.field = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -1447,7 +1447,7 @@ actor ActorWithSetter {
     let x = NonSendableKlass()
     self.twoFieldBox.k1 = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -1455,7 +1455,7 @@ actor ActorWithSetter {
     let x = NonSendableKlass()
     self.twoFieldBoxInTuple.1.k1 = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
   }
 
@@ -1476,7 +1476,7 @@ actor ActorWithSetter {
     let x = NonSendableKlass()
     self.classBox.k1 = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 }
@@ -1492,7 +1492,7 @@ final actor FinalActorWithSetter {
     let x = NonSendableKlass()
     self.field = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -1500,7 +1500,7 @@ final actor FinalActorWithSetter {
     let x = NonSendableKlass()
     self.twoFieldBox.k1 = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -1508,7 +1508,7 @@ final actor FinalActorWithSetter {
     let x = NonSendableKlass()
     self.twoFieldBoxInTuple.1.k1 = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -1529,7 +1529,7 @@ final actor FinalActorWithSetter {
     let x = NonSendableKlass()
     self.classBox.k1 = x
     await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 }
