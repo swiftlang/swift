@@ -934,7 +934,7 @@ mirrors.test("Extended Existential (struct)") {
     value
   }
   let container: any Box<Int> = Container(value: 42)
-  if #available(macOS 13, *) {
+  if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
     let subject = genericErase(container)
     let mirror = Mirror(reflecting: subject)
     let children = mirror.children
@@ -959,7 +959,7 @@ mirrors.test("Extended Existential (class)") {
     value
   }
   let container: any OBox<Int> = Container(value: 42)
-  if #available(macOS 13, *) {
+  if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
     let subject = genericErase(container)
     let mirror = Mirror(reflecting: subject)
     let children = mirror.children
@@ -979,7 +979,7 @@ mirrors.test("Extended Existential (metatype)") {
     value
   }
   let t: any Box<Int>.Type = Container<Int>.self
-  if #available(macOS 13, *) {
+  if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
     let subject = genericErase(t)
     let mirror = Mirror(reflecting: subject)
     let children = mirror.children

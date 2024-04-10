@@ -40,7 +40,7 @@ CastsTests.test("type(of:) should look through extended existentials (none)") {
   struct C<T>: Box { var t: T }
   func genericErase<T>(_ value: T) -> Any { value }
   let c: any Box<Int> = C(t: 42)
-  if #available(macOS 13.0, *) {
+  if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
     let x = genericErase(c)
     expectEqual("C<Int>", "\(type(of:x))")
   } else {
@@ -60,7 +60,7 @@ CastsTests.test("type(of:) should look through extended existentials (class)") {
   }
   func genericErase<T>(_ value: T) -> Any { value }
   let c: any OBox<Int> = C(t: 42)
-  if #available(macOS 13.0, *) {
+  if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
     let x = genericErase(c)
     expectEqual("C<Int>", "\(type(of:x))")
   } else {
@@ -73,7 +73,7 @@ CastsTests.test("type(of:) should look through extended existentials (metatype)"
   struct C<T>: Box { var t: T }
   func genericErase<T>(_ value: T) -> Any { value }
   let t: any Box<Int>.Type = C<Int>.self
-  if #available(macOS 13.0, *) {
+  if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
     let x = genericErase(t)
     expectEqual("C<Int>.Type", "\(type(of:x))")
   } else {
