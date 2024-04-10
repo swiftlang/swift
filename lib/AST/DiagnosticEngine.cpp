@@ -302,6 +302,75 @@ InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
   return *this;
 }
 
+SourceLoc
+DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
+                                           SourceFile *sourceFile) const {
+  auto &SM = SourceMgr;
+
+  SourceLoc bestLoc;
+
+  auto SF =
+      sourceFile ? sourceFile : Member->getDeclContext()->getParentSourceFile();
+  if (!SF) {
+    return bestLoc;
+  }
+
+  for (auto item : SF->getTopLevelItems()) {
+    // If we found an import declaration, we want to insert after it.
+    if (auto importDecl =
+            dyn_cast_or_null<ImportDecl>(item.dyn_cast<Decl *>())) {
+      SourceLoc loc = importDecl->getEndLoc();
+      if (loc.isValid()) {
+        bestLoc = Lexer::getLocForEndOfLine(SM, loc);
+      }
+
+      // Keep looking for more import declarations.
+      continue;
+    }
+
+    // If we got a location based on import declarations, we're done.
+    if (bestLoc.isValid())
+      break;
+
+    // For any other item, we want to insert before it.
+    SourceLoc loc = item.getStartLoc();
+    if (loc.isValid()) {
+      bestLoc = Lexer::getLocForStartOfLine(SM, loc);
+      break;
+    }
+  }
+
+  return bestLoc;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  auto Member = Engine->ActiveDiagnostic->getDecl();
+  SourceLoc bestLoc = Engine->getBestAddImportFixItLoc(Member);
+
+  if (bestLoc.isValid()) {
+    llvm::SmallString<64> importText;
+
+    // @_spi imports.
+    if (Member->isSPI()) {
+      auto spiGroups = Member->getSPIGroups();
+      if (!spiGroups.empty()) {
+        importText += "@_spi(";
+        importText += spiGroups[0].str();
+        importText += ") ";
+      }
+    }
+
+    importText += "import ";
+    importText += ModuleName;
+    importText += "\n";
+
+    return fixItInsert(bestLoc, importText);
+  }
+
+  return *this;
+}
+
 InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
                                                       SourceRange R2) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
