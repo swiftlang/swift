@@ -20,28 +20,26 @@ void ApplySite::insertAfterInvocation(function_ref<void(SILBuilder &)> func) con
   SILBuilderWithScope::insertAfter(getInstruction(), func);
 }
 
-void ApplySite::insertAfterApplication(
-    function_ref<void(SILBuilder &)> func) const {
+void ApplySite::visitFinalApplications(
+    function_ref<void(SILInstruction *)> visitor) const {
   switch (getKind()) {
   case ApplySiteKind::ApplyInst:
   case ApplySiteKind::TryApplyInst:
   case ApplySiteKind::PartialApplyInst:
-    return insertAfterInvocation(func);
+    visitor(getInstruction());
+    return;
   case ApplySiteKind::BeginApplyInst:
-    SmallVector<EndApplyInst *, 2> endApplies;
-    SmallVector<AbortApplyInst *, 2> abortApplies;
-    auto *bai = cast<BeginApplyInst>(getInstruction());
-    bai->getCoroutineEndPoints(endApplies, abortApplies);
-    for (auto *eai : endApplies) {
-      SILBuilderWithScope builder(std::next(eai->getIterator()));
-      func(builder);
-    }
-    for (auto *aai : abortApplies) {
-      SILBuilderWithScope builder(std::next(aai->getIterator()));
-      func(builder);
+    for (auto *tokenUse :
+         cast<BeginApplyInst>(getInstruction())->getTokenResult()->getUses()) {
+      visitor(tokenUse->getUser());
     }
     return;
   }
   llvm_unreachable("covered switch isn't covered");
 }
 
+void ApplySite::insertAfterApplication(
+    function_ref<void(SILBuilder &)> func) const {
+  visitFinalApplications(
+      [&](auto *inst) { SILBuilderWithScope::insertAfter(inst, func); });
+}
