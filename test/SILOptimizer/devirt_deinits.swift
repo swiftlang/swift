@@ -1,14 +1,14 @@
-// RUN: %target-swift-frontend  -primary-file %s -parse-as-library -sil-verify-all -Xllvm -enable-deinit-devirtualizer -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -primary-file %s -parse-as-library -sil-verify-all -Xllvm -enable-deinit-devirtualizer -module-name=test -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test and check if the compiled executable works as expected.
-// RUN: %target-run-simple-swift(-Xllvm -enable-deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -Xllvm -enable-deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Check if it works in embedded mode.
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Run without the deinit-devirtualizer to verify that our CHECK-OUTPUT lines are correct.
 // TODO: currently disabled because of rdar://118449507
-// RUNx: %target-run-simple-swift(-Xllvm -sil-disable-pass=deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUNx: %target-run-simple-swift(-target %target-cpu-apple-macos14 -Xllvm -sil-disable-pass=deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 
 // REQUIRES: swift_in_compiler
