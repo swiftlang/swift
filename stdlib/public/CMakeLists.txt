@@ -227,9 +227,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       )
   elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
     set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
-      "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
-      "arm64    arm64-apple-macos         arm64-apple-macos10.13"
-      "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+      "x86_64   x86_64-apple-macos        x86_64-apple-macos14"
+      "arm64    arm64-apple-macos         arm64-apple-macos14"
+      "arm64e   arm64e-apple-macos        arm64e-apple-macos14"
       )
   endif()
 endif()
