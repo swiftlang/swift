@@ -95,6 +95,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_PATH_TO_STRING_PROCESSING_SOURCE:PATH',
                                   os.path.join(self.source_dir, '..',
                                                'swift-experimental-string-processing'))
+        self.cmake_options.define('SWIFT_ENABLE_SYNCHRONIZATION:BOOL', 'TRUE')
 
         self.add_extra_cmake_options()
 
