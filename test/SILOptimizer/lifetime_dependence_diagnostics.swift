@@ -80,3 +80,19 @@ func bv_borrow_borrow(bv: borrowing BV) -> dependsOn(scoped bv) BV {
 func ncint_capture(ncInt: inout NCInt) {
   takeClosure { _ = ncInt.i }
 }
+
+func neint_throws(ncInt: borrowing NCInt) throws -> NEInt {
+  return NEInt(owner: ncInt)
+}
+
+// CHECK-LABEL: sil hidden @$s4test9neint_try5ncIntAA5NEIntVAA5NCIntVYls_tKF : $@convention(thin) (@guaranteed NCInt) -> _scope(1)  (@owned NEInt, @error any Error) {
+// CHECK:   try_apply %{{.*}}(%0) : $@convention(thin) (@guaranteed NCInt) -> _scope(1)  (@owned NEInt, @error any Error), normal bb1, error bb2
+// CHECK: bb1([[R:%.*]] : $NEInt):
+// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] %5 : $NEInt on %0 : $NCInt
+// CHECK:   return [[MD]] : $NEInt
+// CHECK: bb2([[E:%.*]] : $any Error):
+// CHECK:   throw [[E]] : $any Error
+// CHECK-LABEL: } // end sil function '$s4test9neint_try5ncIntAA5NEIntVAA5NCIntVYls_tKF'
+func neint_try(ncInt: borrowing NCInt) throws -> NEInt {
+  try neint_throws(ncInt: ncInt)
+}
