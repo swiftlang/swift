@@ -72,15 +72,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (auto crossing = apply->getIsolationCrossing()) {
       if (crossing->getCalleeIsolation().isActorIsolated())
         return SILIsolationInfo::getActorIsolated(
-            SILValue(), crossing->getCalleeIsolation());
+            SILValue(), SILValue(), crossing->getCalleeIsolation());
     }
   }
 
   if (auto fas = FullApplySite::isa(inst)) {
     if (auto crossing = fas.getIsolationCrossing()) {
       if (crossing->getCalleeIsolation().isActorIsolated()) {
+        // SIL level, just let it through
         return SILIsolationInfo::getActorIsolated(
-            SILValue(), crossing->getCalleeIsolation());
+            SILValue(), SILValue(), crossing->getCalleeIsolation());
       }
     }
 
@@ -90,9 +91,8 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
               SILParameterInfo::Isolated)) {
         if (auto *nomDecl =
                 self.get()->getType().getNominalOrBoundGenericNominal()) {
-          // TODO: We should be doing this off of the instance... what if we
-          // have two instances of the same class?
-          return SILIsolationInfo::getActorIsolated(SILValue(), nomDecl);
+          return SILIsolationInfo::getActorIsolated(SILValue(), self.get(),
+                                                    nomDecl);
         }
       }
     }
@@ -102,7 +102,8 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
       auto actorIsolation = ace->getActorIsolation();
       if (actorIsolation.isActorIsolated()) {
-        return SILIsolationInfo::getActorIsolated(pai, actorIsolation);
+        return SILIsolationInfo::getActorIsolated(pai, SILValue(),
+                                                  actorIsolation);
       }
     }
   }
@@ -114,7 +115,9 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *rei = dyn_cast<RefElementAddrInst>(inst)) {
     auto *nomDecl =
         rei->getOperand()->getType().getNominalOrBoundGenericNominal();
-    return SILIsolationInfo::getActorIsolated(rei, nomDecl);
+    SILValue actorInstance =
+        nomDecl->isActor() ? rei->getOperand() : SILValue();
+    return SILIsolationInfo::getActorIsolated(rei, actorInstance, nomDecl);
   }
 
   // Check if we have a global_addr inst.
@@ -123,7 +126,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       if (auto *globalDecl = global->getDecl()) {
         auto isolation = swift::getActorIsolation(globalDecl);
         if (isolation.isGlobalActor()) {
-          return SILIsolationInfo::getActorIsolated(ga, isolation);
+          return SILIsolationInfo::getActorIsolated(ga, SILValue(), isolation);
         }
       }
     }
@@ -133,7 +136,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
     auto isolation = fri->getReferencedFunction()->getActorIsolation();
     if (isolation.isActorIsolated()) {
-      return SILIsolationInfo::getActorIsolated(fri, isolation);
+      return SILIsolationInfo::getActorIsolated(fri, SILValue(), isolation);
     }
 
     // Otherwise, lets look at the AST and see if our function ref is from an
@@ -143,7 +146,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         if (funcType->hasGlobalActor()) {
           if (funcType->hasGlobalActor()) {
             return SILIsolationInfo::getActorIsolated(
-                fri,
+                fri, SILValue(),
                 ActorIsolation::forGlobalActor(funcType->getGlobalActor()));
           }
         }
@@ -152,7 +155,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
                 funcType->getResult()->getAs<AnyFunctionType>()) {
           if (resultFType->hasGlobalActor()) {
             return SILIsolationInfo::getActorIsolated(
-                fri,
+                fri, SILValue(),
                 ActorIsolation::forGlobalActor(resultFType->getGlobalActor()));
           }
         }
@@ -166,8 +169,10 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       // propagate actor isolation.
       if (auto isolation = swift::getActorIsolation(declRefExpr->getDecl())) {
         if (isolation.isActorIsolated()) {
-          return SILIsolationInfo::getActorIsolated(cmi->getOperand(),
-                                                    isolation);
+          auto actor = cmi->getOperand()->getType().isActor()
+                           ? cmi->getOperand()
+                           : SILValue();
+          return SILIsolationInfo::getActorIsolated(cmi, actor, isolation);
         }
       }
     }
@@ -175,22 +180,25 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
   // See if we have a struct_extract from a global actor isolated type.
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
-    return SILIsolationInfo::getActorIsolated(sei, sei->getStructDecl());
+    return SILIsolationInfo::getActorIsolated(sei, SILValue(),
+                                              sei->getStructDecl());
   }
 
   // See if we have an unchecked_enum_data from a global actor isolated type.
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
-    return SILIsolationInfo::getActorIsolated(uedi, uedi->getEnumDecl());
+    return SILIsolationInfo::getActorIsolated(uedi, SILValue(),
+                                              uedi->getEnumDecl());
   }
 
   // Check if we have an unsafeMutableAddressor from a global actor, mark the
   // returned value as being actor derived.
-  if (auto applySite = FullApplySite::isa(inst)) {
-    if (auto *calleeFunction = applySite.getCalleeFunction()) {
+  if (auto applySite = dyn_cast<ApplyInst>(inst)) {
+    if (auto *calleeFunction = applySite->getCalleeFunction()) {
       if (calleeFunction->isGlobalInit()) {
         auto isolation = getGlobalActorInitIsolation(calleeFunction);
         if (isolation && isolation->isGlobalActor()) {
-          return SILIsolationInfo::getActorIsolated(SILValue(), *isolation);
+          return SILIsolationInfo::getActorIsolated(applySite, SILValue(),
+                                                    *isolation);
         }
       }
     }
@@ -252,7 +260,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
             swi->getOperand()->getType().getEnumOrBoundGenericEnum();
-        return SILIsolationInfo::getActorIsolated(arg, enumDecl);
+        return SILIsolationInfo::getActorIsolated(arg, SILValue(), enumDecl);
       }
     }
     return SILIsolationInfo();
@@ -273,7 +281,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
       if (functionIsolation.isActorIsolated()) {
         if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
-          return SILIsolationInfo::getActorIsolated(fArg, nomDecl);
+          return SILIsolationInfo::getActorIsolated(fArg, SILValue(), nomDecl);
         }
       }
     }
@@ -288,7 +296,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     }
 
     if (isolation.isActorIsolated()) {
-      return SILIsolationInfo::getActorIsolated(fArg, isolation);
+      return SILIsolationInfo::getActorIsolated(fArg, SILValue(), isolation);
     }
   }
 
@@ -321,7 +329,7 @@ SILIsolationInfo SILIsolationInfo::merge(SILIsolationInfo other) const {
   // TODO: Make this failing mean that we emit an unknown SIL error instead of
   // asserting.
   assert((!other.isActorIsolated() || !isActorIsolated() ||
-          hasSameIsolation(other.getActorIsolation())) &&
+          hasSameIsolation(other)) &&
          "Actor can only be merged with the same actor");
 
   // Otherwise, take the other value.
@@ -345,6 +353,14 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
   case Task:
     return getIsolatedValue() == other.getIsolatedValue();
   case Actor:
+    auto actor1 = getActorInstance();
+    auto actor2 = other.getActorInstance();
+
+    // If either are non-null, and the actor instance doesn't match, return
+    // false.
+    if ((actor1 || actor2) && actor1 != actor2)
+      return false;
+
     auto lhsIsolation = getActorIsolation();
     auto rhsIsolation = other.getActorIsolation();
     return lhsIsolation == rhsIsolation;

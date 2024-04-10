@@ -3281,8 +3281,11 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // If we were able to find this was actor isolated from finding our
     // underlying object, use that. It is never wrong.
     if (info.actorIsolation) {
+      SILValue actorInstance =
+          info.value->getType().isActor() ? info.value : SILValue();
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(value, *info.actorIsolation));
+          SILIsolationInfo::getActorIsolated(value, actorInstance,
+                                             *info.actorIsolation));
     }
 
     auto storage = AccessStorageWithBase::compute(value);
@@ -3332,7 +3335,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     auto parentAddrInfo = getUnderlyingTrackedValue(svi);
     if (parentAddrInfo.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(svi,
+          SILIsolationInfo::getActorIsolated(svi, parentAddrInfo.value,
                                              *parentAddrInfo.actorIsolation));
     }
 
