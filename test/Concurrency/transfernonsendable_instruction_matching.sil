@@ -24,6 +24,7 @@ class NonSendableKlass {}
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
 sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+sil @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
 sil @useUnmanagedNonSendableKlass : $@convention(thin) (@guaranteed @sil_unmanaged NonSendableKlass) -> ()
 
 final class SendableKlass : Sendable {}
@@ -1674,6 +1675,47 @@ bb0(%arg : $Builtin.Word):
   %bridgeUse = function_ref @use_bridge_object : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
   apply %bridgeUse(%b) : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> () // expected-note {{use here could race}}
   destroy_value %b : $Builtin.BridgeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @load_is_lookthrough_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = alloc_stack $NonSendableKlass
+  %indirectConstruct = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %indirectConstruct(%0) : $@convention(thin) () -> @out NonSendableKlass
+
+  %1 = load_borrow %0 : $*NonSendableKlass
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  end_borrow %1 : $NonSendableKlass
+
+  %2 = load [copy] %0 : $*NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  %3 = load [take] %0 : $*NonSendableKlass
+  destroy_value %3 : $NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @loadborrow_is_lookthrough_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = alloc_stack $NonSendableKlass
+  %indirectConstruct = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %indirectConstruct(%0) : $@convention(thin) () -> @out NonSendableKlass
+
+  %1 = load_borrow %0 : $*NonSendableKlass
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  end_borrow %1 : $NonSendableKlass
+
+  %2 = load_borrow %0 : $*NonSendableKlass
+  end_borrow %2 : $NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+
   %9999 = tuple ()
   return %9999 : $()
 }

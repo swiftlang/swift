@@ -371,14 +371,23 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
 static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
-    return UnderlyingTrackedValueInfo(getUnderlyingTrackedObjectValue(value));
+    SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
+
+    if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
+      return UnderlyingTrackedValueInfo(underlyingValue);
+    }
+
+    // If we got an address, lets see if we can do even better by looking at the
+    // address.
+    value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
   }
+  assert(value->getType().isAddress());
 
   UseDefChainVisitor visitor;
   SILValue base = visitor.visitAll(value);
   assert(base);
   if (base->getType().isObject())
-    return {getUnderlyingObject(base), visitor.actorIsolation};
+    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
   return {base, visitor.actorIsolation};
 }
 
@@ -2393,8 +2402,6 @@ CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, AssignFresh)
 // example, a cast would be inappropriate here. This is implemented by
 // propagating the operand's region into the result's region and by
 // requiring all operands.
-CONSTANT_TRANSLATION(LoadInst, Assign)
-CONSTANT_TRANSLATION(LoadBorrowInst, Assign)
 CONSTANT_TRANSLATION(LoadWeakInst, Assign)
 CONSTANT_TRANSLATION(StrongCopyUnownedValueInst, Assign)
 CONSTANT_TRANSLATION(ClassMethodInst, Assign)
@@ -2734,6 +2741,23 @@ PartitionOpTranslator::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   if (bbi->isFromVarDecl())
     return TranslationSemantics::Assign;
   return TranslationSemantics::LookThrough;
+}
+
+/// LoadInst is technically a statically look through instruction, but we want
+/// to handle it especially in the infrastructure, so we cannot mark it as
+/// such. This makes marking it as a normal lookthrough instruction impossible
+/// since the routine checks that invariant.
+TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *limvi) {
+  return TranslationSemantics::Special;
+}
+
+/// LoadBorrowInst is technically a statically look through instruction, but we
+/// want to handle it especially in the infrastructure, so we cannot mark it as
+/// such. This makes marking it as a normal lookthrough instruction impossible
+/// since the routine checks that invariant.
+TranslationSemantics
+PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  return TranslationSemantics::Special;
 }
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
