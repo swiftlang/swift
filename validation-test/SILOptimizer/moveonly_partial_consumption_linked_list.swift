@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil \
 // RUN:     %s \
 // RUN:     -enable-builtin-module \
-// RUN:     -enable-experimental-feature BorrowingSwitch \
 // RUN:     -sil-verify-all \
 // RUN:     -verify
 

@@ -60,7 +60,6 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TransferringArgsAndResults, to: .transferringArgsAndResults)
-    mapFeature(.BorrowingSwitch, to: .borrowingSwitch)
   }
 }
 
