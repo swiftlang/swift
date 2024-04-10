@@ -3298,64 +3298,17 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     }
   }
 
-  if (auto *defInst = value.getDefiningInstruction()) {
-    // Treat function ref as either actor isolated or sendable.
-    if (auto *fri = dyn_cast<FunctionRefInst>(defInst)) {
-      auto isolation = fri->getReferencedFunction()->getActorIsolation();
-      if (isolation.isActorIsolated()) {
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(value, isolation));
-        return {iter.first->first, iter.first->second};
-      }
-
-      // Otherwise, lets look at the AST and see if our function ref is from an
-      // autoclosure.
-      if (auto *autoclosure = fri->getLoc().getAsASTNode<AutoClosureExpr>()) {
-        if (auto *funcType = autoclosure->getType()->getAs<AnyFunctionType>()) {
-          if (funcType->hasGlobalActor()) {
-            if (funcType->hasGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getActorIsolated(
-                      fri, ActorIsolation::forGlobalActor(
-                               funcType->getGlobalActor())));
-              return {iter.first->first, iter.first->second};
-            }
-          }
-
-          if (auto *resultFType =
-                  funcType->getResult()->getAs<AnyFunctionType>()) {
-            if (resultFType->hasGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getActorIsolated(
-                      fri, ActorIsolation::forGlobalActor(
-                               resultFType->getGlobalActor())));
-              return {iter.first->first, iter.first->second};
-            }
-          }
-        }
-      }
-
-      iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+  // Treat function ref and class method as either actor isolated or
+  // sendable. Formally they are non-Sendable, so we do the check before we
+  // check the oracle.
+  if (isa<FunctionRefInst, ClassMethodInst>(value)) {
+    if (auto isolation = SILIsolationInfo::get(value)) {
+      iter.first->getSecond().mergeIsolationRegionInfo(isolation);
       return {iter.first->first, iter.first->second};
     }
 
-    if (auto *cmi = dyn_cast<ClassMethodInst>(defInst)) {
-      if (auto *declRefExpr = cmi->getLoc().getAsASTNode<DeclRefExpr>()) {
-        // See if we are actor isolated. If so, treat this as non-Sendable so we
-        // propagate actor isolation.
-        if (auto isolation = getActorIsolation(declRefExpr->getDecl())) {
-          if (isolation.isActorIsolated()) {
-            iter.first->getSecond().mergeIsolationRegionInfo(
-                SILIsolationInfo::getActorIsolated(cmi->getOperand(),
-                                                   isolation));
-            return {iter.first->first, iter.first->second};
-          }
-        }
-      }
-
-      iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
-      return {iter.first->first, iter.first->second};
-    }
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
   }
 
   // Otherwise refer to the oracle. If we have a Sendable value, just return.
