@@ -509,3 +509,33 @@ extension Alias {
   // CHECK: [[@LINE-2]]:11 | struct/Swift | Root | [[Root_USR]] | Ref,Impl,RelExt | rel: 1
   func empty() {}
 }
+
+func returnsInt() -> Int { 0 }
+
+func containerFunc() {
+  // Make sure all the references here are contained by the function.
+  let i = returnsInt()
+  // CHECK:      [[@LINE-1]]:11 | function/Swift | returnsInt() | {{.*}} | Ref,Call,RelCall,RelCont | rel: 1
+  // CHECK-NEXT: RelCall,RelCont | function/Swift | containerFunc()
+
+  let (_, k): (Int, Int) = (
+    { let a = x; return a }(),
+    { let b = y; return b }()
+  )
+  // CHECK:      [[@LINE-4]]:16 | struct/Swift | Int | s:Si | Ref,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+  // CHECK:      [[@LINE-6]]:21 | struct/Swift | Int | s:Si | Ref,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-8]]:15 | variable/Swift | x | {{.*}} | Ref,Read,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-11]]:15 | function/acc-get/Swift | getter:x | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 1
+  // CHECK-NEXT: RelCall,RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-13]]:15 | variable/Swift | y | {{.*}} | Ref,Read,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-16]]:15 | function/acc-get/Swift | getter:y | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 1
+  // CHECK-NEXT: RelCall,RelCont | function/Swift | containerFunc()
+}
