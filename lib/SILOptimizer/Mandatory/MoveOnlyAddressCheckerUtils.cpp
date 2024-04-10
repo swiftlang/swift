@@ -1611,7 +1611,8 @@ shouldVisitAsEndPointUse(Operand *op) {
 /// directly or that have any subelement that is copied to a load [copy]. This
 /// lets the rest of the optimization handle these as appropriate.
 struct CopiedLoadBorrowEliminationVisitor
-    : public TransitiveAddressWalker<CopiedLoadBorrowEliminationVisitor> {
+    : public TransitiveAddressWalker<CopiedLoadBorrowEliminationVisitor,
+                                     DoNotWalkIntoPartialApply> {
   CopiedLoadBorrowEliminationState &state;
 
   CopiedLoadBorrowEliminationVisitor(CopiedLoadBorrowEliminationState &state)
@@ -1951,7 +1952,9 @@ void PartialReinitChecker::performPartialReinitChecking(
 namespace {
 
 /// Visit all of the uses of value in preparation for running our algorithm.
-struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
+struct GatherUsesVisitor
+    : public TransitiveAddressWalker<GatherUsesVisitor,
+                                     DoNotWalkIntoPartialApply> {
   MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
   MarkUnresolvedNonCopyableValueInst *markedValue;

@@ -402,7 +402,8 @@ struct SimpleTemporaryAllocStackElimState {
 };
 
 struct SimpleTemporaryAllocStackElimVisitor
-    : public TransitiveAddressWalker<SimpleTemporaryAllocStackElimVisitor> {
+    : public TransitiveAddressWalker<SimpleTemporaryAllocStackElimVisitor,
+                                     DoNotWalkIntoPartialApply> {
   SimpleTemporaryAllocStackElimState &state;
   CopyAddrInst *caiToVisit;
   CopyAddrInst *&nextCAI;
@@ -566,7 +567,8 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
 
   StackList<CopyAddrInst *> copiesToVisit(markedInst->getFunction());
   struct FindCopyAddrWalker
-      : public TransitiveAddressWalker<FindCopyAddrWalker> {
+      : public TransitiveAddressWalker<FindCopyAddrWalker,
+                                       DoNotWalkIntoPartialApply> {
     StackList<CopyAddrInst *> &copiesToVisit;
     FindCopyAddrWalker(StackList<CopyAddrInst *> &copiesToVisit)
         : TransitiveAddressWalker(), copiesToVisit(copiesToVisit) {}

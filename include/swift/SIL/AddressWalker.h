@@ -36,6 +36,11 @@ enum class TransitiveAddressWalkerTransitiveUseVisitation : uint8_t {
   BothUserAndUses,
 };
 
+enum WalkIntoPartialApply_t : bool {
+  DoNotWalkIntoPartialApply = false,
+  WalkIntoPartialApply = true,
+};
+
 /// A state structure for findTransitiveUsesForAddress. Intended to be only used
 /// a single time. Please always use a new one for every call to
 /// findTransitiveUsesForAddress.
@@ -43,7 +48,7 @@ enum class TransitiveAddressWalkerTransitiveUseVisitation : uint8_t {
 /// Validated by the SIL verifier as always being able to visit all addresses
 /// derived from alloc_stack, ref_element_addr, project_box, ref_tail_addr and
 /// all other address roots.
-template <typename Impl>
+template <typename Impl, WalkIntoPartialApply_t PartialApplyBehavior>
 class TransitiveAddressWalker {
   /// Whether we could tell if this address use didn't escape, did have a
   /// pointer escape, or unknown if we failed to understand something.
@@ -91,13 +96,15 @@ private:
       result = AddressUseKind::Unknown;
   }
 
+  void walkPartialApply(Operand *op);
+
 public:
   AddressUseKind walk(SILValue address) &&;
 };
 
-template <typename Impl>
-inline AddressUseKind
-TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
+template <typename Impl, WalkIntoPartialApply_t PartialApplyBehavior>
+inline AddressUseKind TransitiveAddressWalker<Impl, PartialApplyBehavior>::walk(
+    SILValue projectedAddress) && {
   assert(!didInvalidate);
 
   // When we exit, set the result to be invalidated so we can't use this again.
@@ -185,9 +192,12 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
       }
     }
 
-    // TODO: Partial apply should be NonEscaping, but then we need to consider
-    // the apply to be a use point.
-    if (isa<PartialApplyInst>(user) || isa<AddressToPointerInst>(user)) {
+    if (isa<PartialApplyInst>(user)) {
+      walkPartialApply(op);
+      continue;
+    }
+
+    if (isa<AddressToPointerInst>(user)) {
       meet(AddressUseKind::PointerEscape);
       callVisitUse(op);
       continue;
@@ -309,6 +319,22 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
   }
 
   return result;
+}
+
+template <typename Impl, WalkIntoPartialApply_t PartialApplyBehavior>
+inline void
+TransitiveAddressWalker<Impl, PartialApplyBehavior>::walkPartialApply(
+    Operand *op) {
+  if (!PartialApplyBehavior) {
+    meet(AddressUseKind::PointerEscape);
+    callVisitUse(op);
+    return;
+  }
+  auto *pai = cast<PartialApplyInst>(op->getUser());
+  pai->visitApplyUses([&](auto *use) {
+    callVisitUse(use);
+    return true;
+  });
 }
 
 } // namespace swift

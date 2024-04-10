@@ -763,7 +763,8 @@ inline AddressUseKind findTransitiveUsesForAddress(
   // is OSSA specific behavior and we should probably create a different API
   // for that. But for now, this lets this APIs users stay the same.
   struct BasicTransitiveAddressVisitor
-      : TransitiveAddressWalker<BasicTransitiveAddressVisitor> {
+      : TransitiveAddressWalker<BasicTransitiveAddressVisitor,
+                                WalkIntoPartialApply> {
     SmallVectorImpl<Operand *> *foundUses;
     std::function<void(Operand *)> *onErrorFunc;
 

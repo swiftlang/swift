@@ -247,7 +247,9 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
 SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     AllocationInst *allocInst) {
-  struct AddressWalker final : public TransitiveAddressWalker<AddressWalker> {
+  struct AddressWalker final
+      : public TransitiveAddressWalker<AddressWalker,
+                                       DoNotWalkIntoPartialApply> {
     AddressWalkerState &state;
 
     AddressWalker(AddressWalkerState &state) : state(state) {}

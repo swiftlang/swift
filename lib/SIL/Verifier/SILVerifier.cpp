@@ -789,10 +789,11 @@ struct ImmutableAddressUseVerifier {
 
 static void checkAddressWalkerCanVisitAllTransitiveUses(SILValue address) {
   SmallVector<SILInstruction *, 8> badUsers;
-  struct Visitor : TransitiveAddressWalker<Visitor> {
+  struct Visitor : TransitiveAddressWalker<Visitor, DoNotWalkIntoPartialApply> {
     SmallVectorImpl<SILInstruction *> &badUsers;
     Visitor(SmallVectorImpl<SILInstruction *> &badUsers)
-        : TransitiveAddressWalker<Visitor>(), badUsers(badUsers) {}
+        : TransitiveAddressWalker<Visitor, DoNotWalkIntoPartialApply>(),
+          badUsers(badUsers) {}
     bool visitUse(Operand *use) { return true; }
     void onError(Operand *use) {
       badUsers.push_back(use->getUser());
