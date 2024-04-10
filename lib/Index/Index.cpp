@@ -216,26 +216,39 @@ public:
 
   bool empty() const { return Stack.empty(); }
 
-  void forEachActiveContainer(llvm::function_ref<void(const Decl *)> f) const {
-    if (Stack.empty())
-      return;
+  void forEachActiveContainer(llvm::function_ref<bool(const Decl *)> allowDecl,
+                              llvm::function_ref<void(const Decl *)> f) const {
+    for (const auto &Entry : llvm::reverse(Stack)) {
+      // No active container, we're done.
+      if (!Entry.ActiveKey)
+        return;
 
-    const StackEntry &Entry = Stack.back();
+      auto MapEntry = Entry.Containers.find(Entry.ActiveKey);
+      if (MapEntry == Entry.Containers.end())
+        return;
 
-    if (!Entry.ActiveKey)
-      return;
+      bool hadViableContainer = false;
+      auto tryContainer = [&](const Decl *D) {
+        if (!allowDecl(D))
+          return;
 
-    auto MapEntry = Entry.Containers.find(Entry.ActiveKey);
-
-    if (MapEntry == Entry.Containers.end())
-      return;
-
-    Container C = MapEntry->second;
-
-    if (auto *D = C.dyn_cast<const Decl *>()) {
-      f(D);
-    } else if (auto *P = C.dyn_cast<const Pattern *>()) {
-      P->forEachVariable([&](VarDecl *VD) { f(VD); });
+        f(D);
+        hadViableContainer = true;
+      };
+      if (auto C = MapEntry->second) {
+        if (auto *D = C.dyn_cast<const Decl *>()) {
+          tryContainer(D);
+        } else {
+          auto *P = C.get<const Pattern *>();
+          P->forEachVariable([&](VarDecl *VD) {
+            tryContainer(VD);
+          });
+        }
+      }
+      // If we had a viable containers, we're done. Otherwise continue walking
+      // up the stack.
+      if (hadViableContainer)
+        return;
     }
   }
 
@@ -343,26 +356,10 @@ private:
   }
 
   // AnyPatterns behave differently to other patterns as they've no associated
-  // VarDecl. The given ActivationKey is therefore associated with the current
-  // active container, if any.
+  // VarDecl. We store null here, and will walk up to the parent container in
+  // forEachActiveContainer.
   void associateAnyPattern(ActivationKey K, StackEntry &Entry) const {
-    Entry.Containers[K] = activeContainer();
-  }
-
-  Container activeContainer() const {
-    if (Stack.empty())
-      return nullptr;
-
-    const StackEntry &Entry = Stack.back();
-
-    if (Entry.ActiveKey) {
-      auto ActiveContainer = Entry.Containers.find(Entry.ActiveKey);
-
-      if (ActiveContainer != Entry.Containers.end())
-        return ActiveContainer->second;
-    }
-
-    return nullptr;
+    Entry.Containers[K] = nullptr;
   }
 
   void associateAllPatternElements(const Pattern *P, ActivationKey K,
@@ -547,6 +544,10 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
   bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, Decl *D) {
     assert(D);
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (!shouldIndex(VD, /*IsRef*/ true))
+        return true;
+    }
     auto Match = std::find_if(Info.Relations.begin(), Info.Relations.end(),
                               [D](IndexRelation R) { return R.decl == D; });
     if (Match != Info.Relations.end()) {
@@ -924,7 +925,14 @@ private:
   }
 
   void addContainedByRelationIfContained(IndexSymbol &Info) {
-    Containers.forEachActiveContainer([&](const Decl *D) {
+    // Only consider the innermost container that we are allowed to index.
+    auto allowDecl = [&](const Decl *D) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        return shouldIndex(VD, /*IsRef*/ true);
+      }
+      return true;
+    };
+    Containers.forEachActiveContainer(allowDecl, [&](const Decl *D) {
       addRelation(Info, (unsigned)SymbolRole::RelationContainedBy,
                   const_cast<Decl *>(D));
     });
@@ -1044,7 +1052,7 @@ private:
     return {{line, col, inGeneratedBuffer}};
   }
 
-  bool shouldIndex(ValueDecl *D, bool IsRef) const {
+  bool shouldIndex(const ValueDecl *D, bool IsRef) const {
     if (D->isImplicit() && isa<VarDecl>(D) && IsRef) {
       // Bypass the implicit VarDecls introduced in CaseStmt bodies by using the
       // canonical VarDecl for these checks instead.
