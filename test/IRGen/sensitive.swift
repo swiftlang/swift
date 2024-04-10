@@ -98,17 +98,17 @@ protocol P {}
 
 @sensitive
 struct SensitiveStruct {
-  var a = 0xdeadbeaf
-  var b = 0xdeadbeaf
-  var c = 0xdeadbeaf
+  var a: UInt32 = 0xdeadbeaf
+  var b: UInt32 = 0xdeadbeaf
+  var c: UInt32 = 0xdeadbeaf
 }
 
 // A struct which would be address-only also without @sensitive
 @sensitive
 struct NonLoadableSensitiveStruct {
-  var a = 0xdeadbeaf
-  var b = 0xdeadbeaf
-  var c = 0xdeadbeaf
+  var a: UInt32 = 0xdeadbeaf
+  var b: UInt32 = 0xdeadbeaf
+  var c: UInt32 = 0xdeadbeaf
   let p: P
 }
 
