@@ -3159,6 +3159,10 @@ public:
   
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
   bool visitOnStackLifetimeEnds(llvm::function_ref<bool (Operand*)> func) const;
+
+  /// Visit the instructions that are some sort of full apply of some
+  /// transitive forward.
+  bool visitApplyUses(llvm::function_ref<bool(Operand *)> visitor) const;
 };
 
 class EndApplyInst;

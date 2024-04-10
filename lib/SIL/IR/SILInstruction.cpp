@@ -21,6 +21,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1866,6 +1867,56 @@ PartialApplyInst::visitOnStackLifetimeEnds(
     return false;
   }
   return !noUsers;
+}
+
+bool PartialApplyInst::visitApplyUses(
+    llvm::function_ref<bool(Operand *)> visitor) const {
+  ValueWorklist worklist(getFunction());
+  worklist.push(this);
+  while (auto value = worklist.pop()) {
+    for (auto *use : value->getUses()) {
+      auto *user = use->getUser();
+      if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
+        worklist.push(cvi);
+      }
+      if (auto *mvi = dyn_cast<MoveValueInst>(user)) {
+        worklist.push(mvi);
+      }
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
+        worklist.push(bbi);
+      }
+      if (auto *cetnei = dyn_cast<ConvertEscapeToNoEscapeInst>(user)) {
+        worklist.push(cetnei);
+        continue;
+      }
+      if (auto forward = ForwardingOperation(user)) {
+        forward.visitForwardedValues([&worklist](auto value) {
+          worklist.pushIfNotVisited(value);
+          return true;
+        });
+        continue;
+      }
+      if (auto *pai = dyn_cast<PartialApplyInst>(user)) {
+        worklist.pushIfNotVisited(pai);
+        continue;
+      }
+      if (auto apply = ApplySite::isa(user)) {
+        auto visitation = visitor(use);
+        if (!visitation)
+          return false;
+        continue;
+      }
+      if (auto *bai = dyn_cast<BeginApplyInst>(user)) {
+        for (auto *tokenUse : bai->getTokenResult()->getUses()) {
+          auto visitation = visitor(tokenUse);
+          if (!visitation)
+            return false;
+        }
+        continue;
+      }
+    }
+  }
+  return true;
 }
 
 // FIXME: Rather than recursing through all results, this should only recurse
