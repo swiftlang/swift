@@ -272,7 +272,7 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // region takes.
     Element repElement = *std::min_element(indices.begin(), indices.end());
     Region repElementRegion = Region(repElement);
-    p.fresh_label = Region(repElementRegion + 1);
+    p.freshLabel = Region(repElementRegion + 1);
 
     // Place all of the operations until end of scope into one history
     // sequence.
@@ -311,7 +311,7 @@ Partition Partition::separateRegions(SILLocation loc, ArrayRef<Element> indices,
     p.pushNewElementRegion(index);
     maxIndex = Element(std::max(maxIndex, index));
   }
-  p.fresh_label = Region(maxIndex + 1);
+  p.freshLabel = Region(maxIndex + 1);
   assert(p.is_canonical_correct());
   return p;
 }
@@ -321,10 +321,10 @@ void Partition::markTransferred(Element val,
   // First see if our val is tracked. If it is not tracked, insert it and mark
   // its new region as transferred.
   if (!isTrackingElement(val)) {
-    elementToRegionMap.insert_or_assign(val, fresh_label);
+    elementToRegionMap.insert_or_assign(val, freshLabel);
     pushNewElementRegion(val);
-    regionToTransferredOpMap.insert({fresh_label, transferredOperandSet});
-    fresh_label = Region(fresh_label + 1);
+    regionToTransferredOpMap.insert({freshLabel, transferredOperandSet});
+    freshLabel = Region(freshLabel + 1);
     canonical = false;
     return;
   }
@@ -346,9 +346,9 @@ void Partition::markTransferred(Element val,
 bool Partition::undoTransfer(Element val) {
   // First see if our val is tracked. If it is not tracked, insert it.
   if (!isTrackingElement(val)) {
-    elementToRegionMap.insert_or_assign(val, fresh_label);
+    elementToRegionMap.insert_or_assign(val, freshLabel);
     pushNewElementRegion(val);
-    fresh_label = Region(fresh_label + 1);
+    freshLabel = Region(freshLabel + 1);
     canonical = false;
     return true;
   }
@@ -364,7 +364,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   SWIFT_DEFER { validateRegionToTransferredOpMapRegions(); };
 
   // First try to emplace newElt with fresh_label.
-  auto iter = elementToRegionMap.try_emplace(newElt, fresh_label);
+  auto iter = elementToRegionMap.try_emplace(newElt, freshLabel);
 
   // If we did insert, then we know that the value is completely new. We can
   // just update the fresh_label, set canonical to false, and return.
@@ -375,7 +375,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
       pushNewElementRegion(newElt);
 
     // Increment the fresh label so it remains fresh.
-    fresh_label = Region(fresh_label + 1);
+    freshLabel = Region(freshLabel + 1);
     canonical = false;
     return;
   }
@@ -391,7 +391,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   // This is important to ensure that every region in the transferredOpMap is
   // also in elementToRegionMap.
   auto oldRegion = iter.first->second;
-  iter.first->second = fresh_label;
+  iter.first->second = freshLabel;
 
   auto getValueFromOtherRegion = [&]() -> std::optional<Element> {
     for (auto pair : elementToRegionMap) {
@@ -414,7 +414,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
     pushNewElementRegion(newElt);
 
   // Increment the fresh label so it remains fresh.
-  fresh_label = Region(fresh_label + 1);
+  freshLabel = Region(freshLabel + 1);
   canonical = false;
 }
 
@@ -558,8 +558,8 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
         result.pushMergeElementRegions(sndEltNumber, Element(sndRegionNumber));
         // We want fresh_label to always be one element larger than our
         // maximum element.
-        if (result.fresh_label <= Region(sndEltNumber))
-          result.fresh_label = Region(sndEltNumber + 1);
+        if (result.freshLabel <= Region(sndEltNumber))
+          result.freshLabel = Region(sndEltNumber + 1);
         continue;
       }
     }
@@ -579,8 +579,8 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
       if (!fstIter.second)
         fstIter.first->second = fstIter.first->second->merge(sndIter->second);
     }
-    if (result.fresh_label <= sndRegionNumber)
-      result.fresh_label = Region(sndEltNumber + 1);
+    if (result.freshLabel <= sndRegionNumber)
+      result.freshLabel = Region(sndEltNumber + 1);
   }
 
   // We should have preserved canonicality during the computation above. It
@@ -745,7 +745,7 @@ bool Partition::is_canonical_correct() const {
 
   for (auto &[eltNo, regionNo] : elementToRegionMap) {
     // Labels should not exceed fresh_label.
-    if (regionNo >= fresh_label)
+    if (regionNo >= freshLabel)
       return fail(eltNo, 0);
 
     // The label of a region should be at most as large as each index in it.
@@ -833,7 +833,7 @@ void Partition::canonicalize() {
 
     // The maximum index iterated over will be used here to appropriately
     // set fresh_label.
-    fresh_label = Region(eltNo + 1);
+    freshLabel = Region(eltNo + 1);
   }
 
   // Then relabel our regionToTransferredInst map if we need to by swapping
