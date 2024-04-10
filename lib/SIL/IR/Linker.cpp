@@ -102,7 +102,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F,
                                                   bool setToSerializable) {
   SILLinkage linkage = F->getLinkage();
   assert((!setToSerializable || F->hasValidLinkageForFragileRef() ||
-         hasSharedVisibility(linkage)) &&
+         hasSharedVisibility(linkage) || F->isExternForwardDeclaration()) &&
          "called function has wrong linkage for serialized function");
                                          
   if (!F->isExternalDeclaration()) {
@@ -422,7 +422,7 @@ void SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
 }
 
 void SILLinkerVisitor::visitGlobalAddrInst(GlobalAddrInst *GAI) {
-  if (!Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  if (!Mod.getOptions().EmbeddedSwift)
     return;
 
   SILGlobalVariable *G = GAI->getReferencedGlobal();
@@ -448,7 +448,7 @@ void SILLinkerVisitor::process() {
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
     }
 
-    if (Fn->getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+    if (Fn->getModule().getOptions().EmbeddedSwift &&
         Fn->getModule().getASTContext().LangOpts.DebuggerSupport) {
       // LLDB requires that functions with bodies are not external.
       Fn->setLinkage(stripExternalFromLinkage(Fn->getLinkage()));
