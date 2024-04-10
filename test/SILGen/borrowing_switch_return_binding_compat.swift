@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature BorrowingSwitch -verify %s
+// RUN: %target-swift-emit-silgen -verify %s
 func orElse<T: ~Copyable>(
     x: consuming T?,
     defaultValue: @autoclosure () throws -> T?

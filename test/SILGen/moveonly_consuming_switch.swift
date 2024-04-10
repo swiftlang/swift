@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend                                      \
 // RUN:     -emit-silgen                                            \
 // RUN:     %s                                                      \
-// RUN:     -enable-experimental-feature BorrowingSwitch            \
 // RUN: | %FileCheck %s
 
 enum MaybeMaybeVoid<Wrapped: ~Copyable>: ~Copyable {

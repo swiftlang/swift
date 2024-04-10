@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BorrowingSwitch -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 struct Box<Wrapped: ~Copyable>: ~Copyable {
     init(_ element: consuming Wrapped) { }
