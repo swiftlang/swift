@@ -351,3 +351,18 @@ public func swift_clearSensitive(buf: UnsafeMutableRawPointer, nbytes: Int) {
   }
 }
 
+@usableFromInline
+func _embeddedReportFatalError(prefix: StaticString, message: StaticString) {
+  print(prefix, terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+}
+
+@usableFromInline
+func _embeddedReportFatalErrorInFile(prefix: StaticString, message: StaticString, file: StaticString, line: UInt) {
+  print(file, terminator: ":")
+  print(line, terminator: ": ")
+  print(prefix, terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+}
