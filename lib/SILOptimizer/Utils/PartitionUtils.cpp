@@ -11,11 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
+
 #include "swift/AST/Expr.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
+
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -101,8 +104,19 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
     if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
       auto actorIsolation = ace->getActorIsolation();
+      SILValue actorInstance;
       if (actorIsolation.isActorIsolated()) {
-        return SILIsolationInfo::getActorIsolated(pai, SILValue(),
+        if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
+          ApplySite as(pai);
+          for (auto &op : as.getArgumentOperands()) {
+            if (as.getArgumentParameterInfo(op).hasOption(
+                    SILParameterInfo::Isolated)) {
+              actorInstance = pai->getAllOperands().back().get();
+              break;
+            }
+          }
+        }
+        return SILIsolationInfo::getActorIsolated(pai, actorInstance,
                                                   actorIsolation);
       }
     }
@@ -399,6 +413,37 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   case Actor:
     id.AddPointer(getIsolatedValue());
     getActorIsolation().Profile(id);
+    return;
+  }
+}
+
+void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
+  switch (Kind(*this)) {
+  case Unknown:
+    llvm::report_fatal_error("Printing unknown for diagnostics?!");
+    return;
+  case Disconnected:
+    os << "disconnected";
+    return;
+  case Actor:
+    if (SILValue instance = getActorInstance()) {
+      if (auto name = VariableNameInferrer::inferName(instance)) {
+        os << "'" << *name << "'-isolated";
+        return;
+      }
+    }
+
+    if (getActorIsolation().getKind() == ActorIsolation::ActorInstance) {
+      if (auto *vd = getActorIsolation().getActorInstance()) {
+        os << "'" << vd->getBaseIdentifier() << "'-isolated";
+        return;
+      }
+    }
+
+    getActorIsolation().printForDiagnostics(os);
+    return;
+  case Task:
+    os << "task-isolated";
     return;
   }
 }

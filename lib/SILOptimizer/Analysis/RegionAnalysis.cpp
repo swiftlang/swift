@@ -604,33 +604,6 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
 }
 
 //===----------------------------------------------------------------------===//
-//                           MARK: SILIsolationInfo
-//===----------------------------------------------------------------------===//
-
-void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
-  switch (Kind(*this)) {
-  case Unknown:
-    llvm::report_fatal_error("Printing unknown for diagnostics?!");
-    return;
-  case Disconnected:
-    os << "disconnected";
-    return;
-  case Actor:
-    if (SILValue instance = getActorInstance()) {
-      if (auto name = VariableNameInferrer::inferName(instance)) {
-        os << "'" << *name << "'-isolated";
-        return;
-      }
-    }
-    getActorIsolation().printForDiagnostics(os);
-    return;
-  case Task:
-    os << "task-isolated";
-    return;
-  }
-}
-
-//===----------------------------------------------------------------------===//
 //                            MARK: TrackableValue
 //===----------------------------------------------------------------------===//
 
