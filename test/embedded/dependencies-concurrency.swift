@@ -23,30 +23,19 @@
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
 // DEP: ___stderrp
-// DEP: __availability_version_check
 // DEP: _abort
-// DEP: _dispatch_once_f
-// DEP: _dlsym
 // DEP: _exit
-// DEP: _fclose
-// DEP: _fopen
 // DEP: _fprintf
-// DEP: _fread
 // DEP: _free
-// DEP: _fseek
-// DEP: _ftell
 // DEP: _malloc
 // DEP: _memset_s
 // DEP: _nanosleep
 // DEP: _posix_memalign
 // DEP: _putchar
-// DEP: _rewind
-// DEP: _sscanf
 // DEP: _strlen
 // DEP: _vfprintf
 // DEP: _vsnprintf
 // DEP: _write
-// DEP: dyld_stub_binder
 
 // RUN: %target-run %t/a.out | %FileCheck %s
 
