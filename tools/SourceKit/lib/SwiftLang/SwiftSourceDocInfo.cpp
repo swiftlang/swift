@@ -78,7 +78,7 @@ private:
 static StringRef getTagForDecl(const Decl *D, bool isRef) {
   auto UID = SwiftLangSupport::getUIDForDecl(D, isRef);
   static const char *prefix = "source.lang.swift.";
-  assert(UID.getName().startswith(prefix));
+  assert(UID.getName().starts_with(prefix));
   return UID.getName().drop_front(strlen(prefix));
 }
 
@@ -695,7 +695,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   Symbol.IsSystem = Mod.isNonUserModule();
   if (auto MD = Mod.getAsSwiftModule()) {
     ide::collectModuleGroups(const_cast<ModuleDecl *>(MD), ModuleGroups);
-    Symbol.ModuleGroupArray = llvm::makeArrayRef(ModuleGroups);
+    Symbol.ModuleGroupArray = llvm::ArrayRef(ModuleGroups);
   }
 
   CursorInfoData Data;
@@ -770,7 +770,13 @@ static StringRef getModuleName(const ValueDecl *VD,
 }
 
 struct DeclInfo {
-  const ValueDecl *VD;
+  ValueDecl *VD;
+  /// If not null, a solution-specific interface type of `VD`. This allows
+  /// us to produce results for declarations where the soluion has not been
+  /// applied to the AST, eg. because the declaration has an ambiguous type
+  /// or because it occurs inside a closure that has an error, which prevents
+  /// the constraint system solution to be applied to the AST.
+  Type SolutionSpecificInterfaceType;
   Type ContainerType;
   bool IsRef;
   bool IsDynamic;
@@ -785,11 +791,13 @@ struct DeclInfo {
   /// Whether the \c VD is in a synthesized extension of \c BaseType
   bool InSynthesizedExtension = false;
 
-  DeclInfo(const ValueDecl *VD, Type ContainerType, bool IsRef, bool IsDynamic,
+  DeclInfo(ValueDecl *VD, Type SolutionSpecificInterfaceType,
+           Type ContainerType, bool IsRef, bool IsDynamic,
            ArrayRef<NominalTypeDecl *> ReceiverTypes,
            const CompilerInvocation &Invoc)
-      : VD(VD), ContainerType(ContainerType), IsRef(IsRef),
-        IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
+      : VD(VD), SolutionSpecificInterfaceType(SolutionSpecificInterfaceType),
+        ContainerType(ContainerType), IsRef(IsRef), IsDynamic(IsDynamic),
+        ReceiverTypes(ReceiverTypes) {
     if (VD == nullptr)
       return;
 
@@ -829,7 +837,7 @@ static StringRef copyAndClearString(llvm::BumpPtrAllocator &Allocator,
 template <typename T>
 static ArrayRef<T> copyAndClearArray(llvm::BumpPtrAllocator &Allocator,
                                      SmallVectorImpl<T> &Array) {
-  auto Ref = copyArray(Allocator, llvm::makeArrayRef(Array));
+  auto Ref = copyArray(Allocator, llvm::ArrayRef(Array));
   Array.clear();
   return Ref;
 }
@@ -939,6 +947,18 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                const CompilerInvocation &Invoc,
                ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
                llvm::BumpPtrAllocator &Allocator) {
+  // Override the type of `DInfo.VD` while retrieving symbol information.
+  // Ideally, we would pass a customizable `getInterfaceType` function to all
+  // functions that operate on VD but doing so is not viable - USR generation,
+  // AST printing, symbol graph and probably more have been designed with the
+  // assumption that VD->getInterfaceType() returns the fixed interface type
+  // of the declaration.
+  Type OriginalInterfaceType = DInfo.VD->getInterfaceType();
+  if (DInfo.SolutionSpecificInterfaceType) {
+    DInfo.VD->setInterfaceType(DInfo.SolutionSpecificInterfaceType);
+  }
+  SWIFT_DEFER { DInfo.VD->setInterfaceType(OriginalInterfaceType); };
+
   SmallString<256> Buffer;
   SmallVector<StringRef, 4> Strings;
   llvm::raw_svector_ostream OS(Buffer);
@@ -987,8 +1007,11 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.ContainerTypeUSR = copyAndClearString(Allocator, Buffer);
 
-  ide::getDocumentationCommentAsXML(DInfo.OriginalProperty, OS);
+  ide::getRawDocumentationComment(DInfo.OriginalProperty, OS);
   Symbol.DocComment = copyAndClearString(Allocator, Buffer);
+
+  ide::getDocumentationCommentAsXML(DInfo.OriginalProperty, OS);
+  Symbol.DocCommentAsXML = copyAndClearString(Allocator, Buffer);
 
   {
     auto *Group = DInfo.InSynthesizedExtension ? DInfo.BaseType->getAnyNominal()
@@ -1031,7 +1054,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                            Component.Kind,
                            copyAndClearString(Allocator, Buffer));
     };
-    Symbol.ParentContexts = copyArray(Allocator, llvm::makeArrayRef(Parents));
+    Symbol.ParentContexts = copyArray(Allocator, llvm::ArrayRef(Parents));
 
     SmallVector<ReferencedDeclInfo, 8> ReferencedDecls;
     for (auto &FI: FragmentInfos) {
@@ -1063,10 +1086,10 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
           swift::getAccessLevelSpelling(FI.VD->getFormalAccess()), Filename,
           getModuleName(FI.VD, Allocator),
           FI.VD->getModuleContext()->isNonUserModule(), FI.VD->isSPI(),
-          copyArray(Allocator, llvm::makeArrayRef(FIParents)));
+          copyArray(Allocator, llvm::ArrayRef(FIParents)));
     }
-    Symbol.ReferencedSymbols = copyArray(Allocator,
-                                         llvm::makeArrayRef(ReferencedDecls));
+    Symbol.ReferencedSymbols =
+        copyArray(Allocator, llvm::ArrayRef(ReferencedDecls));
   }
 
   Symbol.ModuleName = getModuleName(DInfo.VD, Allocator);
@@ -1196,7 +1219,7 @@ static bool addCursorInfoForLiteral(
   }
 
   auto &Symbol = Data.Symbols.emplace_back();
-  DeclInfo Info(Decl, nullptr, true, false, {}, CompInvoc);
+  DeclInfo Info(Decl, nullptr, nullptr, true, false, {}, CompInvoc);
   auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, Lang, CompInvoc,
                             PreviousSnaps, Data.Allocator);
 
@@ -1215,9 +1238,10 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
                      SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
                      std::string &Diagnostic,
                      ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps) {
-  DeclInfo OrigInfo(Info->getValueD(), Info->getContainerType(), Info->isRef(),
-                    Info->isDynamic(), Info->getReceiverTypes(), Invoc);
-  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false,
+  DeclInfo OrigInfo(Info->getValueD(), Info->getSolutionSpecificInterfaceType(),
+                    Info->getContainerType(), Info->isRef(), Info->isDynamic(),
+                    Info->getReceiverTypes(), Invoc);
+  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), Type(), true, false,
                         ArrayRef<NominalTypeDecl *>(), Invoc);
   DeclInfo &MainInfo = CtorTypeInfo.VD ? CtorTypeInfo : OrigInfo;
   if (MainInfo.Unavailable) {
@@ -1254,7 +1278,7 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
   if (!Info->isRef()) {
     for (auto D : Info->getShorthandShadowedDecls()) {
       CursorSymbolInfo &SymbolInfo = Data.Symbols.emplace_back();
-      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
+      DeclInfo DInfo(D, Type(), Type(), /*IsRef=*/true, /*IsDynamic=*/false,
                      ArrayRef<NominalTypeDecl *>(), Invoc);
       if (auto Err =
               fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
@@ -1326,14 +1350,14 @@ getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
     if (Info.ArgNames.size() > NumPieces)
       return clang::DeclarationName();
 
-    ArrayRef<StringRef> Args = llvm::makeArrayRef(Info.ArgNames);
+    ArrayRef<StringRef> Args = llvm::ArrayRef(Info.ArgNames);
     std::vector<clang::IdentifierInfo *> Pieces;
     for (unsigned i = 0; i < NumPieces; ++i) {
       if (i >= Info.ArgNames.size() || Info.ArgNames[i].empty()) {
         Pieces.push_back(OrigSel.getIdentifierInfoForSlot(i));
       } else {
         StringRef T = Args[i];
-        Pieces.push_back(&Ctx.Idents.get(T.endswith(":") ? T.drop_back() : T));
+        Pieces.push_back(&Ctx.Idents.get(T.ends_with(":") ? T.drop_back() : T));
       }
     }
     return clang::DeclarationName(
@@ -1362,7 +1386,7 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
       Args[i] = Ctx.getIdentifier(Arg == "_" ? StringRef() : Arg);
     }
   }
-  return DeclName(Ctx, BaseName, llvm::makeArrayRef(Args));
+  return DeclName(Ctx, BaseName, llvm::ArrayRef(Args));
 }
 
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
@@ -1467,7 +1491,7 @@ protected:
   bool CancelOnSubsequentRequest;
 protected:
   ArrayRef<ImmutableTextSnapshotRef> getPreviousASTSnaps() {
-    return llvm::makeArrayRef(PreviousASTSnaps);
+    return llvm::ArrayRef(PreviousASTSnaps);
   }
 
 public:
@@ -2079,7 +2103,7 @@ void SwiftLangSupport::getCursorInfo(
               const_cast<ValueDecl *>(Entity.Dcl),
               /*CtorTyRef=*/nullptr,
               /*ExtTyRef=*/nullptr, Entity.IsRef,
-              /*Ty=*/Type(),
+              /*SolutionSpecificInterfaceType=*/Type(),
               /*ContainerType=*/Type(),
               /*CustomAttrRef=*/std::nullopt,
               /*IsKeywordArgument=*/false,
@@ -2140,7 +2164,13 @@ void SwiftLangSupport::getCursorInfo(
     // AST based completion *always* produces a result
     bool NoResults = Res.isError();
     if (Res.isValue()) {
-      NoResults = Res.value().Symbols.empty();
+      NoResults |= Res.value().Symbols.empty();
+      bool AllResultsHaveErrorType =
+          llvm::all_of(Res.value().Symbols, [](const CursorSymbolInfo &Symbol) {
+            // USR of the AST's error type if no type could be resolved.
+            return Symbol.TypeUSR == "$sXeD";
+          });
+      NoResults |= AllResultsHaveErrorType;
     }
     if (!NoResults || !InputBuffer) {
       Receiver(Res);
@@ -2341,7 +2371,7 @@ static void resolveCursorFromUSR(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      if (USR.startswith("c:")) {
+      if (USR.starts_with("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
         CursorInfoData Info;
         Info.InternalDiagnostic = "Lookup for C/C++/ObjC USRs not implemented.";
@@ -2380,7 +2410,7 @@ static void resolveCursorFromUSR(
             /*CtorTyRef=*/nullptr,
             /*ExtTyRef=*/nullptr,
             /*IsRef=*/false,
-            /*Ty=*/Type(), ContainerType,
+            /*SolutionSpecificInterfaceType=*/Type(), ContainerType,
             /*CustomAttrRef=*/std::nullopt,
             /*IsKeywordArgument=*/false,
             /*IsDynamic=*/false,
@@ -2649,36 +2679,6 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 // SwiftLangSupport::findActiveRegionsInFile
 //===----------------------------------------------------------------------===//
 
-namespace {
-class IfConfigScanner : public SourceEntityWalker {
-  unsigned BufferID = -1;
-  SmallVectorImpl<IfConfigInfo> &Infos;
-  bool Cancelled = false;
-
-public:
-  explicit IfConfigScanner(unsigned BufferID,
-                           SmallVectorImpl<IfConfigInfo> &Infos)
-      : BufferID(BufferID), Infos(Infos) {}
-
-private:
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    if (Cancelled)
-      return false;
-
-    if (auto *IfDecl = dyn_cast<IfConfigDecl>(D)) {
-      for (auto &Clause : IfDecl->getClauses()) {
-        unsigned Offset = D->getASTContext().SourceMgr.getLocOffsetInBuffer(
-            Clause.Loc, BufferID);
-        Infos.emplace_back(Offset, Clause.isActive);
-      }
-    }
-
-    return true;
-  }
-};
-
-} // end anonymous namespace
-
 void SwiftLangSupport::findActiveRegionsInFile(
     StringRef PrimaryFilePath, StringRef InputBufferName,
     ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
@@ -2714,16 +2714,25 @@ void SwiftLangSupport::findActiveRegionsInFile(
         return;
       }
 
-      SmallVector<IfConfigInfo> Configs;
-      IfConfigScanner Scanner(*SF->getBufferID(), Configs);
-      Scanner.walk(SF);
+      auto &SM = SF->getASTContext().SourceMgr;
+      auto BufferID = *SF->getBufferID();
 
-      // Sort by offset so nested decls are reported
-      // in source order (not tree order).
-      llvm::sort(Configs,
-                 [](const IfConfigInfo &LHS, const IfConfigInfo &RHS) -> bool {
-                   return LHS.Offset < RHS.Offset;
-                 });
+      SmallVector<IfConfigInfo> Configs;
+      for (auto &range : SF->getIfConfigClauseRanges()) {
+        bool isActive = false;
+        switch (range.getKind()) {
+        case IfConfigClauseRangeInfo::ActiveClause:
+          isActive = true;
+          break;
+        case IfConfigClauseRangeInfo::InactiveClause:
+          isActive = false;
+          break;
+        case IfConfigClauseRangeInfo::EndDirective:
+          continue;
+        }
+        auto offset = SM.getLocOffsetInBuffer(range.getStartLoc(), BufferID);
+        Configs.emplace_back(offset, isActive);
+      }
       ActiveRegionsInfo Info;
       Info.Configs = Configs;
       Receiver(RequestResult<ActiveRegionsInfo>::fromResult(Info));

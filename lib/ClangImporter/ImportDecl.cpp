@@ -2847,7 +2847,7 @@ namespace {
       auto conformsToAttr =
           llvm::find_if(clangDecl->getAttrs(), [](auto *attr) {
             if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-              return swiftAttr->getAttribute().startswith("conforms_to:");
+              return swiftAttr->getAttribute().starts_with("conforms_to:");
             return false;
           });
       if (conformsToAttr == clangDecl->getAttrs().end())
@@ -3392,8 +3392,8 @@ namespace {
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
             if ((file->getDir() == owningModule->Directory) &&
-                (filename.endswith("cmath") || filename.endswith("math.h") ||
-                 filename.endswith("stdlib.h") || filename.endswith("cstdlib"))) {
+                (filename.ends_with("cmath") || filename.ends_with("math.h") ||
+                 filename.ends_with("stdlib.h") || filename.ends_with("cstdlib"))) {
               return nullptr;
             }
           }
@@ -3753,38 +3753,42 @@ namespace {
         }
       }
 
-      if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-          if (auto dc = method->getDeclContext();
-              !decl->isPure() &&
-              isa_and_nonnull<NominalTypeDecl>(dc->getAsDecl())) {
-
-            // generates the __synthesizedVirtualCall_ C++ thunk
-            clang::CXXMethodDecl *cxxThunk = synthesizeCxxVirtualMethod(
-                *static_cast<ClangImporter *>(
-                    dc->getASTContext().getClangModuleLoader()),
-                decl->getParent(), decl->getParent(), decl);
-
-            // call the __synthesizedVirtualCall_ C++ thunk from a Swift thunk
-            if (Decl *swiftThunk =
-                    cxxThunk ? VisitCXXMethodDecl(cxxThunk) : nullptr;
-                isa_and_nonnull<FuncDecl>(swiftThunk)) {
-              // synthesize the body of the Swift method to call the swiftThunk
-              synthesizeForwardingThunkBody(cast<FuncDecl>(method),
-                                            cast<FuncDecl>(swiftThunk));
-              return method;
+      if (decl->isVirtual()) {
+        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+          if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
+            if (auto structDecl =
+                    dyn_cast_or_null<StructDecl>(method->getDeclContext())) {
+              // If this is a method of a Swift struct, any possible override of
+              // this method would get sliced away, and an invocation would get
+              // dispatched statically. This is fine because it matches the C++
+              // behavior.
+              if (decl->isPure()) {
+                // If this is a pure virtual method, we won't have any
+                // implementation of it to invoke.
+                Impl.markUnavailable(
+                    funcDecl, "virtual function is not available in Swift "
+                              "because it is pure");
+              }
+            } else if (auto classDecl = dyn_cast_or_null<ClassDecl>(
+                           funcDecl->getDeclContext())) {
+              // This is a foreign reference type. Since `class T` on the Swift
+              // side is mapped from `T*` on the C++ side, an invocation of a
+              // virtual method `t->method()` should get dispatched dynamically.
+              // Create a thunk that will perform dynamic dispatch.
+              // TODO: we don't have to import the actual `method` in this case,
+              // we can just synthesize a thunk and import that instead.
+              auto result = synthesizer.makeVirtualMethod(decl);
+              if (result) {
+                return result;
+              } else {
+                Impl.markUnavailable(
+                    funcDecl, "virtual function is not available in Swift");
+              }
             }
+          } else {
+            Impl.markUnavailable(
+                funcDecl, "virtual functions are not yet available in Swift");
           }
-
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              decl->isPure() ? "virtual function is not available in Swift "
-                               "because it is pure"
-                             : "virtual function is not available in Swift");
-        } else {
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              "virtual functions are not yet available in Swift");
         }
       }
 
@@ -5781,8 +5785,9 @@ namespace {
   template<typename D>
   bool inheritanceListContainsProtocol(D decl, const ProtocolDecl *proto) {
     bool anyObject = false;
+    InvertibleProtocolSet inverses;
     for (const auto &found :
-            getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+            getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject)) {
       if (auto protoDecl = dyn_cast<ProtocolDecl>(found.Item))
         if (protoDecl == proto || protoDecl->inheritsFrom(proto))
           return true;
@@ -5912,6 +5917,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     if (!proto)
       return false;
 
+    if (auto *computedProto = dyn_cast<ProtocolDecl>(computedNominal)) {
+      return (computedProto == proto || computedProto->inheritsFrom(proto));
+    }
     // Break circularity by only looking for declared conformances in the
     // original module, or possibly its overlay.
     if (conformsToProtocolInOriginalModule(computedNominal, proto)) {
@@ -7662,7 +7670,7 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
         asyncImports[objcMethod] = imported;
       } else {
         syncImports[objcMethod] = llvm::TinyPtrVector<Decl *>(
-            llvm::makeArrayRef(members).drop_front(start + 1));
+            llvm::ArrayRef(members).drop_front(start + 1));
       }
     }
   }
@@ -8031,6 +8039,50 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      if (swiftAttr->getAttribute() == "_BitwiseCopyable") {
+        if (!SwiftContext.LangOpts.hasFeature(Feature::BitwiseCopyable))
+          continue;
+        auto *protocol =
+            SwiftContext.getProtocol(KnownProtocolKind::BitwiseCopyable);
+        auto *nominal = dyn_cast<NominalTypeDecl>(MappedDecl);
+        if (!nominal)
+          continue;
+        auto *module = nominal->getModuleContext();
+        // Don't synthesize a conformance if one already exists.
+        auto ty = nominal->getDeclaredInterfaceType();
+        if (module->lookupConformance(ty, protocol))
+          continue;
+        auto conformance = SwiftContext.getNormalConformance(
+            ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),
+            ProtocolConformanceState::Complete,
+            /*isUnchecked=*/false,
+            /*isPreconcurrency=*/false);
+        conformance->setSourceKindAndImplyingConformance(
+            ConformanceEntryKind::Synthesized, nullptr);
+
+        nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
+      }
+
+      if (swiftAttr->getAttribute() == "transferring") {
+        // Swallow this if the feature is not enabled.
+        if (!SwiftContext.LangOpts.hasFeature(
+                Feature::TransferringArgsAndResults))
+          continue;
+        auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl);
+        if (!funcDecl)
+          continue;
+        funcDecl->setTransferringResult();
+        continue;
+      }
+
+      if (swiftAttr->getAttribute() == "sensitive") {
+        if (!SwiftContext.LangOpts.hasFeature(Feature::Sensitive))
+          continue;
+        auto attr = new (SwiftContext) SensitiveAttr(/*implicit=*/true);
+        MappedDecl->getAttrs().add(attr);
+        continue;
+      }
+
       // Dig out a buffer with the attribute text.
       unsigned bufferID = getClangSwiftAttrSourceBuffer(
           swiftAttr->getAttribute());
@@ -8389,9 +8441,9 @@ void ClangImporter::Implementation::importAttributes(
   // such as CGColorRelease(CGColorRef).
   if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
     if (FD->getNumParams() == 1 && FD->getDeclName().isIdentifier() &&
-         (FD->getName().endswith("Release") ||
-          FD->getName().endswith("Retain") ||
-          FD->getName().endswith("Autorelease")) &&
+         (FD->getName().ends_with("Release") ||
+          FD->getName().ends_with("Retain") ||
+          FD->getName().ends_with("Autorelease")) &&
         !FD->getAttr<clang::SwiftNameAttr>()) {
       if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>()){
         if (isCFTypeDecl(t->getDecl())) {
@@ -9434,9 +9486,8 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
     return true;
   });
 
-  addCompletionHandlerAttribute(asyncImport,
-                                llvm::makeArrayRef(members).drop_front(start),
-                                SwiftContext);
+  addCompletionHandlerAttribute(
+      asyncImport, llvm::ArrayRef(members).drop_front(start), SwiftContext);
 }
 
 void ClangImporter::Implementation::importInheritedConstructors(

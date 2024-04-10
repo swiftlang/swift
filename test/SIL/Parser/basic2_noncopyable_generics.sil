@@ -26,8 +26,11 @@ struct NCG<T> : ~Copyable {
   deinit
 }
 
-// CHECK-LABEL: struct NEG<T> : ~Escapable {
+// CHECK-LABEL: struct NEG<T> : ~Escapable where T : ~Escapable {
 // CHECK-NEXT:    var t: T
-struct NEG<T> : ~Escapable {
+struct NEG<T : ~Escapable> : ~Escapable {
   var t: T
+  init(_ t: consuming T) {
+    self.t = t
+  }
 }

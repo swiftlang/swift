@@ -64,7 +64,7 @@ sil [ossa] @test_access_single_child_field_consume : $@convention(method) (@guar
 bb0(%0 : @guaranteed $AggStruct2):
   %1 = copy_value %0 : $AggStruct2
   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{cannot use 'self' after partial consume}}
-  debug_value %2 : $AggStruct2, let, name "self", argno 1, implicit
+  debug_value %2 : $AggStruct2, let, name "self", argno 1
   %4 = begin_borrow %2 : $AggStruct2
   %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
   %6 = struct_extract %5 : $KlassPair2, #KlassPair2.lhs
@@ -87,7 +87,7 @@ sil [ossa] @test_access_single_child_field_consume2 : $@convention(method) (@gua
 bb0(%0 : @guaranteed $AggStruct2):
   %1 = copy_value %0 : $AggStruct2
   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{'self' consumed more than once}}
-  debug_value %2 : $AggStruct2, let, name "self", argno 1, implicit
+  debug_value %2 : $AggStruct2, let, name "self", argno 1
   %4 = begin_borrow %2 : $AggStruct2
   %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
   %6 = struct_extract %5 : $KlassPair2, #KlassPair2.lhs
@@ -107,7 +107,7 @@ sil [ossa] @test_access_single_child_field_consume3 : $@convention(method) (@gua
 bb0(%0 : @guaranteed $AggStruct2):
   %1 = copy_value %0 : $AggStruct2
   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{'self' consumed and used at the same time}}
-  debug_value %2 : $AggStruct2, let, name "self", argno 1, implicit
+  debug_value %2 : $AggStruct2, let, name "self", argno 1
   %4 = begin_borrow %2 : $AggStruct2
   %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
   %6 = struct_extract %5 : $KlassPair2, #KlassPair2.lhs

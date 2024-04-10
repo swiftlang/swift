@@ -116,6 +116,31 @@ public:
   }
 };
 
+/// Returns `true` if `ED` is an extension of `PD` that binds `Self` to a
+/// concrete type, like `extension MyProto where Self == MyStruct {}`.
+///
+/// In these cases, it is possible to access static members defined in the
+/// extension when perfoming unresolved member lookup in a type context of
+/// `PD`.
+static bool isExtensionWithSelfBound(const ExtensionDecl *ED,
+                                     ProtocolDecl *PD) {
+  if (!ED || !PD) {
+    return false;
+  }
+  if (ED->getExtendedNominal() != PD) {
+    return false;
+  }
+  GenericSignature genericSig = ED->getGenericSignature();
+  Type selfType = genericSig->getConcreteType(ED->getSelfInterfaceType());
+  if (!selfType) {
+    return false;
+  }
+  if (selfType->is<ExistentialType>()) {
+    return false;
+  }
+  return true;
+}
+
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
                                        const ExtensionDecl *ED) {
   // We can't do anything if the base type has unbound generic parameters.
@@ -130,8 +155,20 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (!ED->isConstrainedExtension())
     return true;
 
-  GenericSignature genericSig = ED->getGenericSignature();
+  ProtocolDecl *BaseTypeProtocolDecl = nullptr;
+  if (auto opaqueType = dyn_cast<OpaqueTypeArchetypeType>(BaseTy)) {
+    if (opaqueType->getConformsTo().size() == 1) {
+      BaseTypeProtocolDecl = opaqueType->getConformsTo().front();
+    }
+  } else {
+    BaseTypeProtocolDecl = dyn_cast_or_null<ProtocolDecl>(BaseTy->getAnyNominal());
+  }
+
+  if (isExtensionWithSelfBound(ED, BaseTypeProtocolDecl)) {
+    return true;
+  }
   auto *module = DC->getParentModule();
+  GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       module, ED->getExtendedNominal());
   return checkRequirements(module,
@@ -142,7 +179,10 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
 
 static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
                                         const ValueDecl *VD) {
-  if (BaseTy->isExistentialType() && VD->isStatic())
+  if (BaseTy->isExistentialType() && VD->isStatic() &&
+      !isExtensionWithSelfBound(
+          dyn_cast<ExtensionDecl>(VD->getDeclContext()),
+          dyn_cast_or_null<ProtocolDecl>(BaseTy->getAnyNominal())))
     return false;
 
   // We can't leak type variables into another constraint system.

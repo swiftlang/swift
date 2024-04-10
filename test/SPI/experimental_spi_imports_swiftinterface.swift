@@ -16,6 +16,11 @@
 // RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/main.swiftinterface
 // RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/main.private.swiftinterface
 
+/// The flag is rejected in Swift 6.
+// RUN: not %target-swift-frontend -typecheck % -swift-version 6 \
+// RUN:   -experimental-spi-imports 2>&1 | %FileCheck %s -check-prefix=CHECK-6
+// CHECK-6: error: '-experimental-spi-imports' is unsupported in Swift 6, use '@_spiOnly' instead
+
 @_spi(dummy) @_implementationOnly import ExperimentalImported
 // CHECK-PUBLIC-NOT: import ExperimentalImported
 // CHECK-PRIVATE: @_implementationOnly @_spi{{.*}} import ExperimentalImported

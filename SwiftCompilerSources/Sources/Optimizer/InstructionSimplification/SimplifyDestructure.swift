@@ -12,7 +12,7 @@
 
 import SIL
 
-extension DestructureTupleInst : OnoneSimplifyable {
+extension DestructureTupleInst : OnoneSimplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     // Eliminate the redundant instruction pair
@@ -28,7 +28,7 @@ extension DestructureTupleInst : OnoneSimplifyable {
   }
 }
 
-extension DestructureStructInst : OnoneSimplifyable {
+extension DestructureStructInst : OnoneSimplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     switch self.struct {

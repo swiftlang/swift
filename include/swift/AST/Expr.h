@@ -902,12 +902,6 @@ public:
 class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
-  /// Points at the ending quote.
-  /// Needed for the upcoming \c ASTScope subsystem because lookups can be
-  /// targeted to inside an \c InterpolatedStringLiteralExpr. It would be nicer
-  /// to use \c EndLoc for this value, but then \c Lexer::getLocForEndOfToken()
-  /// would not work for \c stringLiteral->getEndLoc().
-  SourceLoc TrailingQuoteLoc;
   TapExpr *AppendingExpr;
 
   // Set by Sema:
@@ -918,13 +912,11 @@ class InterpolatedStringLiteralExpr : public LiteralExpr {
 
 public:
   InterpolatedStringLiteralExpr(SourceLoc Loc,
-                                SourceLoc TrailingQuoteLoc,
                                 unsigned LiteralCapacity,
                                 unsigned InterpolationCount,
                                 TapExpr *AppendingExpr)
       : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
         Loc(Loc),
-        TrailingQuoteLoc(TrailingQuoteLoc),
         AppendingExpr(AppendingExpr) {
     Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
     Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
@@ -977,11 +969,6 @@ public:
     return Loc;
   }
   
-  /// Could also be computed by relaxing.
-  SourceLoc getTrailingQuoteLoc() const {
-    return TrailingQuoteLoc;
-  }
-
   /// Call the \c callback with information about each segment in turn.
   void forEachSegment(ASTContext &Ctx,
                       llvm::function_ref<void(bool, CallExpr *)> callback);
@@ -3531,6 +3518,43 @@ public:
   }
 };
 
+/// Extracts the isolation of a dynamically isolated function value.
+class ExtractFunctionIsolationExpr : public Expr {
+  /// The function value expression from which to extract the
+  /// isolation. The type of `fnExpr` must be an ``@isolated(any)`
+  /// funciton.
+  Expr *fnExpr;
+
+  /// The source location of `.isolation`
+  SourceLoc isolationLoc;
+
+public:
+  ExtractFunctionIsolationExpr(Expr *fnExpr, SourceLoc isolationLoc,
+                               Type type, bool implicit = false)
+      : Expr(ExprKind::ExtractFunctionIsolation, implicit, type),
+        fnExpr(fnExpr), isolationLoc(isolationLoc) {}
+
+  Expr *getFunctionExpr() const {
+    return fnExpr;
+  }
+
+  void setFunctionExpr(Expr *fnExpr) {
+    this->fnExpr = fnExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return fnExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return isolationLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ExtractFunctionIsolation;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
@@ -4716,7 +4740,7 @@ public:
   /// complete type-checking.
   ///
   /// Returns the thrown error destination, which includes both the type
-  /// thrown from this application as well as the the context's error type,
+  /// thrown from this application as well as the context's error type,
   /// which may be different.
   ThrownErrorDestination throws() const {
     assert(Bits.ApplyExpr.ThrowsIsSet);
@@ -5511,9 +5535,6 @@ public:
   Identifier getPlaceholder() const { return Placeholder; }
   SourceRange getSourceRange() const { return Loc; }
   TypeRepr *getPlaceholderTypeRepr() const { return PlaceholderTy; }
-  SourceLoc getTrailingAngleBracketLoc() const {
-    return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
-  }
 
   /// The TypeRepr to be considered for placeholder expansion.
   TypeRepr *getTypeForExpansion() const { return ExpansionTyR; }

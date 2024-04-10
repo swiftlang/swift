@@ -56,6 +56,9 @@ enum class OverloadChoiceKind : int {
   DeclViaUnwrappedOptional,
   /// The overload choice materializes a pack from a tuple.
   MaterializePack,
+  /// The overload choice extracts the isolation of a dynamically isolated
+  /// function value.
+  ExtractFunctionIsolation,
   /// The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.

@@ -75,6 +75,7 @@ KNOWN_SETTINGS=(
     use-gold-linker                               ""                "Enable using the gold linker"
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
     dsymutil-jobs                                 "1"               "number of parallel invocations of dsymutil"
+    extra-dsymutil-args                           ""                "additional arguments to pass to dsymutil"
 
     ## Build Tools
     host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -146,11 +147,11 @@ KNOWN_SETTINGS=(
     ## Build ...
     build-llvm                                    "1"               "set to 1 to build LLVM and Clang"
     build-sil-debugging-stdlib                    "0"               "set to 1 to build the Swift standard library with -sil-based-debuginfo to enable debugging and profiling on SIL level"
+    build-swift-clang-overlays                    "1"               "set to 1 to build the Swift overlays for the clang builtin modules"
     build-swift-dynamic-sdk-overlay               ""                "set to 1 to build dynamic variants of the Swift SDK overlay"
     build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
     build-swift-examples                          "1"               "set to 1 to build examples"
     build-swift-remote-mirror                     "1"               "set to 1 to build the Swift Remote Mirror library"
-    build-swift-external-generic-metadata-builder "1"               "set to 1 to build the Swift External Generic Metadata Builder library"
     build-swift-static-sdk-overlay                ""                "set to 1 to build static variants of the Swift SDK overlay"
     build-swift-static-stdlib                     ""                "set to 1 to build static variants of the Swift standard library"
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
@@ -226,6 +227,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-tracing                          ""                "whether to enable tracing signposts for the stdlib; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-use-relative-protocol-witness-tables "0"            "whether to use relative protocol witness table"
+    swift-stdlib-use-fragile-resilient-protocol-witness-tables "0"            "whether to use fragile resilient protocol witness table"
     swift-enable-runtime-function-counters        ""                "whether to enable runtime function counters"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
@@ -1781,8 +1783,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
+                    -DSWIFT_BUILD_CLANG_OVERLAYS:BOOL=$(true_false "${BUILD_SWIFT_CLANG_OVERLAYS}")
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
-                    -DSWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER:BOOL=$(true_false "${BUILD_SWIFT_EXTERNAL_GENERIC_METADATA_BUILDER}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
                     -DSWIFT_ENABLE_ARRAY_COW_CHECKS:BOOL=$(true_false "${ENABLE_ARRAY_COW_CHECKS}")
@@ -1998,6 +2000,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES:BOOL=$(true_false "${SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES}")
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES:BOOL=$(true_false "${SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES}")
                     )
                 fi
 
@@ -2754,6 +2763,18 @@ for host in "${ALL_HOSTS[@]}"; do
                             --param dotest-args="${DOTEST_ARGS}" \
                             --filter=compat
                 fi
+
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "FALSE" ]]; then
+                    echo "--- Rerun LLDB API tests (Config: Redecl completion) ---"
+                     with_pushd ${results_dir} \
+                        call "${llvm_build_dir}/bin/llvm-lit" \
+                             "${lldb_build_dir}/test/API" \
+                             ${LLVM_LIT_ARGS} \
+                             --param dotest-args="--setting plugin.typesystem.clang.experimental-redecl-completion=true" \
+                             --filter="lang|functionalities|types|commands"
+
+                    # FIXME: run shell-tests with new setting. LLDB doesn't support that yet.
+                 fi
                 continue
                 ;;
             llbuild)
@@ -3216,20 +3237,21 @@ for host in "${ALL_HOSTS[@]}"; do
             printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
-               xargs -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path})
+               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} ${EXTRA_DSYMUTIL_ARGS[@]})
             printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
-            # `host_install_destdir`.
+            # `host_install_destdir`. Avoid touching clang builtins .a files.
             find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
               '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
-              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
+              grep_that_allows_no_matches -v "/clang/lib/darwin/" | \
+              xargs -t -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
             # Codesign dylibs and executables in usr/bin after strip tool
             # rdar://45388785
             find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
               '(' '(' -path "*/usr/bin/*" -and -perm -0111 ')' -or -name "*.dylib" ')' -type f -print | \
-              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -
+              xargs -t -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -
         fi
 
         { set +x; } 2>/dev/null
@@ -3271,8 +3293,6 @@ function build_and_test_installable_package() {
           COMPATIBILITY_VERSION=2
           COMPATIBILITY_VERSION_DISPLAY_STRING="Xcode 8.0"
           DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
-          XCODE_DEFAULT_TOOLCHAIN_PLUGIN_SERVER_DESCRIPTOR='$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins#$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-plugin-server'
-          XCODE_DEFAULT_TOOLCHAIN_LOCAL_PLUGIN_SERVER_DESCRIPTOR='$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/local/lib/swift/host/plugins#$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-plugin-server'
 
           SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME="YES"
           if [[ "${DARWIN_TOOLCHAIN_REQUIRE_USE_OS_RUNTIME}" -eq "1" ]]; then
@@ -3307,8 +3327,6 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DEVELOPMENT_TOOLCHAIN string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME string '${SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-
-          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:OTHER_SWIFT_FLAGS string '\$(inherited) -Xfrontend -external-plugin-path -Xfrontend ${XCODE_DEFAULT_TOOLCHAIN_PLUGIN_SERVER_DESCRIPTOR} -Xfrontend -external-plugin-path -Xfrontend ${XCODE_DEFAULT_TOOLCHAIN_LOCAL_PLUGIN_SERVER_DESCRIPTOR}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
           call chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 

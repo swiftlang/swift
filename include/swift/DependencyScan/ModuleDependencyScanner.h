@@ -72,9 +72,8 @@ public:
                           DiagnosticEngine &diags, bool ParallelScan);
 
   /// Identify the scanner invocation's main module's dependencies
-  llvm::ErrorOr<ModuleDependencyInfo> getMainModuleDependencyInfo(
-      ModuleDecl *mainModule,
-      std::optional<SwiftDependencyTracker> tracker = std::nullopt);
+  llvm::ErrorOr<ModuleDependencyInfo>
+  getMainModuleDependencyInfo(ModuleDecl *mainModule);
 
   /// Resolve module dependencies of the given module, computing a full
   /// transitive closure dependency graph.
@@ -107,9 +106,9 @@ private:
                             ModuleDependenciesCache &cache,
                             ModuleDependencyIDSetVector &directDependencies);
 
-  /// If a module has a bridging header, execute a dependency scan
+  /// If a module has a bridging header or other header inputs, execute a dependency scan
   /// on it and record the dependencies.
-  void resolveBridgingHeaderDependencies(
+  void resolveHeaderDependencies(
       const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
       std::vector<std::string> &allClangModules,
       llvm::StringSet<> &alreadyKnownModules,

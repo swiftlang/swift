@@ -20,14 +20,13 @@ protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any
 
 // CHECK: distributed actor $Greeter<ActorSystem>: Greeter,
 // CHECK-NEXT: Distributed._DistributedActorStub
-// CHECK-NEXT: where ActorSystem: DistributedActorSystem<any Codable>,
-// CHECK-NEXT: ActorSystem.ActorID: Codable
+// CHECK-NEXT: where ActorSystem: DistributedActorSystem<any Codable>
 // CHECK-NEXT: {
 // CHECK-NEXT: }
 
 // CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
 // CHECK-NEXT:   distributed func greet(name: String) -> String {
-// CHECK-NEXT:     if #available (SwiftStdlib 6.0, *) {
+// CHECK-NEXT:     if #available(SwiftStdlib 6.0, *) {
 // CHECK-NEXT:       Distributed._distributedStubFatalError()
 // CHECK-NEXT:     } else {
 // CHECK-NEXT:       fatalError()

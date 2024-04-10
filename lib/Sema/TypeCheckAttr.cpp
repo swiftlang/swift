@@ -147,7 +147,6 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
-  IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(ProjectedValueProperty)
@@ -164,7 +163,8 @@ public:
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(LexicalLifetimes)
-  IGNORED_ATTR(DistributedThunkTarget)
+  IGNORED_ATTR(AllowFeatureSuppression)
+  IGNORED_ATTR(PreInverseGenerics)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -343,6 +343,8 @@ public:
 
   void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
 
+  void visitSensitiveAttr(SensitiveAttr *attr);
+
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
@@ -368,6 +370,7 @@ public:
   void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
 
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
+  void visitWeakLinkedAttr(WeakLinkedAttr *attr);
 };
 
 } // end anonymous namespace
@@ -447,6 +450,13 @@ void AttributeChecker::visitExtractConstantsFromMembersAttr(ExtractConstantsFrom
   if (!Ctx.LangOpts.hasFeature(Feature::ExtractConstantsFromMembers)) {
     diagnoseAndRemoveAttr(attr,
                           diag::attr_extractConstantsFromMembers_experimental);
+  }
+}
+
+void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Sensitive)) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_sensitive_experimental);
   }
 }
 
@@ -1270,7 +1280,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     if (importedModule) {
       auto path = importedModule->getModuleFilename();
       if (llvm::sys::path::extension(path) == ".swiftinterface" &&
-          !(path.endswith(".private.swiftinterface") || path.endswith(".package.swiftinterface"))) {
+          !(path.ends_with(".private.swiftinterface") || path.ends_with(".package.swiftinterface"))) {
         // If the module was built from the public swiftinterface, it can't
         // have any SPI.
         diagnose(attr->getLocation(),
@@ -1515,9 +1525,31 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   }
 }
 
+static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
+                                         Feature requiredFeature) {
+  if (D->getASTContext().LangOpts.hasFeature(requiredFeature))
+    return true;
+
+  // Allow the use of @_objcImplementation *without* Feature::ObjCImplementation
+  // as long as you're using the early adopter syntax. (Avoids breaking existing
+  // adopters.)
+  if (requiredFeature == Feature::ObjCImplementation && attr->isEarlyAdopter())
+    return true;
+
+  // Either you're using Feature::ObjCImplementation without the early adopter
+  // syntax, or you're using Feature::CImplementation. Either way, no go.
+  swift::diagnoseAndRemoveAttr(D, attr, diag::requires_experimental_feature,
+                               attr->getAttrName(), attr->isDeclModifier(),
+                               getFeatureName(requiredFeature));
+  return false;
+}
+
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
+      return;
+
     if (ED->isConstrainedExtension())
       diagnoseAndRemoveAttr(attr,
                             diag::attr_objc_implementation_must_be_unconditional);
@@ -1574,6 +1606,9 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
+      return;
+
     if (!attr->CategoryName.empty()) {
       auto diagnostic =
           diagnose(attr->getLocation(),
@@ -1848,9 +1883,18 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     auto layout = existential->getExistentialLayout();
 
     auto protocols = layout.getProtocols();
-    if (!(protocols.size() == 1 &&
-          protocols[0] == ctx.getProtocol(KnownProtocolKind::Sendable)))
+    if (!llvm::all_of(protocols,
+                      [&](ProtocolDecl *proto) {
+                        if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+                          return true;
+
+                        if (proto->getInvertibleProtocolKind())
+                          return true;
+
+                        return false;
+                      })) {
       return false;
+    }
 
     paramTy = layout.getSuperclass();
     if (!paramTy)
@@ -2151,7 +2195,7 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     // Verify that the name mentioned in the expose
     // attribute matches the supported name pattern.
     if (!attr->Name.empty()) {
-      if (isa<ConstructorDecl>(VD) && !attr->Name.startswith("init"))
+      if (isa<ConstructorDecl>(VD) && !attr->Name.starts_with("init"))
         diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
                  attr->Name);
     }
@@ -3875,7 +3919,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   // conforms to the specified protocol.
   NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
-    if (!OtherPD->inheritsFrom(PD) &&
+    if (!(OtherPD == PD || OtherPD->inheritsFrom(PD)) &&
         !(OtherPD->isSpecificProtocol(KnownProtocolKind::DistributedActor) ||
           PD->isSpecificProtocol(KnownProtocolKind::Actor))) {
       diagnose(attr->getLocation(),
@@ -4671,6 +4715,16 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     attr->setInvalid();
   }
 
+  // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
+  if (var->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (ownershipKind == ReferenceOwnership::Weak ||
+        ownershipKind == ReferenceOwnership::Unowned) {
+      Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
+               ownershipKind);
+      attr->setInvalid();
+    }
+  }
+
   if (attr->isInvalid())
     return type;
 
@@ -5095,6 +5149,7 @@ static IndexSubset *computeDifferentiabilityParameters(
 static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return DescriptiveDeclKind::Getter;
   case AccessorKind::Set:
     return DescriptiveDeclKind::Setter;
@@ -6900,16 +6955,39 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
                                 diag::nonisolated_distributed_actor_storage);
           return;
         }
+      }
 
-        // 'nonisolated' is redundant for the stored properties of a struct.
-        if (isa<StructDecl>(nominal) &&
-            !var->isStatic() &&
-            var->isOrdinaryStoredProperty() &&
-            !isWrappedValueOfPropWrapper(var)) {
-          diagnoseAndRemoveAttr(attr, diag::nonisolated_storage_value_type,
-                                nominal->getDescriptiveKind())
-            .warnUntilSwiftVersion(6);
-          return;
+      // 'nonisolated(unsafe)' is redundant for 'Sendable' immutables.
+      if (attr->isUnsafe() &&
+          type->isSendableType() &&
+          var->isLet()) {
+
+        // '(unsafe)' is redundant for a public actor-isolated 'Sendable'
+        // immutable.
+        auto nominal = dyn_cast<NominalTypeDecl>(dc);
+        if (nominal && nominal->isActor()) {
+          auto access = nominal->getFormalAccessScope(
+              /*useDC=*/nullptr,
+              /*treatUsableFromInlineAsPublic=*/true);
+          if (access.isPublic()) {
+            // Get the location where '(unsafe)' starts.
+            SourceLoc unsafeStart = Lexer::getLocForEndOfToken(
+                Ctx.SourceMgr, attr->getRange().Start);
+            diagnose(unsafeStart, diag::unsafe_sendable_actor_constant, type)
+                .fixItRemoveChars(unsafeStart,
+                                  attr->getRange().End.getAdvancedLoc(1));
+          } else {
+            // This actor is not public, so suggest to remove
+            // 'nonisolated(unsafe)'.
+            diagnose(attr->getLocation(),
+                     diag::nonisolated_unsafe_sendable_actor_constant, type)
+                .fixItRemove(attr->getRange());
+          }
+
+        } else {
+          diagnose(attr->getLocation(),
+                   diag::nonisolated_unsafe_sendable_constant, type)
+              .fixItRemove(attr->getRange());
         }
       }
     }
@@ -7033,20 +7111,25 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
   if (!proto)
     return;
 
-  // A marker protocol cannot inherit a non-marker protocol.
-  for (auto inheritedProto : proto->getInheritedProtocols()) {
-    if (!inheritedProto->isMarkerProtocol()) {
-      proto->diagnose(
-          diag::marker_protocol_inherit_nonmarker,
-          proto->getName(), inheritedProto->getName());
-      inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
-    }
-  }
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
+    if (!req.getFirstType()->isEqual(proto->getSelfInterfaceType()))
+      continue;
 
-  if (Type superclass = proto->getSuperclass()) {
-    proto->diagnose(
+    if (req.getKind() == RequirementKind::Superclass) {
+      // A marker protocol cannot have a superclass requirement.
+      proto->diagnose(
         diag::marker_protocol_inherit_class,
-        proto->getName(), superclass);
+        proto->getName(), req.getSecondType());
+    } else if (req.getKind() == RequirementKind::Conformance) {
+      // A marker protocol cannot inherit a non-marker protocol.
+      auto inheritedProto = req.getProtocolDecl();
+      if (!inheritedProto->isMarkerProtocol()) {
+        proto->diagnose(
+            diag::marker_protocol_inherit_nonmarker,
+            proto->getName(), inheritedProto->getName());
+        inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
+      }
+    }
   }
 
   // A marker protocol cannot have any requirements.
@@ -7333,6 +7416,14 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   }
 }
 
+void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
+  if (!Ctx.LangOpts.Target.isOSBinFormatCOFF())
+    return;
+
+  diagnoseAndRemoveAttr(attr, diag::attr_unsupported_on_target,
+                        attr->getAttrName(), Ctx.LangOpts.Target.str());
+}
+
 namespace {
 
 class ClosureAttributeChecker
@@ -7353,6 +7444,13 @@ public:
 
   void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
+  }
+
+  void visitNonisolatedAttr(NonisolatedAttr *attr) {
+    if (attr->isUnsafe() ||
+        !ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
+      visitDeclAttribute(attr);
+    }
   }
 
   void visitCustomAttr(CustomAttr *attr) {

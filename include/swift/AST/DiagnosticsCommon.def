@@ -45,7 +45,7 @@ NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
 WARNING(error_in_future_swift_version,none,
-        "%0; this is an error in Swift %1",
+        "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
 
 // Generic disambiguation

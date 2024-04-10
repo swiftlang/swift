@@ -746,6 +746,9 @@ internal func _SwiftCreateBridgedString_DoNotCall(
   deinit {}
 }
 
+@available(*, unavailable)
+extension __SwiftNativeNSString: Sendable {}
+
 // Called by the SwiftObject implementation to get the description of a value
 // as an NSString.
 @_silgen_name("swift_stdlib_getDescription")

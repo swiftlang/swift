@@ -349,19 +349,19 @@ internal func _swift_unownedRetainCount(_: UnsafeMutableRawPointer) -> Int
 internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
 
 // Utilities to get refcount(s) of class objects.
-@backDeployed(before: SwiftStdlib 6.0)
+@_alwaysEmitIntoClient
 public func _getRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { _swift_retainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@backDeployed(before: SwiftStdlib 6.0)
+@_alwaysEmitIntoClient
 public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { _swift_unownedRetainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@backDeployed(before: SwiftStdlib 6.0)
+@_alwaysEmitIntoClient
 public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { _swift_weakRetainCount($0) }
   return UInt(bitPattern: count)

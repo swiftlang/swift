@@ -52,6 +52,7 @@ import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
+import CountAlgo
 import CreateObjects
 import CxxSetToCollection
 import CxxStringConversion
@@ -89,6 +90,7 @@ import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
+import FlattenDistanceFromTo
 import FlattenList
 import FloatingPointConversion
 import FloatingPointParsing
@@ -244,6 +246,7 @@ register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
+register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
 register(CxxSetToCollection.benchmarks)
@@ -282,6 +285,7 @@ register(Exclusivity.benchmarks)
 register(ExistentialPerformance.benchmarks)
 register(Fibonacci.benchmarks)
 register(FindStringNaive.benchmarks)
+register(FlattenDistanceFromTo.benchmarks)
 register(FlattenList.benchmarks)
 register(FloatingPointConversion.benchmarks)
 register(FloatingPointParsing.benchmarks)

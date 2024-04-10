@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 
 #include <optional>
+#include <variant>
 
 namespace swift {
 
@@ -51,6 +52,11 @@ inline bool isNonSendableType(SILType type, SILFunction *fn) {
   return !type.isSendable(fn);
 }
 
+/// Return the ApplyIsolationCrossing for a specific \p inst if it
+/// exists. Returns std::nullopt otherwise.
+std::optional<ApplyIsolationCrossing>
+getApplyIsolationCrossing(SILInstruction *inst);
+
 // This is our PImpl type that we use to hide all of the internal details of
 // the computation.
 class PartitionOpTranslator;
@@ -60,6 +66,12 @@ class BlockPartitionState {
 
   /// Set if this block in the next iteration needs to be visited.
   bool needsUpdate = false;
+
+  /// Set if this block is live.
+  ///
+  /// If the block is not live, then we shouldnt try to emit diagnostics for it
+  /// since we will not have performed dataflow upon it.
+  bool isLive = false;
 
   /// The partition of elements into regions at the top of the block.
   Partition entryPartition;
@@ -78,9 +90,12 @@ class BlockPartitionState {
 
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator,
-                      TransferringOperandSetFactory &ptrSetFactory);
+                      TransferringOperandSetFactory &ptrSetFactory,
+                      IsolationHistory::Factory &isolationHistoryFactory);
 
 public:
+  bool getLiveness() const { return isLive; }
+
   ArrayRef<PartitionOp> getPartitionOps() const { return blockPartitionOps; }
 
   const Partition &getEntryPartition() const { return entryPartition; }
@@ -117,15 +132,6 @@ enum class TrackableValueFlag {
 
   /// Set to true if this TrackableValue's representative is Sendable.
   isSendable = 0x2,
-
-  /// Set to true if this TrackableValue is a non-sendable object derived from
-  /// an actor. Example: a value loaded from a ref_element_addr from an actor.
-  ///
-  /// NOTE: We track values with an actor representative even though actors are
-  /// sendable to be able to properly identify values that escape an actor since
-  /// if we escape an actor into a closure, we want to mark the closure as actor
-  /// derived.
-  isActorDerived = 0x4,
 };
 
 using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
@@ -135,6 +141,7 @@ using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
 class regionanalysisimpl::TrackableValueState {
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
+  SILIsolationInfo regionInfo = SILIsolationInfo::getDisconnected();
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
@@ -151,9 +158,19 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  bool isActorDerived() const {
-    return flagSet.contains(TrackableValueFlag::isActorDerived);
+  SILIsolationInfo::Kind getIsolationRegionInfoKind() const {
+    return regionInfo.getKind();
   }
+
+  ActorIsolation getActorIsolation() const {
+    return regionInfo.getActorIsolation();
+  }
+
+  void mergeIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
+    regionInfo = regionInfo.merge(newRegionInfo);
+  }
+
+  SILIsolationInfo getIsolationRegionInfo() const { return regionInfo; }
 
   TrackableValueID getID() const { return TrackableValueID(id); }
 
@@ -165,7 +182,9 @@ public:
     os << "TrackableValueState[id: " << id
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
-       << "][is_actor_derived: " << (isActorDerived() ? "yes" : "no") << "].";
+       << "][region_value_kind: ";
+    getIsolationRegionInfo().print(os);
+    os << "].";
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -207,6 +226,7 @@ public:
 
   SILValue getValue() const { return value.get<SILValue>(); }
   SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
+  bool hasRegionIntroducingInst() const { return value.is<SILInstruction *>(); }
   SILInstruction *getActorRegionIntroducingInst() const {
     return value.get<SILInstruction *>();
   }
@@ -249,7 +269,9 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
-  bool isActorDerived() const { return valueState.isActorDerived(); }
+  SILIsolationInfo getIsolationRegionInfo() const {
+    return valueState.getIsolationRegionInfo();
+  }
 
   TrackableValueID getID() const {
     return TrackableValueID(valueState.getID());
@@ -265,6 +287,13 @@ public:
   bool isTransferringParameter() const;
 
   void print(llvm::raw_ostream &os) const {
+    os << "TrackableValue. State: ";
+    valueState.print(os);
+    os << "\n    Rep Value: ";
+    getRepresentative().print(os);
+  }
+
+  void printVerbose(llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
     valueState.print(os);
     os << "\n    Rep Value: " << getRepresentative();
@@ -300,11 +329,6 @@ private:
       equivalenceClassValuesToState;
   llvm::DenseMap<unsigned, RepresentativeValue> stateIndexToEquivalenceClass;
 
-  /// A list of values that can never be transferred.
-  ///
-  /// This only includes function arguments.
-  std::vector<TrackableValueID> neverTransferredValueIDs;
-
   SILFunction *fn;
 
 public:
@@ -318,13 +342,12 @@ public:
   /// value" returns an empty SILValue.
   SILValue maybeGetRepresentative(Element trackableValueID) const;
 
-  bool isActorDerived(Element trackableValueID) const;
+  /// Returns the fake "representative value" for this element if it
+  /// exists. Returns nullptr otherwise.
+  SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
 
-  ArrayRef<Element> getNonTransferrableElements() const {
-    return neverTransferredValueIDs;
-  }
-
-  void sortUniqueNeverTransferredValues();
+  SILIsolationInfo getIsolationRegion(Element trackableValueID) const;
+  SILIsolationInfo getIsolationRegion(SILValue trackableValueID) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -333,15 +356,22 @@ public:
   getTrackableValue(SILValue value,
                     bool isAddressCapturedByPartialApply = false) const;
 
+  /// An actor introducing inst is an instruction that doesn't have any
+  /// non-Sendable parameters and produces a new value that has to be actor
+  /// isolated.
+  ///
+  /// This is just for looking up the ValueIsolationRegionInfo for a
+  /// instructionInst if we have one. So it is a find like function.
+  std::optional<TrackableValue> getTrackableValueForActorIntroducingInst(
+      SILInstruction *introducingInst) const;
+
 private:
   std::optional<TrackableValue> getValueForId(TrackableValueID id) const;
   std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
   TrackableValue
-  getActorIntroducingRepresentative(SILInstruction *introducingInst) const;
-  bool markValueAsActorDerived(SILValue value);
-  void addNeverTransferredValueID(TrackableValueID valueID) {
-    neverTransferredValueIDs.push_back(valueID);
-  }
+  getActorIntroducingRepresentative(SILInstruction *introducingInst,
+                                    SILIsolationInfo isolation) const;
+  bool mergeIsolationRegionInfo(SILValue value, SILIsolationInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   TrackableValueID lookupValueID(SILValue value);
 };
@@ -364,6 +394,8 @@ class RegionAnalysisFunctionInfo {
   PartitionOpTranslator *translator;
 
   TransferringOperandSetFactory ptrSetFactory;
+
+  IsolationHistory::Factory isolationHistoryFactory;
 
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different

@@ -1,6 +1,20 @@
 // RUN: %target-swift-frontend -enable-relative-protocol-witness-tables -module-name A -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-cpu --check-prefix=CHECK
 
+// Test with resilience enabled.
+// In this mode we still assume protocols to be "fragile"/non changeable.
+// RUN: %target-swift-frontend -enable-resilience -enable-fragile-relative-protocol-tables  -enable-relative-protocol-witness-tables -module-name A -primary-file %s -I %t -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-cpu --check-prefix=CHECK
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-fragile-relative-protocol-tables -enable-library-evolution -enable-relative-protocol-witness-tables -emit-module-path=%t/resilient.swiftmodule -module-name=resilient %S/Inputs/relative_protocol_witness_tables2.swift
+// Inputs/relative_protocol_witness_tables2.swift
+// RUN: %target-swift-frontend -enable-fragile-relative-protocol-tables -enable-relative-protocol-witness-tables -module-name A -primary-file %s -I %t -emit-ir -DWITH_RESILIENCE | %FileCheck %s --check-prefix=CHECK-%target-cpu --check-prefix=CHECK
+// RUN: %target-swift-frontend -enable-fragile-relative-protocol-tables -enable-relative-protocol-witness-tables -module-name A -primary-file %s -I %t -emit-ir -DWITH_RESILIENCE | %FileCheck %s --check-prefix=EVO
+// RUN: not --crash %target-swift-frontend -enable-fragile-relative-protocol-tables -enable-relative-protocol-witness-tables -module-name A -primary-file %s -I %t -emit-ir -DWITH_RESILIENCE -DEXPECT_CRASH 2>&1 | %FileCheck %s --check-prefix=CRASH
+
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
+
+#if WITH_RESILIENCE
+import resilient
+#endif
 
 func testVWT<T>(_ t: T) {
   var local = t
@@ -137,7 +151,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedAAWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA8FuncOnlyAAWP" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7BStructVAA9InheritedAAWP", i32 0, i32 1) to i64)) to i32),
-// CHECK-SAME   i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedA2aDP1cyyFTW" to i64),
+// CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedA2aDP1cyyFTW" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7BStructVAA9InheritedAAWP", i32 0, i32 2) to i64)) to i32)
 // CHECK-SAME: ], align 8
 
@@ -323,3 +337,30 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   [[T26:%.*]] = call ptr @swift_getWitnessTableRelative({{.*}}@"$s1A1XVyxGAA4BaseA2aERzlMc{{.*}}, ptr {{.*}}, ptr [[T24]])
 // CHECK:   [[T28:%.*]] = getelementptr inbounds ptr, ptr [[C0]], i32 1
 // CHECK:   store ptr [[T26]], ptr [[T28]]
+
+#if WITH_RESILIENCE
+public func requireFormallyResilientWitness<T: ResilientProto> (_ t: T) {
+  t.impl()
+}
+
+// EVO: define{{.*}} swiftcc void @"$s1A27useFormallyResilientWitnessyyF"()
+// EVO: call swiftcc void @"$s1A31requireFormallyResilientWitnessyyx9resilient0C5ProtoRzlF"(ptr noalias %{{[0-9]+}}, ptr %{{[0-9]+}}, ptr @"$s9resilient15ResilientStructVyxGAA0B5ProtoAAWP{{(.ptrauth)?}}")
+public func useFormallyResilientWitness() {
+  requireFormallyResilientWitness(ResilientStruct(1))
+}
+#endif
+
+#if EXPECT_CRASH
+protocol P {
+  func p()
+}
+
+@available(SwiftStdlib 5.9, *)
+struct G<each T> {}
+
+@available(SwiftStdlib 5.9, *)
+extension G: P where repeat each T: P {
+    func p() {}
+}
+// CRASH: not supported
+#endif

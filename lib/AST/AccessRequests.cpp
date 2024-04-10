@@ -52,6 +52,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     AbstractStorageDecl *storage = accessor->getStorage();
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::Read:
       return storage->getFormalAccess();
@@ -248,7 +249,7 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
 
     // Try to scope the extension's access to the least public type mentioned
     // in its where clause.
-    for (auto *typeDecl : typeDecls) {
+    for (auto *typeDecl : typeDecls.first) {
       if (isa<TypeAliasDecl>(typeDecl) || isa<NominalTypeDecl>(typeDecl)) {
         auto scope = typeDecl->getFormalAccessScope(ED->getDeclContext());
         maxScope = maxScope->intersectWith(scope);

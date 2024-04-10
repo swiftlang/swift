@@ -345,8 +345,8 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
 
   unsigned initialDiagCount = diagnosticEmitter.getDiagnosticCount();
 
-  auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
-                                            moveIntroducersToProcess.end());
+  auto moveIntroducers = llvm::ArrayRef(moveIntroducersToProcess.begin(),
+                                        moveIntroducersToProcess.end());
   while (!moveIntroducers.empty()) {
     MarkUnresolvedNonCopyableValueInst *markedValue = moveIntroducers.front();
 

@@ -47,28 +47,48 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   selfType = F.mapTypeIntoContext(selfType);
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
 
+  uint16_t ArgNo = 1; // Hardcoded for destructors.
+  auto dv = SILDebugVariable(selfDecl->isLet(), ArgNo);
+
   // If we have a move only type, then mark it with
   // mark_unresolved_non_copyable_value so we can't escape it.
-  if (selfType.isMoveOnly()) {
-    // For now, we do not handle move only class deinits. This is because we
-    // need to do a bit more refactoring to handle the weird way that it deals
-    // with ownership. But for simple move only deinits (like struct/enum), that
-    // are owned, lets mark them as needing to be no implicit copy checked so
-    // they cannot escape.
-    if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
-      selfValue = B.createMarkUnresolvedNonCopyableValueInst(
-          selfDecl, selfValue,
+  //
+  // For now, we do not handle move only class deinits. This is because we need
+  // to do a bit more refactoring to handle the weird way that it deals with
+  // ownership. But for simple move only deinits (like struct/enum), that are
+  // owned, lets mark them as needing to be no implicit copy checked so they
+  // cannot escape.
+  if (selfType.isMoveOnly() && !selfType.isAnyClassReferenceType()) {
+    if (getASTContext().LangOpts.hasFeature(
+            Feature::MoveOnlyPartialConsumption)) {
+      SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
+      addr = B.createMarkUnresolvedNonCopyableValueInst(
+          selfDecl, addr,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
               ConsumableAndAssignable);
+      if (selfValue->getType().isObject()) {
+        B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
+      } else {
+        B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
+      }
+      // drop_deinit invalidates any user-defined struct/enum deinit
+      // before the individual members are destroyed.
+      addr = B.createDropDeinit(selfDecl, addr);
+      selfValue = addr;
+    } else {
+      if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
+        selfValue = B.createMarkUnresolvedNonCopyableValueInst(
+            selfDecl, selfValue,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
+      }
     }
   }
 
   VarLocs[selfDecl] = VarLoc::get(selfValue);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
-  uint16_t ArgNo = 1; // Hardcoded for destructors.
-  B.createDebugValue(PrologueLoc, selfValue,
-                     SILDebugVariable(selfDecl->isLet(), ArgNo));
+  B.createDebugValue(PrologueLoc, selfValue, dv);
   return selfValue;
 }
 
@@ -614,7 +634,7 @@ public:
       // formal self parameter, but they do not pass an origFnType down,
       // so we can ignore that possibility.
       FormalParamTypes.emplace(SGF.getASTContext(), loweredParams, *origFnType,
-                               llvm::makeArrayRef(substFormalParams),
+                               llvm::ArrayRef(substFormalParams),
                                /*ignore final*/ false);
     }
 
@@ -769,7 +789,7 @@ private:
       SILValue value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
           loc, argrv.getValue());
       argrv = SGF.emitManagedRValueWithCleanup(value);
-      argrv = SGF.B.createMoveValue(loc, argrv, /*isLexical=*/true);
+      argrv = SGF.B.createMoveValue(loc, argrv, IsLexical);
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
@@ -804,7 +824,7 @@ private:
       // If we have an owned value, forward it into the
       // mark_unresolved_non_copyable_value to avoid an extra destroy_value.
       argrv = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, argrv);
-      argrv = SGF.B.createMoveValue(loc, argrv, true /*is lexical*/);
+      argrv = SGF.B.createMoveValue(loc, argrv, IsLexical);
       argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           loc, argrv,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -843,6 +863,7 @@ private:
 
     if (auto *allocStack = dyn_cast<AllocStackInst>(argrv.getValue())) {
       allocStack->setArgNo(ArgNo);
+      allocStack->setIsFromVarDecl();
       if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
               SGF.getModule()) &&
           SGF.F.getLifetime(pd, allocStack->getType()).isLexical())
@@ -1211,17 +1232,28 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 void SILGenFunction::emitProlog(
     DeclContext *DC, CaptureInfo captureInfo, ParameterList *paramList,
     ParamDecl *selfParam, Type resultType, std::optional<Type> errorType,
-    SourceLoc throwsLoc, std::optional<AbstractionPattern> origClosureType) {
+    SourceLoc throwsLoc) {
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
 
+  bool hasErasedIsolation =
+    (TypeContext && TypeContext->ExpectedLoweredType->hasErasedIsolation());
+
   uint16_t ArgNo = emitBasicProlog(DC, paramList, selfParam, resultType,
                                    errorType, throwsLoc,
                                    /*ignored parameters*/
-                                     captureInfo.getCaptures().size(),
-                                   origClosureType);
+                                     (hasErasedIsolation ? 1 : 0) +
+                                     captureInfo.getCaptures().size());
+
+  // If we're emitting into a type context that expects erased isolation,
+  // add (and ignore) the isolation parameter.
+  if (hasErasedIsolation) {
+    SILType ty = SILType::getOpaqueIsolationType(getASTContext());
+    SILValue val = F.begin()->createFunctionArgument(ty);
+    (void) val;
+  }
 
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
@@ -1265,7 +1297,7 @@ void SILGenFunction::emitProlog(
 
   emitExpectedExecutor();
 
-  // IMPORTANT: This block should be the last one in `emitProlog`, 
+  // IMPORTANT: This block should be the last one in `emitProlog`,
   // since it terminates BB and no instructions should be insterted after it.
   // Emit an unreachable instruction if a parameter type is
   // uninhabited
@@ -1421,11 +1453,13 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
 uint16_t SILGenFunction::emitBasicProlog(
     DeclContext *DC, ParameterList *paramList, ParamDecl *selfParam,
     Type resultType, std::optional<Type> errorType, SourceLoc throwsLoc,
-    unsigned numIgnoredTrailingParameters,
-    std::optional<AbstractionPattern> origClosureType) {
+    unsigned numIgnoredTrailingParameters) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getReducedType(genericSig);
+
+  std::optional<AbstractionPattern> origClosureType;
+  if (TypeContext) origClosureType = TypeContext->OrigType;
 
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()
@@ -1436,14 +1470,9 @@ uint16_t SILGenFunction::emitBasicProlog(
 
   std::optional<AbstractionPattern> origErrorType;
   if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
-    CanType substClosureType = origClosureType->getType()
-        .subst(origClosureType->getGenericSubstitutions())->getCanonicalType();
-    CanAnyFunctionType substClosureFnType =
-        cast<AnyFunctionType>(substClosureType);
-    if (auto optPair = origClosureType->getFunctionThrownErrorType(substClosureFnType)) {
-      origErrorType = optPair->first;
-      errorType = optPair->second;
-    }
+    origErrorType = origClosureType->getFunctionThrownErrorType();
+    if (origErrorType && !errorType)
+      errorType = origErrorType->getEffectiveThrownErrorType();
   } else if (errorType) {
     origErrorType = AbstractionPattern(genericSig.getCanonicalSignature(),
                                        (*errorType)->getCanonicalType());
@@ -1470,6 +1499,19 @@ uint16_t SILGenFunction::emitBasicProlog(
     if (throwsLoc.isValid())
       loc = throwsLoc;
     B.createDebugValue(loc, undef.getValue(), dbgVar);
+  }
+
+  for (auto &i : *B.getInsertionBB()) {
+    auto *alloc = dyn_cast<AllocStackInst>(&i);
+    if (!alloc)
+      continue;
+    auto varInfo = alloc->getVarInfo();
+    if (!varInfo || varInfo->ArgNo)
+      continue;
+    // The allocation has a varinfo but no argument number, which should not
+    // happen in the prolog. Unfortunately, some copies can generate wrong
+    // debug info, so we have to fix it here, by invalidating it.
+    alloc->invalidateVarInfo();
   }
 
   return ArgNo;

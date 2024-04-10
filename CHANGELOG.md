@@ -1,9 +1,93 @@
 # CHANGELOG
 
-> **Note**\
+> [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 6.0
+
+* Swift 5.10 missed a semantic check from [SE-0309][]. In type context, a reference to a
+  protocol `P` that has associated types or `Self` requirements should use
+  the `any` keyword, but this was not enforced in nested generic argument positions.
+  This is now an error as required by the proposal:
+
+  ```swift
+  protocol P { associatedtype A }
+  struct Outer<T> { struct Inner<U> { } }
+  let x = Outer<P>.Inner<P>()  // error
+  ```
+  To correct the error, add `any` where appropriate, for example
+  `Outer<any P>.Inner<any P>`.
+
+* Swift 5.10 accepted certain invalid opaque return types from [SE-0346][].
+  If a generic argument of a constrained opaque return type did not
+  satisfy the requirements on the primary associated type, the generic
+  argument was silently ignored and type checking would proceed as if it
+  weren't stated. This now results in a diagnostic:
+
+  ```swift
+  protocol P<A> { associatedtype A: Sequence }
+  struct G<A: Sequence>: P {}
+
+  func f() -> some P<Int> { return G<Array<Int>>() }  // error
+  ```
+
+  The return type above should be written as `some P<Array<Int>>` to match
+  the return statement. The old broken behavior in this situation can also
+  be restored, by removing the erroneous constraint and using the more general
+  upper bound `some P`.
+
+* [SE-0408][]:
+  A `for`-`in` loop statement can now accept a pack expansion expression,
+  enabling iteration over the elements of its respective value pack. This form
+  supports pattern matching, control transfer statements, and other features
+  available to a `Sequence`-driven `for`-`in` loop, except for the `where`
+  clause. Below is an example implementation of the equality operator for
+  tuples of arbitrary length using pack iteration:
+
+  ```swift
+  func == <each Element: Equatable>(lhs: (repeat each Element),
+                                    rhs: (repeat each Element)) -> Bool {
+
+    for (left, right) in repeat (each lhs, each rhs) {
+      guard left == right else { return false }
+    }
+    return true
+  }
+  ```
+
+  The elements of the value pack corresponding to the pack expansion expression
+  are evaluated on demand, meaning the i<sup>th</sup> element is evaluated on
+  the i<sup>th</sup> iteration:
+
+  ```swift
+  func doSomething(_: some Any) {}
+
+  func evaluateFirst<each T>(_ t: repeat each T) {
+    for _ in repeat doSomething(each t) {
+      break
+    }
+  }
+
+  evaluateFirst(1, 2, 3) 
+  // 'doSomething' will be called only on the first element of the pack.
+  ```
+
+* [SE-0352][]:
+  The Swift 6 language mode will open existential values with
+  "self-conforming" types (such as `any Error` or `@objc` protocols)
+  passed to generic functions. For example:
+
+  ```swift
+  func takeError<E: Error>(_ error: E) { }
+
+  func passError(error: any Error) {
+    takeError(error)  // Swift 5 does not open `any Error`, Swift 6 does
+  }
+  ```
+
+  This behavior can be enabled prior to the Swift 6 language mode
+  using the upcoming language feature `ImplicitOpenExistentials`.
+
 * [SE-0422][]:
   Non-built-in expression macros can now be used as default arguments that
   expand at each call site. For example, a custom `#CurrentFile` macro used as
@@ -146,7 +230,9 @@
 
 ## Swift 5.10
 
-* Swift 5.10 closes all known static data-race safey holes in complete strict
+### 2024-03-05 (Xcode 15.3)
+
+* Swift 5.10 closes all known static data-race safety holes in complete strict
 concurrency checking.
 
   When writing code against `-strict-concurrency=complete`, Swift 5.10 will
@@ -284,6 +370,8 @@ concurrency checking.
   guaranteed to be evaluated in the callee's isolation domain.
 
 ## Swift 5.9.2
+
+### 2023-12-11 (Xcode 15.1)
 
 * [SE-0407][]:
 
@@ -10129,10 +10217,12 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0394]: https://github.com/apple/swift-evolution/blob/main/proposals/0394-swiftpm-expression-macros.md
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
+[SE-0408]: https://github.com/apple/swift-evolution/blob/main/proposals/0408-pack-iteration.md
 [SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
 [SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
+[SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

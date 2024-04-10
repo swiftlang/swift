@@ -609,6 +609,40 @@ enum class MangledTypeRefRole {
   FlatUnique,
 };
 
+
+struct AccessibleFunction {
+private:
+  std::string RecordName;
+  std::string FunctionName;
+
+  bool IsDistributed: 1;
+
+  CanSILFunctionType Type;
+  llvm::Constant *Address;
+
+  explicit AccessibleFunction(std::string recordName, std::string funcName,
+                              bool isDistributed, CanSILFunctionType type,
+                              llvm::Constant *addr)
+      : RecordName(recordName), FunctionName(funcName),
+        IsDistributed(isDistributed), Type(type), Address(addr) {}
+
+public:
+  StringRef getRecordName() const { return RecordName; }
+  StringRef getFunctionName() const { return FunctionName; }
+
+  bool isDistributed() const { return IsDistributed; }
+
+  CanSILFunctionType getType() const { return Type; }
+
+  llvm::Constant *getAddress() const { return Address; }
+
+  static AccessibleFunction forSILFunction(IRGenModule &IGM, SILFunction *func);
+  static AccessibleFunction forDistributed(std::string recordName,
+                                           std::string accessorName,
+                                           CanSILFunctionType type,
+                                           llvm::Constant *address);
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -771,9 +805,6 @@ public:
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
-  llvm::StructType
-      *AccessibleProtocolRequirementFunctionRecordTy; // { i32*, i32*, i32*,
-                                                      // i32, i32*, i32*}
 
   // clang-format off
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
@@ -785,9 +816,10 @@ public:
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
   llvm::PointerType *SwiftAsyncLetPtrTy;
-  llvm::IntegerType *SwiftTaskOptionRecordPtrTy;
+  llvm::PointerType *SwiftTaskOptionRecordPtrTy;
   llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::StructType  *SwiftTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialSerialExecutorTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
@@ -1151,7 +1183,7 @@ public:
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
-  void addAccessibleFunction(SILFunction *func);
+  void addAccessibleFunction(AccessibleFunction func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
@@ -1159,10 +1191,7 @@ public:
 
   void emitAccessibleFunctions();
   void emitAccessibleFunction(StringRef sectionName,
-                              std::string mangledRecordName,
-                              std::optional<std::string> mangledActorName,
-                              std::string mangledFunctionName,
-                              SILFunction *func);
+                              const AccessibleFunction &func);
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1310,7 +1339,7 @@ private:
 
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
-  SmallVector<SILFunction *, 4> AccessibleFunctions;
+  SmallVector<AccessibleFunction, 4> AccessibleFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
@@ -1574,10 +1603,13 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
-  Signature getSignature(CanSILFunctionType fnType);
-  Signature getSignature(CanSILFunctionType fnType,
-                         FunctionPointerKind kind,
-                         bool forStaticCall = false);
+  Signature
+  getSignature(CanSILFunctionType fnType,
+               const clang::CXXConstructorDecl *cxxCtorDecl = nullptr);
+  Signature
+  getSignature(CanSILFunctionType fnType, FunctionPointerKind kind,
+               bool forStaticCall = false,
+               const clang::CXXConstructorDecl *cxxCtorDecl = nullptr);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
@@ -1816,10 +1848,14 @@ public:
   Address getAddrOfObjCISAMask();
 
   llvm::Function *
-  getAddrOfDistributedTargetAccessor(SILFunction *F,
+  getAddrOfDistributedTargetAccessor(LinkEntity accessor,
                                      ForDefinition_t forDefinition);
 
-  void emitDistributedTargetAccessor(SILFunction *method);
+  /// Emit a distributed accessor function for the given distributed thunk or
+  /// protocol requirement.
+  void emitDistributedTargetAccessor(
+      llvm::PointerUnion<SILFunction *, AbstractFunctionDecl *>
+          thunkOrRequirement);
 
   llvm::Constant *getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn);
 

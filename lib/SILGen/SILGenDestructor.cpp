@@ -264,6 +264,18 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
                                 dd->getDeclContext()->getSelfNominalTypeDecl(),
                                 cleanupLoc);
 
+  if (getASTContext().LangOpts.hasFeature(
+          Feature::MoveOnlyPartialConsumption)) {
+    if (auto *ddi = dyn_cast<DropDeinitInst>(selfValue)) {
+      if (auto *mu =
+              dyn_cast<MarkUnresolvedNonCopyableValueInst>(ddi->getOperand())) {
+        if (auto *asi = dyn_cast<AllocStackInst>(mu->getOperand())) {
+          B.createDeallocStack(loc, asi);
+        }
+      }
+    }
+  }
+
   // Return.
   B.createReturn(loc, emitEmptyTuple(loc));
 }
@@ -506,15 +518,19 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
 void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
                                                    NominalTypeDecl *nom,
                                                    CleanupLocation cleanupLoc) {
-  // drop_deinit invalidates any user-defined struct/enum deinit
-  // before the individual members are destroyed.
-  selfValue = B.createDropDeinit(cleanupLoc, selfValue);
+  if (!isa<DropDeinitInst>(selfValue)) {
+    // drop_deinit invalidates any user-defined struct/enum deinit
+    // before the individual members are destroyed.
+    selfValue = B.createDropDeinit(cleanupLoc, selfValue);
+  }
   if (selfValue->getType().isObject()) {
     // A destroy value that uses the result of a drop_deinit implicitly performs
     // memberwise destruction.
     B.emitDestroyValueOperation(cleanupLoc, selfValue);
     return;
   }
+  // self has been stored into a temporary
+  assert(!selfValue->getType().isObject());
   if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
     for (VarDecl *vd : nom->getStoredProperties()) {
       const TypeLowering &ti = getTypeLowering(vd->getTypeInContext());

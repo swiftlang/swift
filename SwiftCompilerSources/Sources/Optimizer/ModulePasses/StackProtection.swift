@@ -355,7 +355,7 @@ private struct StackProtectionOptimization {
   /// Moves the value of a `beginAccess` to a temporary stack location, if possible.
   private func moveToTemporary(scope beginAccess: BeginAccessInst, mustFixStackNesting: inout Bool,
                                _ context: FunctionPassContext) {
-    if beginAccess.accessKind != .Modify {
+    if beginAccess.accessKind != .modify {
       // We can only move from a `modify` access.
       // Also, read-only accesses shouldn't be subject to buffer overflows (because
       // no one should ever write to such a storage).
@@ -455,7 +455,7 @@ private extension AccessBase {
 
   var isStackAllocated: IsStackAllocatedResult {
     switch self {
-      case .stack:
+      case .stack, .storeBorrow:
         return .yes
       case .box, .global:
         return .no

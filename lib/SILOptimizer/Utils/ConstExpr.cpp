@@ -520,7 +520,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // TODO: Certain covariant or otherwise ABI-compatible conversions should
   // be handled as well.
   if (auto cf = dyn_cast<ConvertFunctionInst>(value)) {
-    if (cf->onlyConvertsSubstitutions()) {
+    if (cf->onlyConvertsSubstitutions() || cf->onlyConvertsSendable()) {
       return getConstantValue(cf->getOperand());
     }
   }

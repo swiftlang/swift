@@ -269,7 +269,8 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       // We cannot emit the witness table symbol if the protocol is imported
       // from another module and it's resilient, because initialization of that
       // protocol is necessary in this case
-      if (!rootConformance->getProtocol()->isResilient(
+      if (Ctx.getOpts().FragileResilientProtocols ||
+          !rootConformance->getProtocol()->isResilient(
               IDC->getAsGenericContext()->getParentModule(),
               ResilienceExpansion::Maximal))
         Visitor.addProtocolWitnessTable(rootConformance);
@@ -288,7 +289,9 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
             return;
 
           if (!isa<SelfProtocolConformance>(rootConformance) &&
-              !fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+              !fixmeWitnessHasLinkageThatNeedsToBePublic(
+                  witnessRef,
+                  witnessRef.getASTContext().SILOpts.EnableSerializePackage)) {
             return;
           }
         }
@@ -465,7 +468,8 @@ public:
 
       auto specializedSignature = attr->getSpecializedSignature(AFD);
       auto erasedSignature =
-          specializedSignature.typeErased(attr->getTypeErasedParams());
+          SILSpecializeAttr::buildTypeErasedSignature(specializedSignature,
+                                                      attr->getTypeErasedParams());
 
       if (auto *targetFun = attr->getTargetFunctionDecl(AFD)) {
         addFunction(SILDeclRef(targetFun, erasedSignature),

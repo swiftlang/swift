@@ -96,7 +96,7 @@ static bool looksLikeInitMethod(ObjCSelector selector) {
   ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
   assert(!selectorPieces.empty());
   auto firstPiece = selectorPieces.front().str();
-  if (!firstPiece.startswith("init")) return false;
+  if (!firstPiece.starts_with("init")) return false;
   return !(firstPiece.size() > 4 && clang::isLowercase(firstPiece[4]));
 }
 
@@ -383,16 +383,9 @@ private:
           printMembers(SD->getMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
-            SmallVector<Requirement, 2> reqs;
-            SmallVector<InverseRequirement, 2> inverseReqs;
-            if (auto sig = ed->getGenericSignature()) {
-              sig->getRequirementsWithInverses(reqs, inverseReqs);
-              assert(inverseReqs.empty() &&
-                     "Non-copyable generics not supported here!");
-              // FIXME: support requirements.
-              if (!reqs.empty())
-                continue;
-            }
+            if (!cxx_translation::isExposableToCxx(ed->getGenericSignature()))
+              continue;
+
             printMembers(ed->getMembers());
           }
         },
@@ -876,6 +869,14 @@ private:
           os << "\n";
 
           printMembers(ED->getMembers());
+
+          for (const auto *ext :
+               owningPrinter.interopContext.getExtensionsForNominalType(ED)) {
+            if (!cxx_translation::isExposableToCxx(ext->getGenericSignature()))
+              continue;
+
+            printMembers(ext->getMembers());
+          }
         },
         owningPrinter);
     recordEmittedDeclInCurrentCxxLexicalScope(ED);
@@ -957,11 +958,26 @@ private:
 
   template <typename T>
   static const T *findClangBase(const T *member) {
-    while (member) {
-      if (member->getClangDecl())
-        return member;
-      member = member->getOverriddenDecl();
+    // Search overridden members.
+    const T *ancestorMember = member;
+    while (ancestorMember) {
+      if (ancestorMember->getClangDecl())
+        return ancestorMember;
+      ancestorMember = ancestorMember->getOverriddenDecl();
     }
+
+    // Search witnessed requirements.
+    // FIXME: Semi-arbitrary behavior if `member` witnesses several requirements
+    // (The conformance which sorts first will be used; the others will be
+    // ignored.)
+    for (const ValueDecl *requirementVD :
+            member->getSatisfiedProtocolRequirements(/*Sorted=*/true)) {
+      const T *requirement = dyn_cast<T>(requirementVD);
+      if (requirement && requirement->getClangDecl())
+        return requirement;
+    }
+
+    // No related clang members found.
     return nullptr;
   }
 
@@ -1394,7 +1410,10 @@ private:
   /// Print C or C++ trailing attributes for a function declaration.
   void printFunctionClangAttributes(FuncDecl *FD, AnyFunctionType *funcTy) {
     if (funcTy->getResult()->isUninhabited()) {
-      os << " SWIFT_NORETURN";
+      if (funcTy->isThrowing())
+        os << " SWIFT_NORETURN_EXCEPT_ERRORS";
+      else
+        os << " SWIFT_NORETURN";
     } else if (!funcTy->getResult()->isVoid() &&
                !FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
       os << " SWIFT_WARN_UNUSED_RESULT";
@@ -1473,8 +1492,13 @@ private:
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
-    if (!funcTy->isThrowing())
+    if (!funcTy->isThrowing()) {
       os << " SWIFT_NOEXCEPT";
+      // Lowered Never-returning functions *are* considered to return when they
+      // throw, so only use SWIFT_NORETURN on non-throwing functions.
+      if (funcTy->getResult()->isUninhabited())
+        os << " SWIFT_NORETURN";
+    }
     if (!funcABI.useCCallingConvention())
       os << " SWIFT_CALL";
     printAvailability(FD);
@@ -2776,13 +2800,13 @@ static bool isStringNestedType(const ValueDecl *VD, StringRef Typename) {
              VD->getASTContext().getStringDecl();
 }
 
-static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
+static bool hasExposeAttr(const ValueDecl *VD) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
     if (VD == VD->getASTContext().getStringDecl())
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
-    if (VD == VD->getASTContext().getOptionalDecl() && !isExtension)
+    if (VD == VD->getASTContext().getOptionalDecl())
       return true;
     if (isStringNestedType(VD, "UTF8View") || isStringNestedType(VD, "Index"))
       return true;
@@ -2819,7 +2843,7 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
         return false;
     }
 
-    return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
+    return hasExposeAttr(ED->getExtendedNominal());
   }
   return false;
 }
@@ -2839,7 +2863,7 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
     return true;
   // Exclude overrides in an @_objcImplementation extension; the decl they're
   // overriding is declared elsewhere.
-  if (VD->isImplicit() && VD->getOverriddenDecl()) {
+  if (VD->getOverriddenDecl()) {
     auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
     if (ED && ED->isObjCImplementation())
       return true;
@@ -2955,7 +2979,7 @@ DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
       sourceMgr.getImmediateExpansionRange(loc).getBegin();
   clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
 
-  if (!sourceMgr.getFilename(spellingLoc).endswith("/os/object.h"))
+  if (!sourceMgr.getFilename(spellingLoc).ends_with("/os/object.h"))
     return StringRef();
 
   return name;

@@ -256,7 +256,7 @@ private:
         return Options.DisplayObjCModule;
       if (Context->getText() == Options.HidingCurrentModule)
         return false;
-      if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
+      if (Context->getText().starts_with(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
         return Options.DisplayDebuggerGeneratedModule;
     }
     return true;
@@ -425,6 +425,7 @@ private:
     case Node::Kind::ImplDifferentiabilityKind:
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplErasedIsolation:
+    case Node::Kind::ImplTransferringResult:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplParameterResultDifferentiability:
     case Node::Kind::ImplParameterTransferring:
@@ -432,6 +433,7 @@ private:
     case Node::Kind::ImplFunctionConvention:
     case Node::Kind::ImplFunctionConventionName:
     case Node::Kind::ImplFunctionType:
+    case Node::Kind::ImplCoroutineKind:
     case Node::Kind::ImplInvocationSubstitutions:
     case Node::Kind::ImplPatternSubstitutions:
     case Node::Kind::ImplicitClosure:
@@ -595,6 +597,7 @@ private:
     case Node::Kind::AnonymousContext:
     case Node::Kind::AnyProtocolConformanceList:
     case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::PackProtocolConformance:
     case Node::Kind::DependentAssociatedConformance:
     case Node::Kind::DependentProtocolConformanceAssociated:
     case Node::Kind::DependentProtocolConformanceInherited:
@@ -633,7 +636,6 @@ private:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
     case Node::Kind::AccessibleFunctionRecord:
-    case Node::Kind::AccessibleProtocolRequirementFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::ExtendedExistentialTypeShape:
@@ -645,6 +647,7 @@ private:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
     case Node::Kind::ParamLifetimeDependence:
     case Node::Kind::SelfLifetimeDependence:
+    case Node::Kind::DependentGenericInverseConformanceRequirement:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -976,6 +979,7 @@ private:
   void printImplFunctionType(NodePointer fn, unsigned depth) {
     NodePointer patternSubs = nullptr;
     NodePointer invocationSubs = nullptr;
+    NodePointer transferringResult = nullptr;
     enum State { Attrs, Inputs, Results } curState = Attrs;
     auto transitionTo = [&](State newState) {
       assert(newState >= curState);
@@ -989,7 +993,14 @@ private:
           }
           Printer << '(';
           continue;
-        case Inputs: Printer << ") -> ("; continue;
+        case Inputs:
+          Printer << ") -> ";
+          if (transferringResult) {
+            print(transferringResult, depth + 1);
+            Printer << " ";
+          }
+          Printer << "(";
+          continue;
         case Results: printer_unreachable("no state after Results");
         }
         printer_unreachable("bad state");
@@ -1011,6 +1022,8 @@ private:
         patternSubs = child;
       } else if (child->getKind() == Node::Kind::ImplInvocationSubstitutions) {
         invocationSubs = child;
+      } else if (child->getKind() == Node::Kind::ImplTransferringResult) {
+        transferringResult = child;
       } else {
         assert(curState == Attrs);
         print(child, depth + 1);
@@ -2311,11 +2324,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "accessible function runtime record for ";
     }
     return nullptr;
-  case Node::Kind::AccessibleProtocolRequirementFunctionRecord:
-    if (!Options.ShortenThunk) {
-      Printer << "accessible distributed function runtime record for ";
-    }
-    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -2753,6 +2761,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
+    return nullptr;    
+  case Node::Kind::ImplCoroutineKind:
+    // Skip if text is empty.
+    if (Node->getText().empty())
+      return nullptr;
+    // Otherwise, print with leading @.
+    Printer << '@' << Node->getText();
+    return nullptr;
+  case Node::Kind::ImplTransferringResult:
+    Printer << "transferring";
     return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
@@ -2852,6 +2870,20 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(type, depth + 1);
     Printer << ": ";
     print(reqt, depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::DependentGenericInverseConformanceRequirement: {
+    NodePointer type = Node->getChild(0);
+    print(type, depth + 1);
+    Printer << ": ~";
+    switch (Node->getChild(1)->getIndex()) {
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+    case Bit: Printer << "Swift." << #Name; break;
+#include "swift/ABI/InvertibleProtocols.def"
+    default:
+      Printer << "Swift.<bit " << Node->getChild(1)->getIndex() << ">";
+      break;
+    }
     return nullptr;
   }
   case Node::Kind::DependentGenericLayoutRequirement: {
@@ -3083,12 +3115,31 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     printChildren(Node, depth);
     return nullptr;
   case Node::Kind::AnyProtocolConformanceList:
-    printChildren(Node, depth);
+    if (Node->getNumChildren() > 0) {
+      Printer << "(";
+      for (unsigned i = 0; i < Node->getNumChildren(); ++i) {
+        if (i > 0)
+          Printer << ", ";
+        print(Node->getChild(i), depth + 1);
+      }
+      Printer << ")";
+    }
     return nullptr;
   case Node::Kind::ConcreteProtocolConformance:
     Printer << "concrete protocol conformance ";
     if (Node->hasIndex())
       Printer << "#" << Node->getIndex() << " ";
+    print(Node->getChild(0), depth + 1);
+    Printer << " to ";
+    print(Node->getChild(1), depth + 1);
+    if (Node->getNumChildren() > 2 &&
+        Node->getChild(2)->getNumChildren() > 0) {
+      Printer << " with conditional requirements: ";
+      print(Node->getChild(2), depth + 1);
+    }
+    return nullptr;
+  case Node::Kind::PackProtocolConformance:
+    Printer << "pack protocol conformance ";
     printChildren(Node, depth);
     return nullptr;
   case Node::Kind::DependentAssociatedConformance:
@@ -3099,18 +3150,21 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "dependent associated protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::DependentProtocolConformanceInherited:
     Printer << "dependent inherited protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::DependentProtocolConformanceRoot:
     Printer << "dependent root protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::ProtocolConformanceRefInTypeModule:

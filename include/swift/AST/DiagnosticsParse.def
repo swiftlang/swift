@@ -88,8 +88,6 @@ WARNING(escaped_parameter_name,none,
 
 ERROR(forbidden_interpolated_string,none,
       "%0 cannot be an interpolated string literal", (StringRef))
-ERROR(forbidden_multiline_string,none,
-      "%0 cannot be a multi-line string literal", (StringRef))
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
@@ -1298,6 +1296,8 @@ ERROR(anon_closure_tuple_param_destructuring,none,
       "closure tuple parameter does not support destructuring", ())
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
+ERROR(nonisolated_closure_parameter_parentheses,none,
+      "the parameter list of a 'nonisolated' closure requires parentheses", ())
 ERROR(expected_capture_specifier,none,
       "expected 'weak', 'unowned', or no specifier in capture list", ())
 ERROR(expected_capture_specifier_name,none,
@@ -1891,6 +1891,10 @@ ERROR(attr_rawlayout_expected_params,none,
 
 ERROR(attr_extern_expected_label,none,
       "expected %0 argument to @_extern attribute", (StringRef))
+
+ERROR(attr_expected_feature_name,none,
+      "expected feature name in @%0 attribute", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1941,7 +1945,7 @@ ERROR(platform_condition_expected_argument,none,
       "expected argument to platform condition",
       ())
 ERROR(platform_condition_expected_one_argument,none,
-      "expected only one argument to platform condition",
+      "expected only one unlabeled argument to platform condition",
       ())
 ERROR(unsupported_platform_runtime_condition_argument,none,
       "unexpected argument for the '_runtime' condition; "

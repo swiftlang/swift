@@ -246,7 +246,9 @@ int Requirement::compare(const Requirement &other) const {
   return compareProtos;
 }
 
-CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requirements) {
+static std::optional<CheckRequirementsResult>
+checkRequirementsImpl(ArrayRef<Requirement> requirements,
+                      bool allowTypeParameters) {
   SmallVector<Requirement, 4> worklist(requirements.begin(), requirements.end());
 
   bool hadSubstFailure = false;
@@ -258,12 +260,20 @@ CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requireme
 #ifndef NDEBUG
   {
     auto firstType = req.getFirstType();
-    assert(!firstType->hasTypeParameter());
+    assert((allowTypeParameters || !firstType->hasTypeParameter())
+           && "must take a contextual type. if you really are ok with an "
+            "indefinite answer (and usually YOU ARE NOT), then consider whether "
+            "you really, definitely are ok with an indefinite answer, and "
+            "use `checkRequirementsWithoutContext` instead");
     assert(!firstType->hasTypeVariable());
 
     if (req.getKind() != RequirementKind::Layout) {
       auto secondType = req.getSecondType();
-      assert(!secondType->hasTypeParameter());
+      assert((allowTypeParameters || !secondType->hasTypeParameter())
+             && "must take a contextual type. if you really are ok with an "
+              "indefinite answer (and usually YOU ARE NOT), then consider whether "
+              "you really, definitely are ok with an indefinite answer, and "
+              "use `checkRequirementsWithoutContext` instead");
       assert(!secondType->hasTypeVariable());
     }
   }
@@ -276,6 +286,12 @@ CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requireme
       break;
 
     case CheckRequirementResult::RequirementFailure:
+      // If a requirement failure was caused by a context-free type parameter,
+      // then we can't definitely know whether it would have satisfied the
+      // requirement without context.
+      if (req.getFirstType()->isTypeParameter()) {
+        return std::nullopt;
+      }
       return CheckRequirementsResult::RequirementFailure;
 
     case CheckRequirementResult::SubstitutionFailure:
@@ -288,6 +304,19 @@ CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requireme
     return CheckRequirementsResult::SubstitutionFailure;
 
   return CheckRequirementsResult::Success;
+}
+
+CheckRequirementsResult
+swift::checkRequirements(ArrayRef<Requirement> requirements) {
+  // This entry point requires that there are no type parameters in any of the
+  // requirements, so the underlying check should always produce a result.
+  return checkRequirementsImpl(requirements, /*allow type parameters*/ false)
+    .value();
+}
+
+std::optional<CheckRequirementsResult>
+swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
+  return checkRequirementsImpl(requirements, /*allow type parameters*/ true);
 }
 
 CheckRequirementsResult swift::checkRequirements(
@@ -316,93 +345,31 @@ InvertibleProtocolKind InverseRequirement::getKind() const {
   return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
 }
 
-void InverseRequirement::enumerateDefaultedParams(
-    GenericContext *genericContext,
-    SmallVectorImpl<Type> &result) {
-
-  auto add = [&](Type t) {
-    assert(t->isTypeParameter());
-    result.push_back(t);
-  };
-
-  // Nothing to enumerate if it's not generic.
-  if (!genericContext->isGeneric())
-    return;
-
-  if (auto proto = dyn_cast<ProtocolDecl>(genericContext)) {
-    add(proto->getSelfInterfaceType());
-
-    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
-      add(assocTypeDecl->getDeclaredInterfaceType());
-
-    return;
-  }
-
-  for (GenericTypeParamDecl *gtpd : *genericContext->getGenericParams())
-    add(gtpd->getDeclaredInterfaceType());
-}
-
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
-      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return;
-
-  SmallVector<ProtocolDecl*, NumInvertibleProtocols> defaults;
-  expandDefaults(ctx, /*inverses=*/{}, defaults);
-
-  // Fast-path.
-  if (defaults.empty())
-    return;
-
   for (auto gp : gps) {
-    for (auto *proto : defaults) {
-      auto protoTy = proto->getDeclaredInterfaceType();
-      result.push_back({{RequirementKind::Conformance, gp, protoTy},
-                        SourceLoc()});
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      result.push_back({{RequirementKind::Conformance, gp,
+                         proto->getDeclaredInterfaceType()},
+                         SourceLoc()});
     }
   }
 }
 
-void InverseRequirement::expandDefaults(
-    ASTContext &ctx,
-    InvertibleProtocolSet inverses,
-    SmallVectorImpl<ProtocolDecl*> &protocols) {
+/// Linear order on inverse requirements in a generic signature.
+int InverseRequirement::compare(const InverseRequirement &other) const {
+  int compareLHS =
+      compareDependentTypes(subject, other.subject);
 
-  // Skip unless noncopyable generics is enabled
-  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
-    return;
+  if (compareLHS != 0)
+    return compareLHS;
 
-  // Try to add all invertible protocols, unless:
-  //  - an inverse was provided
-  //  - an existing protocol already requires it
-  for (auto ip : InvertibleProtocolSet::full()) {
-    // This matches with `lookupExistentialConformance`'s use of 'inheritsFrom'.
-    bool alreadyRequired = false;
-    for (auto proto : protocols) {
-      if (proto->isSpecificProtocol(getKnownProtocolKind(ip))
-          || proto->requiresInvertible(ip)) {
-        alreadyRequired = true;
-        break;
-      }
-    }
+  int compareProtos =
+      TypeDecl::compare(protocol, other.protocol);
+  assert(compareProtos != 0 && "Duplicate conformance requirements");
 
-    // If some protocol member already implies P, then we don't need to
-    // add a requirement for P.
-    if (alreadyRequired) {
-      assert(!inverses.contains(ip) && "cannot require P and ~P");
-      continue;
-    }
-
-    // Nothing implies P, so unless there's an inverse ~P, add the requirement.
-    if (inverses.contains(ip))
-      continue;
-
-    auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-    assert(proto && "missing Copyable/Escapable from stdlib!");
-
-    protocols.push_back(proto);
-  }
+  return compareProtos;
 }

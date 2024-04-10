@@ -61,6 +61,9 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
   }
 }
 
+@available(*, unavailable)
+extension __SwiftNativeNSArrayWithContiguousStorage: Sendable {}
+
 private let NSNotFound: Int = .max
 
 // Implement the APIs required by NSArray 
@@ -322,6 +325,9 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   }
 }
 
+@available(*, unavailable)
+extension _SwiftNSMutableArray: Sendable {}
+
 /// An `NSArray` whose contiguous storage is created and filled, upon
 /// first access, by bridging the elements of a Swift `Array`.
 ///
@@ -429,6 +435,9 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   }
 }
 
+@available(*, unavailable)
+extension __SwiftDeferredNSArray: Sendable {}
+
 /// A `__SwiftDeferredNSArray` which is used for static read-only Swift Arrays.
 ///
 /// In contrast to its base class, `__SwiftDeferredStaticNSArray` is generic
@@ -500,6 +509,10 @@ internal class __SwiftNativeNSArrayWithContiguousStorage {
   @inlinable
   deinit {}
 }
+
+@available(*, unavailable)
+extension __SwiftNativeNSArrayWithContiguousStorage: Sendable {}
+
 #endif
 
 /// Base class of the heap buffer backing arrays.  
@@ -580,3 +593,6 @@ internal class __ContiguousArrayStorageBase
       self !== _emptyArrayStorage, "Deallocating empty array storage?!")
   }
 }
+
+@available(*, unavailable)
+extension __ContiguousArrayStorageBase: Sendable {}

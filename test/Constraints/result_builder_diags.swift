@@ -313,9 +313,9 @@ func acceptMetatype<T>(_: T.Type) -> Bool { true }
 
 func syntacticUses<T>(_: T) {
   tuplify(true) { x in
-    if x && acceptMetatype(T) { // expected-error{{expected member name or constructor call after type name}}
+    if x && acceptMetatype(T) { // expected-error{{expected member name or initializer call after type name}}
       // expected-note@-1{{use '.self' to reference the type object}}
-      acceptMetatype(T) // expected-error{{expected member name or constructor call after type name}}
+      acceptMetatype(T) // expected-error{{expected member name or initializer call after type name}}
       // expected-note@-1{{use '.self' to reference the type object}}
     }
   }
@@ -837,7 +837,7 @@ func test_rdar89742267() {
     @Builder var body: S {
       switch entry {
       case .listen: S()
-      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in Swift 6}}
+      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in the Swift 6 language mode}}
       default: S()
       }
     }

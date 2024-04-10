@@ -16,6 +16,12 @@ public class C {
 @_originallyDefinedIn(module: "original", OSX 10.13)
 public class D {}
 
+@_originallyDefinedIn(module: "original", macOS) // expected-error {{expected version number in '@_originallyDefinedIn' attribute}}
+public func missingVersion() {}
+
+@_originallyDefinedIn(module: "original", macOS 0) // expected-warning {{expected version number in '@_originallyDefinedIn' attribute; this is an error in the Swift 6 language mode}}
+public func versionZero() {}
+
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", _myProject 2.0) // expected-error {{reference to undefined version '2.0' for availability macro '_myProject'}}
 public func macroVersioned() {}

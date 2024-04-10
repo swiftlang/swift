@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s | %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s | %target-sil-opt -enable-experimental-feature TransferringArgsAndResults -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete | %FileCheck %s
 
 sil_stage raw
 

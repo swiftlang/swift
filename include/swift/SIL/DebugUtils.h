@@ -488,11 +488,11 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(**this)->getUsesMoveableValueDebugInfo();
+      return cast<DebugValueInst>(**this)->usesMoveableValueDebugInfo();
     case Kind::AllocStack:
-      return cast<AllocStackInst>(**this)->getUsesMoveableValueDebugInfo();
+      return cast<AllocStackInst>(**this)->usesMoveableValueDebugInfo();
     case Kind::AllocBox:
-      return cast<AllocBoxInst>(**this)->getUsesMoveableValueDebugInfo();
+      return cast<AllocBoxInst>(**this)->usesMoveableValueDebugInfo();
     }
   }
 

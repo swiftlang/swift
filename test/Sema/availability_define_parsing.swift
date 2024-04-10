@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -typecheck %s \
+// RUN: not %target-swift-frontend -typecheck %s -diagnostic-style llvm \
 // RUN:   -define-availability "_brokenParse:a b c d" \
 // RUN:   -define-availability ":a b c d" \
 // RUN:   -define-availability "_justAName" \

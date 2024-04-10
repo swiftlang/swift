@@ -3472,7 +3472,7 @@ public:
   /// path element.
   ConstraintLocator *
   getConstraintLocator(ASTNode anchor, ConstraintLocator::PathElement pathElt) {
-    return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt),
+    return getConstraintLocator(anchor, llvm::ArrayRef(pathElt),
                                 pathElt.getNewSummaryFlags());
   }
 
@@ -4370,8 +4370,8 @@ public:
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
-  AnyFunctionType *adjustFunctionTypeForConcurrency(
-      AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+  FunctionType *adjustFunctionTypeForConcurrency(
+      FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
       OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
 

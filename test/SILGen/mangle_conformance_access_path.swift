@@ -2,8 +2,6 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/mangle_conformance_access_path_helper.swift -emit-module-path %t/mangle_conformance_access_path_helper.swiftmodule
 // RUN: %target-swift-frontend -emit-silgen %s -I %t | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 import mangle_conformance_access_path_helper
 
 struct GG<T : P> {}

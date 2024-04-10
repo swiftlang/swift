@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -295,7 +296,8 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
 
   auto fixupSILForLifetimeExtension = [&](SILValue value, SILValue entryValue) {
     // Use SSAUpdater to find insertion points for lifetime ends.
-    updater.initialize(optionalEscapingClosureTy, value->getOwnershipKind());
+    updater.initialize(value->getFunction(), optionalEscapingClosureTy,
+                       value->getOwnershipKind());
     SmallVector<SILPhiArgument *, 8> insertedPhis;
     updater.setInsertedPhis(&insertedPhis);
 
@@ -405,7 +407,7 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
       if (m->hasGuaranteedInitialKind())
         continue;
     curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
-                                  MarkDependenceKind::Escaping);
+                                  MarkDependenceKind::NonEscaping);
   }
 
   return curr;
@@ -1303,9 +1305,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(optionalEscapingClosureTy, fn.hasOwnership()
-                                                    ? OwnershipKind::Owned
-                                                    : OwnershipKind::None);
+  updater.initialize(&fn, optionalEscapingClosureTy,
+                     fn.hasOwnership() ? OwnershipKind::Owned
+                                       : OwnershipKind::None);
 
   // Create the Optional.none as the beginning available value.
   SILValue entryBlockOptionalNone;
@@ -1480,6 +1482,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
 
     if (fixupClosureLifetimes(*getFunction(), dominanceAnalysis,
                               checkStackNesting, modifiedCFG)) {
+      updateBorrowedFrom(getPassManager(), getFunction());
       if (checkStackNesting){
         modifiedCFG |=
           StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;

@@ -1295,7 +1295,7 @@ private:
             getLocForContentStartOnSameLine(SM, StringLiteralRange.getStart());
         bool StartLineOnlyQuotes = CharSourceRange(SM, StartLineContentLoc,
                                                    StringLiteralRange.getEnd())
-            .str().startswith(StringRef("\"\"\""));
+            .str().starts_with(StringRef("\"\"\""));
         if (!StartLineOnlyQuotes)
           return IndentContext {StringLiteralRange.getStart(), true};
 
@@ -1619,11 +1619,11 @@ private:
             SM, CommentRange.getEnd());
         auto TokenStr = CurrentTokIt->getRange().str();
         InDocCommentBlock |= SM.isBeforeInBuffer(StartLineLoc, TargetLineLoc) && !SM.isBeforeInBuffer(EndLineLoc, TargetLineLoc) &&
-            TokenStr.startswith("/*");
+            TokenStr.starts_with("/*");
         InCommentLine |= StartLineLoc == TargetLineLoc &&
-            TokenStr.startswith("//");
+            TokenStr.starts_with("//");
       } else if (CurrentTokIt->getKind() == tok::unknown &&
-                 CurrentTokIt->getRange().str().startswith("\"\"\"")) {
+                 CurrentTokIt->getRange().str().starts_with("\"\"\"")) {
         StringLiteralRange = CurrentTokIt->getRange();
       }
     }

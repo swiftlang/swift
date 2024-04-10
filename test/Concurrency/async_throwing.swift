@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -148,5 +148,30 @@ func asyncTest() async {
     let _ = try await invokeAuto(await throwingTask())
   } catch {
     // ignore
+  }
+}
+
+// rdar://123356909 - spurious error - `call can throw, but it is not marked with 'try' and the error is not handled`
+do {
+  struct AsyncTestSequence<Element>: AsyncSequence {
+    typealias Element = Element
+
+    let stream: AsyncMapSequence<AsyncStream<[String : Any]>, Element>
+
+    init(stream: AsyncMapSequence<AsyncStream<[String : Any]>, Element>) {
+      self.stream = stream
+    }
+
+    func makeAsyncIterator() -> AsyncIterator {
+      .init(iterator: stream.makeAsyncIterator())
+    }
+
+    struct AsyncIterator: AsyncIteratorProtocol {
+      var iterator: AsyncMapSequence<AsyncStream<[String : Any]>, Element>.AsyncIterator
+
+      mutating func next() async -> Element? {
+        await iterator.next() // Ok
+      }
+    }
   }
 }

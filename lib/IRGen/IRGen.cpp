@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "../Serialization/ModuleFormat.h"
+#include "GenValueWitness.h"
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
@@ -56,15 +57,14 @@
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -79,6 +79,7 @@
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
@@ -89,6 +90,7 @@
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/DCE.h"
 
 #include <thread>
 
@@ -328,7 +330,14 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
           MPM.addPass(InstrProfiling(options, false));
         });
   }
-
+  if (Opts.shouldOptimize()) {
+    PB.registerPipelineStartEPCallback(
+        [](ModulePassManager &MPM, OptimizationLevel level) {
+          // Run this before SROA to avoid un-neccessary expansion of dead
+          // loads.
+          MPM.addPass(createModuleToFunctionPassAdaptor(DCEPass()));
+        });
+  }
   bool isThinLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Thin;
   bool isFullLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Full;
   if (!Opts.shouldOptimize() || Opts.DisableLLVMOptzns) {
@@ -1162,6 +1171,8 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
 
+  (void)layoutStringsEnabled(IGM, /*diagnose*/ true);
+
   {
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
@@ -1231,10 +1242,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the embedding of bitcode.
   auto SILModuleRelease = [&SILMod]() {
-    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    if (checkForLeaks)
-      SILModule::checkForLeaksAfterDestruction();
   };
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
@@ -1407,6 +1415,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       runIRGenPreparePasses(*SILMod, *IGM);
       DidRunSILCodeGenPreparePasses = true;
     }
+
+    (void)layoutStringsEnabled(*IGM, /*diagnose*/ true);
   }
   
   if (!IGMcreated) {
@@ -1546,10 +1556,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the LLVM compilation.
   auto SILModuleRelease = [&SILMod]() {
-    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    if (checkForLeaks)
-      SILModule::checkForLeaksAfterDestruction();
   };
   auto releaseModuleThread = std::thread(SILModuleRelease);
 

@@ -163,16 +163,16 @@ public:
   bool empty() const { return innerResults().empty(); }
 
   ArrayRef<LookupResultEntry> innerResults() const {
-    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
+    return llvm::ArrayRef(Results).take_front(IndexOfFirstOuterResult);
   }
 
   ArrayRef<LookupResultEntry> outerResults() const {
-    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
+    return llvm::ArrayRef(Results).drop_front(IndexOfFirstOuterResult);
   }
 
   /// \returns An array of both the inner and outer results.
   ArrayRef<LookupResultEntry> allResults() const {
-    return llvm::makeArrayRef(Results);
+    return llvm::ArrayRef(Results);
   }
 
   const LookupResultEntry& operator[](unsigned index) const {
@@ -247,6 +247,9 @@ enum class UnqualifiedLookupFlags {
   MacroLookup            = 1 << 7,
   /// This lookup should only return modules
   ModuleLookup           = 1 << 8,
+  /// This lookup should discard 'Self' requirements in protocol extension
+  /// 'where' clauses.
+  DisregardSelfBounds    = 1 << 9
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -603,7 +606,7 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
-    bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration, looking through typealiases
@@ -612,7 +615,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// If we come across the AnyObject type, set \c anyObject true.
 SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the
@@ -624,6 +627,15 @@ SelfBounds getSelfBoundsFromWhereClause(
 /// constraint type of any "Self" constraints in the generic signature of the
 /// given protocol or protocol extension.
 SelfBounds getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl);
+
+/// Determine whether the given declaration is visible to name lookup when
+/// found from the given module scope context.
+///
+/// Note that this routine does not check ASTContext::isAccessControlDisabled();
+/// that's left for the caller.
+bool declIsVisibleToNameLookup(
+    const ValueDecl *decl, const DeclContext *moduleScopeContext,
+    NLOptions options);
 
 namespace namelookup {
 

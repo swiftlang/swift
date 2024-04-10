@@ -116,8 +116,8 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     targetSink.Results.push_back(contextualResult);
   }
 
-  return llvm::makeMutableArrayRef(targetSink.Results.data() + startSize,
-                                   targetSink.Results.size() - startSize);
+  return llvm::MutableArrayRef(targetSink.Results.data() + startSize,
+                               targetSink.Results.size() - startSize);
 }
 
 void CodeCompletionContext::addResultsFromModules(

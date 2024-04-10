@@ -132,7 +132,7 @@ public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
 #elseif os(WASI)
     preconditionFailure("No pipes available on WebAssembly/WASI")
 #else
-    return pipe(unsafeFds.baseAddress)
+    return pipe(unsafeFds.baseAddress!)
 #endif
   }
   return (readEnd: fds[0], writeEnd: fds[1], error: ret)

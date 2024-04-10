@@ -229,22 +229,14 @@ void BitwiseCopyableStorageVisitor::emitNonconformingMemberTypeDiagnostic(
 static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
                                                 DeclContext *dc,
                                                 BitwiseCopyableCheck check) {
+  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
+          ->isNoncopyable()) {
+    // Already separately diagnosed when explicit.
+    return true;
+  }
+
   assert(dc->getParentModule()->getASTContext().getProtocol(
       KnownProtocolKind::BitwiseCopyable));
-
-  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isNoncopyable()) {
-    if (!isImplicit(check)) {
-      nominal->diagnose(diag::non_bitwise_copyable_type_noncopyable);
-    }
-    return true;
-  }
-
-  if (!dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isEscapable()) {
-    if (!isImplicit(check)) {
-      nominal->diagnose(diag::non_bitwise_copyable_type_nonescapable);
-    }
-    return true;
-  }
 
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {
@@ -265,6 +257,14 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
   if (sd && sd->isCxxNonTrivial()) {
     if (!isImplicit(check)) {
       nominal->diagnose(diag::non_bitwise_copyable_type_cxx_nontrivial);
+    }
+    return true;
+  }
+
+  if (sd && sd->hasUnreferenceableStorage()) {
+    if (!isImplicit(check)) {
+      sd->diagnose(diag::non_bitwise_copyable_c_type_nontrivial);
+      sd->diagnose(diag::note_non_bitwise_copyable_c_type_add_attr);
     }
     return true;
   }

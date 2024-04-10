@@ -16,7 +16,19 @@ func testAmbiguousFunctionReference() {
   // LOCAL_FUNC: SECONDARY SYMBOLS END
 }
 
+func testAmbiguousFunctionResult() {
+  func foo() -> Int {}
+  func foo() -> String {}
 
+  // RUN: %sourcekitd-test -req=cursor -pos=%(line + 1):7 %s -- %s | %FileCheck %s --check-prefix AMBIGUOUS_FUNC_RESULT
+  let value = foo()
+  // AMBIGUOUS_FUNC_RESULT: source.lang.swift.ref.var.local
+  // AMBIGUOUS_FUNC_RESULT: <Declaration>let value: <Type usr="s:Si">Int</Type></Declaration>
+  // AMBIGUOUS_FUNC_RESULT: SECONDARY SYMBOLS BEGIN
+  // AMBIGUOUS_FUNC_RESULT: source.lang.swift.ref.var.local
+  // AMBIGUOUS_FUNC_RESULT: <Declaration>let value: <Type usr="s:SS">String</Type></Declaration>
+  // AMBIGUOUS_FUNC_RESULT: SECONDARY SYMBOLS END
+}
 
 struct TestDeduplicateResults {
   // The constraints system produces multiple solutions here for the argument type but

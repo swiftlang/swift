@@ -83,6 +83,9 @@ public:
              const PrintOptions &Options = PrintOptions()) const;
   void print(ProtocolDecl *owner, ASTPrinter &Printer,
              const PrintOptions &Opts = PrintOptions()) const;
+
+  static RequirementSignature getPlaceholderRequirementSignature(
+      const ProtocolDecl *proto, GenericSignatureErrors errors);
 };
 
 } // end namespace swift

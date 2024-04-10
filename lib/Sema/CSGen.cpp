@@ -1770,7 +1770,7 @@ namespace {
       auto *base = expr->getChainBase();
       assert(base == TypeChecker::getUnresolvedMemberChainBase(tail));
 
-      // The result type of the chain is is represented by a new type variable.
+      // The result type of the chain is represented by a new type variable.
       auto locator = CS.getConstraintLocator(
           expr, ConstraintLocator::UnresolvedMemberChainResult);
       auto chainResultTy = CS.createTypeVariable(
@@ -3935,6 +3935,10 @@ namespace {
       return OptionalType::get(actorProto->getDeclaredExistentialType());
     }
 
+    Type visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E) {
+      llvm_unreachable("found ExtractFunctionIsolationExpr in CSGen");
+    }
+
     Type visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
@@ -4708,8 +4712,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 }
 
 static std::optional<SyntacticElementTarget>
-generateForEachStmtConstraints(ConstraintSystem &cs,
-                               SyntacticElementTarget target) {
+generateForEachPreambleConstraints(ConstraintSystem &cs,
+                                   SyntacticElementTarget target) {
   ForEachStmt *stmt = target.getAsForEachStmt();
   auto *forEachExpr = stmt->getParsedSequence();
   auto *dc = target.getDeclContext();
@@ -4952,7 +4956,7 @@ bool ConstraintSystem::generateConstraints(
     }
   }
 
-  case SyntacticElementTarget::Kind::forEachStmt: {
+  case SyntacticElementTarget::Kind::forEachPreamble: {
 
     // Cache the outer generic environment, if it exists.
     if (target.getPackElementEnv()) {
@@ -4961,7 +4965,7 @@ bool ConstraintSystem::generateConstraints(
 
     // For a for-each statement, generate constraints for the pattern, where
     // clause, and sequence traversal.
-    auto resultTarget = generateForEachStmtConstraints(*this, target);
+    auto resultTarget = generateForEachPreambleConstraints(*this, target);
     if (!resultTarget)
       return true;
 
@@ -5146,7 +5150,7 @@ getBestOverload() const { return Impl->AllDecls[Impl->BestIdx.value()]; }
 
 ArrayRef<ValueDecl*> ResolvedMemberResult::
 getMemberDecls(InterestedMemberKind Kind) {
-  auto Result = llvm::makeArrayRef(Impl->AllDecls);
+  auto Result = llvm::ArrayRef(Impl->AllDecls);
   switch (Kind) {
   case InterestedMemberKind::Viable:
     return Result.slice(Impl->ViableStartIdx);

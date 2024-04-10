@@ -699,8 +699,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
         assert(!isPack);
 
-        auto addr = emitTemporaryAllocation(vd, entryValue->getType(), false,
-                                            false, /*generateDebugInfo*/ false);
+        auto addr = emitTemporaryAllocation(vd, entryValue->getType(),
+                                            DoesNotHaveDynamicLifetime,
+                                            IsNotLexical, IsNotFromVarDecl,
+                                            /*generateDebugInfo*/ false);
         auto val = B.emitCopyValueOperation(loc, entryValue);
         auto &lowering = getTypeLowering(entryValue->getType());
         lowering.emitStore(B, loc, val, addr, StoreOwnershipQualifier::Init);
@@ -963,9 +965,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
-                                 CanType expectedType,
-                                 SubstitutionMap subs,
-                                 bool alreadyConverted) {
+                                 const FunctionTypeInfo &typeContext,
+                                 SubstitutionMap subs) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
   SGM.Types.setCaptureTypeExpansionContext(constant, SGM.M);
   
@@ -1006,42 +1007,52 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     emitMarkFunctionEscapeForTopLevelCodeGlobals(loc, captureInfo);
   }
 
-  if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
-    auto result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
-    if (!alreadyConverted)
-      result = emitOrigToSubstValue(loc, result,
-                                    AbstractionPattern(expectedType),
-                                    expectedType);
-    return result;
+  bool hasErasedIsolation =
+    typeContext.ExpectedLoweredType->hasErasedIsolation();
+
+  ManagedValue result;
+  if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized &&
+      !hasErasedIsolation) {
+    result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
+  } else {
+    SmallVector<ManagedValue, 4> capturedArgs;
+    emitCaptures(loc, constant, CaptureEmission::PartialApplication,
+                 capturedArgs);
+
+    // Compute the erased isolation
+    ManagedValue isolation;
+    if (hasErasedIsolation) {
+      isolation = emitClosureIsolation(loc, constant, capturedArgs);
+    }
+
+    // The partial application takes ownership of the context parameters.
+    SmallVector<SILValue, 4> forwardedArgs;
+    if (hasErasedIsolation)
+      forwardedArgs.push_back(isolation.forward(*this));
+    for (auto capture : capturedArgs)
+      forwardedArgs.push_back(capture.forward(*this));
+
+    auto calleeConvention = ParameterConvention::Direct_Guaranteed;
+
+    auto resultIsolation = (hasErasedIsolation
+                              ? SILFunctionTypeIsolation::Erased
+                              : SILFunctionTypeIsolation::Unknown);
+
+    auto toClosure =
+      B.createPartialApply(loc, functionRef, subs, forwardedArgs,
+                           calleeConvention, resultIsolation);
+    result = emitManagedRValueWithCleanup(toClosure);
   }
 
-  SmallVector<ManagedValue, 4> capturedArgs;
-  emitCaptures(loc, constant, CaptureEmission::PartialApplication,
-               capturedArgs);
-
-  // The partial application takes ownership of the context parameters.
-  SmallVector<SILValue, 4> forwardedArgs;
-  for (auto capture : capturedArgs)
-    forwardedArgs.push_back(capture.forward(*this));
-
-  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
-
-  auto toClosure =
-    B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                         calleeConvention);
-  auto result = emitManagedRValueWithCleanup(toClosure);
-
-  // Get the lowered AST types:
-  //  - the original type
-  auto origFormalType = AbstractionPattern(subs, constantInfo.LoweredType);
-
-  // - the substituted type
-  auto substFormalType = expectedType;
-
   // Generalize if necessary.
-  if (!alreadyConverted)
-    result = emitOrigToSubstValue(loc, result, origFormalType,
-                                  substFormalType);
+  if (result.getType().getASTType() != typeContext.ExpectedLoweredType) {
+    result = emitTransformedValue(loc, result,
+                                  AbstractionPattern(subs, constantInfo.LoweredType),
+                                  typeContext.FormalType,
+                                  typeContext.OrigType,
+                                  typeContext.FormalType,
+              SILType::getPrimitiveObjectType(typeContext.ExpectedLoweredType));
+  }
 
   return result;
 }
@@ -1080,7 +1091,9 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
-  OrigFnType = SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace));
+
+  auto &closureInfo = SGM.M.Types.getClosureTypeInfo(ace);
+  TypeContext = closureInfo;
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   std::optional<Type> errorIfaceTy;
@@ -1089,9 +1102,9 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
   emitProlog(ace, captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
-             resultIfaceTy, errorIfaceTy, ace->getLoc(), OrigFnType);
+             resultIfaceTy, errorIfaceTy, ace->getLoc());
   prepareEpilog(ace, resultIfaceTy, errorIfaceTy,
-                CleanupLocation(ace), OrigFnType);
+                CleanupLocation(ace));
 
   emitProfilerIncrement(ace);
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -1107,16 +1120,6 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   }
   emitEpilog(ace);
 }
-
-// The emitBuiltinCreateAsyncTask function symbol is exposed from
-// SILGenBuiltin so that it is available from SILGenFunction. There is a
-// fair bit of work involved going from what is available at the SGF to
-// what is needed for actually calling the CreateAsyncTask builtin, so in
-// order to avoid additional maintenance, it's good to re-use that.
-ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
-                                        SubstitutionMap subs,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C);
 
 void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   // Create the argc and argv arguments.
@@ -1153,11 +1156,9 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     
     ImportPath::Element UIKitName =
       {ctx.getIdentifier("UIKit"), SourceLoc()};
-    
-    ModuleDecl *UIKit = ctx
-      .getClangModuleLoader()
-      ->loadModule(SourceLoc(),
-                   ImportPath::Module(llvm::makeArrayRef(UIKitName)));
+
+    ModuleDecl *UIKit = ctx.getClangModuleLoader()->loadModule(
+        SourceLoc(), ImportPath::Module(llvm::ArrayRef(UIKitName)));
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 2> results;
     UIKit->lookupQualified(UIKit,
@@ -1372,12 +1373,10 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
       emitWrapIntegerLiteral(moduleLoc, getLoweredType(ctx.getIntType()),
                              taskCreationFlagMask.getOpaqueValue());
 
-  SILValue task =
-      emitBuiltinCreateAsyncTask(
-          *this, moduleLoc, subs,
-          {ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
-           ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef)},
-          {}) //, /*inGroup=*/false, /*withExecutor=*/false)
+  SILValue task = emitCreateAsyncMainTask(
+          moduleLoc, subs,
+          ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
+          ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef))
           .forward(*this);
   DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
   task = structure->getResult(0);
@@ -1609,8 +1608,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 }
 
 void SILGenFunction::emitGeneratorFunction(
-    SILDeclRef function, Type resultInterfaceType, BraceStmt *body,
-    std::optional<AbstractionPattern> pattern) {
+    SILDeclRef function, Type resultInterfaceType, BraceStmt *body) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation loc(function.getDecl());
@@ -1620,7 +1618,7 @@ void SILGenFunction::emitGeneratorFunction(
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   emitProlog(dc, captureInfo, ParameterList::createEmpty(getASTContext()),
              /*selfParam=*/nullptr, resultInterfaceType,
-             /*errorType=*/std::nullopt, SourceLoc(), pattern);
+             /*errorType=*/std::nullopt, SourceLoc());
 
   prepareEpilog(dc, resultInterfaceType, std::nullopt, CleanupLocation(loc));
 
@@ -1868,7 +1866,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     setterFRef = emitApplyOfSetterToBase(loc, SILDeclRef(setter), selfValue,
                                          substitutions);
   } else {
-    setterFRef = SILUndef::get(initFRef->getType(), F);
+    setterFRef = SILUndef::get(F, initFRef->getType());
   }
 
   auto isValueSelf = !selfValue.getType().getASTType()->mayHaveSuperclass();

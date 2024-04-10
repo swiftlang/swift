@@ -39,7 +39,8 @@ using llvm::BCVBR;
 
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 5; // optionalModuleImports
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR =
+    6; // mappedPCMPath
 /// Increment this on every change.
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 1;
 
@@ -140,7 +141,7 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDField,                         // bridgingHeaderFile
                    FileIDArrayIDField,                  // sourceFiles
                    FileIDArrayIDField,                  // bridgingSourceFiles
-                   FileIDArrayIDField,                  // bridgingModuleDependencies
+                   IdentifierIDField,                  // bridgingModuleDependencies
                    DependencyIDArrayIDField,            // swiftOverlayDependencies
                    IdentifierIDField,                   // CASFileSystemRootID
                    IdentifierIDField,                   // bridgingHeaderIncludeTree
@@ -167,7 +168,9 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
                    DependencyIDArrayIDField,         // swiftOverlayDependencies
-                   ImportArrayIDField,               // headerImports
+                   FileIDField,                      // headerImport
+                   IdentifierIDField,                // headerModuleDependencies
+                   FileIDArrayIDField,               // headerSourceFiles
                    IsFrameworkField,                 // isFramework
                    IdentifierIDField                 // moduleCacheKey
                    >;
@@ -182,6 +185,7 @@ using SwiftPlaceholderModuleDetailsLayout =
 using ClangModuleDetailsLayout =
     BCRecordLayout<CLANG_MODULE_DETAILS_NODE, // ID
                    FileIDField,               // pcmOutputPath
+                   FileIDField,               // mappedPCMPath
                    FileIDField,               // moduleMapPath
                    ContextHashIDField,        // contextHash
                    FlagIDArrayIDField,        // commandLine

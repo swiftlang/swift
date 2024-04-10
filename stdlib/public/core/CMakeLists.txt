@@ -97,7 +97,7 @@ split_embedded_sources(
     NORMAL IntegerParsing.swift
   EMBEDDED Integers.swift
     NORMAL Join.swift
-    NORMAL KeyPath.swift
+  EMBEDDED KeyPath.swift
     NORMAL KeyValuePairs.swift
   EMBEDDED LazyCollection.swift
   EMBEDDED LazySequence.swift
@@ -125,7 +125,7 @@ split_embedded_sources(
     NORMAL PrefixWhile.swift
     NORMAL Prespecialize.swift
     NORMAL Print.swift
-    NORMAL PtrAuth.swift
+  EMBEDDED PtrAuth.swift
   EMBEDDED Random.swift
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
@@ -226,11 +226,13 @@ split_embedded_sources(
   EMBEDDED DurationProtocol.swift
   EMBEDDED FloatingPointRandom.swift
   EMBEDDED Instant.swift
+  EMBEDDED Int128.swift
     NORMAL Mirror.swift
     NORMAL PlaygroundDisplay.swift
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
     NORMAL StaticBigInt.swift
+  EMBEDDED UInt128.swift
     NORMAL UnfoldSequence.swift
     NORMAL UnsafeBufferPointerSlice.swift
     NORMAL VarArgs.swift
@@ -246,9 +248,9 @@ split_embedded_sources(
     NORMAL FloatingPointParsing.swift.gyb
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
+  EMBEDDED LegacyInt128.swift.gyb
   EMBEDDED UnsafeBufferPointer.swift.gyb
   EMBEDDED UnsafeRawBufferPointer.swift.gyb
-  EMBEDDED Int128.swift.gyb
   EMBEDDED Tuple.swift.gyb
   )
 
@@ -261,7 +263,7 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
 endif()
 
 # Freestanding and Linux builds both have failures to resolve.
-if(NOT SWIFT_FREESTANDING_FLAVOR AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
   list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
 endif()
 
@@ -314,9 +316,18 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowingSwitch")
+
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
+  set(swift_lib_dir "${CMAKE_BINARY_DIR}/lib")
+else()
+  set(swift_bin_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+  set(swift_lib_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib")
+endif()
 
 list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
-  "${CMAKE_BINARY_DIR}/lib/swift/host/plugins#${CMAKE_BINARY_DIR}/bin/swift-plugin-server")
+  "${swift_lib_dir}/swift/host/plugins#${swift_bin_dir}/swift-plugin-server")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
 
 set(swift_core_incorporate_object_libraries)
@@ -403,9 +414,6 @@ add_swift_target_library(swiftCore
 # Embedded standard library - embedded libraries are built as .swiftmodule only,
 # i.e. there is no .o or .a file produced (no binary code is actually produced)
 # and only users of a library are going to actually compile any needed code.
-#
-# For now, we build a hardcoded list of target triples of the embedded stdlib,
-# and only when building Swift on macOS.
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib ALL)
 

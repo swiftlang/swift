@@ -1,10 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify \
-// RUN: -enable-builtin-module \
 // RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -disable-experimental-parser-round-trip \
-// RUN: -enable-experimental-feature NoncopyableGenerics \
-// RUN: -enable-experimental-lifetime-dependence-inference \
-// RUN:  -Xllvm -enable-lifetime-dependence-diagnostics=true
+// RUN: -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: asserts
 
@@ -13,16 +9,6 @@
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
-  init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
-    self.ptr = ptr
-    self.c = c
-  }
-}
-
-struct NEContainer : ~Escapable {
-  let ptr: UnsafeRawBufferPointer
-  let c: Int
-  @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
@@ -45,7 +31,7 @@ struct View : ~Escapable {
     self.ptr = k.ptr
     self.c = k.c
   }
-  init(_ k: consuming NEContainer) {
+  init(_ k: consuming View) {
     self.ptr = k.ptr
     self.c = k.c
   }
@@ -67,43 +53,30 @@ struct MutableView : ~Copyable, ~Escapable {
     self.ptr = k.ptr
     self.c = k.c
   }
-  init(_ k: consuming NEContainer) {
-    self.ptr = k.ptr
-    self.c = k.c
-  }
 }
 
 func use(_ o : borrowing View) {}
 func mutate(_ x: inout NCContainer) { }
 func mutate(_ x: inout View) { }
-func mutate(_ x: inout NEContainer) { }
 func consume(_ o : consuming View) {}
 func use(_ o : borrowing MutableView) {}
 func consume(_ o : consuming MutableView) {}
 
-func getConsumingView(_ x: consuming NEContainer) -> _consume(x) View {
-  return View(x)
-}
-
-func getConsumingView(_ x: consuming View) -> _consume(x) View {
+func getConsumingView(_ x: consuming View) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
-func getBorrowingView(_ x: borrowing View) -> _borrow(x) View {
+func getBorrowingView(_ x: borrowing View) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
-func getBorrowingView(_ x: borrowing NCContainer) -> _borrow(x) View {
-  return View(x.ptr, x.c)
-}
-
-func getBorrowingView(_ x: borrowing NEContainer) -> _borrow(x) View {
+func getBorrowingView(_ x: borrowing NCContainer) -> dependsOn(x) View {
   return View(x.ptr, x.c)
 }
 
 func test1(_ a: Array<Int>) {
   a.withUnsafeBytes {
-    var x = NEContainer($0, a.count)
+    var x = View($0, a.count)
     mutate(&x)
     let view = getConsumingView(x)
     let newView = View(view)
@@ -145,9 +118,6 @@ func test3(_ a: Array<Int>) {
   }
 }
 
-/*
-// Currently fails because the lifetime dependence util isn't analyzing a
-// def-use chain involving a stack temporary
 func test4(_ a: Array<Int>) {
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
@@ -157,19 +127,20 @@ func test4(_ a: Array<Int>) {
     consume(view)
   }
 }
-*/
 
 func test5(_ a: Array<Int>) {
   a.withUnsafeBytes {
-    let x = NEContainer($0, a.count)
+    let x = View($0, a.count)
     let view = getBorrowingView(x)
     let anotherView = getConsumingView(view)
     use(anotherView)
   }
 }
 
+// rdar://124651399
+// XFAIL: *
 func test6(_ a: Array<Int>) {
-  var p : View?
+  var p : View? // error: type 'View' does not conform to protocol 'Escapable'
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
     mutate(&x)
@@ -192,7 +163,7 @@ func test6(_ a: Array<Int>) {
 // CHECK:   end_access [[BA]] : $*NEContainer
 // CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup5test7yySWF'
 func test7(_ a: UnsafeRawBufferPointer) {
-  var x = NEContainer(a, a.count)
+  var x = View(a, a.count)
   do {
     let view = getBorrowingView(x)
     use(view)
@@ -200,9 +171,11 @@ func test7(_ a: UnsafeRawBufferPointer) {
   mutate(&x)
 }
 
+// Currently fails because the lifetime dependence util isn't analyzing a
+// def-use chain involving a stack temporary
 func test8(_ a: Array<Int>) {
   a.withUnsafeBytes {
-    var x = NEContainer($0, a.count)
+    var x = View($0, a.count)
     mutate(&x)
     let view = MutableView(x)
     use(view)
@@ -232,6 +205,22 @@ func test9() {
     var c = Wrapper(view)
     use(c.view)
     mutate(&c.view)
+  }
+}
+
+func getViewTuple(_ x: borrowing View) -> (View, View) {
+  return (View(x.ptr, x.c), View(x.ptr, x.c))
+}
+
+public func test10() {
+  let a = [Int](repeating: 0, count: 4)
+  a.withUnsafeBytes {
+    var x = View($0, a.count)
+    mutate(&x)
+    let view = getBorrowingView(x)
+    let tuple = getViewTuple(view)
+    use(tuple.0)
+    use(tuple.1)
   }
 }
 

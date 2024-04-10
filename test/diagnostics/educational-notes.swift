@@ -1,5 +1,5 @@
-// RUN: not %target-swift-frontend -color-diagnostics -diagnostic-style=llvm -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
-// RUN: not %target-swift-frontend -no-color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
+// RUN: not %target-swift-frontend -color-diagnostics -diagnostic-style=llvm -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -diagnostic-style llvm -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
+// RUN: not %target-swift-frontend -no-color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -diagnostic-style llvm -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
 
 // A diagnostic with no educational notes
 let x = 1 +

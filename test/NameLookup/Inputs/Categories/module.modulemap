@@ -1,0 +1,14 @@
+module Categories_A {
+  header "Categories_A.h"
+  export *
+}
+
+module Categories_B {
+  header "Categories_B.h"
+  export *
+}
+
+module Categories_C {
+  header "Categories_C.h"
+  export *
+}

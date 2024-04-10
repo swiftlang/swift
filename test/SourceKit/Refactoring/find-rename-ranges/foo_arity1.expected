@@ -10,13 +10,9 @@ source.edit.kind.active:
   18:17-18:20 source.refactoring.range.kind.basename
 source.edit.kind.string:
   22:12-22:15 source.refactoring.range.kind.basename
-source.edit.kind.selector:
-  23:19-23:22 source.refactoring.range.kind.basename
-  23:23-23:24 source.refactoring.range.kind.selector-argument-label arg-index=0
-source.edit.kind.selector:
-  24:19-24:22 source.refactoring.range.kind.basename
-source.edit.kind.selector:
-  25:19-25:22 source.refactoring.range.kind.basename
+source.edit.kind.unknown:
+source.edit.kind.unknown:
+source.edit.kind.unknown:
 source.edit.kind.string:
   26:17-26:20 source.refactoring.range.kind.basename
 source.edit.kind.active:

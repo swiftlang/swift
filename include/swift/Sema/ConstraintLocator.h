@@ -216,8 +216,8 @@ public:
   /// subcomponent.
   ArrayRef<PathElement> getPath() const {
     // FIXME: Alignment.
-    return llvm::makeArrayRef(reinterpret_cast<const PathElement *>(this + 1),
-                              numPathElements);
+    return llvm::ArrayRef(reinterpret_cast<const PathElement *>(this + 1),
+                          numPathElements);
   }
 
   unsigned getSummaryFlags() const { return summaryFlags; }
@@ -817,18 +817,6 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == PathElementKind::Witness;
-  }
-};
-
-class LocatorPathElt::ProtocolRequirement final : public StoredPointerElement<ValueDecl> {
-public:
-  ProtocolRequirement(ValueDecl *decl)
-      : StoredPointerElement(PathElementKind::ProtocolRequirement, decl) {}
-
-  ValueDecl *getDecl() const { return getStoredPointer(); }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == PathElementKind::ProtocolRequirement;
   }
 };
 

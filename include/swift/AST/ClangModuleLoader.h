@@ -144,6 +144,7 @@ public:
   virtual clang::Sema &getClangSema() const = 0;
   virtual const clang::CompilerInstance &getClangInstance() const = 0;
   virtual void printStatistics() const = 0;
+  virtual void dumpSwiftLookupTables() const = 0;
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.

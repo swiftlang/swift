@@ -186,8 +186,9 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
 }
 
 llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
-ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
-                                                     StringRef moduleName) const {
+ModuleDependencyInfo::collectCrossImportOverlayNames(
+    ASTContext &ctx, StringRef moduleName,
+    std::vector<std::string> &overlayFiles) const {
   using namespace llvm::sys;
   using namespace file_types;
   std::optional<std::string> modulePath;
@@ -239,6 +240,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
       ModuleDecl::collectCrossImportOverlay(ctx, file, moduleName,
                                             bystandingModule);
     result[bystandingModule] = std::move(overlayNames);
+    overlayFiles.push_back(file.str());
   });
   return result;
 }

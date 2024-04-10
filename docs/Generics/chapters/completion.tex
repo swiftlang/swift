@@ -351,7 +351,7 @@ When checking the left-hand side $ab$ for overlaps, we perform two lookups:
 This new kind of trie lookup can be thought of as a \index{coroutine}coroutine or an iterator, yielding zero or more results as the search proceeds. We implement it as a higher-order function taking a callback.
 
 \begin{algorithm}[Overlap lookup in rule trie]\label{overlap trie lookup}
-Takes a term $t$, position $i$ with $0\leq i<|t|$, and a callback. For each rule $u\Rightarrow v$ where $t[i:]$ is a prefix of $u$ or $u$ is a prefix of $t[i:]$, invokes the the callback with the rule $u\Rightarrow v$.
+Takes a term $t$, position $i$ with $0\leq i<|t|$, and a callback. For each rule $u\Rightarrow v$ where $t[i:]$ is a prefix of $u$ or $u$ is a prefix of $t[i:]$, invokes the callback with the rule $u\Rightarrow v$.
 \begin{enumerate}
 \item (Initialize) Set \texttt{N} to the root node of the trie.
 \item (End) If $i=|t|$, we've reached the end of the term. Perform a pre-order traversal of all child nodes of \texttt{N}, and for those children that have an associated rewrite rule, invoke the callback with that rule (this is the case where $t[i:]$ is a prefix of each $u$).

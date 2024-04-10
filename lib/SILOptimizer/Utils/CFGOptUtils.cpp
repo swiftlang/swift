@@ -19,6 +19,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -81,7 +82,7 @@ static void deleteTriviallyDeadOperandsOfDeadArgument(
   auto *i = op.get()->getDefiningInstruction();
   if (!i)
     return;
-  op.set(SILUndef::get(op.get()->getType(), *i->getFunction()));
+  op.set(SILUndef::get(op.get()));
   eliminateDeadInstruction(i, callbacks);
 }
 
@@ -142,8 +143,12 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
                              bool cleanupDeadPhiOps,
                              InstModCallbacks callbacks) {
-  assert(block->getArgument(argIndex)->isPhi()
-         && "Only should be used on phi arguments");
+  SILArgument *arg = block->getArgument(argIndex);
+  assert(arg->isPhi() && "Only should be used on phi arguments");
+  if (auto *bfi = getBorrowedFromUser(arg)) {
+    bfi->replaceAllUsesWith(arg);
+    bfi->eraseFromParent();
+  }
   block->eraseArgument(argIndex);
 
   // Determine the set of predecessors in case any predecessor has
@@ -534,9 +539,9 @@ static bool isTrapNoReturnFunction(ApplyInst *ai) {
       MANGLE_SYM(s18_fatalErrorMessageyys12StaticStringV_AcCSutF));
   auto *fn = ai->getReferencedFunctionOrNull();
 
-  // We use endswith here since if we specialize fatal error we will always
+  // We use ends_with here since if we specialize fatal error we will always
   // prepend the specialization records to fatalName.
-  if (!fn || !fn->getName().endswith(fatalName))
+  if (!fn || !fn->getName().ends_with(fatalName))
     return false;
 
   return true;

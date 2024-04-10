@@ -6,7 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-// FIXME: Figure this out before removing -disable-experimental-associated-type-inference
-// RUN: not %target-swift-frontend %s -emit-ir -disable-experimental-associated-type-inference
+// RUN: not %target-swift-frontend %s -emit-ir
 class a:A
 protocol A:a{typealias a:=a

@@ -757,7 +757,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
   case DiagnosticArgumentKind::FullyQualifiedType:
   case DiagnosticArgumentKind::Type:
   case DiagnosticArgumentKind::WitnessType: {
-    assert(Modifier.empty() && "Improper modifier for Type argument");
+    std::optional<DiagnosticFormatOptions> TypeFormatOpts;
+    if (Modifier == "noformat") {
+      TypeFormatOpts.emplace(DiagnosticFormatOptions::formatForFixIts());
+    } else {
+      assert(Modifier.empty() && "Improper modifier for Type argument");
+      TypeFormatOpts.emplace(FormatOpts);
+    }
     
     // Strip extraneous parentheses; they add no value.
     Type type;
@@ -829,7 +835,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
       auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
 
-      Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
+      Out << llvm::format(TypeFormatOpts->OpaqueResultFormatString.c_str(),
                           type->getString(printOptions).c_str(),
                           Decl::getDescriptiveKindName(descriptiveKind).data(),
                           NamingDeclText.c_str());
@@ -843,11 +849,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
         llvm::raw_svector_ostream OutAka(AkaText);
 
         getAkaTypeForDisplay(type)->print(OutAka, printOptions);
-        Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
+        Out << llvm::format(TypeFormatOpts->AKAFormatString.c_str(),
                             typeName.c_str(), AkaText.c_str());
       } else {
-        Out << FormatOpts.OpeningQuotationMark << typeName
-            << FormatOpts.ClosingQuotationMark;
+        Out << TypeFormatOpts->OpeningQuotationMark << typeName
+            << TypeFormatOpts->ClosingQuotationMark;
       }
     }
     break;
@@ -935,40 +941,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsLayoutConstraint()
         << FormatOpts.ClosingQuotationMark;
     break;
-  case DiagnosticArgumentKind::ActorIsolation:
+  case DiagnosticArgumentKind::ActorIsolation: {
     assert(Modifier.empty() && "Improper modifier for ActorIsolation argument");
-    switch (auto isolation = Arg.getAsActorIsolation()) {
-    case ActorIsolation::ActorInstance:
-      Out << "actor-isolated";
-      break;
-
-    case ActorIsolation::GlobalActor: {
-      if (isolation.isMainActor()) {
-        Out << "main actor-isolated";
-      } else {
-        Type globalActor = isolation.getGlobalActor();
-        Out << "global actor " << FormatOpts.OpeningQuotationMark
-          << globalActor.getString()
-          << FormatOpts.ClosingQuotationMark << "-isolated";
-      }
-      break;
-    }
-
-    case ActorIsolation::Erased:
-      Out << "@isolated(any)";
-      break;
-
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::Unspecified:
-      Out << "nonisolated";
-      if (isolation == ActorIsolation::NonisolatedUnsafe) {
-        Out << "(unsafe)";
-      }
-      break;
-    }
+    auto isolation = Arg.getAsActorIsolation();
+    isolation.printForDiagnostics(Out, FormatOpts.OpeningQuotationMark);
     break;
-
+  }
   case DiagnosticArgumentKind::Diagnostic: {
     assert(Modifier.empty() && "Improper modifier for Diagnostic argument");
     auto diagArg = Arg.getAsDiagnostic();

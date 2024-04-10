@@ -38,28 +38,28 @@ struct ExpectedCheckMatchStartParser {
       : MatchStart(MatchStart) {}
 
   bool tryParseClassification() {
-    if (MatchStart.startswith("note")) {
+    if (MatchStart.starts_with("note")) {
       ClassificationStartLoc = MatchStart.data();
       ExpectedClassification = DiagnosticKind::Note;
       MatchStart = MatchStart.substr(strlen("note"));
       return true;
     }
 
-    if (MatchStart.startswith("warning")) {
+    if (MatchStart.starts_with("warning")) {
       ClassificationStartLoc = MatchStart.data();
       ExpectedClassification = DiagnosticKind::Warning;
       MatchStart = MatchStart.substr(strlen("warning"));
       return true;
     }
 
-    if (MatchStart.startswith("error")) {
+    if (MatchStart.starts_with("error")) {
       ClassificationStartLoc = MatchStart.data();
       ExpectedClassification = DiagnosticKind::Error;
       MatchStart = MatchStart.substr(strlen("error"));
       return true;
     }
 
-    if (MatchStart.startswith("remark")) {
+    if (MatchStart.starts_with("remark")) {
       ClassificationStartLoc = MatchStart.data();
       ExpectedClassification = DiagnosticKind::Remark;
       MatchStart = MatchStart.substr(strlen("remark"));
@@ -718,7 +718,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     // Check if the next expected diagnostic should be in the same line.
     StringRef AfterEnd = MatchStart.substr(End + strlen("}}"));
     AfterEnd = AfterEnd.substr(AfterEnd.find_first_not_of(" \t"));
-    if (AfterEnd.startswith("\\"))
+    if (AfterEnd.starts_with("\\"))
       PrevExpectedContinuationLine = Expected.LineNo;
     else
       PrevExpectedContinuationLine = 0;
@@ -727,7 +727,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     // Scan for fix-its: {{10-14=replacement text}}
     bool startNewAlternatives = true;
     StringRef ExtraChecks = MatchStart.substr(End+2).ltrim(" \t");
-    while (ExtraChecks.startswith("{{")) {
+    while (ExtraChecks.starts_with("{{")) {
       // First make sure we have a closing "}}".
       size_t EndIndex = ExtraChecks.find("}}");
       if (EndIndex == StringRef::npos) {
@@ -765,7 +765,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
           (Expected.Fixits.empty() || !Expected.Fixits.back().empty()))
         Expected.Fixits.push_back({});
 
-      if (ExtraChecks.startswith("||")) {
+      if (ExtraChecks.starts_with("||")) {
         startNewAlternatives = false;
         ExtraChecks = ExtraChecks.substr(2).ltrim(" \t");
       } else {
@@ -774,7 +774,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       // If this check starts with 'educational-notes=', check for one or more
       // educational notes instead of a fix-it.
-      if (CheckStr.startswith(educationalNotesSpecifier)) {
+      if (CheckStr.starts_with(educationalNotesSpecifier)) {
         if (Expected.EducationalNotes.has_value()) {
           addError(CheckStr.data(),
                    "each verified diagnostic may only have one "

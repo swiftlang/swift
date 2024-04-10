@@ -49,36 +49,41 @@ enum class RestrictedImportKind {
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
 /// Stores range information for a \c #if block in a SourceFile.
-class IfConfigRangeInfo final {
-  /// The range of the entire \c #if block, including \c #else and \c #endif.
-  CharSourceRange WholeRange;
+class IfConfigClauseRangeInfo final {
+public:
+  enum ClauseKind {
+    // Active '#if', '#elseif', or '#else' clause.
+    ActiveClause,
+    // Inactive '#if', '#elseif', or '#else' clause.
+    InactiveClause,
+    // '#endif' directive.
+    EndDirective,
+  };
 
-  /// The range of the active selected body, if there is one. This does not
-  /// include the outer syntax of the \c #if. This may be invalid, which
-  /// indicates there is no active body.
-  CharSourceRange ActiveBodyRange;
+private:
+  /// Source location of '#if', '#elseif', etc.
+  SourceLoc DirectiveLoc;
+  /// Character source location of body starts.
+  SourceLoc BodyLoc;
+  /// Location of the end of the body.
+  SourceLoc EndLoc;
+
+  ClauseKind Kind;
 
 public:
-  IfConfigRangeInfo(CharSourceRange wholeRange, CharSourceRange activeBodyRange)
-      : WholeRange(wholeRange), ActiveBodyRange(activeBodyRange) {
-    assert(wholeRange.getByteLength() > 0 && "Range must be non-empty");
-    assert(activeBodyRange.isInvalid() || wholeRange.contains(activeBodyRange));
+  IfConfigClauseRangeInfo(SourceLoc DirectiveLoc, SourceLoc BodyLoc,
+                          SourceLoc EndLoc, ClauseKind Kind)
+      : DirectiveLoc(DirectiveLoc), BodyLoc(BodyLoc), EndLoc(EndLoc),
+        Kind(Kind) {
+    assert(DirectiveLoc.isValid() && BodyLoc.isValid() && EndLoc.isValid());
   }
 
-  CharSourceRange getWholeRange() const { return WholeRange; }
-  SourceLoc getStartLoc() const { return WholeRange.getStart(); }
+  SourceLoc getStartLoc() const { return DirectiveLoc; }
+  CharSourceRange getDirectiveRange(const SourceManager &SM) const;
+  CharSourceRange getWholeRange(const SourceManager &SM) const;
+  CharSourceRange getBodyRange(const SourceManager &SM) const;
 
-  friend bool operator==(const IfConfigRangeInfo &lhs,
-                         const IfConfigRangeInfo &rhs) {
-    return lhs.WholeRange == rhs.WholeRange &&
-           lhs.ActiveBodyRange == rhs.ActiveBodyRange;
-  }
-
-  /// Retrieve the ranges produced by subtracting the active body range from
-  /// the whole range. This includes both inactive branches as well as the
-  /// other syntax of the \c #if.
-  SmallVector<CharSourceRange, 2>
-  getRangesWithoutActiveBody(const SourceManager &SM) const;
+  ClauseKind getKind() const { return Kind; }
 };
 
 /// A file containing Swift source code.
@@ -244,9 +249,9 @@ private:
   ParserStatePtr DelayedParserState =
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
-  struct IfConfigRangesData {
+  struct IfConfigClauseRangesData {
     /// All the \c #if source ranges in this file.
-    std::vector<IfConfigRangeInfo> Ranges;
+    std::vector<IfConfigClauseRangeInfo> Ranges;
 
     /// Whether the elemnts in \c Ranges are sorted in source order within
     /// this file. We flip this to \c false any time a new range gets recorded,
@@ -255,7 +260,7 @@ private:
   };
 
   /// Stores all the \c #if source range info in this file.
-  mutable IfConfigRangesData IfConfigRanges;
+  mutable IfConfigClauseRangesData IfConfigClauseRanges;
 
   friend class HasImportsMatchingFlagRequest;
 
@@ -302,7 +307,7 @@ public:
   std::optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
     if (!Items)
       return std::nullopt;
-    return llvm::makeArrayRef(*Items);
+    return llvm::ArrayRef(*Items);
   }
 
   /// Retrieve the parsing options for the file.
@@ -413,6 +418,11 @@ public:
     ImportedUnderlyingModule = module;
   }
 
+  /// Finds the import declaration that effectively imports a given module in
+  /// this source file.
+  std::optional<AttributedImport<ImportedModule>>
+  findImport(const ModuleDecl *mod) const;
+
   /// Whether the given import has used @preconcurrency.
   bool hasImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import) const;
@@ -500,12 +510,16 @@ public:
      const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
   }
 
-  /// Record the source range info for a parsed \c #if block.
-  void recordIfConfigRangeInfo(IfConfigRangeInfo ranges);
+  /// Record the source range info for a parsed \c #if clause.
+  void recordIfConfigClauseRangeInfo(const IfConfigClauseRangeInfo &range);
 
-  /// Retrieve the source range infos for any \c #if blocks contained within a
+  /// Retrieve the source range info for any \c #if clauses in the file.
+  ArrayRef<IfConfigClauseRangeInfo> getIfConfigClauseRanges() const;
+
+  /// Retrieve the source range infos for any \c #if clauses contained within a
   /// given source range of this file.
-  ArrayRef<IfConfigRangeInfo> getIfConfigsWithin(SourceRange outer) const;
+  ArrayRef<IfConfigClauseRangeInfo>
+  getIfConfigClausesWithin(SourceRange outer) const;
 
   void getMissingImportedModules(
          SmallVectorImpl<ImportedModule> &imports) const override;
@@ -614,6 +628,11 @@ public:
   /// because it describes a macro expansion, return the source file it was
   /// enclosed in.
   SourceFile *getEnclosingSourceFile() const;
+
+  /// If this file has an enclosing source file (because it is the result of
+  /// expanding a macro or default argument), returns the node in the enclosing
+  /// file that this file's contents were expanded from.
+  ASTNode getNodeInEnclosingSourceFile() const;
 
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.

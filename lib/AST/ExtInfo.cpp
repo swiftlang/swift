@@ -104,7 +104,7 @@ void UnexpectedClangTypeError::dump() {
   switch (errorKind) {
   case Kind::NullForCOrBlock: {
     e << "Expected non-null Clang type for @convention(c)/@convention(block)"
-      << " function but found nullptr.";
+      << " function but found nullptr.\n";
     return;
   }
   case Kind::NonnullForNonCOrBlock: {

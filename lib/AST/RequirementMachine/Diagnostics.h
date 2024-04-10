@@ -84,13 +84,15 @@ private:
 
 public:
   Requirement getRequirement() const {
-    assert(!(kind == Kind::InvalidInverseOuterSubject ||
-             kind == Kind::ConflictingInverseRequirement));
+    assert(kind != Kind::InvalidInverseOuterSubject &&
+           kind != Kind::InvalidInverseSubject &&
+           kind != Kind::ConflictingInverseRequirement);
     return requirement;
   }
 
   InverseRequirement getInverse() const {
     assert(kind == Kind::InvalidInverseOuterSubject ||
+           kind == Kind::InvalidInverseSubject ||
            kind == Kind::ConflictingInverseRequirement);
     return inverse;
   }
@@ -107,14 +109,13 @@ public:
     return {Kind::InvalidRequirementSubject, req, loc};
   }
 
-  static RequirementError forInvalidInverseSubject(Requirement req,
-                                                   SourceLoc loc) {
-    return {Kind::InvalidInverseSubject, req, loc};
+  static RequirementError forInvalidInverseSubject(InverseRequirement inv) {
+    return {Kind::InvalidInverseSubject, inv, inv.loc};
   }
 
   static
-  RequirementError forInvalidInverseOuterSubject(InverseRequirement req) {
-    return {Kind::InvalidInverseOuterSubject, req, req.loc};
+  RequirementError forInvalidInverseOuterSubject(InverseRequirement inv) {
+    return {Kind::InvalidInverseOuterSubject, inv, inv.loc};
   }
 
   static RequirementError forConflictingInverseRequirement(

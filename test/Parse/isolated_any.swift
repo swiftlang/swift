@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature IsolatedAny
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature IsolatedAny -disable-availability-checking
+
+// REQUIRES: asserts
 
 typealias FnType = @isolated(any) () -> ()
 

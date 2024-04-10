@@ -18,7 +18,7 @@ class Extant {
   // GOOD-IGNORE-NOT: access-notes-invalid.swift:[[@LINE-1]]:{{[0-9]+}}: remark: implicitly added '@objc' to this instance method, as specified by access note for Access notes containing future, unknown syntax
   // GOOD-IGNORE-NOT: access-notes-invalid.swift:[[@LINE-2]]:{{[0-9]+}}: note: add '@objc' explicitly to silence this warning
   // GOOD-REMARK-DAG: access-notes-invalid.swift:[[@LINE-3]]:{{[0-9]+}}: remark: implicitly added '@objc' to this instance method, as specified by access note for Access notes containing future, unknown syntax
-  // GOOD-REMARK-DAG: access-notes-invalid.swift:[[@LINE-4]]:{{[0-9]+}}: note: add '@objc' explicitly to silence this warning
+  // GOOD-REMARK-DAG: note: add '@objc' explicitly to silence this warning
 
   func bad(_: Int?) {} // expected-remark * {{}}
   // BAD-IGNORE-NOT: access-notes-invalid.swift:[[@LINE-1]]:{{[0-9]+}}: remark: ignored access note: method cannot be marked @objc by an access note because the type of the parameter cannot be represented in Objective-C; did not implicitly add '@objc' to this instance method, even though it was specified by access note for Access notes containing future, unknown syntax

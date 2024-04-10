@@ -1474,7 +1474,7 @@ bb7(%r : $Builtin.Int32, %carg2 : $Builtin.Int32):
 // CHECK-LABEL: sil @jumpthread_switch_enum5
 // CHECK:      bb0:
 // CHECK:        br bb1
-// CHECK:      bb1({{.*}}):
+// CHECK:      bb1:
 // CHECK-NEXT:   cond_br undef, bb2, bb3
 // CHECK:      bb2:
 // CHECK:        br bb1
@@ -2190,9 +2190,9 @@ sil @f_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  switch_enum {{.*}} case #Optional.some!enumelt: bb3
 
 // CHECK: bb3{{.*}}
-// CHECK:  br bb5({{.*}} : $Builtin.Int32, %2 : $Builtin.Int32, [[EXT]]
+// CHECK:  br bb5(%2 : $Builtin.Int32, [[EXT]]
 
-// CHECK: bb5({{.*}} : $Builtin.Int32, [[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
+// CHECK: bb5([[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
 // CHECK:  [[F:%.*]] = function_ref @f
 // CHECK:  apply [[F]]([[CUR]])
 // CHECK:  cond_br {{.*}}, bb7, bb6
@@ -2200,7 +2200,7 @@ sil @f_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK: bb7:
 // CHECK:   [[VARADD:%.*]] = builtin "sadd_with_overflow_Int32"([[NEXT]] : $Builtin.Int32
 // CHECK:   [[NEXT2:%.*]] = tuple_extract [[VARADD]]
-// CHECK:   br bb5({{.*}} : $Builtin.Int32, [[NEXT]] : $Builtin.Int32, [[NEXT2]]
+// CHECK:   br bb5([[NEXT]] : $Builtin.Int32, [[NEXT2]]
 
 
 sil @switch_enum_jumpthreading_bug : $@convention(thin) (Optional<Builtin.Int32>, Builtin.Int1, Builtin.Int32, Builtin.Int1) -> Builtin.Int32 {
@@ -3126,7 +3126,7 @@ bb4:
 bb5:
   br bb6
 bb6:
-  end_apply %token
+  end_apply %token as $()
   %rv = tuple ()
   return %rv : $()
 }

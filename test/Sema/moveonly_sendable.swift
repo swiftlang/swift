@@ -1,8 +1,8 @@
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking -disable-region-based-isolation-with-strict-concurrency -verify-additional-prefix complete-
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
-// XFAIL: noncopyable_generics
-
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 
 struct CopyableStruct {}
@@ -20,7 +20,8 @@ enum MaybeFile { // should implicitly conform
 }
 
 @_moveOnly
-struct NotSendableMO { // expected-note 2{{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
+struct NotSendableMO { // expected-note {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
+  // expected-complete-note @-1 {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
   var ref: Ref
 }
 
@@ -52,7 +53,7 @@ func processFiles(_ a: A, _ anotherFile: borrowing FileDescriptor) async {
   _ = A(.available(anotherFile))
 
   let ns = await a.getRef() // expected-warning {{non-sendable type 'NotSendableMO' returned by call to actor-isolated function cannot cross actor boundary}}
-  await takeNotSendable(ns) // expected-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
+  await takeNotSendable(ns) // expected-complete-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
 
   switch (await a.giveFileDescriptor()) {
   case let .available(fd):
@@ -95,17 +96,17 @@ enum Wrong_NoncopyableOption<T> : Sendable { // expected-note {{consider making 
 func takeAnySendable(_ s: any Sendable) {}
 func takeSomeSendable(_ s: some Sendable) {} // expected-note {{generic parameter 'some Sendable' has an implicit Copyable requirement}}
 
-// expected-error@+1 {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+// expected-error@+1 {{return expression of type 'FileDescriptor' does not conform to 'Copyable'}}
 func mkSendable() -> Sendable { return FileDescriptor(id: 0) }
 
 func tryToCastIt(_ fd: borrowing FileDescriptor) {
-  let _: any Sendable = fd // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
-  let _: Sendable = fd // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  let _: any Sendable = fd // expected-error {{value of type 'FileDescriptor' does not conform to specified type 'Copyable'}}
+  let _: Sendable = fd // expected-error {{value of type 'FileDescriptor' does not conform to specified type 'Copyable'}}
 
-  takeAnySendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  takeAnySendable(fd) // expected-error {{argument type 'FileDescriptor' does not conform to expected type 'Copyable'}}
   takeSomeSendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be substituted for copyable generic parameter 'some Sendable' in 'takeSomeSendable'}}
 
-  let _ = fd as Sendable // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  let _ = fd as Sendable // expected-error {{cannot convert value of type 'FileDescriptor' to type 'any Sendable' in coercion}}
 
   let _ = fd as? Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
   // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
@@ -148,7 +149,7 @@ class Container<T> where T:Sendable {
 }
 
 func createContainer(_ fd: borrowing FileDescriptor) {
-  let _: Container<Sendable> = Container(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  let _: Container<Sendable> = Container(fd) // expected-error {{argument type 'FileDescriptor' does not conform to expected type 'Copyable'}}
   let _: Container<Sendable> = Container(CopyableStruct())
 }
 

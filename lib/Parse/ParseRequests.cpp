@@ -79,7 +79,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
                                                  declsAndHash.first};
   return FingerprintAndMembers{
       fingerprintAndMembers.fingerprint,
-      ctx.AllocateCopy(llvm::makeArrayRef(fingerprintAndMembers.members))};
+      ctx.AllocateCopy(llvm::ArrayRef(fingerprintAndMembers.members))};
 }
 
 BodyAndFingerprint

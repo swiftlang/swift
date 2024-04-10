@@ -278,7 +278,18 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
+static void expandDefaults(SmallVectorImpl<ProtocolDecl *> &protocols,
+                           InvertibleProtocolSet inverses,
+                           ASTContext &ctx) {
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
+    if (!inverses.contains(ip)) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      protocols.push_back(proto);
+    }
+  }
 
+  ProtocolType::canonicalizeProtocols(protocols);
+}
 
 ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
@@ -291,9 +302,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   representsAnyObject = false;
 
   protocols.push_back(protoDecl);
-
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(), {}, protocols);
+  expandDefaults(protocols, InvertibleProtocolSet(), type->getASTContext());
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
@@ -326,13 +335,26 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
-  representsAnyObject =
-      hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
+  auto inverses = type->getInverses();
+  expandDefaults(protocols, inverses, type->getASTContext());
 
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(),
-                                     type->getInverses(),
-                                     protocols);
+  representsAnyObject = [&]() {
+    if (!hasExplicitAnyObject)
+      return false;
+
+    if (explicitSuperclass)
+      return false;
+
+    if (!inverses.empty())
+      return false;
+
+    for (auto *proto : protocols) {
+      if (!proto->getInvertibleProtocolKind())
+        return false;
+    }
+
+    return true;
+  }();
 }
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
@@ -385,14 +407,9 @@ Type ExistentialLayout::getSuperclass() const {
     return explicitSuperclass;
 
   for (auto protoDecl : getProtocols()) {
-    // If we have a generic signature, check there, because it
-    // will pick up superclass constraints from protocols that we
-    // refine as well.
-    if (auto genericSig = protoDecl->getGenericSignature()) {
-      if (auto superclass = genericSig->getSuperclassBound(
-            protoDecl->getSelfInterfaceType()))
-        return superclass;
-    } else if (auto superclass = protoDecl->getSuperclass())
+    auto genericSig = protoDecl->getGenericSignature();
+    if (auto superclass = genericSig->getSuperclassBound(
+          protoDecl->getSelfInterfaceType()))
       return superclass;
   }
 
@@ -896,7 +913,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     // Strip off Sendable and (possibly) the global actor.
     ASTExtInfo extInfo =
         fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
-    extInfo = extInfo.withConcurrent(false);
+    extInfo = extInfo.withSendable(false);
     if (dropGlobalActor)
       extInfo = extInfo.withoutIsolation();
 
@@ -971,6 +988,9 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     if (newConstraintType.getPointer() ==
             existentialType->getConstraintType().getPointer())
       return Type(this);
+
+    if (newConstraintType->getClassOrBoundGenericClass())
+      return newConstraintType;
 
     return ExistentialType::get(newConstraintType);
   }
@@ -1092,20 +1112,6 @@ bool TypeBase::isAnyObject() {
     return false;
 
   return canTy.getExistentialLayout().isAnyObject();
-}
-
-// Distinguish between class-bound types that might be AnyObject vs other
-// class-bound types. Only types that are potentially AnyObject might have a
-// transparent runtime type wrapper like __SwiftValue. This must look through
-// all optional types because dynamic casting sees through them.
-bool TypeBase::isPotentiallyAnyObject() {
-  Type unwrappedTy = lookThroughAllOptionalTypes();
-  if (auto archetype = unwrappedTy->getAs<ArchetypeType>()) {
-    // Does archetype have any requirements that contradict AnyObject?
-    // 'T : AnyObject' requires a layout constraint, not a conformance.
-    return archetype->getConformsTo().empty() && !archetype->getSuperclass();
-  }
-  return unwrappedTy->isAnyObject();
 }
 
 bool ExistentialLayout::isErrorExistential() const {
@@ -1501,39 +1507,12 @@ static void addProtocols(Type T,
   Superclass = T;
 }
 
-bool ProtocolType::visitAllProtocols(
-                                 ArrayRef<ProtocolDecl *> protocols,
-                                 llvm::function_ref<bool(ProtocolDecl *)> fn) {
-  SmallVector<ProtocolDecl *, 4> stack;
-  SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-
-  // Prepopulate the stack.
-  for (auto proto : protocols) {
-    if (knownProtocols.insert(proto).second)
-      stack.push_back(proto);
-  }
-  std::reverse(stack.begin(), stack.end());
-
-  while (!stack.empty()) {
-    auto proto = stack.back();
-    stack.pop_back();
-
-    // Visit this protocol.
-    if (fn(proto))
-      return true;
-
-    // Add inherited protocols that we haven't seen already.
-    for (auto inherited : proto->getInheritedProtocols()) {
-      if (knownProtocols.insert(inherited).second)
-        stack.push_back(inherited);
-    }
-  }
-
-  return false;
-}
-
 static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
                                   ParameterizedProtocolMap *parameterized) {
+  // Skip a bunch of useless work.
+  if (protocols.size() <= 1)
+    return;
+
   llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
   bool zappedAny = false;
 
@@ -1558,23 +1537,24 @@ static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
     if (proto == nullptr)
       continue;
 
-    // Add the protocols we inherited.
-    proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-      if (inherited == proto)
-        return TypeWalker::Action::Continue;
+    // The below algorithm assumes the inheritance graph is acyclic. Just skip
+    // it if we have invalid code.
+    if (proto->hasCircularInheritedProtocols())
+      continue;
 
+    // Add the protocols we inherited.
+    auto allInherited = proto->getAllInheritedProtocols();
+    for (auto *inherited : allInherited) {
       auto found = known.find(inherited);
       if (found != known.end()) {
         // Don't zap protocols associated with parameterized types.
         if (parameterized && parameterized->count(inherited))
-          return TypeWalker::Action::Continue;
+          return;
 
         protocols[found->second] = nullptr;
         zappedAny = true;
       }
-
-      return TypeWalker::Action::Continue;
-    });
+    }
   }
   
   if (zappedAny) {
@@ -3055,7 +3035,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         && !result.getConformance()->getType()->isEqual(type)) {
       auto specialized = type->getASTContext()
         .getSpecializedConformance(type,
-             cast<RootProtocolConformance>(result.getConformance()),
+             cast<NormalProtocolConformance>(result.getConformance()),
              boundGenericType->getContextSubstitutionMap(dc->getParentModule(),
                                                  boundGenericType->getDecl()));
       result = ForeignRepresentationInfo::forBridged(specialized);
@@ -3172,12 +3152,12 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     // Removing '@Sendable' is ABI-compatible because there's nothing wrong with
     // a function being sendable when it doesn't need to be.
     if (!ext2.isSendable())
-      ext1 = ext1.withConcurrent(false);
+      ext1 = ext1.withSendable(false);
   }
 
   if (matchMode.contains(TypeMatchFlags::IgnoreFunctionSendability)) {
-    ext1 = ext1.withConcurrent(false);
-    ext2 = ext2.withConcurrent(false);
+    ext1 = ext1.withSendable(false);
+    ext2 = ext2.withSendable(false);
   }
 
   // If specified, allow an escaping function parameter to override a
@@ -3720,6 +3700,20 @@ Type ProtocolCompositionType::getInverseOf(const ASTContext &C,
                                       /*HasExplicitAnyObject=*/false);
 }
 
+Type ProtocolCompositionType::withoutMarkerProtocols() const {
+  SmallVector<Type, 4> newMembers;
+  llvm::copy_if(getMembers(), std::back_inserter(newMembers), [](Type member) {
+    auto *P = member->getAs<ProtocolType>();
+    return !(P && P->getDecl()->isMarkerProtocol());
+  });
+
+  if (newMembers.size() == getMembers().size())
+    return Type(const_cast<ProtocolCompositionType *>(this));
+
+  return ProtocolCompositionType::get(getASTContext(), newMembers,
+                                      getInverses(), hasExplicitAnyObject());
+}
+
 Type ProtocolCompositionType::get(const ASTContext &C,
                                   ArrayRef<Type> Members,
                                   InvertibleProtocolSet Inverses,
@@ -3777,13 +3771,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
         CanTypes.push_back(it->second->getCanonicalType());
         continue;
       }
-    }
-
-    // Drop any explicitly provided invertible protocols.
-    if (auto ip = proto->getInvertibleProtocolKind()) {
-      // We diagnose '~Copyable & Copyable' before forming the PCT.
-      assert(!Inverses.contains(*ip) && "opposing invertible constraints!");
-      continue;
     }
 
     CanTypes.push_back(proto->getDeclaredInterfaceType());
@@ -3908,6 +3895,15 @@ Type AnyFunctionType::getThrownError() const {
   }
 }
 
+bool AnyFunctionType::isSendable() const {
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+    // Global-actor-isolated function types are implicitly Sendable.
+    return getExtInfo().isSendable() || getIsolation().isGlobalActor();
+  }
+  return getExtInfo().isSendable();
+}
+
 Type AnyFunctionType::getGlobalActor() const {
   switch (getKind()) {
   case TypeKind::Function:
@@ -3919,12 +3915,13 @@ Type AnyFunctionType::getGlobalActor() const {
   }
 }
 
-LifetimeDependenceInfo AnyFunctionType::getLifetimeDependenceInfo() const {
+const LifetimeDependenceInfo *
+AnyFunctionType::getLifetimeDependenceInfoOrNull() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getLifetimeDependenceInfo();
+    return cast<FunctionType>(this)->getLifetimeDependenceInfoOrNull();
   case TypeKind::GenericFunction:
-    return cast<GenericFunctionType>(this)->getLifetimeDependenceInfo();
+    return cast<GenericFunctionType>(this)->getLifetimeDependenceInfoOrNull();
 
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
@@ -4467,11 +4464,8 @@ case TypeKind::Id:
     auto sig = opaque->getDecl()->getGenericSignature();
     auto newSubMap =
       SubstitutionMap::get(sig,
-       [&](SubstitutableType *t) -> Type {
-         auto index = sig->getGenericParamOrdinal(cast<GenericTypeParamType>(t));
-         return newSubs[index];
-       },
-       LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
+        QueryReplacementTypeArray{sig, newSubs},
+        LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
     return OpaqueTypeArchetypeType::get(opaque->getDecl(),
                                         opaque->getInterfaceType(),
                                         newSubMap);
@@ -5364,23 +5358,6 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened,
   opened = OpenedArchetypeType::get(getCanonicalType(),
                                     parentSig.getCanonicalSignature());
   return opened;
-}
-
-CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
-                                                   TypeExpansionContext context,
-                                                   bool allowLoweredTypes) {
-  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
-      !ty->hasOpaqueArchetype())
-    return ty;
-
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      context.getContext(), context.getResilienceExpansion(),
-      context.isWholeModuleContext());
-  SubstOptions flags = SubstFlags::SubstituteOpaqueArchetypes;
-  if (allowLoweredTypes)
-    flags =
-        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
-  return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {

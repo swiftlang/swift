@@ -1,3 +1,4 @@
+// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: struct PublicBase {

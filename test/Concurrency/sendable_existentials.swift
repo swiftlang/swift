@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=targeted -emit-sil -o /dev/null %s -verify
 // RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete-and-tns- -verify-additional-prefix complete- -emit-sil -o /dev/null %s -verify
-// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s -verify -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx

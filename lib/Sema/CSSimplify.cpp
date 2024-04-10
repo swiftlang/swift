@@ -205,6 +205,7 @@ static bool areConservativelyCompatibleArgumentLabels(
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     return true;
   }
 
@@ -563,8 +564,6 @@ static bool matchCallArgumentsImpl(
       // backward-match rule that skips this parameter if doing so is the only
       // way to successfully match arguments to parameters.
       if (!parameterRequiresArgument(params, paramInfo, paramIdx) &&
-          !param.getPlainType()->getASTContext().LangOpts.hasFeature(
-              Feature::ForwardTrailingClosures) &&
           anyParameterRequiresArgument(
               params, paramInfo, paramIdx + 1,
               nextArgIdx + 1 < numArgs
@@ -1578,10 +1577,13 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
     return std::nullopt;
 
   // If the existential argument conforms to all of protocol requirements on
-  // the formal parameter's type, don't open.
+  // the formal parameter's type, don't open unless ImplicitOpenExistentials is
+  // enabled.
+
   // If all of the conformance requirements on the formal parameter's type
   // are self-conforming, don't open.
-  {
+  ASTContext &ctx = argTy->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials)) {
     Type existentialObjectType;
     if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
       existentialObjectType = existentialMetaTy->getInstanceType();
@@ -3039,6 +3041,13 @@ matchFunctionThrowing(ConstraintSystem &cs,
   }
 }
 
+static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  (void) locator.getLocatorParts(path);
+  return (path.size() == 1 &&
+          path[0].is<LocatorPathElt::Witness>());
+}
+
 bool
 ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
                                           FunctionType *func2,
@@ -3052,8 +3061,11 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
   // function-conversion score to make sure this solution is worse than
   // an exact match.
   // FIXME: there may be a better way. see https://github.com/apple/swift/pull/62514
-  auto matchIfConversion = [&]() -> bool {
-    if (kind < ConstraintKind::Subtype)
+  auto matchIfConversion = [&](bool isErasure = false) -> bool {
+    // We generally require a conversion here, but allow some lassitude
+    // if we're doing witness-matching.
+    if (kind < ConstraintKind::Subtype &&
+        !(isErasure && isWitnessMatching(locator)))
       return false;
     increaseScore(SK_FunctionConversion, locator);
     return true;
@@ -3152,7 +3164,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // isolation as a conversion.
     case FunctionTypeIsolation::Kind::NonIsolated:
     case FunctionTypeIsolation::Kind::GlobalActor:
-      return matchIfConversion();
+      return matchIfConversion(/*erasure*/ true);
 
     // Parameter isolation is value-dependent and can't be erased in the
     // abstract, though.  We need to be able to recover the isolation from
@@ -3984,23 +3996,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchAmbiguous();
   }
 
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // move-only types (and their metatypes) cannot match with existential types.
-    if (type1->getMetatypeInstanceType()->isNoncopyable()) {
-      // tailor error message
-      if (shouldAttemptFixes()) {
-        auto *fix = MustBeCopyable::create(*this,
-                                           type1,
-                                           NoncopyableMatchFailure::forExistentialCast(
-                                               type2),
-                                           getConstraintLocator(locator));
-        if (!recordFix(fix))
-          return getTypeMatchSuccess();
-      }
-      return getTypeMatchFailure(locator);
-    }
-  }
-
   // FIXME: Feels like a hack.
   if (type1->is<InOutType>())
     return getTypeMatchFailure(locator);
@@ -4133,14 +4128,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   for (auto *protoDecl : layout.getProtocols()) {
-    if (auto superclass = protoDecl->getSuperclass()) {
-      auto subKind = std::min(ConstraintKind::Subtype, kind);
-      auto result = matchTypes(type1, superclass, subKind,
-                               subflags, locator);
-      if (result.isFailure())
-        return result;
-    }
-
     switch (simplifyConformsToConstraint(type1, protoDecl, kind, locator,
                                          subflags)) {
       case SolutionKind::Solved:
@@ -5599,6 +5586,38 @@ bool ConstraintSystem::repairFailures(
     }
 
     return false;
+  }
+
+  if (auto *VD = getAsDecl<ValueDecl>(anchor)) {
+    // Matching a witness to an ObjC protocol requirement.
+    if (VD->isObjC() &&
+        isa<ProtocolDecl>(VD->getDeclContext()) &&
+        VD->isProtocolRequirement() &&
+        path[0].is<LocatorPathElt::Witness>() &&
+        // Note that the condition below is very important,
+        // we need to wait until the very last moment to strip
+        // the concurrency annotations from the inner most type.
+        conversionsOrFixes.empty()) {
+      // Allow requirements to introduce `swift_attr` annotations
+      // (note that `swift_attr` in type contexts weren't supported
+      // before) and for witnesses to adopt them gradually by matching
+      // with a warning in non-strict concurrency mode.
+      if (!(Context.isSwiftVersionAtLeast(6) ||
+            Context.LangOpts.StrictConcurrencyLevel ==
+                StrictConcurrency::Complete)) {
+        auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
+                                                 /*dropGlobalActor=*/true);
+        auto strippedRHS = rhs->stripConcurrency(/*recursive=*/true,
+                                                 /*dropGlobalActor=*/true);
+
+        auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
+                                 flags | TMF_ApplyingFix, locator);
+        if (!result.isFailure()) {
+          increaseScore(SK_MissingSynthesizableConformance, locator);
+          return true;
+        }
+      }
+    }
   }
 
   auto elt = path.back();
@@ -8496,26 +8515,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Solved;
   }
 
-  // FIXME: This is already handled by tuple conformance lookup path and
-  // should be removed once non-copyable generics are enabled by default.
-  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // Copyable is checked structurally, so for better performance, split apart
-    // this constraint into individual Copyable constraints on each tuple
-    // element.
-    if (auto *tupleType = type->getAs<TupleType>()) {
-      if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-        for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
-          addConstraint(
-              ConstraintKind::ConformsTo, tupleType->getElementType(i),
-              protocol->getDeclaredInterfaceType(),
-              locator.withPathElement(LocatorPathElt::TupleElement(i)));
-        }
-
-        return SolutionKind::Solved;
-      }
-    }
-  }
-
   auto *loc = getConstraintLocator(locator);
 
   /// Record the given conformance as the result, adding any conditional
@@ -8595,7 +8594,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto synthesizeConformance = [&]() {
           ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
-              /*anchor=*/{}, LocatorPathElt::Witness(witness));
+              locator.getAnchor(), LocatorPathElt::Witness(witness));
           SynthesizedConformances.insert({witnessLoc, synthesized});
           return recordConformance(synthesized);
         };
@@ -9212,6 +9211,23 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       }
     }
 
+    // Peel off marker protocol requirements if this is an existential->concrete
+    // cast. Handles cases like `WritableKeyPath<...> & Sendable as KeyPath`
+    // that require inference which is only attempted if both sides are classes.
+    if (fromType->isExistentialType() && !toType->isExistentialType()) {
+      if (auto *existential = fromType->getAs<ExistentialType>()) {
+        if (auto *PCT = existential->getConstraintType()
+                            ->getAs<ProtocolCompositionType>()) {
+          auto newConstraintTy = PCT->withoutMarkerProtocols();
+          if (!newConstraintTy->isEqual(PCT)) {
+            fromType = newConstraintTy->getClassOrBoundGenericClass()
+                           ? newConstraintTy
+                           : ExistentialType::get(newConstraintTy);
+          }
+        }
+      }
+    }
+
     // We've decomposed the types further, so adopt the subflags.
     flags = subflags;
 
@@ -9745,6 +9761,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (auto *selfTy = instanceTy->getAs<DynamicSelfType>())
     instanceTy = selfTy->getSelfType();
 
+  // Dynamically isolated function types have a magic '.isolation'
+  // member that extracts the isolation value.
+  if (auto *fn = instanceTy->getAs<FunctionType>()) {
+    if (fn->getIsolation().isErased() &&
+        memberName.isSimpleName(Context.Id_isolation)) {
+      result.ViableCandidates.push_back(
+        OverloadChoice(baseTy, OverloadChoiceKind::ExtractFunctionIsolation));
+    }
+  }
+
   if (!instanceTy->mayHaveMembers())
     return result;
 
@@ -10205,6 +10231,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // where the base type has a conditional Sendable conformance
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
     auto shouldCheckSendabilityOfBase = [&]() {
+      if (!Context.getProtocol(KnownProtocolKind::Sendable))
+        return false;
+
       // Static members are always sendable because they only capture
       // metatypes which are Sendable.
       if (baseObjTy->is<AnyMetatypeType>())
@@ -10738,8 +10767,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // reason to perform a lookup because it wouldn't return any results.
   if (shouldAttemptFixes()) {
     auto markMemberTypeAsPotentialHole = [&](Type memberTy) {
-      if (auto *typeVar = memberTy->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
+      recordAnyTypeVarAsPotentialHole(simplifyType(memberTy));
     };
 
     // If this is an unresolved member ref e.g. `.foo` and its contextual base
@@ -11878,7 +11906,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (contextualFnType->isSendable())
-      closureExtInfo = closureExtInfo.withConcurrent();
+      closureExtInfo = closureExtInfo.withSendable();
   }
 
   // Isolated parameters override any other kind of isolation we might infer.
@@ -12083,7 +12111,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     return SolutionKind::Solved;
   }
 
-  // In a previous version of Swift, we could accidently drop the coercion
+  // In a previous version of Swift, we could accidentally drop the coercion
   // constraint in certain cases. In most cases this led to either miscompiles
   // or crashes later down the pipeline, but for coercions between collections
   // we generated somewhat reasonable code that performed a force cast. To
@@ -15105,6 +15133,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyContextualTypeForNil:
   case FixKind::AllowRefToInvalidDecl:
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
+  case FixKind::SpecifyPackElementType:
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowNoopCheckedCast:
   case FixKind::AllowNoopExistentialToCFTypeCheckedCast:

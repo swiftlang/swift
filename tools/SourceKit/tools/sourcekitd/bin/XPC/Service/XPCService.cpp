@@ -26,6 +26,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Threading.h"
 
+#include <csignal>
 #include <xpc/xpc.h>
 
 using namespace SourceKit;
@@ -277,10 +278,10 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         };
 
         if (sourcekitd::requestIsEnableBarriers(req)) {
+          RequestBarriersEnabled = true;
           dispatch_barrier_async(requestQueue, ^{
             auto Responder = std::make_shared<XPCResponder>(event, peer);
             xpc_release(event);
-            RequestBarriersEnabled = true;
             sourcekitd::sendBarriersEnabledResponse([Responder](sourcekitd_response_t response) {
               Responder->sendReply(response);
             });
@@ -307,13 +308,16 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
           sourcekitd::cancelRequest(/*CancellationToken=*/cancelToken);
         });
+        xpc_release(event);
       } else if (SourceKitCancellationToken cancelToken =
                      reinterpret_cast<SourceKitCancellationToken>(
                          xpc_dictionary_get_uint64(
                              event, xpc::KeyDisposeRequestHandle))) {
         sourcekitd::disposeCancellationToken(/*CancellationToken=*/cancelToken);
+        xpc_release(event);
       } else {
         assert(false && "unexpected message");
+        xpc_release(event);
       }
     });
   }
@@ -385,6 +389,7 @@ static void fatal_error_handler(void *user_data, const char *reason,
 }
 
 int main(int argc, const char *argv[]) {
+  std::signal(SIGTERM, SIG_DFL);
   llvm::install_fatal_error_handler(fatal_error_handler, 0);
   sourcekitd::enableLogging("sourcekit-serv");
   sourcekitd_set_uid_handlers(

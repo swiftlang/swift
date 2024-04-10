@@ -105,8 +105,10 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // the users force the live range to be alive.
     if (!ti) {
       for (SILValue v : user->getResults()) {
-        if (v->getOwnershipKind() != OwnershipKind::Owned)
+        if (v->getOwnershipKind() != OwnershipKind::Owned &&
+            !isa<BorrowedFromInst>(user)) {
           continue;
+        }
         llvm::copy(v->getUses(), std::back_inserter(worklist));
       }
       continue;
@@ -147,7 +149,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
   llvm::copy(tmpForwardingConsumingUses, std::back_inserter(consumingUses));
   llvm::copy(tmpUnknownConsumingUses, std::back_inserter(consumingUses));
 
-  auto cUseArrayRef = llvm::makeArrayRef(consumingUses);
+  auto cUseArrayRef = llvm::ArrayRef(consumingUses);
   destroyingUses = cUseArrayRef.take_front(tmpDestroyingUses.size());
   ownershipForwardingUses = cUseArrayRef.slice(
       tmpDestroyingUses.size(), tmpForwardingConsumingUses.size());

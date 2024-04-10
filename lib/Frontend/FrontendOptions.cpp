@@ -956,6 +956,47 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   llvm_unreachable("unhandled action");
 }
 
+bool FrontendOptions::doesActionBuildModuleFromInterface(ActionType action) {
+  switch (action) {
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+    return true;
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::PrintASTDecl:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
+  case ActionType::Typecheck:
+  case ActionType::ResolveImports:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::PrintVersion:
+  case ActionType::PrintFeature:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitIRGen:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+    return false;
+  }
+  llvm_unreachable("unhandled action");
+}
 
 const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {

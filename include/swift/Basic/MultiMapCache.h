@@ -64,9 +64,10 @@ public:
     // If we already have a cached value, just return the cached value.
     if (!iter.second) {
 
-      return swift::transform(iter.first->second,
+      return swift::transform(
+          iter.first->second,
           [&](std::tuple<unsigned, unsigned> startLengthRange) {
-            return llvm::makeArrayRef(data).slice(
+            return llvm::ArrayRef(data).slice(
                 std::get<ArrayStartOffset>(startLengthRange),
                 std::get<ArrayLengthOffset>(startLengthRange));
           });
@@ -88,7 +89,7 @@ public:
     // update the map with the start, length, and return the resulting ArrayRef.
     unsigned length = data.size() - initialOffset;
     iter.first->second = std::make_tuple(initialOffset, length);
-    auto result = llvm::makeArrayRef(data).slice(initialOffset, length);
+    auto result = llvm::ArrayRef(data).slice(initialOffset, length);
     return result;
   }
 };

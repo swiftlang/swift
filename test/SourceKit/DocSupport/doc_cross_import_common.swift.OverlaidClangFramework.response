@@ -1,11 +1,11 @@
 import SwiftOnoneSupport
 
 func fromOverlaidClangFramework()
+
 func fromOverlaidClangFrameworkOverlay()
 
 
 // MARK: - BystandingLibrary Additions
-
 
 // Available when BystandingLibrary is imported with OverlaidClangFramework
 func fromOverlaidClangFrameworkCrossImport()
@@ -34,22 +34,22 @@ func fromOverlaidClangFrameworkCrossImport()
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 60,
+    key.offset: 61,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 65,
+    key.offset: 66,
     key.length: 33
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 103,
+    key.offset: 104,
     key.length: 39
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment.mark,
-    key.offset: 106,
+    key.offset: 107,
     key.length: 35
   },
   {
@@ -81,7 +81,7 @@ func fromOverlaidClangFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.name: "fromOverlaidClangFrameworkOverlay()",
     key.usr: "s:22OverlaidClangFramework04fromabC7OverlayyyF",
-    key.offset: 60,
+    key.offset: 61,
     key.length: 40,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fromOverlaidClangFrameworkOverlay</decl.name>()</decl.function.free>"
   },

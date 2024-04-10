@@ -500,60 +500,6 @@ CanType GenericSignature::getReducedType(Type type) const {
   return getPointer()->getReducedType(type);
 }
 
-GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) const {
-  bool changedSignature = false;
-  llvm::SmallVector<Requirement, 2> requirementsErased;
-  auto &C = Ptr->getASTContext();
-
-  for (auto req : getRequirements()) {
-    bool found = std::any_of(typeErasedParams.begin(),
-                             typeErasedParams.end(),
-                             [&](Type t) {
-      auto other = req.getFirstType();
-      return t->isEqual(other);
-    });
-    if (found && req.getKind() == RequirementKind::Layout) {
-      auto layout = req.getLayoutConstraint();
-      if (layout->isClass()) {
-        requirementsErased.push_back(Requirement(RequirementKind::SameType,
-                                                 req.getFirstType(),
-                                                 C.getAnyObjectType()));
-      } else if (layout->isBridgeObject()) {
-        requirementsErased.push_back(Requirement(RequirementKind::SameType,
-                                                 req.getFirstType(),
-                                                 C.TheBridgeObjectType));
-      } else if (layout->isFixedSizeTrivial()) {
-        unsigned bitWidth = layout->getTrivialSizeInBits();
-        requirementsErased.push_back(
-            Requirement(RequirementKind::SameType, req.getFirstType(),
-                        CanType(BuiltinIntegerType::get(bitWidth, C))));
-      } else if (layout->isTrivialStride()) {
-        requirementsErased.push_back(
-            Requirement(RequirementKind::SameType, req.getFirstType(),
-                        CanType(BuiltinVectorType::get(
-                            Ptr->getASTContext(),
-                            BuiltinIntegerType::get(8, Ptr->getASTContext()),
-                            layout->getTrivialStride()))));
-      } else {
-        requirementsErased.push_back(req);
-      }
-    } else {
-      requirementsErased.push_back(req);
-    }
-    changedSignature |= found;
-  }
-
-  if (changedSignature) {
-    return buildGenericSignature(
-        Ptr->getASTContext(), GenericSignature(),
-        SmallVector<GenericTypeParamType *>(getGenericParams()),
-        requirementsErased,
-        /*allowInverses=*/false);
-  }
-
-  return *this;
-}
-
 CanType GenericSignatureImpl::getReducedType(Type type) const {
   type = type->getCanonicalType();
 
@@ -714,23 +660,19 @@ Type GenericSignatureImpl::getUpperBound(Type type,
   // we didn't have a superclass or require AnyObject.
   InvertibleProtocolSet inverses;
 
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    if (!superclass && !hasExplicitAnyObject) {
-      for (auto ip : InvertibleProtocolSet::full()) {
-        auto *kp = ctx.getProtocol(::getKnownProtocolKind(ip));
-        if (!requiresProtocol(type, kp))
-          inverses.insert(ip);
-      }
+  if (!superclass && !hasExplicitAnyObject) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto *kp = ctx.getProtocol(::getKnownProtocolKind(ip));
+      if (!requiresProtocol(type, kp))
+        inverses.insert(ip);
     }
   }
 
   for (auto *proto : getRequiredProtocols(type)) {
-    if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-      // Don't add invertible protocols to the composition, because we recorded
-      // their absence above.
-      if (proto->getInvertibleProtocolKind())
-        continue;
-    }
+    // Don't add invertible protocols to the composition, because we recorded
+    // their absence above.
+    if (proto->getInvertibleProtocolKind())
+      continue;
 
     if (proto->requiresClass())
       hasExplicitAnyObject = false;
@@ -882,6 +824,11 @@ void GenericSignature::verify() const {
 
 void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
   auto dumpAndAbort = [&]() {
+    llvm::errs() << "All requirements:\n";
+    for (auto reqt : reqts) {
+      reqt.dump(llvm::errs());
+      llvm::errs() << "\n";
+    }
     getPointer()->getRequirementMachine()->dump(llvm::errs());
     abort();
   };
@@ -1081,7 +1028,14 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     ProtocolType::canonicalizeProtocols(canonicalProtos);
 
     if (protos.size() != canonicalProtos.size()) {
-      llvm::errs() << "Redundant conformance requirements in signature\n";
+      llvm::errs() << "Redundant conformance requirements in signature "
+                   << *this << ":\n";
+      llvm::errs() << "Ours:\n";
+      for (auto *proto : protos)
+        llvm::errs() << "- " << proto->getName() << "\n";
+      llvm::errs() << "Theirs:\n";
+      for (auto *proto : canonicalProtos)
+        llvm::errs() << "- " << proto->getName() << "\n";
       dumpAndAbort();
     }
     if (!std::equal(protos.begin(), protos.end(), canonicalProtos.begin())) {
@@ -1296,11 +1250,6 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = getASTContext();
 
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    reqs.append(getRequirements().begin(), getRequirements().end());
-    return;
-  }
-
   // Record the absence of conformances to invertible protocols.
   for (auto gp : getGenericParams()) {
     // Any generic parameter with a superclass bound or concrete type does not
@@ -1308,7 +1257,7 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     if (getSuperclassBound(gp) || getConcreteType(gp))
       continue;
 
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
       // If we can derive a conformance to this protocol, then don't add an
@@ -1333,17 +1282,60 @@ void GenericSignatureImpl::getRequirementsWithInverses(
   }
 }
 
+/// If we we can't build a requirement signature because of a request cycle or
+/// failure in Knuth-Bendix completion, we give the protocol a requirement
+/// signature that still has inherited protocol requirements on Self, and also
+/// conformances to Copyable and Escapable for all associated types. Otherwise,
+/// we'll see invariant violations from the inheritance clause mismatch, as
+/// well as spurious downstream diagnostics concerning move-only types.
+RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
+    const ProtocolDecl *proto, GenericSignatureErrors errors) {
+  auto &ctx = proto->getASTContext();
+
+  SmallVector<ProtocolDecl *, 2> inheritedProtos;
+  for (auto *inheritedProto : proto->getInheritedProtocols()) {
+    inheritedProtos.push_back(inheritedProto);
+  }
+
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
+    auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
+    inheritedProtos.push_back(otherProto);
+  }
+
+  ProtocolType::canonicalizeProtocols(inheritedProtos);
+
+  SmallVector<Requirement, 2> requirements;
+
+  for (auto *inheritedProto : inheritedProtos) {
+    requirements.emplace_back(RequirementKind::Conformance,
+                              proto->getSelfInterfaceType(),
+                              inheritedProto->getDeclaredInterfaceType());
+  }
+
+  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
+      requirements.emplace_back(RequirementKind::Conformance,
+                                assocTypeDecl->getDeclaredInterfaceType(),
+                                otherProto->getDeclaredInterfaceType());
+    }
+  }
+
+  // Maintain invariants.
+  llvm::array_pod_sort(requirements.begin(), requirements.end(),
+                       [](const Requirement *lhs, const Requirement *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
+
+  return RequirementSignature(ctx.AllocateCopy(requirements),
+                              ArrayRef<ProtocolTypeAlias>());
+}
+
 void RequirementSignature::getRequirementsWithInverses(
     ProtocolDecl *owner,
     SmallVector<Requirement, 2> &reqs,
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = owner->getASTContext();
-
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    reqs.append(getRequirements().begin(), getRequirements().end());
-    return;
-  }
-
   auto sig = owner->getGenericSignature();
 
   llvm::SmallDenseSet<CanType, 2> assocTypes;
@@ -1357,7 +1349,7 @@ void RequirementSignature::getRequirementsWithInverses(
         sig->getConcreteType(interfaceType))
       return;
 
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
       // If we can derive a conformance to this protocol, then don't add an

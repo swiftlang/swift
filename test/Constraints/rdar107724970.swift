@@ -5,12 +5,11 @@ enum E {
   case e(Int)
 }
 func foo(_ x: E) {
-  // FIXME: We need to handle pattern arguments in a bunch of places in argument
-  // list diagnostic logic.
   // https://github.com/apple/swift/issues/65062
-  let fn = { // expected-error {{unable to infer closure type without a type annotation}}
+  let fn = {
     switch x {
     case E.e(_, _):
+      // expected-error@-1 {{tuple pattern has the wrong length for tuple type 'Int'}}
       break
     }
   }

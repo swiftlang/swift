@@ -453,6 +453,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES")
   endif()
 
+  if(SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES)
+    list(APPEND result "-DSWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES")
+  endif()
+
   if(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE)
     list(APPEND result "-DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE")
   endif()
@@ -530,7 +534,11 @@ function(_add_target_variant_link_flags)
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26")
+        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
+      else()
+        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      endif()
       list(APPEND result "-resource-dir=${RESOURCE_DIR}")
     endif()
 
@@ -783,7 +791,8 @@ function(add_swift_target_library_single target name)
         BACK_DEPLOYMENT_LIBRARY
         ENABLE_LTO
         MODULE_DIR
-        BOOTSTRAPPING)
+        BOOTSTRAPPING
+        INSTALL_BINARY_SWIFTMODULE)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -842,6 +851,10 @@ function(add_swift_target_library_single target name)
      NOT SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
+  endif()
+
+  if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
+    set(SWIFTLIB_INSTALL_BINARY_SWIFTMODULE TRUE)
   endif()
 
   # Determine the subdirectory where this library will be installed.
@@ -1002,7 +1015,8 @@ function(add_swift_target_library_single target name)
       DEPLOYMENT_VERSION_TVOS ${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}
       DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
-      ${BOOTSTRAPPING_arg})
+      ${BOOTSTRAPPING_arg}
+      INSTALL_BINARY_SWIFTMODULE ${SWIFTLIB_INSTALL_BINARY_SWIFTMODULE})
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
   # If there were any swift sources, then a .swiftmodule may have been created.
@@ -1237,6 +1251,9 @@ function(add_swift_target_library_single target name)
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
     endif()
+
+    set_target_properties(${target} PROPERTIES
+      POSITION_INDEPENDENT_CODE YES)
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OPENBSD")
     set_target_properties("${target}"
       PROPERTIES
@@ -1790,6 +1807,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
         INSTALL_IN_COMPONENT
+        INSTALL_BINARY_SWIFTMODULE
         DARWIN_INSTALL_NAME_DIR
         DEPLOYMENT_VERSION_MACCATALYST
         MACCATALYST_BUILD_FLAVOR
@@ -1912,6 +1930,10 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
+  endif()
+
+  if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
+    set(SWIFTLIB_INSTALL_BINARY_SWIFTMODULE TRUE)
   endif()
 
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND
@@ -2309,6 +2331,7 @@ function(add_swift_target_library name)
         ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
         PREFIX_INCLUDE_DIRS ${SWIFTLIB_PREFIX_INCLUDE_DIRS}
+        INSTALL_BINARY_SWIFTMODULE ${SWIFTLIB_INSTALL_BINARY_SWIFTMODULE}
       )
     if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
       add_dependencies(${VARIANT_NAME} clang)

@@ -27,7 +27,7 @@ actor IOActor {
 
 @available(SwiftStdlib 5.5, *)
 func asyncFunc() async {
-    // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in Swift 6}}
+    // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
     basicNoAsync()
 
     // expected-warning@+1{{global function 'messageNoAsync' is unavailable from asynchronous contexts; a message from the author}}

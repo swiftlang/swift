@@ -130,6 +130,26 @@ BridgedFunction BridgedNodeSet::getFunction() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                            BridgedOperandSet
+//===----------------------------------------------------------------------===//
+
+bool BridgedOperandSet::contains(BridgedOperand operand) const {
+  return set->contains(operand.op);
+}
+
+bool BridgedOperandSet::insert(BridgedOperand operand) const {
+  return set->insert(operand.op);
+}
+
+void BridgedOperandSet::erase(BridgedOperand operand) const {
+  set->erase(operand.op);
+}
+
+BridgedFunction BridgedOperandSet::getFunction() const {
+  return {set->getFunction()};
+}
+
+//===----------------------------------------------------------------------===//
 //                            BridgedPassContext
 //===----------------------------------------------------------------------===//
 
@@ -229,7 +249,7 @@ void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedI
 }
 
 BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
-  return {swift::SILUndef::get(type.unbridged(), *invocation->getFunction())};
+  return {swift::SILUndef::get(invocation->getFunction(), type.unbridged())};
 }
 
 bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) const {
@@ -254,6 +274,14 @@ BridgedNodeSet BridgedPassContext::allocNodeSet() const {
 
 void BridgedPassContext::freeNodeSet(BridgedNodeSet set) const {
   invocation->freeNodeSet(set.set);
+}
+
+BridgedOperandSet BridgedPassContext::allocOperandSet() const {
+  return {invocation->allocOperandSet()};
+}
+
+void BridgedPassContext::freeOperandSet(BridgedOperandSet set) const {
+  invocation->freeOperandSet(set.set);
 }
 
 void BridgedPassContext::notifyInvalidatedStackNesting() const {
@@ -410,8 +438,10 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
       inst.unbridged(), invocation->getFunction(), invocation->getTransform());
 }
 
-void BridgedPassContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
-  invocation->initializeSSAUpdater(type.unbridged(),
+void BridgedPassContext::SSAUpdater_initialize(
+    BridgedFunction function, BridgedType type,
+    BridgedValue::Ownership ownership) const {
+  invocation->initializeSSAUpdater(function.getFunction(), type.unbridged(),
                                    BridgedValue::castToOwnership(ownership));
 }
 

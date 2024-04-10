@@ -529,6 +529,8 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       builder.createDestructureTuple(loc, applyInst);
   SILValue arraySIL = destructureInst->getResults()[0];
   SILValue storagePointerSIL = destructureInst->getResults()[1];
+  storagePointerSIL = builder.createMarkDependence(
+      loc, storagePointerSIL, arraySIL, MarkDependenceKind::Escaping);
 
   if (elements.empty()) {
     // Nothing more to be done if we are creating an empty array.

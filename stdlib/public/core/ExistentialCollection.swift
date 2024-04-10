@@ -90,6 +90,9 @@ public struct AnyIterator<Element> {
   }
 }
 
+@available(*, unavailable)
+extension AnyIterator: Sendable {}
+
 extension AnyIterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -120,6 +123,9 @@ internal struct _ClosureBasedIterator<Element>: IteratorProtocol {
   internal func next() -> Element? { return _body() }
 }
 
+@available(*, unavailable)
+extension _ClosureBasedIterator: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal class _AnyIteratorBoxBase<Element>: IteratorProtocol {
@@ -139,6 +145,9 @@ internal class _AnyIteratorBoxBase<Element>: IteratorProtocol {
   internal func next() -> Element? { _abstract() }
 }
 
+@available(*, unavailable)
+extension _AnyIteratorBoxBase: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal final class _IteratorBox<Base: IteratorProtocol>
@@ -156,6 +165,9 @@ internal final class _IteratorBox<Base: IteratorProtocol>
   @usableFromInline
   internal var _base: Base
 }
+
+@available(*, unavailable)
+extension _IteratorBox: Sendable {}
 
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -250,6 +262,9 @@ internal class _AnySequenceBox<Element> {
     _abstract()
   }
 }
+
+@available(*, unavailable)
+extension _AnySequenceBox: Sendable {}
 
 @_fixed_layout
 @usableFromInline
@@ -387,6 +402,9 @@ internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element> {
   ) -> _AnyCollectionBox<Element> { _abstract() }
 }
 
+@available(*, unavailable)
+extension _AnyCollectionBox: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal class _AnyBidirectionalCollectionBox<Element>
@@ -450,6 +468,9 @@ internal class _AnyBidirectionalCollectionBox<Element>
   internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
 }
 
+@available(*, unavailable)
+extension _AnyBidirectionalCollectionBox: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal class _AnyRandomAccessCollectionBox<Element>
@@ -507,6 +528,9 @@ internal class _AnyRandomAccessCollectionBox<Element>
   ) -> _AnyRandomAccessCollectionBox<Element> { _abstract() }
 }
 
+@available(*, unavailable)
+extension _AnyRandomAccessCollectionBox: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
@@ -526,7 +550,11 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(
@@ -599,6 +627,9 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal var _base: S
 }
 
+@available(*, unavailable)
+extension _SequenceBox: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
@@ -619,7 +650,11 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(
@@ -793,6 +828,9 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal var _base: S
 }
 
+@available(*, unavailable)
+extension _CollectionBox: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
@@ -814,7 +852,11 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(
@@ -1006,6 +1048,9 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal var _base: S
 }
 
+@available(*, unavailable)
+extension _BidirectionalCollectionBox: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
@@ -1027,7 +1072,11 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(
@@ -1218,6 +1267,9 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal var _base: S
 }
 
+@available(*, unavailable)
+extension _RandomAccessCollectionBox: Sendable {}
+
 @usableFromInline
 @frozen
 internal struct _ClosureBasedSequence<Iterator: IteratorProtocol> {
@@ -1229,6 +1281,9 @@ internal struct _ClosureBasedSequence<Iterator: IteratorProtocol> {
     self._makeUnderlyingIterator = makeUnderlyingIterator
   }
 }
+
+@available(*, unavailable)
+extension _ClosureBasedSequence: Sendable {}
 
 extension _ClosureBasedSequence: Sequence {
 
@@ -1266,6 +1321,9 @@ public struct AnySequence<Element> {
     self._box = _box
   }
 }
+
+@available(*, unavailable)
+extension AnySequence: Sendable {}
 
 extension  AnySequence: Sequence {
   public typealias Iterator = AnyIterator<Element>
@@ -1760,6 +1818,9 @@ internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
   }
 }
 
+@available(*, unavailable)
+extension _IndexBox: Sendable {}
+
 /// A wrapper over an underlying index that hides the specific underlying type.
 @frozen
 @_unavailableInEmbedded
@@ -1783,6 +1844,9 @@ public struct AnyIndex {
     return _box._typeID
   }
 }
+
+@available(*, unavailable)
+extension AnyIndex: Sendable {}
 
 @_unavailableInEmbedded
 extension AnyIndex: Comparable {
@@ -1842,6 +1906,9 @@ public struct AnyCollection<Element> {
     self._box = _box
   }
 }
+
+@available(*, unavailable)
+extension AnyCollection: Sendable {}
 
 @_unavailableInEmbedded
 extension AnyCollection: Collection {
@@ -2062,6 +2129,9 @@ public struct AnyBidirectionalCollection<Element> {
     self._box = _box
   }
 }
+
+@available(*, unavailable)
+extension AnyBidirectionalCollection: Sendable {}
 
 @_unavailableInEmbedded
 extension AnyBidirectionalCollection: BidirectionalCollection {
@@ -2290,6 +2360,9 @@ public struct AnyRandomAccessCollection<Element> {
     self._box = _box
   }
 }
+
+@available(*, unavailable)
+extension AnyRandomAccessCollection: Sendable {}
 
 @_unavailableInEmbedded
 extension AnyRandomAccessCollection: RandomAccessCollection {

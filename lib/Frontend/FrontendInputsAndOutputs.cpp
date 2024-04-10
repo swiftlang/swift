@@ -171,7 +171,7 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
     StringRef extension) const {
   unsigned n = 0;
   (void)forEachPrimaryInput([&](const InputFile &input) -> bool {
-    if (llvm::sys::path::extension(input.getFileName()).endswith(extension))
+    if (llvm::sys::path::extension(input.getFileName()).ends_with(extension))
       ++n;
     return false;
   });
@@ -201,6 +201,16 @@ bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
   StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
   file_types::ID InputType = file_types::lookupTypeForExtension(InputExt);
   return InputType == file_types::TY_SwiftModuleInterfaceFile;
+}
+
+bool FrontendInputsAndOutputs::shouldTreatAsNonPackageModuleInterface() const {
+  if (!hasSingleInput())
+    return false;
+
+  file_types::ID InputType =
+      file_types::lookupTypeFromFilename(getFilenameOfFirstInput());
+  return InputType == file_types::TY_SwiftModuleInterfaceFile ||
+         InputType == file_types::TY_PrivateSwiftModuleInterfaceFile;
 }
 
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {

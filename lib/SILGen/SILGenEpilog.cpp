@@ -22,8 +22,7 @@ using namespace Lowering;
 
 void SILGenFunction::prepareEpilog(
     DeclContext *DC, std::optional<Type> directResultType,
-    std::optional<Type> errorType, CleanupLocation CleanupL,
-    std::optional<AbstractionPattern> origClosureType) {
+    std::optional<Type> errorType, CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.
@@ -66,8 +65,8 @@ void SILGenFunction::prepareEpilog(
 
   if (errorType) {
     auto genericSig = DC->getGenericSignatureOfContext();
-    AbstractionPattern origErrorType = origClosureType
-      ? *origClosureType->getFunctionThrownErrorType()
+    AbstractionPattern origErrorType = TypeContext
+      ? *TypeContext->OrigType.getFunctionThrownErrorType()
       : AbstractionPattern(genericSig.getCanonicalSignature(),
                            (*errorType)->getCanonicalType());
 

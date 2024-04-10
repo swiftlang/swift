@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -232,7 +232,7 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
 // Sendable restriction on nonisolated declarations.
 // ----------------------------------------------------------------------
 actor ANI {
-  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in Swift 6}}
+  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in the Swift 6 language mode}}
   nonisolated func f() -> NC? { nil }
 }
 
@@ -273,7 +273,7 @@ typealias CF = @Sendable () -> NotConcurrent?
 typealias BadGenericCF<T> = @Sendable () -> T?
 typealias GoodGenericCF<T: Sendable> = @Sendable () -> T? // okay
 
-var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
 // expected-note@-1 {{isolate 'concurrentFuncVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 
 // ----------------------------------------------------------------------
@@ -336,9 +336,20 @@ class C5: @unchecked Sendable {
   var x: Int = 0 // okay
 }
 
+// expected-warning@+1 {{class 'C6' must restate inherited '@unchecked Sendable' conformance}}
 class C6: C5 {
   var y: Int = 0 // still okay, it's unsafe
 }
+
+class C6_Restated: C5, @unchecked Sendable {
+  var y: Int = 0 // still okay, it's unsafe
+}
+
+class C6_Restated_Extension: C5 {
+  var y: Int = 0 // still okay, it's unsafe
+}
+
+extension C6_Restated_Extension: @unchecked Sendable {}
 
 final class C7<T>: Sendable { }
 

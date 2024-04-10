@@ -144,7 +144,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   // Otherwise, we have a program argument. If it looks like an option or a
   // path, then invoke in interactive mode with the arguments as given.
   StringRef FirstArg(Args[1]);
-  if (FirstArg.startswith("-") || FirstArg.contains('.') ||
+  if (FirstArg.starts_with("-") || FirstArg.contains('.') ||
       FirstArg.contains('/'))
     return false;
 
@@ -253,14 +253,14 @@ static int run_driver(StringRef ExecName,
     StringRef FirstArg(argv[1]);
 
     if (FirstArg == "-frontend") {
-      return performFrontend(llvm::makeArrayRef(argv.data()+2,
-                                                argv.data()+argv.size()),
-                             argv[0], (void *)(intptr_t)getExecutablePath);
+      return performFrontend(
+          llvm::ArrayRef(argv.data() + 2, argv.data() + argv.size()), argv[0],
+          (void *)(intptr_t)getExecutablePath);
     }
     if (FirstArg == "-modulewrap") {
-      return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
-                                                argv.data()+argv.size()),
-                             argv[0], (void *)(intptr_t)getExecutablePath);
+      return modulewrap_main(
+          llvm::ArrayRef(argv.data() + 2, argv.data() + argv.size()), argv[0],
+          (void *)(intptr_t)getExecutablePath);
     }
     if (FirstArg == "-sil-opt") {
       return sil_opt_main(eraseFirstArg(argv),
@@ -293,17 +293,17 @@ static int run_driver(StringRef ExecName,
 
     // Run the integrated Swift frontend when called as "swift-frontend" but
     // without a leading "-frontend".
-    if (!FirstArg.startswith("--driver-mode=")
+    if (!FirstArg.starts_with("--driver-mode=")
         && ExecName == "swift-frontend") {
-      return performFrontend(llvm::makeArrayRef(argv.data()+1,
-                                                argv.data()+argv.size()),
-                             argv[0], (void *)(intptr_t)getExecutablePath);
+      return performFrontend(
+          llvm::ArrayRef(argv.data() + 1, argv.data() + argv.size()), argv[0],
+          (void *)(intptr_t)getExecutablePath);
     }
 
     if (FirstArg == "repl") {
       isRepl = true;
       argv = argv.drop_front();
-    } else if (FirstArg.startswith("--driver-mode=")) {
+    } else if (FirstArg.starts_with("--driver-mode=")) {
       DriverModeArg = FirstArg;
     }
   }

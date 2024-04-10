@@ -67,7 +67,19 @@ extension Clock {
   ///          await someWork()
   ///       }
   @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
+  @_allowFeatureSuppression(OptionalIsolatedParameters)
   public func measure(
+    isolation: isolated (any Actor)? = #isolation,
+    _ work: () async throws -> Void
+  ) async rethrows -> Instant.Duration {
+    try await measure(work)
+  }
+
+  @available(SwiftStdlib 5.7, *)
+  @_unsafeInheritExecutor
+  @usableFromInline
+  internal func measure(
     _ work: () async throws -> Void
   ) async rethrows -> Instant.Duration {
     let start = now

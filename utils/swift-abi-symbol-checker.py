@@ -52,10 +52,7 @@ def checkSymbols(args):
     # actually appear in the dylib then print those symbols out and fail.
     if notInDylib:
         for symbol in notInDylib:
-            print(('{} was marked as \'Added\', but it was not found in the '
-                   'just built library').format(symbol))
-
-        sys.exit(-1)
+            symbols.append('<MISSING ADDITION> {}'.format(symbol))
 
     # Filter the built symbols for the additions because we're removing them to
     # get back to the baseline

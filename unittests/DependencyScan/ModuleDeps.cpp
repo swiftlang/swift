@@ -246,6 +246,6 @@ public func overlayFuncA() { }\n"));
   auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA);
   auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB);
   // Ensure that scans that only differ in module name have distinct scanning context hashes
-  ASSERT_NE(instanceA->get()->getInvocation().getModuleScanningHash(),
-            instanceB->get()->getInvocation().getModuleScanningHash());
+  ASSERT_NE(instanceA->ScanInstance.get()->getInvocation().getModuleScanningHash(),
+            instanceB->ScanInstance.get()->getInvocation().getModuleScanningHash());
 }

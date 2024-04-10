@@ -65,6 +65,3 @@ enum DirectOnEnum {
 // CHECK:         "kind": "enum",
 // CHECK:         "cases": [
 // CHECK:             "name": "yes"
-
-// XFAIL: noncopyable_generics
-

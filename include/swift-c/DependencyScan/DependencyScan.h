@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 0
-#define SWIFTSCAN_VERSION_MINOR 7
+#define SWIFTSCAN_VERSION_MINOR 8
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -61,6 +61,18 @@ typedef struct {
   size_t count;
 } swiftscan_dependency_set_t;
 
+typedef enum {
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR = 0,
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING = 1,
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE = 2,
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK = 3
+} swiftscan_diagnostic_severity_t;
+
+typedef struct {
+  swiftscan_diagnostic_info_t *diagnostics;
+  size_t count;
+} swiftscan_diagnostic_set_t;
+
 //=== Batch Scan Input Specification --------------------------------------===//
 
 /// Opaque container to a container of batch scan entry information.
@@ -90,6 +102,12 @@ swiftscan_dependency_graph_get_main_module_name(
 
 SWIFTSCAN_PUBLIC swiftscan_dependency_set_t *
 swiftscan_dependency_graph_get_dependencies(
+    swiftscan_dependency_graph_t result);
+
+// Return value disposed of together with the dependency_graph
+// using `swiftscan_dependency_graph_dispose`
+SWIFTSCAN_PUBLIC swiftscan_diagnostic_set_t *
+swiftscan_dependency_graph_get_diagnostics(
     swiftscan_dependency_graph_t result);
 
 //=== Dependency Module Info Functions ------------------------------------===//
@@ -184,8 +202,12 @@ SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_binary_detail_get_swift_overlay_dependencies(
     swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_header_dependency(
+    swiftscan_module_details_t details);
+
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
-swiftscan_swift_binary_detail_get_header_dependencies(
+swiftscan_swift_binary_detail_get_header_dependency_module_dependencies(
     swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC bool
@@ -276,6 +298,11 @@ swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_import_set_get_imports(swiftscan_import_set_t result);
+
+// Return value disposed of together with the dependency_graph
+// using `swiftscan_import_set_dispose`
+SWIFTSCAN_PUBLIC swiftscan_diagnostic_set_t *
+swiftscan_import_set_get_diagnostics(swiftscan_import_set_t result);
 
 //=== Scanner Invocation Functions ----------------------------------------===//
 
@@ -378,18 +405,6 @@ SWIFTSCAN_PUBLIC swiftscan_import_set_t swiftscan_import_set_create(
 
 
 //=== Scanner Diagnostics -------------------------------------------------===//
-typedef enum {
-  SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR = 0,
-  SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING = 1,
-  SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE = 2,
-  SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK = 3
-} swiftscan_diagnostic_severity_t;
-
-typedef struct {
-  swiftscan_diagnostic_info_t *diagnostics;
-  size_t count;
-} swiftscan_diagnostic_set_t;
-
 /// For the specified \c scanner instance, query all insofar emitted diagnostics
 SWIFTSCAN_PUBLIC swiftscan_diagnostic_set_t*
 swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner);

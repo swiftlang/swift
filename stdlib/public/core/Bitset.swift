@@ -33,6 +33,9 @@ internal struct _UnsafeBitset {
   }
 }
 
+@available(*, unavailable)
+extension _UnsafeBitset: Sendable {}
+
 extension _UnsafeBitset {
   @inlinable
   @inline(__always)
@@ -178,6 +181,9 @@ extension _UnsafeBitset: Sequence {
     }
   }
 }
+
+@available(*, unavailable)
+extension _UnsafeBitset.Iterator: Sendable {}
 
 ////////////////////////////////////////////////////////////////////////////////
 

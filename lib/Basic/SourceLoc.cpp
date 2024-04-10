@@ -778,7 +778,7 @@ ArrayRef<unsigned> SourceManager::getAncestors(
   // Cache the ancestors in the generated source info record.
   unsigned *ancestorsPtr = new unsigned [ancestors.size()];
   std::copy(ancestors.begin(), ancestors.end(), ancestorsPtr);
-  knownInfo->second.ancestors = llvm::makeArrayRef(ancestorsPtr, ancestors.size());
+  knownInfo->second.ancestors = llvm::ArrayRef(ancestorsPtr, ancestors.size());
   return knownInfo->second.ancestors;
 }
 

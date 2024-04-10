@@ -171,7 +171,7 @@ private:
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
   bool IsRef = true;
-  Type Ty;
+  Type SolutionSpecificInterfaceType;
   Type ContainerType;
   std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
       std::nullopt;
@@ -196,13 +196,15 @@ public:
   ResolvedValueRefCursorInfo() = default;
   explicit ResolvedValueRefCursorInfo(
       SourceFile *SF, SourceLoc Loc, ValueDecl *ValueD, TypeDecl *CtorTyRef,
-      ExtensionDecl *ExtTyRef, bool IsRef, Type Ty, Type ContainerType,
+      ExtensionDecl *ExtTyRef, bool IsRef, Type SolutionSpecificInterfaceType,
+      Type ContainerType,
       std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
       bool IsKeywordArgument, bool IsDynamic,
       SmallVector<NominalTypeDecl *> ReceiverTypes,
       SmallVector<ValueDecl *> ShorthandShadowedDecls)
       : ResolvedCursorInfo(CursorInfoKind::ValueRef, SF, Loc), ValueD(ValueD),
-        CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef), Ty(Ty),
+        CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef),
+        SolutionSpecificInterfaceType(SolutionSpecificInterfaceType),
         ContainerType(ContainerType), CustomAttrRef(CustomAttrRef),
         IsKeywordArgument(IsKeywordArgument), IsDynamic(IsDynamic),
         ReceiverTypes(ReceiverTypes),
@@ -216,7 +218,9 @@ public:
 
   bool isRef() const { return IsRef; }
 
-  Type getType() const { return Ty; }
+  Type getSolutionSpecificInterfaceType() const {
+    return SolutionSpecificInterfaceType;
+  }
 
   Type getContainerType() const { return ContainerType; }
 
@@ -428,7 +432,7 @@ public:
   DeclNameViewer() : DeclNameViewer(StringRef()) {}
   operator bool() const { return !BaseName.empty(); }
   StringRef base() const { return BaseName; }
-  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
+  llvm::ArrayRef<StringRef> args() const { return llvm::ArrayRef(Labels); }
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
@@ -437,12 +441,26 @@ public:
 };
 
 enum class RegionType {
+  /// We could not match the rename location to a symbol to be renamed and the
+  /// symbol was originally a text match result (has `RenameLocUsage::Unknown`).
   Unmatched,
+  /// We could not match the rename location to a symbol to be renamed and the
+  /// symbol came from the index (does not have `RenameLocUsage::Unknown`).
   Mismatch,
+  /// We were able to match the result to a location in source code that's
+  /// active with respect to the current compiler arguments.
   ActiveCode,
+  /// We were able to match the result to a location in source code that's
+  /// inactive with respect to the current compiler arguments.
+  ///
+  /// Currently, we don't evaluate #if so all occurrences inside #if blocks
+  /// are considered inactive.
   InactiveCode,
+  /// The location is inside a string literal.
   String,
+  /// The location is inside a `#selector`.
   Selector,
+  /// The location is inside a comment.
   Comment,
 };
 

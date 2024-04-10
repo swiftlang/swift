@@ -346,9 +346,9 @@ static SerialExecutorRef executorForEnqueuedJob(Job *job) {
   return SerialExecutorRef::generic();
 #else
   void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
-  if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
+  if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR) {
     return SerialExecutorRef::generic();
-  else
+  } else
     return SerialExecutorRef::forOrdinary(reinterpret_cast<HeapObject*>(jobQueue),
                     _swift_task_getDispatchQueueSerialExecutorWitnessTable());
 #endif
@@ -653,6 +653,11 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   RunInlineTaskOptionRecord *runInlineOption = nullptr;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
+    case TaskOptionRecordKind::InitialSerialExecutor:
+      serialExecutor = cast<InitialSerialExecutorTaskOptionRecord>(option)
+                          ->getExecutorRef();
+      break;
+
     case TaskOptionRecordKind::InitialTaskExecutor:
       taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();

@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -enable-objc-interop -swift-version 5 -import-objc-header %S/Inputs/experimental_clang_importer_diagnostics_bridging_header.h -typecheck %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -enable-objc-interop -swift-version 5 -import-objc-header %S/Inputs/experimental_clang_importer_diagnostics_bridging_header.h -typecheck %s -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 let s: PartialImport
 s.c = 5

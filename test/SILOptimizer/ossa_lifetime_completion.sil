@@ -1,4 +1,10 @@
-// RUN: %target-sil-opt -enable-ossa-complete-lifetimes -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt                     \
+// RUN:     -test-runner                    \
+// RUN:     -enable-ossa-complete-lifetimes \
+// RUN:     %s                              \
+// RUN:     -sil-disable-input-verify       \
+// RUN:     -o /dev/null                    \
+// RUN: 2>&1 | %FileCheck %s
 
 sil_stage raw
 
@@ -9,6 +15,16 @@ class C {}
 public enum FakeOptional<T> {
   case none
   case some(T)
+}
+
+sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+
+protocol Error {}
+
+enum Optional<Wrapped> {
+case none
+case some(Wrapped)
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
@@ -266,12 +282,12 @@ exit:
 }
 
 // CHECK-LABEL: sil [ossa] @availability_boundary_2_after_loop : {{.*}} {
-// CHECK:         [[REGISTER_1:%[^,]+]] = move_value [lexical]
+// CHECK:         [[LEXICAL:%[^,]+]] = move_value [lexical]
 // CHECK:         br [[CONDITION_1:bb[0-9]+]]
 // CHECK:       [[CONDITION_1]]:
 // CHECK:         cond_br undef, [[CONDITION_2:bb[0-9]+]], [[PREHEADER:bb[0-9]+]]
 // CHECK:       [[CONDITION_2]]:
-// CHECK:         destroy_value [[REGISTER_1]]
+// CHECK:         destroy_value [[LEXICAL]]
 // CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[TO_DIE_2:bb[0-9]+]]
 // CHECK:       [[PREHEADER]]:
 // CHECK:         br [[HEADER:bb[0-9]+]]
@@ -282,7 +298,7 @@ exit:
 // CHECK:       [[BACKEDGE]]:
 // CHECK:         br [[HEADER]]
 // CHECK:       [[TO_DIE_1]]:
-// CHECK:         destroy_value [[REGISTER_1]]
+// CHECK:         destroy_value [[LEXICAL]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[TO_DIE_2]]:
 // CHECK:         br [[DIE]]
@@ -393,5 +409,92 @@ die:
 
 exit:
   %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @project_box_deadend : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK:         [[BOX:%[^,]+]] = alloc_box
+// CHECK:         [[BOX_BORROW:%[^,]+]] = begin_borrow [[BOX]]
+// CHECK:         [[ADDR:%[^,]+]] = project_box [[BOX_BORROW]]
+// CHECK:         store [[C]] to [init] [[ADDR]]
+// CHECK:         end_borrow [[BOX_BORROW]]
+// CHECK:         unreachable                                     
+// CHECK-LABEL: } // end sil function 'project_box_deadend'
+sil [ossa] @project_box_deadend : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %2 = alloc_box ${ var C }
+  %3 = begin_borrow %2 : ${ var C }
+  specify_test "ossa-lifetime-completion %3"
+  %4 = project_box %3 : ${ var C }, 0
+  store %0 to [init] %4 : $*C
+  unreachable
+}
+
+indirect enum IndirectEnumNontrivialPayload {
+  case c(C)
+}
+
+// CHECK-LABEL: sil [ossa] @project_box_owned : {{.*}} {
+// CHECK:       bb0([[IE:%[^,]+]] :
+// CHECK:         switch_enum [[IE]] 
+// CHECK-SAME:        case #IndirectEnumNontrivialPayload.c!enumelt: [[ONE_CASE:bb[0-9]+]]
+// CHECK:       [[ONE_CASE]]([[BOX:%[^,]+]] :
+// CHECK:         [[C_ADDR:%[^,]+]] = project_box [[BOX]]
+// CHECK:         [[C:%[^,]+]] = load_borrow [[C_ADDR]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[BASIC_BLOCK4:bb[0-9]+]]
+// CHECK:       [[BASIC_BLOCK4]]:
+// CHECK:         end_borrow [[C]]
+// CHECK:         destroy_value [[BOX]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'project_box_owned'
+sil [ossa] @project_box_owned : $@convention(thin) (@owned IndirectEnumNontrivialPayload) -> () {
+entry(%ie : @owned $IndirectEnumNontrivialPayload):
+  switch_enum %ie : $IndirectEnumNontrivialPayload, case #IndirectEnumNontrivialPayload.c!enumelt: one_case
+
+one_case(%box : @owned ${ var C }):
+  specify_test "ossa-lifetime-completion %box"
+  %c_addr = project_box %box : ${ var C }, 0
+  %c = load_borrow %c_addr : $*C
+  cond_br undef, left, right
+
+left:
+  end_borrow %c : $C
+  destroy_value %box : ${ var C }
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+right:
+  end_borrow %c : $C
+  unreachable
+}
+
+// Nothing to check here--the output is the same as the input.  Verify that
+// completing the lifetime of a value used by a startAsyncLetWithLocalBuffer
+// doesn't crash when visiting an endAsyncLetLifetime.
+sil [ossa] @async_let : $@convention(thin) @async () -> () {
+bb0:
+  %result_addr = alloc_stack $()
+  %result_ptr = address_to_pointer %result_addr : $*() to $Builtin.RawPointer
+  %task_options = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %callee_pa = partial_apply [callee_guaranteed] undef() : $@convention(thin) @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  %callee_noescape = convert_escape_to_noescape [not_guaranteed] %callee_pa : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> 
+            to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  specify_test "ossa-lifetime-completion %callee_noescape"
+  %async_let = builtin "startAsyncLetWithLocalBuffer"<()>(
+            %task_options : $Optional<Builtin.RawPointer>, 
+            %callee_noescape : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>, 
+            %result_ptr : $Builtin.RawPointer
+        ) : $Builtin.RawPointer
+  %get = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  apply %get(%async_let, %result_ptr) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  builtin "endAsyncLetLifetime"(%async_let : $Builtin.RawPointer) : $()
+  destroy_value %callee_noescape : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  destroy_value %callee_pa : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+  %retval = load [trivial] %result_addr : $*()
+  dealloc_stack %result_addr : $*()
   return %retval : $()
 }

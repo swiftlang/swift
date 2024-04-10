@@ -162,7 +162,7 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 #include "llvm/ProfileData/InstrProfData.inc"
     };
     auto *FunctionRecordTy =
-        llvm::StructType::get(Ctx, makeArrayRef(FunctionRecordTypes),
+        llvm::StructType::get(Ctx, llvm::ArrayRef(FunctionRecordTypes),
                               /*isPacked=*/true);
 
     // Create the function record constant.
@@ -171,7 +171,7 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 #include "llvm/ProfileData/InstrProfData.inc"
     };
     auto *FuncRecordConstant = llvm::ConstantStruct::get(
-        FunctionRecordTy, makeArrayRef(FunctionRecordVals));
+        FunctionRecordTy, llvm::ArrayRef(FunctionRecordVals));
 
     // Create the function record global.
     auto *FuncRecord = new llvm::GlobalVariable(
@@ -196,20 +196,20 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 #include "llvm/ProfileData/InstrProfData.inc"
   };
   auto CovDataHeaderTy =
-      llvm::StructType::get(Ctx, makeArrayRef(CovDataHeaderTypes));
+      llvm::StructType::get(Ctx, llvm::ArrayRef(CovDataHeaderTypes));
   llvm::Constant *CovDataHeaderVals[] = {
 #define COVMAP_HEADER(Type, LLVMType, Name, Init) Init,
 #include "llvm/ProfileData/InstrProfData.inc"
   };
   auto CovDataHeaderVal = llvm::ConstantStruct::get(
-      CovDataHeaderTy, makeArrayRef(CovDataHeaderVals));
+      CovDataHeaderTy, llvm::ArrayRef(CovDataHeaderVals));
 
   // Create the coverage data record
   llvm::Type *CovDataTypes[] = {CovDataHeaderTy, FilenamesVal->getType()};
-  auto CovDataTy = llvm::StructType::get(Ctx, makeArrayRef(CovDataTypes));
+  auto CovDataTy = llvm::StructType::get(Ctx, llvm::ArrayRef(CovDataTypes));
   llvm::Constant *TUDataVals[] = {CovDataHeaderVal, FilenamesVal};
   auto CovDataVal =
-      llvm::ConstantStruct::get(CovDataTy, makeArrayRef(TUDataVals));
+      llvm::ConstantStruct::get(CovDataTy, llvm::ArrayRef(TUDataVals));
   auto CovData = new llvm::GlobalVariable(
       *getModule(), CovDataTy, true, llvm::GlobalValue::PrivateLinkage,
       CovDataVal, llvm::getCoverageMappingVarName());

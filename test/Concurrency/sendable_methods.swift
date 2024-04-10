@@ -154,7 +154,7 @@ let helloworld:  @Sendable () -> Void = World.greet
 class NonSendableC {
     var x: Int = 0
 
-    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in Swift 6}}
+    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in the Swift 6 language mode}}
         x += 1
     }
 }
@@ -226,5 +226,46 @@ do {
       let _: @Sendable (Test<Int>) -> Void = X.test // Ok
       let _ = X.test(self) // Ok
     }
+  }
+}
+
+func test_initializer_ref() {
+  func test<T>(_: @Sendable (T, T) -> Array<T>) {
+  }
+
+  let initRef: @Sendable (Int, Int) -> Array<Int> = Array<Int>.init // Ok
+
+  test(initRef) // Ok
+  test(Array<Int>.init) // Ok
+}
+
+// rdar://119593407 - incorrect errors when partially applied member is accessed with InferSendableFromCaptures
+do {
+  @MainActor struct ErrorHandler {
+    static func log(_ error: Error) {}
+  }
+
+  @MainActor final class Manager {
+    static var shared: Manager!
+
+    func test(_: @escaping @MainActor (Error) -> Void) {
+    }
+  }
+
+  @MainActor class Test {
+    func schedule() {
+      Task {
+        Manager.shared.test(ErrorHandler.log) // Ok (access is wrapped in an autoclosure)
+      }
+    }
+  }
+}
+
+// rdar://125932231 - incorrect `error: type of expression is ambiguous without a type annotation`
+do {
+  class C {}
+
+  func test(c: C) -> (any Sendable)? {
+    true ? nil : c // Ok
   }
 }

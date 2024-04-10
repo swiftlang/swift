@@ -103,9 +103,6 @@ class ModuleFileSharedCore {
   /// \c true if this module was compiled with -enable-ossa-modules.
   bool RequiresOSSAModules;
 
-  /// \c true if this module was compiled with NoncopyableGenerics
-  bool RequiresNoncopyableGenerics;
-
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
 
@@ -391,6 +388,9 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
+    /// Whether this module is built with -experimental-allow-non-resilient-access.
+    unsigned AllowNonResilientAccess : 1;
+
     // Explicitly pad out to the next word boundary.
     unsigned : 3;
   } Bits = {};
@@ -413,7 +413,6 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
       bool isFramework,
       bool requiresOSSAModules,
-      bool requiresNoncopyableGenerics,
       StringRef requiredSDK,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
@@ -551,14 +550,13 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, bool requiresOSSAModules,
-       bool requiresNoncopyableGenerics,
        StringRef requiredSDK, PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiresNoncopyableGenerics, requiredSDK, info,
+        requiresOSSAModules, requiredSDK, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -648,8 +646,7 @@ void ModuleFileSharedCore::allocateBuffer(MutableArrayRef<T> &buffer,
     return;
 
   void *rawBuffer = Allocator.Allocate(sizeof(T) * rawData.size(), alignof(T));
-  buffer = llvm::makeMutableArrayRef(static_cast<T *>(rawBuffer),
-                                     rawData.size());
+  buffer = llvm::MutableArrayRef(static_cast<T *>(rawBuffer), rawData.size());
   std::uninitialized_copy(rawData.begin(), rawData.end(), buffer.begin());
 }
 

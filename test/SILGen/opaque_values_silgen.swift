@@ -1,7 +1,5 @@
 // RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
-// XFAIL: noncopyable_generics
-
 // Test SILGen -enable-sil-opaque-values with tests that depend on the stdlib.
 
 // FIXME: "HECK" lines all need to be updated for OSSA.
@@ -876,3 +874,14 @@ struct Twople<T> {
     self.storage = (t1, t2)
   }
 }
+
+// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValue : {{.*}} {
+// CHECK:       bb0([[E:%[^,]+]] :
+// CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped
+// CHECK:         apply [[SWIFT_WILL_THROW_TYPED]]<Err>([[E]])
+// CHECK:         throw [[E]]
+// CHECK-LABEL: } // end sil function 'throwTypedValue'
+@_silgen_name("throwTypedValue")
+func throwTypedValue(_ e: Err) throws(Err) { throw e }
+
+struct Err : Error {}

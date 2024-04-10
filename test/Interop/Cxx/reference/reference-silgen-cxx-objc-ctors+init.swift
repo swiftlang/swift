@@ -1,5 +1,5 @@
 // REQUIRES: objc_interop
-// RUN: %target-swift-emit-sil -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++17 -Ounchecked %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %S/Inputs -enable-experimental-cxx-interop -Ounchecked %s | %FileCheck %s
 
 import ConstRefCxxObjCCtorInitParameter
 

@@ -131,7 +131,7 @@ func useGenericClosureThrowing<T, V>(_ c: (T) throws -> V) throws {
 // CHECK: function_ref @$s22closure_lifetime_fixup17useGenericClosureyyq_xXEr0_lF
 
 // CHECK: partial_apply [callee_guaranteed] [on_stack]
-// CHECK: function_ref @$ss5Error_pIgzo_ytytsAA_pIegnrzo_TR
+// CHECK: function_ref @$sIg_ytyts5Error_pIegnrzo_TR
 // CHECK: partial_apply [callee_guaranteed] [on_stack]
 // CHECK: function_ref @$s22closure_lifetime_fixup25useGenericClosureThrowingyyq_xKXEKr0_l
 public func captureClass(c: C, d: C) throws {
@@ -172,7 +172,7 @@ public protocol DoIt {
 // CHECK: function_ref @$s22closure_lifetime_fixup17useGenericClosureyyq_xXEr0_lF
 
 // CHECK: partial_apply [callee_guaranteed] [on_stack]
-// CHECK: function_ref @$ss5Error_pIgzo_ytytsAA_pIegnrzo_TR
+// CHECK: function_ref @$sIg_ytyts5Error_pIegnrzo_TR
 // CHECK: partial_apply [callee_guaranteed] [on_stack]
 // CHECK: function_ref @$s22closure_lifetime_fixup25useGenericClosureThrowingyyq_xKXEKr0_lF
 public func captureGeneric<C :DoIt,D: DoIt>(c: C, d: D) throws {
@@ -211,7 +211,7 @@ public func captureGeneric<C :DoIt,D: DoIt>(c: C, d: D) throws {
 // CHECK: function_ref @$s22closure_lifetime_fixup17useGenericClosureyyq_xXEr0_lF
 
 // CHECK:  partial_apply [callee_guaranteed] [on_stack]
-// CHECK:  function_ref @$ss5Error_pIgzo_ytytsAA_pIegnrzo_TR
+// CHECK:  function_ref @$sIg_ytyts5Error_pIegnrzo_TR
 // CHECK:  partial_apply [callee_guaranteed] [on_stack]
 // CHECK:  function_ref @$s22closure_lifetime_fixup25useGenericClosureThrowingyyq_xKXEKr0_lF
 public func captureClosure<T, V>(c : (T) ->V, d: (T) -> V, t: T) throws {

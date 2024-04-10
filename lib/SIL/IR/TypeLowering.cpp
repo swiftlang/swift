@@ -2353,7 +2353,7 @@ namespace {
 
       return handleReference(classType, properties);
     }
-
+    
     // WARNING: when the specification of trivial types changes, also update
     // the isValueTrivial() API used by SILCombine.
     TypeLowering *visitAnyStructType(CanType structType,
@@ -2400,6 +2400,13 @@ namespace {
         return handleMoveOnlyAddressOnly(structType, properties);
       }
 
+      if (D->getAttrs().hasAttribute<SensitiveAttr>()) {
+        properties.setAddressOnly();
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return handleAddressOnly(structType, properties);
+      }
+
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
       // Classify the type according to its stored properties.
@@ -2433,7 +2440,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
+      if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2441,7 +2448,9 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-      if (D->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(structType)) {
         properties.setNonTrivial();
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2530,7 +2539,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
+      if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2538,10 +2547,11 @@ namespace {
         return new (TC)
             MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
-
-      assert(D->canBeEscapable() == TypeDecl::CanBeInvertible::Always
-             && "missing typelowering case here!");
-
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(enumType)) {
+        properties.setNonTrivial();
+      }
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
     }
@@ -3196,15 +3206,20 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
                    << substType << "\n"
-                   << "of " << origType << "\n";
+                   << "of " << origType << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
 
-  if (!lowering.isTrivial() && conformance) {
-    // A non-trivial type can have a conformance in one case:
-    // (1) contains a conforming archetype
+  if (!lowering.isTrivial() && conformance &&
+      !conformance.hasUnavailableConformance()) {
+    // A non-trivial type can have a conformance in a few cases:
+    // (1) containing or being a conforming archetype
     // (2) is resilient with minimal expansion
+    // (3) containing or being ~Escapable
+    // (4) containing or being an opaque archetype
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
@@ -3215,6 +3230,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (nominal && nominal->isResilient() &&
               forExpansion.getResilienceExpansion() ==
                   ResilienceExpansion::Minimal) {
+            return true;
+          }
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
             return true;
           }
           // Walk into every aggregate.
@@ -3236,9 +3257,21 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return false;
           }
 
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+            return false;
+          }
+
           // An archetype may conform but be non-trivial (case (1)).
           if (origTy.isTypeParameter())
             return false;
+
+          // An opaque archetype may conform but be non-trivial (case (4)).
+          if (isa<OpaqueTypeArchetypeType>(ty)) {
+            return false;
+          }
 
           return true;
         });
@@ -3246,7 +3279,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
       llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
-      llvm::errs() << "\n";
+      llvm::errs() << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
@@ -3269,7 +3304,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                              AbstractionPattern origType)
         : TC(TC), forExpansion(forExpansion), origType(origType) {
       if (auto origEltType = origType.getVanishingTupleElementPatternType())
-        origType = *origEltType;
+        this->origType = *origEltType;
     }
 
     // AST function types are turned into SIL function types:
@@ -3737,8 +3772,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   auto sig = dd->getGenericSignatureOfContext();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::makeArrayRef(args),
-                                 methodTy, extInfo);
+                                 llvm::ArrayRef(args), methodTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -3765,8 +3799,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
   auto sig = cd->getGenericSignature();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::makeArrayRef(args),
-                                 resultType, extInfo);
+                                 llvm::ArrayRef(args), resultType, extInfo);
 }
 
 static CanAnyFunctionType
@@ -3785,7 +3818,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
                                       funcType->isThrowing(),
                                       funcType->getThrownError())
-          .withConcurrent(funcType->isSendable())
+          .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
@@ -3859,8 +3892,8 @@ static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
                      .withClangFunctionType(clangTy)
                      .build();
 
-  return CanAnyFunctionType::get(/*genericSig*/ nullptr,
-                                 llvm::makeArrayRef(params), Int32Ty, extInfo);
+  return CanAnyFunctionType::get(/*genericSig*/ nullptr, llvm::ArrayRef(params),
+                                 Int32Ty, extInfo);
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
@@ -4784,15 +4817,40 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   return boxTy;
 }
 
-std::optional<AbstractionPattern>
-TypeConverter::getConstantAbstractionPattern(SILDeclRef constant) {
+const FunctionTypeInfo *TypeConverter::getClosureTypeInfo(SILDeclRef constant) {
   if (auto closure = constant.getAbstractClosureExpr()) {
-    // Using operator[] here creates an entry in the map if one doesn't exist
-    // yet, marking the fact that the lack of abstraction pattern has been
-    // established and cannot be overridden by `setAbstractionPattern` later.
-    return ClosureAbstractionPatterns[closure];
+    return &getClosureTypeInfo(closure);
   }
-  return std::nullopt;
+  return nullptr;
+}
+
+const FunctionTypeInfo &
+TypeConverter::getClosureTypeInfo(AbstractClosureExpr *closure) {
+  auto it = ClosureInfos.find(closure);
+  assert(it != ClosureInfos.end() &&
+         "looking for closure info for closure without any set");
+  return it->second;
+}
+
+void TypeConverter::withClosureTypeInfo(AbstractClosureExpr *closure,
+                                        const FunctionTypeInfo &info,
+                                        llvm::function_ref<void()> operation) {
+  auto insertResult = ClosureInfos.insert({closure, info});
+  (void) insertResult;
+#ifndef NDEBUG
+  if (!insertResult.second) {
+    auto &existing = insertResult.first->second;
+    assert(existing.FormalType == info.FormalType);
+    assert(existing.ExpectedLoweredType == info.ExpectedLoweredType);
+  }
+#endif
+
+  operation();
+
+  // TODO: figure out a way to clear this out so that emitting a closure
+  // doesn't require permanent memory use.  Right now we have too much
+  // code relying on not emitting this in a scoped pattern.
+  //ClosureInfos.erase(closure);
 }
 
 TypeExpansionContext
@@ -4806,17 +4864,6 @@ TypeConverter::getCaptureTypeExpansionContext(SILDeclRef constant) {
   auto minimal = TypeExpansionContext::minimal();
   CaptureTypeExpansionContexts.insert({constant, minimal});
   return minimal;
-}
-
-void TypeConverter::setAbstractionPattern(AbstractClosureExpr *closure,
-                                          AbstractionPattern pattern) {
-  auto existing = ClosureAbstractionPatterns.find(closure);
-  if (existing != ClosureAbstractionPatterns.end()) {
-    assert(*existing->second == pattern
-     && "closure shouldn't be emitted at different abstraction level contexts");
-  } else {
-    ClosureAbstractionPatterns[closure] = pattern;
-  }
 }
 
 void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,

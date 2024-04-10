@@ -222,7 +222,7 @@ TEST(SmallMap, Basic) {
   {
     SmallMap<A, A> map;
 
-    auto entries = llvm::makeArrayRef(globalEntries);
+    auto entries = llvm::ArrayRef(globalEntries);
 
     for (size_t iteration : range(entries.size())) {
       EXPECT_EQ(iteration, map.size());

@@ -111,6 +111,8 @@ struct ConversionOperation {
 
   static bool isa(SILInstruction *inst) {
     switch (inst->getKind()) {
+    case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+    case SILInstructionKind::MarkUninitializedInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::UpcastInst:
     case SILInstructionKind::AddressToPointerInst:
@@ -135,6 +137,10 @@ struct ConversionOperation {
     case SILInstructionKind::RefToUnownedInst:
     case SILInstructionKind::UnmanagedToRefInst:
     case SILInstructionKind::UnownedToRefInst:
+    case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+    case SILInstructionKind::DropDeinitInst:
       return true;
     default:
       return false;
@@ -273,6 +279,8 @@ public:
         &forwardingInst->getOperandRef(RefToBridgeObjectInst::ConvertedOperand);
     case SILInstructionKind::TuplePackExtractInst:
       return &forwardingInst->getOperandRef(TuplePackExtractInst::TupleOperand);
+    case SILInstructionKind::BorrowedFromInst:
+      return &forwardingInst->getOperandRef(0);
     default:
       int numRealOperands = forwardingInst->getNumRealOperands();
       if (numRealOperands == 0) {

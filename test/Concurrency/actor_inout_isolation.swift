@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix minimal-targeted- -strict-concurrency=targeted
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix complete-tns- -verify-additional-prefix complete- -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix minimal-targeted- -strict-concurrency=targeted -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix complete-tns- -verify-additional-prefix complete- -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix complete-tns- -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -318,7 +318,7 @@ actor ProtectDictionary {
 
   func invalid() async {
     await dict[0].mutate()
-    // expected-warning@-1 {{cannot call mutating async function 'mutate()' on actor-isolated property 'dict'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot call mutating async function 'mutate()' on actor-isolated property 'dict'; this is an error in the Swift 6 language mode}}
     // expected-targeted-complete-warning@-2 {{passing argument of non-sendable type 'inout Optional<Int>' outside of actor-isolated context may introduce data races}}
   }
 }

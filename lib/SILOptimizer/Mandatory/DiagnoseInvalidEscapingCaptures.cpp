@@ -336,22 +336,6 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
   }
 }
 
-static bool isNonEscapingFunctionValue(SILValue value) {
-  auto type = value->getType().getASTType();
-
-  // Look through box types to handle mutable 'var' bindings.
-  if (auto boxType = dyn_cast<SILBoxType>(type)) {
-    for (auto field : boxType->getLayout()->getFields()) {
-      if (field.getLoweredType()->isNoEscape())
-        return true;
-    }
-
-    return false;
-  }
-
-  return type->isNoEscape();
-}
-
 // Diagnose this partial_apply if it captures a non-escaping value and has
 // an escaping use.
 static void checkPartialApply(ASTContext &Context, DeclContext *DC,
@@ -379,7 +363,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
 
     // Captures of noescape function types or tuples containing noescape
     // function types cannot escape.
-    if (isNonEscapingFunctionValue(value))
+    if (value->getType().containsNoEscapeFunction())
       noEscapeCaptures.push_back(&oper);
   }
 
@@ -501,7 +485,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
 static void checkApply(ASTContext &Context, FullApplySite site) {
   auto isNoEscapeParam = [&](SILValue value) -> const ParamDecl * {
     // If the value is an escaping, do not enforce any restrictions.
-    if (!isNonEscapingFunctionValue(value))
+    if (!value->getType().containsNoEscapeFunction())
       return nullptr;
 
     // If the value is not a function parameter, do not enforce any restrictions.

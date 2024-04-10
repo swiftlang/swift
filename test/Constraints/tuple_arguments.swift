@@ -1490,7 +1490,7 @@ do {
   let tuple = (1, (2, 3))
   [tuple].map { (x, (y, z)) -> Int in x + y + z } // expected-note 2 {{'x' declared here}}
   // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{21-27=arg1}} {{39-39=let (y, z) = arg1; }}
-  // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in Swift 6}}  {{21-21=_: }}
+  // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}}  {{21-21=_: }}
   // expected-error@-3 {{cannot find 'y' in scope; did you mean 'x'?}}
   // expected-error@-4 {{cannot find 'z' in scope; did you mean 'x'?}}
 }
@@ -1501,7 +1501,7 @@ r31892961_1.forEach { (k, v) in print(k + v) }
 
 let r31892961_2 = [1, 2, 3]
 // expected-error@+2 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{+1:3-3=\n  let (index, val) = arg0\n  }}
-// expected-warning@+1 {{unnamed parameters must be written with the empty name '_'; this is an error in Swift 6}} {{48-48=_: }}
+// expected-warning@+1 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{48-48=_: }}
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
   val + 1
   // expected-error@-1 {{cannot find 'val' in scope}}
@@ -1518,13 +1518,13 @@ _ = [r31892961_4].map { x, y in x + y }
 let r31892961_5 = (x: 1, (y: 2, (w: 3, z: 4)))
 [r31892961_5].map { (x: Int, (y: Int, (w: Int, z: Int))) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-56=arg1}} {{61-61=let (y, (w, z)) = arg1; }}
-// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in Swift 6}} {{30-30=_: }}
+// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{30-30=_: }}
 // expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 let r31892961_6 = (x: 1, (y: 2, z: 4))
 [r31892961_6].map { (x: Int, (y: Int, z: Int)) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-46=arg1}} {{51-51=let (y, z) = arg1; }}
-// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in Swift 6}} {{30-30=_: }}
+// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{30-30=_: }}
 // expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 // rdar://problem/32214649 -- these regressed in Swift 4 mode

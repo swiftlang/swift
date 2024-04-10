@@ -205,6 +205,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     return x.getTupleIndex() == y.getTupleIndex();
 
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     return true;
   }
 
@@ -1121,6 +1122,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
     case OverloadChoiceKind::MaterializePack:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
       continue;
 
     case OverloadChoiceKind::KeyPathApplication:

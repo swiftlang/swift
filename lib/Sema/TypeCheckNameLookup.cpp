@@ -545,7 +545,7 @@ unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
 
   // Don't typo-correct to a name with a leading underscore unless the typed
   // name also begins with an underscore.
-  if (correctedBase.startswith("_") && !writtenBase.startswith("_")) {
+  if (correctedBase.starts_with("_") && !writtenBase.starts_with("_")) {
     return UnreasonableCallEditDistance;
   }
 

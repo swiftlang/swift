@@ -145,6 +145,11 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch");
   }
 
+  friend bool operator!=(const Requirement &lhs,
+                         const Requirement &rhs) {
+    return !(lhs == rhs);
+  }
+
   /// Whether this requirement's types contain ErrorTypes.
   bool hasError() const;
 
@@ -223,6 +228,12 @@ enum class CheckRequirementsResult : uint8_t {
 /// not contain any type parameters.
 CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements);
 
+/// Check if each substituted requirement is satisfied. If the requirement
+/// contains type parameters, and the answer would depend on the context of
+/// those type parameters, then `nullopt` is returned.
+std::optional<CheckRequirementsResult>
+checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
+
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
@@ -251,10 +262,8 @@ struct InverseRequirement {
 
   InvertibleProtocolKind getKind() const;
 
-  /// Adds the type parameters of this generic context to the result if
-  /// it has default requirements.
-  static void enumerateDefaultedParams(GenericContext *decl,
-                                       SmallVectorImpl<Type> &result);
+  /// Linear order on inverse requirements in a generic signature.
+  int compare(const InverseRequirement &other) const;
 
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.
@@ -262,20 +271,7 @@ struct InverseRequirement {
                              ArrayRef<Type> gps,
                              SmallVectorImpl<StructuralRequirement> &result);
 
-  /// Adds the inferred default protocols for an assumed generic parameter with
-  /// respect to that parameter's inverses and existing required protocols.
-  /// For example, if an inverse ~P exists, then P will not be added to the
-  /// protocols list.
-  ///
-  /// Similarly, if the protocols list has a protocol Q that already implies
-  /// Copyable, then we will not add `Copyable` to the protocols list.
-  ///
-  /// \param inverses the inverses '& ~P' that are applied to the generic param.
-  /// \param protocols the existing required protocols, to which defaults will
-  ///                  be appended.
-  static void expandDefaults(ASTContext &ctx,
-                             InvertibleProtocolSet inverses,
-                             SmallVectorImpl<ProtocolDecl*> &protocols);
+  void print(raw_ostream &os, const PrintOptions &opts, bool forInherited=false) const;
 };
 
 } // end namespace swift

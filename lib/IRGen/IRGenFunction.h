@@ -76,7 +76,7 @@ public:
   OptimizationMode OptMode;
   bool isPerformanceConstraint;
 
-  llvm::Function *CurFn;
+  llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
   Lowering::TypeConverter &getSILTypes() const;
@@ -155,6 +155,18 @@ public:
     CoroutineHandle = handle;
   }
 
+  llvm::BasicBlock *getCoroutineExitBlock() const {
+    return CoroutineExitBlock;
+  }
+
+  SmallVector<llvm::Value *, 1> coroutineResults;
+  
+  void setCoroutineExitBlock(llvm::BasicBlock *block) {
+    assert(CoroutineExitBlock == nullptr && "already set exit BB");
+    assert(block != nullptr && "setting a null exit BB");
+    CoroutineExitBlock = block;
+  }
+
   llvm::Value *getAsyncTask();
   llvm::Value *getAsyncContext();
   void storeCurrentAsyncContext(llvm::Value *context);
@@ -190,6 +202,8 @@ public:
 
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
+
+  void emitClearSensitive(Address address, llvm::Value *size);
 
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
@@ -236,7 +250,7 @@ private:
   bool callsAnyAlwaysInlineThunksWithForeignExceptionTraps = false;
 
 public:
-  void emitCoroutineOrAsyncExit();
+  void emitCoroutineOrAsyncExit(bool isUnwind);
 
 //--- Helper methods -----------------------------------------------------------
 public:
@@ -792,7 +806,25 @@ public:
   llvm::Value *getDynamicSelfMetadata();
   void setDynamicSelfMetadata(CanType selfBaseTy, bool selfIsExact,
                               llvm::Value *value, DynamicSelfKind kind);
+#ifndef NDEBUG
+  LocalTypeDataCache const *getLocalTypeData() { return LocalTypeData; }
+#endif
 
+  /// A forwardable argument is a load that is immediately preceeds the apply it
+  /// is used as argument to. If there is no side-effecting instructions between
+  /// said load and the apply, we can memcpy the loads address to the apply's
+  /// indirect argument alloca.
+  void clearForwardableArguments() {
+    forwardableArguments.clear();
+  }
+
+  void setForwardableArgument(unsigned idx) {
+    forwardableArguments.insert(idx);
+  }
+
+  bool isForwardableArgument(unsigned idx) const {
+    return forwardableArguments.contains(idx);
+  }
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -811,6 +843,8 @@ private:
   CanType SelfType;
   bool SelfTypeIsExact = false;
   DynamicSelfKind SelfKind;
+
+  llvm::SmallSetVector<unsigned, 16> forwardableArguments;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

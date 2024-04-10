@@ -21,7 +21,7 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(SwiftStdlib 5.7, *)
-public struct SuspendingClock {
+public struct SuspendingClock: Sendable {
   public struct Instant: Codable, Sendable {
     internal var _value: Swift.Duration
 

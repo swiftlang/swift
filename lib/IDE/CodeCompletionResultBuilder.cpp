@@ -69,7 +69,7 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
       });
 
   if (!USRs.empty())
-    return makeArrayRef(USRs).copy(Allocator);
+    return llvm::ArrayRef(USRs).copy(Allocator);
 
   return {};
 }

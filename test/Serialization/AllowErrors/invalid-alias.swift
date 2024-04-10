@@ -8,7 +8,7 @@
 
 // RUN: %target-swift-frontend -module-name errors -emit-module -o %t/errors.swiftmodule -experimental-allow-module-with-compiler-errors %t/errors.partial.swiftmodule %t/errorsempty.partial.swiftmodule
 
-// RUN: %target-swift-frontend -emit-module -o %t/mods/uses.swiftmodule -experimental-allow-module-with-compiler-errors -I %t/mods %t/uses.swift 2>&1 | %FileCheck -check-prefix=CHECK-USES %s
+// RUN: %target-swift-frontend -emit-module -o %t/mods/uses.swiftmodule -experimental-allow-module-with-compiler-errors -I %t/mods %t/uses.swift -diagnostic-style llvm 2>&1 | %FileCheck -check-prefix=CHECK-USES %s
 
 // BEGIN errors.swift
 typealias AnAlias = undefined // expected-error {{cannot find type 'undefined'}}

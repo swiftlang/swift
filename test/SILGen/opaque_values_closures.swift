@@ -56,7 +56,7 @@ func captureImmutablePackGuaranteed<each T>(t: repeat each T) {
 // CaptureKind::Immutable, canGuarantee=true, isPack=false
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures26captureImmutableGuaranteed1tyx_tlF : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
-// CHECK:         [[STACK:%[^,]+]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:         [[VAR:%[^,]+]] = mark_uninitialized [var] [[STACK]]
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
 // CHECK:         assign [[COPY]] to [[VAR]]

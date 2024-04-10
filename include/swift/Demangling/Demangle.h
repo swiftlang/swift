@@ -206,7 +206,8 @@ private:
   Kind NodeKind;
 
   enum class PayloadKind : uint8_t {
-    None, Text, Index, OneChild, TwoChildren, ManyChildren
+    None = 0, OneChild = 1, TwoChildren = 2,
+    Text, Index, ManyChildren
   };
   PayloadKind NodePayloadKind;
 
@@ -227,6 +228,22 @@ private:
 public:
   Kind getKind() const { return NodeKind; }
 
+  bool isSimilarTo(const Node *other) const {
+    if (NodeKind != other->NodeKind
+        || NodePayloadKind != other->NodePayloadKind)
+      return false;
+    switch (NodePayloadKind) {
+    case PayloadKind::ManyChildren:
+      return Children.Number == other->Children.Number;
+    case PayloadKind::Index:
+      return Index == other->Index;
+    case PayloadKind::Text:
+      return Text == other->Text;
+    default:
+      return true;
+    }
+  }
+
   bool hasText() const { return NodePayloadKind == PayloadKind::Text; }
   llvm::StringRef getText() const {
     assert(hasText());
@@ -241,13 +258,41 @@ public:
 
   using iterator = const NodePointer *;
 
-  size_t getNumChildren() const;
+  size_t getNumChildren() const {
+    switch (NodePayloadKind) {
+    case PayloadKind::OneChild: return 1;
+    case PayloadKind::TwoChildren: return 2;
+    case PayloadKind::ManyChildren: return Children.Number;
+    default: return 0;
+    }
+  }
 
   bool hasChildren() const { return getNumChildren() != 0; }
 
-  iterator begin() const;
+  iterator begin() const {
+    switch (NodePayloadKind) {
+    case PayloadKind::OneChild:
+    case PayloadKind::TwoChildren:
+      return &InlineChildren[0];
+    case PayloadKind::ManyChildren:
+      return Children.Nodes;
+    default:
+      return nullptr;
+    }
+  }
 
-  iterator end() const;
+  iterator end() const {
+    switch (NodePayloadKind) {
+    case PayloadKind::OneChild:
+      return &InlineChildren[1];
+    case PayloadKind::TwoChildren:
+      return &InlineChildren[2];
+    case PayloadKind::ManyChildren:
+      return Children.Nodes + Children.Number;
+    default:
+      return nullptr;
+    }
+  }
 
   NodePointer getFirstChild() const {
     return getChild(0);
@@ -553,6 +598,7 @@ struct [[nodiscard]] ManglingError {
     UnknownEncoding,
     InvalidImplCalleeConvention,
     InvalidImplDifferentiability,
+    InvalidImplCoroutineKind,
     InvalidImplFunctionAttribute,
     InvalidImplParameterConvention,
     InvalidImplParameterTransferring,

@@ -528,7 +528,7 @@ Takes a list of protocols that are the immediate successors of a generic signatu
 \item (Check) If the worklist is empty, go to Step~8.
 \item (Next) Otherwise, remove the next protocol $p$ from the worklist. If $p\in\texttt{S}$, go back to Step~2, otherwise set $\texttt{S}\leftarrow\texttt{S}\cup\{p\}$.
 \item (Component) Use Algorithm~\ref{tarjan} to compute the component ID for $p$.
-\item (Machine) Let $m$ be the the requirement machine for this component, creating it first if necessary. If $m\not\in\texttt{M}$, set $\texttt{M}\leftarrow\texttt{M}\cup\{m\}$.
+\item (Machine) Let $m$ be the requirement machine for this component, creating it first if necessary. If $m\not\in\texttt{M}$, set $\texttt{M}\leftarrow\texttt{M}\cup\{m\}$.
 \item (Successors) Add each successor of $p$ to the worklist.
 \item (Loop) Go back to Step~1.
 \item (Collect) Return the concatenation of the local rules from each $m\in\texttt{M}$.

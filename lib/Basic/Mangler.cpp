@@ -131,7 +131,7 @@ std::string Mangler::finalize() {
   Storage.clear();
 
 #ifndef NDEBUG
-  if (StringRef(result).startswith(MANGLING_PREFIX_STR))
+  if (StringRef(result).starts_with(MANGLING_PREFIX_STR))
     verify(result);
 #endif
 
@@ -160,9 +160,9 @@ static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
 void Mangler::verify(StringRef nameStr) {
 #ifndef NDEBUG
   SmallString<128> buffer;
-  if (!nameStr.startswith(MANGLING_PREFIX_STR) &&
-      !nameStr.startswith("_Tt") &&
-      !nameStr.startswith("_S")) {
+  if (!nameStr.starts_with(MANGLING_PREFIX_STR) &&
+      !nameStr.starts_with("_Tt") &&
+      !nameStr.starts_with("_S")) {
     // This list is the set of prefixes recognized by Demangler::demangleSymbol.
     // It should be kept in sync.
     assert(StringRef(MANGLING_PREFIX_STR) != "_S" && "redundant check");

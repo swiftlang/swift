@@ -191,11 +191,11 @@ func test6() {
 // VOID_1: ]
 
 // VOID_1_RAW: key.name: "foo1()",
-// VOID_1_RAW-NEXT: key.sourcetext: "foo1()",
 // VOID_1_RAW-NEXT: key.description: "foo1()",
 // VOID_1_RAW-NEXT: key.typename: "Void",
 // VOID_1_RAW-NEXT: key.context: source.codecompletion.context.local,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
+// VOID_1_RAW: key.sourcetext: "foo1()"
 
 
 

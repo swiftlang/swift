@@ -35,9 +35,6 @@ constexpr unsigned numFeatures() {
   return NumFeatures;
 }
 
-/// Determine whether the given feature is suppressible.
-bool isSuppressibleFeature(Feature feature);
-
 /// Check whether the given feature is available in production compilers.
 bool isFeatureAvailableInProduction(Feature feature);
 

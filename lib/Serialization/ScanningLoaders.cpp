@@ -33,6 +33,7 @@
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <algorithm>
+#include <system_error>
 
 using namespace swift;
 
@@ -50,37 +51,25 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   auto &fs = *Ctx.SourceMgr.getFileSystem();
 
   auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
-  auto InPath = BaseName.getName(file_types::TY_SwiftModuleInterfaceFile);
+  auto InPath = BaseName.findInterfacePath(fs, Ctx);
 
-  if (LoadMode == ModuleLoadingMode::OnlySerialized || !fs.exists(InPath)) {
+  if (LoadMode == ModuleLoadingMode::OnlySerialized || !InPath) {
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
-      auto dependencies = scanModuleFile(ModPath, IsFramework);
+      auto dependencies =
+          scanModuleFile(ModPath, IsFramework, isTestableDependencyLookup);
       if (dependencies) {
         this->dependencies = std::move(dependencies.get());
         return std::error_code();
       }
       return dependencies.getError();
-    } else {
-      return std::make_error_code(std::errc::no_such_file_or_directory);
     }
+    return std::make_error_code(std::errc::no_such_file_or_directory);
   }
-  assert(fs.exists(InPath));
+  assert(InPath);
 
-  // Use package.swiftinterface if it exists and its package-name applies to
-  // the importer module.
-  auto PkgInPath = BaseName.getPackageInterfacePathIfInSamePackage(fs, Ctx).value_or("");
-  if (!PkgInPath.empty() && fs.exists(PkgInPath)) {
-    InPath = PkgInPath;
-  } else {
-    // If not in package, use the private interface file if exits.
-    auto PrivateInPath =
-    BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
-    if (fs.exists(PrivateInPath)) {
-      InPath = PrivateInPath;
-    }
-  }
-  auto dependencies = scanInterfaceFile(InPath, IsFramework);
+  auto dependencies =
+      scanInterfaceFile(*InPath, IsFramework, isTestableDependencyLookup);
   if (dependencies) {
     this->dependencies = std::move(dependencies.get());
     return std::error_code();
@@ -147,7 +136,7 @@ static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
 
 llvm::ErrorOr<ModuleDependencyInfo>
 SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
-                                      bool isFramework) {
+                                      bool isFramework, bool isTestableImport) {
   // Create a module filename.
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
@@ -166,15 +155,43 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         std::string InPath = moduleInterfacePath.str();
         auto compiledCandidates =
             getCompiledCandidates(Ctx, realModuleName.str(), InPath);
-        std::vector<std::string> Args(BaseArgs.begin(), BaseArgs.end());
+        if (!compiledCandidates.empty() &&
+            !Ctx.SearchPathOpts.NoScannerModuleValidation) {
+          assert(compiledCandidates.size() == 1 &&
+                 "Should only have 1 candidate module");
+          auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
+                                          isTestableImport);
+          if (BinaryDep) {
+            Result = *BinaryDep;
+            return std::error_code();
+          }
 
+          // If return no such file, just fallback to use interface.
+          if (BinaryDep.getError() != std::errc::no_such_file_or_directory)
+            return BinaryDep.getError();
+        }
+
+        std::vector<std::string> Args(BaseArgs.begin(), BaseArgs.end());
         // Add explicit Swift dependency compilation flags
         Args.push_back("-explicit-interface-module-build");
         Args.push_back("-disable-implicit-swift-modules");
-        Args.push_back("-Xcc");
-        Args.push_back("-fno-implicit-modules");
-        Args.push_back("-Xcc");
-        Args.push_back("-fno-implicit-module-maps");
+
+        // Handle clang arguments. For caching build, all arguments are passed
+        // with `-direct-clang-cc1-module-build`.
+        if (Ctx.ClangImporterOpts.ClangImporterDirectCC1Scan) {
+          Args.push_back("-direct-clang-cc1-module-build");
+          auto *importer =
+              static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+          for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args()) {
+            Args.push_back("-Xcc");
+            Args.push_back(Arg);
+          }
+        } else {
+          Args.push_back("-Xcc");
+          Args.push_back("-fno-implicit-modules");
+          Args.push_back("-Xcc");
+          Args.push_back("-fno-implicit-module-maps");
+        }
         for (const auto &candidate : compiledCandidates) {
           Args.push_back("-candidate-module-file");
           Args.push_back(candidate);
@@ -206,28 +223,20 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             *moduleDecl, SourceFileKind::Interface, bufferID, parsingOpts);
         moduleDecl->addAuxiliaryFile(*sourceFile);
 
-        std::string RootID;
-        if (dependencyTracker) {
-          dependencyTracker->startTracking();
-          dependencyTracker->addCommonSearchPathDeps(Ctx.SearchPathOpts);
+        std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
+        Result = ModuleDependencyInfo::forSwiftInterfaceModule(
+            outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs,
+            PCMArgs, Hash, isFramework, {}, /*module-cache-key*/ "");
+
+        if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;
           auto clangImporter =
               static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
           clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
           llvm::for_each(clangDependencyFiles, [&](std::string &file) {
-            dependencyTracker->trackFile(file);
+            Result->addAuxiliaryFile(file);
           });
-          dependencyTracker->trackFile(moduleInterfacePath);
-          auto RootOrError = dependencyTracker->createTreeFromDependencies();
-          if (!RootOrError)
-            return llvm::errorToErrorCode(RootOrError.takeError());
-          RootID = RootOrError->getID().toString();
         }
-
-        std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
-        Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-            outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs,
-            PCMArgs, Hash, isFramework, RootID, /*module-cache-key*/ "");
 
         // Walk the source file to find the import declarations.
         llvm::StringSet<> alreadyAddedModules;
@@ -261,9 +270,6 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   ImportPath::Module::Builder builder(moduleName);
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
-  std::optional<SwiftDependencyTracker> tracker = std::nullopt;
-  if (CacheFS)
-    tracker = SwiftDependencyTracker(*CacheFS, mapper);
 
   // Do not load interface module if it is testable import.
   ModuleLoadingMode MLM =
@@ -278,10 +284,10 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   // FIXME: submodules?
   scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
       Ctx, MLM, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
-      delegate, moduleOutputPath, tracker));
+      delegate, moduleOutputPath));
   scanners.push_back(std::make_unique<SwiftModuleScanner>(
       Ctx, MLM, moduleId, delegate, moduleOutputPath,
-      SwiftModuleScanner::MDS_plain, tracker));
+      SwiftModuleScanner::MDS_plain));
 
   // Check whether there is a module with this name that we can import.
   assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&

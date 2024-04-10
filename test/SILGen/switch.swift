@@ -1461,16 +1461,16 @@ func testVoidType() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch28addressOnlyFallthroughCalleeyyAA015MultipleAddressC8CaseEnumOyxGSzRzlF : $@convention(thin) <T where T : BinaryInteger> (@in_guaranteed MultipleAddressOnlyCaseEnum<T>) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[AB_PHI:%.*]] = alloc_stack $T, let, name "x"
-// CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T, let, name "x"
-// CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   [[AB_PHI:%.*]] = alloc_stack $T
+// CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T
+// CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T
 // CHECK:   [[SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
 // CHECK:   copy_addr [[ARG]] to [init] [[SWITCH_ENUM_ARG]]
 // CHECK:   switch_enum_addr [[SWITCH_ENUM_ARG]] : $*MultipleAddressOnlyCaseEnum<T>, case #MultipleAddressOnlyCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]
 //
 // CHECK: [[BB_A]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
-// CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_A]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_A]] to [init] [[AB_PHI]]
 // CHECK:   destroy_addr [[CASE_BODY_VAR_A]]
@@ -1478,7 +1478,7 @@ func testVoidType() {
 //
 // CHECK: [[BB_B]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
-// CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_B]]
 // CHECK:   [[FUNC_CMP:%.*]] = function_ref @$sSzsE2eeoiySbx_qd__tSzRd__lFZ :
 // CHECK:   [[GUARD_RESULT:%.*]] = apply [[FUNC_CMP]]<T, Int>([[CASE_BODY_VAR_B]], {{%.*}}, {{%.*}})
@@ -1503,14 +1503,14 @@ func testVoidType() {
 //
 // CHECK: [[BB_B_GUARD_FAIL]]:
 // CHECK:   destroy_addr [[CASE_BODY_VAR_B]]
-// CHECK:   [[CASE_BODY_VAR_B_2:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_B_2:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_B_2]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_B_2]] to [init] [[ABB_PHI]]
 // CHECK:   br [[BB_AB_CONT]]
 //
 // CHECK: [[BB_C]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
-// CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_C]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_C]] to [init] [[ABBC_PHI]]
 // CHECK:   destroy_addr [[CASE_BODY_VAR_C]]

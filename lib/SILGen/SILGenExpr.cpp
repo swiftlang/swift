@@ -486,6 +486,8 @@ namespace {
                                        SGFContext C);
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
+    RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                             SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
              CovariantFunctionConversionExpr *E,
              SGFContext C);
@@ -516,6 +518,11 @@ namespace {
     RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
     RValue visitCaptureListExpr(CaptureListExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
+    ManagedValue tryEmitConvertedClosure(AbstractClosureExpr *e,
+                                         CanAnyFunctionType closureType,
+                                         const Conversion &conv);
+    ManagedValue emitClosureReference(AbstractClosureExpr *e,
+                                      const FunctionTypeInfo &contextInfo);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     RValue visitRegexLiteralExpr(RegexLiteralExpr *E, SGFContext C);
@@ -672,7 +679,7 @@ static BridgingConversion getBridgingConversion(Expr *E) {
 
   // If we peeked through an opening, and we didn't recognize a specific
   // pattern above involving the opaque value, make sure we use the opening
-  // as the final expression instead of accidentally look through it.
+  // as the final expression instead of accidentally looking through it.
   if (open)
     return {open, std::nullopt, 0};
 
@@ -975,9 +982,10 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // sort.
   SILDeclRef silDeclRef(decl);
   assert(silDeclRef.getParameterListCount() == 1);
-  ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
-                                         declRef.getSubstitutions(),
-                                         /*already converted*/ false);
+  auto substType = cast<AnyFunctionType>(refType);
+  auto typeContext = getFunctionTypeInfo(substType);
+  ManagedValue result = emitClosureValue(loc, silDeclRef, typeContext,
+                                         declRef.getSubstitutions());
   return RValue(*this, loc, refType, result);
 }
 
@@ -1086,8 +1094,9 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                                 bool hasDynamicLifetime,
-                                                 bool isLexical,
+                                                 HasDynamicLifetime_t dynamic,
+                                                 IsLexical_t isLexical,
+                                                 IsFromVarDecl_t isFromVarDecl,
                                                  bool generateDebugInfo) {
   ty = ty.getObjectType();
   std::optional<SILDebugVariable> DbgVar;
@@ -1095,7 +1104,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
     if (auto *VD = loc.getAsASTNode<VarDecl>())
       DbgVar = SILDebugVariable(VD->isLet(), 0);
   auto *alloc =
-      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical, false
+      B.createAllocStack(loc, ty, DbgVar, dynamic, isLexical, isFromVarDecl,
+                         DoesNotUseMoveableValueDebugInfo
 #ifndef NDEBUG
                          ,
                          !generateDebugInfo
@@ -1686,6 +1696,25 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
   return RValue(SGF, E, base);
 }
 
+static bool isAnyClosureExpr(Expr *e) {
+  return isa<AbstractClosureExpr>(e) || isa<CaptureListExpr>(e);
+}
+
+static ManagedValue emitCaptureListExpr(SILGenFunction &SGF,
+                                        CaptureListExpr *e,
+            llvm::function_ref<ManagedValue(AbstractClosureExpr *closure)> fn);
+
+static ManagedValue emitAnyClosureExpr(SILGenFunction &SGF, Expr *e,
+            llvm::function_ref<ManagedValue(AbstractClosureExpr *closure)> fn) {
+  if (auto closure = dyn_cast<AbstractClosureExpr>(e)) {
+    return fn(closure);
+  } else if (auto captures = dyn_cast<CaptureListExpr>(e)) {
+    return emitCaptureListExpr(SGF, captures, fn);
+  } else {
+    llvm_unreachable("not a closure expression!");
+  }
+}
+
 static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
                                               FunctionConversionExpr *e,
                                               SILType loweredResultTy,
@@ -1753,23 +1782,17 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
     setLocFromConcreteDeclRef(declRef->getDeclRef());
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(memberRef->getMember());
-  } else if (auto closure = dyn_cast<AbstractClosureExpr>(semanticExpr)) {
-    // Emit the closure body.
-    SGF.SGM.emitClosure(closure);
+  } else if (isAnyClosureExpr(semanticExpr)) {
+    (void) emitAnyClosureExpr(SGF, semanticExpr,
+                              [&](AbstractClosureExpr *closure) {
+      // Emit the closure body.
+      auto closureType =
+        cast<AnyFunctionType>(closure->getType()->getCanonicalType());
+      SGF.SGM.emitClosure(closure, SGF.getFunctionTypeInfo(closureType));
 
-    loc = closure;
-  } else if (auto captureList = dyn_cast<CaptureListExpr>(semanticExpr)) {
-    // Ensure that weak captures are in a separate scope.
-    DebugScope scope(SGF, CleanupLocation(captureList));
-    // CaptureListExprs evaluate their bound variables.
-    for (auto capture : captureList->getCaptureList())
-      SGF.visit(capture.PBD);
-
-    // Emit the closure body.
-    auto *closure = captureList->getClosureBody();
-    SGF.SGM.emitClosure(closure);
-
-    loc = closure;
+      loc = closure;
+      return ManagedValue();
+    });
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
@@ -1902,74 +1925,19 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   llvm_unreachable("bad representation");
 }
 
-/// Whether the given abstraction pattern as an opaque thrown error.
-static bool hasOpaqueThrownError(const AbstractionPattern &pattern) {
-  if (auto thrownPattern = pattern.getFunctionThrownErrorType())
-    return thrownPattern->isTypeParameterOrOpaqueArchetype();
-
-  return false;
-}
-
-// Ideally our prolog/epilog emission would be able to handle all possible
-// reabstractions and conversions. Until then, this returns true if a closure
-// literal of type `literalType` can be directly emitted by SILGen as
-// `convertedType`.
-static bool canPeepholeLiteralClosureConversion(
-    Type literalType, Type convertedType,
-    const std::optional<AbstractionPattern> &closurePattern) {
-  auto literalFnType = literalType->getAs<FunctionType>();
-  auto convertedFnType = convertedType->getAs<FunctionType>();
-  
-  if (!literalFnType || !convertedFnType)
-    return false;
-    
-  // Is it an identity conversion?
-  if (literalFnType->isEqual(convertedFnType)) {
-    return true;
-  }
-
-  // Are the types equivalent aside from effects (throws) or coeffects
-  // (escaping)? Then we should emit the literal as having the destination type
-  // (co)effects, even if it doesn't exercise them.
-  //
-  // TODO: We could also in principle let `async` through here, but that
-  // interferes with the implementation of `reasync`.
-  auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
-    .withNoEscape(false)
-    .build();
-    
-  auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
-    .withNoEscape(false)
-    .build();
-
-  // If the closure pattern has an abstract thrown error, we are unable to
-  // emit the literal with a difference in the thrown error type.
-  if (!(closurePattern && hasOpaqueThrownError(*closurePattern))) {
-    literalWithoutEffects = literalWithoutEffects.withThrows(false, Type());
-    convertedWithoutEffects = convertedWithoutEffects.withThrows(false, Type());
-  }
-
-  if (literalFnType->withExtInfo(literalWithoutEffects)
-        ->isEqual(convertedFnType->withExtInfo(convertedWithoutEffects))) {
-    return true;
-  }
-
-  return false;
-}
-
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
-  CanAnyFunctionType srcRepTy =
+  CanAnyFunctionType srcType =
       cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
-  CanAnyFunctionType destRepTy =
+  CanAnyFunctionType destType =
       cast<FunctionType>(e->getType()->getCanonicalType());
 
-  if (destRepTy->getRepresentation() ==
+  if (destType->getRepresentation() ==
       FunctionTypeRepresentation::CFunctionPointer) {
     ManagedValue result;
 
-    if (srcRepTy->getRepresentation() !=
+    if (srcType->getRepresentation() !=
         FunctionTypeRepresentation::CFunctionPointer) {
       // A "conversion" of a DeclRef a C function pointer is done by referencing
       // the thunk (or original C function) with the C calling convention.
@@ -2011,39 +1979,32 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     }
     subExpr = subCoerce->getSubExpr()->getSemanticsProvidingExpr();
   }
-  
-  if ((isa<AbstractClosureExpr>(subExpr) || isa<CaptureListExpr>(subExpr))
-      && canPeepholeLiteralClosureConversion(subExpr->getType(),
-                                             e->getType(),
-                                             C.getAbstractionPattern())) {
-    // If we're emitting into a context with a preferred abstraction pattern
-    // already, carry that along.
-    auto origType = C.getAbstractionPattern();
-    // If not, use the conversion type as the desired abstraction pattern.
-    if (!origType) {
-      origType = AbstractionPattern(e->getType()->getCanonicalType());
-    }
-    
-    auto substType = subExpr->getType()->getCanonicalType();
-    
-    auto conversion = Conversion::getSubstToOrig(*origType, substType,
-                                      SGF.getLoweredType(*origType, substType));
-    ConvertingInitialization convertingInit(conversion, SGFContext());
-    auto closure = SGF.emitRValue(subExpr,
-                                  SGFContext(&convertingInit))
-      .getAsSingleValue(SGF, e);
-    closure = SGF.emitSubstToOrigValue(e, closure, *origType, substType);
 
+  assert(subExpr->getType()->getCanonicalType() == srcType &&
+         "looked through a type change?");
+
+  // If the subexpression is a closure, emit it in a converting context.
+  // The emission of the closure expression will decide whether we can
+  // actually apply the conversion directly when emitting the closure.
+  //
+  // We don't allow representation changes on this path, although we
+  // probably could.
+  if (isAnyClosureExpr(subExpr) &&
+      destType->getRepresentation() == srcType->getRepresentation()) {
+    auto loweredDestTy = SGF.getLoweredType(destType);
+    auto conversion = Conversion::getSubtype(srcType, destType, loweredDestTy);
+    auto closure = SGF.emitConvertedRValue(subExpr, conversion, C);
     return RValue(SGF, e, closure);
   }
   
   // Handle a reference to a "thin" native Swift function that only changes
   // representation and refers to an inherently thin function reference.
-  if (destRepTy->getRepresentation() == FunctionTypeRepresentation::Thin) {
-    if (srcRepTy->getRepresentation() == FunctionTypeRepresentation::Swift
-        && srcRepTy->withExtInfo(destRepTy->getExtInfo())->isEqual(destRepTy)) {
+  // FIXME: this definitely should not be completely replacing the ExtInfo.
+  if (destType->getRepresentation() == FunctionTypeRepresentation::Thin) {
+    if (srcType->getRepresentation() == FunctionTypeRepresentation::Swift
+        && srcType->withExtInfo(destType->getExtInfo())->isEqual(destType)) {
       auto value = SGF.emitRValueAsSingleValue(e->getSubExpr());
-      auto expectedTy = SGF.getLoweredType(e->getType());
+      auto expectedTy = SGF.getLoweredType(destType);
       if (auto thinToThick =
             dyn_cast<ThinToThickFunctionInst>(value.getValue())) {
         value = ManagedValue::forObjectRValueWithoutOwnership(
@@ -2071,34 +2032,35 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // We only do one of 1) or 3), but we have to do them in the right order
   // with respect to 2).
 
-  CanAnyFunctionType srcTy = srcRepTy;
-  CanAnyFunctionType destTy = destRepTy;
+  CanAnyFunctionType stage1Type = srcType;
+  CanAnyFunctionType stage2Type = destType;
 
-  switch(srcRepTy->getRepresentation()) {
+  switch(srcType->getRepresentation()) {
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
     // Source is native, so we can convert signature first.
-    destTy = adjustFunctionType(destRepTy, srcTy->getRepresentation(),
-                                srcTy->getClangTypeInfo());
+    stage2Type = adjustFunctionType(destType, srcType->getRepresentation(),
+                                    srcType->getClangTypeInfo());
     break;
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     // Source is foreign, so do the representation change first.
-    srcTy = adjustFunctionType(srcRepTy, destRepTy->getRepresentation(),
-                               destRepTy->getClangTypeInfo());
+    stage1Type = adjustFunctionType(srcType, destType->getRepresentation(),
+                                    destType->getClangTypeInfo());
   }
 
   auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());
 
-  if (srcRepTy != srcTy)
-    result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
+  if (srcType != stage1Type)
+    result = convertFunctionRepresentation(SGF, e, result, srcType, stage1Type);
 
-  if (srcTy != destTy) {
-    result = SGF.emitTransformedValue(e, result, srcTy, destTy, SGFContext());
+  if (stage1Type != stage2Type) {
+    result = SGF.emitTransformedValue(e, result, stage1Type, stage2Type,
+                                      SGFContext());
   }
 
-  if (destTy != destRepTy)
-    result = convertFunctionRepresentation(SGF, e, result, destTy, destRepTy);
+  if (stage2Type != destType)
+    result = convertFunctionRepresentation(SGF, e, result, stage2Type, destType);
 
   return RValue(SGF, e, result);
 }
@@ -2145,6 +2107,14 @@ RValue RValueEmitter::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *
   return RValue(SGF, E,
                 SGF.emitActorIsolationErasureThunk(loc, funcRef, isolatedType,
                                                    nonIsolatedType));
+}
+
+RValue RValueEmitter::visitExtractFunctionIsolationExpr(
+    ExtractFunctionIsolationExpr *E, SGFContext C) {
+  auto arg = SGF.emitRValue(E->getFunctionExpr());
+  auto result = SGF.emitExtractFunctionIsolation(
+      E, ArgumentSource(E, std::move(arg)), C);
+  return RValue(SGF, E, result);
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
@@ -2831,6 +2801,14 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
+  return RValue(SGF, E, emitCaptureListExpr(SGF, E, [&](AbstractClosureExpr *body) {
+    return visitAbstractClosureExpr(body, C).getScalarValue();
+  }));
+}
+
+static ManagedValue emitCaptureListExpr(SILGenFunction &SGF,
+                                        CaptureListExpr *E,
+    llvm::function_ref<ManagedValue(AbstractClosureExpr *)> operation) {
   // Ensure that weak captures are in a separate scope.
   DebugScope scope(SGF, CleanupLocation(E));
   // CaptureListExprs evaluate their bound variables, but they don't introduce
@@ -2839,8 +2817,8 @@ RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   for (auto capture : E->getCaptureList())
     SGF.visitPatternBindingDecl(capture.PBD, generateDebugInfo);
 
-  // Then they evaluate to their body.
-  return visit(E->getClosureBody(), C);
+  // Then they evaluate to their "body" (the underlying closure expression).
+  return operation(E->getClosureBody());
 }
 
 /// Returns the wrapped value placeholder that is meant to be substituted
@@ -2857,21 +2835,185 @@ wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
   return nullptr;
 }
 
+/// Try to turn a contextual conversion into type information for a
+/// specialized closure function emission.
+static std::optional<FunctionTypeInfo>
+tryGetSpecializedClosureTypeFromContext(CanAnyFunctionType closureType,
+                                        const Conversion &conv) {
+  // Note that the kinds of conversion we work on here have to be kinds
+  // that we can call withSourceType on later.
+  if (conv.getKind() == Conversion::Reabstract ||
+      conv.getKind() == Conversion::Subtype) {
+    // We don't care about the input type here; we'll be emitting that
+    // based on the closure.
+    auto destType = cast<AnyFunctionType>(conv.getResultType());
+    auto origType =
+      conv.getKind() == Conversion::Reabstract
+        ? conv.getReabstractionOutputOrigType()
+        : AbstractionPattern(destType);
+    auto expectedTy = conv.getLoweredResultType().castTo<SILFunctionType>();
+    return FunctionTypeInfo{origType, destType, expectedTy};
+  }
+
+  // No other kinds of conversion.
+  return std::nullopt;
+}
+
+/// Whether the given abstraction pattern as an opaque thrown error.
+static bool hasOpaqueThrownError(const AbstractionPattern &pattern) {
+  if (auto thrownPattern = pattern.getFunctionThrownErrorType())
+    return thrownPattern->isTypeParameterOrOpaqueArchetype();
+
+  return false;
+}
+
+/// Given that a subtype conversion is possibly being applied to the
+/// type of a closure, can we emit the closure function under this
+/// conversion?
+static bool canEmitClosureFunctionUnderConversion(
+    CanAnyFunctionType literalFnType, CanAnyFunctionType convertedFnType) {
+
+  // Is it an identity conversion?
+  if (literalFnType == convertedFnType) {
+    return true;
+  }
+
+  // Are the types equivalent aside from effects (throws) or coeffects
+  // (escaping)? Then we should emit the literal as having the destination type
+  // (co)effects, even if it doesn't exercise them.
+  //
+  // TODO: We could also in principle let `async` through here, but that
+  // interferes with the implementation of `reasync`.
+  auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
+    .withNoEscape(false)
+    .withSendable(false)
+    .withThrows(false, Type());
+
+  auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
+    .withNoEscape(false)
+    .withSendable(false)
+    .withThrows(false, Type());
+
+  // If the converted type has erased isolation, remove the isolation from
+  // both types.
+  if (convertedWithoutEffects.getIsolationKind() ==
+        FunctionTypeIsolation::Kind::Erased) {
+    auto nonIsolation = FunctionTypeIsolation::forNonIsolated();
+    literalWithoutEffects = literalWithoutEffects.withIsolation(nonIsolation);
+    convertedWithoutEffects = convertedWithoutEffects.withIsolation(nonIsolation);
+  }
+
+  if (literalFnType->withExtInfo(literalWithoutEffects.build())
+        ->isEqual(convertedFnType->withExtInfo(convertedWithoutEffects.build()))) {
+    return true;
+  }
+
+  return false;
+}
+
+/// Can we emit a closure with the given specialized type info?
+///
+/// TODO: ideally, our prolog/epilog emission would be able to handle
+/// all possible subtype and reabstraction conversions.
+static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
+                                        const FunctionTypeInfo &contextInfo) {
+  auto destType = contextInfo.FormalType;
+
+  // Require the closure's formal type to be closely related to the formal
+  // type we're trying to convert it to.
+  if (!canEmitClosureFunctionUnderConversion(closureType, destType))
+    return false;
+
+  // If the abstraction pattern has an abstract thrown error, we are
+  // currently unable to emit the literal with a difference in the thrown
+  // error type.
+  if (hasOpaqueThrownError(contextInfo.OrigType) &&
+      (closureType->isThrowing() != destType->isThrowing() ||
+       closureType.getThrownError() != destType.getThrownError()))
+    return false;
+
+  return true;
+}
+
+/// Try to emit the given closure under the given conversion.
+/// Returns an invalid ManagedValue if this fails.
+ManagedValue
+RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
+                                       CanAnyFunctionType closureType,
+                                       const Conversion &conv) {
+  // Bail out if we don't have specialized type information from context.
+  auto info = tryGetSpecializedClosureTypeFromContext(closureType, conv);
+  if (!info) return ManagedValue();
+
+  // If we can emit the closure with all of the specialized type information,
+  // that's great.
+  if (canEmitSpecializedClosureFunction(closureType, *info)) {
+    return emitClosureReference(e, *info);
+  }
+
+  // If we're converting to an `@isolated(any)` type, at least force the
+  // closure to be emitted using the erased-isolation pattern so that
+  // we don't lose that information.
+  if (info->ExpectedLoweredType->hasErasedIsolation()) {
+    // This assertion is why this isn't an infinite recursion.
+    assert(!closureType->getIsolation().isErased() &&
+           "closure cannot directly have erased isolation");
+
+    // Construct a conversion that just erases isolation and doesn't make
+    // any other changes to the closure type.
+    auto erasedExtInfo = closureType->getExtInfo()
+      .withIsolation(FunctionTypeIsolation::forErased());
+    auto erasedClosureType = closureType.withExtInfo(erasedExtInfo);
+    auto erasureInfo = SGF.getFunctionTypeInfo(erasedClosureType);
+
+    // Emit the closure under that conversion.  This should always succeed.
+    assert(canEmitSpecializedClosureFunction(closureType, erasureInfo));
+    auto erasedResult = emitClosureReference(e, erasureInfo);
+
+    // Narrow the original conversion to start from the erased closure type.
+    auto convAfterErasure = conv.withSourceType(SGF, erasedClosureType);
+
+    // Apply the narrowed conversion.
+    return convAfterErasure.emit(SGF, e, erasedResult, SGFContext());
+  }
+
+  // Otherwise, give up.
+  return ManagedValue();
+}
+
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
+  // Look through autoclosures that are just calls to a placeholder
+  // expression.  TODO: this is just eta reduction; try to recognize
+  // more situations for it.
   if (auto *placeholder = wrappedValueAutoclosurePlaceholder(e))
     return visitPropertyWrapperValuePlaceholderExpr(placeholder, C);
 
-  // If the context prefers a particular abstraction pattern, lower the
-  // closure against that abstraction pattern. This should be the only use
-  // of the closure.
-  if (auto contextOrigType = C.getAbstractionPattern()) {
-    SGF.SGM.Types.setAbstractionPattern(e, *contextOrigType);
+  auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
+
+  // If we're emitting into a converting context, try to combine the
+  // conversion into the emission of the closure function.
+  if (auto *convertingInit = C.getAsConversion()) {
+    ManagedValue closure = tryEmitConvertedClosure(e, closureType,
+                                              convertingInit->getConversion());
+    if (closure.isValid()) {
+      convertingInit->initWithConvertedValue(SGF, e, closure);
+      convertingInit->finishInitialization(SGF);
+      return RValue::forInContext();
+    }
   }
-  SGF.SGM.Types.setCaptureTypeExpansionContext(SILDeclRef(e), SGF.SGM.M);
-  
+
+  // Otherwise, emit the expression using the simple type of the expression.
+  auto info = SGF.getFunctionTypeInfo(closureType);
+  auto closure = emitClosureReference(e, info);
+  return RValue(SGF, e, closureType, closure);
+}
+
+ManagedValue
+RValueEmitter::emitClosureReference(AbstractClosureExpr *e,
+                                    const FunctionTypeInfo &contextInfo) {
   // Emit the closure body.
-  SGF.SGM.emitClosure(e);
+  SGF.SGM.emitClosure(e, contextInfo);
 
   SubstitutionMap subs;
   if (e->getCaptureInfo().hasGenericParamCaptures())
@@ -2879,13 +3021,9 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  auto refType = e->getType()->getCanonicalType();
   SILLocation L = e;
   L.markAutoGenerated();
-  ManagedValue result = SGF.emitClosureValue(L, SILDeclRef(e),
-                   refType, subs,
-                   /*already converted*/ C.getAbstractionPattern().has_value());
-  return RValue(SGF, e, refType, result);
+  return SGF.emitClosureValue(L, SILDeclRef(e), contextInfo, subs);
 }
 
 RValue RValueEmitter::
@@ -5253,28 +5391,6 @@ void SILGenFunction::emitAssignToPatternVars(
   TupleLValueAssigner(*this, loc, destLVs).emit(destType, std::move(src));
 }
 
-void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
-                                             ManagedValue optAddress,
-                                             unsigned depth) {
-  assert(optAddress.getType().isAddress() && "Expected an address here");
-  assert(depth < BindOptionalFailureDests.size());
-  auto failureDest =
-      BindOptionalFailureDests[BindOptionalFailureDests.size() - depth - 1];
-  assert(failureDest.isValid() && "too big to fail");
-
-  // Since we know that we have an address, we do not need to worry about
-  // ownership invariants. Instead just use a select_enum_addr.
-  SILBasicBlock *someBB = createBasicBlock();
-  SILValue hasValue = emitDoesOptionalHaveValue(loc, optAddress.getValue());
-
-  auto noneBB = Cleanups.emitBlockForCleanups(failureDest, loc);
-  B.createCondBranch(loc, hasValue, someBB, noneBB);
-
-  // Reset the insertion point at the end of hasValueBB so we can
-  // continue to emit code there.
-  B.setInsertionPoint(someBB);
-}
-
 ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
                                               ManagedValue optValue,
                                               unsigned depth) {
@@ -5285,6 +5401,11 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   SILBasicBlock *hasValueBB = createBasicBlock();
   SILBasicBlock *hasNoValueBB = createBasicBlock();
+
+  // For move checking purposes, binding always consumes the value whole.
+  if (optValue.getType().isMoveOnly() && optValue.getType().isAddress()) {
+    optValue = B.createOpaqueConsumeBeginAccess(loc, optValue);
+  }
 
   SILType optValueTy = optValue.getType();
   SwitchEnumBuilder SEB(B, loc, optValue);
@@ -5581,7 +5702,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   SmallVector<SILValue, 4> bbArgs;
   if (!isByAddress)
     bbArgs.push_back(results[0].getValue());
-  for (const auto &result : llvm::makeArrayRef(results).slice(1))
+  for (const auto &result : llvm::ArrayRef(results).slice(1))
     bbArgs.push_back(result.getValue());
 
   // Branch to the continuation block.
@@ -5598,7 +5719,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   } else {
     bbArgs.push_back(getOptionalNoneValue(loc, optTL));
   }
-  for (const auto &result : llvm::makeArrayRef(results).slice(1)) {
+  for (const auto &result : llvm::ArrayRef(results).slice(1)) {
     auto resultTy = result.getType();
     bbArgs.push_back(getOptionalNoneValue(loc, getTypeLowering(resultTy)));
   }
@@ -6785,6 +6906,6 @@ ManagedValue SILGenFunction::emitUndef(Type type) {
 }
 
 ManagedValue SILGenFunction::emitUndef(SILType type) {
-  SILValue undef = SILUndef::get(type, F);
+  SILValue undef = SILUndef::get(F, type);
   return ManagedValue::forRValueWithoutOwnership(undef);
 }

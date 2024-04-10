@@ -22,19 +22,16 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    print((prefix ? "### " : "") + message())
   }
 }
 
 let lifetimeDependenceInsertionPass = FunctionPass(
   name: "lifetime-dependence-insertion")
 { (function: Function, context: FunctionPassContext) in
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-  log("Inserting lifetime dependence markers in \(function.name)")
+  log(prefix: false, "\n--- Inserting lifetime dependence markers in \(function.name)")
 
   for instruction in function.instructions {
     if let dependentApply = LifetimeDependentApply(instruction) {
@@ -108,15 +105,13 @@ extension LifetimeDependentApply {
 /// dependent value within each scope.
 private func insertDependencies(for apply: LifetimeDependentApply,
   _ context: FunctionPassContext ) {
-  precondition(apply.applySite.results.count > 0,
-    "a lifetime-dependent instruction must have at least one result")
-
   let bases = findDependenceBases(of: apply, context)
-  let builder = Builder(after: apply.applySite, context)
   for dependentValue in apply.applySite.resultOrYields {
+    let builder = Builder(before: dependentValue.nextInstruction, context)
     insertMarkDependencies(value: dependentValue, initializer: nil,
                            bases: bases, builder: builder, context)
   }
+  let builder = Builder(after: apply.applySite, context)
   for resultOper in apply.applySite.indirectResultOperands {
     let accessBase = resultOper.value.accessBase
     guard let (initialAddress, initializingStore) =

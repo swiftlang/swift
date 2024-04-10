@@ -98,6 +98,8 @@ PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
 PASS(AccessEnforcementWMO, "access-enforcement-wmo",
      "Access Enforcement Whole Module Optimization")
+PASS(AlwaysEmitConformanceMetadataPreservation, "preserve-always-emit-conformance-metadata",
+     "Mark conformances to @_alwaysEmitConformanceMetadata protocols as externally visible")
 PASS(CrossModuleOptimization, "cmo",
      "Perform cross-module optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
@@ -497,6 +499,10 @@ PASS(MoveOnlyBorrowToDestructureTransform,
      "any move only errors with respect to non-borrow+projection uses")
 PASS(ReferenceBindingTransform, "sil-reference-binding-transform",
      "Check/transform reference bindings")
+PASS(DiagnosticDeadFunctionElimination, "sil-diagnostic-dead-function-elim",
+     "Eliminate dead functions from early specialization optimizations before we run later diagnostics")
+SWIFT_FUNCTION_PASS(UpdateBorrowedFrom, "update-borrowed-from",
+     "Test pass for update borrowed-from instructions")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
@@ -510,6 +516,8 @@ SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
 SWIFT_SILCOMBINE_PASS(LoadInst)
 SWIFT_SILCOMBINE_PASS(CopyValueInst)
 SWIFT_SILCOMBINE_PASS(DestroyValueInst)
+SWIFT_SILCOMBINE_PASS(DestructureStructInst)
+SWIFT_SILCOMBINE_PASS(DestructureTupleInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

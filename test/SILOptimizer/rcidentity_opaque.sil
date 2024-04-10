@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -rc-id-dumper -enable-sil-opaque-values -module-name Swift %s -o /dev/null | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 import Builtin
 
 typealias AnyObject = Builtin.AnyObject

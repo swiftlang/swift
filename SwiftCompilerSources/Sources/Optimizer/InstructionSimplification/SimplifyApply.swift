@@ -17,6 +17,10 @@ extension ApplyInst : OnoneSimplifyable {
     if tryTransformThickToThinCallee(of: self, context) {
       return
     }
+    if context.tryOptimizeKeypath(apply: self) {
+      context.erase(instruction: self)
+      return
+    }
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }
 }

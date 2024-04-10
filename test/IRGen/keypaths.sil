@@ -318,34 +318,49 @@ sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
 entry:
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_A]], ptr undef)
   %a = keypath $KeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  strong_retain %a : $KeyPath<S, Int>
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_B]], ptr undef)
   %b = keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
+  strong_retain %b : $KeyPath<S, String>
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_C]], ptr undef)
   %c = keypath $KeyPath<S, C>, (root $S; stored_property #S.z : $C)
+  strong_retain %c : $KeyPath<S, C>
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_D]], ptr undef)
   %d = keypath $KeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  strong_retain %d : $KeyPath<C, Int>
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_D1]], ptr undef)
   %d1 = keypath $KeyPath<C1, Int>, (root $C1; stored_property #C.x : $Int)
+  strong_retain %d1 : $KeyPath<C1, Int>
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_E]], ptr undef)
   %e = keypath $KeyPath<C, String>, (root $C; stored_property #C.y : $String)
+  strong_retain %e : $KeyPath<C, String>
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_F]], ptr undef)
   %f = keypath $KeyPath<C, S>, (root $C; stored_property #C.z : $S)
+  strong_retain %f : $KeyPath<C, S>
 
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_G]], ptr undef)
   %g = keypath $KeyPath<S, Int>, (root $S; stored_property #S.z : $C; stored_property #C.x : $Int)
+  strong_retain %g : $KeyPath<S, Int>
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_H]], ptr undef)
   %h = keypath $KeyPath<C, Int>, (root $C; stored_property #C.z : $S; stored_property #S.x : $Int)
+  strong_retain %h : $KeyPath<C, Int>
 
   %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(keypath_accessor_getter) (@in_guaranteed S) -> @out Int)
+  strong_retain %k : $KeyPath<S, Int>
   %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter, getter @l_get : $@convention(keypath_accessor_getter) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @in_guaranteed C) -> ())
+  strong_retain %l : $KeyPath<C, Int>
   %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(keypath_accessor_getter) (@in_guaranteed S) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>, setter @m_set : $@convention(keypath_accessor_setter) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout S) -> ())
+  strong_retain %m : $KeyPath<S, () -> ()>
   %m2 = keypath $KeyPath<C2, () -> ()>, (root $C2; settable_property $() -> (), id ##C2.reabstracted, getter @m2_get : $@convention(keypath_accessor_getter) (@in_guaranteed C2) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>, setter @m2_set : $@convention(keypath_accessor_setter) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout C2) -> ())
+  strong_retain %m2 : $KeyPath<C2, () -> ()>
 
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_T0]], ptr undef)
   %t0 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.a : $(Int, String); tuple_element #0 : $Int)
+  strong_retain %t0 : $KeyPath<T, Int>
 
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_T1]], ptr undef)
   %t1 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.b : $(f: String, g: Int); tuple_element #1 : $Int)
+  strong_retain %t1 : $KeyPath<T, Int>
 
   return undef : $()
 }
@@ -395,11 +410,13 @@ entry:
   // CHECK: store ptr %T, ptr [[ARGS]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS]])
   %i = keypath $KeyPath<Gen<T,T>, T>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <T>
+  strong_retain %i : $KeyPath<Gen<T,T>, T>
 
   // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
   // CHECK: store ptr %U, ptr [[ARGS]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_J]], ptr [[ARGS]])
   %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
+  strong_retain %j : $KeyPath<Gen<U,U>, U>
 
   // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
   // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8keypaths3FooVMa"([[WORD]] 0, ptr %T)
@@ -407,6 +424,7 @@ entry:
   // CHECK: store ptr [[FOO_T]], ptr [[ARGS]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS]])
   %i2 = keypath $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <Foo<T>>
+  strong_retain %i2 : $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>
 
   return undef : $()
 }
@@ -418,16 +436,19 @@ entry:
   // CHECK: store ptr %T, ptr [[ARGS]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG0]], ptr [[ARGS]])
   %tg0 = keypath $KeyPath<TG<T,U,V>, T>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #0 : $A) <T,U,V>
+  strong_retain %tg0 : $KeyPath<TG<T,U,V>, T>
 
   // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
   // CHECK: store ptr %T, ptr [[ARGS]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG1]], ptr [[ARGS]])
   %tg1 = keypath $KeyPath<TG<T,U,V>, V>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #2 : $C) <T,U,V>
+  strong_retain %tg1 : $KeyPath<TG<T,U,V>, V>
 
   // CHECK: [[ARGS:%.*]] = alloca i{{.*}}
   // CHECK: store ptr %T, ptr [[ARGS]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG2]], ptr [[ARGS]])
   %tg2 = keypath $KeyPath<TGA<T,U>, U>, <A,B> (root $TGA<A,B>; tuple_element #1 : $B) <T,U>
+  strong_retain %tg2 : $KeyPath<TGA<T,U>, U>
 
   return undef : $()
 }
@@ -435,6 +456,7 @@ entry:
 sil @generic_class_stored_final : $@convention(thin) <T> () -> () {
 entry:
   %gcx = keypath $ReferenceWritableKeyPath<GC<T>, T>, <T> (root $GC<T>; stored_property #GC.x: $T) <T>
+  strong_retain %gcx : $ReferenceWritableKeyPath<GC<T>, T>
 
   return undef : $()
 }
@@ -541,6 +563,10 @@ entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
       indices_equals @s_equals : $@convention(keypath_accessor_equals) <T: Hashable, U: Hashable> (@in_guaranteed Int, @in_guaranteed Int) -> Bool,
       indices_hash @s_hash : $@convention(keypath_accessor_hash) <T: Hashable, U: Hashable> (@in_guaranteed Int) -> Int
   ) <A, B> (%3, %4, %5)
+
+  strong_retain %s : $WritableKeyPath<A, B>
+  strong_retain %t : $WritableKeyPath<A, B>
+  strong_retain %v : $WritableKeyPath<A, A>
 
   return undef : $()
 }

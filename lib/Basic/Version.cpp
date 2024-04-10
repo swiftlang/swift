@@ -313,6 +313,16 @@ StringRef getCurrentCompilerSerializationTag() {
 #endif
 }
 
+StringRef getCurrentCompilerChannel() {
+  static const char* forceDebugChannel =
+    ::getenv("SWIFT_FORCE_SWIFTMODULE_CHANNEL");
+  if (forceDebugChannel)
+    return forceDebugChannel;
+
+  // Leave it to downstream compilers to define the different channels.
+  return StringRef();
+}
+
 unsigned getUpcomingCxxInteropCompatVersion() {
   return SWIFT_VERSION_MAJOR + 1;
 }

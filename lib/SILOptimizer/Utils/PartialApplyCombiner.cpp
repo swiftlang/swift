@@ -98,7 +98,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   collectDestroys(pai, paiUses);
 
   ValueLifetimeAnalysis vla(pai,
-                            llvm::makeArrayRef(paiUses.begin(), paiUses.end()));
+                            llvm::ArrayRef(paiUses.begin(), paiUses.end()));
   ValueLifetimeAnalysis::Frontier partialApplyFrontier;
 
   // Computing the frontier may fail if the frontier is located on a critical

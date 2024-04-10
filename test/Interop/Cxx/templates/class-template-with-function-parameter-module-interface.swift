@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=ClassTemplateWithFunctionParameter -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=ClassTemplateWithFunctionParameter -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=ClassTemplateWithFunctionParameter -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: @available(*, unavailable

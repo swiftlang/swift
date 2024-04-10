@@ -18,6 +18,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "../../IRGen/IRGenModule.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -95,6 +96,10 @@ llvm::cl::opt<std::string> SILBreakOnFun(
 llvm::cl::opt<std::string> SILBreakOnPass(
     "sil-break-on-pass", llvm::cl::init(""),
     llvm::cl::desc("Break before running a particular function pass"));
+
+llvm::cl::opt<std::string>
+    SILBreakBeforePassCount("sil-break-before-pass-count", llvm::cl::init(""),
+                            llvm::cl::desc("Break before running pass number"));
 
 llvm::cl::list<std::string>
     SILPrintFunction("sil-print-function", llvm::cl::CommaSeparated,
@@ -403,7 +408,7 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
   if (!SILNumOptPassesToRun.empty()) {
-    parsePassCount(SILNumOptPassesToRun);
+    parsePassesToRunCount(SILNumOptPassesToRun);
   } else if (!SILPassCountConfigFile.empty()) {
     StringRef moduleName = M->getSwiftModule()->getName().str();
     std::fstream fs(SILPassCountConfigFile);
@@ -417,11 +422,15 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
       StringRef modName = pair.first;
       StringRef countsStr = pair.second;
       if (modName == moduleName) {
-        parsePassCount(countsStr);
+        parsePassesToRunCount(countsStr);
         break;
       }
     }
     fs.close();
+  }
+
+  if (!SILBreakBeforePassCount.empty()) {
+    parseBreakBeforePassCount(SILBreakBeforePassCount);
   }
 
   for (SILAnalysis *A : Analyses) {
@@ -434,17 +443,28 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
   M->registerDeserializationNotificationHandler(std::move(handler));
 }
 
-void SILPassManager::parsePassCount(StringRef countsStr) {
+void SILPassManager::parsePassesToRunCount(StringRef countsStr) {
   bool validFormat = true;
   if (countsStr.consumeInteger(10, maxNumPassesToRun))
     validFormat = false;
-  if (countsStr.startswith(".")) {
+  if (countsStr.starts_with(".")) {
     countsStr = countsStr.drop_front(1);
     if (countsStr.consumeInteger(10, maxNumSubpassesToRun))
       validFormat = false;
   }
   if (!validFormat || !countsStr.empty()) {
     llvm::errs() << "error: wrong format of -sil-opt-pass-count option\n";
+    exit(1);
+  }
+}
+
+void SILPassManager::parseBreakBeforePassCount(StringRef countsStr) {
+  bool validFormat = true;
+  if (countsStr.consumeInteger(10, breakBeforePassCount))
+    validFormat = false;
+  if (!validFormat || !countsStr.empty()) {
+    llvm::errs()
+        << "error: wrong format of -sil-break-before-pass-count option\n";
     exit(1);
   }
 }
@@ -486,19 +506,24 @@ bool SILPassManager::analysesUnlocked() {
 // Test the function and pass names we're given against the debug
 // options that force us to break prior to a given pass and/or on a
 // given function.
-static bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT) {
-  if (SILBreakOnFun.empty() && SILBreakOnPass.empty())
+bool SILPassManager::breakBeforeRunning(StringRef fnName,
+                                        SILFunctionTransform *SFT) {
+  if (SILBreakOnFun.empty() && SILBreakOnPass.empty() &&
+      SILBreakBeforePassCount.empty())
     return false;
 
-  if (SILBreakOnFun.empty()
-      && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
+  if (!SILBreakOnPass.empty() &&
+      (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass))
     return true;
 
-  if (SILBreakOnPass.empty() && fnName == SILBreakOnFun)
+  if (!SILBreakOnFun.empty() && fnName == SILBreakOnFun)
     return true;
 
-  return fnName == SILBreakOnFun
-    && (SFT->getID() == SILBreakOnPass || SFT->getTag() == SILBreakOnPass);
+  if (!SILBreakBeforePassCount.empty() &&
+      breakBeforePassCount == NumPassesRun) {
+    return true;
+  }
+  return false;
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
@@ -550,7 +575,7 @@ bool SILPassManager::isInstructionPassDisabled(StringRef instName) {
   StringRef prefix("simplify-");
   for (const std::string &namePattern : SILDisablePass) {
     StringRef pattern(namePattern);
-    if (pattern.startswith(prefix) && pattern.endswith(instName) &&
+    if (pattern.starts_with(prefix) && pattern.ends_with(instName) &&
         pattern.size() == prefix.size() + instName.size()) {
       return true;
     }
@@ -1377,8 +1402,8 @@ FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
 }
 
 BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
-  assert(numBlockSetsAllocated < BlockSetCapacity - 1 &&
-         "too many BasicBlockSets allocated");
+  require(numBlockSetsAllocated < BlockSetCapacity,
+          "too many BasicBlockSets allocated");
 
   auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
   BasicBlockSet *set = new (storage) BasicBlockSet(function);
@@ -1401,8 +1426,8 @@ void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
 }
 
 NodeSet *SwiftPassInvocation::allocNodeSet() {
-  assert(numNodeSetsAllocated < NodeSetCapacity - 1 &&
-         "too many BasicNodeSets allocated");
+  require(numNodeSetsAllocated < NodeSetCapacity,
+          "too many NodeSets allocated");
 
   auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
   NodeSet *set = new (storage) NodeSet(function);
@@ -1421,6 +1446,30 @@ void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
     auto *set = (NodeSet *)nodeSetStorage + numNodeSetsAllocated - 1;
     set->~NodeSet();
     --numNodeSetsAllocated;
+  }
+}
+
+OperandSet *SwiftPassInvocation::allocOperandSet() {
+  require(numOperandSetsAllocated < OperandSetCapacity,
+          "too many OperandSets allocated");
+
+  auto *storage = (OperandSet *)operandSetStorage + numOperandSetsAllocated;
+  OperandSet *set = new (storage) OperandSet(function);
+  aliveOperandSets[numOperandSetsAllocated] = true;
+  ++numOperandSetsAllocated;
+  return set;
+}
+
+void SwiftPassInvocation::freeOperandSet(OperandSet *set) {
+  int idx = set - (OperandSet *)operandSetStorage;
+  assert(idx >= 0 && idx < numOperandSetsAllocated);
+  assert(aliveOperandSets[idx] && "double free of OperandSet");
+  aliveOperandSets[idx] = false;
+
+  while (numOperandSetsAllocated > 0 && !aliveOperandSets[numOperandSetsAllocated - 1]) {
+    auto *set = (OperandSet *)operandSetStorage + numOperandSetsAllocated - 1;
+    set->~OperandSet();
+    --numOperandSetsAllocated;
   }
 }
 
@@ -1468,6 +1517,7 @@ void SwiftPassInvocation::endPass() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
   assert(numClonersAllocated == 0 && "Not all cloners deallocated");
   assert(!needFixStackNesting && "Stack nesting not fixed");
   if (ssaUpdater) {
@@ -1492,6 +1542,7 @@ void SwiftPassInvocation::endTransformFunction() {
   function = nullptr;
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
 }
 
 void SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
@@ -1510,6 +1561,7 @@ void SwiftPassInvocation::endVerifyFunction() {
            "verifyication must not change the SIL of a function");
     assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
     assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+    assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
     function = nullptr;
   }
 }
@@ -1566,14 +1618,20 @@ bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure, bool n
 
 BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(BridgedInstruction apply,
                                                                           bool isMandatory) const {
-  auto cha = invocation->getPassManager()->getAnalysis<ClassHierarchyAnalysis>();
-  auto result = ::tryDevirtualizeApply(ApplySite(apply.unbridged()), cha,
+  SILPassManager *pm = invocation->getPassManager();
+  auto cha = pm->getAnalysis<ClassHierarchyAnalysis>();
+  auto result = ::tryDevirtualizeApply(pm, ApplySite(apply.unbridged()), cha,
                                        nullptr, isMandatory);
   if (result.first) {
     OptionalBridgedInstruction newApply(result.first.getInstruction()->asSILNode());
     return {newApply, result.second};
   }
   return {{nullptr}, false};
+}
+
+bool BridgedPassContext::tryOptimizeKeypath(BridgedInstruction apply) const {
+  SILBuilder builder(apply.unbridged());
+  return ::tryOptimizeKeypath(apply.getAs<ApplyInst>(), builder);
 }
 
 OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction builtin) const {
@@ -1812,6 +1870,25 @@ void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFun
 bool FullApplySite_canInline(BridgedInstruction apply) {
   return swift::SILInliner::canInlineApplySite(
       swift::FullApplySite(apply.unbridged()));
+}
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
+                                                    BridgedFunction function,
+                                                    bool sourceTypeIsExact) {
+  static_assert((int)DynamicCastFeasibility::WillSucceed == (int)BridgedDynamicCastResult::willSucceed);
+  static_assert((int)DynamicCastFeasibility::MaySucceed  == (int)BridgedDynamicCastResult::maySucceed);
+  static_assert((int)DynamicCastFeasibility::WillFail    == (int)BridgedDynamicCastResult::willFail);
+
+  return static_cast<BridgedDynamicCastResult>(
+    classifyDynamicCast(function.getFunction()->getModule().getSwiftModule(),
+                        sourceTy.unbridged().getASTType(),
+                        destTy.unbridged().getASTType(),
+                        sourceTypeIsExact));
+}
+
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst) {
+  SILDynamicCastInst castInst(inst.unbridged());
+  return static_cast<BridgedDynamicCastResult>(castInst.classifyFeasibility(/*allowWholeModule=*/ false));
 }
 
 // TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502

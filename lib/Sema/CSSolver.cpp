@@ -1277,14 +1277,19 @@ void ConstraintSystem::shrink(Expr *expr) {
     bool isSuitableCollection(TypeRepr *collectionTypeRepr) {
       // Only generic identifier, array or dictionary.
       switch (collectionTypeRepr->getKind()) {
-      case TypeReprKind::GenericIdent:
+      case TypeReprKind::UnqualifiedIdent:
+        return cast<UnqualifiedIdentTypeRepr>(collectionTypeRepr)
+            ->hasGenericArgList();
+
       case TypeReprKind::Array:
       case TypeReprKind::Dictionary:
         return true;
 
       default:
-        return false;
+        break;
       }
+
+      return false;
     }
 
     void visitCoerceExpr(CoerceExpr *coerceExpr) {
@@ -2358,6 +2363,18 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     if (constraint->isFavored()) {
       favored.push_back(index);
       return true;
+    }
+
+    // Order VarDecls before other kinds of declarations because they are
+    // effectively favored over functions when the two are in the same
+    // overload set. This disjunction order allows SK_UnappliedFunction
+    // to prune later overload choices that are functions when a solution
+    // has already been found with a property.
+    if (auto *decl = getOverloadChoiceDecl(constraint)) {
+      if (isa<VarDecl>(decl)) {
+        everythingElse.push_back(index);
+        return true;
+      }
     }
 
     return false;

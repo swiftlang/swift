@@ -1916,7 +1916,13 @@ private:
     auto composition =
         ProtocolCompositionType::get(ctx, members, inverses, explicitAnyObject);
 
-    return { composition, true };
+    // If we started from a protocol or a composition we should already
+    // be in an existential context. Otherwise we'd have to wrap a new
+    // composition into an existential.
+    if (isa<ProtocolType>(ty) || isa<ProtocolCompositionType>(ty))
+      return {composition, true};
+
+    return {ExistentialType::get(composition), true};
   }
 
   /// Visitor action: Recurse into the children of this type and try to add
@@ -2005,7 +2011,7 @@ private:
 
   Result visitAnyFunctionType(AnyFunctionType *ty) {
     auto newFn = applyToFunctionType(ty, [](ASTExtInfo extInfo) {
-      return extInfo.withConcurrent();
+      return extInfo.withSendable();
     });
     return { newFn, true };
   }
@@ -2571,6 +2577,18 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
       param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
       impl->importSourceLoc(param->getLocation()), bodyName,
       impl->ImportedHeaderUnit);
+
+  // If TransferringArgsAndResults are enabled and we have a transferring
+  // argument, set that the param was transferring.
+  if (paramInfo->getASTContext().LangOpts.hasFeature(
+          Feature::TransferringArgsAndResults)) {
+    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+      if (attr->getAttribute() == "transferring") {
+        paramInfo->setTransferring();
+      }
+    }
+  }
+
   // Foreign references are already references so they don't need to be passed
   // as inout.
   paramInfo->setSpecifier(isInOut && !swiftParamTy->isForeignReferenceType()

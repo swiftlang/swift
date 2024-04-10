@@ -232,7 +232,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
   // replacePhiArgument() expects the replaced argument to not have
   // any uses.
   SmallVector<Operand *, 16> operands;
-  SILValue undef = SILUndef::get(ty, *getParent());
+  SILValue undef = SILUndef::get(getParent(), ty);
   SILArgument *arg = getArgument(i);
   while (!arg->use_empty()) {
     Operand *use = *arg->use_begin();
@@ -334,6 +334,9 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
     for (auto &II : *First) {
       for (SILValue result : II.getResults()) {
         result->resetBitfields();
+      }
+      for (Operand &op : II.getAllOperands()) {
+        op.resetBitfields();
       }
       II.asSILNode()->resetBitfields();
     

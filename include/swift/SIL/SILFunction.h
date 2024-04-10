@@ -40,6 +40,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class SILUndef;
 
 namespace Lowering {
 class TypeLowering;
@@ -98,6 +99,9 @@ public:
     Full,
     Partial
   };
+
+  static GenericSignature buildTypeErasedSignature(
+      GenericSignature sig, ArrayRef<Type> typeErasedParams);
 
   static SILSpecializeAttr *create(SILModule &M,
                                    GenericSignature specializedSignature,
@@ -208,6 +212,7 @@ private:
   friend class BasicBlockBitfield;
   friend class NodeBitfield;
   friend class OperandBitfield;
+  friend SILUndef;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -264,6 +269,17 @@ private:
   /// @_dynamicReplacement(for:) function.
   SILFunction *ReplacedFunction = nullptr;
 
+  /// This SILFunction REFerences an ad-hoc protocol requirement witness in
+  /// order to keep it alive, such that it main be obtained in IRGen. Without
+  /// this explicit reference, the witness would seem not-used, and not be
+  /// accessible for IRGen.
+  ///
+  /// Specifically, one such case is the DistributedTargetInvocationDecoder's
+  /// 'decodeNextArgument' which must be retained, as it is only used from IRGen
+  /// and such, appears as-if unused in SIL and would get optimized away.
+  // TODO: Consider making this a general "references adhoc functions" and make it an array?
+  SILFunction *RefAdHocRequirementFunction = nullptr;
+
   Identifier ObjCReplacementFor;
 
   /// The head of a single-linked list of currently alive BasicBlockBitfield.
@@ -278,7 +294,7 @@ private:
   /// A monotonically increasing ID which is incremented whenever a
   /// BasicBlockBitfield, NodeBitfield, or OperandBitfield is constructed.  For
   /// details see SILBitfield::bitfieldID;
-  int64_t currentBitfieldID = 1;
+  uint64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
   /// May be reused when zombie functions are recovered.
@@ -315,6 +331,13 @@ private:
 
   PerformanceConstraints perfConstraints = PerformanceConstraints::None;
 
+  /// This is the set of undef values we've created, for uniquing purposes.
+  ///
+  /// We use a SmallDenseMap since in most functions, we will have only one type
+  /// of undef if we have any at all. In that case, by staying small we avoid
+  /// needing a heap allocation.
+  llvm::SmallDenseMap<SILType, SILUndef *, 1> undefValues;
+
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
@@ -323,6 +346,9 @@ private:
   /// This counter is incremented every time a BasicBlockData re-assigns new
   /// block indices.
   unsigned BlockListChangeIdx = 0;
+
+  /// The isolation of this function.
+  ActorIsolation actorIsolation = ActorIsolation::forUnspecified();
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -583,6 +609,27 @@ public:
       return;
     ReplacedFunction->decrementRefCount();
     ReplacedFunction = nullptr;
+  }
+
+  SILFunction *getReferencedAdHocRequirementWitnessFunction() const {
+    return RefAdHocRequirementFunction;
+  }
+  // Marks that this `SILFunction` uses the passed in ad-hoc protocol
+  // requirement witness `f` and therefore must retain it explicitly,
+  // otherwise we might not be able to get a reference to it.
+  void setReferencedAdHocRequirementWitnessFunction(SILFunction *f) {
+    assert(RefAdHocRequirementFunction == nullptr && "already set");
+
+    if (f == nullptr)
+      return;
+    RefAdHocRequirementFunction = f;
+    RefAdHocRequirementFunction->incrementRefCount();
+  }
+  void dropReferencedAdHocRequirementWitnessFunction() {
+    if (!RefAdHocRequirementFunction)
+      return;
+    RefAdHocRequirementFunction->decrementRefCount();
+    RefAdHocRequirementFunction = nullptr;
   }
 
   bool hasObjCReplacement() const {
@@ -932,7 +979,7 @@ public:
   /// TODO: This needs a better name.
   bool hasSemanticsAttrThatStartsWith(StringRef S) {
     return count_if(getSemanticsAttrs(), [&S](const std::string &Attr) -> bool {
-      return StringRef(Attr).startswith(S);
+      return StringRef(Attr).starts_with(S);
     });
   }
 
@@ -1307,6 +1354,20 @@ public:
     WasmImportModuleAndField = std::make_pair(module, field);
   }
 
+  bool isExternForwardDeclaration() const {
+    if (isExternalDeclaration()) {
+      if (auto declContext = getDeclContext()) {
+        if (auto decl = declContext->getAsDecl()) {
+          if (decl->getAttrs().hasAttribute<ExternAttr>())
+            return true;
+          if (decl->getAttrs().hasAttribute<SILGenNameAttr>())
+            return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Returns true if this function belongs to a declaration that returns
   /// an opaque result type with one or more availability conditions that are
   /// allowed to produce a different underlying type at runtime.
@@ -1322,6 +1383,12 @@ public:
 
     return false;
   }
+
+  void setActorIsolation(ActorIsolation newActorIsolation) {
+    actorIsolation = newActorIsolation;
+  }
+
+  ActorIsolation getActorIsolation() const { return actorIsolation; }
 
   //===--------------------------------------------------------------------===//
   // Block List Access
@@ -1522,6 +1589,12 @@ public:
   ///
   /// This is a fast subset of the checks performed in the SILVerifier.
   void verifyCriticalEdges() const;
+
+  /// Validate that all SILUndefs stored in the function's type -> SILUndef map
+  /// have this function as their parent function.
+  ///
+  /// Please only call this from the SILVerifier.
+  void verifySILUndefMap() const;
 
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

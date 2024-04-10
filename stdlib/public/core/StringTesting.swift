@@ -36,6 +36,12 @@ struct _StringRepresentation {
   }
 }
 
+@available(*, unavailable)
+extension _StringRepresentation: Sendable {}
+
+@available(*, unavailable)
+extension _StringRepresentation._Form: Sendable {}
+
 extension String {
   public // @testable
   func _classify() -> _StringRepresentation { return _guts._classify() }

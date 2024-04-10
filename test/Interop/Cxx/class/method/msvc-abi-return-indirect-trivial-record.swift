@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-emit-irgen -I %t/Inputs -enable-experimental-cxx-interop  -Xcc -std=c++17 %t/test.swift -module-name Test | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-emit-irgen -I %t/Inputs -enable-experimental-cxx-interop %t/test.swift -module-name Test | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-cpu
 
 // REQUIRES: OS=windows-msvc
 

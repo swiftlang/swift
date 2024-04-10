@@ -660,14 +660,26 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
   }
 }
 
-// CHECK: sil {{.*}} [ossa] @$sS4SIgggoo_S2Ss11AnyHashableVypIegggrr_TR
-// CHECK:  [[TUPLE:%.*]] = apply %4(%2, %3) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
+
+//   TODO: we really ought to be able to fully peephole this into the
+//   emission of the closure.
+// CHECK-LABEL: sil {{.*}} [ossa] @$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR
+// CHECK: bb0(%0 : $*(AnyHashable, Any), %1 : $*Never, %2 : $*(key: String, value: String), %3 : @guaranteed $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)):
+// CHECK:  [[KEY_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 0
+// CHECK:  [[KEY:%.*]] = load_borrow [[KEY_ADDR]] :
+// CHECK:  [[VALUE_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 1
+// CHECK:  [[VALUE:%.*]] = load_borrow [[VALUE_ADDR]] :
+// CHECK:  [[OUT_KEY_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 0
+// CHECK:  [[OUT_VALUE_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 1
+// CHECK:  [[TUPLE:%.*]] = apply %3([[KEY]], [[VALUE]]) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
 // CHECK:  ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[TUPLE]]
 // CHECK:  [[ADDR:%.*]] = alloc_stack $String
 // CHECK:  store [[LHS]] to [init] [[ADDR]] : $*String
 // CHECK:  [[CVT:%.*]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
-// CHECK:  apply [[CVT]]<String>(%0, [[ADDR]])
-// CHECK: } // end sil function '$sS4SIgggoo_S2Ss11AnyHashableVypIegggrr_TR'
+// CHECK:  apply [[CVT]]<String>([[OUT_KEY_ADDR]], [[ADDR]])
+// CHECK:  [[OUT_VALUE_BUF:%.*]] = init_existential_addr [[OUT_VALUE_ADDR]] : $*Any, $String
+// CHECK:  store [[RHS]] to [init] [[OUT_VALUE_BUF]]
+// CHECK: } // end sil function '$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR'
 
 func dontCrash() {
   let userInfo = ["hello": "world"]

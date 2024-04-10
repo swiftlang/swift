@@ -62,8 +62,9 @@ private:
     return SEWalker.getMacroWalkingBehavior();
   }
 
-  MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const override {
-    return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+  QualifiedIdentTypeReprWalkingScheme
+  getQualifiedIdentTypeReprWalkingScheme() const override {
+    return QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override;
@@ -177,7 +178,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
         SourceLoc loc = parsedName.second;
         if (auto assocTypeDecl = proto->getAssociatedType(name)) {
           auto Continue = passReference(
-              assocTypeDecl, assocTypeDecl->getDeclaredInterfaceType(),
+              assocTypeDecl, assocTypeDecl->getInterfaceType(),
               DeclNameLoc(loc),
               ReferenceMetaData(SemaReferenceKind::TypeRef, std::nullopt));
           if (!Continue)

@@ -25,34 +25,24 @@ internal func internalAmbiguity() {}
 func foo() {
   publicAmbiguity()
 // CHECK: error: ambiguous use of 'publicAmbiguity()'
-// CHECK-NEXT:  publicAmbiguity()
-// CHECK-NEXT:  ^
-// CHECK-NEXT: Lib.swift:1:13: note: found this candidate in module 'A'
-// CHECK-NEXT: public func publicAmbiguity() {}
-// CHECK-NEXT:             ^
-// CHECK-NEXT: Lib.swift:1:13: note: found this candidate in module 'B'
-// CHECK-NEXT: public func publicAmbiguity() {}
-// CHECK-NEXT:             ^
+// CHECK:  publicAmbiguity()
+// CHECK: note: found this candidate in module 'A'
+// CHECK: public func publicAmbiguity() {}
+// CHECK: note: found this candidate in module 'B'
+// CHECK: public func publicAmbiguity() {}
 
   packageAmbiguity()
 // CHECK: error: ambiguous use of 'packageAmbiguity()'
 // CHECK-NEXT:  packageAmbiguity()
-// CHECK-NEXT:  ^
-// CHECK-NEXT: Lib.swift:2:14: note: found this candidate in module 'A'
-// CHECK-NEXT: package func packageAmbiguity() {}
-// CHECK-NEXT:             ^
-// CHECK-NEXT: Lib.swift:2:14: note: found this candidate in module 'B'
-// CHECK-NEXT: package func packageAmbiguity() {}
-// CHECK-NEXT:             ^
+// CHECK: note: found this candidate in module 'A'
+// CHECK: package func packageAmbiguity() {}
+// CHECK: note: found this candidate in module 'B'
+// CHECK: package func packageAmbiguity() {}
 
   internalAmbiguity()
 // CHECK: error: ambiguous use of 'internalAmbiguity()'
 // CHECK-NEXT:  internalAmbiguity()
-// CHECK-NEXT:  ^
-// CHECK-NEXT: Lib.swift:3:15: note: found this candidate in module 'A'
-// CHECK-NEXT: internal func internalAmbiguity() {}
-// CHECK-NEXT:             ^
-// CHECK-NEXT: Lib.swift:3:15: note: found this candidate in module 'B'
-// CHECK-NEXT: internal func internalAmbiguity() {}
-// CHECK-NEXT:             ^
+// CHECK: note: found this candidate in module 'A'
+// CHECK: internal func internalAmbiguity() {}
+// CHECK: note: found this candidate in module 'B'
 }

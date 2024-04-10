@@ -31,3 +31,11 @@ func checkArrayBuiltins(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, cou
   Builtin.assignCopyArrayBackToFront(NC.self, dest, src, count) // expected-illegal-error {{noncopyable type 'NC' cannot be substituted for copyable generic parameter 'T' in 'assignCopyArrayBackToFront'}}
 #endif
 }
+
+public func checkIllegal() {
+#if ILLEGAL
+  _ = Builtin.unsafeCastToNativeObject(NC())
+  _ = Builtin.castToNativeObject(NC()) // expected-illegal-error {{noncopyable type 'NC' cannot be substituted for copyable generic parameter 'T' in 'castToNativeObject'}}
+  let _: NC = Builtin.zeroInitializer()
+#endif
+}

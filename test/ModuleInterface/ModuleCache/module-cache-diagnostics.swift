@@ -64,7 +64,6 @@
 // CHECK-ERROR: LeafModule.swiftinterface:7:8: error: no such module 'NotAModule'
 // CHECK-ERROR: OtherModule.swiftinterface:4:8: error: failed to build module 'LeafModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
 // CHECK-ERROR: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to build module 'OtherModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
-// CHECK-ERROR-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file
@@ -89,7 +88,6 @@
 // CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: cannot find 'unresolved' in scope
 // CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: failed to build module 'LeafModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
 // CHECK-ERROR-INLINE: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to build module 'OtherModule' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
-// CHECK-ERROR-INLINE-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file

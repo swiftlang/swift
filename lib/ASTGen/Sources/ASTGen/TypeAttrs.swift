@@ -31,6 +31,10 @@ extension ASTGenVisitor {
         attrs.add(attr);
       case .ifConfigDecl:
         fatalError("unimplemented")
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
     }
 

@@ -287,8 +287,6 @@ final public class StoreInst : Instruction, StoringInstruction {
 final public class StoreWeakInst : Instruction, StoringInstruction { }
 final public class StoreUnownedInst : Instruction, StoringInstruction { }
 
-final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction { }
-
 final public class AssignInst : Instruction, StoringInstruction {
   // must match with enum class swift::AssignOwnershipQualifier
   public enum AssignOwnership: Int {
@@ -340,17 +338,6 @@ final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction
     bridged.ExplicitCopyAddrInst_isInitializationOfDest()
   }
 }
-
-final public class EndAccessInst : Instruction, UnaryInstruction {
-  public var beginAccess: BeginAccessInst {
-    return operand.value as! BeginAccessInst
-  }
-}
-
-final public class BeginUnpairedAccessInst : Instruction {}
-final public class EndUnpairedAccessInst : Instruction {}
-
-final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
 
@@ -445,14 +432,13 @@ final public class DebugStepInst : Instruction {}
 
 final public class SpecifyTestInst : Instruction {}
 
-final public class UnconditionalCheckedCastAddrInst : Instruction {
+final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAddrInstruction {
+  public var isTakeOfSrc: Bool { true }
+  public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
 }
 
-final public class EndApplyInst : Instruction, UnaryInstruction {}
-final public class AbortApplyInst : Instruction, UnaryInstruction {}
-
-final public class BeginDeallocRefInst : SingleValueInstruction {
+final public class BeginDeallocRefInst : SingleValueInstruction, UnaryInstruction {
   public var reference: Value { operands[0].value }
   public var allocation: AllocRefInstBase { operands[1].value as! AllocRefInstBase }
 }
@@ -543,9 +529,6 @@ final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocatio
   }
 }
 
-final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
-final public class DeallocPackMetadataInst : Instruction, Deallocation {}
-
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
 }
@@ -568,9 +551,6 @@ extension LoadInstruction {
   public var address: Value { operand.value }
 }
 
-/// Instructions, beginning a borrow-scope which must be ended by `end_borrow`.
-public protocol BorrowIntroducingInstruction : SingleValueInstruction {}
-
 final public class LoadInst : SingleValueInstruction, LoadInstruction {
   // must match with enum class LoadOwnershipQualifier
   public enum LoadOwnership: Int {
@@ -583,7 +563,6 @@ final public class LoadInst : SingleValueInstruction, LoadInstruction {
 
 final public class LoadWeakInst : SingleValueInstruction, LoadInstruction {}
 final public class LoadUnownedInst : SingleValueInstruction, LoadInstruction {}
-final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
   public typealias ID = BridgedInstruction.BuiltinValueKind
@@ -720,12 +699,6 @@ class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class OpenPackElementInst : SingleValueInstruction {}
-final public class PackLengthInst : SingleValueInstruction {}
-final public class DynamicPackIndexInst : SingleValueInstruction {}
-final public class PackPackIndexInst : SingleValueInstruction {}
-final public class ScalarPackIndexInst : SingleValueInstruction {}
 
 final public class ObjCProtocolInst : SingleValueInstruction {}
 
@@ -983,49 +956,16 @@ final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruct
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
 
-public typealias AccessKind = BridgedInstruction.AccessKind
-
-
-// TODO: add support for begin_unpaired_access
-final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  public var accessKind: AccessKind { bridged.BeginAccessInst_getAccessKind() }
-
-  public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
-
-  public var address: Value { operand.value }
-}
-
-// An instruction that is always paired with a scope ending instruction
-// such as `begin_access` (ending with `end_access`) and `alloc_stack`
-// (ending with `dealloc_stack`).
-public protocol ScopedInstruction {
-  // The type of the ending instructions (while `IteratorProtocol` would be
-  // ideal, for performance reasons we allow the user to specify any type as return)
-  associatedtype EndInstructions
-
-  // The instructions that end the scope of the instruction denoted
-  // by `self`.
-  var endInstructions: EndInstructions { get }
-}
-
-extension BeginAccessInst : ScopedInstruction {
-  public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<UseList>, EndAccessInst>
-
-  public var endInstructions: EndInstructions {
-    endOperands.map { $0.instruction as! EndAccessInst }
+final public class BorrowedFromInst : SingleValueInstruction, BorrowIntroducingInstruction {
+  public var borrowedValue: Value { operands[0].value }
+  public var borrowedPhi: Phi { Phi(borrowedValue)! }
+  public var enclosingOperands: OperandArray {
+    let ops = operands
+    return ops[1..<ops.count]
   }
-
-  public var endOperands: LazyFilterSequence<UseList> {
-    return uses.lazy.filter { $0.instruction is EndAccessInst }
+  public var enclosingValues: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
+    enclosingOperands.values
   }
-}
-
-final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
-  public var borrowedValue: Value { operand.value }
-
-  public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
-
-  public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
@@ -1035,18 +975,18 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 
 final public class ProjectExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
 
-public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction {}
+public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction, OwnershipTransitionInstruction {}
 
-final public class CopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
+final public class CopyValueInst : SingleValueInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
 
-final public class ExplicitCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
+final public class ExplicitCopyValueInst : SingleValueInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
 
-final public class UnownedCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
-final public class WeakCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
+final public class UnownedCopyValueInst : SingleValueInstruction, CopyingInstruction {}
+final public class WeakCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 
 final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
 
@@ -1076,7 +1016,21 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
+
+  /// WARNING: isOnStack incorrectly returns false for all closures prior to ClosureLifetimeFixup, even if they need to
+  /// be diagnosed as on-stack closures. Use has mayEscape instead.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
+
+  public var mayEscape: Bool { !isOnStack && !hasNoescapeCapture }
+
+  /// True if this closure captures anything nonescaping.
+  public var hasNoescapeCapture: Bool {
+    if operandConventions.contains(.indirectInoutAliasable) {
+      return true
+    }
+    return arguments.contains { $0.type.containsNoEscapeFunction }
+  }
+
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
 }
 
@@ -1109,8 +1063,7 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class MarkUnresolvedNonCopyableValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
 
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
@@ -1119,13 +1072,11 @@ final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstr
   public var isInitializationOfDest: Bool { true }
 }
 
-final public class CopyableToMoveOnlyWrapperValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class CopyableToMoveOnlyWrapperValueInst: SingleValueInstruction, UnaryInstruction {}
 
-final public class MoveOnlyWrapperToCopyableValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class MoveOnlyWrapperToCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
 
-final public class MoveOnlyWrapperToCopyableBoxInst : SingleValueInstruction {}
+final public class MoveOnlyWrapperToCopyableBoxInst: SingleValueInstruction, UnaryInstruction {}
 
 final public class CopyableToMoveOnlyWrapperAddrInst
   : SingleValueInstruction, UnaryInstruction {}
@@ -1146,20 +1097,6 @@ final public class ObjectInst : SingleValueInstruction {
 
 final public class VectorInst : SingleValueInstruction {
 }
-
-final public class TuplePackExtractInst: SingleValueInstruction {
-  public var indexOperand: Operand { operands[0] }
-  public var tupleOperand: Operand { operands[1] }
-}
-
-final public class TuplePackElementAddrInst: SingleValueInstruction {
-  public var indexOperand: Operand { operands[0] }
-  public var tupleOperand: Operand { operands[1] }
-}
-
-final public class PackElementGetInst: SingleValueInstruction {}
-
-final public class PackElementSetInst: SingleValueInstruction {}
 
 final public class DifferentiableFunctionInst: SingleValueInstruction {}
 
@@ -1193,9 +1130,6 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
 final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
   public var capacity: Value { operand.value }
 }
-
-final public class AllocPackInst : SingleValueInstruction, Allocation {}
-final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
   final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
@@ -1239,11 +1173,169 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 }
 
 //===----------------------------------------------------------------------===//
+//                           scoped instructions
+//===----------------------------------------------------------------------===//
+
+/// An instruction whose side effects extend across a scope including other instructions. These are always paired with a
+/// scope ending instruction such as `begin_access` (ending with `end_access`) and `begin_borrow` (ending with
+/// `end_borrow`).
+public protocol ScopedInstruction {
+  var endOperands: LazyFilterSequence<UseList> { get }
+}
+
+extension Instruction {
+  /// Return the sequence of use points of any instruction.
+  public var endInstructions: EndInstructions {
+    if let scopedInst = self as? ScopedInstruction {
+      return .scoped(scopedInst.endOperands.map({ $0.instruction }))
+    }
+    return .single(self)
+  }
+}
+
+/// Instructions beginning a borrow-scope which must be ended by `end_borrow`.
+public protocol BorrowIntroducingInstruction : SingleValueInstruction, ScopedInstruction {}
+
+final public class EndBorrowInst : Instruction, UnaryInstruction {}
+
+extension BorrowIntroducingInstruction {
+  public var endOperands: LazyFilterSequence<UseList> {
+    return uses.lazy.filter { $0.instruction is EndBorrowInst }
+  }
+}
+
+final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
+  public var borrowedValue: Value { operand.value }
+
+  public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
+
+  public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
+
+  public var endOperands: LazyFilterSequence<UseList> {
+    return uses.endingLifetime
+  }
+}
+
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
+
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
+  var allocStack: AllocStackInst {
+    var dest = destination
+    if let mark = dest as? MarkUnresolvedNonCopyableValueInst {
+      dest = mark.operand.value
+    }
+    return dest as! AllocStackInst
+  }
+}
+
+final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
+  // The raw values must match SILAccessKind.
+  public enum AccessKind: Int {
+    case `init` = 0
+    case read = 1
+    case modify = 2
+    case `deinit` = 3
+  }
+  public var accessKind: AccessKind {
+    AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
+  }
+
+  public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
+
+  public var address: Value { operand.value }
+
+  public typealias EndAccessInstructions = LazyMapSequence<LazyFilterSequence<UseList>, EndAccessInst>
+
+  public var endAccessInstructions: EndAccessInstructions {
+    endOperands.map { $0.instruction as! EndAccessInst }
+  }
+}
+
+final public class EndAccessInst : Instruction, UnaryInstruction {
+  public var beginAccess: BeginAccessInst {
+    return operand.value as! BeginAccessInst
+  }
+}
+
+extension BeginAccessInst : ScopedInstruction {
+  public var endOperands: LazyFilterSequence<UseList> {
+    return uses.lazy.filter { $0.instruction is EndAccessInst }
+  }
+}
+
+// Unpaired accesses do not have a static scope, are generally unsupported by the optimizer, and should be avoided.
+final public class BeginUnpairedAccessInst : Instruction {}
+
+final public class EndUnpairedAccessInst : Instruction {}
+
+
+final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
+  public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
+
+  public var singleDirectResult: Value? { nil }
+
+  public var token: Value { getResult(index: resultCount - 1) }
+
+  public var yieldedValues: Results {
+    Results(inst: self, numResults: resultCount - 1)
+  }
+}
+
+final public class EndApplyInst : Instruction, UnaryInstruction {}
+final public class AbortApplyInst : Instruction, UnaryInstruction {}
+
+extension BeginApplyInst : ScopedInstruction {
+  public var endOperands: LazyFilterSequence<UseList> {
+    return token.uses.lazy.filter { _ in true }
+  }
+}
+
+/// A sequence representing the use points of an instruction for the purpose of liveness and the general
+/// nesting of scopes.
+///
+/// Abstracts over simple single-use instructions vs. an instruction that is always paired with scope ending
+/// instructions that denote the end of the scoped operation.
+public enum EndInstructions: CollectionLikeSequence {
+  public typealias EndScopedInstructions = LazyMapSequence<LazyFilterSequence<UseList>, Instruction>
+
+  case single(Instruction)
+  case scoped(EndScopedInstructions)
+
+  public enum Iterator : IteratorProtocol {
+    case single(Instruction?)
+    case scoped(EndScopedInstructions.Iterator)
+
+    public mutating func next() -> Instruction? {
+      switch self {
+      case let .single(inst):
+        if let result = inst {
+          self = .single(nil)
+          return result
+        }
+        return nil
+      case var .scoped(iter):
+        let result = iter.next()
+        self = .scoped(iter)
+        return result
+      }
+    }
+  }
+
+  public func makeIterator() -> Iterator {
+    switch self {
+    case let .single(inst):
+      return .single(inst)
+    case let .scoped(endScoped):
+      return .scoped(endScoped.makeIterator())
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                            multi-value instructions
 //===----------------------------------------------------------------------===//
 
-final public class BeginCOWMutationInst : MultipleValueInstruction,
-                                          UnaryInstruction {
+final public class BeginCOWMutationInst : MultipleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
   public var uniquenessResult: Value { return getResult(index: 0) }
   public var instanceResult: Value { return getResult(index: 1) }
@@ -1257,17 +1349,35 @@ final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruc
   public var `tuple`: Value { operand.value }
 }
 
-final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
-  public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
+//===----------------------------------------------------------------------===//
+//                           parameter pack instructions
+//===----------------------------------------------------------------------===//
 
-  public var singleDirectResult: Value? { nil }
+final public class AllocPackInst : SingleValueInstruction, Allocation {}
+final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
-  public var token: Value { getResult(index: resultCount - 1) }
+final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
+final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
-  public var yieldedValues: Results {
-    Results(inst: self, numResults: resultCount - 1)
-  }
+final public class OpenPackElementInst : SingleValueInstruction {}
+final public class PackLengthInst : SingleValueInstruction {}
+final public class DynamicPackIndexInst : SingleValueInstruction {}
+final public class PackPackIndexInst : SingleValueInstruction {}
+final public class ScalarPackIndexInst : SingleValueInstruction {}
+
+final public class TuplePackExtractInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
 }
+
+final public class TuplePackElementAddrInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
+}
+
+final public class PackElementGetInst: SingleValueInstruction {}
+
+final public class PackElementSetInst: Instruction {}
 
 //===----------------------------------------------------------------------===//
 //                            terminator instructions
@@ -1411,5 +1521,35 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
 }
 
-final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {
+final public class CheckedCastAddrBranchInst : TermInst {
+  public var source: Value { operands[0].value }
+  public var destination: Value { operands[1].value }
+
+  public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
+  public var failureBlock: BasicBlock { bridged.CheckedCastAddrBranch_getFailureBlock().block }
+
+  public enum CastConsumptionKind {
+    /// The source value is always taken, regardless of whether the cast
+    /// succeeds.  That is, if the cast fails, the source value is
+    /// destroyed.
+    case TakeAlways
+
+    /// The source value is taken only on a successful cast; otherwise,
+    /// it is left in place.
+    case TakeOnSuccess
+
+    /// The source value is always left in place, and the destination
+    /// value is copied into on success.
+    case CopyOnSuccess
+  }
+
+  public var consumptionKind: CastConsumptionKind {
+    switch bridged.CheckedCastAddrBranch_getConsumptionKind() {
+    case .TakeAlways:    return .TakeAlways
+    case .TakeOnSuccess: return .TakeOnSuccess
+    case .CopyOnSuccess: return .CopyOnSuccess
+    default:
+      fatalError("invalid cast consumption kind")
+    }
+  }
 }

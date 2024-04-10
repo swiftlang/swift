@@ -60,7 +60,7 @@ public:
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
-    return sectionName.startswith("__swift5_") || sectionName == "__const";
+    return sectionName.starts_with("__swift5_") || sectionName == "__const";
   }
 };
 
@@ -79,7 +79,7 @@ public:
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
-    return sectionName.startswith("swift5_");
+    return sectionName.starts_with("swift5_");
   }
 };
 
@@ -98,7 +98,7 @@ public:
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
-    return sectionName.startswith(".sw5");
+    return sectionName.starts_with(".sw5");
   }
 };
 } // namespace swift

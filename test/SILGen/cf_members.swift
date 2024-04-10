@@ -39,7 +39,10 @@ public func foo(_ x: Double) {
 
   // CHECK: [[FN:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcfu_ : $@convention(thin) (Double) -> Struct1
   // CHECK: [[A:%.*]] = thin_to_thick_function [[FN]]
-  // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[A]]
+  // CHECK: [[MOVED_A:%.*]] = move_value [var_decl] [[A]]
+  // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[MOVED_A]]
+  // CHECK: [[COPIED_A:%.*]] = copy_value [[BORROWED_A]]
+  // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[COPIED_A]]
   let a: (Double) -> Struct1 = Struct1.init(value:)
   // CHECK: [[NEW_Z_VALUE:%.*]] = apply [[BORROWED_A]]([[X]])
   // CHECK: end_borrow [[BORROWED_A]]
@@ -78,10 +81,13 @@ public func foo(_ x: Double) {
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu2_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
+  // CHECK: [[MOVED_THICK:%.*]] = move_value [var_decl] [[THICK]]
+  // CHECK: [[BORROWED_THICK:%.*]] = begin_borrow [[MOVED_THICK]]
+  // CHECK: [[COPIED_THICK:%.*]] = copy_value [[BORROWED_THICK]]
   let d: (Struct1) -> (Double) -> Struct1 = Struct1.translate(radians:)
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[THICK_BORROW:%.*]] = begin_borrow [[THICK]]
+  // CHECK: [[THICK_BORROW:%.*]] = begin_borrow [[COPIED_THICK]]
   // CHECK: apply [[THICK_BORROW]]([[ZVAL]])
   // CHECK: end_borrow [[THICK_BORROW]]
   z = d(z)(x)
@@ -156,8 +162,11 @@ public func foo(_ x: Double) {
   var y = Struct1.staticMethod()
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
   // CHECK: [[I2:%.*]] = thin_to_thick_function [[THUNK]]
+  // CHECK: [[MOVED_I2:%.*]] = move_value [var_decl] [[I2]]
+  // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[MOVED_I2]]
+  // CHECK: [[COPIED_I2:%.*]] = copy_value [[BORROWED_I2]]
   let i = Struct1.staticMethod
-  // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[I2]]
+  // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[COPIED_I2]]
   // CHECK: apply [[BORROWED_I2]]()
   y = i()
 

@@ -51,6 +51,7 @@ NODE(ClangType)
 CONTEXT_NODE(Class)
 NODE(ClassMetadataBaseOffset)
 NODE(ConcreteProtocolConformance)
+NODE(PackProtocolConformance)
 NODE(ConformanceAttachedMacroExpansion)
 CONTEXT_NODE(Constructor)
 NODE(CoroutineContinuationPrototype)
@@ -132,12 +133,14 @@ NODE(ImplEscaping)
 NODE(ImplConvention)
 NODE(ImplDifferentiabilityKind)
 NODE(ImplErasedIsolation)
+NODE(ImplTransferringResult)
 NODE(ImplParameterResultDifferentiability)
 NODE(ImplParameterTransferring)
 NODE(ImplFunctionAttribute)
 NODE(ImplFunctionConvention)
 NODE(ImplFunctionConventionName)
 NODE(ImplFunctionType)
+NODE(ImplCoroutineKind)
 NODE(ImplInvocationSubstitutions)
 CONTEXT_NODE(ImplicitClosure)
 NODE(ImplParameter)
@@ -361,9 +364,6 @@ NODE(AsyncSuspendResumePartialFunction)
 NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
-// Added in Swift 6.0
-NODE(AccessibleProtocolRequirementFunctionRecord)
-
 // Added in Swift 5.7
 NODE(BackDeploymentThunk)
 NODE(BackDeploymentFallback)
@@ -395,6 +395,8 @@ NODE(OutlinedInitializeWithCopyNoValueWitness)
 NODE(OutlinedAssignWithTakeNoValueWitness)
 NODE(OutlinedAssignWithCopyNoValueWitness)
 NODE(OutlinedDestroyNoValueWitness)
+
+NODE(DependentGenericInverseConformanceRequirement)
 
 #undef CONTEXT_NODE
 #undef NODE

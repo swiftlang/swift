@@ -41,7 +41,7 @@ func testLoadableVar() {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7consume18testAddressOnlyLetyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
-// CHECK: [[BOX:%.*]] = alloc_stack [lexical] $T
+// CHECK: [[BOX:%.*]] = alloc_stack [lexical] [var_decl] $T
 //
 // CHECK: [[STACK:%.*]] = alloc_stack $T
 // CHECK: mark_unresolved_move_addr [[BOX]] to [[STACK]]

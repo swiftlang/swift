@@ -165,6 +165,12 @@ ERROR(init_candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|package|@_spi|@_spi}1' protection level",
       (Type, AccessLevel))
 
+ERROR(candidate_from_missing_import,none,
+      "%0 %1 is not available due to missing import of defining module %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
+NOTE(candidate_add_import,none,
+     "add import of module %0", (DeclName))
+
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))
@@ -850,6 +856,11 @@ ERROR(serialization_module_incompatible_revision,Fatal,
       "compiled module was created by a different version of the compiler '%0'; "
       "rebuild %1 and try again: %2",
       (StringRef, Identifier, StringRef))
+ERROR(serialization_module_incompatible_channel,Fatal,
+      "compiled module was created for a different distribution channel '%0' "
+      "than the local compiler '%1', "
+      "please ensure %2 is found from the expected path: %3",
+      (StringRef, StringRef, Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
@@ -914,6 +925,9 @@ ERROR(cannot_import_embedded_module,none,
 ERROR(cannot_import_non_embedded_module,none,
       "module %0 cannot be imported in embedded Swift mode",
       (Identifier))
+ERROR(volatile_is_experimental,none,
+      "importing _Volatile module requires '-enable-experimental-feature Volatile'", ())
+
 ERROR(need_cxx_interop_to_import_module,none,
       "module %0 was built with C++ interoperability enabled, but "
       "current compilation does not enable C++ interoperability",
@@ -949,13 +963,17 @@ NOTE(modularization_issue_stale_module,none,
      "the module %0 has enabled library-evolution; "
      "the following file may need to be deleted if the SDK was modified: '%1'",
      (const ModuleDecl *, StringRef))
+NOTE(modularization_issue_type_mismatch,none,
+     "a candidate was filtered out because of a type mismatch; "
+     "expected: %0, found: %1",
+     (const Type, const Type))
 NOTE(modularization_issue_swift_version,none,
      "the module %0 was built with a Swift language version set to %1 "
      "while the current invocation uses %2; "
      "APINotes may change how clang declarations are imported",
      (const ModuleDecl *, llvm::VersionTuple, llvm::VersionTuple))
 NOTE(modularization_issue_audit_headers,none,
-     "declarations in the %select{underlying|}0 clang module %1 "
+     "declarations in the %select{underlying |}0clang module %1 "
      "may be hidden by clang preprocessor macros",
      (bool, const ModuleDecl*))
 NOTE(modularization_issue_layering_expected_local,none,
@@ -1177,6 +1195,9 @@ REMARK(module_api_import_aliases,none,
        "typealias underlying type %kind0 is imported via %1"
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
+
+REMARK(skip_module_invalid,none,"skip invalid swiftmodule: %0", (StringRef))
+REMARK(skip_module_testable,none,"skip swiftmodule built with '-enable-testing': %0", (StringRef))
 
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
@@ -1730,6 +1751,9 @@ ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
 
+WARNING(objc_implementation_early_spelling_deprecated,none,
+        "'@_objcImplementation' is deprecated; use '@implementation' instead",
+        ())
 ERROR(attr_objc_implementation_must_be_unconditional,none,
       "only unconditional extensions can implement an Objective-C '@interface'",
       ())
@@ -1908,8 +1932,7 @@ NOTE(objc_implementation_one_matched_requirement,none,
      (ValueDecl *, ObjCSelector, bool, StringRef))
 
 WARNING(wrap_objc_implementation_will_become_error,none,
-        "%0; this will become an error before '@_objcImplementation' is "
-        "stabilized",
+        "%0; this will become an error after adopting '@implementation'",
         (DiagnosticInfo *))
 
 ERROR(cdecl_not_at_top_level,none,
@@ -1959,6 +1982,10 @@ ERROR(attr_static_exclusive_only_mutating,none,
 // @extractConstantsFromMembers
 ERROR(attr_extractConstantsFromMembers_experimental,none,
       "@extractConstantsFromMembers requires '-enable-experimental-feature ExtractConstantsFromMembers'", ())
+
+// @sensitive
+ERROR(attr_sensitive_experimental,none,
+      "@sensitive requires '-enable-experimental-feature Sensitive'", ())
 
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
@@ -2026,6 +2053,9 @@ ERROR(attr_only_at_non_generic_scope, none,
       "attribute '%0' cannot be used in a generic context", (StringRef))
 ERROR(attr_only_on_static_properties, none,
       "properties with attribute '_section' must be static", (StringRef))
+
+ERROR(weak_unowned_in_embedded_swift, none,
+      "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
 
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
@@ -2465,7 +2495,7 @@ ERROR(spi_only_imports_not_enabled, none,
 ERROR(access_level_on_import_unsupported, none,
       "The access level %0 is unsupported on imports: "
       "only 'public', 'package', 'internal', 'fileprivate' and 'private' "
-      "are unsupported",
+      "are accepted",
       (DeclAttribute))
 ERROR(access_level_conflict_with_exported,none,
       "'%0' is incompatible with %1; it can only be applied to public imports",
@@ -2491,7 +2521,7 @@ ERROR(inferred_opaque_type,none,
 
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
-      "type %0 is not invertible", (Type))
+      "type %0 cannot be suppressed", (Type))
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -2675,6 +2705,12 @@ ERROR(type_does_not_conform_anyobject_decl_owner,none,
 ERROR(type_does_not_conform_in_opaque_return,none,
       "return type of %kind0 requires that %1 %select{conform to %2|be a class type}3",
       (const ValueDecl *, Type, Type, bool))
+ERROR(type_is_not_equal_in_opaque_return,none,
+      "return type of %kind0 requires the types %1 and %2 be equivalent",
+      (const ValueDecl *, Type, Type))
+ERROR(types_not_inherited_in_opaque_return,none,
+      "return type of %kind0 requires that %1 inherit from %2",
+      (const ValueDecl *, Type, Type))
 ERROR(types_not_equal_decl,none,
       "%kind0 requires the types %1 and %2 be equivalent",
       (const ValueDecl *, Type, Type))
@@ -2771,7 +2807,7 @@ ERROR(protocol_has_missing_requirements_versioned,none,
       (Type, Type, llvm::VersionTuple, llvm::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%kindonly0 requirement %0 cannot add constraint "
-      "'%1%select{:|:| ==|:}2 %3' on 'Self'",
+      "'%1%select{:|:| ==|:| has same shape as}2 %3' on 'Self'",
       (const ValueDecl *, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%kind0 has different argument labels "
@@ -3163,12 +3199,11 @@ ERROR(requires_not_suitable_archetype,none,
       (Type))
 
 ERROR(requires_not_suitable_inverse_subject,none,
-      "cannot apply inverse '~%1' to type %0 in conformance requirement",
+      "cannot suppress '~%1' on type %0",
       (Type, StringRef))
 
 ERROR(requires_not_suitable_inverse_outer_subject,none,
-      "cannot add inverse constraint '%0: ~%1' "
-      "on generic parameter '%0' defined in outer scope",
+      "cannot suppress '~%1' on generic parameter '%0' defined in outer scope",
       (StringRef, StringRef))
 
 ERROR(invalid_shape_requirement,none,
@@ -4460,6 +4495,13 @@ ERROR(cannot_force_unwrap_nil_literal,none,
 ERROR(could_not_infer_placeholder,none,
       "could not infer type for placeholder", ())
 
+ERROR(could_not_infer_pack_element,none,
+      "could not infer pack element #%0 from context", (unsigned))
+
+NOTE(note_in_opening_pack_element,none,
+      "in inferring pack element #%0 of '%1'", (unsigned,StringRef))
+
+      
 ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without a type annotation", ())
 
@@ -4645,7 +4687,7 @@ ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
 ERROR(value_of_metatype_type,none,
-      "expected member name or constructor call after type name%select{|; this "
+      "expected member name or initializer call after type name%select{|; this "
       "will be an error in Swift 6}0", (bool))
 
 NOTE(add_parens_to_type,none,
@@ -5393,9 +5435,9 @@ ERROR(isolated_default_argument_context,none,
 ERROR(conflicting_default_argument_isolation,none,
       "default argument cannot be both %0 and %1",
       (ActorIsolation, ActorIsolation))
-ERROR(distributed_actor_needs_explicit_distributed_import,none,
-      "'Distributed' module not imported, required for 'distributed actor'",
-      ())
+ERROR(distributed_decl_needs_explicit_distributed_import,none,
+      "%kind0 requires explicit import of Distributed module",
+      (const ValueDecl *))
 NOTE(distributed_func_cannot_overload_on_async_only,none,
      "%0 previously declared here, cannot overload distributed methods on effect only", (const ValueDecl *))
 NOTE(distributed_func_other_ambiguous_overload_here,none,
@@ -5489,9 +5531,6 @@ ERROR(distributed_actor_remote_func_implemented_manually,none,
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
-ERROR(nonisolated_storage_value_type,none,
-      "'nonisolated' is redundant on %0's stored properties",
-      (DescriptiveDeclKind))
 ERROR(distributed_actor_func_nonisolated, none,
       "cannot declare method %0 as both 'nonisolated' and 'distributed'",
       (DeclName))
@@ -5529,8 +5568,12 @@ NOTE(shared_mutable_state_decl_note,none,
      "isolate %0 to a global actor, or convert it to a 'let' constant and "
      "conform it to 'Sendable'", (const ValueDecl *))
 ERROR(shared_immutable_state_decl,none,
-      "%kind0 is not concurrency-safe because it is not either conforming to "
-      "'Sendable' or isolated to a global actor", (const ValueDecl *))
+      "%kind0 is not concurrency-safe because non-'Sendable' type %1 may have "
+      "shared mutable state",
+      (const ValueDecl *, Type))
+NOTE(shared_immutable_state_decl_note,none,
+     "isolate %0 to a global actor, or conform %1 to 'Sendable'",
+     (const ValueDecl *, Type))
 ERROR(actor_isolated_witness,none,
      "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 protocol "
      "requirement",
@@ -5640,6 +5683,9 @@ ERROR(sendable_raw_storage,none,
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))
+WARNING(restate_unchecked_sendable,none,
+        "class %0 must restate inherited '@unchecked Sendable' conformance",
+        (DeclName))
 ERROR(unchecked_not_inheritance_clause,none,
       "'unchecked' attribute only applies in inheritance clauses", ())
 ERROR(unchecked_not_existential,none,
@@ -5666,6 +5712,8 @@ ERROR(incorrect_optional_any,none,
 ERROR(existential_requires_any,none,
       "use of %select{protocol |}2%0 as a type must be written %1",
       (Type, Type, bool))
+ERROR(inverse_requires_any,none,
+      "constraint that suppresses conformance requires 'any'", ())
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
@@ -5678,6 +5726,18 @@ NOTE(nonisolated_mutable_storage_note,none,
      "convert %0 to a 'let' constant or consider declaring it "
      "'nonisolated(unsafe)' if manually managing concurrency safety",
      (const VarDecl *))
+WARNING(nonisolated_unsafe_sendable_constant,none,
+     "'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type "
+     "%0, consider removing it",
+     (Type))
+WARNING(unsafe_sendable_actor_constant,none,
+     "'(unsafe)' is unnecessary for a constant public actor property with "
+     "'Sendable' type %0, consider removing it",
+     (Type))
+WARNING(nonisolated_unsafe_sendable_actor_constant,none,
+     "'nonisolated(unsafe)' is unnecessary for a constant actor-isolated "
+     "property with 'Sendable' type %0, consider removing it",
+     (Type))
 ERROR(nonisolated_non_sendable,none,
       "'nonisolated' can not be applied to variable with non-'Sendable' "
       "type %0",
@@ -5761,9 +5821,6 @@ ERROR(global_actor_on_actor_class,none,
       "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
-ERROR(global_actor_on_storage_of_value_type,none,
-      "stored property %0 within struct cannot have a global actor",
-      (DeclName))
 ERROR(unsafe_global_actor,none,
       "'(unsafe)' global actors are deprecated; "
       "use '@preconcurrency' instead",
@@ -6479,9 +6536,9 @@ ERROR(dynamic_replacement_replaced_not_objc_dynamic, none,
 ERROR(dynamic_replacement_replacement_not_objc_dynamic, none,
       "%0 is marked @objc dynamic", (DeclName))
 ERROR(dynamic_replacement_replaced_constructor_is_convenience, none,
-      "replaced constructor %0 is marked as convenience", (DeclNameRef))
+      "replaced initializer %0 is marked as convenience", (DeclNameRef))
 ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
-      "replaced constructor %0 is not marked as convenience", (DeclNameRef))
+      "replaced initializer %0 is not marked as convenience", (DeclNameRef))
 
 //------------------------------------------------------------------------------
 // MARK: @_typeEraser()
@@ -6603,6 +6660,11 @@ ERROR(availability_concurrency_only_version_newer, none,
 
 ERROR(availability_parameterized_protocol_only_version_newer, none,
       "runtime support for parameterized protocol types is only available in "
+      "%0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
+ERROR(availability_isolated_any_only_version_newer, none,
+      "runtime support for @isolated(any) function types is only available in "
       "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
@@ -6799,7 +6861,7 @@ WARNING(inlinable_decl_ref_from_hidden_module_warn,
       none, "%kind0 cannot be used in " FRAGILE_FUNC_KIND "1 "
       "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|<<ERROR>>|"
       "%2 was not imported by this file}3"
-      "; this is an error in Swift 6",
+      "; this is an error in the Swift 6 language mode",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
@@ -7584,6 +7646,9 @@ ERROR(inverse_but_also_conforms, none,
 ERROR(inverse_generic_but_also_conforms, none,
       "%0 required to be '%1' but is marked with '~%1'",
       (Type, StringRef))
+ERROR(inverse_associatedtype_restriction, none,
+      "cannot suppress '%0' requirement of an associated type",
+      (StringRef))
 ERROR(inverse_on_class, none,
       "classes cannot be '~%0'",
       (StringRef))
@@ -7595,11 +7660,15 @@ ERROR(inverse_conflicts_explicit_composition, none,
       "composition cannot contain '~%0' when another member requires '%0'",
       (StringRef))
 ERROR(inverse_extension, none,
-      "cannot apply inverse %0 to extension",
+      "cannot suppress %0 in extension",
       (Type))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
       (const ValueDecl *))
+ERROR(inverse_cannot_be_conditional_on_requirement, none,
+      "conditional conformance to suppressible %kind0 cannot depend on "
+      "'%noformat1%select{:|:| ==|:| has same shape as}2 %noformat3'",
+      (const ProtocolDecl *, Type, unsigned, Type))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
       "'%4'-conforming %kind3 has non-%4 type %0",
@@ -7610,10 +7679,6 @@ NOTE(add_inverse,none,
 NOTE(note_inverse_preventing_conformance,none,
      "%0 has '~%1' constraint preventing implicit '%1' conformance",
      (Type, StringRef))
-NOTE(note_inverse_preventing_conformance_implicit,none,
-     "%kind0 has '~%1' constraint on a generic parameter, "
-     "making its '%1' conformance conditional",
-     (const ValueDecl *, StringRef))
 NOTE(note_inverse_preventing_conformance_explicit,none,
      "%kind0 has '~%1' constraint preventing '%1' conformance",
      (const ValueDecl *, StringRef))
@@ -7631,12 +7696,12 @@ ERROR(non_bitwise_copyable_type_indirect_enum_element,none,
       "enum with indirect case cannot conform to 'BitwiseCopyable'", ())
 NOTE(note_non_bitwise_copyable_type_indirect_enum_element,none,
      "indirect case is here", ())
-ERROR(non_bitwise_copyable_type_noncopyable,none,
-      "noncopyable type cannot conform to 'BitwiseCopyable'", ())
-ERROR(non_bitwise_copyable_type_nonescapable,none,
-      "nonescapable type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_cxx_nontrivial,none,
       "non-trivial C++ type cannot conform to 'BitwiseCopyable'", ())
+ERROR(non_bitwise_copyable_c_type_nontrivial,none,
+      "type with unrepresentable fields cannot derive conformance to 'BitwiseCopyable'", ())
+NOTE(note_non_bitwise_copyable_c_type_add_attr,none,
+     "annotate the type __attribute__((__swift_attr__(\"_BitwiseCopyable\")))",())
 ERROR(non_bitwise_copyable_type_member,none,
       "%select{stored property %2|associated value %2}1 of "
       "'BitwiseCopyable'-conforming %kind3 has non-bitwise-copyable type %0",
@@ -7658,16 +7723,6 @@ ERROR(bitwise_copyable_outside_module,none,
       (const ValueDecl *))
 
 // -- older ones below --
-
-ERROR(noncopyable_within_copyable, none,
-      "%kind0 cannot contain a noncopyable type without also being noncopyable",
-      (const ValueDecl *))
-NOTE(noncopyable_within_copyable_location, none,
-     "contained noncopyable %0 '%1.%2'",
-     (DescriptiveDeclKind, StringRef, StringRef))
-ERROR(noncopyable_cannot_conform_to_type, none,
-     "noncopyable %kind0 cannot conform to %1",
-     (const ValueDecl *, Type))
 ERROR(noncopyable_parameter_requires_ownership, none,
       "parameter of noncopyable type %0 must specify ownership", (Type))
 ERROR(noncopyable_parameter_subscript_unsupported, none,
@@ -7709,14 +7764,22 @@ ERROR(noncopyable_enums_do_not_support_indirect,none,
       "noncopyable enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
 ERROR(noncopyable_cast,none,
       "noncopyable types cannot be conditionally cast", ())
-ERROR(noncopyable_failable_init,none,
-      "noncopyable types cannot have failable initializers yet", ())
 ERROR(noncopyable_objc_enum, none,
       "noncopyable enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
+ERROR(consume_expression_partial_copyable,none,
+      "'consume' can only be used to partially consume storage of a noncopyable type", ())
+ERROR(consume_expression_non_storage,none,
+      "'consume' can only be used to partially consume storage", ())
+NOTE(note_consume_expression_non_storage_call,none,
+      "non-storage produced by this call", ())
+NOTE(note_consume_expression_non_storage_subscript,none,
+      "non-storage produced by this subscript", ())
+NOTE(note_consume_expression_non_storage_property,none,
+      "non-storage produced by this computed property", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(copy_expression_not_passed_lvalue,none,
@@ -7811,53 +7874,60 @@ ERROR(lifetime_dependence_invalid_param_name, none,
       "invalid parameter name specified %0", (Identifier))
 ERROR(lifetime_dependence_invalid_param_index, none,
       "invalid parameter index specified %0", (unsigned))
-ERROR(lifetime_dependence_invalid_self, none,
-      "invalid lifetime dependence specifier, self is valid in non-static "
-      "methods only", ())
+ERROR(lifetime_dependence_invalid_self_in_static, none,
+      "invalid lifetime dependence specifier on non-existent self", ())
+ERROR(lifetime_dependence_invalid_self_in_init, none,
+      "invalid lifetime dependence on self in an initializer", ())
 ERROR(lifetime_dependence_duplicate_param_id, none,
       "duplicate lifetime dependence specifier", ())
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
+ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
+      "invalid use of scoped lifetime dependence with consuming ownership",
+      ())
+ERROR(lifetime_dependence_cannot_use_inferred_scoped_consuming, none,
+      "invalid use of lifetime dependence on an Escapable parameter with "
+      "consuming ownership",
+      ())
+ERROR(lifetime_dependence_invalid_self_ownership, none,
+      "invalid scoped lifetime dependence on an Escapable self with consuming "
+      "ownership",
+      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
 ERROR(lifetime_dependence_invalid_return_type, none,
       "lifetime dependence can only be specified on ~Escapable results", ())
-ERROR(lifetime_dependence_missing_ownership_modifier, none,
-      "lifetime dependence can only be specified on parameters with ownership "
-      "modifiers (borrowing, consuming, inout)", ())
-ERROR(lifetime_dependence_cannot_infer_wo_ownership_modifier_on_method, none,
-      "cannot infer lifetime dependence, specify ownership modifier for the "
-       "method", ())
- ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
-      "cannot infer lifetime dependence, multiple ~Escapable or ~Copyable "
-      "parameters with ownership modifiers, specify explicit lifetime "
-       "dependence", ())
-ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
-       "cannot infer lifetime dependence, no parameters with ownership "
-       "modifiers present", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected nil or self as return values in an initializer with "
-       "lifetime dependent specifiers", ())
-ERROR(lifetime_dependence_cannot_use_infer, none,
-       "invalid use of %0 lifetime dependence on Escapable type",
-       (StringRef))
-ERROR(lifetime_dependence_on_bitwise_copyable, none,
-      "invalid lifetime dependence on bitwise copyable type", ())
+ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
+      "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
+ ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
+       "cannot infer lifetime dependence %0, no parameters found that are either "
+       "~Escapable or Escapable with a borrowing ownership", (StringRef))
+ ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
+       "expected nil or self as return values in an initializer with "
+       "lifetime dependent specifiers",
+       ())
+ ERROR(lifetime_dependence_on_bitwise_copyable, none,
+       "invalid lifetime dependence on bitwise copyable type", ())
+ ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
+       "lifetime dependence specifiers cannot be applied to tuple elements", ())
+ ERROR(lifetime_dependence_method_escapable_bitwisecopyable_self, none,
+       "cannot infer lifetime dependence on a self which is BitwiseCopyable & "
+       "Escapable",
+       ())
 
-//===----------------------------------------------------------------------===//
-//                             MARK: Transferring
-//===----------------------------------------------------------------------===//
+ //===----------------------------------------------------------------------===//
+ //                             MARK: Transferring
+ //===----------------------------------------------------------------------===//
 
-ERROR(transferring_unsupported_param_specifier, none,
-      "'%0' cannot be applied to a 'transferring' parameter", (StringRef))
+ ERROR(transferring_unsupported_param_specifier, none,
+       "'%0' cannot be applied to a 'transferring' parameter", (StringRef))
 
-ERROR(transferring_only_on_parameters_and_results, none,
-      "'transferring' may only be used on parameters and results", ())
-ERROR(transferring_cannot_be_applied_to_tuple_elt, none,
-      "'transferring' cannot be applied to tuple elements", ())
-
+ ERROR(transferring_only_on_parameters_and_results, none,
+       "'transferring' may only be used on parameters and results", ())
+ ERROR(transferring_cannot_be_applied_to_tuple_elt, none,
+       "'transferring' cannot be applied to tuple elements", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

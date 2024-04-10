@@ -58,6 +58,17 @@ std::optional<PlatformKind> swift::platformFromString(StringRef Name) {
       .Default(std::optional<PlatformKind>());
 }
 
+std::optional<PlatformKind> swift::platformFromUnsigned(unsigned value) {
+  PlatformKind platform = PlatformKind(value);
+  switch (platform) {
+  case PlatformKind::none:
+#define AVAILABILITY_PLATFORM(X, PrettyName) case PlatformKind::X:
+#include "swift/AST/PlatformKinds.def"
+    return platform;
+  }
+  return std::nullopt;
+}
+
 std::optional<StringRef>
 swift::closestCorrectedPlatformString(StringRef candidate) {
   auto lowerCasedCandidate = candidate.lower();

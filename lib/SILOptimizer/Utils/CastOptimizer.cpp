@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1065,7 +1066,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         CastedValue =
             emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
       } else {
-        CastedValue = SILUndef::get(TargetLoweredType, *F);
+        CastedValue = SILUndef::get(F, TargetLoweredType);
       }
       if (!CastedValue)
         CastedValue =
@@ -1203,7 +1204,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,
-        // The cast is now from the the MetatypeInst, so get the source formal
+        // The cast is now from the MetatypeInst, so get the source formal
         // type from it.
         mi->getType().getASTType(),
         dynamicCast.getTargetLoweredType(),
@@ -1470,6 +1471,10 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // valid conformance will be returned.
     auto Conformance = SM->checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
+      return false;
+
+    auto layout = TargetType->getExistentialLayout();
+    if (layout.getProtocols().size() != 1)
       return false;
 
     SILBuilderWithScope B(Inst);

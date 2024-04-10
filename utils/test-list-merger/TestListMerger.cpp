@@ -108,7 +108,7 @@ static std::ostream &operator<<(std::ostream &str, llvm::ArrayRef<T> list) {
 
 template <class T>
 static std::ostream &operator<<(std::ostream &str, const std::vector<T> &list) {
-  return (str << llvm::makeArrayRef(list));
+  return (str << llvm::ArrayRef(list));
 }
 
 static void runInsertAndMergeTest(llvm::ArrayRef<Instruction> values) {

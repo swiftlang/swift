@@ -270,7 +270,9 @@ class PluginDiagnosticsEngine {
     case .note: bridgedSeverity = .note
     case .warning: bridgedSeverity = .warning
     case .remark: bridgedSeverity = .remark
+#if RESILIENT_SWIFT_SYNTAX
     @unknown default: bridgedSeverity = .error
+#endif
     }
 
     // Emit the diagnostic
@@ -345,6 +347,10 @@ class PluginDiagnosticsEngine {
 
     // Compute the resulting address.
     guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress else {
+      return nil
+    }
+    // Ensure 'offset' is within the buffer.
+    guard offset <= exportedSourceFile.pointee.buffer.count else {
       return nil
     }
     return BridgedSourceLoc(raw: bufferBaseAddress).advanced(by: offset)

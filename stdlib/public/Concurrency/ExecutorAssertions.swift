@@ -106,11 +106,12 @@ extension Actor {
       return
     }
 
+    // NOTE: This method will CRASH in new runtime versions,
+    // if it would have previously returned `false`.
+    // It will call through to SerialExecutor.checkIsolated` as a last resort.
     let expectationCheck = _taskIsCurrentExecutor(self.unownedExecutor.executor)
 
-    // TODO: offer information which executor we actually got
     precondition(expectationCheck,
-        // TODO: figure out a way to get the typed repr out of the unowned executor
         "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
         file: file, line: line)
   }
@@ -247,8 +248,6 @@ extension Actor {
     }
 
     guard _taskIsCurrentExecutor(self.unownedExecutor.executor) else {
-      // TODO: offer information which executor we actually got
-      // TODO: figure out a way to get the typed repr out of the unowned executor
       let msg = "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())"
       /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
       assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
@@ -343,12 +342,10 @@ extension Actor {
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.1, *)
-  #if !$Embedded
-  @backDeployed(before: SwiftStdlib 5.9)
-  #endif
+  @_alwaysEmitIntoClient
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
   @_unavailableInEmbedded
-  public nonisolated func assumeIsolated<T>(
+  public nonisolated func assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) rethrows -> T {
@@ -363,12 +360,27 @@ extension Actor {
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 
+    #if $TypedThrows
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
       let rawFn = unsafeBitCast(fn, to: NoActor.self)
       return try rawFn(self)
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @usableFromInline
+  @_unavailableInEmbedded
+  @_silgen_name("$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKlF")
+  internal nonisolated func __abi__assumeIsolated<T : Sendable>(
+      _ operation: (isolated Self) throws -> T,
+      _ file: StaticString, _ line: UInt
+  ) rethrows -> T {
+    try assumeIsolated(operation, file: file, line: line)
   }
 }
 

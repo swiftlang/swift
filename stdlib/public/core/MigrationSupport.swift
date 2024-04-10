@@ -623,6 +623,9 @@ public enum _PlaygroundQuickLook {
   case _raw([UInt8], String)
 }
 
+@available(*, unavailable)
+extension _PlaygroundQuickLook: Sendable {}
+
 #if SWIFT_ENABLE_REFLECTION
 extension _PlaygroundQuickLook {
   /// Creates a new Quick Look for the given instance.

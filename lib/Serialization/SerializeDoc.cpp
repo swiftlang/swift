@@ -184,7 +184,7 @@ public:
     for (auto It = Map.begin(); It != Map.end(); ++ It) {
       ViewBuffer.push_back(It->first);
     }
-    return llvm::makeArrayRef(ViewBuffer);
+    return llvm::ArrayRef(ViewBuffer);
   }
 
   bool isEnable() {
@@ -433,7 +433,7 @@ static void writeDeclCommentTable(
   SmallVector<const FileUnit *, 1> Scratch;
   if (SF) {
     Scratch.push_back(SF);
-    files = llvm::makeArrayRef(Scratch);
+    files = llvm::ArrayRef(Scratch);
   } else {
     files = M->getFiles();
   }
@@ -721,8 +721,8 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::raw_svector_ostream Out(Buffer);
     endian::Writer Writer(Out, little);
     Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
-    Writer.write<uint32_t>(DocWriter.getDocRangesOffset(
-        D, llvm::makeArrayRef(RawLocs->DocRanges)));
+    Writer.write<uint32_t>(
+        DocWriter.getDocRangesOffset(D, llvm::ArrayRef(RawLocs->DocRanges)));
     writeRawLoc(RawLocs->Loc, Writer, FWriter);
     writeRawLoc(RawLocs->StartLoc, Writer, FWriter);
     writeRawLoc(RawLocs->EndLoc, Writer, FWriter);

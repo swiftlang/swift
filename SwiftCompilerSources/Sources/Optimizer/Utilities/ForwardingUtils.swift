@@ -18,6 +18,14 @@
 
 import SIL
 
+private let verbose = false
+
+private func log(_ message: @autoclosure () -> String) {
+  if verbose {
+    print("### \(message())")
+  }
+}
+
 /// Return true if any use in `value`s forward-extend lifetime has
 /// .pointerEscape operand ownership.
 ///
@@ -325,6 +333,80 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
   mutating func deadValue(_ value: Value, using operand: Operand?)
   -> WalkResult {
     return visitor(.deadValue(value, operand))
+  }
+}
+
+/// Walk all uses of partial_apply [on_stack] that may propagate the closure context. Gather each FullApplySite that
+/// either invokes this closure as its callee, or passes the closure as an argument to another function.
+///
+/// Start walk:
+///   walkDown(closure:)
+///
+/// This is a subset of the functionality in LifetimeDependenceDefUseWalker, but significantly simpler. This avoids
+/// traversing lifetime dependencies that do not propagate context. For example, a mark_dependence on a closure extends
+/// its lifetime but cannot introduce any new uses of the closure context.
+struct NonEscapingClosureDefUseWalker {
+  let context: Context
+  var visitedValues: ValueSet
+  var applyOperandStack: Stack<Operand>
+
+  /// `visitor` takes an operand whose instruction is always a FullApplySite.
+  init(_ context: Context) {
+    self.context = context
+    self.visitedValues = ValueSet(context)
+    self.applyOperandStack = Stack(context)
+  }
+
+  mutating func deinitialize() {
+    visitedValues.deinitialize()
+    applyOperandStack.deinitialize()
+  }
+
+  mutating func walkDown(closure: PartialApplyInst) -> WalkResult {
+    assert(!closure.mayEscape)
+    return walkDownUses(of: closure, using: nil)
+  }
+
+  mutating func closureContextLeafUse(of operand: Operand) -> WalkResult {
+    switch operand.instruction {
+    case is FullApplySite:
+      applyOperandStack.push(operand)
+      return .continueWalk
+    case is MarkDependenceInst, is FixLifetimeInst, is DestroyValueInst:
+      return .continueWalk
+    default:
+      if operand.instruction.isIncidentalUse {
+        return .continueWalk
+      }
+      log(">>> Unexpected closure use \(operand)")
+      // Escaping or unexpected closure use. Expected escaping uses include ReturnInst with a lifetime-dependent result.
+      //
+      // TODO: Check in the SIL verifier that all uses are expected.
+      return .abortWalk
+    }
+  }
+}
+
+extension NonEscapingClosureDefUseWalker: ForwardingDefUseWalker {
+  mutating func needWalk(for value: Value) -> Bool {
+    visitedValues.insert(value)
+  }
+
+  mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
+    // Nonescaping closures may be moved, copied, or borrowed.
+    switch operand.instruction {
+    case let transition as OwnershipTransitionInstruction:
+      return walkDownUses(of: transition.ownershipResult, using: operand)
+    case let convert as ConvertEscapeToNoEscapeInst:
+      return walkDownUses(of: convert, using: operand)
+    default:
+      // Otherwise, assume the use cannot propagate the closure context.
+      return closureContextLeafUse(of: operand)
+    }
+  }
+
+  mutating func deadValue(_ value: Value, using operand: Operand?) -> WalkResult {
+    return .continueWalk
   }
 }
 

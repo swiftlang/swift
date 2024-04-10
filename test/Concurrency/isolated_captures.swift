@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -verify -disable-availability-checking -strict-concurrency=complete -verify-additional-prefix complete- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -verify -disable-availability-checking -strict-concurrency=complete -verify-additional-prefix region-isolation- -emit-sil -o /dev/null %s -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -verify -disable-availability-checking -strict-concurrency=complete -verify-additional-prefix complete- -emit-sil -o /dev/null %s -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -verify -disable-availability-checking -strict-concurrency=complete -verify-additional-prefix region-isolation- -emit-sil -o /dev/null %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -39,9 +39,10 @@ class NotSendable {
   let ns = NotSendable(x: 0)
   MyActor.ns = ns
 
-  // expected-region-isolation-warning@+1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller; this is an error in Swift 6}}
   await { @YourActor in
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in Swift 6}}
+    // expected-region-isolation-warning @+3 {{transferring 'ns' may cause a data race}}
+    // expected-region-isolation-note @+2 {{global actor 'MyActor'-isolated 'ns' is captured by a global actor 'YourActor'-isolated closure. global actor 'YourActor'-isolated uses in closure may race against later global actor 'MyActor'-isolated uses}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 
@@ -60,9 +61,10 @@ class NotSendable {
   let ns = NotSendable(x: 0)
   ns.stash()
 
-  // FIXME: Region isolation should diagnose this (https://github.com/apple/swift/issues/71533)
   await { @YourActor in
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in Swift 6}}
+    // expected-region-isolation-warning @+3 {{transferring 'ns' may cause a data race}}
+    // expected-region-isolation-note @+2 {{global actor 'MyActor'-isolated 'ns' is captured by a global actor 'YourActor'-isolated closure. global actor 'YourActor'-isolated uses in closure may race against later global actor 'MyActor'-isolated uses}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 
@@ -80,9 +82,10 @@ class NotSendable {
 @MyActor func exhibitRace3() async {
   let ns = NotSendable()
 
-  // FIXME: Region isolation should diagnose this (https://github.com/apple/swift/issues/71533)
   await { @YourActor in
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in Swift 6}}
+    // expected-region-isolation-warning @+3 {{transferring 'ns' may cause a data race}}
+    // expected-region-isolation-note @+2 {{global actor 'MyActor'-isolated 'ns' is captured by a global actor 'YourActor'-isolated closure. global actor 'YourActor'-isolated uses in closure may race against later global actor 'MyActor'-isolated uses}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 

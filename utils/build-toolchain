@@ -35,6 +35,9 @@ function usage() {
   echo "--preset-prefix"
   echo "Customize the preset invoked by prepending a prefix"
   echo ""
+  echo "--macos-only"
+  echo "On Darwin, only build for macOS instead of for all platforms"
+  echo ""
   echo "--use-os-runtime"
   echo "Require this toolchain to link against the OS runtime rather than the toolchains packaged runtime"
   echo ""
@@ -52,6 +55,7 @@ PRESET_FILE_FLAGS=
 PRESET_PREFIX=
 NO_TEST=",no_test"
 USE_OS_RUNTIME=
+MACOS_ONLY=
 
 case $(uname -s) in
   Darwin)
@@ -94,6 +98,9 @@ while [ $# -ne 0 ]; do
   ;;
     --use-os-runtime)
       USE_OS_RUNTIME=",use_os_runtime"
+  ;;
+    --macos-only)
+      MACOS_ONLY=",macos_only"
   ;;
   -h|--help)
     usage
@@ -145,7 +152,7 @@ SCCACHE_FLAG="${SCCACHE_FLAG}"
 
 ./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} ${PRESET_FILE_FLAGS} \
         ${SCCACHE_FLAG} \
-        --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}${NO_TEST}${USE_OS_RUNTIME}" \
+        --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}${NO_TEST}${USE_OS_RUNTIME}${MACOS_ONLY}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \

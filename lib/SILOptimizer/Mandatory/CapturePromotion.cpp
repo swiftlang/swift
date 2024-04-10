@@ -46,6 +46,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILCloner.h"
@@ -404,7 +405,8 @@ computeNewArgInterfaceTypes(SILFunction *f, IndicesSet &promotableIndices,
       convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
                                         : ParameterConvention::Direct_Owned;
     }
-    outTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(), convention));
+    outTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(), convention,
+                                      param.getOptions()));
   }
 }
 
@@ -1208,16 +1210,16 @@ static bool findEscapeOrMutationUses(Operand *op,
   }
 
   // A mark_dependence user on a partial_apply is safe.
-  if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
-    if (mdi->getBase() == op->get()) {
-      auto parent = mdi->getValue();
-      while ((mdi = dyn_cast<MarkDependenceInst>(parent))) {
-        parent = mdi->getValue();
+  if (auto *userMDI = dyn_cast<MarkDependenceInst>(user)) {
+    if (userMDI->getBase() == op->get()) {
+      auto parent = userMDI->getValue();
+      while (auto *parentMDI = dyn_cast<MarkDependenceInst>(parent)) {
+        parent = parentMDI->getValue();
       }
       if (isa<PartialApplyInst>(parent))
         return false;
       state.accumulatedEscapes.push_back(
-          &mdi->getOperandRef(MarkDependenceInst::Value));
+          &userMDI->getOperandRef(MarkDependenceInst::Value));
       return true;
     }
   }
@@ -1472,6 +1474,10 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   SILFunction *clonedFn = ClosureCloner::constructClonedFunction(
       funcBuilder, pai, fri, promotableIndices, f->getResilienceExpansion());
   worklist.push_back(clonedFn);
+
+  // Mark the original partial apply function as deletable if it doesn't have
+  // uses later.
+  fri->getReferencedFunction()->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.

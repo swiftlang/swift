@@ -404,7 +404,7 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
 
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
-  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+  assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
          "already have a contextual type");
   assert((env || !type->hasTypeParameter()) &&
          "no generic environment provided for type with type parameters");

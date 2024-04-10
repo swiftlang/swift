@@ -21,6 +21,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -100,6 +101,17 @@ protected:
     return StringRef(Storage.data(), Storage.size());
   }
 
+  void print(llvm::raw_ostream &os) const {
+    os << getBufferStr() << '\n';
+  }
+
+public:
+  /// Dump the current stored state in the Mangler. Only for use in the debugger!
+  SWIFT_DEBUG_DUMPER(dumpBufferStr()) {
+    print(llvm::dbgs());
+  }
+
+protected:
   /// Removes the last characters of the buffer by setting it's size to a
   /// smaller value.
   void resetBuffer(size_t toPos) {
@@ -107,7 +119,6 @@ protected:
     Storage.resize(toPos);
   }
 
-protected:
   Mangler() : Buffer(Storage) { }
 
   /// Begins a new mangling but does not add the mangling prefix.

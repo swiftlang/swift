@@ -112,26 +112,15 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
 }
 
 void SILGenModule::emitDistributedThunkForDecl(
-    llvm::PointerUnion<AbstractFunctionDecl *, VarDecl *> varOrAFD) {
-  FuncDecl *thunkDecl =
-      varOrAFD.is<AbstractFunctionDecl *>()
-          ? varOrAFD.get<AbstractFunctionDecl *>()->getDistributedThunk()
-          : varOrAFD.get<VarDecl *>()->getDistributedThunk();
-  if (!thunkDecl)
-    return;
+    AbstractFunctionDecl *afd) {
+  FuncDecl *thunkDecl = afd->getDistributedThunk();
 
-  if (thunkDecl->isBodySkipped())
+  if (!thunkDecl || !thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;
 
   auto thunk = SILDeclRef(thunkDecl).asDistributed();
   emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
                          getFunction(thunk, ForDefinition));
-}
-
-void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
-  // Thunks are always emitted by need, so don't need delayed emission.
-  assert(thunk.isDistributedThunk() && "distributed thunks only");
-  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
 void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {
@@ -196,7 +185,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
       isa<BuiltinUnit>(constant.getDecl()->getDeclContext())) {
     SGM.diagnose(loc.getSourceLoc(), diag::not_implemented,
                  "delayed application of builtin");
-    return SILUndef::get(constantInfo.getSILType(), F);
+    return SILUndef::get(&F, constantInfo.getSILType());
   }
   
   // If the constant is a thunk we haven't emitted yet, emit it.
@@ -224,7 +213,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                    existingType, constantFnTypeInContext);
       SGM.diagnose(f->getLocation().getSourceLoc(),
                    diag::function_declared_here);
-      return SILUndef::get(constantInfo.getSILType(), F);
+      return SILUndef::get(&F, constantInfo.getSILType());
     };
 
     // If we have a distributed thunk, see if we only differ by isolation.
@@ -604,8 +593,8 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       }
     }
 
-    SGF.B.createReturn(loc,
-                       SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F));
+    SGF.B.createReturn(
+        loc, SILUndef::get(&SGF.F, SGF.SGM.Types.getEmptyTupleType()));
   }
   
   return F;

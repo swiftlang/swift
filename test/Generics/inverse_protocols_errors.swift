@@ -3,8 +3,8 @@
 
 
 protocol RegularProto {}
-protocol NCProto: RegularProto
-  where Self: ~Copyable { // expected-error{{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
+protocol NCProto: RegularProto // expected-error{{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
+  where Self: ~Copyable {
   func checkIfCopyableSelf(_ s: Self)
 }
 

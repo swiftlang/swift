@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature GroupActorErrors
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature GroupActorErrors  -strict-concurrency=complete
 // REQUIRES: concurrency
 
 @MainActor
@@ -7,22 +7,52 @@ protocol P {
   nonisolated func g()
 }
 
-struct S_P: P {
+@preconcurrency @MainActor
+protocol Q {
+  func f()
+  nonisolated func g()
+}
+
+struct S: P {
   func f() { }
   func g() { }
 }
 
-// expected-error@+2{{calls to '@MainActor'-isolated' code in global function 'testP(x:p:)'}}
-// expected-note@+1{{add '@MainActor' to make global function 'testP(x:p:)' part of global actor 'MainActor'}}
-func testP(x: S_P, p: P) {
+@preconcurrency
+struct NonConcurrentS: Q {
+  func f() { }
+  func g() { }
+}
+
+// expected-note@+1{{add '@MainActor' to make global function 'testP(s:p:)' part of global actor 'MainActor'}}
+func testP(s: S, p: P) { // expected-error {{calls to '@MainActor'-isolated' code in global function 'testP(s:p:)'}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p.g() // OKAY
-  x.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
-  x.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
-  x.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
-  x.g() // OKAY
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.g() // OKAY
+}
+// expected-note @+1{{add '@MainActor' to make global function 'testPreconcurrency(ncs:s:)' part of global actor 'MainActor'}}
+func testPreconcurrency(ncs: NonConcurrentS, s:S ) { // expected-error {{calls to '@MainActor'-isolated' code in global function 'testPreconcurrency(ncs:s:)'}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.g() // OKAY
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.g() // OKAY
+}
+
+// expected-note @+1{{add '@MainActor' to make global function 'testOnlyPreconcurrency(ncs:)' part of global actor 'MainActor'}}
+func testOnlyPreconcurrency(ncs: NonConcurrentS) { // expected-warning {{calls to '@MainActor'-isolated' code in global function 'testOnlyPreconcurrency(ncs:)'}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.g() // OKAY
 }
 
 actor SomeActor { }
@@ -46,7 +76,7 @@ struct WrapperOnActor<Wrapped: Sendable> {
   }
 
   @SomeGlobalActor var projectedValue: Wrapped {
-    get {  }
+    get { }
     set { }
   }
 }
@@ -75,9 +105,32 @@ struct HasWrapperOnActor {
   @MainActor
   func testMA(){ }
 
-  // expected-error@+2{{calls to '@MainActor'-isolated' code in instance method 'testErrors()'}}
   // expected-note@+1{{add '@MainActor' to make instance method 'testErrors()' part of global actor 'MainActor'}}
-  func testErrors() {
+  func testErrors() {  // expected-error{{calls to '@MainActor'-isolated' code in instance method 'testErrors()'}}
     testMA() // expected-error{{call to main actor-isolated instance method 'testMA()' in a synchronous nonisolated context}}
   }
+}
+
+@preconcurrency @MainActor
+class MainActorPreconcurrency {}
+
+class InferMainActorPreconcurrency: MainActorPreconcurrency {
+  static func predatesConcurrency() {}
+  func predatesConcurrency (s: String) -> String { return s }
+  func predatesConcurrency (n: Int) -> Int  { return n }
+}
+
+nonisolated func testPreconcurrency() {
+  InferMainActorPreconcurrency.predatesConcurrency()
+  // expected-warning@-1 {{call to main actor-isolated static method 'predatesConcurrency()' in a synchronous nonisolated context}}
+}
+
+func testPreconcurrencyGrouped() {  // expected-warning {{calls to '@MainActor'-isolated' code in global function 'testPreconcurrencyGrouped()'}}
+  // expected-note@-1 {{add '@MainActor' to make global function 'testPreconcurrencyGrouped()' part of global actor 'MainActor'}}
+  InferMainActorPreconcurrency.predatesConcurrency()
+  // expected-note@-1 {{call to main actor-isolated static method 'predatesConcurrency()' in a synchronous nonisolated context}}
+  let _ = InferMainActorPreconcurrency().predatesConcurrency(s:"swift 6")
+  // expected-note@-1 {{call to main actor-isolated instance method 'predatesConcurrency(s:)' in a synchronous nonisolated context}}
+  let _ = InferMainActorPreconcurrency().predatesConcurrency(n:4)
+  // expected-note@-1 {{call to main actor-isolated instance method 'predatesConcurrency(n:)' in a synchronous nonisolated context}}
 }

@@ -29,6 +29,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
@@ -191,7 +192,7 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
 }
 
 static llvm::Error resolveExplicitModuleInputs(
-    ModuleDependencyID moduleID, const ModuleDependencyInfo &resolvingDepInfo,
+    ModuleDependencyID moduleID,
     const std::set<ModuleDependencyID> &dependencies,
     ModuleDependenciesCache &cache, CompilerInstance &instance,
     std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps) {
@@ -199,6 +200,7 @@ static llvm::Error resolveExplicitModuleInputs(
   if (moduleID.Kind == ModuleDependencyKind::SwiftPlaceholder)
     return llvm::Error::success();
 
+  auto &resolvingDepInfo = cache.findKnownDependency(moduleID);
   // If the dependency is already finalized, nothing needs to be done.
   if (resolvingDepInfo.isFinalized())
     return llvm::Error::success();
@@ -206,13 +208,11 @@ static llvm::Error resolveExplicitModuleInputs(
   auto &service = cache.getScanService();
   auto remapPath = [&](StringRef path) { return service.remapPath(path); };
   std::vector<std::string> rootIDs;
-  if (auto ID = resolvingDepInfo.getCASFSRootID())
-    rootIDs.push_back(*ID);
-
   std::vector<std::string> includeTrees;
   if (auto ID = resolvingDepInfo.getClangIncludeTree())
     includeTrees.push_back(*ID);
 
+  auto tracker = cache.getScanService().createSwiftDependencyTracker();
   auto addBridgingHeaderDeps =
       [&](const ModuleDependencyInfo &depInfo) -> llvm::Error {
     auto sourceDepDetails = depInfo.getAsSwiftSourceModule();
@@ -222,8 +222,7 @@ static llvm::Error resolveExplicitModuleInputs(
     if (sourceDepDetails->textualModuleDetails
             .CASBridgingHeaderIncludeTreeRootID.empty()) {
       if (!sourceDepDetails->textualModuleDetails.bridgingSourceFiles.empty()) {
-        if (auto tracker =
-                cache.getScanService().createSwiftDependencyTracker()) {
+        if (tracker) {
           tracker->startTracking();
           for (auto &file :
                sourceDepDetails->textualModuleDetails.bridgingSourceFiles)
@@ -244,13 +243,10 @@ static llvm::Error resolveExplicitModuleInputs(
 
   std::vector<std::string> commandLine = resolvingDepInfo.getCommandline();
   for (const auto &depModuleID : dependencies) {
-    const auto optionalDepInfo =
-        cache.findDependency(depModuleID);
-    assert(optionalDepInfo.has_value());
-    const auto depInfo = optionalDepInfo.value();
+    const auto &depInfo = cache.findKnownDependency(depModuleID);
     switch (depModuleID.Kind) {
     case swift::ModuleDependencyKind::SwiftInterface: {
-      auto interfaceDepDetails = depInfo->getAsSwiftInterfaceModule();
+      auto interfaceDepDetails = depInfo.getAsSwiftInterfaceModule();
       assert(interfaceDepDetails && "Expected Swift Interface dependency.");
       auto &path = interfaceDepDetails->moduleCacheKey.empty()
                        ? interfaceDepDetails->moduleOutputPath
@@ -259,66 +255,58 @@ static llvm::Error resolveExplicitModuleInputs(
                             path);
     } break;
     case swift::ModuleDependencyKind::SwiftBinary: {
-      auto binaryDepDetails = depInfo->getAsSwiftBinaryModule();
+      auto binaryDepDetails = depInfo.getAsSwiftBinaryModule();
       assert(binaryDepDetails && "Expected Swift Binary Module dependency.");
       auto &path = binaryDepDetails->moduleCacheKey.empty()
                        ? binaryDepDetails->compiledModulePath
                        : binaryDepDetails->moduleCacheKey;
       commandLine.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
                             path);
-      for (const auto &headerDep : binaryDepDetails->preCompiledBridgingHeaderPaths) {
-        commandLine.push_back("-Xcc");
-        commandLine.push_back("-include-pch");
-        commandLine.push_back("-Xcc");
-        commandLine.push_back(remapPath(headerDep));
+      // If this binary module was built with a header, the header's module
+      // dependencies must also specify a .modulemap to the compilation, in
+      // order to resolve the header's own header include directives.
+      for (const auto &bridgingHeaderDepName :
+           binaryDepDetails->headerModuleDependencies) {
+        auto optionalBridgingHeaderDepModuleInfo = cache.findKnownDependency(
+            {bridgingHeaderDepName, ModuleDependencyKind::Clang});
+        const auto bridgingHeaderDepModuleDetails =
+            optionalBridgingHeaderDepModuleInfo.getAsClangModule();
+        commandLine.push_back(
+            "-fmodule-map-file=" +
+            remapPath(bridgingHeaderDepModuleDetails->moduleMapFile));
       }
     } break;
     case swift::ModuleDependencyKind::SwiftPlaceholder: {
-      auto placeholderDetails = depInfo->getAsPlaceholderDependencyModule();
+      auto placeholderDetails = depInfo.getAsPlaceholderDependencyModule();
       assert(placeholderDetails && "Expected Swift Placeholder dependency.");
       commandLine.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
                             placeholderDetails->compiledModulePath);
     } break;
     case swift::ModuleDependencyKind::Clang: {
-      auto clangDepDetails = depInfo->getAsClangModule();
+      auto clangDepDetails = depInfo.getAsClangModule();
       assert(clangDepDetails && "Expected Clang Module dependency.");
       if (!resolvingDepInfo.isClangModule()) {
         commandLine.push_back("-Xcc");
         commandLine.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
-                              remapPath(clangDepDetails->pcmOutputPath));
-        if (!instance.getInvocation()
-                 .getClangImporterOptions()
-                 .UseClangIncludeTree) {
-          commandLine.push_back("-Xcc");
-          commandLine.push_back("-fmodule-map-file=" +
-                                remapPath(clangDepDetails->moduleMapFile));
-        }
+                              clangDepDetails->mappedPCMPath);
       }
       if (!clangDepDetails->moduleCacheKey.empty()) {
-        auto appendXclang = [&]() {
-          if (!resolvingDepInfo.isClangModule()) {
-            // clang module build using cc1 arg so this is not needed.
-            commandLine.push_back("-Xcc");
-            commandLine.push_back("-Xclang");
-          }
-          commandLine.push_back("-Xcc");
-        };
-        appendXclang();
+        commandLine.push_back("-Xcc");
         commandLine.push_back("-fmodule-file-cache-key");
-        appendXclang();
-        commandLine.push_back(remapPath(clangDepDetails->pcmOutputPath));
-        appendXclang();
+        commandLine.push_back("-Xcc");
+        commandLine.push_back(clangDepDetails->mappedPCMPath);
+        commandLine.push_back("-Xcc");
         commandLine.push_back(clangDepDetails->moduleCacheKey);
       }
 
       // Only need to merge the CASFS from clang importer.
-      if (auto ID = depInfo->getCASFSRootID())
+      if (auto ID = depInfo.getCASFSRootID())
         rootIDs.push_back(*ID);
-      if (auto ID = depInfo->getClangIncludeTree())
+      if (auto ID = depInfo.getClangIncludeTree())
         includeTrees.push_back(*ID);
     } break;
     case swift::ModuleDependencyKind::SwiftSource: {
-      if (auto E = addBridgingHeaderDeps(*depInfo))
+      if (auto E = addBridgingHeaderDeps(depInfo))
         return E;
       break;
     }
@@ -342,6 +330,41 @@ static llvm::Error resolveExplicitModuleInputs(
     auto &CASFS = cache.getScanService().getSharedCachingFS();
     auto &CAS = CASFS.getCAS();
 
+    assert(tracker && "no caching tracker is available");
+    // Compute the CASFS root ID for the resolving dependency.
+    if (auto *sourceDep = resolvingDepInfo.getAsSwiftSourceModule()) {
+      tracker->startTracking();
+      tracker->addCommonSearchPathDeps(
+          instance.getInvocation().getSearchPathOptions());
+      llvm::for_each(
+          sourceDep->sourceFiles,
+          [&tracker](const std::string &file) { tracker->trackFile(file); });
+      llvm::for_each(
+          sourceDep->auxiliaryFiles,
+          [&tracker](const std::string &file) { tracker->trackFile(file); });
+      auto root = tracker->createTreeFromDependencies();
+      if (!root)
+        return root.takeError();
+      auto rootID = root->getID().toString();
+      dependencyInfoCopy.updateCASFileSystemRootID(rootID);
+      rootIDs.push_back(rootID);
+    } else if (auto *textualDep =
+                   resolvingDepInfo.getAsSwiftInterfaceModule()) {
+      tracker->startTracking();
+      tracker->addCommonSearchPathDeps(
+          instance.getInvocation().getSearchPathOptions());
+      tracker->trackFile(textualDep->swiftInterfaceFile);
+      llvm::for_each(
+          textualDep->auxiliaryFiles,
+          [&tracker](const std::string &file) { tracker->trackFile(file); });
+      auto root = tracker->createTreeFromDependencies();
+      if (!root)
+        return root.takeError();
+      auto rootID = root->getID().toString();
+      dependencyInfoCopy.updateCASFileSystemRootID(rootID);
+      rootIDs.push_back(rootID);
+    }
+
     // Update build command line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
         resolvingDepInfo.isSwiftSourceModule()) {
@@ -364,15 +387,14 @@ static llvm::Error resolveExplicitModuleInputs(
       std::vector<std::string> newCommandLine =
           dependencyInfoCopy.getBridgingHeaderCommandline();
       for (auto bridgingDep : *bridgingHeaderDeps) {
-        auto dep = cache.findDependency(bridgingDep);
-        assert(dep && "unknown clang dependency");
-        auto *clangDep = (*dep)->getAsClangModule();
+        auto &dep = cache.findKnownDependency(bridgingDep);
+        auto *clangDep = dep.getAsClangModule();
         assert(clangDep && "wrong module dependency kind");
         if (!clangDep->moduleCacheKey.empty()) {
           newCommandLine.push_back("-Xcc");
           newCommandLine.push_back("-fmodule-file-cache-key");
           newCommandLine.push_back("-Xcc");
-          newCommandLine.push_back(remapPath(clangDep->pcmOutputPath));
+          newCommandLine.push_back(clangDep->mappedPCMPath);
           newCommandLine.push_back("-Xcc");
           newCommandLine.push_back(clangDep->moduleCacheKey);
         }
@@ -380,19 +402,11 @@ static llvm::Error resolveExplicitModuleInputs(
       dependencyInfoCopy.updateBridgingHeaderCommandLine(newCommandLine);
     }
 
-    if (resolvingDepInfo.isClangModule() ||
-        resolvingDepInfo.isSwiftInterfaceModule()) {
-      // Compute and update module cache key.
-      auto Key = updateModuleCacheKey(dependencyInfoCopy, cache, CAS);
-      if (!Key)
-        return Key.takeError();
-    }
-
-    // For binary module, we need to make sure the lookup key is setup here in
-    // action cache. We just use the CASID of the binary module itself as key.
-    if (auto *binaryDep = dependencyInfoCopy.getAsSwiftBinaryModule()) {
-      auto Ref =
-          CASFS.getObjectRefForFileContent(binaryDep->compiledModulePath);
+    // Compute and update module cache key.
+    auto setupBinaryCacheKey = [&](StringRef path) -> llvm::Error {
+      // For binary module, we need to make sure the lookup key is setup here in
+      // action cache. We just use the CASID of the binary module itself as key.
+      auto Ref = CASFS.getObjectRefForFileContent(path);
       if (!Ref)
         return llvm::errorCodeToError(Ref.getError());
       assert(*Ref && "Binary module should be loaded into CASFS already");
@@ -406,18 +420,36 @@ static llvm::Error resolveExplicitModuleInputs(
       if (auto E = instance.getActionCache().put(CAS.getID(**Ref),
                                                  CAS.getID(*Result)))
         return E;
+      return llvm::Error::success();
+    };
+
+    if (resolvingDepInfo.isClangModule() ||
+        resolvingDepInfo.isSwiftInterfaceModule()) {
+      auto Key = updateModuleCacheKey(dependencyInfoCopy, cache, CAS);
+      if (!Key)
+        return Key.takeError();
+    } else if (auto *binaryDep = dependencyInfoCopy.getAsSwiftBinaryModule()) {
+      if (auto E = setupBinaryCacheKey(binaryDep->compiledModulePath))
+        return E;
     }
   }
+
   dependencyInfoCopy.setIsFinalized(true);
   cache.updateDependency(moduleID, dependencyInfoCopy);
 
   return llvm::Error::success();
 }
 
-static llvm::Error pruneUnusedVFSOverlays(
-    ModuleDependencyID moduleID, const ModuleDependencyInfo &resolvingDepInfo,
-    const std::set<ModuleDependencyID> &dependencies,
-    ModuleDependenciesCache &cache, CompilerInstance &instance) {
+static llvm::Error
+pruneUnusedVFSOverlays(ModuleDependencyID moduleID,
+                       const std::set<ModuleDependencyID> &dependencies,
+                       ModuleDependenciesCache &cache,
+                       CompilerInstance &instance) {
+  // Pruning of unused VFS overlay options for Clang dependencies
+  // is performed by the Clang dependency scanner.
+  if (moduleID.Kind == ModuleDependencyKind::Clang)
+    return llvm::Error::success();
+
   auto isVFSOverlayFlag = [](StringRef arg) {
     return arg == "-ivfsoverlay" || arg == "-vfsoverlay";
   };
@@ -425,11 +457,7 @@ static llvm::Error pruneUnusedVFSOverlays(
     return arg == "-Xcc";
   };
 
-  // Pruning of unused VFS overlay options for Clang dependencies
-  // is performed by the Clang dependency scanner.
-  if (!resolvingDepInfo.isSwiftModule())
-    return llvm::Error::success();
-
+  auto &resolvingDepInfo = cache.findKnownDependency(moduleID);
   // If this Swift dependency contains any VFS overlay paths,
   // then attempt to prune the ones not used by any of the Clang dependencies.
   if (!llvm::any_of(resolvingDepInfo.getCommandline(),
@@ -443,10 +471,8 @@ static llvm::Error pruneUnusedVFSOverlays(
   // pruned by the Clang dependency scanner.
   llvm::StringSet<> usedVFSOverlayPaths;
   for (const auto &depModuleID : dependencies) {
-    const auto optionalDepInfo = cache.findDependency(depModuleID);
-    assert(optionalDepInfo.has_value());
-    const auto depInfo = optionalDepInfo.value();
-    if (auto clangDepDetails = depInfo->getAsClangModule()) {
+    const auto &depInfo = cache.findKnownDependency(depModuleID);
+    if (auto clangDepDetails = depInfo.getAsClangModule()) {
       const auto &depCommandLine = clangDepDetails->buildCommandLine;
       // true if the previous argument was the dash-option of an option pair
       bool getNext = false;
@@ -623,7 +649,7 @@ void writeJSONValue(llvm::raw_ostream &out, ArrayRef<T> values,
 template <typename T>
 void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
                     unsigned indentLevel) {
-  writeJSONValue(out, llvm::makeArrayRef(values), indentLevel);
+  writeJSONValue(out, llvm::ArrayRef(values), indentLevel);
 }
 
 /// Write a single JSON field.
@@ -797,9 +823,6 @@ static void writeJSON(llvm::raw_ostream &out,
       if (!moduleInterfacePath.empty()) {
         writeJSONSingleField(out, "moduleInterfacePath", moduleInterfacePath, 5,
                              /*trailingComma=*/true);
-        writeJSONSingleField(out, "contextHash", swiftTextualDeps->context_hash,
-                             5,
-                             /*trailingComma=*/true);
         out.indent(5 * 2);
         out << "\"compiledModuleCandidates\": [\n";
         for (int i = 0,
@@ -830,6 +853,9 @@ static void writeJSON(llvm::raw_ostream &out,
       }
       out.indent(5 * 2);
       out << "],\n";
+      writeJSONSingleField(out, "contextHash", swiftTextualDeps->context_hash,
+                           5,
+                           /*trailingComma=*/true);
       bool hasBridgingHeaderPath =
           swiftTextualDeps->bridging_header_path.data &&
           get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0';
@@ -965,9 +991,21 @@ static void writeJSON(llvm::raw_ostream &out,
       }
 
       // Module Header Dependencies
-      if (swiftBinaryDeps->header_dependencies->count != 0)
-        writeJSONSingleField(out, "headerDependencies",
-                             swiftBinaryDeps->header_dependencies, 5,
+      if (swiftBinaryDeps->header_dependency.length != 0)
+        writeJSONSingleField(out, "headerDependency",
+                             swiftBinaryDeps->header_dependency, 5,
+                             /*trailingComma=*/true);
+
+      // Module Header Module Dependencies
+      if (swiftBinaryDeps->header_dependencies_module_dependnecies->count != 0)
+        writeJSONSingleField(out, "headerModuleDependencies",
+                             swiftBinaryDeps->header_dependencies_module_dependnecies, 5,
+                             /*trailingComma=*/true);
+
+      // Module Header Source Files
+      if (swiftBinaryDeps->header_dependencies_source_files->count != 0)
+        writeJSONSingleField(out, "headerDependenciesSourceFiles",
+                             swiftBinaryDeps->header_dependencies_source_files, 5,
                              /*trailingComma=*/true);
 
       if (hasOverlayDependencies) {
@@ -1070,8 +1108,42 @@ static void bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
   }
 }
 
+static swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
+    const DependencyScanDiagnosticCollector *diagnosticCollector) {
+  auto collectedDiagnostics = diagnosticCollector->getDiagnostics();
+  auto numDiagnostics = collectedDiagnostics.size();
+  swiftscan_diagnostic_set_t *diagnosticOutput = new swiftscan_diagnostic_set_t;
+  diagnosticOutput->count = numDiagnostics;
+  diagnosticOutput->diagnostics =
+      new swiftscan_diagnostic_info_t[numDiagnostics];
+  for (size_t i = 0; i < numDiagnostics; ++i) {
+    const auto &Diagnostic = collectedDiagnostics[i];
+    swiftscan_diagnostic_info_s *diagnosticInfo =
+        new swiftscan_diagnostic_info_s;
+    diagnosticInfo->message =
+        swift::c_string_utils::create_clone(Diagnostic.Message.c_str());
+    switch (Diagnostic.Severity) {
+    case llvm::SourceMgr::DK_Error:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR;
+      break;
+    case llvm::SourceMgr::DK_Warning:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING;
+      break;
+    case llvm::SourceMgr::DK_Note:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE;
+      break;
+    case llvm::SourceMgr::DK_Remark:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK;
+      break;
+    }
+    diagnosticOutput->diagnostics[i] = diagnosticInfo;
+  }
+  return diagnosticOutput;
+}
+
 static swiftscan_dependency_graph_t
 generateFullDependencyGraph(const CompilerInstance &instance,
+                            const DependencyScanDiagnosticCollector *diagnosticCollector,
                             const ModuleDependenciesCache &cache,
                             const ArrayRef<ModuleDependencyID> allModules) {
   if (allModules.empty()) {
@@ -1086,24 +1158,17 @@ generateFullDependencyGraph(const CompilerInstance &instance,
 
   for (size_t i = 0; i < allModules.size(); ++i) {
     const auto &module = allModules[i];
-    // Grab the completed module dependencies.
-    auto moduleDepsQuery = cache.findDependency(module);
-    if (!moduleDepsQuery) {
-      llvm::report_fatal_error(Twine("Module Dependency Cache missing module") +
-                               module.ModuleName);
-    }
-
-    auto moduleDeps = *moduleDepsQuery;
+    auto &moduleDeps = cache.findKnownDependency(module);
     // Collect all the required pieces to build a ModuleInfo
-    auto swiftPlaceholderDeps = moduleDeps->getAsPlaceholderDependencyModule();
-    auto swiftTextualDeps = moduleDeps->getAsSwiftInterfaceModule();
-    auto swiftSourceDeps = moduleDeps->getAsSwiftSourceModule();
-    auto swiftBinaryDeps = moduleDeps->getAsSwiftBinaryModule();
-    auto clangDeps = moduleDeps->getAsClangModule();
+    auto swiftPlaceholderDeps = moduleDeps.getAsPlaceholderDependencyModule();
+    auto swiftTextualDeps = moduleDeps.getAsSwiftInterfaceModule();
+    auto swiftSourceDeps = moduleDeps.getAsSwiftSourceModule();
+    auto swiftBinaryDeps = moduleDeps.getAsSwiftBinaryModule();
+    auto clangDeps = moduleDeps.getAsClangModule();
 
     // ModulePath
     const char *modulePathSuffix =
-        moduleDeps->isSwiftModule() ? ".swiftmodule" : ".pcm";
+        moduleDeps.isSwiftModule() ? ".swiftmodule" : ".pcm";
     std::string modulePath;
     if (swiftTextualDeps)
       modulePath = swiftTextualDeps->moduleOutputPath;
@@ -1124,10 +1189,8 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       sourceFiles = clangDeps->fileDependencies;
     }
 
-    auto optionalDepInfo = cache.findDependency(module);
-    assert(optionalDepInfo.has_value() && "Missing dependency info during graph generation diagnosis.");
-    auto depInfo = optionalDepInfo.value();
-    auto directDependencies = depInfo->getDirectModuleDependencies();
+    auto &depInfo = cache.findKnownDependency(module);
+    auto directDependencies = depInfo.getDirectModuleDependencies();
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
@@ -1136,9 +1199,12 @@ generateFullDependencyGraph(const CompilerInstance &instance,
         swiftscan_string_ref_t moduleInterfacePath =
             create_clone(swiftTextualDeps->swiftInterfaceFile.c_str());
         swiftscan_string_ref_t bridgingHeaderPath =
-            swiftTextualDeps->textualModuleDetails.bridgingHeaderFile.has_value()
+            swiftTextualDeps->textualModuleDetails.bridgingHeaderFile
+                    .has_value()
                 ? create_clone(
-                      swiftTextualDeps->textualModuleDetails.bridgingHeaderFile.value().c_str())
+                      swiftTextualDeps->textualModuleDetails.bridgingHeaderFile
+                          .value()
+                          .c_str())
                 : create_null();
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
         // Create an overlay dependencies set according to the output format
@@ -1179,9 +1245,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
                             bridgedOverlayDependencyNames);
 
         details->swift_textual_details = {
-            moduleInterfacePath,
-            create_empty_set(),
-            bridgingHeaderPath,
+            moduleInterfacePath, create_empty_set(), bridgingHeaderPath,
             create_set(
                 swiftSourceDeps->textualModuleDetails.bridgingSourceFiles),
             create_set(swiftSourceDeps->textualModuleDetails
@@ -1190,7 +1254,9 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_set(swiftSourceDeps->textualModuleDetails.buildCommandLine),
             create_set(swiftSourceDeps->bridgingHeaderBuildCommandLine),
             create_set(swiftSourceDeps->textualModuleDetails.extraPCMArgs),
-            /*contextHash*/ create_null(),
+            /*contextHash*/
+            create_clone(
+                instance.getInvocation().getModuleScanningHash().c_str()),
             /*isFramework*/ false,
             /*CASFS*/
             create_clone(swiftSourceDeps->textualModuleDetails
@@ -1216,7 +1282,9 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
             create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
             create_set(bridgedOverlayDependencyNames),
-            create_set(swiftBinaryDeps->preCompiledBridgingHeaderPaths),
+            create_clone(swiftBinaryDeps->headerImport.c_str()),
+            create_set(swiftBinaryDeps->headerModuleDependencies),
+            create_set(swiftBinaryDeps->headerSourceFiles),
             swiftBinaryDeps->isFramework,
             create_clone(swiftBinaryDeps->moduleCacheKey.c_str())};
       } else {
@@ -1253,6 +1321,10 @@ generateFullDependencyGraph(const CompilerInstance &instance,
   swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
   result->main_module_name = create_clone(mainModuleName.c_str());
   result->dependencies = dependencySet;
+  result->diagnostics =
+      diagnosticCollector
+          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
+          : nullptr;
   return result;
 }
 
@@ -1336,12 +1408,12 @@ computeTransitiveClosureOfExplicitDependencies(
 }
 
 static std::set<ModuleDependencyID> computeBridgingHeaderTransitiveDependencies(
-    const ModuleDependencyInfo *dep,
+    const ModuleDependencyInfo &dep,
     const std::unordered_map<ModuleDependencyID, std::set<ModuleDependencyID>>
         &transitiveClosures,
     const ModuleDependenciesCache &cache) {
   std::set<ModuleDependencyID> result;
-  auto *sourceDep = dep->getAsSwiftSourceModule();
+  auto *sourceDep = dep.getAsSwiftSourceModule();
   if (!sourceDep)
     return result;
 
@@ -1358,7 +1430,7 @@ static std::set<ModuleDependencyID> computeBridgingHeaderTransitiveDependencies(
 
 static std::vector<ModuleDependencyID>
 findClangDepPath(const ModuleDependencyID &from, const ModuleDependencyID &to,
-                 ModuleDependenciesCache &cache) {
+                 const ModuleDependenciesCache &cache) {
   std::unordered_set<ModuleDependencyID> visited;
   std::vector<ModuleDependencyID> result;
   std::stack<ModuleDependencyID, std::vector<ModuleDependencyID>> stack;
@@ -1392,15 +1464,16 @@ findClangDepPath(const ModuleDependencyID &from, const ModuleDependencyID &to,
   return result;
 }
 
-static bool diagnoseCycle(CompilerInstance &instance,
-                          ModuleDependenciesCache &cache,
+static bool diagnoseCycle(const CompilerInstance &instance,
+                          const ModuleDependenciesCache &cache,
                           ModuleDependencyID mainId) {
   ModuleDependencyIDSetVector openSet;
   ModuleDependencyIDSetVector closeSet;
 
   auto kindIsSwiftDependency = [&](const ModuleDependencyID &ID) {
     return ID.Kind == swift::ModuleDependencyKind::SwiftInterface ||
-           ID.Kind == swift::ModuleDependencyKind::SwiftBinary;
+           ID.Kind == swift::ModuleDependencyKind::SwiftBinary ||
+           ID.Kind == swift::ModuleDependencyKind::SwiftSource;
   };
 
   auto emitModulePath = [&](const std::vector<ModuleDependencyID> path,
@@ -1410,6 +1483,9 @@ static bool diagnoseCycle(CompilerInstance &instance,
         [&buffer](const ModuleDependencyID &id) {
           buffer.append(id.ModuleName);
           switch (id.Kind) {
+          case swift::ModuleDependencyKind::SwiftSource:
+            buffer.append(" (Source Target)");
+            break;
           case swift::ModuleDependencyKind::SwiftInterface:
             buffer.append(".swiftinterface");
             break;
@@ -1429,11 +1505,12 @@ static bool diagnoseCycle(CompilerInstance &instance,
         [&buffer] { buffer.append(" -> "); });
   };
 
-  auto emitCycleDiagnostic = [&](const ModuleDependencyID &dep) {
-    auto startIt = std::find(openSet.begin(), openSet.end(), dep);
+  auto emitCycleDiagnostic = [&](const ModuleDependencyID &sourceId,
+				 const ModuleDependencyID &sinkId) {
+    auto startIt = std::find(openSet.begin(), openSet.end(), sourceId);
     assert(startIt != openSet.end());
     std::vector<ModuleDependencyID> cycleNodes(startIt, openSet.end());
-    cycleNodes.push_back(*startIt);
+    cycleNodes.push_back(sinkId);
     llvm::SmallString<64> errorBuffer;
     emitModulePath(cycleNodes, errorBuffer);
     instance.getASTContext().Diags.diagnose(
@@ -1472,13 +1549,20 @@ static bool diagnoseCycle(CompilerInstance &instance,
     auto beforeSize = openSet.size();
     assert(cache.findDependency(lastOpen).has_value() &&
            "Missing dependency info during cycle diagnosis.");
-    for (const auto &dep : cache.getAllDependencies(lastOpen)) {
-      if (closeSet.count(dep))
+    for (const auto &depId : cache.getAllDependencies(lastOpen)) {
+      if (closeSet.count(depId))
         continue;
-      if (openSet.insert(dep)) {
+      // Ensure we detect dependency of the Source target
+      // on an existing Swift module with the same name
+      if (kindIsSwiftDependency(depId) &&
+          depId.ModuleName == mainId.ModuleName && openSet.contains(mainId)) {
+        emitCycleDiagnostic(mainId, depId);
+        return true;
+      }
+      if (openSet.insert(depId)) {
         break;
       } else {
-        emitCycleDiagnostic(dep);
+        emitCycleDiagnostic(depId, depId);
         return true;
       }
     }
@@ -1657,7 +1741,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
 
   // Execute scan
   llvm::ErrorOr<swiftscan_dependency_graph_t> dependenciesOrErr =
-      performModuleScan(instance, cache);
+      performModuleScan(instance, nullptr, cache);
 
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
@@ -1693,7 +1777,7 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
       instance.getInvocation().getModuleScanningHash());
 
   // Execute import prescan, and write JSON output to the output stream
-  auto importSetOrErr = performModulePrescan(instance, cache);
+  auto importSetOrErr = performModulePrescan(instance, nullptr, cache);
   if (importSetOrErr.getError())
     return true;
   auto importSet = std::move(*importSetOrErr);
@@ -1733,7 +1817,8 @@ bool swift::dependencies::batchScanDependencies(
     return true;
 
   auto batchScanResults = performBatchModuleScan(
-      instance, cache, /*versionedPCMInstanceCache*/ nullptr, saver,
+      instance, /*DependencyScanDiagnosticCollector*/ nullptr, 
+      cache, /*versionedPCMInstanceCache*/ nullptr, saver,
       *batchInput);
 
   // Write the result JSON to the specified output path, for each entry
@@ -1780,22 +1865,19 @@ static void resolveDependencyCommandLineArguments(
     // For main module or binary modules, no command-line to resolve.
     // For Clang modules, their dependencies are resolved by the clang Scanner
     // itself for us.
-    auto optionalDeps = cache.findDependency(modID);
-    assert(optionalDeps.has_value());
-    auto deps = optionalDeps.value();
+    auto &deps = cache.findKnownDependency(modID);
     std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps;
     if (modID.Kind == ModuleDependencyKind::SwiftSource)
       bridgingHeaderDeps = computeBridgingHeaderTransitiveDependencies(
           deps, moduleTransitiveClosures, cache);
 
-    if (auto E =
-            resolveExplicitModuleInputs(modID, *deps, dependencyClosure, cache,
-                                        instance, bridgingHeaderDeps))
+    if (auto E = resolveExplicitModuleInputs(modID, dependencyClosure, cache,
+                                             instance, bridgingHeaderDeps))
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                    toString(std::move(E)));
 
-    if (auto E = pruneUnusedVFSOverlays(modID, *deps, dependencyClosure,
-                                        cache, instance))
+    if (auto E =
+            pruneUnusedVFSOverlays(modID, dependencyClosure, cache, instance))
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                    toString(std::move(E)));
   }
@@ -1837,6 +1919,7 @@ updateDependencyTracker(CompilerInstance &instance,
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 swift::dependencies::performModuleScan(CompilerInstance &instance,
+                                       DependencyScanDiagnosticCollector *diagnosticCollector,
                                        ModuleDependenciesCache &cache) {
   auto scanner = ModuleDependencyScanner(
       cache.getScanService(), instance.getInvocation(),
@@ -1846,9 +1929,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
-  auto mainModuleDepInfo = scanner.getMainModuleDependencyInfo(
-      instance.getMainModule(),
-      cache.getScanService().createSwiftDependencyTracker());
+  auto mainModuleDepInfo =
+      scanner.getMainModuleDependencyInfo(instance.getMainModule());
   auto mainModuleName = instance.getMainModule()->getNameStr();
   auto mainModuleID = ModuleDependencyID{mainModuleName.str(),
                                          ModuleDependencyKind::SwiftSource};
@@ -1882,12 +1964,13 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
                                         topologicallySortedModuleList);
 
   updateDependencyTracker(instance, cache, allModules);
-  return generateFullDependencyGraph(instance, cache,
+  return generateFullDependencyGraph(instance, diagnosticCollector, cache,
                                      topologicallySortedModuleList);
 }
 
 llvm::ErrorOr<swiftscan_import_set_t>
 swift::dependencies::performModulePrescan(CompilerInstance &instance,
+                                          DependencyScanDiagnosticCollector *diagnosticCollector,
                                           ModuleDependenciesCache &cache) {
   // Setup the scanner
   auto scanner = ModuleDependencyScanner(
@@ -1902,12 +1985,17 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance,
     return mainDependencies.getError();
   auto *importSet = new swiftscan_import_set_s;
   importSet->imports = create_set(mainDependencies->getModuleImports());
+  importSet->diagnostics =
+      diagnosticCollector
+          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
+          : nullptr;
   return importSet;
 }
 
 std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
 swift::dependencies::performBatchModuleScan(
     CompilerInstance &invocationInstance,
+    DependencyScanDiagnosticCollector *diagnosticCollector,
     ModuleDependenciesCache &invocationCache,
     CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
@@ -1918,7 +2006,8 @@ swift::dependencies::performBatchModuleScan(
   forEachBatchEntry(
       invocationInstance, invocationCache, versionedPCMInstanceCache, saver,
       batchInput,
-      [&batchScanResult](BatchScanInput entry, CompilerInstance &instance,
+      [&batchScanResult, &diagnosticCollector](BatchScanInput entry,
+                         CompilerInstance &instance,
                          ModuleDependenciesCache &cache) {
         auto scanner = ModuleDependencyScanner(
             cache.getScanService(), instance.getInvocation(),
@@ -1950,7 +2039,10 @@ swift::dependencies::performBatchModuleScan(
                                       : ModuleDependencyKind::SwiftInterface};
         auto allDependencies = scanner.getModuleDependencies(moduleID, cache);
         batchScanResult.push_back(
-            generateFullDependencyGraph(instance, cache, allDependencies));
+            generateFullDependencyGraph(instance, diagnosticCollector,
+                                        cache, allDependencies));
+        if (diagnosticCollector)
+          diagnosticCollector->reset();
       });
 
   return batchScanResult;

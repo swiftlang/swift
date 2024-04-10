@@ -513,7 +513,7 @@ struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struc
   // expected-note@+1 {{generic parameter 'T' of instance method 'bar(_:)' declared here}}
   func bar<T>(_ v: T) { foo(v) }
   // expected-error@-1 {{cannot convert value of type 'T' (generic parameter of instance method 'bar(_:)') to expected argument type 'T' (generic parameter of generic struct 'S_24329052')}}
-  // expected-warning@-2 {{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
+  // expected-warning@-2 {{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
 }
 
 extension Sequence {

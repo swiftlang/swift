@@ -139,7 +139,7 @@ let x: () = ()
 // https://github.com/apple/swift/issues/50734
 
 func f1_50734(@NSApplicationMain x: Int) {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
-func f2_50734(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@available' attribute cannot be applied to this declaration}}
+func f2_50734(@available(iOS, deprecated: 1) x: Int) {} // expected-error {{'@available' attribute cannot be applied to this declaration}}
 func f3_50734(@discardableResult x: Int) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
 func f4_50734(@objcMembers x: String) {} // expected-error {{@objcMembers may only be used on 'class' declarations}}
 func f5_50734(@weak x: String) {} // expected-error {{'weak' is a declaration modifier, not an attribute}} expected-error {{'weak' may only be used on 'var' declarations}}

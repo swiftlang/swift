@@ -1,0 +1,3 @@
+module CAssoc {
+  header "assoc.h"
+}

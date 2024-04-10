@@ -506,7 +506,7 @@ CandidateSpecificMatcher::scoreCandidateTrial(unsigned firstPatternPos) {
   if (!runs.empty() && runs[0].location == 0 && runs[0].length == patternLength) {
     trialScore *= 2.5;
     // Case sensitive exact prefix matches are the best of the best.
-    if (candidate.startswith(pattern))
+    if (candidate.starts_with(pattern))
       trialScore *= 1.2;
   }
 

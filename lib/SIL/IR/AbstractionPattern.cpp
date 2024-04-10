@@ -284,6 +284,93 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   }
 }
 
+bool AbstractionPattern::conformsToKnownProtocol(
+  CanType substTy, KnownProtocolKind protocolKind) const {
+  auto suppressible
+    = substTy->getASTContext().getProtocol(protocolKind);
+    
+  auto definitelyConforms = [&](CanType t) -> bool {
+    auto result = suppressible->getParentModule()
+      ->checkConformanceWithoutContext(t, suppressible,
+                                       /*allowMissing=*/false);
+    return result.has_value() && !result.value().isInvalid();
+  };
+    
+  // If the substituted type definitely conforms, that's authoritative.
+  if (definitelyConforms(substTy)) {
+    return true;
+  }
+
+  // If the substituted type is fully concrete, that's it. If there are unbound
+  // type variables in the type, then we may have to account for the upper
+  // abstraction bound from the abstraction pattern.
+  if (!substTy->hasTypeParameter()) {
+    return false;
+  }
+  
+  switch (getKind()) {
+  case Kind::Opaque: {
+    // The abstraction pattern doesn't provide any more specific bounds.
+    return false;
+  }
+  case Kind::Type:
+  case Kind::Discard:
+  case Kind::ClangType: {
+    // See whether the abstraction pattern's context gives us an upper bound
+    // that ensures the type conforms.
+    auto type = getType();
+    if (hasGenericSignature() && getType()->hasTypeParameter()) {
+      type = GenericEnvironment::mapTypeIntoContext(
+        getGenericSignature().getGenericEnvironment(), getType())
+        ->getReducedType(getGenericSignature());
+    }
+    
+    return definitelyConforms(type);
+  }
+  case Kind::Tuple: {
+    // A tuple conforms if all elements do.
+    if (doesTupleVanish()) {
+      return getVanishingTupleElementPatternType().value()
+        .conformsToKnownProtocol(substTy, protocolKind);
+    }
+    auto substTupleTy = cast<TupleType>(substTy);
+  
+    for (unsigned i = 0, e = getNumTupleElements(); i < e; ++i) {
+      if (!getTupleElementType(i).conformsToKnownProtocol(
+            substTupleTy.getElementType(i), protocolKind)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  // Functions are, at least for now, always copyable.
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    return true;
+  
+  case Kind::Invalid:
+    llvm_unreachable("asking invalid abstraction pattern");
+  }
+}
+
+bool AbstractionPattern::isNoncopyable(CanType substTy) const {
+  return !conformsToKnownProtocol(substTy, KnownProtocolKind::Copyable);
+}
+
+bool AbstractionPattern::isEscapable(CanType substTy) const {
+  return conformsToKnownProtocol(substTy, KnownProtocolKind::Escapable);
+}
+
 bool AbstractionPattern::matchesTuple(CanType substType) const {
   switch (getKind()) {
   case Kind::Invalid:
@@ -462,8 +549,8 @@ bool AbstractionPattern::doesTupleContainPackExpansionType() const {
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("pattern is not a tuple");
   case Kind::Tuple: {
-    for (auto &elt : llvm::makeArrayRef(OrigTupleElements,
-                                        getNumTupleElements_Stored())) {
+    for (auto &elt :
+         llvm::ArrayRef(OrigTupleElements, getNumTupleElements_Stored())) {
       if (elt.isPackExpansion())
         return true;
     }
@@ -1263,7 +1350,6 @@ AbstractionPattern::getFunctionThrownErrorType(
   if (!optOrigErrorType)
     return std::nullopt;
 
-  auto &ctx = substFnInterfaceType->getASTContext();
   auto substErrorType = substFnInterfaceType->getEffectiveThrownErrorType();
 
   if (isTypeParameterOrOpaqueArchetype()) {
@@ -1275,14 +1361,19 @@ AbstractionPattern::getFunctionThrownErrorType(
   }
 
   if (!substErrorType) {
-    if (optOrigErrorType->getType()->hasTypeParameter())
-      substErrorType = ctx.getNeverType();
-    else
-      substErrorType = optOrigErrorType->getType();
+    substErrorType = optOrigErrorType->getEffectiveThrownErrorType();
   }
 
   return std::make_pair(*optOrigErrorType,
                         (*substErrorType)->getCanonicalType());
+}
+
+CanType AbstractionPattern::getEffectiveThrownErrorType() const {
+  CanType type = getType();
+  if (type->hasTypeParameter())
+    return type->getASTContext().getNeverType()->getCanonicalType();
+
+  return type;
 }
 
 AbstractionPattern

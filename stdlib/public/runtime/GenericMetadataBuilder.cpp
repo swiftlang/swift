@@ -283,10 +283,6 @@ public:
   SWIFT_FORMAT(5, 6)
   void log(const char *filename, unsigned line, const char *function,
            const char *fmt, ...) {
-    if (swift::runtime::environment::
-            SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER() < 2)
-      return;
-
     va_list args;
     va_start(args, fmt);
 
@@ -298,47 +294,9 @@ public:
   }
 };
 
-static BuilderErrorOr<ValueMetadata *> allocateGenericValueMetadata(
-    const ValueTypeDescriptor *description, llvm::ArrayRef<InProcessReaderWriter::GenericArgument> arguments,
-    const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
-  InProcessReaderWriter readerWriter;
-  GenericMetadataBuilder builder{readerWriter};
-  auto result = builder.buildGenericValueMetadata({description}, arguments,
-                                                  {pattern}, extraDataSize);
-  if (!result)
-    return *result.getError();
-
-  char *base = reinterpret_cast<char *>(result->data.ptr);
-  return reinterpret_cast<ValueMetadata *>(base + result->offset);
-}
-
-static bool initializeGenericValueMetadata(Metadata *metadata) {
-  InProcessReaderWriter readerWriter;
-  GenericMetadataBuilder builder{readerWriter};
-
-  auto result = builder.initializeGenericMetadata(
-      {asFullMetadata(metadata), -1u}, nullptr);
-  if (auto *error = result.getError()) {
-    fprintf(stderr, "swift_initializeGenericValueMetadata failed: %s",
-            error->cStr());
-    return false;
-  }
-  return true;
-}
-
-static BuilderErrorOr<size_t>
-genericValueDataExtraSize(const ValueTypeDescriptor *description,
-                          const GenericMetadataPattern *pattern) {
-  InProcessReaderWriter readerWriter;
-  GenericMetadataBuilder builder{readerWriter};
-  return builder.extraDataSize({description}, {pattern});
-}
-
 SWIFT_FORMAT(2, 3)
 static void validationLog(bool isValidationFailure, const char *fmt, ...) {
-  if (!isValidationFailure &&
-      swift::runtime::environment::
-              SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER() < 2)
+  if (!isValidationFailure)
     return;
   FILE *output = stderr;
 
@@ -528,45 +486,4 @@ bool swift::compareGenericMetadata(const Metadata *original,
   }
 
   return equal;
-}
-
-void swift::validateExternalGenericMetadataBuilder(
-    const Metadata *original, const TypeContextDescriptor *description,
-    const void * const *arguments) {
-  if (auto valueDescriptor = dyn_cast<ValueTypeDescriptor>(description)) {
-    if (valueDescriptor->isGeneric()) {
-      auto pattern = reinterpret_cast<GenericValueMetadataPattern *>(
-          valueDescriptor->getFullGenericContextHeader()
-              .DefaultInstantiationPattern.get());
-      auto extraDataSize = genericValueDataExtraSize(valueDescriptor, pattern);
-      if (auto *error = extraDataSize.getError()) {
-        validationLog(false, "error getting extra data size: %s",
-                      error->cStr());
-        return;
-      }
-
-      const auto &genericContext = *description->getGenericContext();
-      const auto &header = genericContext.getGenericContextHeader();
-      auto argsCount = header.NumKeyArguments;
-      llvm::ArrayRef argsArray{arguments, argsCount};
-
-      auto maybeNewMetadata = allocateGenericValueMetadata(
-          valueDescriptor, argsArray, pattern, *extraDataSize.getValue());
-      if (auto *error = maybeNewMetadata.getError()) {
-        validationLog(false, "error allocating metadata: %s", error->cStr());
-        return;
-      }
-      auto *newMetadata = *maybeNewMetadata.getValue();
-      bool success = initializeGenericValueMetadata(newMetadata);
-      if (!success)
-        return;
-
-      if (!compareGenericMetadata(original, newMetadata))
-        swift::fatalError(0, "Fatal error: mismatched metadata.\n");
-
-      auto typeName = swift_getTypeName(original, false);
-      validationLog(false, "Validated generic metadata builder on %.*s",
-                    (int)typeName.length, typeName.data);
-    }
-  }
 }

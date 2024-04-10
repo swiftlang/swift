@@ -187,7 +187,7 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
 
 static std::vector<const char *> createArgs(ArrayRef<std::string> Cmd,
                                             StringSaver &Saver) {
-  if (!Cmd.empty() && StringRef(Cmd.front()).endswith("swift-frontend"))
+  if (!Cmd.empty() && StringRef(Cmd.front()).ends_with("swift-frontend"))
     Cmd = Cmd.drop_front();
 
   std::vector<const char *> Args;

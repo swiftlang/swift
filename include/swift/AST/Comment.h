@@ -46,7 +46,7 @@ public:
   }
 
   ArrayRef<StringRef> getTags() const {
-    return llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end());
+    return llvm::ArrayRef(Parts.Tags.begin(), Parts.Tags.end());
   }
 
   std::optional<const swift::markup::Paragraph *> getBrief() const {

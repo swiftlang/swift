@@ -620,7 +620,7 @@ public:
         clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
   [[nodiscard]]
-  ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
+  ASTExtInfoBuilder withSendable(bool concurrent = true) const {
     return ASTExtInfoBuilder(
         concurrent ? (bits | SendableMask) : (bits & ~SendableMask),
         clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
@@ -808,10 +808,10 @@ public:
 
   /// Helper method for changing only the concurrent field.
   ///
-  /// Prefer using \c ASTExtInfoBuilder::withConcurrent for chaining.
+  /// Prefer using \c ASTExtInfoBuilder::withSendable for chaining.
   [[nodiscard]]
-  ASTExtInfo withConcurrent(bool concurrent = true) const {
-    return builder.withConcurrent(concurrent).build();
+  ASTExtInfo withSendable(bool isSendable = true) const {
+    return builder.withSendable(isSendable).build();
   }
 
   /// Helper method for changing only the throws field.
@@ -935,8 +935,7 @@ class SILExtInfoBuilder {
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     UnimplementableMask = 1 << 12,
     ErasedIsolationMask = 1 << 13,
-    TransferringResultMask = 1 << 14,
-    NumMaskBits = 15
+    NumMaskBits = 14
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -957,17 +956,15 @@ class SILExtInfoBuilder {
                                      bool isNoEscape, bool isSendable,
                                      bool isAsync, bool isUnimplementable,
                                      SILFunctionTypeIsolation isolation,
-                                     bool hasTransferringResult,
                                      DifferentiabilityKind diffKind) {
     return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
            (isNoEscape ? NoEscapeMask : 0) | (isSendable ? SendableMask : 0) |
            (isAsync ? AsyncMask : 0) |
            (isUnimplementable ? UnimplementableMask : 0) |
-           (isolation == SILFunctionTypeIsolation::Erased
-              ? ErasedIsolationMask : 0) |
+           (isolation == SILFunctionTypeIsolation::Erased ? ErasedIsolationMask
+                                                          : 0) |
            (((unsigned)diffKind << DifferentiabilityMaskOffset) &
-            DifferentiabilityMask) |
-           (hasTransferringResult ? TransferringResultMask : 0);
+            DifferentiabilityMask);
   }
 
 public:
@@ -976,7 +973,7 @@ public:
   SILExtInfoBuilder()
       : SILExtInfoBuilder(makeBits(SILFunctionTypeRepresentation::Thick, false,
                                    false, false, false, false,
-                                   SILFunctionTypeIsolation::Unknown, false,
+                                   SILFunctionTypeIsolation::Unknown,
                                    DifferentiabilityKind::NonDifferentiable),
                           ClangTypeInfo(nullptr), LifetimeDependenceInfo()) {}
 
@@ -984,11 +981,10 @@ public:
                     bool isSendable, bool isAsync, bool isUnimplementable,
                     SILFunctionTypeIsolation isolation,
                     DifferentiabilityKind diffKind, const clang::Type *type,
-                    LifetimeDependenceInfo lifetimeDependenceInfo,
-                    bool hasTransferringResult)
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
       : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
                                    isAsync, isUnimplementable, isolation,
-                                   hasTransferringResult, diffKind),
+                                   diffKind),
                           ClangTypeInfo(type), lifetimeDependenceInfo) {}
 
   // Constructor for polymorphic type.
@@ -999,7 +995,6 @@ public:
                                    info.getIsolation().isErased()
                                        ? SILFunctionTypeIsolation::Erased
                                        : SILFunctionTypeIsolation::Unknown,
-                                   /*has transferring result*/ false,
                                    info.getDifferentiabilityKind()),
                           info.getClangTypeInfo(),
                           info.getLifetimeDependenceInfo()) {}
@@ -1028,10 +1023,6 @@ public:
   constexpr bool isSendable() const { return bits & SendableMask; }
 
   constexpr bool isAsync() const { return bits & AsyncMask; }
-
-  constexpr bool hasTransferringResult() const {
-    return bits & TransferringResultMask;
-  }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -1131,7 +1122,7 @@ public:
                              clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
-  SILExtInfoBuilder withConcurrent(bool isSendable = true) const {
+  SILExtInfoBuilder withSendable(bool isSendable = true) const {
     return SILExtInfoBuilder(isSendable ? (bits | SendableMask)
                                         : (bits & ~SendableMask),
                              clangTypeInfo, lifetimeDependenceInfo);
@@ -1163,14 +1154,6 @@ public:
   SILExtInfoBuilder withUnimplementable(bool isUnimplementable = true) const {
     return SILExtInfoBuilder(isUnimplementable ? (bits | UnimplementableMask)
                                                : (bits & ~UnimplementableMask),
-                             clangTypeInfo, lifetimeDependenceInfo);
-  }
-
-  [[nodiscard]] SILExtInfoBuilder
-  withTransferringResult(bool hasTransferringResult = true) const {
-    return SILExtInfoBuilder(hasTransferringResult
-                                 ? (bits | TransferringResultMask)
-                                 : (bits & ~TransferringResultMask),
                              clangTypeInfo, lifetimeDependenceInfo);
   }
 
@@ -1239,11 +1222,11 @@ public:
 
   /// A default ExtInfo but with a Thin convention.
   static SILExtInfo getThin() {
-    return SILExtInfoBuilder(
-               SILExtInfoBuilder::Representation::Thin, false, false, false,
-               false, false, SILFunctionTypeIsolation::Unknown,
-               DifferentiabilityKind::NonDifferentiable, nullptr,
-               LifetimeDependenceInfo(), false /*transferring result*/)
+    return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
+                             false, false, false, false,
+                             SILFunctionTypeIsolation::Unknown,
+                             DifferentiabilityKind::NonDifferentiable, nullptr,
+                             LifetimeDependenceInfo())
         .build();
   }
 
@@ -1281,10 +1264,6 @@ public:
     return builder.getIsolation();
   }
 
-  constexpr bool hasTransferringResult() const {
-    return builder.hasTransferringResult();
-  }
-
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return builder.getDifferentiabilityKind();
   }
@@ -1315,8 +1294,8 @@ public:
     return builder.withNoEscape(noEscape).build();
   }
   
-  SILExtInfo withConcurrent(bool isSendable = true) const {
-    return builder.withConcurrent(isSendable).build();
+  SILExtInfo withSendable(bool isSendable = true) const {
+    return builder.withSendable(isSendable).build();
   }
 
   SILExtInfo withAsync(bool isAsync = true) const {
@@ -1331,8 +1310,8 @@ public:
     return builder.withUnimplementable(isUnimplementable).build();
   }
 
-  SILExtInfo withTransferringResult(bool hasTransferringResult = true) const {
-    return builder.withTransferringResult(hasTransferringResult).build();
+  SILExtInfo withLifetimeDependenceInfo(LifetimeDependenceInfo info) const {
+    return builder.withLifetimeDependenceInfo(info);
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }

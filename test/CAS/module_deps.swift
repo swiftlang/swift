@@ -4,7 +4,7 @@
 // RUN: mkdir -p %t/clang-module-cache
 // RUN: mkdir -p %t/cas
 
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas -no-clang-include-tree
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas -no-clang-include-tree
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
@@ -15,12 +15,12 @@
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
-// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas -no-clang-include-tree
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas -no-clang-include-tree
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
 
 // Ensure that scanning with `-clang-target` makes sure that Swift modules' respective PCM-dependency-build-argument sets do not contain target triples.
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas -no-clang-include-tree
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas -no-clang-include-tree
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps_clang_target.json &>/dev/null
 // RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
@@ -31,9 +31,8 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F casFSRootID > %t/F_fs.casid
 // RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/F_fs.casid | %FileCheck %s -check-prefix FS_ROOT_F
 
-/// make sure the number of CASFS is correct. 10 entries with 2 line each + 1 extra bracket
-// RUN: NUM_CMDS=$(%{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps commandLine | wc -l)
-// RUN: if [ ! $NUM_CMDS -eq 21 ]; then echo "wrong number of CASFS from scanning"; exit 1; fi
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps commandLine > %t/deps.cmd
+// RUN: %FileCheck %s -check-prefix MAIN_CMD -input-file=%t/deps.cmd
 
 // FS_ROOT_E-DAG: E.swiftinterface
 // FS_ROOT_E-DAG: SDKSettings.json
@@ -48,6 +47,10 @@
 // FS_ROOT_F: CHeaders/I.h
 // FS_ROOT_F: CHeaders/X.h
 // FS_ROOT_F: CHeaders/module.modulemap
+
+// MAIN_CMD: -direct-clang-cc1-module-build
+// MAIN_CMD: -cas-fs
+// MAIN_CMD-NOT: -clang-include-tree-root
 
 import C
 import E
@@ -130,7 +133,6 @@ import SubE
 // CHECK: ],
 // CHECK-NEXT: "details": {
 
-// CHECK: "contextHash": "{{.*}}",
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
@@ -141,6 +143,7 @@ import SubE
 // CHECK: "-swift-version"
 // CHECK: "5"
 // CHECK: ],
+// CHECK: "contextHash": "{{.*}}",
 // CHECK_NO_CLANG_TARGET: "extraPcmArgs": [
 // CHECK_NO_CLANG_TARGET-NEXT:   "-Xcc",
 // CHECK_NO_CLANG_TARGET-NEXT:   "-target",
