@@ -19,9 +19,12 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+
 #include <algorithm>
 #include <variant>
 
@@ -705,7 +708,16 @@ public:
     fst.canonicalize();
     snd.canonicalize();
 
-    return fst.elementToRegionMap == snd.elementToRegionMap;
+    return fst.elementToRegionMap == snd.elementToRegionMap &&
+           fst.regionToTransferredOpMap.size() ==
+               snd.regionToTransferredOpMap.size() &&
+           llvm::all_of(
+               fst.regionToTransferredOpMap,
+               [&snd](const std::pair<Region, TransferringOperandSet *> &p) {
+                 auto sndIter = snd.regionToTransferredOpMap.find(p.first);
+                 return sndIter != snd.regionToTransferredOpMap.end() &&
+                        sndIter->second == p.second;
+               });
   }
 
   bool isTrackingElement(Element val) const {
