@@ -31,9 +31,12 @@ struct LibPrespecializedData {
   uint32_t minorVersion;
 
   TargetPointer<Runtime, const void> metadataMap;
+  TargetPointer<Runtime, const void> disabledProcessesTable;
 
   static constexpr uint32_t currentMajorVersion = 1;
-  static constexpr uint32_t currentMinorVersion = 1;
+  static constexpr uint32_t currentMinorVersion = 2;
+
+  static constexpr uint32_t minorVersionWithDisabledProcessesTable = 2;
 
   // Helpers for retrieving the metadata map in-process.
   static bool stringIsNull(const char *str) { return str == nullptr; }
@@ -42,6 +45,12 @@ struct LibPrespecializedData {
 
   const MetadataMap *getMetadataMap() const {
     return reinterpret_cast<const MetadataMap *>(metadataMap);
+  }
+
+  const char *const *getDisabledProcessesTable() const {
+    if (minorVersion < minorVersionWithDisabledProcessesTable)
+      return nullptr;
+    return reinterpret_cast<const char *const *>(disabledProcessesTable);
   }
 };
 
