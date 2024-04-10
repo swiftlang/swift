@@ -757,7 +757,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
   case DiagnosticArgumentKind::FullyQualifiedType:
   case DiagnosticArgumentKind::Type:
   case DiagnosticArgumentKind::WitnessType: {
-    assert(Modifier.empty() && "Improper modifier for Type argument");
+    std::optional<DiagnosticFormatOptions> TypeFormatOpts;
+    if (Modifier == "noformat") {
+      TypeFormatOpts.emplace(DiagnosticFormatOptions::formatForFixIts());
+    } else {
+      assert(Modifier.empty() && "Improper modifier for Type argument");
+      TypeFormatOpts.emplace(FormatOpts);
+    }
     
     // Strip extraneous parentheses; they add no value.
     Type type;
@@ -829,7 +835,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
       auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
 
-      Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
+      Out << llvm::format(TypeFormatOpts->OpaqueResultFormatString.c_str(),
                           type->getString(printOptions).c_str(),
                           Decl::getDescriptiveKindName(descriptiveKind).data(),
                           NamingDeclText.c_str());
@@ -843,11 +849,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
         llvm::raw_svector_ostream OutAka(AkaText);
 
         getAkaTypeForDisplay(type)->print(OutAka, printOptions);
-        Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
+        Out << llvm::format(TypeFormatOpts->AKAFormatString.c_str(),
                             typeName.c_str(), AkaText.c_str());
       } else {
-        Out << FormatOpts.OpeningQuotationMark << typeName
-            << FormatOpts.ClosingQuotationMark;
+        Out << TypeFormatOpts->OpeningQuotationMark << typeName
+            << TypeFormatOpts->ClosingQuotationMark;
       }
     }
     break;
