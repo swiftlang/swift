@@ -23,6 +23,7 @@
 #include "SILCombiner.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -213,11 +214,25 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
                       trans->getFunction(), this) {}
 
 bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
+  std::optional<SSAPrunedLiveness> liveness;
+  if (auto *mvi = dyn_cast<MarkDependenceInst>(svi)) {
+    SmallVector<SILBasicBlock *> blocks;
+    liveness.emplace(svi->getFunction(), &blocks);
+    liveness->initializeDef(mvi->getBase());
+    auto summary = liveness->computeSimple();
+    if (summary.addressUseKind != AddressUseKind::NonEscaping)
+      return false;
+  }
   if (auto *consumingUse = svi->getSingleConsumingUse()) {
     auto *consumingUser = consumingUse->getUser();
 
     // If our user is already in the same block, we don't move it further.
     if (svi->getParent() == consumingUser->getParent())
+      return false;
+
+    // If the consuming use is outside of the lifetime of the base of the mark
+    // dependence, it can't be sunk to it.
+    if (liveness && !liveness->isWithinBoundary(consumingUser))
       return false;
 
     // Otherwise, make sure our instruction does not have any non-debug uses
@@ -244,6 +259,11 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
   // might be able to duplicate/sink.
   if (llvm::any_of(getNonDebugUses(svi),
                    [](Operand *use) { return !use->isLifetimeEnding(); }))
+    return false;
+
+  if (liveness && llvm::any_of(svi->getConsumingUses(), [&](auto *use) {
+        return !liveness->isWithinBoundary(use->getUser());
+      }))
     return false;
 
   while (!svi->use_empty()) {
