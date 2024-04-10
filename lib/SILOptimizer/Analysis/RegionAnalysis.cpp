@@ -1145,11 +1145,10 @@ struct PartitionOpBuilder {
     currentInstPartitionOps.clear();
   }
 
-  TrackableValueID lookupValueID(SILValue value);
+  Element lookupValueID(SILValue value);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
 
-  TrackableValueID
-  getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
+  Element getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
 
   void addAssignFresh(SILValue value) {
     currentInstPartitionOps.emplace_back(
@@ -1160,7 +1159,7 @@ struct PartitionOpBuilder {
     assert(valueHasID(src, /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
-    TrackableValueID srcID = lookupValueID(src);
+    Element srcID = lookupValueID(src);
     if (lookupValueID(tgt) == srcID) {
       LLVM_DEBUG(llvm::dbgs() << "    Skipping assign since tgt and src have "
                                  "the same representative.\n");
@@ -1501,7 +1500,7 @@ public:
     return partialApplyReachabilityDataflow.isReachable(value, inst);
   }
 
-  std::optional<TrackableValue> getValueForId(TrackableValueID id) const {
+  std::optional<TrackableValue> getValueForId(Element id) const {
     return valueMap.getValueForId(id);
   }
 
@@ -1542,7 +1541,7 @@ private:
     return valueMap.valueHasID(value, dumpIfHasNoID);
   }
 
-  TrackableValueID lookupValueID(SILValue value) {
+  Element lookupValueID(SILValue value) {
     return valueMap.lookupValueID(value);
   }
 
@@ -2288,11 +2287,11 @@ public:
 } // namespace regionanalysisimpl
 } // namespace swift
 
-TrackableValueID PartitionOpBuilder::lookupValueID(SILValue value) {
+Element PartitionOpBuilder::lookupValueID(SILValue value) {
   return translator->lookupValueID(value);
 }
 
-TrackableValueID PartitionOpBuilder::getActorIntroducingRepresentative(
+Element PartitionOpBuilder::getActorIntroducingRepresentative(
     SILIsolationInfo actorIsolation) {
   return translator
       ->getActorIntroducingRepresentative(currentInst, actorIsolation)
@@ -2332,17 +2331,17 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 
   // Now print out a translation from region to equivalence class value.
   llvm::dbgs() << " └─────╼ Used Values\n";
-  llvm::SmallVector<TrackableValueID, 8> opsToPrint;
+  llvm::SmallVector<Element, 8> opsToPrint;
   SWIFT_DEFER { opsToPrint.clear(); };
   for (const PartitionOp &op : ops) {
     // Now dump our the root value we map.
     for (unsigned opArg : op.getOpArgs()) {
       // If we didn't insert, skip this. We only emit this once.
-      opsToPrint.push_back(TrackableValueID(opArg));
+      opsToPrint.push_back(Element(opArg));
     }
   }
   sortUnique(opsToPrint);
-  for (TrackableValueID opArg : opsToPrint) {
+  for (Element opArg : opsToPrint) {
     llvm::dbgs() << "          └╼ ";
     auto trackableValue = translator->getValueForId(opArg);
     assert(trackableValue);
@@ -3201,7 +3200,7 @@ SILInstruction *RegionAnalysisValueMap::maybeGetActorIntroducingInst(
 }
 
 std::optional<TrackableValue>
-RegionAnalysisValueMap::getValueForId(TrackableValueID id) const {
+RegionAnalysisValueMap::getValueForId(Element id) const {
   auto iter = stateIndexToEquivalenceClass.find(id);
   if (iter == stateIndexToEquivalenceClass.end())
     return {};
@@ -3578,7 +3577,7 @@ bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
   return hasID;
 }
 
-TrackableValueID RegionAnalysisValueMap::lookupValueID(SILValue value) {
+Element RegionAnalysisValueMap::lookupValueID(SILValue value) {
   auto state = getTrackableValue(value);
   assert(state.isNonSendable() &&
          "only non-Sendable values should be entered in the map");

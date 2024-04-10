@@ -46,7 +46,7 @@ using namespace swift::regionanalysisimpl;
 namespace {
 
 using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
-using TrackableValueID = PartitionPrimitives::Element;
+using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
 
 } // namespace
@@ -1330,10 +1330,9 @@ struct DiagnosticEvaluator final
         transferredNonTransferrable(transferredNonTransferrable) {}
 
   void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
-                                   TrackableValueID transferredVal,
+                                   Element transferredVal,
                                    Operand *transferringOp) const {
     auto &operandState = operandToStateMap.get(transferringOp);
-
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and transferringOp was not set with closure
     // capture.
@@ -1364,7 +1363,7 @@ struct DiagnosticEvaluator final
 
   void
   handleTransferNonTransferrable(const PartitionOp &partitionOp,
-                                 TrackableValueID transferredVal,
+                                 Element transferredVal,
                                  SILIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
@@ -1384,8 +1383,8 @@ struct DiagnosticEvaluator final
 
   void
   handleTransferNonTransferrable(const PartitionOp &partitionOp,
-                                 TrackableValueID transferredVal,
-                                 TrackableValueID actualNonTransferrableValue,
+                                 Element transferredVal,
+                                 Element actualNonTransferrableValue,
                                  SILIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
