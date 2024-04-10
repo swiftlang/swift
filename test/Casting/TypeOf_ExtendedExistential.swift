@@ -43,8 +43,6 @@ CastsTests.test("type(of:) should look through extended existentials (none)") {
   if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
     let x = genericErase(c)
     expectEqual("C<Int>", "\(type(of:x))")
-  } else {
-    expectEqual(0, 1)
   }
 }
 
@@ -63,8 +61,6 @@ CastsTests.test("type(of:) should look through extended existentials (class)") {
   if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
     let x = genericErase(c)
     expectEqual("C<Int>", "\(type(of:x))")
-  } else {
-    expectEqual(0, 1)
   }
 }
 
@@ -76,8 +72,6 @@ CastsTests.test("type(of:) should look through extended existentials (metatype)"
   if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
     let x = genericErase(t)
     expectEqual("C<Int>.Type", "\(type(of:x))")
-  } else {
-    expectEqual(0, 1)
   }
 }
 
