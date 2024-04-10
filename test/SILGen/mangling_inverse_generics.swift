@@ -110,7 +110,7 @@ public struct A<T: ~Copyable>: ~Copyable {
   public func foo() {}
 
   // DEMANGLED: test.A.weird() -> ()
-  // CHECK: sil [ossa] @$s4test1AV5weirdyyF : $@convention(method) <T> (@guaranteed A<T>) -> () {
+  // CHECK: sil [ossa] @$s4test1AV5weirdyyF : $@convention(method) <T> (A<T>) -> () {
   public func weird() where T: Copyable {}
 
   // DEMANGLED: variable initialization expression of (extension in test):test.A< where A: ~Swift.Copyable>.property : Swift.Int
@@ -155,7 +155,7 @@ extension A where T: ~Copyable {
   func bar() {}
 
   // DEMANGLED: test.A.weird2() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AV6weird2yyF : $@convention(method) <T> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AV6weird2yyF : $@convention(method) <T> (A<T>) -> () {
   func weird2() where T: Copyable {}
 }
 
@@ -172,11 +172,11 @@ extension A {
   // requirements must be mangled as if there were no inverse generics.
 
   // DEMANGLED: test.A.baz() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AV3bazyyF : $@convention(method) <T> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AV3bazyyF : $@convention(method) <T> (A<T>) -> () {
   func baz() {}
 
   // DEMANGLED: test.A.computedAgain.getter : Swift.Int
-  // CHECK: sil hidden [ossa] @$s4test1AV13computedAgainSivg : $@convention(method) <T> (@guaranteed A<T>) -> Int {
+  // CHECK: sil hidden [ossa] @$s4test1AV13computedAgainSivg : $@convention(method) <T> (A<T>) -> Int {
   var computedAgain: Int {
     123
   }
@@ -188,7 +188,7 @@ extension A where T: CopyableProto {
   // the extra constraints and not any inverses.
 
   // DEMANGLED: (extension in test):test.A<A where A: test.CopyableProto>.something() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AVA2A13CopyableProtoRzlE9somethingyyF : $@convention(method) <T where T : CopyableProto> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AVA2A13CopyableProtoRzlE9somethingyyF : $@convention(method) <T where T : CopyableProto> (A<T>) -> () {
   func something() {}
 }
 
