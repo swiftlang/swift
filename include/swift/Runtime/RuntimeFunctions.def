@@ -2825,6 +2825,20 @@ FUNCTION(ExceptionPersonality,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
+FUNCTION(ClearSensitive, swift_clearSensitive, C_CC, ClearSensitiveAvailability,
+         RETURNS(VoidTy),
+         ARGS(PtrTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+FUNCTION(MemsetS, memset_s, C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(PtrTy, SizeTy, Int32Ty, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

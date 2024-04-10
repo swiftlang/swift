@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -transfer-non-sendable -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -o /dev/null -verify
+// RUN: %target-sil-opt -transfer-non-sendable -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -strict-concurrency=complete %s -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -13,12 +13,19 @@ sil_stage raw
 
 import Swift
 import Builtin
+import _Concurrency
 
 ////////////////////////
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass {}
+class Klass {}
+
+class NonSendableKlass {
+  var klass: Klass
+
+  func asyncCall() async
+}
 
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
@@ -74,6 +81,24 @@ case none
 case some(T)
 }
 
+sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+
+@MainActor
+struct MainActorIsolatedStruct {
+  let ns: NonSendableKlass
+}
+
+@MainActor
+enum MainActorIsolatedEnum {
+  case first
+  case second(NonSendableKlass)
+}
+
+actor MyActor {
+  var klass: NonSendableKlass { get set }
+}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -87,7 +112,7 @@ bb0(%0 : $*{ var NonSendableKlass }):
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // expected-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
   destroy_value %1 : ${ var NonSendableKlass }
 
   %9999 = tuple ()
@@ -135,7 +160,7 @@ bb0:
   // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
   %useIndirect = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %useIndirect<NonSendableKlass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-note @-1 {{access here could race}}
+  // expected-note @-1 {{use here could race}}
 
   destroy_addr %1 : $*NonSendableKlass
   dealloc_stack %1 : $*NonSendableKlass
@@ -145,3 +170,208 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil @implicitClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+
+sil [ossa] @asyncLetWithThinToThickFunction : $@convention(thin) @async () -> () {
+bb0:
+  %0 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  hop_to_executor %0 : $Optional<Builtin.Executor>
+  %2 = alloc_stack $NonSendableKlass
+  %3 = address_to_pointer %2 : $*NonSendableKlass to $Builtin.RawPointer
+  %4 = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %5 = function_ref @implicitClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+  %6 = convert_function %5 : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass> to $@convention(thin) @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+  %7 = thin_to_thick_function %6 : $@convention(thin) @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+  %8 = builtin "startAsyncLetWithLocalBuffer"<NonSendableKlass>(%4 : $Optional<Builtin.RawPointer>, %7 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>, %3 : $Builtin.RawPointer) : $Builtin.RawPointer
+  %9 = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %10 = apply %9(%8, %3) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  hop_to_executor %0 : $Optional<Builtin.Executor>
+  %12 = load [copy] %2 : $*NonSendableKlass
+  destroy_value %12 : $NonSendableKlass
+  %14 = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %15 = apply %14(%8, %3) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  hop_to_executor %0 : $Optional<Builtin.Executor>
+  %17 = builtin "endAsyncLetLifetime"(%8 : $Builtin.RawPointer) : $()
+  dealloc_stack %2 : $*NonSendableKlass
+  %19 = tuple ()
+  return %19 : $()
+}
+
+// Dead block crasher
+//
+// We used to crash here since we attempted to process /all/ blocks for
+// diagnostic even for non-dead blocks. This is a problem since the dataflow
+// uses a reverse post order traversal to get quick convergence and that skips
+// dead blocks.
+sil [ossa] @dead_block_crasher : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+  br bb1
+
+bbDeadBlock:
+  %transfer = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  br bb1
+
+bb1:
+  destroy_value %1 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @synchronous_returns_transferring : $@convention(method) (@guaranteed NonSendableStruct) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : @guaranteed $NonSendableStruct):
+  debug_value %0 : $NonSendableStruct, var, name "myname"
+  %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
+  %3 = copy_value %2 : $NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
+  // expected-note @-1 {{task-isolated 'myname.ns' cannot be a transferring result. task-isolated uses may race with caller uses}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_struct_structextract : $@convention(method) (@guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  debug_value %0 : $MainActorIsolatedStruct, var, name "myname"
+  %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  %3 = copy_value %2 : $NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
+  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_struct_structelementaddr : $@convention(method) (@in_guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : $*MainActorIsolatedStruct):
+  debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
+  %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  %3 = load [copy] %2 : $*NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
+  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedenumdata : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : @guaranteed $MainActorIsolatedEnum):
+  debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
+  %2 = unchecked_enum_data %0 : $MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
+  %3 = copy_value %2 : $NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a data race}}
+  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedtakeenumdataaddr : $@convention(method) (@in MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
+bb0(%0 : $*MainActorIsolatedEnum):
+  debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
+  %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
+  %3 = load [take] %2 : $*NonSendableKlass
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a data race}}
+  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+}
+
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_switchenum : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned FakeOptional<NonSendableKlass> {
+bb0(%0 : @guaranteed $MainActorIsolatedEnum):
+  debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
+  switch_enum %0 : $MainActorIsolatedEnum, case #MainActorIsolatedEnum.first!enumelt: bb1, case #MainActorIsolatedEnum.second!enumelt: bb2
+
+bb1:
+  %nil = enum $FakeOptional<NonSendableKlass>, #FakeOptional.none!enumelt
+  br bb3(%nil : $FakeOptional<NonSendableKlass>)
+
+bb2(%1 : @guaranteed $NonSendableKlass):
+  %2 = copy_value %1 : $NonSendableKlass
+  %3 = enum $FakeOptional<NonSendableKlass>, #FakeOptional.some!enumelt, %2 : $NonSendableKlass
+  br bb3(%3 : $FakeOptional<NonSendableKlass>)
+
+bb3(%4 : @owned $FakeOptional<NonSendableKlass>):
+  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{transferring 'myname.some' may cause a data race}}
+  // expected-note @-1 {{main actor-isolated 'myname.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+}
+
+sil [ossa] @warningIfCallingGetter : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  debug_value %0 : $MyActor, let, name "self", argno 1
+  hop_to_executor %0 : $MyActor
+  %3 = class_method %0 : $MyActor, #MyActor.klass!getter : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %4 = apply %3(%0) : $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %5 = class_method %4 : $NonSendableKlass, #NonSendableKlass.asyncCall : (NonSendableKlass) -> () async -> (), $@convention(method) @async (@guaranteed NonSendableKlass) -> ()
+  %6 = apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %5(%4) : $@convention(method) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{actor-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+  destroy_value %4 : $NonSendableKlass
+  hop_to_executor %0 : $MyActor
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil [ossa] @assignIntoSetter : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  debug_value %0 : $MyActor, let, name "self", argno 1
+  hop_to_executor %0 : $MyActor
+  %4 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %5 = apply %4() : $@convention(thin) () -> @owned NonSendableKlass
+  %6 = move_value [lexical] [var_decl] %5 : $NonSendableKlass
+  debug_value %6 : $NonSendableKlass, let, name "x"
+  %8 = copy_value %6 : $NonSendableKlass
+  %9 = class_method %0 : $MyActor, #MyActor.klass!setter : (isolated MyActor) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %10 = apply %9(%8, %0) : $@convention(method) (@owned NonSendableKlass, @sil_isolated @guaranteed MyActor) -> ()
+  %11 = alloc_stack $NonSendableKlass
+  %12 = store_borrow %6 to %11 : $*NonSendableKlass
+  %13 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %14 = apply [caller_isolation=actor_instance] [callee_isolation=global_actor] %13<NonSendableKlass>(%12) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{actor-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
+  end_borrow %12 : $*NonSendableKlass
+  dealloc_stack %11 : $*NonSendableKlass
+  hop_to_executor %0 : $MyActor
+  destroy_value %6 : $NonSendableKlass
+  %19 = tuple ()
+  return %19 : $()
+}
+
+sil @sendableAsyncLetClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed NonSendableKlass) -> (@out τ_0_0, @error any Error) for <Int>
+
+sil [ossa] @sendableAsyncLetClosureTest : $@convention(thin) @async () -> () {
+bb0:
+  %3 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %4 = apply %3() : $@convention(thin) () -> @owned NonSendableKlass
+  %5 = move_value [lexical] [var_decl] %4 : $NonSendableKlass
+  debug_value %5 : $NonSendableKlass, let, name "x"
+  %7 = alloc_stack $Int
+  %8 = address_to_pointer %7 : $*Int to $Builtin.RawPointer
+  %9 = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %10 = function_ref @sendableAsyncLetClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed NonSendableKlass) -> (@out τ_0_0, @error any Error) for <Int>
+  %11 = copy_value %5 : $NonSendableKlass
+  %12 = partial_apply [callee_guaranteed] %10(%11) : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed NonSendableKlass) -> (@out τ_0_0, @error any Error) for <Int>
+  %13 = convert_function %12 : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int> to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  %14 = convert_escape_to_noescape [not_guaranteed] %13 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  %15 = builtin "startAsyncLetWithLocalBuffer"<Int>(%9 : $Optional<Builtin.RawPointer>, %14 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>, %8 : $Builtin.RawPointer) : $Builtin.RawPointer
+
+  %useValue = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  apply %useValue(%5) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+
+  %26 = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %27 = apply %26(%15, %8) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %29 = load [trivial] %7 : $*Int
+  %30 = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %31 = apply %30(%15, %8) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %33 = builtin "endAsyncLetLifetime"(%15 : $Builtin.RawPointer) : $()
+  destroy_value %14 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  destroy_value %13 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
+  dealloc_stack %7 : $*Int
+  destroy_value %5 : $NonSendableKlass
+  %38 = tuple ()
+  return %38 : $()
+}
+
+// Make sure that when we process the following sil we do not crash.
+//
+// We previously crashed since we used the base of the storage instead of the
+// operand of the root (the ref_element_addr)
+sil [ossa] @test_ref_element_addr_with_different_storage_no_crash : $@convention(method) <Self where Self : NonSendableKlass> (@guaranteed Self) -> () {
+bb0(%0 : @guaranteed $Self):
+  %1 = copy_value %0 : $Self
+  %2 = upcast %1 : $Self to $NonSendableKlass
+  %3 = begin_borrow %2 : $NonSendableKlass
+  %4 = ref_element_addr [immutable] %3 : $NonSendableKlass, #NonSendableKlass.klass
+  %5 = load [copy] %4 : $*Klass
+  destroy_value %5 : $Klass
+  end_borrow %3 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+

@@ -36,7 +36,7 @@ struct MyText<V> {
 
 sil [ossa] @tuple_addr_constructor_1 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
 bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
-  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self", implicit
+  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self"
   %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
   %7 = copy_value %0 : $String
   %8 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
@@ -56,7 +56,7 @@ bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
 
 sil [ossa] @tuple_addr_constructor_2 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
 bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
-  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self", implicit
+  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self"
   %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
   %7 = copy_value %0 : $String
   %8 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
@@ -76,7 +76,7 @@ bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
 
 sil [ossa] @tuple_addr_constructor_3 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
 bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
-  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self", implicit
+  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self"
   %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
   %7 = copy_value %0 : $String
   %8 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>

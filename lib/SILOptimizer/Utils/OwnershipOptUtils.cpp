@@ -29,6 +29,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -652,7 +653,7 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
   InstructionDeleter deleter(std::move(tempCallbacks));
 
   // Generate and map the phis with undef operands first, in case of recursion.
-  auto undef = SILUndef::get(ownedValue->getType(), *ownedValue->getFunction());
+  auto undef = SILUndef::get(ownedValue);
   for (PhiValue reborrowedPhi : reborrowedPhis) {
     auto *phiBlock = reborrowedPhi.phiBlock;
     auto *ownedPhi = phiBlock->createPhiArgument(ownedValue->getType(),
@@ -1263,8 +1264,7 @@ OwnershipRAUWHelper::getReplacementAddress() {
   // guaranteedUsePoints?
   BeginBorrowInst *bbi = extender.borrowCopyOverGuaranteedUses(
       base.getReference(), borrowPt,
-      llvm::makeArrayRef(
-        ctx->extraAddressFixupInfo.allAddressUsesFromOldValue));
+      llvm::ArrayRef(ctx->extraAddressFixupInfo.allAddressUsesFromOldValue));
   auto bbiNext = &*std::next(bbi->getIterator());
   auto *refProjection = cast<SingleValueInstruction>(base.getBaseAddress());
   auto *newBase = refProjection->clone(bbiNext);
@@ -1906,4 +1906,33 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
   }
 
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+static BridgedUtilities::UpdateBorrowedFromFn updateBorrowedFromFunction;
+static BridgedUtilities::UpdateBorrowedFromPhisFn updateBorrowedFromPhisFunction;
+
+void BridgedUtilities::registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
+                                                   UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn) {
+  updateBorrowedFromFunction = updateBorrowedFromFn;
+  updateBorrowedFromPhisFunction = updateBorrowedFromPhisFn;
+}
+
+void swift::updateBorrowedFrom(SILPassManager *pm, SILFunction *f) {
+  if (updateBorrowedFromFunction)
+    updateBorrowedFromFunction({pm->getSwiftPassInvocation()}, {f});
+}
+
+void swift::updateBorrowedFromPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!updateBorrowedFromPhisFunction)
+    return;
+
+  llvm::SmallVector<BridgedValue, 8> bridgedPhis;
+  for (SILPhiArgument *phi : phis) {
+    bridgedPhis.push_back({phi});
+  }
+  updateBorrowedFromPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
 }

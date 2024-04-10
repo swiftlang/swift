@@ -1036,22 +1036,81 @@ ManagedValue SILGenBuilder::createMarkDependence(
   return cloner.clone(mdi);
 }
 
-ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
-                                              ManagedValue value,
-                                              bool isLexical) {
-  auto *newValue =
-      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical);
+namespace {
+class EndAccessCleanup final : public Cleanup {
+  SILValue beginAccess;
+public:
+  EndAccessCleanup(SILValue beginAccess)
+    : beginAccess(beginAccess)
+  {}
+  
+  void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
+  override {
+    SGF.B.createEndAccess(loc, beginAccess, /*aborted*/ false);
+  }
+  
+  void dump(SILGenFunction &SGF) const override {
+    llvm::errs() << "EndAccessCleanup\n";
+    if (beginAccess) {
+      beginAccess->print(llvm::errs());
+    }
+  }
+};
+}
+
+ManagedValue
+SILGenBuilder::createOpaqueBorrowBeginAccess(SILLocation loc,
+                                             ManagedValue address) {
+  auto access = createBeginAccess(loc, address.getValue(),
+                                  SILAccessKind::Read,
+                                  SILAccessEnforcement::Static,
+                                  /*no nested conflict*/ true, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return ManagedValue::forBorrowedAddressRValue(access);
+}
+
+ManagedValue
+SILGenBuilder::createOpaqueConsumeBeginAccess(SILLocation loc,
+                                             ManagedValue address) {
+  auto access = createBeginAccess(loc, address.forward(SGF),
+                                  SILAccessKind::Deinit,
+                                  SILAccessEnforcement::Static,
+                                  /*no nested conflict*/ true, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return SGF.emitManagedRValueWithCleanup(access);
+}
+
+ManagedValue
+SILGenBuilder::createBeginBorrow(SILLocation loc, ManagedValue value,
+                                 IsLexical_t isLexical,
+                                 BeginBorrowInst::IsFixed_t isFixed) {
+  auto *newValue = SILBuilder::createBeginBorrow(
+      loc, value.getValue(), isLexical, DoesNotHavePointerEscape,
+      IsNotFromVarDecl, isFixed);
   SGF.emitManagedBorrowedRValueWithCleanup(newValue);
   return ManagedValue::forBorrowedObjectRValue(newValue);
 }
 
+ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(
+    SILLocation loc, ManagedValue value, IsLexical_t isLexical,
+    BeginBorrowInst::IsFixed_t isFixed) {
+  auto *newValue = SILBuilder::createBeginBorrow(
+      loc, value.getValue(), isLexical, DoesNotHavePointerEscape,
+      IsNotFromVarDecl, isFixed);
+  return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
+                                                    value.getValue(), newValue);
+}
+
 ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,
-                                            bool isLexical) {
+                                            IsLexical_t isLexical) {
   assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
-  CleanupCloner cloner(*this, value);
   auto *mdi =
       createMoveValue(loc, value.forward(getSILGenFunction()), isLexical);
-  return cloner.clone(mdi);
+  // We always want a generic destroy_value cleanup on the moved value, even
+  // if the original had a more specialized cleanup (because it was a trivial
+  // case of an enum or something like that), so that the move checker does
+  // the right thing with the moved value.
+  return SGF.emitManagedRValueWithCleanup(mdi);
 }
 
 ManagedValue

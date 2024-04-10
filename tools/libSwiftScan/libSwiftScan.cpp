@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "swift/Option/Options.h"
+#include "swift/SIL/SILBridging.h"
 
 using namespace swift::dependencies;
 
@@ -65,8 +67,8 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_binary_details.module_source_info_path);
     swiftscan_string_set_dispose(
         details_impl->swift_binary_details.swift_overlay_module_dependencies);
-    swiftscan_string_set_dispose(
-        details_impl->swift_binary_details.header_dependencies);
+      swiftscan_string_dispose(
+        details_impl->swift_binary_details.header_dependency);
     swiftscan_string_dispose(
         details_impl->swift_binary_details.module_cache_key);
     break;
@@ -129,7 +131,11 @@ void swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner) {
 //=== Scanner Functions ---------------------------------------------------===//
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {
+  static std::mutex initializationMutex;
+  std::lock_guard<std::mutex> lock(initializationMutex);
   INITIALIZE_LLVM();
+  if (!swiftModulesInitialized())
+    initializeSwiftModules();
   return wrap(new DependencyScanningTool());
 }
 
@@ -219,6 +225,11 @@ swiftscan_string_ref_t swiftscan_dependency_graph_get_main_module_name(
 swiftscan_dependency_set_t *swiftscan_dependency_graph_get_dependencies(
     swiftscan_dependency_graph_t result) {
   return result->dependencies;
+}
+
+swiftscan_diagnostic_set_t *swiftscan_dependency_graph_get_diagnostics(
+    swiftscan_dependency_graph_t result) {
+  return result->diagnostics;
 }
 
 //=== Module Dependency Info query APIs -----------------------------------===//
@@ -348,10 +359,16 @@ swiftscan_swift_binary_detail_get_swift_overlay_dependencies(
   return details->swift_binary_details.swift_overlay_module_dependencies;
 }
 
-swiftscan_string_set_t *
-swiftscan_swift_binary_detail_get_header_dependencies(
+swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_header_dependency(
     swiftscan_module_details_t details) {
-  return details->swift_binary_details.header_dependencies;
+  return details->swift_binary_details.header_dependency;
+}
+
+swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_header_dependency_module_dependencies(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.header_dependencies_module_dependnecies;
 }
 
 bool swiftscan_swift_binary_detail_get_is_framework(
@@ -472,6 +489,11 @@ swiftscan_import_set_get_imports(swiftscan_import_set_t result) {
   return result->imports;
 }
 
+swiftscan_diagnostic_set_t *
+swiftscan_import_set_get_diagnostics(swiftscan_import_set_t result) {
+  return result->diagnostics;
+}
+
 //=== Scanner Invocation Functions ----------------------------------------===//
 
 swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
@@ -521,11 +543,13 @@ void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
 void swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result) {
   swiftscan_string_dispose(result->main_module_name);
   swiftscan_dependency_set_dispose(result->dependencies);
+  swiftscan_diagnostics_set_dispose(result->diagnostics);
   delete result;
 }
 
 void swiftscan_import_set_dispose(swiftscan_import_set_t result) {
   swiftscan_string_set_dispose(result->imports);
+  swiftscan_diagnostics_set_dispose(result->diagnostics);
   delete result;
 }
 

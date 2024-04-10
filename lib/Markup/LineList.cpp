@@ -24,18 +24,19 @@ std::string LineList::str() const {
   if (Lines.empty())
     return "";
 
-  auto FirstLine = Lines.begin();
-  while (FirstLine != Lines.end() && FirstLine->Text.empty())
-    ++FirstLine;
+  Line *FirstNonEmptyLine = Lines.begin();
+  while (FirstNonEmptyLine != Lines.end() && FirstNonEmptyLine->Text.empty())
+    ++FirstNonEmptyLine;
 
-  if (FirstLine == Lines.end())
+  if (FirstNonEmptyLine == Lines.end())
     return "";
 
-  auto InitialIndentation = measureIndentation(FirstLine->Text);
+  auto InitialIndentation = measureIndentation(FirstNonEmptyLine->Text);
 
-  for (auto Line = FirstLine; Line != Lines.end(); ++Line) {
+  Stream << FirstNonEmptyLine->Text.drop_front(InitialIndentation);
+  for (auto Line = FirstNonEmptyLine + 1; Line != Lines.end(); ++Line) {
     auto Drop = std::min(InitialIndentation, Line->FirstNonspaceOffset);
-    Stream << Line->Text.drop_front(Drop) << "\n";
+    Stream << '\n' << Line->Text.drop_front(Drop);
   }
 
   Stream.flush();
@@ -67,9 +68,9 @@ static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
 
   S = S.drop_front(NumLeadingSpaces);
 
-  if (S.startswith(" * "))
+  if (S.starts_with(" * "))
     return NumLeadingSpaces + 3;
-  if (S.startswith(" *\n") || S.startswith(" *\r\n"))
+  if (S.starts_with(" *\n") || S.starts_with(" *\r\n"))
     return NumLeadingSpaces + 2;
   return 0;
 }
@@ -95,9 +96,9 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
       unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
       StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes);
 
-      if (Cleaned.endswith("*/"))
+      if (Cleaned.ends_with("*/"))
         Cleaned = Cleaned.drop_back(2);
-      else if (Cleaned.endswith("/"))
+      else if (Cleaned.ends_with("/"))
         Cleaned = Cleaned.drop_back(1);
 
       swift::SourceLoc CleanedStartLoc =

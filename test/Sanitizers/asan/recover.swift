@@ -1,6 +1,7 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 // UNSUPPORTED: OS=windows-msvc
+// REQUIRES: rdar126150190
 
 // Check with recovery instrumentation and the runtime option to continue execution.
 // RUN: %target-swiftc_driver %s -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -emit-ir -o %t.asan_recover.ll

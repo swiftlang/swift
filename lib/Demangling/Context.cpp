@@ -96,14 +96,14 @@ static llvm::StringRef stripSuffix(llvm::StringRef Name) {
 
 // Removes a 'TQ<index>' or 'TY<index>' from \p Name.
 static llvm::StringRef stripAsyncContinuation(llvm::StringRef Name) {
-  if (!Name.endswith("_"))
+  if (!Name.ends_with("_"))
     return Name;
 
   StringRef Stripped = Name.drop_back();
   while (!Stripped.empty() && swift::Mangle::isDigit(Stripped.back()))
     Stripped = Stripped.drop_back();
 
-  if (Stripped.endswith("TQ") || Stripped.endswith("TY"))
+  if (Stripped.ends_with("TQ") || Stripped.ends_with("TY"))
     return Stripped.drop_back(2);
 
   return Name;
@@ -113,14 +113,14 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
   if (isMangledName(MangledName)) {
     MangledName = stripAsyncContinuation(stripSuffix(MangledName));
     // First do a quick check
-    if (MangledName.endswith("TA") ||  // partial application forwarder
-        MangledName.endswith("Ta") ||  // ObjC partial application forwarder
-        MangledName.endswith("To") ||  // swift-as-ObjC thunk
-        MangledName.endswith("TO") ||  // ObjC-as-swift thunk
-        MangledName.endswith("TR") ||  // reabstraction thunk helper function
-        MangledName.endswith("Tr") ||  // reabstraction thunk
-        MangledName.endswith("TW") ||  // protocol witness thunk
-        MangledName.endswith("fC")) {  // allocating constructor
+    if (MangledName.ends_with("TA") ||  // partial application forwarder
+        MangledName.ends_with("Ta") ||  // ObjC partial application forwarder
+        MangledName.ends_with("To") ||  // swift-as-ObjC thunk
+        MangledName.ends_with("TO") ||  // ObjC-as-swift thunk
+        MangledName.ends_with("TR") ||  // reabstraction thunk helper function
+        MangledName.ends_with("Tr") ||  // reabstraction thunk
+        MangledName.ends_with("TW") ||  // protocol witness thunk
+        MangledName.ends_with("fC")) {  // allocating constructor
 
       // To avoid false positives, we need to fully demangle the symbol.
       NodePointer Nd = D->demangleSymbol(MangledName);
@@ -145,13 +145,13 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
     return false;
   }
 
-  if (MangledName.startswith("_T")) {
+  if (MangledName.starts_with("_T")) {
     // Old mangling.
     StringRef Remaining = MangledName.substr(2);
-    if (Remaining.startswith("To") ||   // swift-as-ObjC thunk
-        Remaining.startswith("TO") ||   // ObjC-as-swift thunk
-        Remaining.startswith("PA_") ||  // partial application forwarder
-        Remaining.startswith("PAo_")) { // ObjC partial application forwarder
+    if (Remaining.starts_with("To") ||   // swift-as-ObjC thunk
+        Remaining.starts_with("TO") ||   // ObjC-as-swift thunk
+        Remaining.starts_with("PA_") ||  // partial application forwarder
+        Remaining.starts_with("PAo_")) { // ObjC partial application forwarder
       return true;
     }
   }
@@ -171,12 +171,12 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
     MangledName = stripAsyncContinuation(MangledName);
 
     // The targets of those thunks not derivable from the mangling.
-    if (MangledName.endswith("TR") ||
-        MangledName.endswith("Tr") ||
-        MangledName.endswith("TW") )
+    if (MangledName.ends_with("TR") ||
+        MangledName.ends_with("Tr") ||
+        MangledName.ends_with("TW") )
       return std::string();
 
-    if (MangledName.endswith("fC")) {
+    if (MangledName.ends_with("fC")) {
       std::string target = MangledName.str();
       target[target.size() - 1] = 'c';
       return target;
@@ -185,13 +185,13 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
     return MangledName.substr(0, MangledName.size() - 2).str();
   }
   // Old mangling.
-  assert(MangledName.startswith("_T"));
+  assert(MangledName.starts_with("_T"));
   StringRef Remaining = MangledName.substr(2);
-  if (Remaining.startswith("PA_"))
+  if (Remaining.starts_with("PA_"))
     return Remaining.substr(3).str();
-  if (Remaining.startswith("PAo_"))
+  if (Remaining.starts_with("PAo_"))
     return Remaining.substr(4).str();
-  assert(Remaining.startswith("To") || Remaining.startswith("TO"));
+  assert(Remaining.starts_with("To") || Remaining.starts_with("TO"));
   return std::string("_T") + Remaining.substr(2).str();
 }
 

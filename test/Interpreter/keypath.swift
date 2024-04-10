@@ -1,7 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 // REQUIRES: executable_test
 
 // UNSUPPORTED: use_os_stdlib

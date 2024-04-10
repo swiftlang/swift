@@ -160,4 +160,8 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     return (IndexingIterator(_elements: self, _position: c), c)
   }
 }
+
+@available(*, unavailable)
+extension _CocoaArrayWrapper: Sendable {}
+
 #endif

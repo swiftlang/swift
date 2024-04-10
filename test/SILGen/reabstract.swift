@@ -29,10 +29,11 @@ func test0() {
 // CHECK-NEXT: [[T4:%.*]] = partial_apply [callee_guaranteed] [[T3]]([[CVT]])
 // CHECK-NEXT: [[T5:%.*]] = convert_function [[T4]]
 // CHECK-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[T5]]
-// CHECK: destroy_value [[T5]]
-// CHECK:      [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
 // CHECK-NEXT: destroy_value [[CVT]]
+// CHECK-NEXT: destroy_value [[T5]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK-NEXT: } // end sil function '$s10reabstract5test0yyF'

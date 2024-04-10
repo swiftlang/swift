@@ -48,6 +48,7 @@ struct LibPrespecializedData {
 const LibPrespecializedData<InProcess> *getLibPrespecializedData();
 Metadata *getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                        const void *const *arguments);
+void libPrespecializedImageLoaded();
 
 } // namespace swift
 
@@ -61,7 +62,6 @@ Metadata *getLibPrespecializedMetadata(const TypeContextDescriptor *description,
 // were validated (which is the total number in the table), and outFailed is set
 // to the number that failed validation.
 SWIFT_RUNTIME_EXPORT
-void _swift_validatePrespecializedMetadata(unsigned *outValidated,
-                                           unsigned *outFailed);
+void _swift_validatePrespecializedMetadata();
 
 #endif // SWIFT_LIB_PRESPECIALIZED_H

@@ -162,6 +162,22 @@ enum class SGFAccessKind : uint8_t {
   OwnedObjectConsume,
 };
 
+static inline bool isBorrowAccess(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+    return true;
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+  case SGFAccessKind::Write:
+  case SGFAccessKind::ReadWrite:
+  case SGFAccessKind::OwnedAddressConsume:
+  case SGFAccessKind::OwnedObjectConsume:
+    return false;
+  }
+}
+
 static inline bool isReadAccess(SGFAccessKind kind) {
   return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
 }
@@ -302,8 +318,9 @@ public:
   DeclName MagicFunctionName;
   std::string MagicFunctionString;
   
-  /// The abstraction pattern against which the function is being lowered.
-  std::optional<AbstractionPattern> OrigFnType;
+  /// The specialized type context in which the function is being emitted.
+  /// Only applies to closures.
+  std::optional<FunctionTypeInfo> TypeContext;
 
   ASTContext &getASTContext() const { return SGM.M.getASTContext(); }
 
@@ -705,6 +722,12 @@ public:
     return SGM.Types.getConstantInfo(context, constant);
   }
 
+  /// Return the normal local type-lowering information for the given
+  /// formal function type without any special abstraction pattern applied.
+  /// This matches the type that `emitRValue` etc. are expected to produce
+  /// without any contextual overrides.
+  FunctionTypeInfo getFunctionTypeInfo(CanAnyFunctionType fnType);
+
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
   void stopEmittingTopLevelCode() { IsEmittingTopLevelCode = false; }
 
@@ -925,6 +948,10 @@ public:
                                             ArgumentSource &&fnSource,
                                             SGFContext C);
 
+  ManagedValue emitDistributedActorAsAnyActor(SILLocation loc,
+                                          SubstitutionMap distributedActorSubs,
+                                              ManagedValue actor);
+
   /// Generate a nullary function that returns the given value.
   /// If \p emitProfilerIncrement is set, emit a profiler increment for
   /// \p value.
@@ -938,8 +965,7 @@ public:
   /// Generate a nullary function that has the given result interface type and
   /// body.
   void emitGeneratorFunction(
-      SILDeclRef function, Type resultInterfaceType, BraceStmt *body,
-      std::optional<AbstractionPattern> pattern = std::nullopt);
+      SILDeclRef function, Type resultInterfaceType, BraceStmt *body);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
@@ -1139,12 +1165,12 @@ public:
                                        ActorIsolation isolation,
                                        std::optional<ManagedValue> maybeSelf);
 
-  /// Emit the executor value that corresponds to the generic (concurrent)
-  /// executor.
-  SILValue emitGenericExecutor(SILLocation loc);
-
-  /// Emit the executor value that corresponds to the main actor.
-  SILValue emitMainExecutor(SILLocation loc);
+  /// Emit a precondition check to ensure that the function is executing in
+  /// the expected isolation context.
+  void
+  emitPreconditionCheckExpectedExecutor(SILLocation loc,
+                                        ActorIsolation isolation,
+                                        std::optional<ManagedValue> actorSelf);
 
   /// Emit a precondition check to ensure that the function is executing in
   /// the expected isolation context.
@@ -1154,34 +1180,62 @@ public:
   /// Gets a reference to the current executor for the task.
   /// \returns a value of type Builtin.Executor
   SILValue emitGetCurrentExecutor(SILLocation loc);
-  
-  /// Generates code to obtain an actor's executor given a reference
-  /// to the actor.
-  /// \returns a value which can be used with hop_to_executor
+
+  /// Emit a "hoppable" reference to the executor value for the generic
+  /// (concurrent) executor.
+  SILValue emitGenericExecutor(SILLocation loc);
+
+  /// Emit the opaque isolation value for a non-isolated context
+  /// (`Optional<any Actor>.none`).
+  ManagedValue emitNonIsolatedIsolation(SILLocation loc);
+
+  /// Emit a "hoppable" reference to an actor's executor given a
+  /// reference to the actor.
   SILValue emitLoadActorExecutor(SILLocation loc, ManagedValue actor);
 
-  /// Generates the code to obtain the executor for the shared instance 
-  /// of the \p globalActor based on the type.
-  /// \returns a value which can be used with hop_to_executor
+  /// Transform an actor reference into an opaque isolation value.
+  /// This supports optional actor references.
+  /// The actor reference must be +1.
+  ManagedValue emitActorInstanceIsolation(SILLocation loc,
+                                          ManagedValue actor,
+                                          CanType actorType);
+
+  /// Emit a "hoppable" reference to the executor value for the MainActor
+  /// global executor.
+  SILValue emitMainExecutor(SILLocation loc);
+
+  /// Emits a "hoppable" reference to the executor for the shared instance
+  /// of \p globalActor based on the type.
   SILValue emitLoadGlobalActorExecutor(Type globalActor);
 
-  /// Generates the code to call .shared on the given global actor type.
-  ManagedValue emitLoadOfGlobalActorShared(SILLocation loc,
-                                           CanType globalActorType);
+  /// Call `.shared` on the given global actor type.
+  ///
+  /// Returns the value of the property and the formal instance type.
+  std::pair<ManagedValue, CanType>
+  emitLoadOfGlobalActorShared(SILLocation loc, CanType globalActorType);
 
-  /// Generates the code to obtain the executor for the actor stored in
-  /// an @isolated(any) function value.
+  /// Emit a reference to the given global actor as an opaque isolation.
+  ManagedValue emitGlobalActorIsolation(SILLocation loc,
+                                        CanType globalActorType);
+
+  /// Emit a "hoppable" reference to an executor for the opaque isolation
+  /// stored in an @isolated(any) function value.
   SILValue emitLoadErasedExecutor(SILLocation loc, ManagedValue fn);
 
-  /// Generates the code to obtain the actor reference for the actor
-  /// stored in an @isolated(any) function value.
+  /// Load the opaque isolation value from an @isolated(any) function
+  /// value.
   ManagedValue emitLoadErasedIsolation(SILLocation loc, ManagedValue fn);
 
-  /// Generates the code to obtain the actor reference (as a opaque
-  /// isolation) for a function value with the given formal isolation.
-  ManagedValue emitLoadOfFunctionIsolation(SILLocation loc,
-                                           FunctionTypeIsolation isolation,
-                                           ManagedValue fn);
+  /// Emit the opaque isolation value for a function value with the given
+  /// formal type isolation.
+  ManagedValue emitFunctionTypeIsolation(SILLocation loc,
+                                         FunctionTypeIsolation isolation,
+                                         ManagedValue fn);
+
+  /// Emit the opaque isolation value for a concrete closure,
+  /// given its captures.
+  ManagedValue emitClosureIsolation(SILLocation loc, SILDeclRef constant,
+                                    ArrayRef<ManagedValue> captures);
 
   //===--------------------------------------------------------------------===//
   // Memory management
@@ -1195,15 +1249,13 @@ public:
   void
   emitProlog(DeclContext *DC, CaptureInfo captureInfo, ParameterList *paramList,
              ParamDecl *selfParam, Type resultType,
-             std::optional<Type> errorType, SourceLoc throwsLoc,
-             std::optional<AbstractionPattern> origClosureType = std::nullopt);
+             std::optional<Type> errorType, SourceLoc throwsLoc);
   /// A simpler version of emitProlog
   /// \returns the number of variables in paramPatterns.
   uint16_t emitBasicProlog(
       DeclContext *DC, ParameterList *paramList, ParamDecl *selfParam,
       Type resultType, std::optional<Type> errorType, SourceLoc throwsLoc,
-      unsigned numIgnoredTrailingParameters,
-      std::optional<AbstractionPattern> origClosureType = std::nullopt);
+      unsigned numIgnoredTrailingParameters);
 
   /// Set up the ExpectedExecutor field for the current function and emit
   /// whatever hops or assertions are locally expected.
@@ -1231,12 +1283,9 @@ public:
   ///                   thrown error type.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  /// \param origClosureType Overrides the abstraction pattern for lowering the
-  ///                        error type.
   void prepareEpilog(
       DeclContext *dc, std::optional<Type> directResultType,
-      std::optional<Type> errorType, CleanupLocation L,
-      std::optional<AbstractionPattern> origClosureType = std::nullopt);
+      std::optional<Type> errorType, CleanupLocation L);
   void prepareRethrowEpilog(DeclContext *dc,
                             AbstractionPattern origErrorType,
                             Type errorType, CleanupLocation l);
@@ -1290,10 +1339,12 @@ public:
   ///
   /// \p isLexical if set to true, this is a temporary that we are using for a
   /// local let that we need to mark with the lexical flag.
-  SILValue emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                   bool hasDynamicLifetime = false,
-                                   bool isLexical = false,
-                                   bool generateDebugInfo = true);
+  SILValue emitTemporaryAllocation(
+      SILLocation loc, SILType ty,
+      HasDynamicLifetime_t hasDynamicLifetime = DoesNotHaveDynamicLifetime,
+      IsLexical_t isLexical = IsNotLexical,
+      IsFromVarDecl_t isFromVarDecl = IsNotFromVarDecl,
+      bool generateDebugInfo = true);
 
   /// Emits a temporary allocation for a pack that will be deallocated
   /// automatically at the end of the current scope.  Returns the address
@@ -1484,6 +1535,16 @@ public:
                             SGFContext C,
                             llvm::function_ref<ManagedValue (SGFContext)> F,
                             bool allowEmbeddedNSError = true);
+
+  /// Transform a value of concrete or existential type into an
+  /// existential type.  The input and existential types must be
+  /// different.
+  ManagedValue emitTransformExistential(
+                            SILLocation loc,
+                            ManagedValue input,
+                            CanType inputType,
+                            CanType existentialType,
+                            SGFContext C = SGFContext());
 
   RValue emitCollectionConversion(SILLocation loc,
                                   FuncDecl *fn,
@@ -1714,9 +1775,8 @@ public:
   /// given. The result is re-abstracted to the given expected type.
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
-                                CanType expectedType,
-                                SubstitutionMap subs,
-                                bool alreadyConverted);
+                                const FunctionTypeInfo &typeContext,
+                                SubstitutionMap subs);
 
   PreparedArguments prepareSubscriptIndices(SILLocation loc,
                                             SubscriptDecl *subscript,
@@ -1753,6 +1813,10 @@ public:
   ManagedValue emitReadAsyncLetBinding(SILLocation loc, VarDecl *var);
   
   ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
+
+  ManagedValue emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
+                                       ManagedValue flags,
+                                       ManagedValue mainFunctionRef);
 
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
@@ -2199,14 +2263,6 @@ public:
   ManagedValue emitBindOptional(SILLocation loc,
                                 ManagedValue optionalAddrOrValue,
                                 unsigned depth);
-
-  /// Emit the control flow for an optional 'bind' operation, branching to the
-  /// active failure destination if the optional value addressed by optionalAddr
-  /// is nil, and leaving the insertion point on the success branch.
-  ///
-  /// NOTE: This operation does not consume the managed address.
-  void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
-                               unsigned depth);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,

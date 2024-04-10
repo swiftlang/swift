@@ -21,6 +21,9 @@ case none
 case some(T)
 }
 
+protocol P {}
+struct S: P {}
+
 ///////////
 // Tests //
 ///////////
@@ -749,3 +752,13 @@ bb6:
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @testStoredOnlyExistential :
+// CHECK:         alloc_stack
+// CHECK:       } // end sil function 'testStoredOnlyExistential'
+sil [ossa] @testStoredOnlyExistential : $@convention(thin) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $any P
+  %4 = init_existential_addr %1 : $*any P, $S
+  store %0 to [trivial] %4 : $*S
+  unreachable
+}

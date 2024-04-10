@@ -118,7 +118,6 @@ PrintOptions PrintOptions::printDocInterface() {
   result.ArgAndParamPrinting =
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;
-  result.PrintRegularClangComments = false;
   result.PrintFunctionRepresentationAttrs =
     PrintOptions::FunctionRepresentationMode::None;
   return result;
@@ -589,7 +588,7 @@ forEachExtensionMergeGroup(MergeGroupKind Kind, ExtensionGroupOperation Fn) {
       GroupContent.push_back(
           {Member->Ext, Member->EnablingExt, Member->IsSynthesized});
     }
-    Fn(llvm::makeArrayRef(GroupContent));
+    Fn(llvm::ArrayRef(GroupContent));
   }
 }
 

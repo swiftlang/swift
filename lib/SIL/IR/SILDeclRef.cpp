@@ -127,17 +127,17 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), 
-      isDistributed(isDistributed), isKnownToBeLocal(isKnownToBeLocal),
+    : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
+      isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
-      pointer(derivativeId) {}
+      isAsyncLetClosure(0), pointer(derivativeId) {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
                        bool asDistributed, bool asDistributedKnownToBeLocal)
     : isRuntimeAccessible(false),
       backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
-      defaultArgIndex(0),
+      defaultArgIndex(0), isAsyncLetClosure(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -170,6 +170,13 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
   } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
     loc = ACE;
     kind = Kind::Func;
+    if (ACE->getASTContext().LangOpts.hasFeature(
+            Feature::TransferringArgsAndResults)) {
+      if (auto *autoClosure = dyn_cast<AutoClosureExpr>(ACE)) {
+        isAsyncLetClosure =
+            autoClosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet;
+      }
+    }
   } else {
     llvm_unreachable("impossible SILDeclRef loc");
   }

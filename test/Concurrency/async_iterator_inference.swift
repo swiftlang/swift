@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -disable-availability-checking -enable-experimental-associated-type-inference
-// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -disable-availability-checking -disable-experimental-associated-type-inference
+// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -disable-availability-checking
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
@@ -77,11 +76,11 @@ case fail
 
 @available(SwiftStdlib 5.1, *)
 func testAssocTypeInference(sf: S.Failure, tsf: TS.Failure, gtsf1: GenericTS<MyError>.Failure, adapter: SequenceAdapter<SpecificTS<MyError>>.Failure, ntas: NormalThrowingAsyncSequence<String, MyError>.Failure) {
-  let _: Int = sf // expected-error{{cannot convert value of type 'S.Failure' (aka 'Never') to specified type 'Int'}}
-  let _: Int = tsf // expected-error{{cannot convert value of type 'TS.Failure' (aka 'any Error') to specified type 'Int'}}
-  let _: Int = gtsf1 // expected-error{{cannot convert value of type 'GenericTS<MyError>.Failure' (aka 'any Error') to specified type 'Int'}}
-  let _: Int = adapter // expected-error{{cannot convert value of type 'SequenceAdapter<SpecificTS<MyError>>.Failure' (aka 'MyError') to specified type 'Int'}}
-  let _: Int = ntas // expected-error{{cannot convert value of type 'NormalThrowingAsyncSequence<String, MyError>.Failure' (aka 'any Error') to specified type 'Int'}}
+  let _: Int = sf // expected-error{{cannot convert value of type 'S.__AsyncSequence_Failure' (aka 'Never') to specified type 'Int'}}
+  let _: Int = tsf // expected-error{{cannot convert value of type 'TS.__AsyncSequence_Failure' (aka 'any Error') to specified type 'Int'}}
+  let _: Int = gtsf1 // expected-error{{cannot convert value of type 'GenericTS<MyError>.__AsyncSequence_Failure' (aka 'any Error') to specified type 'Int'}}
+  let _: Int = adapter // expected-error{{cannot convert value of type 'SequenceAdapter<SpecificTS<MyError>>.__AsyncSequence_Failure' (aka 'MyError') to specified type 'Int'}}
+  let _: Int = ntas // expected-error{{cannot convert value of type 'NormalThrowingAsyncSequence<String, MyError>.__AsyncSequence_Failure' (aka 'any Error') to specified type 'Int'}}
 }
 
 

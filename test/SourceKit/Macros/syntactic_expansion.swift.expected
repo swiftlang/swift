@@ -13,10 +13,10 @@ source.edit.kind.active:
 source.edit.kind.active:
   7:17-7:17 "{
     get {
-            _value.wrappedValue
+        _value.wrappedValue
       }
     set {
-            _value.wrappedValue = newValue
+        _value.wrappedValue = newValue
       }
 }"
 source.edit.kind.active:
@@ -89,10 +89,10 @@ source.edit.kind.active:
 source.edit.kind.active:
   7:17-7:17 "{
     get {
-            _value.wrappedValue
+        _value.wrappedValue
       }
     set {
-            _value.wrappedValue = newValue
+        _value.wrappedValue = newValue
       }
 }"
 source.edit.kind.active:

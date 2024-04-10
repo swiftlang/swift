@@ -31,7 +31,7 @@
 
 // RUN: not %target-swift-frontend -typecheck %t/ClientLoadInterface.swift -package-name libPkg -I %t 2> %t/resultY.output
 // RUN: %FileCheck %s -check-prefix CHECK-Y < %t/resultY.output
-// CHECK-Y: error: module 'LibInterface' is in package 'libPkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}LibInterface.private.swiftinterface
+// CHECK-Y: error: no such module 'LibInterface'
 
 
 //--- Lib.swift

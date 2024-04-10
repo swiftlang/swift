@@ -64,9 +64,7 @@ public:
   bool walkToStmtPre(Stmt *S) override { return contains(S); }
   bool walkToExprPre(Expr *E) override { return contains(E); }
   void resolve() { walk(SF); }
-  ArrayRef<ASTNode> getContexts() const {
-    return llvm::makeArrayRef(AllContexts);
-  }
+  ArrayRef<ASTNode> getContexts() const { return llvm::ArrayRef(AllContexts); }
 };
 
 } // namespace refactoring

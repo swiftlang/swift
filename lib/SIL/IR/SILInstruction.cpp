@@ -85,6 +85,9 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
       for (SILValue result : first->getResults()) {
         result->resetBitfields();
       }
+      for (Operand &op : first->getAllOperands()) {
+        op.resetBitfields();
+      }
       first->asSILNode()->resetBitfields();
     }
   }
@@ -1792,15 +1795,16 @@ bool SILInstruction::maySuspend() const {
   return false;
 }
 
-static bool visitRecursivelyLifetimeEndingUses(
-  SILValue i,
-  bool &noUsers,
-  llvm::function_ref<bool(Operand *)> func)
-{
+static bool
+visitRecursivelyLifetimeEndingUses(
+  SILValue i, bool &noUsers,
+  llvm::function_ref<bool(Operand *)> visitScopeEnd,
+  llvm::function_ref<bool(Operand *)> visitUnknownUse) {
+
   for (Operand *use : i->getConsumingUses()) {
     noUsers = false;
     if (isa<DestroyValueInst>(use->getUser())) {
-      if (!func(use)) {
+      if (!visitScopeEnd(use)) {
         return false;
       }
       continue;
@@ -1808,7 +1812,7 @@ static bool visitRecursivelyLifetimeEndingUses(
     if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
       auto fnTy = ret->getFunction()->getLoweredFunctionType();
       assert(!fnTy->getLifetimeDependenceInfo().empty());
-      if (!func(use)) {
+      if (!visitScopeEnd(use)) {
         return false;
       }
       continue;
@@ -1825,18 +1829,14 @@ static bool visitRecursivelyLifetimeEndingUses(
     // separately checked in the verifier. It is the only check that verifies
     // the structural requirements of on-stack partial_apply uses.
     auto *user = use->getUser();
-    if (user->getNumResults() != 1) {
-      llvm::errs() << "partial_apply [on_stack] use:\n";
-      user->printInContext(llvm::errs());
-      if (isa<BranchInst>(user)) {
-        llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
-      }
-      llvm::report_fatal_error("partial_apply [on_stack] must be directly "
-                               "forwarded to a destroy_value");
+    if (user->getNumResults() == 0) {
+      return visitUnknownUse(use);
     }
-    if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
-                                            noUsers, func)) {
-      return false;
+    for (auto res : use->getUser()->getResults()) {
+      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, visitScopeEnd,
+                                              visitUnknownUse)) {
+        return false;
+      }
     }
   }
   return true;
@@ -1850,22 +1850,43 @@ PartialApplyInst::visitOnStackLifetimeEnds(
          && "only meaningful for OSSA stack closures");
   bool noUsers = true;
 
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
+  auto visitUnknownUse = [](Operand *unknownUse){
+    llvm::errs() << "partial_apply [on_stack] use:\n";
+    auto *user = unknownUse->getUser();
+    user->printInContext(llvm::errs());
+    if (isa<BranchInst>(user)) {
+      llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+    }
+    llvm::report_fatal_error("partial_apply [on_stack] must be directly "
+                             "forwarded to a destroy_value");
+    return false;
+  };
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
+                                          visitUnknownUse)) {
     return false;
   }
   return !noUsers;
 }
 
-bool MarkDependenceInst::
-visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand *)> func) const {
+// FIXME: Rather than recursing through all results, this should only recurse
+// through ForwardingInstruction and OwnershipTransitionInstruction and the
+// client should prove that any other uses cannot be upstream from a consume of
+// the dependent value.
+bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
+  llvm::function_ref<bool (Operand *)> visitScopeEnd,
+  llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
   bool noUsers = true;
-
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
+                                          visitUnknownUse)) {
     return false;
   }
   return !noUsers;
+}
+
+bool DestroyValueInst::isFullDeinitialization() {
+  return !isa<DropDeinitInst>(lookThroughOwnershipInsts(getOperand()));
 }
 
 PartialApplyInst *

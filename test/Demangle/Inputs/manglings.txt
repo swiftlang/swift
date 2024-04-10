@@ -467,3 +467,9 @@ $sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swif
 $s4testA2A5KlassCyYTF ---> test.test() -> transferring test.Klass
 $s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> transferring main.Klass
 $s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() -> transferring null.NonSendableKlass
+$s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> transferring (@out null.NonSendableKlass, @error @owned Swift.Error)
+$sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+$sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+$sSRyxG15Synchronization19AtomicRepresentableABRi1_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.<bit 2>> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+
+$s23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC ---> concrete protocol conformance variadic_generic_opaque.G2<Pack{variadic_generic_opaque.S1, variadic_generic_opaque.S2}> to protocol conformance ref (type's module) variadic_generic_opaque.P with conditional requirements: (pack protocol conformance (concrete protocol conformance variadic_generic_opaque.S1 to protocol conformance ref (type's module) variadic_generic_opaque.Q, concrete protocol conformance variadic_generic_opaque.S2 to protocol conformance ref (type's module) variadic_generic_opaque.Q))

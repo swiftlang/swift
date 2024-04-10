@@ -143,27 +143,16 @@ bool SuperclassTypeRequest::isCached() const {
 }
 
 std::optional<Type> SuperclassTypeRequest::getCachedResult() const {
-  auto nominalDecl = std::get<0>(getStorage());
-
-  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    if (classDecl->LazySemanticInfo.SuperclassType.getInt())
-      return classDecl->LazySemanticInfo.SuperclassType.getPointer();
-
-  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    if (protocolDecl->LazySemanticInfo.SuperclassType.getInt())
-      return protocolDecl->LazySemanticInfo.SuperclassType.getPointer();
+  auto classDecl = std::get<0>(getStorage());
+  if (classDecl->LazySemanticInfo.SuperclassType.getInt())
+    return classDecl->LazySemanticInfo.SuperclassType.getPointer();
 
   return std::nullopt;
 }
 
 void SuperclassTypeRequest::cacheResult(Type value) const {
-  auto nominalDecl = std::get<0>(getStorage());
-
-  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    classDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
-
-  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
+  auto classDecl = std::get<0>(getStorage());
+  classDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
 void SuperclassTypeRequest::writeDependencySink(
@@ -341,7 +330,7 @@ std::optional<RequirementSignature>
 RequirementSignatureRequest::getCachedResult() const {
   auto proto = std::get<0>(getStorage());
   if (proto->isRequirementSignatureComputed())
-    return *proto->RequirementSig;
+    return proto->RequirementSig;
 
   return std::nullopt;
 }
@@ -1682,6 +1671,43 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
         .withPreconcurrency(preconcurrency());
   }
   llvm_unreachable("unhandled actor isolation kind!");
+}
+
+void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
+                                         StringRef openingQuotationMark) const {
+  switch (*this) {
+  case ActorIsolation::ActorInstance:
+    os << "actor-isolated";
+    break;
+
+  case ActorIsolation::GlobalActor: {
+    if (isMainActor()) {
+      os << "main actor-isolated";
+    } else {
+      Type globalActor = getGlobalActor();
+      os << "global actor " << openingQuotationMark << globalActor.getString()
+         << openingQuotationMark << "-isolated";
+    }
+    break;
+  }
+  case ActorIsolation::Erased:
+    os << "@isolated(any)";
+    break;
+
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::Unspecified:
+    os << "nonisolated";
+    if (*this == ActorIsolation::NonisolatedUnsafe) {
+      os << "(unsafe)";
+    }
+    break;
+  }
+}
+
+void ActorIsolation::dumpForDiagnostics() const {
+  printForDiagnostics(llvm::dbgs());
+  llvm::dbgs() << '\n';
 }
 
 void swift::simple_display(

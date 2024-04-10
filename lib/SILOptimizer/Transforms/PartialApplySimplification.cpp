@@ -753,11 +753,10 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       // Continue emitting code to populate the context.
       B.setInsertionPoint(contextAlloc->getNextInstruction());
     } else {
-      contextBuffer =
-          B.createAllocBox(loc, contextStorageTy.castTo<SILBoxType>(),
-                           /*debug variable*/ std::nullopt,
-                           /*dynamic lifetime*/ false,
-                           /*reflection*/ true);
+      contextBuffer = B.createAllocBox(
+          loc, contextStorageTy.castTo<SILBoxType>(),
+          /*debug variable*/ std::nullopt, DoesNotHaveDynamicLifetime,
+          /*reflection*/ true);
       contextProj = B.createProjectBox(loc, contextBuffer, 0);
     }
     

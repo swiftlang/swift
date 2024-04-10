@@ -106,11 +106,15 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
   elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
-      # At build time and run time, link against the swift libraries in the
-      # installed host toolchain.
-      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS")
+        # At build time and run time, link against the swift libraries in the
+        # installed host toolchain.
+        get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+        get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+        set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      else()
+        set(host_lib_dir "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      endif()
 
       target_link_libraries(${target} PRIVATE ${swiftrt})
       target_link_libraries(${target} PRIVATE "swiftCore")

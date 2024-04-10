@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend %S/Inputs/conforms-to-imported.swift -module-name ImportedModule -emit-module -emit-module-path %t/ImportedModule.swiftmodule
 
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -enable-experimental-cxx-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -cxx-interoperability-mode=swift-6 -D UPCOMING_SWIFT
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -cxx-interoperability-mode=upcoming-swift -D UPCOMING_SWIFT
 
 import ConformsTo

@@ -1165,14 +1165,37 @@ public:
                                            Counter.getLLVMCounter()));
     }
     // Add any skipped regions present in the outer range.
-    for (auto IfConfig : SF->getIfConfigsWithin(OuterRange)) {
-      for (auto SkipRange : IfConfig.getRangesWithoutActiveBody(SM)) {
-        auto Start = SM.getLineAndColumnInBuffer(SkipRange.getStart());
-        auto End = SM.getLineAndColumnInBuffer(SkipRange.getEnd());
-        assert(Start.first <= End.first && "region start and end out of order");
-        Regions.push_back(MappedRegion::skipped(Start.first, Start.second,
-                                                End.first, End.second));
+    for (auto clause : SF->getIfConfigClausesWithin(OuterRange)) {
+      CharSourceRange SkipRange;
+      switch (clause.getKind()) {
+      case IfConfigClauseRangeInfo::ActiveClause:
+      case IfConfigClauseRangeInfo::EndDirective:
+        SkipRange = clause.getDirectiveRange(SM);
+        break;
+      case IfConfigClauseRangeInfo::InactiveClause:
+        SkipRange = clause.getWholeRange(SM);
+        break;
       }
+      if (SkipRange.getByteLength() == 0)
+        continue;
+
+      auto Start = SM.getLineAndColumnInBuffer(SkipRange.getStart());
+      auto End = SM.getLineAndColumnInBuffer(SkipRange.getEnd());
+      assert(Start.first <= End.first && "region start and end out of order");
+
+      // If this is consecutive with the last one, expand it.
+      if (!Regions.empty()) {
+        auto &last = Regions.back();
+        if (last.RegionKind == MappedRegion::Kind::Skipped &&
+            last.EndLine == Start.first && last.EndCol == Start.second) {
+          last.EndLine = End.first;
+          last.EndCol = End.second;
+          continue;
+        }
+      }
+
+      Regions.push_back(MappedRegion::skipped(Start.first, Start.second,
+                                              End.first, End.second));
     }
     return SILCoverageMap::create(M, SF, Filename, Name, PGOFuncName, Hash,
                                   Regions, CounterBuilder.getExpressions());

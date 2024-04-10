@@ -386,6 +386,15 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
   }
 
+  // If the protocol is invertible, fall back to a global lookup instead of
+  // evaluating a conformance path, to avoid an infinite substitution issue.
+  if (proto->getInvertibleProtocolKind()) {
+    auto substType = type.subst(*this);
+    if (!substType->isTypeParameter())
+      return proto->getModuleContext()->lookupConformance(substType, proto);
+    return ProtocolConformanceRef(proto);
+  }
+
   auto path = genericSig->getConformancePath(type, proto);
 
   ProtocolConformanceRef conformance;
@@ -527,9 +536,8 @@ SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {
-  return get(protocol->getGenericSignature(),
-             llvm::makeArrayRef<Type>(selfType),
-             llvm::makeArrayRef<ProtocolConformanceRef>(conformance));
+  return get(protocol->getGenericSignature(), llvm::ArrayRef<Type>(selfType),
+             llvm::ArrayRef<ProtocolConformanceRef>(conformance));
 }
 
 SubstitutionMap

@@ -69,7 +69,7 @@ namespace {
 /// it sees that the locked bit is set in the `Status` field, it
 /// must acquire the global status-record lock, find this record
 /// (which should be the innermost record), and wait for an unlock if
-/// the the task is not the lock owner. If it already owns the
+/// the task is not the lock owner. If it already owns the
 /// status record lock, it may proceed.
 ///
 class StatusRecordLockRecord

@@ -134,9 +134,9 @@ class BuildScriptInvocation(object):
             "--dsymutil-jobs", str(args.dsymutil_jobs),
             '--build-swift-libexec', str(args.build_swift_libexec).lower(),
             '--swift-enable-backtracing', str(args.swift_enable_backtracing).lower(),
+            '--build-swift-clang-overlays', str(
+                args.build_swift_clang_overlays).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
-            '--build-swift-external-generic-metadata-builder', str(
-                args.build_swift_external_generic_metadata_builder).lower(),
         ]
 
         # Compute any product specific cmake arguments.
@@ -512,6 +512,12 @@ class BuildScriptInvocation(object):
                 ' '.join(args.darwin_symroot_path_filters)
             ]
 
+        if args.extra_dsymutil_args:
+            impl_args += [
+                "--extra-dsymutil-args=%s" % ' '.join(
+                    shlex.quote(opt) for opt in args.extra_dsymutil_args)
+            ]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -670,9 +676,13 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmThreadsLLVMRuntimeLibs,
+                            is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmKit,
                             is_enabled=self.args.build_wasmkit)
         builder.add_product(products.WasmStdlib,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmThreadsStdlib,
                             is_enabled=self.args.build_wasmstdlib)
 
         # Keep SwiftDriver at last.

@@ -85,7 +85,7 @@ if #available(SwiftStdlib 5.9, *) {
 
 // rdar://116652595
 //
-// We were accidently hanging when rounding word indices for some concoctions of
+// We were accidentally hanging when rounding word indices for some concoctions of
 // strings. In particular, where we had a pair of scalars create a constraint
 // for the preceeding pair, but the preceeding extend rules were not taking the
 // constraint into consideration.

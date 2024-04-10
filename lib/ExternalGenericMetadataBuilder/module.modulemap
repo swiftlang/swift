@@ -1,4 +1,0 @@
-module ExternalGenericMetadataBuilder {
-  header "ExternalGenericMetadataBuilder.h"
-  export *
-}

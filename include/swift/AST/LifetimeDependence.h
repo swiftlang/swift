@@ -30,13 +30,15 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class LifetimeDependentReturnTypeRepr;
+class SILParameterInfo;
 
-enum class LifetimeDependenceKind : uint8_t {
-  Copy = 0,
-  Consume,
-  Borrow,
-  Mutate
+enum class ParsedLifetimeDependenceKind : uint8_t {
+  Default = 0,
+  Scope,
+  Inherit // Only used with deserialized decls
 };
+
+enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
 
 class LifetimeDependenceSpecifier {
 public:
@@ -45,7 +47,7 @@ public:
 private:
   SourceLoc loc;
   SpecifierKind specifierKind;
-  LifetimeDependenceKind lifetimeDependenceKind;
+  ParsedLifetimeDependenceKind parsedLifetimeDependenceKind;
   union Value {
     struct {
       Identifier name;
@@ -60,26 +62,27 @@ private:
     Value() {}
   } value;
 
-  LifetimeDependenceSpecifier(SourceLoc loc, SpecifierKind specifierKind,
-                              LifetimeDependenceKind lifetimeDependenceKind,
-                              Value value)
+  LifetimeDependenceSpecifier(
+      SourceLoc loc, SpecifierKind specifierKind,
+      ParsedLifetimeDependenceKind parsedLifetimeDependenceKind, Value value)
       : loc(loc), specifierKind(specifierKind),
-        lifetimeDependenceKind(lifetimeDependenceKind), value(value) {}
+        parsedLifetimeDependenceKind(parsedLifetimeDependenceKind),
+        value(value) {}
 
 public:
   static LifetimeDependenceSpecifier getNamedLifetimeDependenceSpecifier(
-      SourceLoc loc, LifetimeDependenceKind kind, Identifier name) {
+      SourceLoc loc, ParsedLifetimeDependenceKind kind, Identifier name) {
     return {loc, SpecifierKind::Named, kind, name};
   }
 
   static LifetimeDependenceSpecifier getOrderedLifetimeDependenceSpecifier(
-      SourceLoc loc, LifetimeDependenceKind kind, unsigned index) {
+      SourceLoc loc, ParsedLifetimeDependenceKind kind, unsigned index) {
     return {loc, SpecifierKind::Ordered, kind, index};
   }
 
   static LifetimeDependenceSpecifier
   getSelfLifetimeDependenceSpecifier(SourceLoc loc,
-                                     LifetimeDependenceKind kind) {
+                                     ParsedLifetimeDependenceKind kind) {
     return {loc, SpecifierKind::Self, kind, {}};
   }
 
@@ -87,8 +90,8 @@ public:
 
   SpecifierKind getSpecifierKind() const { return specifierKind; }
 
-  LifetimeDependenceKind getLifetimeDependenceKind() const {
-    return lifetimeDependenceKind;
+  ParsedLifetimeDependenceKind getParsedLifetimeDependenceKind() const {
+    return parsedLifetimeDependenceKind;
   }
 
   Identifier getName() const {
@@ -113,19 +116,17 @@ public:
     llvm_unreachable("Invalid LifetimeDependenceSpecifier::SpecifierKind");
   }
 
-  StringRef getLifetimeDependenceKindString() const {
-    switch (lifetimeDependenceKind) {
-    case LifetimeDependenceKind::Borrow:
-      return "_borrow";
-    case LifetimeDependenceKind::Consume:
-      return "_consume";
-    case LifetimeDependenceKind::Copy:
-      return "_copy";
-    case LifetimeDependenceKind::Mutate:
-      return "_mutate";
+  std::string getLifetimeDependenceSpecifierString() const {
+    switch (parsedLifetimeDependenceKind) {
+    case ParsedLifetimeDependenceKind::Default:
+      return "dependsOn(" + getParamString() + ")";
+    case ParsedLifetimeDependenceKind::Scope:
+      return "dependsOn(scoped " + getParamString() + ")";
+    case ParsedLifetimeDependenceKind::Inherit:
+      return "dependsOn(inherited " + getParamString() + ")";
     }
     llvm_unreachable(
-        "Invalid LifetimeDependenceSpecifier::LifetimeDependenceKind");
+        "Invalid LifetimeDependenceSpecifier::ParsedLifetimeDependenceKind");
   }
 };
 
@@ -135,13 +136,14 @@ class LifetimeDependenceInfo {
 
   static LifetimeDependenceInfo getForParamIndex(AbstractFunctionDecl *afd,
                                                  unsigned index,
-                                                 ValueOwnership ownership);
+                                                 LifetimeDependenceKind kind);
 
+  /// Builds LifetimeDependenceInfo from a swift decl
   static std::optional<LifetimeDependenceInfo>
-  fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
+  fromTypeRepr(AbstractFunctionDecl *afd);
 
-  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
-                                                     Type resultType);
+  /// Infer LifetimeDependenceInfo
+  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd);
 
 public:
   LifetimeDependenceInfo()
@@ -150,7 +152,12 @@ public:
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
-        scopeLifetimeParamIndices(scopeLifetimeParamIndices) {}
+        scopeLifetimeParamIndices(scopeLifetimeParamIndices) {
+    assert(!empty());
+    assert(!inheritLifetimeParamIndices ||
+           !inheritLifetimeParamIndices->isEmpty());
+    assert(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
+  }
 
   operator bool() const { return !empty(); }
 
@@ -183,12 +190,20 @@ public:
   std::optional<LifetimeDependenceKind>
   getLifetimeDependenceOnParam(unsigned paramIndex);
 
-  static std::optional<LifetimeDependenceInfo>
-  get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
+  /// Builds LifetimeDependenceInfo from a swift decl, either from the explicit
+  /// lifetime dependence specifiers or by inference based on types and
+  /// ownership modifiers.
+  static std::optional<LifetimeDependenceInfo> get(AbstractFunctionDecl *decl);
 
+  /// Builds LifetimeDependenceInfo from the bitvectors passes as parameters.
   static LifetimeDependenceInfo
   get(ASTContext &ctx, const SmallBitVector &inheritLifetimeIndices,
       const SmallBitVector &scopeLifetimeIndices);
+
+  /// Builds LifetimeDependenceInfo from SIL
+  static std::optional<LifetimeDependenceInfo>
+  fromTypeRepr(LifetimeDependentReturnTypeRepr *lifetimeDependentRepr,
+               SmallVectorImpl<SILParameterInfo> &params, DeclContext *dc);
 };
 
 } // namespace swift

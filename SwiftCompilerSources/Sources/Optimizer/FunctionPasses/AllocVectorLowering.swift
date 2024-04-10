@@ -414,7 +414,7 @@ private struct ComputeNonEscapingLiferange : EscapeVisitorWithResult {
       if dominates {
         liferange.insert(user)
       }
-      if !apply.type.isEscapable {
+      if !apply.isEscapable {
         return .abort
       }
       return .ignore

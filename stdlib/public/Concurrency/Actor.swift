@@ -85,3 +85,12 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 public macro isolation<T>() -> T = Builtin.IsolationMacro
 #endif
 
+#if $IsolatedAny
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+public func extractIsolation<each Arg, Result>(
+  _ fn: @escaping @isolated(any) (repeat each Arg) async throws -> Result
+) -> (any Actor)? {
+  return Builtin.extractFunctionIsolation(fn)
+}
+#endif

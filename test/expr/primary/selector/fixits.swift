@@ -21,7 +21,7 @@
 // RUN: cp %s %t.sources/fixits.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
 // RUN: %{python} %utils/apply-fixit-edits.py %t.remapping
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift 2> %t.result
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift -diagnostic-style llvm 2> %t.result
 
 // RUN: %FileCheck %s < %t.result
 // RUN: grep -c "warning:" %t.result | grep 3

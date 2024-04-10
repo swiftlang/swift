@@ -367,9 +367,9 @@ static bool getModuleInterfaceInfo(
   if (!Group && InterestedUSR) {
     Group = findGroupNameForUSR(Mod, InterestedUSR.value());
   }
-  printModuleInterface(Mod, Group.has_value()
-                         ? llvm::makeArrayRef(Group.value())
-                         : ArrayRef<StringRef>(),
+  printModuleInterface(Mod,
+                       Group.has_value() ? llvm::ArrayRef(Group.value())
+                                         : ArrayRef<StringRef>(),
                        TraversalOptions, Printer, Options,
                        Group.has_value() && SynthesizedExtensions);
 
@@ -761,8 +761,8 @@ void SwiftLangSupport::editorOpenInterface(
       // if the first attempt failed.
       bool retryWithCxxEnabled = true;
       for (const auto &arg: Args) {
-          if (StringRef(arg).startswith("-cxx-interoperability-mode=") ||
-              StringRef(arg).startswith("-enable-experimental-cxx-interop")) {
+          if (StringRef(arg).starts_with("-cxx-interoperability-mode=") ||
+              StringRef(arg).starts_with("-enable-experimental-cxx-interop")) {
               retryWithCxxEnabled = false;
               break;
           }

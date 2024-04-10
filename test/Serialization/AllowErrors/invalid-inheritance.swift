@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/mods)
 
-// XFAIL: noncopyable_generics
-
 // RUN: touch %t/empty.swift
 // RUN: %{python} %utils/split_file.py -o %t %s
 

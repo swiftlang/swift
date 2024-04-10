@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 // ----------------------------------------------------------------------------
 // Using protocol requirements from inside protocol extensions
 // ----------------------------------------------------------------------------

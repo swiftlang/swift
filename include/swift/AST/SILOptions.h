@@ -126,6 +126,14 @@ public:
   /// Controls whether cross module optimization is enabled.
   CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
 
+  /// Optimization to perform default CMO within a package boundary.
+  /// Unlike the existing CMO, package CMO can be built with
+  /// -enable-library-evolution since package modules are required
+  /// to be built in the same project. To enable this optimization, the
+  /// module also needs to opt in to allow non-resilient access with
+  /// -experimental-allow-non-resilient-access.
+  bool EnableSerializePackage = false;
+
   /// Enables the emission of stack protectors in functions.
   bool EnableStackProtection = true;
 
@@ -136,6 +144,9 @@ public:
   /// Enables codegen support for clang imported ptrauth qualified field
   /// function pointers.
   bool EnableImportPtrauthFieldFunctionPointers = false;
+
+  /// Enables SIL-level diagnostics for NonescapableTypes.
+  bool EnableLifetimeDependenceDiagnostics = true;
 
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
@@ -173,6 +184,9 @@ public:
 
   /// Require linear OSSA lifetimes after SILGen
   bool OSSACompleteLifetimes = false;
+
+  /// Verify linear OSSA lifetimes after SILGen
+  bool OSSAVerifyComplete = false;
 
   /// Enable pack metadata stack "promotion".
   ///
@@ -269,12 +283,6 @@ public:
 
   /// Are we parsing the stdlib, i.e. -parse-stdlib?
   bool ParseStdlib = false;
-
-  /// If true, check for leaking instructions when the SILModule is destructed.
-  ///
-  /// Warning: this is not thread safe. It can only be enabled in case there
-  /// is a single SILModule in a single thread.
-  bool checkSILModuleLeaks = false;
 
   /// Are we building in embedded Swift mode?
   bool EmbeddedSwift = false;

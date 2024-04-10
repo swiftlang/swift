@@ -78,7 +78,7 @@ int main2(int argc, const char *argv[]) {
     return 1;
   }
 
-  Observer observer(llvm::makeArrayRef(argBegin, dashDash));
+  Observer observer(llvm::ArrayRef(argBegin, dashDash));
 
   // Set up the frontend arguments.
   unsigned numFrontendArgs = argEnd - (dashDash + 1);

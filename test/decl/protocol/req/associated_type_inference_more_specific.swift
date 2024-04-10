@@ -1,5 +1,4 @@
-// RUN: not %target-swift-frontend -typecheck %s -disable-experimental-associated-type-inference
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
   associatedtype A

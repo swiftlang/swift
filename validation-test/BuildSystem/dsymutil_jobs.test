@@ -8,5 +8,5 @@
 
 # CHECK: --- Extracting symbols ---
 # CHECK: { "command": "dsymutil", "start": "
-# CHECK: xargs -n 1 -P 5 {{.*}}dsymutil
+# CHECK: xargs -t -n 1 -P 5 {{.*}}dsymutil
 # CHECK: { "command": "dsymutil", "end": "

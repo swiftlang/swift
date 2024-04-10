@@ -506,6 +506,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::ProjectExistentialBoxInst:
@@ -746,6 +747,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
   case SILInstructionKind::CopyAddrInst: {
     auto *ca = cast<CopyAddrInst>(inst);
+    if (ca->getSrc()->getType().isTrivial(ca->getFunction()))
+      return RuntimeEffect::NoEffect;
     impactType = ca->getSrc()->getType();
     if (!ca->isInitializationOfDest())
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
@@ -1185,7 +1188,7 @@ bool PolymorphicBuiltinSpecializedOverloadInfo::init(
   // we have an overload for its current operand type.
   StringRef name = getBuiltinName(builtinKind);
   StringRef prefix = "generic_";
-  assert(name.startswith(prefix) &&
+  assert(name.starts_with(prefix) &&
          "Invalid polymorphic builtin name! Prefix should be Generic$OP?!");
   SmallString<32> staticOverloadName;
   staticOverloadName.append(name.drop_front(prefix.size()));

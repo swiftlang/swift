@@ -165,7 +165,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
   CursorInfo = new ResolvedValueRefCursorInfo(
       CursorInfo->getSourceFile(), CursorInfo->getLoc(), D, CtorTyRef, ExtTyRef,
-      IsRef, Ty, ContainerType, CustomAttrRef,
+      IsRef, /*SolutionSpecificInterfaceType=*/Type(), ContainerType,
+      CustomAttrRef,
       /*IsKeywordArgument=*/false, IsDynamic, ReceiverTypes,
       /*ShorthandShadowedDecls=*/{});
 
@@ -639,39 +640,29 @@ private:
     auto UnhandledEffects = getUnhandledEffects({Node});
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
-      return ResolvedRangeInfo(RangeKind::SingleExpression,
-                               resolveNodeType(Node, RangeKind::SingleExpression),
-                               TokensInRange,
-                               getImmediateContext(),
-                               /*Common Parent Expr*/nullptr,
-                               SingleEntry,
-                               UnhandledEffects, Kind,
-                               llvm::makeArrayRef(ContainedASTNodes),
-                               llvm::makeArrayRef(DeclaredDecls),
-                               llvm::makeArrayRef(ReferencedDecls));
+      return ResolvedRangeInfo(
+          RangeKind::SingleExpression,
+          resolveNodeType(Node, RangeKind::SingleExpression), TokensInRange,
+          getImmediateContext(),
+          /*Common Parent Expr*/ nullptr, SingleEntry, UnhandledEffects, Kind,
+          llvm::ArrayRef(ContainedASTNodes), llvm::ArrayRef(DeclaredDecls),
+          llvm::ArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
-      return ResolvedRangeInfo(RangeKind::SingleStatement,
-                               resolveNodeType(Node, RangeKind::SingleStatement),
-                               TokensInRange,
-                               getImmediateContext(),
-                               /*Common Parent Expr*/nullptr,
-                               SingleEntry,
-                               UnhandledEffects, Kind,
-                               llvm::makeArrayRef(ContainedASTNodes),
-                               llvm::makeArrayRef(DeclaredDecls),
-                               llvm::makeArrayRef(ReferencedDecls));
+      return ResolvedRangeInfo(
+          RangeKind::SingleStatement,
+          resolveNodeType(Node, RangeKind::SingleStatement), TokensInRange,
+          getImmediateContext(),
+          /*Common Parent Expr*/ nullptr, SingleEntry, UnhandledEffects, Kind,
+          llvm::ArrayRef(ContainedASTNodes), llvm::ArrayRef(DeclaredDecls),
+          llvm::ArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
-      return ResolvedRangeInfo(RangeKind::SingleDecl,
-                               ReturnInfo(),
-                               TokensInRange,
-                               getImmediateContext(),
-                               /*Common Parent Expr*/nullptr,
-                               SingleEntry,
-                               UnhandledEffects, Kind,
-                               llvm::makeArrayRef(ContainedASTNodes),
-                               llvm::makeArrayRef(DeclaredDecls),
-                               llvm::makeArrayRef(ReferencedDecls));
+      return ResolvedRangeInfo(
+          RangeKind::SingleDecl, ReturnInfo(), TokensInRange,
+          getImmediateContext(),
+          /*Common Parent Expr*/ nullptr, SingleEntry, UnhandledEffects, Kind,
+          llvm::ArrayRef(ContainedASTNodes), llvm::ArrayRef(DeclaredDecls),
+          llvm::ArrayRef(ReferencedDecls));
     }
   }
 
@@ -722,19 +713,17 @@ public:
   void leave(ASTNode Node) {
     if (!hasResult() && !Node.isImplicit() && nodeContainSelection(Node)) {
       if (auto Parent = Node.is<Expr*>() ? Node.get<Expr*>() : nullptr) {
-        Result = {
-          RangeKind::PartOfExpression,
-          ReturnInfo(),
-          TokensInRange,
-          getImmediateContext(),
-          Parent,
-          hasSingleEntryPoint(ContainedASTNodes),
-          getUnhandledEffects(ContainedASTNodes),
-          getOrphanKind(ContainedASTNodes),
-          llvm::makeArrayRef(ContainedASTNodes),
-          llvm::makeArrayRef(DeclaredDecls),
-          llvm::makeArrayRef(ReferencedDecls)
-        };
+        Result = {RangeKind::PartOfExpression,
+                  ReturnInfo(),
+                  TokensInRange,
+                  getImmediateContext(),
+                  Parent,
+                  hasSingleEntryPoint(ContainedASTNodes),
+                  getUnhandledEffects(ContainedASTNodes),
+                  getOrphanKind(ContainedASTNodes),
+                  llvm::ArrayRef(ContainedASTNodes),
+                  llvm::ArrayRef(DeclaredDecls),
+                  llvm::ArrayRef(ReferencedDecls)};
       }
     }
 
@@ -969,18 +958,15 @@ public:
 
     if (DCInfo.isMultiStatement()) {
       postAnalysis(DCInfo.EndMatches.back());
-      Result = {RangeKind::MultiStatement,
-                /* Last node has the type */
-                resolveNodeType(DCInfo.EndMatches.back(),
-                                RangeKind::MultiStatement),
-                TokensInRange,
-                getImmediateContext(), nullptr,
-                hasSingleEntryPoint(ContainedASTNodes),
-                getUnhandledEffects(ContainedASTNodes),
-                getOrphanKind(ContainedASTNodes),
-                llvm::makeArrayRef(ContainedASTNodes),
-                llvm::makeArrayRef(DeclaredDecls),
-                llvm::makeArrayRef(ReferencedDecls)};
+      Result = {
+          RangeKind::MultiStatement,
+          /* Last node has the type */
+          resolveNodeType(DCInfo.EndMatches.back(), RangeKind::MultiStatement),
+          TokensInRange, getImmediateContext(), nullptr,
+          hasSingleEntryPoint(ContainedASTNodes),
+          getUnhandledEffects(ContainedASTNodes),
+          getOrphanKind(ContainedASTNodes), llvm::ArrayRef(ContainedASTNodes),
+          llvm::ArrayRef(DeclaredDecls), llvm::ArrayRef(ReferencedDecls)};
     }
 
     if (DCInfo.isMultiTypeMemberDecl()) {
@@ -993,9 +979,9 @@ public:
                 /*SinleEntry*/ true,
                 getUnhandledEffects(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
-                llvm::makeArrayRef(ContainedASTNodes),
-                llvm::makeArrayRef(DeclaredDecls),
-                llvm::makeArrayRef(ReferencedDecls)};
+                llvm::ArrayRef(ContainedASTNodes),
+                llvm::ArrayRef(DeclaredDecls),
+                llvm::ArrayRef(ReferencedDecls)};
     }
   }
 
@@ -1253,7 +1239,7 @@ ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
       }
     }
   }
-  return copyToContext(VD->getASTContext(), llvm::makeArrayRef(Results));
+  return copyToContext(VD->getASTContext(), llvm::ArrayRef(Results));
 }
 
 //----------------------------------------------------------------------------//
@@ -1281,7 +1267,7 @@ CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  return copyToContext(VD->getASTContext(), llvm::makeArrayRef(results));
+  return copyToContext(VD->getASTContext(), llvm::ArrayRef(results));
 }
 
 

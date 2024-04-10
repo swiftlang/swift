@@ -61,21 +61,9 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
-llvm::cl::opt<bool> EnableDeinitDevirtualizer(
-    "enable-deinit-devirtualizer", llvm::cl::init(false),
-    llvm::cl::desc("Enable the DeinitDevirtualizer pass."));
-
-// Temporary flag until the stdlib builds with ~Escapable
-llvm::cl::opt<bool>
-EnableLifetimeDependenceInsertion(
-  "enable-lifetime-dependence-insertion", llvm::cl::init(false),
-  llvm::cl::desc("Enable lifetime dependence insertion."));
-
-// Temporary flag until the stdlib builds with ~Escapable
-llvm::cl::opt<bool>
-EnableLifetimeDependenceDiagnostics(
-  "enable-lifetime-dependence-diagnostics", llvm::cl::init(false),
-  llvm::cl::desc("Enable lifetime dependence diagnostics."));
+static llvm::cl::opt<bool>
+    EnableDeinitDevirtualizer("enable-deinit-devirtualizer", llvm::cl::init(false),
+                          llvm::cl::desc("Enable the DestroyHoisting pass."));
 
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
@@ -139,6 +127,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addAddressLowering();
 
+  // Before we run later semantic optimizations, eliminate simple functions that
+  // we specialized to ensure that we do not emit diagnostics twice.
+  P.addDiagnosticDeadFunctionElimination();
+
   P.addFlowIsolation();
 
   //===---
@@ -179,13 +171,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
 
-  // Check ~Escapable.
-  if (EnableLifetimeDependenceDiagnostics) {
-    P.addLifetimeDependenceDiagnostics();
-  }
-  if (EnableDeinitDevirtualizer)
-    P.addDeinitDevirtualizer();
-
   // FIXME: rdar://122701694 (`consuming` keyword causes verification error on
   //        invalid SIL types)
   //
@@ -196,6 +181,19 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
   P.addConsumeOperatorCopyableValuesChecker();
+
+  // Check ~Escapable.
+  if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
+    P.addLifetimeDependenceDiagnostics();
+  }
+
+  // Devirtualize deinits early if requested.
+  //
+  // FIXME: why is DeinitDevirtualizer in the middle of the mandatory pipeline,
+  // and what passes/compilation modes depend on it? This pass is never executed
+  // or tested without '-Xllvm enable-deinit-devirtualizer'.
+  if (EnableDeinitDevirtualizer)
+    P.addDeinitDevirtualizer();
 
   // As a temporary measure, we also eliminate move only for non-trivial types
   // until we can audit the later part of the pipeline. Eventually, this should
@@ -292,10 +290,8 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   P.startPipeline("SILGen Passes");
 
   P.addSILGenCleanup();
-  if (EnableLifetimeDependenceDiagnostics || EnableLifetimeDependenceInsertion) {
+  if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceInsertion();
-  }
-  if (EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceScopeFixup();
   }
   if (SILViewSILGenCFG) {
@@ -910,6 +906,7 @@ SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   P.startPipeline("Lowering");
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
   P.addOwnershipModelEliminator();
+  P.addAlwaysEmitConformanceMetadataPreservation();
   P.addIRGenPrepare();
 
   return P;

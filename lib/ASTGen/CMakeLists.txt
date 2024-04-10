@@ -105,7 +105,7 @@ set(compile_options
   ${c_include_paths_args}
   "SHELL: -DRESILIENT_SWIFT_SYNTAX"
   "SHELL: ${cxx_interop_flag}"
-  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT -Xcc -DSWIFT_TARGET"
+  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
 
   # FIXME: Needed to work around an availability issue with CxxStdlib
   "SHELL: -Xfrontend -disable-target-os-checking"

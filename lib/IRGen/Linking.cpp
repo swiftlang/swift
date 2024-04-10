@@ -518,19 +518,23 @@ std::string LinkEntity::mangleAsString() const {
   }
 
   case Kind::DistributedAccessor: {
-    std::string Result(getSILFunction()->getName());
+    std::string Result = getSILDeclRef().mangle();
     Result.append("TF");
     return Result;
   }
 
   case Kind::AccessibleFunctionRecord: {
+    auto DC = getSILFunction()->getDeclContext();
+
+    auto thunk = dyn_cast<AbstractFunctionDecl>(DC);
+    if (thunk && thunk->isDistributedThunk()) {
+      IRGenMangler mangler;
+      return mangler.mangleDistributedThunkRecord(thunk);
+    }
+
+    // Otherwise use the default mangling: just the function name
     std::string Result(getSILFunction()->getName());
     Result.append("HF");
-    return Result;
-  }
-  case Kind::AccessibleProtocolRequirementFunctionRecord: {
-    std::string Result(getSILFunction()->getName());
-    Result.append("HpF");
     return Result;
   }
 
@@ -550,6 +554,7 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
   switch (getKind()) {
   case Kind::DispatchThunk:
   case Kind::MethodDescriptor:
+  case Kind::DistributedAccessor:
     return SILDeclRef::Kind::Func;
   case Kind::DispatchThunkInitializer:
   case Kind::MethodDescriptorInitializer:
@@ -567,7 +572,10 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
 }
 
 SILDeclRef LinkEntity::getSILDeclRef() const {
-  return SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
+  auto ref = SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
+  if (getKind() == Kind::DistributedAccessor)
+    return ref.asDistributed();
+  return ref;
 }
 
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
@@ -888,7 +896,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
-  case Kind::AccessibleProtocolRequirementFunctionRecord:
     return SILLinkage::Shared;
   case Kind::ExtendedExistentialTypeShape:
     return (isExtendedExistentialTypeShapeShared()
@@ -986,7 +993,6 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::KnownAsyncFunctionPointer:
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
-  case Kind::AccessibleProtocolRequirementFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
     return false;
   }
@@ -1113,8 +1119,6 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.FunctionPtrTy;
   case Kind::AccessibleFunctionRecord:
     return IGM.AccessibleFunctionRecordTy;
-  case Kind::AccessibleProtocolRequirementFunctionRecord:
-    return IGM.AccessibleProtocolRequirementFunctionRecordTy;
   case Kind::ExtendedExistentialTypeShape:
     return IGM.RelativeAddressTy;
   default:
@@ -1148,7 +1152,6 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::OpaqueTypeDescriptor:
   case Kind::OpaqueTypeDescriptorRecord:
   case Kind::AccessibleFunctionRecord:
-  case Kind::AccessibleProtocolRequirementFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
     return Alignment(4);
   case Kind::AsyncFunctionPointer:
@@ -1293,7 +1296,6 @@ bool LinkEntity::isText() const {
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::AccessibleFunctionRecord:
-  case Kind::AccessibleProtocolRequirementFunctionRecord:
     return false;
   }
 }
@@ -1308,8 +1310,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return false;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
-  case Kind::SILFunction:
-  case Kind::DistributedAccessor: {
+  case Kind::SILFunction: {
     return getSILFunction()->isWeakImported(module);
   }
 
@@ -1371,6 +1372,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
+  case Kind::DistributedAccessor:
     return getDecl()->isWeakImported(module);
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
@@ -1414,7 +1416,6 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::CoroutineContinuationPrototype:
   case Kind::DifferentiabilityWitness:
   case Kind::AccessibleFunctionRecord:
-  case Kind::AccessibleProtocolRequirementFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
     return false;
 
@@ -1483,6 +1484,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+  case Kind::DistributedAccessor:
     return getDecl()->getDeclContext();
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
@@ -1558,9 +1560,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getDeclContextForEmission();
 
-  case Kind::DistributedAccessor:
-  case Kind::AccessibleFunctionRecord:
-  case Kind::AccessibleProtocolRequirementFunctionRecord: {
+  case Kind::AccessibleFunctionRecord: {
     return getSILFunction()->getParentModule();
   }
   }

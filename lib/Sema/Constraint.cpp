@@ -534,6 +534,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
     case OverloadChoiceKind::MaterializePack:
       Out << "materialize pack";
       break;
+    case OverloadChoiceKind::ExtractFunctionIsolation:
+      Out << "extract function islation";
+      break;
     case OverloadChoiceKind::KeyPathApplication:
       Out << "key path application";
       break;

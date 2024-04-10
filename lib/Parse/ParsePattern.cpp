@@ -232,6 +232,15 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       // ('inout' | '__shared' | '__owned' | isolated)?
       bool hasSpecifier = false;
       while (isParameterSpecifier()) {
+        // Placing 'inout' in front of the parameter specifiers was allowed in
+        // the Swift 2-ish era and got moved to the return type in Swift 3
+        // (SE-0031).
+        // But new parameters that don't store there location in
+        // `SpecifierLoc` were added afterwards and didn't get diagnosed.
+        // We thus need to parameter specifiers that don't store their location
+        // in `SpecifierLoc` here. `SpecifierLoc` parameters get diagnosed in
+        // `validateParameterWithOwnership`
+
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
@@ -247,6 +256,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
         
         if (Tok.isContextualKeyword("isolated")) {
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
+                    .warnUntilSwiftVersion(6);
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
@@ -261,12 +272,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
 
         if (Tok.isContextualKeyword("_const")) {
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
+                    .warnUntilSwiftVersion(6);
           param.CompileConstLoc = consumeToken();
           continue;
         }
 
         if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
             Tok.isContextualKeyword("transferring")) {
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
+                    .warnUntilSwiftVersion(6);
           if (param.TransferringLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
                 .fixItRemove(Tok.getLoc());

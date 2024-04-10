@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift                       \
-// RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-experimental-feature BitwiseCopyable     \
 // RUN:     -enable-builtin-module                           \
@@ -35,3 +34,31 @@ func take<T : _BitwiseCopyable>(_ t: T) {}
 
 func passInternalUsableStruct(_ s: InternalUsableStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
                                                                      // expected-note@-8{{where_requirement_failure_one_subst}}
+
+func passMemoryLayout<T>(_ m: MemoryLayout<T>) { take(m) } // expected-error{{conformance_availability_unavailable}}
+
+func passCommandLine(_ m: CommandLine) { take(m) } // expected-error{{conformance_availability_unavailable}}
+
+func passUnicode(_ m: Unicode) { take(m) } // expected-error{{conformance_availability_unavailable}}
+
+import Builtin
+
+#if arch(arm)
+func passBuiltinFloat16(_ f: Builtin.FPIEEE16) { take(f) }
+@available(SwiftStdlib 5.3, *)
+func passFloat16(_ f: Float16) { take(f) }
+#endif
+
+enum E_Raw_Int : Int {
+  case one = 1
+  case sixty_three = 63
+}
+
+func passE_Raw_Int(_ e: E_Raw_Int) { take(e) }
+
+enum E_Raw_String : String {
+  case one = "one"
+  case sixty_three = "sixty three"
+}
+
+func passE_Raw_String(_ e: E_Raw_String) { take(e) }

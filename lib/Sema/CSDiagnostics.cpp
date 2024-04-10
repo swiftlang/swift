@@ -455,8 +455,28 @@ bool RequirementFailure::diagnoseAsError() {
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
-    emitDiagnostic(diag::type_does_not_conform_in_opaque_return,
-                   namingDecl, lhs, rhs, rhs->isAnyObject());
+
+    auto &req = getRequirement();
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+      emitDiagnostic(diag::type_does_not_conform_in_opaque_return, namingDecl,
+                     lhs, rhs, rhs->isAnyObject());
+      break;
+
+    case RequirementKind::Superclass:
+      emitDiagnostic(diag::types_not_inherited_in_opaque_return, namingDecl,
+                    lhs, rhs);
+      break;
+
+    case RequirementKind::SameType:
+      emitDiagnostic(diag::type_is_not_equal_in_opaque_return, namingDecl, lhs,
+                     rhs);
+      break;
+
+    case RequirementKind::SameShape:
+      return false;
+    }
 
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
       emitDiagnosticAt(repr->getLoc(), diag::opaque_return_type_declared_here)
@@ -903,7 +923,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
           auto *decl = DRE->getDecl();
           if (decl && decl->hasName()) {
             auto baseName = DRE->getDecl()->getBaseIdentifier();
-            if (baseName.str().startswith("$__builder")) {
+            if (baseName.str().starts_with("$__builder")) {
               diagnostic =
                   diag::cannot_convert_result_builder_result_to_return_type;
               break;
@@ -3473,9 +3493,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
       evaluateOrDefault(getASTContext().evaluator,
                         ResolveTypeWitnessesRequest{conformance},
                         evaluator::SideEffect());
-      evaluateOrDefault(getASTContext().evaluator,
-                        ResolveValueWitnessesRequest{conformance},
-                        evaluator::SideEffect());
+      conformance->resolveValueWitnesses();
 
       fakeConformances.push_back(conformance);
     }
@@ -4660,6 +4678,7 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
       break;
 
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Read:
     case AccessorKind::Modify:
     case AccessorKind::Address:
@@ -4696,7 +4715,8 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   while (auto *metatype = dyn_cast<MetatypeTypeRepr>(constraintRepr)) {
     // The generic equivalent of 'any P.Type' is '(some P).Type'
     constraintRepr = metatype->getBase()->getWithoutParens();
-    if (isa<SimpleIdentTypeRepr>(constraintRepr))
+    if (isa<UnqualifiedIdentTypeRepr>(constraintRepr) &&
+        !cast<UnqualifiedIdentTypeRepr>(constraintRepr)->hasGenericArgList())
       needsParens = !isa<TupleTypeRepr>(metatype->getBase());
   }
 
@@ -5862,12 +5882,16 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
 
     // Move requires postfix comma only if argument is moved in-between
     // other arguments.
-    bool requiresComma =
-        !isExpr<BinaryExpr>(anchor) && PrevArgIdx != args->size() - 1;
+    std::string argumentSeparator;
+    if (auto *BE = getAsExpr<BinaryExpr>(anchor)) {
+      auto operatorName = std::string(*getOperatorName(BE->getFn()));
+      argumentSeparator = " " + operatorName + " ";
+    } else if (PrevArgIdx != args->size() - 1) {
+      argumentSeparator = ", ";
+    }
 
     diag.fixItRemove(removalRange);
-    diag.fixItInsert(secondRange.Start,
-                     text.str() + (requiresComma ? ", " : ""));
+    diag.fixItInsert(secondRange.Start, text.str() + argumentSeparator);
   };
 
   // There are 4 diagnostic messages variations depending on
@@ -5982,6 +6006,18 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
     }
 
     return true;
+  }
+
+  if (auto *pattern = getAsPattern<EnumElementPattern>(anchor)) {
+    if (isa<TuplePattern>(pattern->getSubPattern())) {
+      auto paramTuple = FunctionType::composeTuple(
+          getASTContext(), ContextualType->getParams(),
+          ParameterFlagHandling::IgnoreNonEmpty);
+
+      emitDiagnostic(diag::tuple_pattern_length_mismatch,
+                     paramTuple);
+      return true;
+    }
   }
 
   if (isContextualMismatch()) {
@@ -6151,7 +6187,65 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
   auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
-  if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
+  bool suppressDeclHereNote = false;
+  if (accessLevel == AccessLevel::Public &&
+      !Member->findImport(getDC())) {
+    auto definingModule = Member->getDeclContext()->getParentModule();
+    emitDiagnosticAt(loc, diag::candidate_from_missing_import,
+                     Member->getDescriptiveKind(), Member->getName(),
+                     definingModule->getName());
+
+    auto enclosingSF = getDC()->getParentSourceFile();
+    SourceLoc bestLoc;
+    SourceManager &srcMgr = Member->getASTContext().SourceMgr;
+    for (auto item : enclosingSF->getTopLevelItems()) {
+      // If we found an import declaration, we want to insert after it.
+      if (auto importDecl =
+              dyn_cast_or_null<ImportDecl>(item.dyn_cast<Decl *>())) {
+        SourceLoc loc = importDecl->getEndLoc();
+        if (loc.isValid()) {
+          bestLoc = Lexer::getLocForEndOfLine(srcMgr, loc);
+        }
+
+        // Keep looking for more import declarations.
+        continue;
+      }
+
+      // If we got a location based on import declarations, we're done.
+      if (bestLoc.isValid())
+        break;
+
+      // For any other item, we want to insert before it.
+      SourceLoc loc = item.getStartLoc();
+      if (loc.isValid()) {
+        bestLoc = Lexer::getLocForStartOfLine(srcMgr, loc);
+        break;
+      }
+    }
+
+    if (bestLoc.isValid()) {
+      llvm::SmallString<64> importText;
+
+      // @_spi imports.
+      if (Member->isSPI()) {
+        auto spiGroups = Member->getSPIGroups();
+        if (!spiGroups.empty()) {
+          importText += "@_spi(";
+          importText += spiGroups[0].str();
+          importText += ") ";
+        }
+      }
+
+      importText += "import ";
+      importText += definingModule->getName().str();
+      importText += "\n";
+      emitDiagnosticAt(bestLoc, diag::candidate_add_import,
+                       definingModule->getName())
+        .fixItInsert(bestLoc, importText);
+    }
+
+    suppressDeclHereNote = true;
+  } else if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
     emitDiagnosticAt(loc, diag::init_candidate_inaccessible,
                      CD->getResultInterfaceType(), accessLevel)
         .highlight(nameLoc.getSourceRange());
@@ -6161,7 +6255,8 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
         .highlight(nameLoc.getSourceRange());
   }
 
-  emitDiagnosticAt(Member, diag::decl_declared_here, Member);
+  if (!suppressDeclHereNote)
+    emitDiagnosticAt(Member, diag::decl_declared_here, Member);
   return true;
 }
 
@@ -6404,13 +6499,11 @@ bool NotCopyableFailure::diagnoseAsError() {
   emitDiagnostic(diag::noncopyable_generics, noncopyableTy);
 
 #ifndef NDEBUG
-  if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     getLocator()->dump(&getConstraintSystem());
 #pragma clang diagnostic pop
     llvm_unreachable("NoncopyableGenerics: vague diagnostic for locator");
-  }
 #endif
 
   return true;
@@ -8182,6 +8275,44 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
     diagnostic.fixItInsertAfter(body->getLBraceLoc(),
                                 diag::insert_closure_return_type_placeholder,
                                 /*argListSpecified=*/true);
+  }
+
+  return true;
+}
+
+bool UnableToInferGenericPackElementType::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  auto packElementElt = locator->getLastElementAs<LocatorPathElt::PackElement>();
+  assert(packElementElt && "Expected path to end with a pack element locator");
+
+  if (isExpr<NilLiteralExpr>(getAnchor())) {
+    // `nil` appears as an element of generic pack params, let's record a
+    // specify contextual type for nil fix.
+    emitDiagnostic(diag::unresolved_nil_literal);
+  } else {
+    // unable to infer the type of an element of generic pack params
+    emitDiagnostic(diag::could_not_infer_pack_element,
+                   packElementElt->getIndex());
+  }
+
+  if (isExpr<ApplyExpr>(locator->getAnchor())) {
+    // emit callee side diagnostics
+    if (auto *calleeLocator = getSolution().getCalleeLocator(locator)) {
+      if (const auto choice = getOverloadChoiceIfAvailable(calleeLocator)) {
+        if (auto *decl = choice->choice.getDeclOrNull()) {
+          if (auto applyArgToParamElt =
+                  locator->findFirst<LocatorPathElt::ApplyArgToParam>()) {
+            if (auto paramDecl =
+                    getParameterAt(decl, applyArgToParamElt->getParamIdx())) {
+              emitDiagnosticAt(
+                  paramDecl->getLoc(), diag::note_in_opening_pack_element,
+                  packElementElt->getIndex(), paramDecl->getNameStr());
+            }
+          }
+        }
+      }
+    }
   }
 
   return true;

@@ -39,6 +39,9 @@ struct SILSymbolVisitorOptions {
 
   /// Whether LLVM IR Witness Method Elimination is enabled.
   bool WitnessMethodElimination = false;
+
+  /// Whether resilient protocols should be emitted fragile.
+  bool FragileResilientProtocols = false;
 };
 
 /// Context for `SILSymbolVisitor` symbol enumeration.

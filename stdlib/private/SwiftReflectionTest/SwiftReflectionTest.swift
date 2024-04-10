@@ -318,7 +318,7 @@ internal func sendBytes() {
   var totalBytesWritten = 0
   var pointer = UnsafeMutableRawPointer(bitPattern: address)
   while totalBytesWritten < count {
-    let bytesWritten = Int(fwrite(pointer, 1, Int(count), stdout))
+    let bytesWritten = Int(fwrite(pointer!, 1, Int(count), stdout))
     fflush(stdout)
     if bytesWritten == 0 {
       printErrnoAndExit()

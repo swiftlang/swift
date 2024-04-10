@@ -213,7 +213,7 @@ extension Sequence  {
   /// sequence are equivalent to the elements in another sequence, using
   /// the given predicate as the equivalence test.
   ///
-  /// The predicate must be a *equivalence relation* over the elements. That
+  /// The predicate must be an *equivalence relation* over the elements. That
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
   /// hold:
   ///
@@ -297,7 +297,7 @@ extension Sequence {
   ///
   /// At least one of the sequences must be finite.
   ///
-  /// The predicate must be a *equivalence relation* over the elements. That
+  /// The predicate must be an *equivalence relation* over the elements. That
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
   /// hold:
   ///
@@ -407,7 +407,7 @@ extension Sequence {
   public func lexicographicallyPrecedes<OtherSequence: Sequence>(
     _ other: OtherSequence,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) rethrows -> Bool 
+  ) rethrows -> Bool
   where OtherSequence.Element == Element {
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
@@ -573,6 +573,48 @@ extension Sequence where Element: Equatable {
 }
 
 //===----------------------------------------------------------------------===//
+// count(where:)
+//===----------------------------------------------------------------------===//
+
+extension Sequence {
+  /// Returns the number of elements in the sequence that satisfy the given
+  /// predicate.
+  ///
+  /// You can use this method to count the number of elements that pass a test.
+  /// The following example finds the number of names that are fewer than
+  /// five characters long:
+  ///
+  ///     let names = ["Jacqueline", "Ian", "Amy", "Juan", "Soroush", "Tiffany"]
+  ///     let shortNameCount = names.count(where: { $0.count < 5 })
+  ///     // shortNameCount == 3
+  ///
+  /// To find the number of times a specific element appears in the sequence,
+  /// use the equal to operator (`==`) in the closure to test for a match.
+  ///
+  ///     let birds = ["duck", "duck", "duck", "duck", "goose"]
+  ///     let duckCount = birds.count(where: { $0 == "duck" })
+  ///     // duckCount == 4
+  ///
+  /// The sequence must be finite.
+  ///
+  /// - Parameter predicate: A closure that takes each element of the sequence
+  ///   as its argument and returns a Boolean value indicating whether
+  ///   the element should be included in the count.
+  /// - Returns: The number of elements in the sequence that satisfy the given
+  ///   predicate.
+  @_alwaysEmitIntoClient
+  public func count<E>(
+    where predicate: (Element) throws(E) -> Bool
+  ) throws(E) -> Int {
+    var count = 0
+    for e in self {
+      count += try predicate(e) ? 1 : 0
+    }
+    return count
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//
 
@@ -632,7 +674,7 @@ extension Sequence {
     }
     return accumulator
   }
-  
+
   /// Returns the result of combining the elements of the sequence using the
   /// given closure.
   ///

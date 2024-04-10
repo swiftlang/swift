@@ -645,7 +645,7 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       SILArgument *arg = pass.function->getArgument(argIdx);
       SILType addrType = arg->getType().getAddressType();
       auto loc = SILValue(arg).getLoc();
-      SILValue undefAddress = SILUndef::get(addrType, *pass.function);
+      SILValue undefAddress = SILUndef::get(pass.function, addrType);
       SingleValueInstruction *load;
       if (addrType.isTrivial(*pass.function)) {
         load = argBuilder.createLoad(loc, undefAddress,
@@ -2803,7 +2803,7 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
   // Temporarily redirect all uses to Undef. They will be fixed in
   // replaceDirectResults().
   replaceTermResult(
-      SILUndef::get(resultArg->getType().getAddressType(), *pass.function));
+      SILUndef::get(pass.function, resultArg->getType().getAddressType()));
 }
 
 // Replace all formally direct results by rewriting the destructure_tuple.
@@ -3436,7 +3436,7 @@ protected:
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
 
-    use->set(SILUndef::get(use->get()->getType(), *pass.function));
+    use->set(SILUndef::get(use->get()));
   }
 
   // Copy from an opaque source operand.

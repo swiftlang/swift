@@ -17,9 +17,11 @@ import OptimizerBridging
 struct SSAUpdater<Context: MutatingContext> {
   let context: Context
 
-  init(type: Type, ownership: Ownership, _ context: Context) {
+  init(function: Function, type: Type, ownership: Ownership,
+       _ context: Context) {
     self.context = context
-    context._bridged.SSAUpdater_initialize(type.bridged, ownership._bridged)
+    context._bridged.SSAUpdater_initialize(function.bridged, type.bridged,
+                                           ownership._bridged)
   }
 
   mutating func addAvailableValue(_ value: Value, in block: BasicBlock) {

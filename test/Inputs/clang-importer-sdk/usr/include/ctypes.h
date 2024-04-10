@@ -295,6 +295,8 @@ struct StructWithBitfields {
   unsigned : 11;
 };
 
+union EmptyCUnion {};
+
 typedef struct ModRM {
   unsigned rm: 3;
   unsigned reg: 3;

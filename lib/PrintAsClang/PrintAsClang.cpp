@@ -284,7 +284,7 @@ static void collectClangModuleHeaderIncludes(
     llvm::SmallString<128> containingSearchDirPath;
 
     for (auto &includeDir : includeDirs) {
-      if (textualInclude.startswith(includeDir)) {
+      if (textualInclude.str().starts_with(includeDir)) {
         if (includeDir.size() > containingSearchDirPath.size()) {
           containingSearchDirPath = includeDir;
         }

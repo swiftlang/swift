@@ -24,11 +24,7 @@
 #include <cstring>
 #include <string>
 
-#if __has_include(<sys/errno.h>)
-#include <sys/errno.h>
-#else
 #include <errno.h>
-#endif
 
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Win32.h"

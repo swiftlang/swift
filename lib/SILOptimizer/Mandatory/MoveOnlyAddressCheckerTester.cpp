@@ -94,7 +94,8 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         moveIntroducersToProcess;
     searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-        fn, moveIntroducersToProcess, diagnosticEmitter);
+        fn, getAnalysis<PostOrderAnalysis>(), moveIntroducersToProcess,
+        diagnosticEmitter);
 
     LLVM_DEBUG(llvm::dbgs()
                << "Emitting diagnostic when checking for mark must check inst: "

@@ -156,7 +156,7 @@ public:
   /// Serialize the command line arguments for emitting them
   /// to DWARF or CodeView and inject SDKPath if necessary.
   static void buildDebugFlags(std::string &Output,
-                              const ArrayRef<const char*> &Args,
+                              const llvm::opt::ArgList &Args,
                               StringRef SDKPath,
                               StringRef ResourceDir);
 

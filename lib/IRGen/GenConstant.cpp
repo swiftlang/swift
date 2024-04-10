@@ -469,6 +469,6 @@ void ConstantAggregateBuilderBase::addUniqueHash(StringRef data) {
   llvm::BLAKE3 hasher;
   hasher.update(data);
   auto rawHash = hasher.final();
-  auto truncHash = llvm::makeArrayRef(rawHash).slice(0, NumBytes_UniqueHash);
+  auto truncHash = llvm::ArrayRef(rawHash).slice(0, NumBytes_UniqueHash);
   add(llvm::ConstantDataArray::get(IGM().getLLVMContext(), truncHash));
 }

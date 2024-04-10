@@ -59,7 +59,7 @@ std::string SpecializationMangler::finalize() {
 
   StringRef FuncName = Function ? Function->getName() : StringRef(FunctionName);
   NodePointer FuncTopLevel = nullptr;
-  if (FuncName.startswith(MANGLING_PREFIX_STR)) {
+  if (FuncName.starts_with(MANGLING_PREFIX_STR)) {
     FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
   }

@@ -44,108 +44,6 @@
 
 using namespace swift;
 
-namespace {
-/// Prints regular comments from clang module headers.
-class ClangCommentPrinter : public ASTPrinter {
-public:
-  ClangCommentPrinter(ASTPrinter &OtherPrinter, ClangModuleLoader &ClangLoader)
-    : OtherPrinter(OtherPrinter),
-      ClangLoader(ClangLoader) {}
-
-private:
-  void printDeclPre(const Decl *D,
-                    std::optional<BracketOptions> Bracket) override;
-  void printDeclPost(const Decl *D,
-                     std::optional<BracketOptions> Bracket) override;
-  void avoidPrintDeclPost(const Decl *D) override;
-  // Forwarding implementations.
-
-  void printText(StringRef Text) override {
-    return OtherPrinter.printText(Text);
-  }
-  void printDeclLoc(const Decl *D) override {
-    return OtherPrinter.printDeclLoc(D);
-  }
-  void printDeclNameEndLoc(const Decl *D) override {
-    return OtherPrinter.printDeclNameEndLoc(D);
-  }
-  void printDeclNameOrSignatureEndLoc(const Decl *D) override {
-    return OtherPrinter.printDeclNameOrSignatureEndLoc(D);
-  }
-  void printTypePre(const TypeLoc &TL) override {
-    return OtherPrinter.printTypePre(TL);
-  }
-  void printTypePost(const TypeLoc &TL) override {
-    return OtherPrinter.printTypePost(TL);
-  }
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name,
-                    PrintNameContext NameContext) override {
-    return OtherPrinter.printTypeRef(T, TD, Name, NameContext);
-  }
-  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
-    return OtherPrinter.printModuleRef(Mod, Name);
-  }
-  void
-  printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                               TypeOrExtensionDecl Target,
-                               std::optional<BracketOptions> Bracket) override {
-    return OtherPrinter.printSynthesizedExtensionPre(ED, Target, Bracket);
-  }
-
-  void printSynthesizedExtensionPost(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      std::optional<BracketOptions> Bracket) override {
-    return OtherPrinter.printSynthesizedExtensionPost(ED, Target, Bracket);
-  }
-
-  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
-    return OtherPrinter.printStructurePre(Kind, D);
-  }
-  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
-    return OtherPrinter.printStructurePost(Kind, D);
-  }
-
-  void printNamePre(PrintNameContext Context) override {
-    return OtherPrinter.printNamePre(Context);
-  }
-  void printNamePost(PrintNameContext Context) override {
-    return OtherPrinter.printNamePost(Context);
-  }
-
-  // Prints regular comments of the header the clang node comes from, until
-  // the location of the node. Keeps track of the comments that were printed
-  // from the file and resumes printing for the next node from the same file.
-  // This expects to get passed clang nodes in source-order (at least within the
-  // same header).
-  void printCommentsUntil(ClangNode Node);
-
-  void printComment(StringRef Text, unsigned StartLocCol);
-
-  bool isDocumentationComment(clang::SourceLocation CommentLoc,
-                              ClangNode Node) const;
-
-  unsigned getResumeOffset(clang::FileID FID) const {
-    auto OffsI = ResumeOffsets.find(FID);
-    if (OffsI != ResumeOffsets.end())
-      return OffsI->second;
-    return 0;
-  }
-  void setResumeOffset(clang::FileID FID, unsigned Offset) {
-    ResumeOffsets[FID] = Offset;
-  }
-
-  bool shouldPrintNewLineBefore(ClangNode Node) const;
-  void updateLastEntityLine(clang::SourceLocation Loc);
-  void updateLastEntityLine(clang::FileID FID, unsigned LineNo);
-
-  ASTPrinter &OtherPrinter;
-  ClangModuleLoader &ClangLoader;
-  llvm::DenseMap<clang::FileID, unsigned> ResumeOffsets;
-  SmallVector<StringRef, 2> PendingComments;
-  llvm::DenseMap<clang::FileID, unsigned> LastEntityLines;
-};
-} // unnamed namespace
-
 static const clang::Module *
 getUnderlyingClangModuleForImport(ImportDecl *Import) {
   if (auto *ClangMod = Import->getClangModule())
@@ -269,11 +167,13 @@ static bool printModuleInterfaceDecl(Decl *D,
       };
     }
   }
-  if (!LeadingComment.empty() && Options.shouldPrint(D))
-    Printer << LeadingComment << "\n";
+  if (!LeadingComment.empty() && Options.shouldPrint(D)) {
+    Printer << LeadingComment;
+    Printer.printNewline();
+  }
   if (D->print(Printer, Options)) {
     if (Options.BracketOptions.shouldCloseNominal(D))
-      Printer << "\n";
+      Printer.printNewline();
     Options.BracketOptions = BracketOptions();
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       std::queue<NominalTypeDecl *> SubDecls{{NTD}};
@@ -296,11 +196,13 @@ static bool printModuleInterfaceDecl(Decl *D,
             }
             if (extensionHasClangNode(Ext))
               continue; // will be printed in its source location, see above.
-            Printer << "\n";
-            if (!LeadingComment.empty())
-              Printer << LeadingComment << "\n";
+            Printer.printNewline();
+            if (!LeadingComment.empty()) {
+              Printer << LeadingComment;
+              Printer.printNewline();
+            }
             Ext->print(Printer, Options);
-            Printer << "\n";
+            Printer.printNewline();
           }
           for (auto Sub : Ext->getMembers())
             if (auto N = dyn_cast<NominalTypeDecl>(Sub))
@@ -328,7 +230,7 @@ static bool printModuleInterfaceDecl(Decl *D,
                 if (ET.IsSynthesized)
                   Options.clearSynthesizedExtension();
                 if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
-                  Printer << "\n";
+                  Printer.printNewline();
               }
             });
         }
@@ -352,9 +254,11 @@ static bool printModuleInterfaceDecl(Decl *D,
                 ET.Ext, !Opened, Decls.back().Ext == ET.Ext, true
               };
               if (Options.BracketOptions.shouldOpenExtension(ET.Ext)) {
-                Printer << "\n";
-                if (Options.shouldPrint(ET.Ext) && !LeadingComment.empty())
-                  Printer << LeadingComment << "\n";
+                Printer.printNewline();
+                if (Options.shouldPrint(ET.Ext) && !LeadingComment.empty()) {
+                  Printer << LeadingComment;
+                  Printer.printNewline();
+                }
               }
               if (ET.IsSynthesized) {
                 if (ET.EnablingExt)
@@ -367,7 +271,7 @@ static bool printModuleInterfaceDecl(Decl *D,
               if (ET.IsSynthesized)
                 Options.clearSynthesizedExtension();
               if (Options.BracketOptions.shouldCloseExtension(ET.Ext)) {
-                Printer << "\n";
+                Printer.printNewline();
               }
             }
           });
@@ -513,18 +417,22 @@ static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
       BystanderList += Bystanders[I].str();
     }
 
-    Printer << "\n// MARK: - " << BystanderList << " Additions\n\n";
+    Printer.printNewline();
+    Printer << "// MARK: - " << BystanderList << " Additions";
+    Printer.printNewline();
+    Printer.printNewline();
     for (auto *Import : DeclLists.first)
       PrintDecl(Import);
-    Printer << "\n";
+    if (!DeclLists.first.empty())
+      Printer.printNewline();
 
     std::string PerDeclComment = "// Available when " + BystanderList;
     PerDeclComment += Bystanders.size() == 1 ? " is" : " are";
     PerDeclComment += " imported with " + Declaring->getNameStr().str();
 
     for (auto *D : DeclLists.second) {
-      if (PrintDecl(D, PerDeclComment))
-        Printer << "\n";
+      if (PrintDecl(D, PerDeclComment) && Options.EmptyLineBetweenDecls)
+        Printer.printNewline();
     }
   }
 }
@@ -761,14 +669,8 @@ void swift::ide::printModuleInterface(
   if (GroupNames.empty())
     std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(), compareSwiftDecls);
 
-  ASTPrinter *PrinterToUse = &Printer;
-
-  ClangCommentPrinter RegularCommentPrinter(Printer, Importer);
-  if (Options.PrintRegularClangComments)
-    PrinterToUse = &RegularCommentPrinter;
-
   auto PrintDecl = [&](Decl *D) {
-    return printModuleInterfaceDecl(D, *PrinterToUse, AdjustedOptions,
+    return printModuleInterfaceDecl(D, Printer, AdjustedOptions,
                                     PrintSynthesizedExtensions);
   };
 
@@ -776,7 +678,7 @@ void swift::ide::printModuleInterface(
   if (!TargetMod->isStdlibModule()) {
     for (auto *D : ImportDecls)
       PrintDecl(D);
-    Printer << "\n";
+    Printer.printNewline();
   }
 
   {
@@ -794,24 +696,27 @@ void swift::ide::printModuleInterface(
 
     for (auto CM : ClangModules) {
       for (auto DeclAndLoc : ClangDecls[CM.first])
-        PrintDecl(DeclAndLoc.first);
+        if (PrintDecl(DeclAndLoc.first) && Options.EmptyLineBetweenDecls)
+          Printer.printNewline();
     }
   }
 
   if (!(TraversalOptions & ModuleTraversal::SkipOverlay) || !TargetClangMod) {
     for (auto *D : SwiftDecls) {
-      if (PrintDecl(D))
-        Printer << "\n";
+      if (PrintDecl(D) && Options.EmptyLineBetweenDecls)
+        Printer.printNewline();
     }
 
     // If we're printing the entire target module (not specific sub-groups),
     // also print the decls from any underscored Swift cross-import overlays it
     // is the underlying module of, transitively.
     if (GroupNames.empty()) {
-      printCrossImportOverlays(TargetMod, SwiftContext, *PrinterToUse,
+      printCrossImportOverlays(TargetMod, SwiftContext, Printer,
                                AdjustedOptions, PrintSynthesizedExtensions);
     }
   }
+  // Flush pending newlines.
+  Printer.forceNewlines();
 }
 
 static SourceLoc getDeclStartPosition(SourceFile &File) {
@@ -911,234 +816,19 @@ void swift::ide::printHeaderInterface(
                                             getEffectiveClangNode(RHS).getLocation());
             });
 
-  ASTPrinter *PrinterToUse = &Printer;
-
-  ClangCommentPrinter RegularCommentPrinter(Printer, Importer);
-  if (Options.PrintRegularClangComments)
-    PrinterToUse = &RegularCommentPrinter;
-
   for (auto *D : ClangDecls) {
     // Even though the corresponding clang decl should be top-level, its
     // equivalent Swift decl may not be. E.g. a top-level function may be mapped
     // to a property accessor in Swift.
     D = getTopLevelDecl(D);
-    ASTPrinter &Printer = *PrinterToUse;
     if (!AdjustedOptions.shouldPrint(D)) {
       Printer.callAvoidPrintDeclPost(D);
       continue;
     }
     if (D->print(Printer, AdjustedOptions))
-      Printer << "\n";
+      Printer.printNewline();
   }
-}
-
-void ClangCommentPrinter::avoidPrintDeclPost(const Decl *D) {
-  auto CD = D->getClangDecl();
-  if (!CD)
-    return;
-  const auto &Ctx = ClangLoader.getClangASTContext();
-  const auto &SM = Ctx.getSourceManager();
-  auto EndLoc = CD->getSourceRange().getEnd();
-  if (EndLoc.isInvalid())
-    return;
-  clang::FileID FID = SM.getFileID(EndLoc);
-  if (FID.isInvalid())
-    return;
-  auto Loc = EndLoc;
-
-  for (unsigned Line = SM.getSpellingLineNumber(EndLoc);
-       Loc.isValid() && SM.getSpellingLineNumber(Loc) == Line;
-       Loc = Loc.getLocWithOffset(1));
-  if (Loc.isInvalid())
-    return;
-  if (SM.getFileOffset(Loc) > getResumeOffset(FID))
-    setResumeOffset(FID, SM.getFileOffset(Loc));
-}
-
-void ClangCommentPrinter::printDeclPre(const Decl *D,
-                                       std::optional<BracketOptions> Bracket) {
-  // Skip parameters, since we do not gracefully handle nested declarations on a
-  // single line.
-  // FIXME: we should fix that, since it also affects struct members, etc.
-  if (!isa<ParamDecl>(D)) {
-    if (auto ClangN = swift::ide::getEffectiveClangNode(D)) {
-      printCommentsUntil(ClangN);
-      if (shouldPrintNewLineBefore(ClangN)) {
-        *this << "\n";
-        printIndent();
-      }
-      updateLastEntityLine(ClangN.getSourceRange().getBegin());
-    }
-  }
-  return OtherPrinter.printDeclPre(D, Bracket);
-}
-
-void ClangCommentPrinter::printDeclPost(const Decl *D,
-                                        std::optional<BracketOptions> Bracket) {
-  OtherPrinter.printDeclPost(D, Bracket);
-
-  // Skip parameters; see printDeclPre().
-  if (isa<ParamDecl>(D))
-    return;
-
-  for (auto CommentText : PendingComments) {
-    *this << " " << unicode::sanitizeUTF8(CommentText);
-  }
-  PendingComments.clear();
-  if (auto ClangN = swift::ide::getEffectiveClangNode(D))
-    updateLastEntityLine(ClangN.getSourceRange().getEnd());
-}
-
-void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
-  const auto &Ctx = ClangLoader.getClangASTContext();
-  const auto &SM = Ctx.getSourceManager();
-
-  clang::SourceLocation NodeLoc =
-      SM.getFileLoc(Node.getSourceRange().getBegin());
-  if (NodeLoc.isInvalid())
-    return;
-  unsigned NodeLineNo = SM.getSpellingLineNumber(NodeLoc);
-  clang::FileID FID = SM.getFileID(NodeLoc);
-  if (FID.isInvalid())
-    return;
-  clang::SourceLocation FileLoc = SM.getLocForStartOfFile(FID);
-  StringRef Text = SM.getBufferData(FID);
-  if (Text.empty())
-    return;
-
-  const char *BufStart = Text.data();
-  const char *BufPtr = BufStart + getResumeOffset(FID);
-  const char *BufEnd = BufStart + Text.size();
-  assert(BufPtr <= BufEnd);
-  if (BufPtr == BufEnd)
-    return; // nothing left.
-
-  clang::Lexer Lex(FileLoc, Ctx.getLangOpts(), BufStart, BufPtr, BufEnd);
-  Lex.SetCommentRetentionState(true);
-
-  unsigned &LastPrintedLineNo = LastEntityLines[FID];
-  clang::Token Tok;
-  do {
-    BufPtr = Lex.getBufferLocation();
-    Lex.LexFromRawLexer(Tok);
-    if (Tok.is(clang::tok::eof))
-      break;
-    if (Tok.isNot(clang::tok::comment))
-      continue;
-
-    // Reached a comment.
-
-    clang::SourceLocation CommentLoc = Tok.getLocation();
-    std::pair<clang::FileID, unsigned> LocInfo =
-      SM.getDecomposedLoc(CommentLoc);
-    assert(LocInfo.first == FID);
-
-    unsigned LineNo = SM.getLineNumber(LocInfo.first, LocInfo.second);
-    if (LineNo > NodeLineNo)
-      break; // Comment is past the clang node.
-
-    bool IsDocComment = isDocumentationComment(CommentLoc, Node);
-
-    // Print out the comment.
-
-    StringRef CommentText(BufStart + LocInfo.second, Tok.getLength());
-
-    // Check if comment is on same line but after the declaration.
-    if (SM.isBeforeInTranslationUnit(NodeLoc, Tok.getLocation())) {
-      if (!IsDocComment)
-        PendingComments.push_back(CommentText);
-      continue;
-    }
-
-    if (LastPrintedLineNo && LineNo - LastPrintedLineNo > 1) {
-      *this << "\n";
-      printIndent();
-    }
-    if (!IsDocComment) {
-      unsigned StartLocCol = SM.getSpellingColumnNumber(Tok.getLocation());
-      printComment(CommentText, StartLocCol);
-    }
-    LastPrintedLineNo =
-        SM.getLineNumber(LocInfo.first, LocInfo.second + Tok.getLength());
-
-  } while (true);
-
-  // Resume printing comments from this point.
-  setResumeOffset(FID, BufPtr - BufStart);
-}
-
-void ClangCommentPrinter::printComment(StringRef RawText, unsigned StartCol) {
-  unsigned WhitespaceToTrim = StartCol ? StartCol - 1 : 0;
-  SmallVector<StringRef, 8> Lines;
-  trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
-
-  for (auto Line : Lines) {
-    *this << unicode::sanitizeUTF8(Line) << "\n";
-    printIndent();
-  }
-}
-
-bool ClangCommentPrinter::isDocumentationComment(
-      clang::SourceLocation CommentLoc, ClangNode Node) const {
-  const clang::Decl *D = Node.getAsDecl();
-  if (!D)
-    return false;
-
-  const auto &Ctx = ClangLoader.getClangASTContext();
-  const auto &SM = Ctx.getSourceManager();
-  const clang::RawComment *RC = Ctx.getRawCommentForAnyRedecl(D);
-  if (!RC)
-    return false;
-
-  clang::SourceRange DocRange = RC->getSourceRange();
-  if (SM.isBeforeInTranslationUnit(CommentLoc, DocRange.getBegin()) ||
-      SM.isBeforeInTranslationUnit(DocRange.getEnd(), CommentLoc))
-    return false;
-  return true;
-}
-
-bool ClangCommentPrinter::shouldPrintNewLineBefore(ClangNode Node) const {
-  assert(Node);
-  const auto &Ctx = ClangLoader.getClangASTContext();
-  const auto &SM = Ctx.getSourceManager();
-
-  clang::SourceLocation NodeLoc =
-      SM.getFileLoc(Node.getSourceRange().getBegin());
-  if (NodeLoc.isInvalid())
-    return false;
-  unsigned NodeLineNo = SM.getSpellingLineNumber(NodeLoc);
-  clang::FileID FID = SM.getFileID(NodeLoc);
-  if (FID.isInvalid())
-    return false;
-
-  unsigned LastEntiyLine = 0;
-  auto It = LastEntityLines.find(FID);
-  if (It != LastEntityLines.end())
-    LastEntiyLine = It->second;
-  return (NodeLineNo > LastEntiyLine) && NodeLineNo - LastEntiyLine > 1;
-}
-
-void ClangCommentPrinter::updateLastEntityLine(clang::SourceLocation Loc) {
-  if (Loc.isInvalid())
-    return;
-
-  const auto &Ctx = ClangLoader.getClangASTContext();
-  const auto &SM = Ctx.getSourceManager();
-
-  unsigned LineNo = SM.getSpellingLineNumber(Loc);
-  clang::FileID FID = SM.getFileID(Loc);
-  if (FID.isInvalid())
-    return;
-
-  updateLastEntityLine(FID, LineNo);
-}
-
-void ClangCommentPrinter::updateLastEntityLine(clang::FileID FID,
-                                               unsigned LineNo) {
-  assert(!FID.isInvalid());
-  unsigned &LastEntiyLine = LastEntityLines[FID];
-  if (LineNo > LastEntiyLine)
-    LastEntiyLine = LineNo;
+  Printer.forceNewlines();
 }
 
 void swift::ide::printSymbolicSwiftClangModuleInterface(
@@ -1154,7 +844,6 @@ void swift::ide::printSymbolicSwiftClangModuleInterface(
   auto popts =
       PrintOptions::printModuleInterface(/*printFullConvention=*/false);
   popts.PrintDocumentationComments = false;
-  popts.PrintRegularClangComments = false;
   popts.SkipInlineCXXNamespace = true;
 
   auto &SwiftContext = M->getTopLevelModule()->getASTContext();

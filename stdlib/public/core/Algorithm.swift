@@ -103,6 +103,8 @@ public struct EnumeratedSequence<Base: Sequence> {
   }
 }
 
+extension EnumeratedSequence: Sendable where Base: Sendable {}
+
 extension EnumeratedSequence {
   /// The iterator for `EnumeratedSequence`.
   ///
@@ -133,6 +135,8 @@ extension EnumeratedSequence {
     }
   }
 }
+
+extension EnumeratedSequence.Iterator: Sendable where Base.Iterator: Sendable {}
 
 extension EnumeratedSequence.Iterator: IteratorProtocol, Sequence {
   /// The type of element returned by `next()`.

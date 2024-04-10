@@ -21,7 +21,7 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(SwiftStdlib 5.7, *)
-public struct ContinuousClock {
+public struct ContinuousClock: Sendable {
   /// A continuous point in time used for `ContinuousClock`.
   public struct Instant: Codable, Sendable {
     internal var _value: Swift.Duration

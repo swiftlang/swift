@@ -101,6 +101,10 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   llvm_unreachable("invalid derivative kind");
 }
 
+void AutoDiffConfig::dump() const {
+  print(llvm::errs());
+}
+
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
   parameterIndices->print(s);
@@ -354,22 +358,30 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
   // Require differentiability results to conform to `Differentiable`.
   SmallVector<SILResultInfo, 2> originalResults;
   getSemanticResults(originalFnTy, diffParamIndices, originalResults);
+  unsigned firstSemanticParamResultIdx = originalFnTy->getNumResults();
+  unsigned firstYieldResultIndex = originalFnTy->getNumResults() +
+      originalFnTy->getNumAutoDiffSemanticResultsParameters();
   for (unsigned resultIdx : diffResultIndices->getIndices()) {
     // Handle formal original result.
-    if (resultIdx < originalFnTy->getNumResults()) {
+    if (resultIdx < firstSemanticParamResultIdx) {
       auto resultType = originalResults[resultIdx].getInterfaceType();
       addRequirement(resultType);
-      continue;
+    } else if (resultIdx < firstYieldResultIndex) {
+      // Handle original semantic result parameters.
+      auto resultParamIndex = resultIdx - originalFnTy->getNumResults();
+      auto resultParamIt = std::next(
+        originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+        resultParamIndex);
+      auto paramIndex =
+        std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+      addRequirement(originalFnTy->getParameters()[paramIndex].getInterfaceType());
+    } else {
+      // Handle formal original yields.
+      assert(originalFnTy->isCoroutine());
+      assert(originalFnTy->getCoroutineKind() == SILCoroutineKind::YieldOnce);
+      auto yieldResultIndex = resultIdx - firstYieldResultIndex;
+      addRequirement(originalFnTy->getYields()[yieldResultIndex].getInterfaceType());
     }
-    // Handle original semantic result parameters.
-    // FIXME: Constraint generic yields when we will start supporting them
-    auto resultParamIndex = resultIdx - originalFnTy->getNumResults();
-    auto resultParamIt = std::next(
-      originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
-      resultParamIndex);
-    auto paramIndex =
-      std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
-    addRequirement(originalFnTy->getParameters()[paramIndex].getInterfaceType());
   }
 
   return buildGenericSignature(ctx, derivativeGenSig,
@@ -386,7 +398,7 @@ static void parseAutoDiffBuiltinCommonConfig(
     StringRef &operationName, unsigned &arity, bool &throws) {
   // Parse '_arity'.
   constexpr char arityPrefix[] = "_arity";
-  if (operationName.startswith(arityPrefix)) {
+  if (operationName.starts_with(arityPrefix)) {
     operationName = operationName.drop_front(sizeof(arityPrefix) - 1);
     auto arityStr = operationName.take_while(llvm::isDigit);
     operationName = operationName.drop_front(arityStr.size());
@@ -398,7 +410,7 @@ static void parseAutoDiffBuiltinCommonConfig(
   }
   // Parse '_throws'.
   constexpr char throwsPrefix[] = "_throws";
-  if (operationName.startswith(throwsPrefix)) {
+  if (operationName.starts_with(throwsPrefix)) {
     operationName = operationName.drop_front(sizeof(throwsPrefix) - 1);
     throws = true;
   } else {
@@ -410,15 +422,15 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
     StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
     unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyDerivative";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   // Parse 'jvp' or 'vjp'.
   constexpr char jvpPrefix[] = "_jvp";
   constexpr char vjpPrefix[] = "_vjp";
-  if (operationName.startswith(jvpPrefix))
+  if (operationName.starts_with(jvpPrefix))
     kind = AutoDiffDerivativeFunctionKind::JVP;
-  else if (operationName.startswith(vjpPrefix))
+  else if (operationName.starts_with(vjpPrefix))
     kind = AutoDiffDerivativeFunctionKind::VJP;
   operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -428,7 +440,7 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
 bool autodiff::getBuiltinApplyTransposeConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyTranspose";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -439,9 +451,9 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char differentiablePrefix[] = "differentiableFunction";
   constexpr char linearPrefix[] = "linearFunction";
-  if (operationName.startswith(differentiablePrefix))
+  if (operationName.starts_with(differentiablePrefix))
     operationName = operationName.drop_front(sizeof(differentiablePrefix) - 1);
-  else if (operationName.startswith(linearPrefix))
+  else if (operationName.starts_with(linearPrefix))
     operationName = operationName.drop_front(sizeof(linearPrefix) - 1);
   else
     return false;

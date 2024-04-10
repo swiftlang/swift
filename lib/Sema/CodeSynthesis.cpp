@@ -1401,9 +1401,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       // FIXME: This should be more fine-grained to avoid having to check
       // for a cycle here.
       if (!evaluator.hasActiveRequest(ResolveValueWitnessesRequest{conformance})) {
-        evaluateOrDefault(evaluator,
-                          ResolveValueWitnessesRequest{conformance},
-                          evaluator::SideEffect());
+        conformance->resolveValueWitnesses();
       }
     }
 

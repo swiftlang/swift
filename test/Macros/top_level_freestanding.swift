@@ -13,7 +13,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -DIMPORT_MACRO_LIBRARY -swift-version 5  %S/Inputs/top_level_freestanding_other.swift -I %t
 
 // Check diagnostic buffer names
-// RUN: not %target-swift-frontend -typecheck -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 %s %S/Inputs/top_level_freestanding_other.swift 2> %t.diags
+// RUN: not %target-swift-frontend -typecheck -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 %s %S/Inputs/top_level_freestanding_other.swift -diagnostic-style llvm 2> %t.diags
 // RUN: %FileCheck -check-prefix DIAG_BUFFERS %s < %t.diags
 
 // Execution testing

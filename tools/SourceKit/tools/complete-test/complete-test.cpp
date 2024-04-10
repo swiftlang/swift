@@ -126,12 +126,12 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.compilerArgs = args.slice(i + 1);
       break;
     }
-    if (opt == "-" || !opt.startswith("-")) {
+    if (opt == "-" || !opt.starts_with("-")) {
       options.sourceFile = args[i];
       continue;
     }
 
-    if (opt.startswith("--")) {
+    if (opt.starts_with("--")) {
       error = std::string("unrecognized option '") + args[i] + "'";
       return false;
     }
@@ -358,7 +358,7 @@ static int skt_main(int argc, const char **argv) {
   KeyUnpopular = sourcekitd_uid_get_from_cstr("key.unpopular");
   KeySubStructure = sourcekitd_uid_get_from_cstr("key.substructure");
 
-  auto Args = llvm::makeArrayRef(argv + 1, argc - 1);
+  auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   TestOptions options;
   std::string error;
   if (!parseOptions(Args, options, error)) {

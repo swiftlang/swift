@@ -23,7 +23,10 @@ public func borrowVal(_ x: borrowing EmptyStruct) {}
 
 // CHECK-LABEL: sil [ossa] @$s26moveonly_library_evolution10DeinitTestVfD : $@convention(method) (@in DeinitTest) -> () {
 // CHECK: bb0([[ARG:%.*]] : $*DeinitTest):
-// CHECK:   drop_deinit [[ARG]]
+// CHECK:   [[TMP:%[^,]+]] = alloc_stack
+// CHECK:   [[MUNV:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TMP]]
+// CHECK:   copy_addr [take] [[ARG]] to [init] [[MUNV]]
+// CHECK:   drop_deinit [[MUNV]]
 // CHECK: } // end sil function '$s26moveonly_library_evolution10DeinitTestVfD'
 public struct DeinitTest : ~Copyable {
     deinit {

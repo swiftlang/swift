@@ -389,6 +389,7 @@ public:
       std::optional<std::pair<std::string, bool /*isObjC*/>>;
   using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
   using BuiltRequirement = TypeRefRequirement;
+  using BuiltInverseRequirement = TypeRefInverseRequirement;
   using BuiltLayoutConstraint = TypeRefLayoutConstraint;
   using BuiltGenericTypeParam = const GenericTypeParameterTypeRef *;
   using BuiltGenericSignature = const GenericSignatureRef *;
@@ -1133,7 +1134,9 @@ public:
 
   const FunctionTypeRef *createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
+      Demangle::ImplCoroutineKind coroutineKind,
       llvm::ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
+      llvm::ArrayRef<Demangle::ImplFunctionYield<const TypeRef *>> yields,
       llvm::ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
       std::optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
       ImplFunctionTypeFlags flags) {
@@ -1162,7 +1165,7 @@ public:
       break;
     }
 
-    funcFlags = funcFlags.withConcurrent(flags.isSendable());
+    funcFlags = funcFlags.withSendable(flags.isSendable());
     funcFlags = funcFlags.withAsync(flags.isAsync());
     funcFlags = funcFlags.withDifferentiable(flags.isDifferentiable());
     extFuncFlags =
@@ -1221,7 +1224,9 @@ public:
   }
 
   const ConstrainedExistentialTypeRef *createConstrainedExistentialType(
-      const TypeRef *base, llvm::ArrayRef<BuiltRequirement> constraints) {
+      const TypeRef *base, llvm::ArrayRef<BuiltRequirement> constraints,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) {
+    // FIXME: Handle inverse requirements.
     auto *baseProto = llvm::dyn_cast<ProtocolCompositionTypeRef>(base);
     if (!baseProto)
       return nullptr;
@@ -1295,10 +1300,17 @@ public:
     return {};
   }
 
+  BuiltInverseRequirement createInverseRequirement(
+      const TypeRef *subject, InvertibleProtocolKind proto) {
+    return TypeRefInverseRequirement(subject, proto);
+  }
+
   const SILBoxTypeWithLayoutTypeRef *createSILBoxTypeWithLayout(
       const llvm::SmallVectorImpl<BuiltSILBoxField> &Fields,
       const llvm::SmallVectorImpl<BuiltSubstitution> &Substitutions,
-      const llvm::SmallVectorImpl<BuiltRequirement> &Requirements) {
+      const llvm::SmallVectorImpl<BuiltRequirement> &Requirements,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) {
+    // FIXME: Handle inverse requirements.
     return SILBoxTypeWithLayoutTypeRef::create(*this, Fields, Substitutions,
                                                Requirements);
   }

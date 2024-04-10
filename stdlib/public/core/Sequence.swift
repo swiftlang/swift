@@ -453,7 +453,7 @@ public protocol Sequence<Element> {
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.
 extension Sequence where Self: IteratorProtocol {
-  // @_implements(Sequence, Iterator)
+  @_implements(Sequence, Iterator)
   public typealias _Default_Iterator = Self
 }
 
@@ -486,6 +486,8 @@ public struct DropFirstSequence<Base: Sequence> {
     _limit = limit
   }
 }
+
+extension DropFirstSequence: Sendable where Base: Sendable {}
 
 extension DropFirstSequence: Sequence {
   public typealias Element = Base.Element
@@ -530,6 +532,8 @@ public struct PrefixSequence<Base: Sequence> {
   }
 }
 
+extension PrefixSequence: Sendable where Base: Sendable {}
+
 extension PrefixSequence {
   @frozen
   public struct Iterator {
@@ -545,6 +549,8 @@ extension PrefixSequence {
     }
   }  
 }
+
+extension PrefixSequence.Iterator: Sendable where Base.Iterator: Sendable {}
 
 extension PrefixSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element
@@ -603,6 +609,9 @@ public struct DropWhileSequence<Base: Sequence> {
   }
 }
 
+extension DropWhileSequence: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
+
 extension DropWhileSequence {
   @frozen
   public struct Iterator {
@@ -618,6 +627,9 @@ extension DropWhileSequence {
     }
   }
 }
+
+extension DropWhileSequence.Iterator: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
 
 extension DropWhileSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element

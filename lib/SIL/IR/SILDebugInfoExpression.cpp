@@ -37,6 +37,9 @@ const SILDIExprInfo *SILDIExprInfo::get(SILDIExprOperator Op) {
   static const std::unordered_map<SILDIExprOperator, SILDIExprInfo> Infos = {
       {SILDIExprOperator::Fragment,
        {"op_fragment", {SILDIExprElement::DeclKind}}},
+      {SILDIExprOperator::TupleFragment,
+       {"op_tuple_fragment",
+         {SILDIExprElement::TypeKind, SILDIExprElement::ConstIntKind}}},
       {SILDIExprOperator::Dereference, {"op_deref", {}}},
       {SILDIExprOperator::Plus, {"op_plus", {}}},
       {SILDIExprOperator::Minus, {"op_minus", {}}},
@@ -71,3 +74,13 @@ SILDebugInfoExpression SILDebugInfoExpression::createFragment(VarDecl *Field) {
       {SILDIExprElement::createOperator(SILDIExprOperator::Fragment),
        SILDIExprElement::createDecl(Field)});
 }
+
+SILDebugInfoExpression
+SILDebugInfoExpression::createTupleFragment(TupleType *TypePtr, unsigned Idx) {
+  assert(TypePtr);
+  return SILDebugInfoExpression(
+      {SILDIExprElement::createOperator(SILDIExprOperator::TupleFragment),
+       SILDIExprElement::createType(TypePtr),
+       SILDIExprElement::createConstInt(Idx)});
+}
+

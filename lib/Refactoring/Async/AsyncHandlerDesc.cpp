@@ -196,7 +196,7 @@ AsyncHandlerDesc::extractResultArgs(const CallExpr *CE,
                                     bool ReturnErrorArgsIfAmbiguous) const {
   auto *ArgList = CE->getArgs();
   SmallVector<Argument, 2> Scratch(ArgList->begin(), ArgList->end());
-  auto Args = llvm::makeArrayRef(Scratch);
+  auto Args = llvm::ArrayRef(Scratch);
 
   if (Type == HandlerType::PARAMS) {
     bool IsErrorResult;

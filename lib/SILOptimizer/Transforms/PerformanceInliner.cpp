@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -355,7 +356,7 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
   // branch tracing enum.
   if (auto *arg = dyn_cast<SILFunctionArgument>(val)) {
     if (auto *enumDecl = arg->getType().getEnumOrBoundGenericEnum()) {
-      return enumDecl->getName().str().startswith(
+      return enumDecl->getName().str().starts_with(
           LinearMapBranchTracingEnumPrefix);
     }
   }
@@ -1207,6 +1208,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (invalidatedStackNesting) {
     StackNesting::fixNesting(Caller);
   }
+  updateBorrowedFrom(pm, Caller);
 
   // If we were asked to verify our caller after inlining all callees we could
   // find into it, do so now. This makes it easier to catch verification bugs in

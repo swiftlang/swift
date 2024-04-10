@@ -289,6 +289,29 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
   llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
+/// Opt in package linkage for visibility in case Package CMO is enabled.
+/// Used in SIL verification and other checks that determine inlinability to
+/// accomodate for the optimization.
+inline bool hasPublicOrPackageVisibility(SILLinkage linkage, bool includePackage) {
+    switch (linkage) {
+    case SILLinkage::Public:
+    case SILLinkage::PublicExternal:
+    case SILLinkage::PublicNonABI:
+        return true;
+    case SILLinkage::Package:
+    case SILLinkage::PackageExternal:
+    case SILLinkage::PackageNonABI:
+        return includePackage;
+    case SILLinkage::Hidden:
+    case SILLinkage::Shared:
+    case SILLinkage::Private:
+    case SILLinkage::HiddenExternal:
+        return false;
+    }
+
+    llvm_unreachable("Unhandled SILLinkage in switch.");
+}
+
 inline bool hasSharedVisibility(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Shared:
@@ -371,12 +394,16 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
 // protocol requirement, even if the extended type is not public;
 // then SILGen gives the member private linkage, ignoring the more
 // visible access level it was given in the AST.
-inline bool
-fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness) {
+//
+// Despite the FIXME above, this is still used to determine the linkage
+// for witness thunks. In case package serialization is enabled, we need
+// to take the package linkage into account so we can set a proper final
+// linkage to the thunks in the witness table with a package linkage.
+inline bool fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness,
+                                                      bool isPackageVisible) {
   auto witnessLinkage = witness.getLinkage(ForDefinition);
-  return !hasPublicVisibility(witnessLinkage)
-         && (!hasSharedVisibility(witnessLinkage)
-             || !witness.isSerialized());
+  return !hasPublicOrPackageVisibility(witnessLinkage, isPackageVisible) &&
+         (!hasSharedVisibility(witnessLinkage) || !witness.isSerialized());
 }
 
 } // end swift namespace

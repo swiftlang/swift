@@ -617,7 +617,7 @@ func rdar50679161() {
 
     _ = { () -> Void in
       var foo = S
-      // expected-error@-1 {{expected member name or constructor call after type name}}
+      // expected-error@-1 {{expected member name or initializer call after type name}}
       // expected-note@-2 {{add arguments after the type to construct a value of the type}}
       // expected-note@-3 {{use '.self' to reference the type object}}
       print(foo)
@@ -814,5 +814,15 @@ func test_mismatch_between_param_and_optional_chain() {
     func test() {
       fn(data?.first) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'String'}}
     }
+  }
+}
+
+// rdar://124549952 - incorrect "type of expression is ambiguous without a type annotation"
+do {
+  func fn() -> (any BinaryInteger)? {}
+
+  func test() {
+    let _ = fn()?.op().value
+    // expected-error@-1 {{value of type 'any BinaryInteger' has no member 'op'}}
   }
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -120,6 +120,9 @@ public struct Unsafe${Mutable}RawBufferPointer {
   }
 }
 
+@available(*, unavailable)
+extension Unsafe${Mutable}RawBufferPointer: Sendable {}
+
 %if not mutable:
 extension UnsafeRawBufferPointer {
   /// An iterator over the bytes viewed by a raw buffer pointer.
@@ -135,6 +138,9 @@ extension UnsafeRawBufferPointer {
     }
   }
 }
+
+@available(*, unavailable)
+extension UnsafeRawBufferPointer.Iterator: Sendable { }
 
 extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
   /// Advances to the next byte and returns it, or `nil` if no next byte
@@ -186,7 +192,6 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   ///
   /// - Returns: an iterator over any remaining elements of `self` and the
   ///   number of elements copied.
-  @inlinable // unsafe-performance
   @_alwaysEmitIntoClient
   public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<UInt8>
@@ -400,6 +405,9 @@ extension Unsafe${Mutable}RawBufferPointer {
     return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
+  // FIXME(NCG): Add a consuming analogue of `load`, like `move(fromByteOffset:as:_:)` (in the mutable variant)
+  // FIXME(NCG): Add a borrow analogue of `load`, like `withBorrow(fromByteOffset:as:_:)`
+
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
@@ -442,6 +450,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 #endif
+
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
@@ -488,7 +497,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
-  @inlinable
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawBufferPointer_storeBytes")
@@ -506,7 +514,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   // This unavailable implementation uses the expected mangled name
   // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
   // any binary linked against the stdlib binary for Swift 5.6 and older.
-  @available(*, unavailable)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$sSw10storeBytes2of12toByteOffset2asyx_SixmtlF")
   @usableFromInline func _legacy_se0349_storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
@@ -618,7 +626,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
   ///   buffer's type `T` must be a trivial type.
   @inlinable
-  public init<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+  @_preInverseGenerics
+  public init<T: ~Copyable>(_ buffer: UnsafeMutableBufferPointer<T>) {
     self.init(start: buffer.baseAddress,
       count: buffer.count * MemoryLayout<T>.stride)
   }
@@ -629,7 +638,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
   ///   buffer's type `T` must be a trivial type.
   @inlinable
-  public init<T>(_ buffer: UnsafeBufferPointer<T>) {
+  @_preInverseGenerics
+  public init<T: ~Copyable>(_ buffer: UnsafeBufferPointer<T>) {
     self.init(start: buffer.baseAddress,
       count: buffer.count * MemoryLayout<T>.stride)
   }
@@ -841,7 +851,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`
-  @inlinable
   @_alwaysEmitIntoClient
   public func initializeMemory<C: Collection>(
     as type: C.Element.Type,
@@ -930,9 +939,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.
   @discardableResult
-  @inlinable
   @_alwaysEmitIntoClient
-  public func moveInitializeMemory<T>(
+  public func moveInitializeMemory<T: ~Copyable>(
     as type: T.Type,
     fromContentsOf source: UnsafeMutableBufferPointer<T>
   ) -> UnsafeMutableBufferPointer<T> {
@@ -983,7 +991,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.
   @discardableResult
-  @inlinable
   @_alwaysEmitIntoClient
   public func moveInitializeMemory<T>(
     as type: T.Type,
@@ -995,8 +1002,8 @@ extension Unsafe${Mutable}RawBufferPointer {
 
   %  end # mutable
 
-  /// Binds this buffer’s memory to the specified type and returns a typed buffer 
-  /// of the bound memory.
+  /// Binds this buffer’s memory to the specified type and returns a typed
+  /// buffer of the bound memory.
   ///
   /// Use the `bindMemory(to:)` method to bind the memory referenced
   /// by this buffer to the type `T`. The memory must be uninitialized or
@@ -1013,9 +1020,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
   ///   instances of `T`.
+  @inlinable
   @_transparent
+  @_preInverseGenerics
   @discardableResult
-  public func bindMemory<T>(
+  public func bindMemory<T: ~Copyable>(
     to type: T.Type
   ) -> Unsafe${Mutable}BufferPointer<T> {
     guard let base = _position else {
@@ -1072,12 +1081,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   ///   - buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
-    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     guard let s = _position else {
       return try body(.init(start: nil, count: 0))
     }
@@ -1110,9 +1118,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  @inlinable
   @_alwaysEmitIntoClient
-  public func assumingMemoryBound<T>(
+  public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
   ) -> Unsafe${Mutable}BufferPointer<T> {
     guard let s = _position else {
@@ -1126,11 +1133,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
 %  if Mutable:
-  @inlinable
   @_alwaysEmitIntoClient
   public func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
+    #if $TypedThrows
     try withMemoryRebound(to: Element.self) { b in
       var buffer = b
       defer {
@@ -1141,17 +1148,23 @@ extension Unsafe${Mutable}RawBufferPointer {
       }
       return try body(&buffer)
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
   }
 
 %  end
-  @inlinable
   @_alwaysEmitIntoClient
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
+    #if $TypedThrows
     try withMemoryRebound(to: Element.self) {
       try body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
   }
 }
 
@@ -1206,16 +1219,49 @@ extension ${Self} {
 ///     function. The buffer pointer argument is valid only for the duration
 ///     of the closure's execution.
 /// - Returns: The return value, if any, of the `body` closure.
-@inlinable
-public func withUnsafeMutableBytes<T, Result>(
+@_alwaysEmitIntoClient
+public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
+  of value: inout T,
+  _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+  let pointer = UnsafeMutableRawPointer(Builtin.addressof(&value))
+  return try body(.init(start: pointer, count: MemoryLayout<T>.size))
+}
+
+/// ABI: Historical withUnsafeMutableBytes(of:_:) rethrows,
+/// expressed as "throws", which is ABI-compatible with "rethrows".
+// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
+//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss22withUnsafeMutableBytes2of_q_xz_q_SwKXEtKr0_lF")
+@usableFromInline
+func __abi_se0413_withUnsafeMutableBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws -> Result
-) rethrows -> Result
-{
+) rethrows -> Result {
   return try withUnsafeMutablePointer(to: &value) {
     return try body(UnsafeMutableRawBufferPointer(
         start: $0, count: MemoryLayout<T>.size))
   }
+}
+
+/// Invokes the given closure with a buffer pointer covering the raw bytes of
+/// the given argument.
+///
+/// This function is similar to `withUnsafeMutableBytes`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeMutableBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  of value: inout T,
+  _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+#if $BuiltinUnprotectedAddressOf
+  let pointer = UnsafeMutableRawPointer(Builtin.unprotectedAddressOf(&value))
+#else
+  let pointer = UnsafeMutableRawPointer(Builtin.addressof(&value))
+#endif
+  return try body(.init(start: pointer, count: MemoryLayout<T>.size))
 }
 
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
@@ -1241,12 +1287,25 @@ public func withUnsafeMutableBytes<T, Result>(
 ///     If you want to mutate a value by writing through a pointer, use
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@inlinable
-public func withUnsafeBytes<T, Result>(
+@_alwaysEmitIntoClient
+public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
+  of value: inout T,
+  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+  let address = UnsafeRawPointer(Builtin.addressof(&value))
+  return try body(.init(start: address, count: MemoryLayout<T>.size))
+}
+
+/// ABI: Historical withUnsafeBytes(of:_:) rethrows,
+/// expressed as "throws", which is ABI-compatible with "rethrows".
+// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
+//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss15withUnsafeBytes2of_q_xz_q_SWKXEtKr0_lF")
+@usableFromInline
+func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result
-{
+) rethrows -> Result {
   return try withUnsafePointer(to: &value) {
     try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
@@ -1258,14 +1317,18 @@ public func withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeBytes<T, Result>(
+public func _withUnprotectedUnsafeBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
   of value: inout T,
-  _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result
-{
-  return try _withUnprotectedUnsafePointer(to: &value) {
-    try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
-  }
+  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+#if $BuiltinUnprotectedAddressOf
+  let p = UnsafeRawPointer(Builtin.unprotectedAddressOf(&value))
+#else
+  let p = UnsafeRawPointer(Builtin.addressof(&value))
+#endif
+  return try body(.init(start: p, count: MemoryLayout<T>.size))
 }
 
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
@@ -1287,8 +1350,24 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
 ///     If you want to mutate a value by writing through a pointer, use
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@inlinable
-public func withUnsafeBytes<T, Result>(
+@_alwaysEmitIntoClient
+public func withUnsafeBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  of value: borrowing T,
+  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
+  let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
+  return try body(.init(start: addr, count: MemoryLayout<T>.size))
+}
+
+/// ABI: Historical withUnsafeBytes(of:_:) rethrows,
+/// expressed as "throws", which is ABI-compatible with "rethrows".
+// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
+//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss15withUnsafeBytes2of_q_x_q_SWKXEtKr0_lF")
+@usableFromInline
+func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
 ) rethrows -> Result {
@@ -1303,10 +1382,12 @@ public func withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeBytes<T, Result>(
-  of value: T,
-  _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result {
+public func _withUnprotectedUnsafeBytes<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  of value: borrowing T,
+  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
   let addr = UnsafeRawPointer(Builtin.unprotectedAddressOfBorrow(value))
 #else
@@ -1315,14 +1396,6 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }
-
-@available(*, unavailable)
-extension UnsafeRawBufferPointer: Sendable { }
-@available(*, unavailable)
-extension UnsafeRawBufferPointer.Iterator: Sendable { }
-@available(*, unavailable)
-extension UnsafeMutableRawBufferPointer: Sendable { }
-
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

@@ -1972,6 +1972,20 @@ AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
       AllowNonClassTypeToConvertToAnyObject(cs, type, locator);
 }
 
+
+bool SpecifyPackElementType::diagnose(const Solution &solution,
+                                      bool asNote) const {
+  UnableToInferGenericPackElementType failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyPackElementType *
+SpecifyPackElementType::create(ConstraintSystem &cs,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyPackElementType(cs, locator);
+}
+
+
 bool AddQualifierToAccessTopLevelName::diagnose(const Solution &solution,
                                                 bool asNote) const {
   MissingQualifierInMemberRefFailure failure(solution, getLocator());

@@ -770,13 +770,13 @@ public:
   bool isLeaf() const { return ChildProjections.empty(); }
 
   ArrayRef<unsigned> getChildProjections() const {
-    return llvm::makeArrayRef(ChildProjections);
+    return llvm::ArrayRef(ChildProjections);
   }
 
   std::optional<Projection> &getProjection() { return Proj; }
 
   const ArrayRef<Operand *> getNonProjUsers() const {
-    return llvm::makeArrayRef(NonProjUsers);
+    return llvm::ArrayRef(NonProjUsers);
   }
 
   SILType getType() const { return NodeType; }
@@ -884,7 +884,7 @@ public:
   SILModule &getModule() const { return *Mod; }
 
   llvm::ArrayRef<ProjectionTreeNode *> getProjectionTreeNodes() {
-    return llvm::makeArrayRef(ProjectionTreeNodes);
+    return llvm::ArrayRef(ProjectionTreeNodes);
   }
 
   /// Iterate over all values in the tree. The function should return false if

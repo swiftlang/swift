@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library
 
-// XFAIL: noncopyable_generics
-
 // Generic class locally defined in non-generic function (rdar://problem/20116710)
 func f3() {
   class B<T> {}
@@ -122,7 +120,7 @@ struct OuterGenericStruct<A> {
   func middleFunction() {
     struct ConformingType : Racoon {
     // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction()'}}
-      typealias Stripes = A
+      typealias Stripes = String
     }
   }
 }

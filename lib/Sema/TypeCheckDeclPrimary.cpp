@@ -41,7 +41,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -86,15 +85,6 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
   }
 
   return Type();
-}
-
-bool swift::isInterfaceTypeNoncopyable(Type type, GenericEnvironment *env) {
-  assert(!type->hasTypeParameter() || env && "must have a generic environment");
-
-  if (env)
-    type = env->mapTypeIntoContext(type);
-
-  return type->isNoncopyable();
 }
 
 /// Check the inheritance clause of a type declaration or extension thereof.
@@ -572,6 +562,12 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   if (!currentFile)
     return std::make_tuple<>();
 
+  if (auto func = dyn_cast<AbstractFunctionDecl>(current)) {
+    if (func->isDistributedThunk()) {
+      return std::make_tuple<>();
+    }
+  }
+
   auto &ctx = current->getASTContext();
 
   // Find other potential definitions.
@@ -1034,7 +1030,7 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
       &ctx.Diags, SF->getExportedSourceFile(),
       initExpr->getLoc().getOpaquePointerValue());
 #else
-  ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_unsupported));
+  ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_unsupported);
   return false;
 #endif
 }
@@ -1603,14 +1599,15 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
 /// Determines if a given TypeLoc is module qualified by checking if it's
 /// of the form `<Module>.<Type>`.
 static bool isModuleQualified(TypeRepr *repr, ModuleDecl *module) {
-  auto memberTy = dyn_cast<MemberTypeRepr>(repr);
-  if (!memberTy) {
+  auto qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(repr);
+  if (!qualIdentTR) {
     return false;
   }
 
   // FIXME(ModQual): This needs to be updated once we have an explicit
   //                 module qualification syntax.
-  return memberTy->getRoot()->isSimpleUnqualifiedIdentifier(module->getName());
+  return qualIdentTR->getRoot()->isSimpleUnqualifiedIdentifier(
+      module->getName());
 }
 
 /// If the provided type is an AttributedTypeRepr, unwraps it and provides both
@@ -1898,7 +1895,7 @@ swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
     return std::move(diag);
 
   SmallString<32> attrString;
-  auto attrText = prettyPrintAttrs(VD, makeArrayRef(attr), attrString);
+  auto attrText = prettyPrintAttrs(VD, llvm::ArrayRef(attr), attrString);
 
   ASTContext &ctx = D->getASTContext();
   auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
@@ -2047,35 +2044,40 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
 /// want 'Other' to appear in the inheritance clause of 'Bar', so that
 /// name lookup on Bar can find members of Other.
 static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
-  auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
-      proto->getSelfInterfaceType());
-  const bool EnabledNoncopyableGenerics =
-      proto->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics);
+  auto &ctx = proto->getASTContext();
+  auto selfTy = proto->getSelfInterfaceType();
+  auto genericSig = proto->getGenericSignature();
 
+  // Check for circular inheritance; the HasCircularInheritedProtocolsRequest
+  // will diagnose an error in that case, and we skip all remaining checks.
+  if (proto->hasCircularInheritedProtocols())
+    return;
+
+  // If we make a ~P marking but our protocol Self type still conforms to P,
+  // diagnose an error.
+  //
+  // FIXME: This duplicates logic from computeRequirementDiagnostics().
+  // Get the list of written inverses.
+  InvertibleProtocolSet inverses;
+  bool anyObject = false;
+  (void) getDirectlyInheritedNominalTypeDecls(proto, inverses, anyObject);
+
+  for (auto ip : inverses) {
+    auto kp = getKnownProtocolKind(ip);
+    auto *otherProto = ctx.getProtocol(kp);
+    if (!genericSig->requiresProtocol(selfTy, otherProto))
+      continue;
+
+    ctx.Diags.diagnose(proto,
+                       diag::inverse_generic_but_also_conforms,
+                       selfTy, getProtocolName(kp));
+  }
+
+  auto requiredProtos = genericSig->getRequiredProtocols(selfTy);
   for (auto *otherProto : requiredProtos) {
     // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
     if (otherProto == proto)
       continue;
-
-    // For every invertible protocol IP and any protocol 'P', there is an
-    // implied requirement 'Self: IP', unless it was suppressed via
-    // `Self: ~IP`. So if this suppression annotation exists yet IP was
-    // implied anyway, emit a diagnostic.
-    if (EnabledNoncopyableGenerics) {
-      if (auto kp = otherProto->getKnownProtocolKind()) {
-        if (auto ip = getInvertibleProtocolKind(*kp)) {
-          auto inverse = proto->hasInverseMarking(*ip);
-          if (!inverse)
-            continue; // no ~IP annotation
-
-          auto &Diags = proto->getASTContext().Diags;
-          Diags.diagnose(inverse.getLoc(),
-                         diag::inverse_generic_but_also_conforms,
-                         proto->getSelfInterfaceType(), getProtocolName(*kp));
-          continue;
-        }
-      }
-    }
 
     // SIMDScalar in the standard library currently emits this warning for:
     // 'Hashable', 'Encodable', and 'Decodable'. This is unfortunate, but we
@@ -2743,8 +2745,7 @@ public:
       // accessors since this means that we cannot call mutating methods without
       // copying. We do not want to support types that one cannot define a
       // modify operation via a get/set or a modify.
-      if (isInterfaceTypeNoncopyable(var->getInterfaceType(),
-                                     DC->getGenericEnvironmentOfContext())) {
+      if (var->getTypeInContext()->isNoncopyable()) {
         if (auto *read = var->getAccessor(AccessorKind::Read)) {
           if (!read->isImplicit()) {
             if (auto *set = var->getAccessor(AccessorKind::Set)) {
@@ -2837,8 +2838,7 @@ public:
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (isInterfaceTypeNoncopyable(SD->getElementInterfaceType(),
-                                   SD->getGenericEnvironment())) {
+    if (SD->mapTypeIntoContext(SD->getElementInterfaceType())->isNoncopyable()) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {
@@ -3048,9 +3048,6 @@ public:
     if (ED->isObjC() && !ED->canBeCopyable()) {
       ED->diagnose(diag::noncopyable_objc_enum);
     }
-    // FIXME(kavon): see if these can be integrated into other parts of Sema
-    diagnoseCopyableTypeContainingMoveOnlyType(ED);
-    diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
 
     checkExplicitAvailability(ED);
 
@@ -3108,12 +3105,6 @@ public:
     TypeChecker::checkDeclCircularity(SD);
 
     TypeChecker::checkConformancesInContext(SD);
-
-    // If this struct is not move only, check that all vardecls of nominal type
-    // are not move only.
-    diagnoseCopyableTypeContainingMoveOnlyType(SD);
-
-    diagnoseIncompatibleProtocolsForMoveOnlyType(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -3218,77 +3209,19 @@ public:
   static void diagnoseInverseOnClass(ClassDecl *decl) {
     auto &ctx = decl->getASTContext();
 
-    for (auto ip : InvertibleProtocolSet::full()) {
-      auto inverseMarking = decl->hasInverseMarking(ip);
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void) getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject);
 
-      // Inferred inverses are already ignored for classes.
-      // FIXME: we can also diagnose @_moveOnly here if we use `isAnyExplicit`
-      if (!inverseMarking.is(InverseMarking::Kind::Explicit))
-        continue;
-
+    for (auto ip : inverses) {
       // Allow ~Copyable when MoveOnlyClasses is enabled
       if (ip == InvertibleProtocolKind::Copyable
           && ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
         continue;
 
-
-      ctx.Diags.diagnose(inverseMarking.getLoc(),
+      ctx.Diags.diagnose(decl->getLoc(),
                          diag::inverse_on_class,
                          getProtocolName(getKnownProtocolKind(ip)));
-    }
-  }
-
-  /// check to see if a move-only type can ever conform to the given type.
-  /// \returns true iff a diagnostic was emitted because it was not compatible
-  static bool diagnoseIncompatibleWithMoveOnlyType(SourceLoc loc,
-                                                   NominalTypeDecl *moveonlyType,
-                                                   Type type) {
-    assert(type && "got an empty type?");
-    assert(!moveonlyType->canBeCopyable());
-
-    // no need to emit a diagnostic if the type itself is already problematic.
-    if (type->hasError())
-      return false;
-
-    auto canType = type->getCanonicalType();
-    if (auto prot = canType->getAs<ProtocolType>()) {
-      // Permit conformance to marker protocol Sendable.
-      if (prot->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-        assert(prot->getDecl()->isMarkerProtocol());
-        return false;
-      }
-    }
-
-    auto &ctx = moveonlyType->getASTContext();
-    ctx.Diags.diagnose(loc, diag::noncopyable_cannot_conform_to_type,
-                       moveonlyType, type);
-    return true;
-  }
-
-  static void diagnoseIncompatibleProtocolsForMoveOnlyType(Decl *decl) {
-    if (decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
-      return; // taken care of elsewhere.
-
-    if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl)) {
-      if (nomDecl->canBeCopyable())
-        return;
-
-      // go over the all protocols directly conformed-to by this nominal
-      for (auto *prot : nomDecl->getLocalProtocols())
-        diagnoseIncompatibleWithMoveOnlyType(nomDecl->getLoc(), nomDecl,
-                                             prot->getDeclaredInterfaceType());
-
-    } else if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
-      if (auto *nomDecl = extension->getExtendedNominal()) {
-        if (nomDecl->canBeCopyable())
-          return;
-
-        // go over the all types directly conformed-to by the extension
-        for (auto entry : extension->getInherited().getEntries()) {
-          diagnoseIncompatibleWithMoveOnlyType(extension->getLoc(), nomDecl,
-                                               entry.getType());
-        }
-      }
     }
   }
 
@@ -3326,9 +3259,8 @@ public:
       }
     }
 
-    if (CD->isDistributedActor()) {
-      TypeChecker::checkDistributedActor(SF, CD);
-    }
+    // Check distributed actors
+    TypeChecker::checkDistributedActor(SF, CD);
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
@@ -3468,16 +3400,11 @@ public:
 
     maybeDiagnoseClassWithoutInitializers(CD);
 
-    diagnoseIncompatibleProtocolsForMoveOnlyType(CD);
-
     diagnoseInverseOnClass(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     checkUnsupportedNestedType(PD);
-
-    // Check for circular inheritance within the protocol.
-    (void) PD->hasCircularInheritedProtocols();
 
     TypeChecker::checkDeclAttributes(PD);
 
@@ -3942,10 +3869,8 @@ public:
 
     checkExplicitAvailability(ED);
 
-    if (nominal->isDistributedActor())
-      TypeChecker::checkDistributedActor(SF, nominal);
+    TypeChecker::checkDistributedActor(SF, nominal);
 
-    diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
     diagnoseExtensionOfMarkerProtocol(ED);
 
     checkTupleExtension(ED);
@@ -4110,16 +4035,6 @@ public:
       addDelayedFunction(CD);
     }
 
-    // a move-only / noncopyable type cannot have a failable initializer, since
-    // that would require the ability to wrap one inside an optional
-    if (CD->isFailable()) {
-      if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
-        if (!nom->canBeCopyable()) {
-          CD->diagnose(diag::noncopyable_failable_init);
-        }
-      }
-    }
-
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
 
@@ -4127,19 +4042,12 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    // Only check again for destructor decl outside of a class if our destructor
-    // is not marked as invalid.
+    // Only check again for destructor decl outside of a struct/enum/class
+    // if our destructor is not marked as invalid.
     if (!DD->isInvalid()) {
       auto *nom = dyn_cast<NominalTypeDecl>(
                              DD->getDeclContext()->getImplementedObjCContext());
-      if (!nom || isa<ProtocolDecl>(nom)) {
-        DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
-
-      } else if (!Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
-                  && !isa<ClassDecl>(nom)
-                  && nom->canBeCopyable()) {
-        // When we have NoncopyableGenerics, deinits get validated as part of
-        // Copyable-conformance checking.
+      if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }
 

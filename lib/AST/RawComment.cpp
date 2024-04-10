@@ -158,7 +158,7 @@ RawComment RawCommentRequest::evaluate(Evaluator &eval, const Decl *D) const {
       }
 
       if (!SRCs.empty())
-        return RawComment(ctx.AllocateCopy(llvm::makeArrayRef(SRCs)));
+        return RawComment(ctx.AllocateCopy(llvm::ArrayRef(SRCs)));
     }
 
     // Otherwise check to see if we have a comment available in the swiftdoc.
@@ -248,7 +248,7 @@ static bool hasDoubleUnderscore(const Decl *D) {
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     auto Name = VD->getBaseName();
-    if (!Name.isSpecial() && Name.getIdentifier().str().startswith(Prefix)) {
+    if (!Name.isSpecial() && Name.getIdentifier().str().starts_with(Prefix)) {
       return true;
     }
   }

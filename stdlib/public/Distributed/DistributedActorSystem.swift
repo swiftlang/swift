@@ -382,6 +382,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
+  @available(SwiftStdlib 6.0, *)
   func remoteCall<Act, Err, Res>(
       on actor: Act,
       target: RemoteCallTarget,
@@ -761,6 +762,7 @@ public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
 
   /// Record an argument of `Argument` type.
   /// This will be invoked for every argument of the target, in declaration order.
+  @available(SwiftStdlib 6.0, *)
   mutating func recordArgument<Value/*: SerializationRequirement*/>(
     _ argument: RemoteCallArgument<Value>
   ) throws
@@ -773,6 +775,7 @@ public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
 
   /// Record the return type of the distributed method.
   /// This method will not be invoked if the target is returning `Void`.
+  @available(SwiftStdlib 6.0, *)
   mutating func recordReturnType<R/*: SerializationRequirement*/>(_ type: R.Type) throws
 
   /// Invoked to signal to the encoder that no further `record...` calls will be made on it.
@@ -911,6 +914,7 @@ public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
   /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
   /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
   /// performs the actual distributed (local) instance method invocation.
+  @available(SwiftStdlib 6.0, *)
   mutating func decodeNextArgument<Argument/*: SerializationRequirement*/>() throws -> Argument
 
   /// Decode the specific error type that the distributed invocation target has recorded.
@@ -959,6 +963,7 @@ public protocol DistributedTargetInvocationResultHandler<SerializationRequiremen
 
   /// Invoked when the distributed target execution returns successfully.
   /// The `value` is the return value of the executed distributed invocation target.
+  @available(SwiftStdlib 6.0, *)
   func onReturn<Success/*: SerializationRequirement*/>(value: Success) async throws
 
   /// Invoked when the distributed target execution of a `Void` returning
@@ -1051,7 +1056,7 @@ public struct DistributedActorCodingError: DistributedActorSystemError {
 /// as a stub always should be used as "remote" and therefore no local calls
 /// are performed on them. Seeing this fatal error means a problem in the Swift
 /// Distributed runtime, please report an issue.
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 public // COMPILER_INTRINSIC
 func _diagnoseDistributedStubMethodCalled(
   className: StaticString,

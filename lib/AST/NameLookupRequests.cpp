@@ -322,7 +322,7 @@ ArrayRef<FileUnit *> OperatorLookupDescriptor::getFiles() const {
     return module->getFiles();
 
   // Return an ArrayRef pointing to the FileUnit in the union.
-  return llvm::makeArrayRef(*fileOrModule.getAddrOfPtr1());
+  return llvm::ArrayRef(*fileOrModule.getAddrOfPtr1());
 }
 
 void swift::simple_display(llvm::raw_ostream &out,

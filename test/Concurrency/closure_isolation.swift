@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -dump-ast %s  -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s -disable-availability-checking -enable-experimental-feature ClosureIsolation | %FileCheck %s
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 func acceptClosure<T>(_: () -> T) { }
 func acceptSendableClosure<T>(_: @Sendable () -> T) { }
@@ -45,6 +46,11 @@ extension MyActor {
     // CHECK: closure_expr
     // CHECK: actor_isolated
     acceptEscapingAsyncClosure { () async in print(self) }
+
+    // CHECK: acceptClosure
+    // CHECK: closure_expr
+    // CHECK: nonisolated
+    acceptClosure { nonisolated in print() }
   }
 }
 

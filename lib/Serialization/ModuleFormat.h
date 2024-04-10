@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 854; // _distributedThunkTarget
+const uint16_t SWIFTMODULE_VERSION_MINOR = 870; // borrowed-from instruction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -335,6 +335,7 @@ enum AccessorKind : uint8_t {
   Read,
   Modify,
   Init,
+  DistributedGet,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -423,6 +424,7 @@ using ResultConventionField = BCFixed<3>;
 /// module version.
 enum class SILResultInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
+  IsTransferring = 0x2,
 };
 
 using SILResultInfoOptions = OptionSet<SILResultInfoFlags>;
@@ -860,9 +862,9 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
+    CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
-    HAS_NONCOPYABLE_GENERICS,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -898,6 +900,11 @@ namespace control_block {
     BCBlob
   >;
 
+  using ChannelLayout = BCRecordLayout<
+    CHANNEL,
+    BCBlob
+  >;
+
   using IsOSSALayout = BCRecordLayout<
     IS_OSSA,
     BCFixed<1>
@@ -906,11 +913,6 @@ namespace control_block {
   using AllowableClientLayout = BCRecordLayout<
     ALLOWABLE_CLIENT_NAME,
     BCBlob
-  >;
-
-  using HasNoncopyableGenerics = BCRecordLayout<
-      HAS_NONCOPYABLE_GENERICS,
-      BCFixed<1>
   >;
 }
 
@@ -938,6 +940,7 @@ namespace options_block {
     MODULE_EXPORT_AS_NAME,
     PLUGIN_SEARCH_OPTION,
     HAS_CXX_INTEROPERABILITY_ENABLED,
+    ALLOW_NON_RESILIENT_ACCESS,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1019,6 +1022,10 @@ namespace options_block {
 
   using HasCxxInteroperabilityEnabledLayout = BCRecordLayout<
     HAS_CXX_INTEROPERABILITY_ENABLED
+  >;
+
+  using AllowNonResilientAccess = BCRecordLayout<
+    ALLOW_NON_RESILIENT_ACCESS
   >;
 }
 
@@ -1234,6 +1241,7 @@ namespace decls_block {
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>                       // has transferring result
     // trailed by parameters
+    // Optionally lifetime dependence info
   );
 
   using FunctionParamLayout =
@@ -1335,6 +1343,7 @@ namespace decls_block {
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
+    // Optionally lifetime dependence info
   );
 
   TYPE_LAYOUT(SILFunctionTypeLayout,
@@ -1350,7 +1359,6 @@ namespace decls_block {
     BCFixed<1>,                         // erased isolation?
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
-    BCFixed<1>,                         // transferring result
     BCVBR<6>,                           // number of parameters
     BCVBR<5>,                           // number of yields
     BCVBR<5>,                           // number of results
@@ -1363,6 +1371,7 @@ namespace decls_block {
                           // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
     // Optionally a substitution map (for substituted function types)
+    // Optionally lifetime dependence info
   );
 
   TYPE_LAYOUT(SILBlockStorageTypeLayout,
@@ -1527,11 +1536,18 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
+    DeclIDField,            // superclass decl
     AccessLevelField,       // access level
-    BCVBR<4>,               // number of inherited types
-    BCArray<TypeIDField>    // inherited types, followed by dependency types
-    // Trailed by the generic parameters (if any), the members record, and
-    // the default witness table record
+    BCArray<TypeIDField>    // dependency types
+    // Trailed by the inherited protocols, the generic parameters (if any),
+    // the generic signature, the members record, and the default witness table record
+  >;
+
+  /// A default witness table for a protocol.
+  using InheritedProtocolsLayout = BCRecordLayout<
+    INHERITED_PROTOCOLS,
+    BCArray<DeclIDField>
+    // An array of inherited protocol declarations
   >;
 
   /// A default witness table for a protocol.
@@ -2232,6 +2248,8 @@ namespace decls_block {
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
+  using AllowFeatureSuppressionDeclAttrLayout =
+      BCRecordLayout<AllowFeatureSuppression_DECL_ATTR>;
   using ProjectedValuePropertyDeclAttrLayout = BCRecordLayout<
       ProjectedValueProperty_DECL_ATTR,
       BCFixed<1>,        // isImplicit
@@ -2296,6 +2314,7 @@ namespace decls_block {
     ObjCImplementation_DECL_ATTR,
     BCFixed<1>,                // implicit flag
     BCFixed<1>,                // category name invalid
+    BCFixed<1>,                // is early adopter
     IdentifierIDField          // category name
   >;
 
@@ -2359,14 +2378,6 @@ namespace decls_block {
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
   >;
-
-  using DistributedThunkTargetDeclAttrLayout = BCRecordLayout<
-      DistributedThunkTarget_DECL_ATTR,
-      BCFixed<1>, // implicit flag
-      DeclIDField // target function
-          // FIXME: not entirely right?
-  >;
-
 
   using TypeEraserDeclAttrLayout = BCRecordLayout<
     TypeEraser_DECL_ATTR,

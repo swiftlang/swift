@@ -47,9 +47,6 @@ extension Value {
   /// check, because it treats a value_to_bridge_object instruction as "trivial".
   /// It can also handle non-trivial enums with trivial cases.
   func isTrivial(_ context: some Context) -> Bool {
-    if self is Undef {
-      return true
-    }
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -64,12 +61,12 @@ extension Value {
       switch v {
       case is ValueToBridgeObjectInst:
         break
-      case is StructInst, is TupleInst:
-        let inst = (v as! SingleValueInstruction)
-        worklist.pushIfNotVisited(contentsOf: inst.operands.values.filter { !($0 is Undef) })
+      case let si as StructInst:
+        worklist.pushIfNotVisited(contentsOf: si.operands.values)
+      case let ti as TupleInst:
+        worklist.pushIfNotVisited(contentsOf: ti.operands.values)
       case let en as EnumInst:
-        if let payload = en.payload,
-           !(payload is Undef) {
+        if let payload = en.payload {
           worklist.pushIfNotVisited(payload)
         }
       default:
@@ -292,6 +289,10 @@ extension Instruction {
       if bi.id == .OnFastPath {
         return false
       }
+    case is UncheckedEnumDataInst:
+      // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
+      // for consuming an enum value.
+      return !parentFunction.hasOwnership
     default:
       break
     }
@@ -625,7 +626,7 @@ extension InstructionRange {
         case let endBorrow as EndBorrowInst:
           self.insert(endBorrow)
         case let branch as BranchInst:
-          worklist.pushIfNotVisited(branch.getArgument(for: use))
+          worklist.pushIfNotVisited(branch.getArgument(for: use).lookThroughBorrowedFromUser)
         default:
           break
         }
@@ -697,4 +698,24 @@ func getGlobalInitialization(
     return (allocInst: allocInst!, storeToGlobal: store)
   }
   return nil
+}
+
+func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+  switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
+    case .willSucceed: return true
+    case .maySucceed:  return nil
+    case .willFail:    return false
+    default: fatalError("unknown result from classifyDynamicCastBridged")
+  }
+}
+
+extension CheckedCastAddrBranchInst {
+  var dynamicCastResult: Bool? {
+    switch classifyDynamicCastBridged(bridged) {
+      case .willSucceed: return true
+      case .maySucceed:  return nil
+      case .willFail:    return false
+      default: fatalError("unknown result from classifyDynamicCastBridged")
+    }
+  }
 }

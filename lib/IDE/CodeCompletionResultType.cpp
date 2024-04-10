@@ -228,9 +228,8 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
   ;
   if (auto Nominal = Ty->getAnyNominal()) {
     if (auto *Proto = dyn_cast<ProtocolDecl>(Nominal)) {
-      Proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-        if (Proto != inherited &&
-            !inherited->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+      for (auto *inherited : Proto->getAllInheritedProtocols()) {
+        if (!inherited->isSpecificProtocol(KnownProtocolKind::Sendable) &&
             !inherited->getInvertibleProtocolKind()) {
           LLVM_DEBUG(llvm::dbgs() << "Adding inherited protocol "
                                   << inherited->getName()
@@ -238,9 +237,7 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
           Supertypes.push_back(USRBasedType::fromType(
             inherited->getDeclaredInterfaceType(), Arena));
         }
-
-        return TypeWalker::Action::Continue;
-      });
+      }
     } else {
       auto Conformances = Nominal->getAllConformances();
       Supertypes.reserve(Conformances.size());

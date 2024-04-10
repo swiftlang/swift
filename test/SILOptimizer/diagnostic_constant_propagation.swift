@@ -347,6 +347,12 @@ func add<T : SignedInteger>(_ left: T, _ right: T) -> T {
   return left + right
 }
 
+@Sendable
+@_transparent
+func sendableAdd<T : SignedInteger>(_ left: T, _ right: T) -> T {
+  return left + right
+}
+
 @_transparent
 func applyBinary<T : SignedInteger>(_ fn: (T, T) -> (T), _ left: T, _ right: T) -> T {
   return fn(left, right)
@@ -354,6 +360,10 @@ func applyBinary<T : SignedInteger>(_ fn: (T, T) -> (T), _ left: T, _ right: T) 
 
 func testTransparentApply() -> Int8 {
   return applyBinary(add, Int8.max, Int8.max) // expected-error {{arithmetic operation '127 + 127' (on signed 8-bit integer type) results in an overflow}}
+}
+
+func testTransparentApplySendable() -> Int8 {
+  return applyBinary(sendableAdd, Int8.max, Int8.max) // expected-error {{arithmetic operation '127 + 127' (on signed 8-bit integer type) results in an overflow}}
 }
 
 func testBuiltinGlobalStringTablePointerNoError() -> UnsafePointer<CChar> {

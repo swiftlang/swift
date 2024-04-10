@@ -17,6 +17,10 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                             MARK: CaptureInfo
+//===----------------------------------------------------------------------===//
+
 CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
@@ -56,9 +60,10 @@ CaptureInfo CaptureInfo::empty() {
 }
 
 bool CaptureInfo::hasLocalCaptures() const {
-  for (auto capture : getCaptures())
-    if (capture.getDecl()->isLocalCapture())
+  for (auto capture : getCaptures()) {
+    if (capture.isLocalCapture())
       return true;
+  }
   return false;
 }
 
@@ -71,7 +76,7 @@ getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
 
   // Filter out global variables.
   for (auto capture : getCaptures()) {
-    if (!capture.getDecl()->isLocalCapture())
+    if (!capture.isLocalCapture())
       continue;
 
     Result.push_back(capture);
@@ -83,10 +88,10 @@ VarDecl *CaptureInfo::getIsolatedParamCapture() const {
     return nullptr;
 
   for (const auto &capture : getCaptures()) {
-    if (!capture.getDecl()->isLocalCapture())
-      continue;
-
-    if (capture.isDynamicSelfMetadata())
+    // NOTE: isLocalCapture() returns false if we have dynamic self metadata
+    // since dynamic self metadata is never an isolated capture. So we can just
+    // call isLocalCapture without checking for dynamic self metadata.
+    if (!capture.isLocalCapture())
       continue;
 
     // If we captured an isolated parameter, return it.
@@ -134,3 +139,11 @@ void CaptureInfo::print(raw_ostream &OS) const {
   OS << ')';
 }
 
+//===----------------------------------------------------------------------===//
+//                            MARK: CapturedValue
+//===----------------------------------------------------------------------===//
+
+bool CapturedValue::isLocalCapture() const {
+  auto *decl = Value.getPointer().dyn_cast<ValueDecl *>();
+  return decl && decl->isLocalCapture();
+}

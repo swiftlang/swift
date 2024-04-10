@@ -380,6 +380,11 @@ namespace swift {
     /// Enable experimental eager Clang module diagnostics.
     bool EnableExperimentalEagerClangModuleDiagnostics = false;
 
+    /// Force ClangImporter's import-as-member extensions to load thier members
+    /// immediately, bypassing their SwiftLookupTables. This emulates an
+    /// implementation quirk of previous compilers.
+    bool DisableNamedLazyImportAsMemberLoading = false;
+
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
@@ -439,6 +444,9 @@ namespace swift {
 
     /// The name of the package this module belongs to.
     std::string PackageName;
+
+    /// Allow importing a non-package interface from the same package.
+    bool AllowNonPackageInterfaceImportFromSamePackage = false;
 
     /// Diagnose implicit 'override'.
     bool WarnImplicitOverrides = false;
@@ -559,11 +567,15 @@ namespace swift {
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
-    /// Enable experimental associated type inference improvements.
-    bool EnableExperimentalAssociatedTypeInference = false;
-
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = false;
+    bool EnableExperimentalLifetimeDependenceInference = true;
+
+    /// Skips decls that cannot be referenced externally.
+    bool SkipNonExportableDecls = false;
+
+    /// True if -experimental-allow-non-resilient-access is passed and built
+    /// from source.
+    bool AllowNonResilientAccess = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
@@ -580,6 +592,14 @@ namespace swift {
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
     bool BypassResilienceChecks = false;
+
+    /// Whether or not to allow experimental features that are only available
+    /// in "production".
+#ifdef NDEBUG
+    bool RestrictNonProductionExperimentalFeatures = true;
+#else
+    bool RestrictNonProductionExperimentalFeatures = false;
+#endif
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -960,6 +980,10 @@ namespace swift {
 
     /// Using ClangIncludeTreeRoot for compilation.
     bool HasClangIncludeTreeRoot = false;
+
+    /// Whether the dependency scanner should construct all swift-frontend
+    /// invocations directly from clang cc1 args.
+    bool ClangImporterDirectCC1Scan = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

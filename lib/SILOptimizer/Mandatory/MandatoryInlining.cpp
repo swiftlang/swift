@@ -592,6 +592,20 @@ static SILValue getLoadedCalleeValue(LoadInst *li) {
   return si->getSrc();
 }
 
+static bool convertsThinEscapeToNoescape(ConvertFunctionInst *cv) {
+  // Example:
+  //   %1 = function_ref @thin_closure_impl : $() -> ()
+  //   %2 = convert_function %1 : $() -> () to $@noescape () -> ()
+  //
+  auto fromTy = cv->getOperand()->getType().castTo<SILFunctionType>();
+  if (fromTy->getExtInfo().hasContext())
+    return false;
+
+  auto toTy = cv->getType().castTo<SILFunctionType>();
+  auto escapeToTy = toTy->getWithExtInfo(toTy->getExtInfo().withNoEscape(false));
+  return fromTy == escapeToTy;
+}
+
 // PartialApply/ThinToThick -> ConvertFunction patterns are generated
 // by @noescape closures.
 //
@@ -602,32 +616,13 @@ static SILValue stripFunctionConversions(SILValue CalleeValue) {
   // Skip any copies that we see.
   CalleeValue = lookThroughOwnershipInsts(CalleeValue);
 
-  // We can also allow a thin @escape to noescape conversion as such:
-  // %1 = function_ref @thin_closure_impl : $@convention(thin) () -> ()
-  // %2 = convert_function %1 :
-  //      $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-  // %3 = thin_to_thick_function %2 :
-  //  $@convention(thin) @noescape () -> () to
-  //            $@noescape @callee_guaranteed () -> ()
-  // %4 = apply %3() : $@noescape @callee_guaranteed () -> ()
   if (auto *ConvertFn = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
-    // If the conversion only changes the substitution level of the function,
-    // we can also look through it.
-    if (ConvertFn->onlyConvertsSubstitutions())
+    if (ConvertFn->onlyConvertsSubstitutions() ||
+        ConvertFn->onlyConvertsSendable() ||
+        convertsThinEscapeToNoescape(ConvertFn)) {
       return stripFunctionConversions(ConvertFn->getOperand());
-
-    auto FromCalleeTy =
-        ConvertFn->getOperand()->getType().castTo<SILFunctionType>();
-    if (FromCalleeTy->getExtInfo().hasContext())
-      return CalleeValue;
-
-    auto ToCalleeTy = ConvertFn->getType().castTo<SILFunctionType>();
-    auto EscapingCalleeTy = ToCalleeTy->getWithExtInfo(
-        ToCalleeTy->getExtInfo().withNoEscape(false));
-    if (FromCalleeTy != EscapingCalleeTy)
-      return CalleeValue;
-
-    return lookThroughOwnershipInsts(ConvertFn->getOperand());
+    }
+    return CalleeValue;
   }
 
   // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
@@ -772,9 +767,9 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   return CalleeFunction;
 }
 
-static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
+static SILInstruction *tryDevirtualizeApplyHelper(SILPassManager *pm, FullApplySite InnerAI,
                                                   ClassHierarchyAnalysis *CHA) {
-  auto NewInst = tryDevirtualizeApply(InnerAI, CHA).first;
+  auto NewInst = tryDevirtualizeApply(pm, InnerAI, CHA).first;
   if (!NewInst)
     return InnerAI.getInstruction();
 
@@ -804,7 +799,8 @@ static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
+runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
+                         SILFunction *F,
                          FullApplySite AI, DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
@@ -855,7 +851,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
       // *NOTE* If devirtualization succeeds, devirtInst may not be InnerAI,
       // but a casted result of InnerAI or even a block argument due to
       // abstraction changes when calling the witness or class method.
-      auto *devirtInst = tryDevirtualizeApplyHelper(InnerAI, CHA);
+      auto *devirtInst = tryDevirtualizeApplyHelper(pm, InnerAI, CHA);
       // If devirtualization succeeds, make sure we record that this function
       // changed.
       if (devirtInst != InnerAI.getInstruction())
@@ -879,7 +875,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
 
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(
-              FuncBuilder, CalleeFunction, InnerAI, FullyInlinedSet, SetFactory,
+              FuncBuilder, pm, CalleeFunction, InnerAI, FullyInlinedSet, SetFactory,
               CurrentInliningSet, CHA, changedFunctions)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
@@ -1040,7 +1036,7 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.wasDeserializedCanonical())
         continue;
 
-      runOnFunctionRecursively(FuncBuilder, &F, FullApplySite(),
+      runOnFunctionRecursively(FuncBuilder, getPassManager(), &F, FullApplySite(),
                                FullyInlinedSet, SetFactory,
                                SetFactory.getEmptySet(), CHA, changedFunctions);
 

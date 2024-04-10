@@ -169,9 +169,7 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
             evaluateOrDefault(ctx.evaluator,
                               ResolveTypeWitnessesRequest{normal},
                               evaluator::SideEffect());
-            evaluateOrDefault(ctx.evaluator,
-                              ResolveValueWitnessesRequest{normal},
-                              evaluator::SideEffect());
+            normal->resolveValueWitnesses();
           }
         }
       };
@@ -793,13 +791,8 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  GenericEnvironment *env = nullptr;
-  if (auto *gc = storage->getAsGenericContext())
-    env = gc->getGenericEnvironment();
-  else
-    env = storage->getDeclContext()->getGenericEnvironmentOfContext();
-
-  if (isInterfaceTypeNoncopyable(storage->getValueInterfaceType(), env))
+  if (storage->getInnermostDeclContext()->mapTypeIntoContext(
+        storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
 
   return OpaqueReadOwnership::Owned;
@@ -2198,6 +2191,7 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return synthesizeGetterBody(accessor, ctx);
 
   case AccessorKind::Set:
@@ -2498,6 +2492,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return createGetterPrototype(storage, ctx);
 
   case AccessorKind::Set:
@@ -2676,6 +2671,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
     break;
+  case AccessorKind::DistributedGet:
+    return false;
 
   case AccessorKind::Set:
 

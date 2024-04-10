@@ -528,13 +528,9 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        getSwiftModule(), ResilienceExpansion::Maximal,
-        getSILModule().isWholeModule());
-    auto underlyingTy =
-        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
-            ->getCanonicalType();
-    return underlyingTy;
+    auto context = getMaximalTypeExpansionContext();
+    return swift::substOpaqueTypesWithUnderlyingTypes(type, context,
+                                                      /*allowLoweredTypes=*/false);
   }
 
   return type;
@@ -545,13 +541,11 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type.getASTType()->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        getSwiftModule(), ResilienceExpansion::Maximal,
-        getSILModule().isWholeModule());
-    auto underlyingTy =
-        type.subst(getSILModule(), replacer, replacer, genericSig,
-                   SubstFlags::SubstituteOpaqueArchetypes);
-    return underlyingTy;
+    auto context = getMaximalTypeExpansionContext();
+    return SILType::getPrimitiveType(
+      swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context,
+                                                 /*allowLoweredTypes=*/true),
+      type.getCategory());
   }
 
   return type;
@@ -563,15 +557,11 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        getSwiftModule(), ResilienceExpansion::Maximal,
-        getSILModule().isWholeModule());
-    auto substConformance = conformance.subst(
-        type, replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
-    auto underlyingTy =
-        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
-            ->getCanonicalType();
-    return std::make_pair(underlyingTy, substConformance);
+    auto context = getMaximalTypeExpansionContext();
+    return std::make_pair(
+       swift::substOpaqueTypesWithUnderlyingTypes(type, context,
+                                                  /*allowLoweredTypes=*/false),
+       swift::substOpaqueTypesWithUnderlyingTypes(conformance, type, context));
   }
 
   return std::make_pair(type, conformance);
@@ -1416,19 +1406,48 @@ getFunctionTypeFlags(CanFunctionType type) {
     break;
   }
 
+  // Compute the set of suppressed protocols.
+  InvertibleProtocolSet InvertedProtocols;
+  for (auto invertibleKind : InvertibleProtocolSet::allKnown()) {
+    switch (invertibleKind) {
+    case InvertibleProtocolKind::Copyable: {
+      // If the function type is noncopyable, note that in the suppressed
+      // protocols.
+      auto proto =
+        type->getASTContext().getProtocol(KnownProtocolKind::Copyable);
+      if (proto &&
+          proto->getParentModule()->lookupConformance(type, proto).isInvalid())
+        InvertedProtocols.insert(invertibleKind);
+      break;
+    }
+
+    case InvertibleProtocolKind::Escapable:
+      // We intentionally do not record the "escapable" bit here, because it's
+      // already in the normal function type flags. The runtime will
+      // introduce it as necessary.
+      break;
+    }
+  }
+
+  auto isolation = type->getIsolation();
+
   auto extFlags = ExtendedFunctionTypeFlags()
                       .withTypedThrows(!type->getThrownError().isNull())
-                      .withTransferringResult(type->hasTransferringResult());
+                      .withTransferringResult(type->hasTransferringResult())
+                      .withInvertedProtocols(InvertedProtocols);
+
+  if (isolation.isErased())
+    extFlags = extFlags.withIsolatedAny();
 
   auto flags = FunctionTypeFlags()
       .withConvention(metadataConvention)
       .withAsync(type->isAsync())
-      .withConcurrent(type->isSendable())
+      .withSendable(type->isSendable())
       .withThrows(type->isThrowing())
       .withParameterFlags(hasParameterFlags)
       .withEscaping(isEscaping)
       .withDifferentiable(type->isDifferentiable())
-      .withGlobalActor(!type->getGlobalActor().isNull())
+      .withGlobalActor(isolation.isGlobalActor())
       .withExtendedFlags(extFlags.getIntValue() != 0);
 
   return std::make_pair(flags, extFlags);
@@ -1632,7 +1651,8 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
 
   default:
     assert((!params.empty() || type->isDifferentiable() ||
-            type->getGlobalActor() || type->getThrownError()) &&
+            !type->getIsolation().isNonIsolated() ||
+            type->getThrownError()) &&
            "0 parameter case should be specialized unless it is a "
            "differentiable function or has a global actor");
 

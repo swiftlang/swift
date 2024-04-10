@@ -36,8 +36,6 @@
 // COUNT-COUNT-3: sourceOrigin
 // COUNT-NOT: sourceOrigin
 
-// XFAIL: noncopyable_generics
-
 public protocol SomeProtocol {
     /// Base docs
     func someFunc()

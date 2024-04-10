@@ -1407,3 +1407,38 @@ struct AtStartOfFunctionCallWithExistingParams {
     // AT_START_OF_CALL_ONE_EXISTING_ARGUMENT-DAG: Pattern/Local/Flair[ArgLabels]:     {#a: Int#}[#Int#]; name=a:
   }
 }
+
+struct NestedCallsWithoutClosingParen {
+  func foo(arg: Int, arg2: Int) -> Int { 1 }
+  func bar(arg: Int, option: Int) -> Int { 1 }
+
+  func test() {
+    bar(arg: foo(#^NESTED_CALL_AT_START^#, option: 1)
+    // NESTED_CALL_AT_START-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg: Int#}, {#arg2: Int#}[')'][#Int#];
+
+    bar(arg: 1 + foo(#^NESTED_CALL_IN_BINARY_OP?check=NESTED_CALL_AT_START^#, option: 1)
+
+    bar(arg: foo(#^NESTED_CALL_AFTER_MEMBER_ACCESS?check=NESTED_CALL_AT_START^#, option: 1)
+
+    bar(arg: foo(arg: 1, #^NESTED_CALL_AT_SECOND_ARG^#, option: 1)
+    // NESTED_CALL_AT_SECOND_ARG-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg2: Int#}[#Int#];
+  }
+
+  func testInDictionaryLiteral() {
+    let a = 1
+    let b = 2
+    _ = [a: foo(#^IN_DICTIONARY_LITERAL?check=NESTED_CALL_AT_START^#, b: 1]
+  } 
+
+  func testInArrayLiteral() {
+    _ = [foo(#^IN_ARRAY_LITERAL?check=NESTED_CALL_AT_START^#, 1]
+  }
+
+  func testInParen() {
+    _ = (foo(#^IN_PAREN?check=NESTED_CALL_AT_START^#)
+  }
+
+  func testInTuple() {
+    _ = (foo(#^IN_TUPLE?check=NESTED_CALL_AT_START^#, 1)
+  }
+}

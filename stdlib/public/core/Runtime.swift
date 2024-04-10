@@ -139,11 +139,19 @@ func _stdlib_atomicInitializeARCRef(
   let desiredPtr = unmanaged.toOpaque()
   let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
+#if $TypedThrows
   let wonRace = withUnsafeMutablePointer(to: &expected) {
     _stdlib_atomicCompareExchangeStrongPtr(
       object: rawTarget, expected: $0, desired: desiredPtr
     )
   }
+#else
+  let wonRace = __abi_se0413_withUnsafeMutablePointer(to: &expected) {
+    _stdlib_atomicCompareExchangeStrongPtr(
+      object: rawTarget, expected: $0, desired: desiredPtr
+    )
+  }
+#endif
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
@@ -342,13 +350,22 @@ internal struct _Buffer72 {
 }
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+#if arch(wasm32)
 // Note that this takes a Float32 argument instead of Float16, because clang
 // doesn't have _Float16 on all platforms yet.
+@available(SwiftStdlib 5.3, *)
+typealias _CFloat16Argument = Float32
+#else
+@available(SwiftStdlib 5.3, *)
+typealias _CFloat16Argument = Float16
+#endif
+
+@available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_float16ToString")
 internal func _float16ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
-  _ value: Float32,
+  _ value: _CFloat16Argument,
   _ debug: Bool
 ) -> Int
 
@@ -361,7 +378,7 @@ internal func _float16ToString(
   _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
   let length = buffer.withBytes { (bufferPtr) in
-    _float16ToStringImpl(bufferPtr, 32, Float(value), debug)
+    _float16ToStringImpl(bufferPtr, 32, _CFloat16Argument(value), debug)
   }
   return (buffer, length)
 }
@@ -562,6 +579,9 @@ internal class __SwiftNativeNSArray {
   deinit {}
 }
 
+@available(*, unavailable)
+extension __SwiftNativeNSArray: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSMutableArrayBase)
@@ -574,6 +594,9 @@ internal class _SwiftNativeNSMutableArray {
   deinit {}
 }
 
+@available(*, unavailable)
+extension _SwiftNativeNSMutableArray: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSDictionaryBase)
@@ -584,6 +607,9 @@ internal class __SwiftNativeNSDictionary {
   deinit {}
 }
 
+@available(*, unavailable)
+extension __SwiftNativeNSDictionary: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSSetBase)
@@ -593,6 +619,9 @@ internal class __SwiftNativeNSSet {
   @objc public init(coder: AnyObject) {}
   deinit {}
 }
+
+@available(*, unavailable)
+extension __SwiftNativeNSSet: Sendable {}
 
 @objc
 @_swift_native_objc_runtime_base(__SwiftNativeNSEnumeratorBase)

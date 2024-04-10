@@ -98,10 +98,17 @@ function(add_swift_compiler_modules_library name)
                         "DEPENDS"
                         ${ARGN})
 
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    set(cxx_interop_flag "-enable-experimental-cxx-interop")
+  else()
+    set(cxx_interop_flag "-cxx-interoperability-mode=default")
+  endif()
+
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "-Xfrontend" "-enable-experimental-cxx-interop"
+      "${cxx_interop_flag}"
       "-Xfrontend" "-disable-target-os-checking"
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
@@ -148,10 +155,9 @@ function(add_swift_compiler_modules_library name)
       list(APPEND sdk_option "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
     endif()
   elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
-    get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
     # NOTE: prepending allows SWIFT_COMPILER_SOURCES_SDK_FLAGS to override the
     # resource directory if needed.
-    list(PREPEND sdk_option "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
+    list(PREPEND sdk_option "-resource-dir" "${SWIFTLIB_DIR}")
   endif()
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
@@ -225,6 +231,9 @@ function(add_swift_compiler_modules_library name)
         importedHeaderDependencies
       COMMENT "Building swift module ${module}")
 
+    if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+      add_dependencies(${dep_target} swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+    endif()
     set("${module}_dep_target" ${dep_target})
     set(all_module_targets ${all_module_targets} ${dep_target})
   endforeach()

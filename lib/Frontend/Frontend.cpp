@@ -230,8 +230,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
   if (LangOpts.ClangTarget) {
-    serializationOpts.ExtraClangOptions.push_back("-triple");
-    serializationOpts.ExtraClangOptions.push_back(LangOpts.ClangTarget->str());
+    serializationOpts.ExtraClangOptions.push_back("--target=" +
+                                                  LangOpts.ClangTarget->str());
   }
 
   serializationOpts.PluginSearchOptions =
@@ -249,7 +249,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 
-  serializationOpts.SkipNonExportableDecls = opts.SkipNonExportableDecls;
+  serializationOpts.SkipNonExportableDecls =
+      getLangOptions().SkipNonExportableDecls;
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
@@ -275,10 +276,8 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 }
 
 bool CompilerInstance::setUpASTContextIfNeeded() {
-  if ((Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::CompileModuleFromInterface ||
-      Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::TypecheckModuleFromInterface) &&
+  if (FrontendOptions::doesActionBuildModuleFromInterface(
+          Invocation.getFrontendOptions().RequestedAction) &&
       !Invocation.getFrontendOptions().ExplicitInterfaceBuild) {
     // Compiling a module interface from source uses its own CompilerInstance
     // with options read from the input file. Don't bother setting up an
@@ -710,26 +709,7 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                   enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
-  auto MLM = ModuleLoadingMode::PreferSerialized;
-  if (auto forceModuleLoadingMode =
-      llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
-    if (*forceModuleLoadingMode == "prefer-interface" ||
-        *forceModuleLoadingMode == "prefer-parseable")
-      MLM = ModuleLoadingMode::PreferInterface;
-    else if (*forceModuleLoadingMode == "prefer-serialized")
-      MLM = ModuleLoadingMode::PreferSerialized;
-    else if (*forceModuleLoadingMode == "only-interface" ||
-             *forceModuleLoadingMode == "only-parseable")
-      MLM = ModuleLoadingMode::OnlyInterface;
-    else if (*forceModuleLoadingMode == "only-serialized")
-      MLM = ModuleLoadingMode::OnlySerialized;
-    else {
-      Diagnostics.diagnose(SourceLoc(),
-                           diag::unknown_forced_module_loading_mode,
-                           *forceModuleLoadingMode);
-      return true;
-    }
-  }
+  auto MLM = Invocation.getSearchPathOptions().ModuleLoadMode;
   auto IgnoreSourceInfoFile =
     Invocation.getFrontendOptions().IgnoreSwiftSourceInfo;
   if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
@@ -746,18 +726,18 @@ bool CompilerInstance::setUpModuleLoaders() {
   bool ExplicitModuleBuild =
       Invocation.getFrontendOptions().DisableImplicitModules;
   if (ExplicitModuleBuild ||
-      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
+      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
     if (Invocation.getCASOptions().EnableCaching)
       ESML = ExplicitCASModuleLoader::create(
           *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
-          MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath,
           Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
           IgnoreSourceInfoFile);
     else
       ESML = ExplicitSwiftModuleLoader::create(
           *Context, getDependencyTracker(), MLM,
-          Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath,
           Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
           IgnoreSourceInfoFile);
   }
@@ -782,8 +762,7 @@ bool CompilerInstance::setUpModuleLoaders() {
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
           FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-          RequireOSSAModules_t(Invocation.getSILOptions()),
-          RequireNoncopyableGenerics_t(Invocation.getLangOptions())));
+          RequireOSSAModules_t(Invocation.getSILOptions())));
 
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
@@ -825,8 +804,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
-        RequireOSSAModules_t(Invocation.getSILOptions()),
-        RequireNoncopyableGenerics_t(Invocation.getLangOptions()));
+        RequireOSSAModules_t(Invocation.getSILOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
         std::make_unique<PlaceholderSwiftModuleScanner>(
@@ -870,7 +848,7 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
 
 static inline bool isPCHFilenameExtension(StringRef path) {
   return llvm::sys::path::extension(path)
-    .endswith(file_types::getExtension(file_types::TY_PCH));
+    .ends_with(file_types::getExtension(file_types::TY_PCH));
 }
 
 std::string CompilerInstance::getBridgingHeaderPath() const {
@@ -1402,6 +1380,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
+    if (Invocation.getLangOptions().AllowNonResilientAccess)
+      MainModule->setAllowNonResilientAccess();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);

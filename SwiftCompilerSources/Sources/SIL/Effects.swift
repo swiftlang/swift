@@ -350,10 +350,7 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
     }
 
     public func matches(_ rhsArgIdx: Int, _ rhsPath: SmallProjectionPath) -> Bool {
-      if argumentIndex != rhsArgIdx {
-        return false
-      }
-      return rhsPath.matches(pattern: pathPattern)
+      return argumentIndex == rhsArgIdx && rhsPath.matches(pattern: pathPattern)
     }
 
     public var bodyDescription: String {

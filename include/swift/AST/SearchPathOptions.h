@@ -38,6 +38,15 @@ enum class ModuleSearchPathKind {
   RuntimeLibrary,
 };
 
+/// Specifies how to load modules when both a module interface and serialized
+/// AST are present, or whether to disallow one format or the other altogether.
+enum class ModuleLoadingMode {
+  PreferInterface,
+  PreferSerialized,
+  OnlyInterface,
+  OnlySerialized
+};
+
 /// A single module search path that can come from different sources, e.g.
 /// framework search paths, import search path etc.
 class ModuleSearchPath : public llvm::RefCountedBase<ModuleSearchPath> {
@@ -476,7 +485,7 @@ public:
   std::vector<std::string> CandidateCompiledModules;
 
   /// A map of explicit Swift module information.
-  std::string ExplicitSwiftModuleMap;
+  std::string ExplicitSwiftModuleMapPath;
 
   /// Module inputs specified with -swift-module-input,
   /// <ModuleName, Path to .swiftmodule file>
@@ -498,6 +507,12 @@ public:
   /// Recover the search paths deserialized from .swiftmodule files to their
   /// original form.
   PathObfuscator DeserializedPathRecoverer;
+
+  /// Specify the module loading behavior of the compilation.
+  ModuleLoadingMode ModuleLoadMode = ModuleLoadingMode::PreferSerialized;
+
+  /// Legacy scanner search behavior.
+  bool NoScannerModuleValidation = false;
 
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
@@ -546,7 +561,9 @@ public:
                         RuntimeResourcePath,
                         hash_combine_range(RuntimeLibraryImportPaths.begin(),
                                            RuntimeLibraryImportPaths.end()),
-                        DisableModulesValidateSystemDependencies);
+                        DisableModulesValidateSystemDependencies,
+                        NoScannerModuleValidation,
+                        ModuleLoadMode);
   }
 
   /// Return a hash code of any components from these options that should

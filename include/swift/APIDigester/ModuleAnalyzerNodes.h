@@ -382,7 +382,7 @@ public:
   swift::ReferenceOwnership getReferenceOwnership() const {
     return swift::ReferenceOwnership(ReferenceOwnership);
   }
-  bool isObjc() const { return Usr.startswith("c:"); }
+  bool isObjc() const { return Usr.starts_with("c:"); }
   static bool classof(const SDKNode *N);
   DeclKind getDeclKind() const { return DKind; }
   void printFullyQualifiedName(llvm::raw_ostream &OS) const;

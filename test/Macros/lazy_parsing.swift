@@ -8,7 +8,8 @@
 // RUN: %empty-directory(%t/stats-lookup)
 // RUN: split-file %s %t
 
-// XFAIL: noncopyable_generics
+// rdar://124548628 (additional ExportedSourceFileRequest(s) in `lazy_parsing.swift` (NCGenerics Enablement))
+// XFAIL: *
 
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 

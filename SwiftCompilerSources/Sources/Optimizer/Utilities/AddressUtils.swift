@@ -12,6 +12,14 @@
 
 import SIL
 
+private let verbose = false
+
+private func log(_ message: @autoclosure () -> String) {
+  if verbose {
+    print("### \(message())")
+  }
+}
+
 /// Classify address uses. This can be used by def-use walkers to
 /// ensure complete handling of all legal SIL patterns.
 ///
@@ -89,20 +97,26 @@ extension AddressUseVisitor {
       if markDep.type.isAddress {
         return projectedAddressUse(of: operand, into: markDep)
       }
-      if LifetimeDependence(markDep, context) != nil {
-        // This is unreachable from InteriorUseVisitor because the
-        // base address of a `mark_dependence [nonescaping]` must be a
-        // `begin_access`, and interior liveness does not check uses of
-        // the accessed address.
+      switch markDep.dependenceKind {
+      case .Unresolved:
+        if LifetimeDependence(markDep, context) == nil {
+          break
+        }
+        fallthrough
+      case .NonEscaping:
+        // Note: This is unreachable from InteriorUseVisitor because the base address of a `mark_dependence
+        // [nonescaping]` must be a `begin_access`, and interior liveness does not check uses of the accessed address.
         return dependentAddressUse(of: operand, into: markDep)
+      case .Escaping:
+        break
       }
       // A potentially escaping value depends on this address.
       return escapingAddressUse(of: operand)
 
-    case let pai as PartialApplyInst where pai.isOnStack:
+    case let pai as PartialApplyInst where !pai.mayEscape:
       return dependentAddressUse(of: operand, into: pai)
 
-    case let pai as PartialApplyInst where !pai.isOnStack:
+    case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
 
     case is ReturnInst, is ThrowInst, is YieldInst, is AddressToPointerInst:
@@ -113,7 +127,6 @@ extension AddressUseVisitor {
          is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst,
          is InitExistentialAddrInst, is OpenExistentialAddrInst,
          is ProjectBlockStorageInst, is UncheckedAddrCastInst,
-         is UnconditionalCheckedCastAddrInst,
          is MarkUninitializedInst, is DropDeinitInst,
          is CopyableToMoveOnlyWrapperAddrInst,
          is MoveOnlyWrapperToCopyableAddrInst,
@@ -192,8 +205,7 @@ extension AccessBase {
   /// with the initialized address. This does not guarantee that all
   /// uses of that address are dominated by the store or even that the
   /// store is a direct use of `address`.
-  func findSingleInitializer(_ context: some Context)
-    -> (initialAddress: Value, initializingStore: Instruction)? {
+  func findSingleInitializer(_ context: some Context) -> (initialAddress: Value, initializingStore: Instruction)? {
     let baseAddr: Value
     switch self {
     case let .stack(allocStack):
@@ -206,15 +218,7 @@ extension AccessBase {
     default:
       return nil
     }
-    var walker = AddressInitializationWalker(context: context)
-    if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath())
-         == .abortWalk {
-      return nil
-    }
-    guard let initializingStore = walker.initializingStore else {
-      return nil
-    }
-    return (initialAddress: baseAddr, initializingStore: initializingStore)
+    return AddressInitializationWalker.findSingleInitializer(ofAddress: baseAddr, context: context)
   }
 }
 
@@ -222,6 +226,9 @@ extension AccessBase {
 //
 // Implements AddressUseVisitor to guarantee that we can't miss any
 // stores. This separates escapingAddressUse from leafAddressUse.
+//
+// Main entry point:
+//  static func findSingleInitializer(ofAddress: Value, context: some Context)
 //
 // TODO: Make AddressDefUseWalker always conform to AddressUseVisitor once we're
 // ready to debug changes to escape analysis etc...
@@ -248,6 +255,19 @@ struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
 
   var isProjected = false
   var initializingStore: Instruction?
+
+  static func findSingleInitializer(ofAddress baseAddr: Value, context: some Context)
+    -> (initialAddress: Value, initializingStore: Instruction)? {
+
+    var walker = AddressInitializationWalker(context: context)
+    if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath()) == .abortWalk {
+      return nil
+    }
+    guard let initializingStore = walker.initializingStore else {
+      return nil
+    }
+    return (initialAddress: baseAddr, initializingStore: initializingStore)
+  }
 
   private mutating func setInitializer(instruction: Instruction) -> WalkResult {
     // An initializer must be unique and store the full value.
@@ -331,5 +351,211 @@ extension AddressInitializationWalker {
 
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
     return .abortWalk
+  }
+}
+
+/// A live range representing the ownership of addressible memory.
+///
+/// This live range represents the minimal guaranteed lifetime of the object being addressed. Uses of derived addresses
+/// may be extended up to the ends of this scope without violating ownership.
+///
+/// .liveOut objects (@in_guaranteed, @out) and .global variables have no instruction range.
+///
+/// .local objects (alloc_stack, yield, @in, @inout) report the single live range of the full assignment that reaches
+/// this address.
+///
+/// .owned values (boxes and references) simply report OSSA liveness.
+///
+/// .borrow values report each borrow scope's range. The effective live range is their intersection. A valid use must
+/// lie within all ranges.
+///
+/// FIXME: .borrow values should be represented with a single multiply-defined instruction range. Otherwise we will run
+/// out of blockset bits as soon as we have multiple ranges (each range uses three sets). It is ok to take the
+/// union of the borrow ranges since all address uses that may be extended will be already be dominated by the current
+/// address. Alternatively, we can have a utility that folds two InstructionRanges together as an intersection, and
+/// repeatedly fold the range of each borrow introducer.
+///
+/// Example:
+///
+///     %x = alloc_box
+///     %b = begin_borrow %x -+ begin ownership range
+///     %p = project_box %b   | <--- accessBase
+///     %a = begin_access %p  |
+///     end_access %a         | <--- address use
+///     end_borrow %b        -+ end ownership range
+///     destroy_value %x
+///
+/// This may return multiple ranges if a borrowed reference has multiple introducers:
+///
+///     %b1 = begin_borrow           -+        range1
+///     %b2 = begin_borrow            |  -+ -+ range2
+///     %s  = struct (%b1, %2)        |   |  |
+///     %e  = struct_extract %s, #s.0 |   |  | intersection
+///     %d = ref_element_addr %e      |   |  | where ownership
+///     %a = begin_access %d          |   |  | is valid
+///     end_access %a                 |   |  |
+///     end_borrow %b1               -+   | -+
+///     ...                               |
+///     end_borrow %b2                   -+
+///
+/// Note: The resulting live range must be deinitialized in stack order.
+enum AddressOwnershipLiveRange : CustomStringConvertible {
+  case liveOut(FunctionArgument)
+  case global(GlobalVariable)
+  case local(Value, InstructionRange) // Value represents the local allocation
+  case owned(Value, InstructionRange)
+  case borrow(SingleInlineArray<(BeginBorrowValue, InstructionRange)>)
+
+  mutating func deinitialize() {
+    switch self {
+    case .liveOut, .global:
+      break
+    case var .local(_, range):
+      range.deinitialize()
+    case var .owned(_, range):
+      range.deinitialize()
+    case var .borrow(ranges):
+      for idx in ranges.indices {
+        ranges[idx].1.deinitialize()
+      }
+    }
+  }
+
+  /// Return nil if the live range is unknown.
+  static func compute(for address: Value, at begin: Instruction,
+                      _ localReachabilityCache: LocalVariableReachabilityCache,
+                      _ context: FunctionPassContext) -> AddressOwnershipLiveRange? {
+    let accessBase = address.accessBase
+    switch accessBase {
+    case .box, .class, .tail:
+      return computeValueLiveRange(of: accessBase.reference!, context)
+    case let .stack(allocStack):
+      return computeLocalLiveRange(allocation: allocStack, begin: begin, localReachabilityCache, context)
+    case let .global(global):
+      return .global(global)
+    case let .argument(arg):
+      switch arg.convention {
+      case .indirectInGuaranteed, .indirectOut:
+        return .liveOut(arg)
+      case .indirectIn, .indirectInout, .indirectInoutAliasable:
+        return computeLocalLiveRange(allocation: arg, begin: begin, localReachabilityCache, context)
+      default:
+        return nil
+      }
+    case let .yield(result):
+      let apply = result.parentInstruction as! BeginApplyInst
+      switch apply.convention(of: result) {
+      case .indirectInGuaranteed:
+        var range = InstructionRange(for: address, context)
+        _ = BorrowingInstruction(apply)!.visitScopeEndingOperands(context) {
+          range.insert($0.instruction)
+          return .continueWalk
+        }
+        return .local(result, range)
+      case .indirectIn, .indirectInout, .indirectInoutAliasable:
+        return computeLocalLiveRange(allocation: result, begin: begin, localReachabilityCache, context)
+      default:
+        return nil
+      }
+    case .storeBorrow(let sb):
+      return computeValueLiveRange(of: sb.source, context)
+    case .pointer, .unidentified:
+      return nil
+    }
+  }
+
+  /// Does this inclusive range include `inst`, assuming that `inst` occurs after a definition of the live range.
+  func coversUse(_ inst: Instruction) -> Bool {
+    switch self {
+    case .liveOut, .global:
+      return true
+    case let .local(_, range), let .owned(_, range):
+      return range.inclusiveRangeContains(inst)
+    case let .borrow(borrowRanges):
+      for (_, range) in borrowRanges {
+        if !range.inclusiveRangeContains(inst) {
+          return false
+        }
+      }
+      return true
+    }
+  }
+
+  var description: String {
+    switch self {
+    case let .liveOut(arg):
+      return "liveOut: \(arg)"
+    case let .global(global):
+      return "global: \(global)"
+    case let .local(allocation, range):
+      return "local: \(allocation)\n\(range)"
+    case let .owned(value, range):
+      return "owned: \(value)\n\(range)"
+    case let .borrow(borrowRanges):
+      var str = ""
+      for (borrow, range) in borrowRanges {
+         str += "borrow: \(borrow)\n\(range)"
+      }
+      return str
+    }
+  }
+}
+
+extension AddressOwnershipLiveRange {
+  /// Compute the ownership live range of any non-address value.
+  ///
+  /// For an owned value, simply compute its liveness. For a guaranteed value, return a separate range for each borrow
+  /// introducer.
+  ///
+  /// For address values, use AccessBase.computeOwnershipRange.
+  ///
+  /// FIXME: This should use computeLinearLiveness rather than computeKnownLiveness as soon as lifetime completion
+  /// runs immediately after SILGen.
+  private static func computeValueLiveRange(of value: Value, _ context: FunctionPassContext)
+    -> AddressOwnershipLiveRange? {
+    switch value.ownership {
+    case .none, .unowned:
+      // This is unexpected for a value with derived addresses.
+      return nil
+    case .owned:
+      return .owned(value, computeKnownLiveness(for: value, context))
+    case .guaranteed:
+      return .borrow(computeBorrowLiveRange(for: value, context))
+    }
+  }
+
+  private static func computeLocalLiveRange(allocation: Value, begin: Instruction,
+                                            _ localReachabilityCache: LocalVariableReachabilityCache,
+                                            _ context: some Context) -> AddressOwnershipLiveRange? {
+    guard let localReachability = localReachabilityCache.reachability(for: allocation, context) else {
+      return nil
+    }
+    var reachingAssignments = Stack<LocalVariableAccess>(context)
+    defer { reachingAssignments.deinitialize() }
+
+    if !localReachability.gatherReachingAssignments(for: begin, in: &reachingAssignments) {
+      return nil
+    }
+    // Any one of the reaching assignment is sufficient to compute the minimal live range. The caller presumably only
+    // cares about the live range that is dominated by 'begin'. Since all assignments gathered above reach
+    // 'begin', their live ranges must all be identical on all paths through 'addressInst'.
+    let assignment = reachingAssignments.first!
+
+    var reachableUses = Stack<LocalVariableAccess>(context)
+    defer { reachableUses.deinitialize() }
+
+    localReachability.gatherKnownReachableUses(from: assignment, in: &reachableUses)
+
+    let assignmentInst = assignment.instruction ?? allocation.parentFunction.entryBlock.instructions.first!
+    var range = InstructionRange(begin: assignmentInst, context)
+    for localAccess in reachableUses {
+      if localAccess.kind == .escape {
+        log("Local variable: \(allocation)\n    escapes at \(localAccess.instruction!)")
+      }
+      for end in localAccess.instruction!.endInstructions {
+        range.insert(end)
+      }
+    }
+    return .local(allocation, range)
   }
 }

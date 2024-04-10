@@ -1084,6 +1084,16 @@ namespace {
 
       printFlag(D->isImplicit(), "implicit", DeclModifierColor);
       printFlag(D->isHoisted(), "hoisted", DeclModifierColor);
+
+      if (auto implAttr = D->getAttrs().getAttribute<ObjCImplementationAttr>()) {
+        StringRef label =
+            implAttr->isEarlyAdopter() ? "objc_impl" : "clang_impl";
+        if (implAttr->CategoryName.empty())
+          printFlag(label);
+        else
+          printFieldQuoted(implAttr->CategoryName.str(), label);
+      }
+
       printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
                 DeclModifierColor);
@@ -2217,11 +2227,6 @@ public:
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E, StringRef label) {
     printCommon(E, "interpolated_string_literal_expr", label);
 
-    // Print the trailing quote location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
-      printSourceLoc(E->getTrailingQuoteLoc(), &Ctx, "trailing_quote_loc");
-    }
     printField(E->getLiteralCapacity(), "literal_capacity", ExprModifierColor);
     printField(E->getInterpolationCount(), "interpolation_count",
                ExprModifierColor);
@@ -2704,6 +2709,13 @@ public:
     printFoot();
   }
 
+  void visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
+                                         StringRef label) {
+    printCommon(E, "extract_function_isolation", label);
+    printRec(E->getFunctionExpr());
+    printFoot();
+  }
+
   void visitInOutExpr(InOutExpr *E, StringRef label) {
     printCommon(E, "inout_expr", label);
     printRec(E->getSubExpr());
@@ -2792,8 +2804,11 @@ public:
 
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::Nonisolated:
+      printFlag(true, "nonisolated", CapturesColor);
       break;
 
     case ActorIsolation::Erased:
@@ -3044,12 +3059,6 @@ public:
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, StringRef label) {
     printCommon(E, "editor_placeholder_expr", label);
 
-    // Print the trailing angle bracket location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
-      printSourceLoc(E->getTrailingAngleBracketLoc(), &Ctx,
-                     "trailing_angle_bracket_loc");
-    }
     auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
@@ -3297,7 +3306,9 @@ public:
   }
 
   void visitDeclRefTypeRepr(DeclRefTypeRepr *T, StringRef label) {
-    printCommon(isa<IdentTypeRepr>(T) ? "type_ident" : "type_member", label);
+    printCommon(isa<UnqualifiedIdentTypeRepr>(T) ? "type_unqualified_ident"
+                                                 : "type_qualified_ident",
+                label);
 
     printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
     if (T->isBound())
@@ -3305,8 +3316,8 @@ public:
     else
       printFlag("unbound");
 
-    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
-      printRec(memberTR->getBase());
+    if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T)) {
+      printRec(qualIdentTR->getBase());
     }
 
     for (auto *genArg : T->getGenericArgs()) {
@@ -3534,8 +3545,7 @@ public:
     for (auto &dep : T->getLifetimeDependencies()) {
       printFieldRaw(
           [&](raw_ostream &out) {
-            out << dep.getLifetimeDependenceKindString() << "(";
-            out << dep.getParamString() << ")";
+            out << " " << dep.getLifetimeDependenceSpecifierString() << " ";
           },
           "");
     }
@@ -4309,6 +4319,7 @@ namespace {
         printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
+        printFlag(T->hasTransferringResult(), "transferring_result");
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");

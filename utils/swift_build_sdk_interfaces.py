@@ -271,6 +271,10 @@ def process_module(module_file):
         if module_file.name == STDLIB_NAME:
             command_args += ('-parse-stdlib',)
 
+        # FIXME: Some Python installations are unable to handle Unicode
+        # properly. Narrow this once we figure out how to detect them.
+        command_args += ('-diagnostic-style', 'llvm')
+
         if looks_like_iosmac(interface_base):
             for system_framework_path in args.iosmac_system_framework_dirs:
                 command_args += ('-Fsystem', system_framework_path)

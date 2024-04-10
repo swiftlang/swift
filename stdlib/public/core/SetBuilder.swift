@@ -43,3 +43,6 @@ struct _SetBuilder<Element: Hashable> {
     return Set(_native: _target)
   }
 }
+
+@available(*, unavailable)
+extension _SetBuilder: Sendable {}

@@ -82,7 +82,8 @@ var _ : TheDevil = God()^
 var _ : God = ^TheDevil()
 var _ : Man = TheDevil() ^ God()
 var _ : Man = God()^ ^ ^TheDevil()
-let _ = God()^TheDevil() // expected-error{{operator argument #2 must precede operator argument #1}} {{9-9=TheDevil()}} {{14-25=}}
+let _ = God()^TheDevil() // expected-error{{operator argument #2 must precede operator argument #1}} {{9-9=TheDevil() ^ }} {{14-25=}}
+let _ = God() ^ TheDevil() // expected-error{{operator argument #2 must precede operator argument #1}} {{9-9=TheDevil() ^ }} {{14-27=}}
 
 postfix func ^ (x: Man) -> () -> God {
   return { return God() }

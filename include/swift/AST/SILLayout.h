@@ -142,7 +142,7 @@ public:
   
   /// Get the fields inside the layout.
   ArrayRef<SILField> getFields() const {
-    return llvm::makeArrayRef(getTrailingObjects<SILField>(), NumFields);
+    return llvm::ArrayRef(getTrailingObjects<SILField>(), NumFields);
   }
   
   /// Produce a profile of this layout, for use in a folding set.

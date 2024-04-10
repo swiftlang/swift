@@ -3,7 +3,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -I %t
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
-// XFAIL: noncopyable_generics
+
 
 // this test makes sure that decls containing a move-only type are guarded by the $MoveOnly feature flag
 

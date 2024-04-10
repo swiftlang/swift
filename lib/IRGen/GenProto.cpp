@@ -953,7 +953,10 @@ bool IRGenModule::isResilientConformance(
     const NormalProtocolConformance *conformance) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
-  if (!conformance->getProtocol()->isResilient())
+  bool shouldTreatProtocolNonResilient =
+    IRGen.Opts.UseFragileResilientProtocolWitnesses;
+  if (!conformance->getProtocol()->isResilient() ||
+      shouldTreatProtocolNonResilient)
     return false;
 
   auto *conformanceModule = conformance->getDeclContext()->getParentModule();
@@ -2113,7 +2116,16 @@ namespace {
       if (!normal)
         return;
 
-      std::optional<Requirement> scratchRequirement;
+      // Compute the inverse requirements from the generic signature where the
+      // conformance occurs.
+      SmallVector<Requirement, 2> scratchReqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      if (auto genericSig =
+              normal->getDeclContext()->getGenericSignatureOfContext()) {
+        genericSig->getRequirementsWithInverses(scratchReqs, inverses);
+        scratchReqs.clear();
+      }
+
       auto condReqs = normal->getConditionalRequirements();
       if (condReqs.empty()) {
         // For a protocol P that conforms to another protocol, introduce a
@@ -2121,21 +2133,21 @@ namespace {
         // SILWitnessTable::enumerateWitnessTableConditionalConformances().
         if (auto selfProto = normal->getDeclContext()->getSelfProtocolDecl()) {
           auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
-          scratchRequirement.emplace(RequirementKind::Conformance, selfType,
-                                     selfProto->getDeclaredInterfaceType());
-          condReqs = *scratchRequirement;
+          scratchReqs.emplace_back(RequirementKind::Conformance, selfType,
+                                   selfProto->getDeclaredInterfaceType());
+          condReqs = scratchReqs;
         }
 
-        if (condReqs.empty())
+        if (condReqs.empty() && inverses.empty())
           return;
       }
 
-      Flags = Flags.withNumConditionalRequirements(condReqs.size());
-
       auto nominal = normal->getDeclContext()->getSelfNominalTypeDecl();
       auto sig = nominal->getGenericSignatureOfContext();
-      auto metadata = irgen::addGenericRequirements(IGM, B, sig, condReqs);
+      auto metadata = irgen::addGenericRequirements(
+          IGM, B, sig, condReqs, inverses);
 
+      Flags = Flags.withNumConditionalRequirements(metadata.NumRequirements);
       Flags = Flags.withNumConditionalPackDescriptors(
           metadata.GenericPackArguments.size());
 
@@ -2156,6 +2168,7 @@ namespace {
     void addResilientWitnesses() {
       if (Description.resilientWitnesses.empty())
         return;
+      assert(!IGM.IRGen.Opts.UseFragileResilientProtocolWitnesses);
 
       Flags = Flags.withHasResilientWitnesses(true);
 
@@ -2453,6 +2466,7 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 
     auto mw = entry.getMethodWitness();
     auto member = mw.Requirement;
+
     auto &fnProtoInfo =
         IGM.getProtocolInfo(conf->getProtocol(), ProtocolInfoKind::Full);
     auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable();
@@ -2528,6 +2542,17 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   bool isResilient = isResilientConformance(conf);
   bool useRelativeProtocolWitnessTable =
     IRGen.Opts.UseRelativeProtocolWitnessTables;
+  if (useRelativeProtocolWitnessTable &&
+      !conf->getConditionalRequirements().empty()) {
+    auto sig = conf->getGenericSignature();
+    sig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
+                      if (param->isParameterPack()) {
+#ifndef NDEBUG
+                        wt->dump();
+#endif
+                        llvm::report_fatal_error("use of relative protcol witness tables not supported");
+                      }});
+  }
   if (!isResilient) {
     // Build the witness table.
     ConstantInitBuilder builder(*this);
@@ -2561,8 +2586,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     tableSize = wtableBuilder.getTableSize();
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
   } else {
-    assert(!IRGen.Opts.UseRelativeProtocolWitnessTables &&
-           "resilient relative protocol witness tables are not supported");
+    if (IRGen.Opts.UseRelativeProtocolWitnessTables)
+      llvm::report_fatal_error("resilient relative protocol witness tables are not supported");
+
     // Build the witness table.
     ResilientWitnessTableBuilder wtableBuilder(*this, wt);
 
@@ -4328,8 +4354,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
-        irgen::addGenericRequirements(*this, fields, signature,
-                                      signature.getRequirements());
+        irgen::addGenericRequirements(*this, fields, signature);
         return fields.finishAndCreateFuture();
       });
 }

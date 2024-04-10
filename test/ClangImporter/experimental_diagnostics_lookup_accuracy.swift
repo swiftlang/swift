@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -I %S/Inputs/custom-modules -typecheck %s 2>&1 | %FileCheck %s --strict-whitespace 
+// RUN: not %target-swift-frontend -I %S/Inputs/custom-modules -typecheck %s -diagnostic-style llvm 2>&1 | %FileCheck %s --strict-whitespace 
 
 // This test tests that requests for diagnosis, performed by name,
 // resolve to the correct Clang declarations, even when the same name is used

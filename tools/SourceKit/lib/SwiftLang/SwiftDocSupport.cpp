@@ -335,7 +335,13 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   if (auto *typeDC = GC->getInnermostTypeContext())
     Proto = typeDC->getSelfProtocolDecl();
 
-  for (auto Req: GenericSig.getRequirements()) {
+  SmallVector<Requirement, 2> Reqs;
+  SmallVector<InverseRequirement, 2> InverseReqs;
+  GenericSig->getRequirementsWithInverses(Reqs, InverseReqs);
+  // FIXME: Handle InverseReqs, or change the above to getRequirements()
+  // and update tests to include Copyable/Escapable
+
+  for (auto Req: Reqs) {
     if (Proto &&
         Req.getKind() == RequirementKind::Conformance &&
         Req.getFirstType()->isEqual(Proto->getSelfInterfaceType()) &&
@@ -455,7 +461,7 @@ static bool initDocEntityInfo(const Decl *D,
   }
 
   if (!IsRef) {
-    llvm::raw_svector_ostream OS(Info.DocComment);
+    llvm::raw_svector_ostream OS(Info.DocCommentAsXML);
 
     {
       llvm::SmallString<128> DocBuffer;
@@ -668,7 +674,7 @@ getDeclAttributes(const Decl *D, std::vector<const DeclAttribute*> &Scratch) {
     }
   }
 
-  return llvm::makeArrayRef(Scratch);
+  return llvm::ArrayRef(Scratch);
 }
 
 // Only reports @available.
@@ -1292,9 +1298,8 @@ public:
     std::vector<CategorizedEdits> Results;
     for (unsigned I = 0, N = UIds.size(); I < N; I ++) {
       auto Pair = StartEnds[I];
-      Results.push_back({UIds[I],
-                         llvm::makeArrayRef(AllEdits.data() + Pair.first,
-                                             Pair.second - Pair.first)});
+      Results.push_back({UIds[I], llvm::ArrayRef(AllEdits.data() + Pair.first,
+                                                 Pair.second - Pair.first)});
     }
     Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromResult(Results));
   }

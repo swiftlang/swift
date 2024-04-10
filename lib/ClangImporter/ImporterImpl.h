@@ -1821,7 +1821,7 @@ public:
   void setSinglePCHImport(std::optional<std::string> PCHFilename) {
     if (PCHFilename.has_value()) {
       assert(llvm::sys::path::extension(PCHFilename.value())
-                 .endswith(file_types::getExtension(file_types::TY_PCH)) &&
+                 .ends_with(file_types::getExtension(file_types::TY_PCH)) &&
              "Single PCH imported filename doesn't have .pch extension!");
     }
     SinglePCHImport = PCHFilename;
@@ -1879,7 +1879,7 @@ bool hasSameUnderlyingType(const clang::Type *a,
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                  ASTContext &ctx);
+                                  ASTContext &ctx, bool ignoreClangTarget);
 
 /// Add command-line arguments common to all imports of Clang code.
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
@@ -2023,15 +2023,5 @@ bool isViewType(const clang::CXXRecordDecl *decl);
 
 }
 }
-
-// Forwards to synthesizeCxxBasicMethod(), producing a thunk that calls a
-// virtual function.
-clang::CXXMethodDecl *synthesizeCxxVirtualMethod(
-    swift::ClangImporter &Impl, const clang::CXXRecordDecl *derivedClass,
-    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method);
-
-// Exposed to produce a Swift method body for calling a Swift thunk.
-std::pair<swift::BraceStmt *, bool>
-synthesizeForwardingThunkBody(swift::AbstractFunctionDecl *afd, void *context);
 
 #endif

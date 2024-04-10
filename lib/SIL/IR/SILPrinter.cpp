@@ -327,6 +327,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Get:
       OS << "!getter";
       break;
+    case AccessorKind::DistributedGet:
+      OS << "!_distributed_getter";
+      break;
     case AccessorKind::Set:
       OS << "!setter";
       break;
@@ -1388,6 +1391,11 @@ public:
             *this << V;
           break;
         }
+        case SILDIExprElement::TypeKind: {
+          const Type TypePtr = Arg.getAsType();
+          *this << "$";
+          TypePtr->print(PrintState.OS, PrintState.ASTOptions);
+        }
         }
       }
     }
@@ -1416,8 +1424,6 @@ public:
 
       if (Var->ArgNo)
         *this << ", argno " << Var->ArgNo;
-      if (Var->Implicit)
-        *this << ", implicit";
       if (Var->Type) {
         *this << ", type ";
         Var->Type->print(PrintState.OS, PrintState.ASTOptions);
@@ -1435,7 +1441,9 @@ public:
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
       *this << "[lexical] ";
-    if (AVI->getUsesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
+    if (AVI->isFromVarDecl())
+      *this << "[var_decl] ";
+    if (AVI->usesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
@@ -1489,7 +1497,7 @@ public:
       *this << "[pointer_escape] ";
     }
 
-    if (ABI->getUsesMoveableValueDebugInfo() &&
+    if (ABI->usesMoveableValueDebugInfo() &&
         !ABI->getAddressType().isMoveOnly()) {
       *this << "[moveable_value_debuginfo] ";
     }
@@ -1603,7 +1611,7 @@ public:
   }
 
   void visitEndApplyInst(EndApplyInst *AI) {
-    *this << Ctx.getID(AI->getOperand());
+    *this << Ctx.getID(AI->getOperand()) << " as " << AI->getType();
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -1737,7 +1745,24 @@ public:
     if (BBI->isFromVarDecl()) {
       *this << "[var_decl] ";
     }
+    if (BBI->isFixed()) {
+      *this << "[fixed] ";
+    }
     *this << getIDAndType(BBI->getOperand());
+  }
+
+  void visitBorrowedFromInst(BorrowedFromInst *bfi) {
+    *this << getIDAndType(bfi->getBorrowedValue());
+    *this << " from (";
+    bool first = true;
+    for (SILValue ev : bfi->getEnclosingValues()) {
+      if (!first) {
+        *this << ", ";
+      }
+      first = false;
+      *this << getIDAndType(ev);
+    }
+    *this << ")";
   }
 
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
@@ -1884,7 +1909,7 @@ public:
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->poisonRefs())
       *this << "[poison] ";
-    if (DVI->getUsesMoveableValueDebugInfo() &&
+    if (DVI->usesMoveableValueDebugInfo() &&
         !DVI->getOperand()->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     if (DVI->hasTrace())
@@ -3411,6 +3436,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "\"] ";
   }
 
+  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
+    OS << "[ref_adhoc_requirement_witness \"";
+    OS << usedFunc->getName();
+    OS << "\"] ";
+  }
+
   if (hasObjCReplacement()) {
     OS << "[objc_replacement_for \"";
     OS << getObjCReplacement().str();
@@ -3726,7 +3757,7 @@ static void printSILLinearMapTypes(SILPrintContext &Ctx,
       continue;
 
     StringRef Name = cast<TypeDecl>(D)->getNameStr();
-    if (!Name.startswith("_AD__"))
+    if (!Name.starts_with("_AD__"))
       continue;
 
     D->print(OS, Options);

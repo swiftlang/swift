@@ -170,7 +170,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
       astContext.getIntType(), astContext.getUIntType()};
 
-  auto primTypesArray = llvm::makeArrayRef(supportedPrimitiveTypes);
+  auto primTypesArray = llvm::ArrayRef(supportedPrimitiveTypes);
 
   // Ensure that `long` and `unsigned long` are treated as valid
   // generic Swift types (`Int` and `UInt`) on platforms

@@ -122,7 +122,7 @@ static const entry globalEntries[] = {
 TEST(EnumMap, Basic) {
   EnumMap<A, size_t> map;
 
-  auto entries = llvm::makeArrayRef(globalEntries);
+  auto entries = llvm::ArrayRef(globalEntries);
 
   for (size_t iteration : range(entries.size())) {
     EXPECT_EQ(iteration, map.size());

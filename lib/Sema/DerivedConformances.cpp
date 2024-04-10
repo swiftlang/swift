@@ -932,11 +932,8 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
   assert(subPatternCount > 0);
 
   ASTContext &C = parentDC->getASTContext();
-  auto availableAttr = elt->getAttrs().getUnavailable(C);
-  if (!availableAttr)
-    return nullptr;
-
-  if (!availableAttr->isUnconditionallyUnavailable())
+  if (!elt->isUnreachableAtRuntime() ||
+      elt->getParentEnum()->isUnreachableAtRuntime())
     return nullptr;
 
   // If the stdlib isn't new enough to contain the helper function for

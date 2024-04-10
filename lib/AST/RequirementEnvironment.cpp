@@ -131,7 +131,8 @@ RequirementEnvironment::RequirementEnvironment(
             substConcreteType->getContextSubstitutionMap(
               conformanceDC->getParentModule(), conformanceDC);
           specialized =
-            ctx.getSpecializedConformance(substConcreteType, conformance,
+            ctx.getSpecializedConformance(substConcreteType,
+                                          cast<NormalProtocolConformance>(conformance),
                                           concreteSubs);
         }
 

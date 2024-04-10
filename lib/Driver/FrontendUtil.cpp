@@ -141,5 +141,5 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   }
 
   const llvm::opt::ArgStringList &BaseFrontendArgs = Cmd->getArguments();
-  return Action(llvm::makeArrayRef(BaseFrontendArgs).drop_front());
+  return Action(llvm::ArrayRef(BaseFrontendArgs).drop_front());
 }

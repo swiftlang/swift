@@ -65,7 +65,7 @@ TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
 TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
                                              StringRef usr,
                                              GenericSignature genericSig) {
-  if (!usr.startswith("s:"))
+  if (!usr.starts_with("s:"))
     return nullptr;
 
   std::string mangling(usr);
@@ -104,7 +104,7 @@ TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
 Type
 ASTBuilder::createBuiltinType(StringRef builtinName,
                               StringRef mangledName) {
-  if (builtinName.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
+  if (builtinName.starts_with(BUILTIN_TYPE_NAME_PREFIX)) {
     SmallVector<ValueDecl *, 1> decls;
 
     StringRef strippedName =
@@ -475,7 +475,7 @@ Type ASTBuilder::createFunctionType(
                    resultDiffKind, clangFunctionType, isolation,
                    LifetimeDependenceInfo(), extFlags.hasTransferringResult())
                    .withAsync(flags.isAsync())
-                   .withConcurrent(flags.isSendable())
+                   .withSendable(flags.isSendable())
                    .build();
 
   return FunctionType::get(funcParams, output, einfo);
@@ -558,6 +558,11 @@ getResultOptions(ImplResultInfoOptions implOptions) {
     result |= SILResultInfo::NotDifferentiable;
   }
 
+  if (implOptions.contains(ImplResultInfoFlags::IsTransferring)) {
+    implOptions -= ImplResultInfoFlags::IsTransferring;
+    result |= SILResultInfo::IsTransferring;
+  }
+
   // If we did not remove all of the options from implOptions, someone forgot to
   // update this code for a new type of flag. Return none to signal error!
   if (bool(implOptions))
@@ -566,17 +571,33 @@ getResultOptions(ImplResultInfoOptions implOptions) {
   return result;
 }
 
+static SILCoroutineKind
+getCoroutineKind(ImplCoroutineKind kind) {
+  switch (kind) {
+  case ImplCoroutineKind::None:
+    return SILCoroutineKind::None;
+  case ImplCoroutineKind::YieldOnce:
+    return SILCoroutineKind::YieldOnce;
+  case ImplCoroutineKind::YieldMany:
+    return SILCoroutineKind::YieldMany;
+  }
+  llvm_unreachable("unknown coroutine kind");
+}
+
 Type ASTBuilder::createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,
+    Demangle::ImplCoroutineKind coroutineKind,
     ArrayRef<Demangle::ImplFunctionParam<Type>> params,
+    ArrayRef<Demangle::ImplFunctionYield<Type>> yields,
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     std::optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
   GenericSignature genericSig;
 
-  SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
     getParameterConvention(calleeConvention);
+  SILCoroutineKind funcCoroutineKind =
+    getCoroutineKind(coroutineKind);
 
   SILFunctionTypeRepresentation representation;
   switch (flags.getRepresentation()) {
@@ -639,6 +660,13 @@ Type ASTBuilder::createImplFunctionType(
     funcParams.emplace_back(type, conv, options);
   }
 
+  for (const auto &yield : yields) {
+    auto type = yield.getType()->getCanonicalType();
+    auto conv = getParameterConvention(yield.getConvention());
+    auto options = *getParameterOptions(yield.getOptions());
+    funcParams.emplace_back(type, conv, options);
+  }
+
   for (const auto &result : results) {
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
@@ -664,8 +692,7 @@ Type ASTBuilder::createImplFunctionType(
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
                    flags.isSendable(), flags.isAsync(), unimplementable,
-                   isolation, diffKind, clangFnType, LifetimeDependenceInfo(),
-                   flags.hasTransferringResult())
+                   isolation, diffKind, clangFnType, LifetimeDependenceInfo())
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
@@ -726,7 +753,8 @@ Type ASTBuilder::createExistentialMetatypeType(
 }
 
 Type ASTBuilder::createConstrainedExistentialType(
-    Type base, ArrayRef<BuiltRequirement> constraints) {
+    Type base, ArrayRef<BuiltRequirement> constraints,
+    ArrayRef<BuiltInverseRequirement> inverseRequirements) {
   // FIXME: Generalize to other kinds of bases.
   if (!base->getAs<ProtocolType>())
     return Type();
@@ -755,8 +783,19 @@ Type ASTBuilder::createConstrainedExistentialType(
     }
     args.push_back(argTy->getSecond());
   }
-  auto constrainedBase =
+  Type constrainedBase =
       ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+
+  // Handle inverse requirements.
+  if (!inverseRequirements.empty()) {
+    InvertibleProtocolSet inverseSet;
+    for (const auto &inverseReq : inverseRequirements) {
+      inverseSet.insert(inverseReq.getKind());
+    }
+    constrainedBase = ProtocolCompositionType::get(
+        Ctx, { constrainedBase }, inverseSet, /*hasExplicitAnyObject=*/false);
+  }
+
   return ExistentialType::get(constrainedBase);
 }
 
@@ -843,10 +882,31 @@ Type ASTBuilder::createSILBoxType(Type base) {
   return SILBoxType::get(base->getCanonicalType());
 }
 
+/// Utility function to produce a Requirement from an InverseRequirement.
+static Requirement inverseAsRequirement(const InverseRequirement &inverseReq) {
+  ASTContext &ctx = inverseReq.subject->getASTContext();
+  InvertibleProtocolSet inverses;
+  inverses.insert(inverseReq.getKind());
+  Type constraintType = ProtocolCompositionType::get(
+      ctx, { }, inverses, /*hasExplicitAnyObject=*/false);
+  return Requirement(
+      RequirementKind::Conformance, inverseReq.subject, constraintType);
+}
+
+/// Utility function to append Requirements produced from the given set of
+/// InverseRequirements to the `requirements` vector.
+static void appendInversesAsRequirements(
+    ArrayRef<InverseRequirement> inverseRequirements,
+    SmallVectorImpl<Requirement> &requirements) {
+  for (const auto &inverseReq : inverseRequirements)
+    requirements.push_back(inverseAsRequirement(inverseReq));
+}
+
 Type ASTBuilder::createSILBoxTypeWithLayout(
     ArrayRef<BuiltSILBoxField> fields,
     ArrayRef<BuiltSubstitution> Substitutions,
-    ArrayRef<BuiltRequirement> Requirements) {
+    ArrayRef<BuiltRequirement> Requirements,
+    ArrayRef<BuiltInverseRequirement> InverseRequirements) {
   SmallVector<Type, 4> replacements;
   SmallVector<GenericTypeParamType *, 2> genericTypeParams;
   for (const auto &s : Substitutions) {
@@ -858,6 +918,7 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   GenericSignature signature;
   if (!genericTypeParams.empty()) {
     SmallVector<BuiltRequirement, 2> RequirementsVec(Requirements);
+    appendInversesAsRequirements(InverseRequirements, RequirementsVec);
     signature = swift::buildGenericSignature(Ctx,
                                              signature,
                                              genericTypeParams,
@@ -1097,6 +1158,13 @@ LayoutConstraint ASTBuilder::getLayoutConstraintWithSizeAlign(
                                                getASTContext());
 }
 
+InverseRequirement ASTBuilder::createInverseRequirement(
+    Type subject, InvertibleProtocolKind kind) {
+  auto knownProtoKind = getKnownProtocolKind(kind);
+  auto proto = subject->getASTContext().getProtocol(knownProtoKind);
+  return InverseRequirement(subject, proto, SourceLoc());
+}
+
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
     NodePointer node) {
@@ -1115,8 +1183,11 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   // Constrained extensions mangle the subset of requirements not satisfied
   // by the nominal's generic signature.
   SmallVector<Requirement, 2> requirements;
-  decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
-                    ASTBuilder>(node, requirements, *this);
+  SmallVector<InverseRequirement, 2> inverseRequirements;
+  decodeRequirement<BuiltType, BuiltRequirement, BuiltInverseRequirement,
+                    BuiltLayoutConstraint, ASTBuilder>(
+      node, requirements, inverseRequirements, *this);
+  appendInversesAsRequirements(inverseRequirements, requirements);
 
   return buildGenericSignature(Ctx, baseGenericSig, {}, std::move(requirements),
                                /*allowInverses=*/true)
@@ -1220,21 +1291,52 @@ ASTBuilder::findDeclContext(NodePointer node) {
       return nullptr;
 
     CanGenericSignature genericSig;
-    if (node->getNumChildren() > 2)
+    bool genericSigMatchesNominal = false;
+    if (node->getNumChildren() > 2) {
       genericSig = demangleGenericSignature(nominalDecl, node->getChild(2));
+
+      // If the generic signature are equivalent to that of the nominal type,
+      // we're either in another module or the nominal type is generic and
+      // involves inverse requirements on its generic parameters.
+      genericSigMatchesNominal = genericSig &&
+        genericSig == nominalDecl->getGenericSignatureOfContext().getCanonicalSignature();
+
+      // If the generic signature is equivalent to that of the nominal type,
+      // and we're in the same module, it's due to inverse requirements.
+      // Just return the nominal declaration.
+      if (genericSigMatchesNominal &&
+          nominalDecl->getParentModule() == moduleDecl) {
+        return nominalDecl;
+      }
+    }
 
     for (auto *ext : nominalDecl->getExtensions()) {
       if (ext->getParentModule() != moduleDecl)
         continue;
 
       if (!ext->isConstrainedExtension()) {
-        if (!genericSig)
+        if (!genericSig || genericSigMatchesNominal)
           return ext;
+
         continue;
       }
 
-      if (ext->getGenericSignature().getCanonicalSignature() == genericSig) {
+      if (!ext->isWrittenWithConstraints() && !genericSig)
         return ext;
+
+      auto extSig = ext->getGenericSignature().getCanonicalSignature();
+      if (extSig == genericSig) {
+        return ext;
+      }
+
+      // If the extension mangling doesn't include a generic signature, it
+      // might be because the nominal type suppresses conformance.
+      if (!genericSig) {
+        SmallVector<Requirement, 2> requirements;
+        SmallVector<InverseRequirement, 2> inverses;
+        extSig->getRequirementsWithInverses(requirements, inverses);
+        if (requirements.empty())
+          return ext;
       }
     }
 

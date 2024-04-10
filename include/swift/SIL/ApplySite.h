@@ -571,6 +571,16 @@ public:
     return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
   }
 
+  /// Return the SILParameterInfo for this operand in the callee function.
+  SILParameterInfo getArgumentParameterInfo(const Operand &oper) const {
+    assert(!getArgumentConvention(oper).isIndirectOutParameter() &&
+           "Can only be applied to non-out parameters");
+
+    // The ParameterInfo is going to be the parameter in the caller.
+    unsigned calleeArgIndex = getCalleeArgIndex(oper);
+    return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
+  }
+
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
 
   friend bool operator==(ApplySite lhs, ApplySite rhs) {
@@ -801,13 +811,18 @@ public:
     }
   }
 
-  SILParameterInfo getArgumentParameterInfo(const Operand &oper) const {
-    assert(!getArgumentConvention(oper).isIndirectOutParameter() &&
-           "Can only be applied to non-out parameters");
+  /// Return the applied argument index for the given operand ignoring indirect
+  /// results.
+  ///
+  /// So for instance:
+  ///
+  /// apply %f(%result, %0, %1, %2, ...).
+  unsigned getAppliedArgIndexWithoutIndirectResults(const Operand &oper) const {
+    assert(oper.getUser() == **this);
+    assert(isArgumentOperand(oper));
 
-    // The ParameterInfo is going to be the parameter in the caller.
-    unsigned calleeArgIndex = getCalleeArgIndex(oper);
-    return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
+    return getAppliedArgIndex(oper) - getNumIndirectSILResults() -
+           getNumIndirectSILErrorResults();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

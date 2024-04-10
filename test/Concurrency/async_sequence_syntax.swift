@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -98,4 +98,36 @@ func forTryAwaitReturningExistentialType() async throws {
 
   for try await _ in S().seq() { // Ok
   }
+}
+
+@available(SwiftStdlib 5.1, *)
+public struct ReaderSeq: AsyncSequence, Sendable {
+  public enum Failure: Error {
+    case x
+  }
+
+  public typealias Element = Int
+
+  public func makeAsyncIterator() -> Reader {}
+
+  public actor Reader: AsyncIteratorProtocol {
+    public func next() async throws -> Element? {}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func test1() -> Error {
+  return ReaderSeq.Failure.x
+}
+
+@available(SwiftStdlib 5.1, *)
+public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
+  public mutating func next() async -> Element? { nil }
+  public func makeAsyncIterator() -> Self { self }
+
+  @_implements(AsyncIteratorProtocol, Failure)
+  public typealias __AsyncIteratorProtocol_Failure = Never
+
+  @_implements(AsyncSequence, Failure)
+  public typealias __AsyncSequence_Failure = Never
 }

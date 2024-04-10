@@ -34,6 +34,16 @@
 // imply the existence of earlier features.  (This only needs to apply to
 // suppressible features.)
 //
+// Sometimes, certain declarations will conflict with existing declarations
+// when printed with a suppressible feature disabled. The attribute
+// @_disallowFeatureSuppression can be used to suppress feature suppression on
+// a particular declaration.
+//
+// If suppressing a feature in general is problematic, but it's okay to
+// suppress it for specific declarations, the feature can be made
+// conditionally suppressible.  Declarations opt in to suppression with
+// the @_allowFeatureSuppression attribute.
+//
 // BASELINE_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but is used
 // for features that can be assumed to be available in any Swift compiler that
 // will be used to process the textual interface files produced by this
@@ -44,9 +54,44 @@
 #  error define LANGUAGE_FEATURE before including Features.def
 #endif
 
+// A feature that's both suppressible and experimental.
+// Delegates to whichever the includer defines.
+#ifndef SUPPRESSIBLE_EXPERIMENTAL_FEATURE
+#  if defined(SUPPRESSIBLE_LANGUAGE_FEATURE) && \
+      defined(EXPERIMENTAL_FEATURE)
+#    error ambiguous defines when including Features.def
+#  elif defined(SUPPRESSIBLE_LANGUAGE_FEATURE)
+#    define SUPPRESSIBLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
+       SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
+#  else
+#    define SUPPRESSIBLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
+       EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#  endif
+#endif
+
 #ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+#  define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
   LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#endif
+
+// A feature that's both conditionally-suppressible and experimental.
+// Delegates to whichever the includer defines.
+#ifndef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE
+#  if defined(CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE) && \
+      defined(EXPERIMENTAL_FEATURE)
+#    error ambiguous defines when including Features.def
+#  elif defined(CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE)
+#    define CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
+       CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
+#  else
+#    define CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
+       EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#  endif
+#endif
+
+#ifndef CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE
+#  define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+     LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
 #ifndef UPCOMING_FEATURE
@@ -87,7 +132,7 @@ BASELINE_LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins")
 BASELINE_LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute")
 BASELINE_LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute")
 LANGUAGE_FEATURE(BuiltinBuildTaskExecutorRef, 0, "TaskExecutor-building builtins")
-LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins")
+BASELINE_LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins")
 LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins")
 BASELINE_LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "Task create in task group builtin with extra flags")
@@ -95,21 +140,23 @@ LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in t
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup, 0, "Task create in discarding task group builtin, accounting for the Void return type")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create builtin with extra executor preference")
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
-LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()")
-LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
+BASELINE_LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()")
+BASELINE_LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
 LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
 LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
-LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
-LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
+BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
+BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
 LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
-LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
-LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags")
-SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor")
+BASELINE_LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
+BASELINE_LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags")
+BASELINE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor")
 SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types")
-SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync")
-SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)")
-LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors")
+BASELINE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync")
+BASELINE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)")
+SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeAvailability, 0, "Availability on associated types")
+SUPPRESSIBLE_LANGUAGE_FEATURE(AsyncSequenceFailure, 0, "Failure associated type on AsyncSequence and AsyncIteratorProtocol")
+BASELINE_LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors")
 LANGUAGE_FEATURE(Macros, 0, "Macros")
 LANGUAGE_FEATURE(FreestandingExpressionMacros, 382, "Expression macros")
 LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros")
@@ -122,11 +169,15 @@ LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros")
 SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
-LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
+CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
+LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
+SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
+LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
 
+// Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(StrictConcurrency, 0337, 6)
@@ -137,10 +188,12 @@ UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
 UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
-UPCOMING_FEATURE(FullTypedThrows, 413, 6)
-UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
+UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
+UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 
+// Swift 7
+UPCOMING_FEATURE(ExistentialAny, 335, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -148,6 +201,7 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(BodyMacros, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
+EXPERIMENTAL_FEATURE(FullTypedThrows, true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -171,6 +225,19 @@ EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
+/// Enables a module to allow non resilient access from other
+/// modules within a package if built from source.
+EXPERIMENTAL_FEATURE(AllowNonResilientAccessInPackage, false)
+
+/// Enables a client module within a package to bypass resilient
+/// access (at use site) to decls defined in another module within
+/// the same package.
+EXPERIMENTAL_FEATURE(ClientBypassResilientAccessInPackage, false)
+
+/// Enables serialization of package decls and bodies and performs
+/// CMO within a package.
+EXPERIMENTAL_FEATURE(PackageCMO, false)
+
 /// Whether to enable experimental layout string value witnesses
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnesses, true)
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnessesInstantiation, true)
@@ -191,7 +258,7 @@ EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
 EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
-EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure, true)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
@@ -230,9 +297,6 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
 
-/// Region Based Isolation testing using the TransferNonSendable pass
-EXPERIMENTAL_FEATURE(RegionBasedIsolation, true)
-
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
 EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
@@ -253,8 +317,17 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
+/// Enables importing the Volatile module
+EXPERIMENTAL_FEATURE(Volatile, true)
+
 /// Enables noncopyable generics
-EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+
+// Alias for NoncopyableGenerics
+EXPERIMENTAL_FEATURE(NoncopyableGenerics2, true)
+
+// Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
+EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
@@ -289,12 +362,37 @@ EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
 
+// Enable explicit isolation of closures.
+EXPERIMENTAL_FEATURE(ClosureIsolation, true)
+
 // Enable isolated(any) attribute on function types.
-EXPERIMENTAL_FEATURE(IsolatedAny, false)
+CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
+
+
+// Whether members of extensions respect the enclosing file's imports.
+EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(ExtensionImportVisibility, true)
+
+// Alias for IsolatedAny
+EXPERIMENTAL_FEATURE(IsolatedAny2, true)
+
+// Enable usability improvements for global-actor-isolated types.
+EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, false)
+
+// Enable @implementation on extensions of ObjC classes.
+EXPERIMENTAL_FEATURE(ObjCImplementation, true)
+
+// Enable @implementation on @_cdecl functions.
+EXPERIMENTAL_FEATURE(CImplementation, true)
+
+// Enable @sensitive attribute.
+EXPERIMENTAL_FEATURE(Sensitive, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
+#undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE
+#undef CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE
+#undef SUPPRESSIBLE_EXPERIMENTAL_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

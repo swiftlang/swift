@@ -260,7 +260,7 @@ static void skt_main(skt_args *args) {
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
-  auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
@@ -333,7 +333,7 @@ static std::optional<int64_t> getReqOptValueAsInt(StringRef Value) {
 }
 
 static std::optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
-  if (!Value.startswith("uid:"))
+  if (!Value.starts_with("uid:"))
     return std::nullopt;
   Value = Value.drop_front(4);
   return sourcekitd_uid_get_from_buf(Value.data(), Value.size());
@@ -341,7 +341,7 @@ static std::optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
 
 static std::optional<sourcekitd_object_t>
 getReqOptValueAsArray(StringRef Value) {
-  if (!Value.startswith("[") || !Value.endswith("]"))
+  if (!Value.starts_with("[") || !Value.ends_with("]"))
     return std::nullopt;
   SmallVector<StringRef, 4> Elements;
   Value.drop_front().drop_back().split(Elements, ';');
@@ -1808,6 +1808,7 @@ struct ResponseSymbolInfo {
   const char *TypeUSR = nullptr;
   const char *ContainerTypeUSR = nullptr;
   const char *DocComment = nullptr;
+  const char *DocCommentAsXML = nullptr;
   const char *GroupName = nullptr;
   const char *LocalizationKey = nullptr;
   const char *AnnotatedDeclaration = nullptr;
@@ -1856,6 +1857,8 @@ struct ResponseSymbolInfo {
         sourcekitd_variant_dictionary_get_string(Info, KeyContainerTypeUsr);
 
     Symbol.DocComment =
+        sourcekitd_variant_dictionary_get_string(Info, KeyDocComment);
+    Symbol.DocCommentAsXML =
         sourcekitd_variant_dictionary_get_string(Info, KeyDocFullAsXML);
     Symbol.GroupName =
         sourcekitd_variant_dictionary_get_string(Info, KeyGroupName);
@@ -1981,8 +1984,12 @@ struct ResponseSymbolInfo {
       OS << AnnotatedDeclaration << '\n';
     if (FullyAnnotatedDeclaration)
       OS << FullyAnnotatedDeclaration << '\n';
+    OS << "DOC COMMENT\n";
     if (DocComment)
       OS << DocComment << '\n';
+    OS << "DOC COMMENT XML\n";
+    if (DocCommentAsXML)
+      OS << DocCommentAsXML << '\n';
     if (LocalizationKey) {
       OS << "<LocalizationKey>" << LocalizationKey;
       OS << "</LocalizationKey>" << '\n';
@@ -2633,7 +2640,7 @@ firstPlaceholderRange(StringRef Source, unsigned from) {
       break;
     unsigned OffsetStart = Source.data() + Pos - StartPtr;
     Source = Source.substr(Pos+2);
-    if (Source.startswith("__skip__") || Source.startswith("T##__skip__"))
+    if (Source.starts_with("__skip__") || Source.starts_with("T##__skip__"))
       continue;
     Pos = Source.find("#>");
     if (Pos == StringRef::npos)

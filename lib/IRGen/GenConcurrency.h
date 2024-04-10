@@ -38,6 +38,7 @@ class SILType;
 
 namespace irgen {
 class Explosion;
+class OptionalExplosion;
 class IRGenFunction;
 
 /// Emit the buildMainActorExecutorRef builtin.
@@ -90,6 +91,22 @@ void emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group);
 void emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
                        llvm::Value *result, llvm::Value *closure,
                        llvm::Value *closureContext);
+
+void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
+
+llvm::Value *maybeAddEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
+                                                 llvm::Value *taskOptions,
+                                                 CanType formalResultType);
+
+/// Emit a call to swift_task_create[_f] with the given flags, options, and
+/// task function.
+std::pair<llvm::Value *, llvm::Value *>
+emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+               OptionalExplosion &initialExecutor,
+               OptionalExplosion &taskGroup,
+               OptionalExplosion &taskExecutor,
+               Explosion &taskFunction,
+               SubstitutionMap subs);
 
 } // end namespace irgen
 } // end namespace swift

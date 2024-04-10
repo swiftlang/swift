@@ -35,6 +35,7 @@ UID_KEYS = [
     KEY('GenericParams', 'key.generic_params'),
     KEY('GenericRequirements', 'key.generic_requirements'),
     KEY('DocFullAsXML', 'key.doc.full_as_xml'),
+    KEY('DocComment', 'key.doc_comment'),
     KEY('Line', 'key.line'),
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
@@ -44,12 +45,10 @@ UID_KEYS = [
     KEY('FilePath', 'key.filepath'),
     KEY('ModuleInterfaceName', 'key.module_interface_name'),
     KEY('Hash', 'key.hash'),
-    KEY('CompilerArgs', 'key.compilerargs'),
     KEY('Severity', 'key.severity'),
     KEY('Offset', 'key.offset'),
     KEY('Length', 'key.length'),
     KEY('SourceFile', 'key.sourcefile'),
-    KEY('SourceText', 'key.sourcetext'),
     KEY('PrimaryFile', 'key.primary_file'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('EnableStructure', 'key.enablesubstructure'),
@@ -221,6 +220,16 @@ UID_KEYS = [
     KEY('IncludeSystemModules', 'key.include_system_modules'),
     KEY('IgnoreStdlib', 'key.ignore_stdlib'),
     KEY('DisableImplicitModules', 'key.disable_implicit_modules'),
+
+    KEY('CompilerArgs', 'key.compilerargs'),
+    KEY('SourceText', 'key.sourcetext'),
+
+    # IMPORTANT: Add any new keys before CompilerArgs and SourceText.
+    # Always keep CompilerArgs and SourceText as the last keys so that printing
+    # a request dictionary has those as the last entries. That way, when the
+    # request gets truncated by os_log in sourcekit-lsp, we see most of the
+    # request. Most likely the sourcetext and the compiler args wouldn't have
+    # made it into the log message completely anyway.
 ]
 
 

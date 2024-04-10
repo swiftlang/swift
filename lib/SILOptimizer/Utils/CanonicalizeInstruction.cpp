@@ -139,10 +139,10 @@ static void replaceUsesOfExtract(SingleValueInstruction *extract,
 // (struct_extract (load %base))
 //   ->
 // (load (struct_element_addr %base, #field)
-//
-// TODO: Consider handling LoadBorrowInst.
 static SILBasicBlock::iterator
 splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
+  auto *block = loadInst->getParentBlock();
+  auto *instBeforeLoad = loadInst->getPreviousInstruction();
   // Keep track of the next iterator after any newly added or to-be-deleted
   // instructions. This must be valid regardless of whether the pass immediately
   // deletes the instructions or simply records them for later deletion.
@@ -338,7 +338,22 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     ++nextII;
   }
   deleteAllDebugUses(*loadInst, pass.getCallbacks());
-  return killInstAndIncidentalUses(*loadInst, nextII, pass);
+  nextII = killInstAndIncidentalUses(*loadInst, nextII, pass);
+  /// A change has been made; and the load instruction is deleted.  The caller
+  /// should now process the instruction where the load was before.
+  ///
+  /// BEFORE TRANSFORM   |   AFTER TRANSFORM
+  ///    prequel_2       |      prequel_2
+  ///    prequel_1       |      prequel_1
+  ///    load            |  +-> ???
+  ///    sequel_1        |  |   ???
+  ///    sequel_2        |  |   ???
+  ///                       |
+  ///                       The instruction the caller should process next.
+  if (instBeforeLoad)
+    return instBeforeLoad->getNextInstruction()->getIterator();
+  else
+    return block->begin();
 }
 
 // Given a store within a single property struct, recursively form the parent
@@ -484,11 +499,18 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   if (bbi->isLexical() && (bbi->getModule().getStage() == SILStage::Raw ||
                            !isNestedLexicalBeginBorrow(bbi)))
     return next;
+    
+  // Fixed borrow scopes can't be eliminated during the raw stage since they
+  // control move checker behavior.
+  if (bbi->isFixed() && bbi->getModule().getStage() == SILStage::Raw) {
+    return next;
+  }
 
   // Borrow scopes representing a VarDecl can't be eliminated during the raw
   // stage because they may be needed for diagnostics.
-  if (bbi->isFromVarDecl() && (bbi->getModule().getStage() == SILStage::Raw))
+  if (bbi->isFromVarDecl() && bbi->getModule().getStage() == SILStage::Raw) {
     return next;
+  }
 
   // We know that our borrow is completely within the lifetime of its base value
   // if the borrow is never reborrowed. We check for reborrows and do not
@@ -525,10 +547,13 @@ static SILBasicBlock::iterator
 eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
                                                 CanonicalizeInstruction &pass) {
   auto next = std::next(inst->getIterator());
-
-  for (auto *use : getNonDebugUses(inst))
-    if (!isa<DestroyValueInst>(use->getUser()))
-      return next;
+  for (auto *use : getNonDebugUses(inst)) {
+    if (auto *destroy = dyn_cast<DestroyValueInst>(use->getUser())) {
+      if (destroy->isFullDeinitialization())
+        continue;
+    }
+    return next;
+  }
   deleteAllDebugUses(inst, pass.callbacks);
   SILValue op = inst->getOperand(0);
   inst->replaceAllUsesWith(op);

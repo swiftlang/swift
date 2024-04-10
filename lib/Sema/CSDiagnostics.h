@@ -2343,6 +2343,15 @@ public:
   bool diagnoseAsError() override;
 };
 
+class UnableToInferGenericPackElementType final : public FailureDiagnostic {
+public:
+  UnableToInferGenericPackElementType(const Solution &solution,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
 public:
   UnableToInferProtocolLiteralType(const Solution &solution,

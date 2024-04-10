@@ -113,7 +113,7 @@ public:
 /// Request the superclass type for the given class.
 class SuperclassTypeRequest
     : public SimpleRequest<
-          SuperclassTypeRequest, Type(NominalTypeDecl *, TypeResolutionStage),
+          SuperclassTypeRequest, Type(ClassDecl *, TypeResolutionStage),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -123,7 +123,7 @@ private:
 
   // Evaluation.
   Type
-  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl,
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl,
            TypeResolutionStage stage) const;
 
 public:
@@ -1054,6 +1054,24 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Determine whether the given class is a distributed actor.
+class CanSynthesizeDistributedActorCodableConformanceRequest :
+    public SimpleRequest<CanSynthesizeDistributedActorCodableConformanceRequest,
+        bool(NominalTypeDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Retrieve the implicit conformance for the given distributed actor type to
 /// the Codable protocol protocol.
 ///
@@ -1333,8 +1351,8 @@ public:
 
 /// Obtain the method that could be used to decode argument values passed
 /// to a particular actor invocation type.
-class GetDistributedActorArgumentDecodingMethodRequest :
-  public SimpleRequest<GetDistributedActorArgumentDecodingMethodRequest,
+class GetDistributedActorConcreteArgumentDecodingMethodRequest :
+  public SimpleRequest<GetDistributedActorConcreteArgumentDecodingMethodRequest,
                        FuncDecl *(NominalTypeDecl *),
                        RequestFlags::Cached> {
 public:
@@ -3007,7 +3025,7 @@ public:
 
 /// Checks if the Distributed module is available.
 class DistributedModuleIsAvailableRequest
-    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
+    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(const ValueDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3016,7 +3034,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  bool evaluate(Evaluator &evaluator, const ValueDecl *decl) const;
 
 public:
   // Cached.
@@ -4807,6 +4825,63 @@ private:
   ArrayRef<TypeDecl *> evaluate(Evaluator &evaluator, SourceFile *sf) const;
 
 public:
+  bool isCached() const { return true; }
+};
+
+class ObjCRequirementMapRequest
+    : public SimpleRequest<ObjCRequirementMapRequest,
+                           ObjCRequirementMap(const ProtocolDecl *proto),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ObjCRequirementMap evaluate(Evaluator &evaluator,
+                              const ProtocolDecl *proto) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Finds the import declaration that effectively imports a given module in a
+/// source file.
+class ImportDeclRequest
+    : public SimpleRequest<ImportDeclRequest,
+                           std::optional<AttributedImport<ImportedModule>>(
+                               const SourceFile *sf, const ModuleDecl *mod),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<AttributedImport<ImportedModule>>
+  evaluate(Evaluator &evaluator, const SourceFile *sf,
+           const ModuleDecl *mod) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class LifetimeDependenceInfoRequest
+    : public SimpleRequest<LifetimeDependenceInfoRequest,
+                           std::optional<LifetimeDependenceInfo>(
+                               AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<LifetimeDependenceInfo>
+  evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
+
+public:
+  // Caching.
   bool isCached() const { return true; }
 };
 

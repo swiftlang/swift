@@ -23,10 +23,6 @@ file(GENERATE
 #define COMPILED_WITH_SWIFT
 #endif
 
-#ifndef SWIFT_TARGET
-#define SWIFT_TARGET
-#endif
-
 #include \"swift/Basic/BasicBridging.h\"
 #include \"swift/AST/ASTBridging.h\"
 #include \"swift/IDE/IDEBridging.h\"
@@ -79,7 +75,3 @@ add_subdirectory(StaticMirror)
 add_subdirectory(SymbolGraphGen)
 add_subdirectory(SwiftSyntax)
 add_subdirectory(Threading)
-
-if(SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
-  add_subdirectory(ExternalGenericMetadataBuilder)
-endif()

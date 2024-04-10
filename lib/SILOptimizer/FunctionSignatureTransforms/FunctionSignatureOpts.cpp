@@ -561,7 +561,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Array semantic clients rely on the signature being as in the original
   // version.
   for (auto &Attr : F->getSemanticsAttrs()) {
-    if (!StringRef(Attr).startswith("array."))
+    if (!StringRef(Attr).starts_with("array."))
       NewF->addSemanticsAttr(Attr);
   }
 
@@ -668,6 +668,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
+                     F->getReferencedAdHocRequirementWitnessFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;

@@ -468,6 +468,11 @@ module WinSDK [system] {
     link "User32.Lib"
   }
 
+  module WER {
+    header "WerApi.h"
+    export *
+  }
+
   module WIC {
     header "wincodec.h"
     export *

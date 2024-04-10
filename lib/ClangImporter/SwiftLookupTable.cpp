@@ -1719,7 +1719,7 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
         reinterpret_cast<const clang::serialization::DeclID *>(blobData.data());
       unsigned numElements
         = blobData.size() / sizeof(clang::serialization::DeclID);
-      categories = llvm::makeArrayRef(start, numElements);
+      categories = llvm::ArrayRef(start, numElements);
       break;
     }
 
