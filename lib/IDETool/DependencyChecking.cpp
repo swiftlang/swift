@@ -122,7 +122,7 @@ areAnyDependentFilesInvalidated(CompilerInstance &CI, llvm::vfs::FileSystem &FS,
           // Calculate the hash code of the current content.
           auto newContent = FS.getBufferForFile(filePath);
           if (!newContent)
-            // Unreachable? stat succeeded, but coundn't get the content.
+            // Unreachable? stat succeeded, but couldn't get the content.
             return true;
 
           auto newHash = llvm::hash_value(newContent.get()->getBuffer());
