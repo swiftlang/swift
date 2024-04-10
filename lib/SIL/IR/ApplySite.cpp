@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 
 
@@ -42,4 +43,22 @@ void ApplySite::insertAfterApplication(
     function_ref<void(SILBuilder &)> func) const {
   visitFinalApplications(
       [&](auto *inst) { SILBuilderWithScope::insertAfter(inst, func); });
+}
+
+void ApplySite::computeApplicationBoundary(
+    PrunedLivenessBoundary &boundary,
+    SmallVectorImpl<SILBasicBlock *> &discoveredBlocks) const {
+  auto *inst = getInstruction();
+  SSAPrunedLiveness liveness(inst->getFunction(), &discoveredBlocks);
+  liveness.initializeDef(getCallee());
+  visitFinalApplications([&](auto *inst) {
+    liveness.updateForUse(getInstruction(), /*lifetimeEnding=*/false);
+  });
+  if (auto *pai = dyn_cast<PartialApplyInst>(getInstruction())) {
+    pai->visitApplyUses([&](auto *use) {
+      liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/false);
+      return true;
+    });
+  }
+  liveness.computeBoundary(boundary);
 }
