@@ -32,25 +32,25 @@ func test(borrowing foo: borrowing Foo) {
         eat(x)
         nibble(x)
 
-    // `_borrowing` match variables impose the no-implicit-copy constraint
+    // `borrowing` match variables impose the no-implicit-copy constraint
     // like `borrowing` parameters do.
-    case .copyablePayload(_borrowing x) // expected-error{{'x' is borrowed and cannot be consumed}}
+    case .copyablePayload(borrowing x) // expected-error{{'x' is borrowed and cannot be consumed}}
       where hungryCondition(x): // expected-note{{consumed here}}
         eat(x) // expected-note{{consumed here}}
         nibble(x)
 
-    case .copyablePayload(_borrowing x) // expected-error{{'x' is borrowed and cannot be consumed}}
+    case .copyablePayload(borrowing x) // expected-error{{'x' is borrowed and cannot be consumed}}
       where condition(x):
         eat(x) // expected-note{{consumed here}}
         nibble(x)
 
     // Explicit copies are OK.
-    case .copyablePayload(_borrowing x)
+    case .copyablePayload(borrowing x)
       where hungryCondition(copy x):
         eat(copy x)
         nibble(x)
 
-    case .copyablePayload(_borrowing x):
+    case .copyablePayload(borrowing x):
         nibble(x)
     }
 }
