@@ -764,16 +764,9 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
 
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,
                                       function_ref<void(SILBuilder &)> func) {
-  if (isa<TermInst>(inst)) {
-    for (const SILSuccessor &succ : inst->getParent()->getSuccessors()) {
-      SILBasicBlock *succBlock = succ;
-      assert(succBlock->getSinglePredecessorBlock() == inst->getParent() &&
-             "the terminator instruction must not have critical successors");
-      SILBuilderWithScope builder(succBlock->begin());
-      func(builder);
-    }
-  } else {
-    SILBuilderWithScope builder(std::next(inst->getIterator()));
+  inst->visitSubsequentInstructions([&](auto *inst) {
+    SILBuilderWithScope builder(inst->getIterator());
     func(builder);
-  }
+    return true;
+  });
 }
