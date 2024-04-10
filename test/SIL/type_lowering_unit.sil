@@ -120,6 +120,9 @@ extension GSNC: Copyable where T: Copyable  {}
 
 struct GSNE<T: ~Escapable>: ~Escapable {
     var x: T
+
+    // 60_MERGE: an explicit initializer is temporarily required until initializer inferrence is merged.
+    init(x: consuming T) { self.x = x }
 }
 
 extension GSNE: Escapable where T: Escapable {}

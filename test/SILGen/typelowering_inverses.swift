@@ -139,7 +139,10 @@ func check(_ t: inout any NoEscapeP & ~Escapable) {}
 // MARK: conditionally Copyable & Escapable SILGen
 
 struct MyStruct<T: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
-    var x: T
+  var x: T
+
+  // 60_MERGE: an explicit initializer is temporarily required until initializer inferrence is merged.
+  init(x: consuming T) { self.x = x }
 }
 
 extension MyStruct: Copyable where T: Copyable & ~Escapable {}
