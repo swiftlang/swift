@@ -289,6 +289,10 @@ extension Instruction {
       if bi.id == .OnFastPath {
         return false
       }
+    case is UncheckedEnumDataInst:
+      // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
+      // for consuming an enum value.
+      return !parentFunction.hasOwnership
     default:
       break
     }
