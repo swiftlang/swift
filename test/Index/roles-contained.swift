@@ -254,6 +254,47 @@ func containingFunc(param: Int) {
     // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained | {{.*}}
     // CHECK: [[@LINE-11]]:78 | function/acc-get/Swift | getter:stringValue | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained | {{.*}}
+
+    let (_, tupleIgnoredSiblingElementContained): (Int, String) = (
+      { let x = intValue; return x }(),
+      { let y = stringValue; return y }()
+    )
+    // CHECK:      [[@LINE-3]]:13 | variable(local)/Swift | x | {{.*}} | Def,RelChild | rel: 1
+    // CHECK-NEXT: RelChild | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-6]]:17 | variable/Swift | intValue | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | variable(local)/Swift | x
+
+    // Here the reference to intValue is contained by 'x'.
+    // CHECK:      [[@LINE-10]]:17 | function/acc-get/Swift | getter:intValue | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCont | variable(local)/Swift | x
+    // CHECK-NEXT: RelCall | function/Swift | containingFunc(param:)
+
+    // But here the container for the reference to 'x' is the parent function.
+    // CHECK:      [[@LINE-15]]:34 | variable(local)/Swift | x | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-18]]:34 | function/acc-get(local)/Swift | getter:x | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 1
+    // CHECK-NEXT: RelCall,RelCont | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-20]]:13 | variable(local)/Swift | y | {{.*}} | Def,RelChild | rel: 1
+    // CHECK-NEXT: RelChild | function/Swift | containingFunc(param:)
+
+    // CHECK:      [[@LINE-23]]:17 | variable/Swift | stringValue | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | variable(local)/Swift | y
+
+    // Here the reference to stringValue is contained by 'y'.
+    // CHECK:      [[@LINE-27]]:17 | function/acc-get/Swift | getter:stringValue | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCont | variable(local)/Swift | y
+    // CHECK-NEXT: RelCall | function/Swift | containingFunc(param:)
+
+    // But here the container for the reference to 'y' is the parent binding.
+    // CHECK:      [[@LINE-32]]:37 | variable(local)/Swift | y | {{.*}} | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained
+
+    // CHECK:      [[@LINE-35]]:37 | function/acc-get(local)/Swift | getter:y | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCont | variable(local)/Swift | tupleIgnoredSiblingElementContained
+    // CHECK-NEXT: RelCall | function/Swift | containingFunc(param:)
 }
 
 func functionWithReturnType() -> Int { 0 }
