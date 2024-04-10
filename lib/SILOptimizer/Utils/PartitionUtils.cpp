@@ -104,6 +104,50 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
+  // Treat function ref as either actor isolated or sendable.
+  if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
+    auto isolation = fri->getReferencedFunction()->getActorIsolation();
+    if (isolation.isActorIsolated()) {
+      return SILIsolationInfo::getActorIsolated(fri, isolation);
+    }
+
+    // Otherwise, lets look at the AST and see if our function ref is from an
+    // autoclosure.
+    if (auto *autoclosure = fri->getLoc().getAsASTNode<AutoClosureExpr>()) {
+      if (auto *funcType = autoclosure->getType()->getAs<AnyFunctionType>()) {
+        if (funcType->hasGlobalActor()) {
+          if (funcType->hasGlobalActor()) {
+            return SILIsolationInfo::getActorIsolated(
+                fri,
+                ActorIsolation::forGlobalActor(funcType->getGlobalActor()));
+          }
+        }
+
+        if (auto *resultFType =
+                funcType->getResult()->getAs<AnyFunctionType>()) {
+          if (resultFType->hasGlobalActor()) {
+            return SILIsolationInfo::getActorIsolated(
+                fri,
+                ActorIsolation::forGlobalActor(resultFType->getGlobalActor()));
+          }
+        }
+      }
+    }
+  }
+
+  if (auto *cmi = dyn_cast<ClassMethodInst>(inst)) {
+    if (auto *declRefExpr = cmi->getLoc().getAsASTNode<DeclRefExpr>()) {
+      // See if we are actor isolated. If so, treat this as non-Sendable so we
+      // propagate actor isolation.
+      if (auto isolation = swift::getActorIsolation(declRefExpr->getDecl())) {
+        if (isolation.isActorIsolated()) {
+          return SILIsolationInfo::getActorIsolated(cmi->getOperand(),
+                                                    isolation);
+        }
+      }
+    }
+  }
+
   return SILIsolationInfo();
 }
 
