@@ -626,7 +626,7 @@ extension InstructionRange {
         case let endBorrow as EndBorrowInst:
           self.insert(endBorrow)
         case let branch as BranchInst:
-          worklist.pushIfNotVisited(branch.getArgument(for: use))
+          worklist.pushIfNotVisited(branch.getArgument(for: use).lookThroughBorrowedFromUser)
         default:
           break
         }
