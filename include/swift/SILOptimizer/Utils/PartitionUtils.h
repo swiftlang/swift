@@ -118,14 +118,24 @@ private:
 
   /// This is the value that we got isolation from if we were able to find
   /// one. Used for isolation history.
-  SILValue isolationSource;
+  SILValue isolatedValue;
 
-  SILIsolationInfo(ActorIsolation actorIsolation, SILValue isolationSource)
+  /// If set this is the SILValue that represents the actor instance that we
+  /// derived isolatedValue from.
+  SILValue actorInstance;
+
+  SILIsolationInfo(ActorIsolation actorIsolation, SILValue isolatedValue,
+                   SILValue actorInstance)
       : kind(Actor), actorIsolation(actorIsolation),
-        isolationSource(isolationSource) {}
+        isolatedValue(isolatedValue), actorInstance(actorInstance) {
+    assert((!actorInstance ||
+            (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
+             actorInstance->getType().isActor())) &&
+           "actorInstance must be an actor if it is non-empty");
+  }
 
-  SILIsolationInfo(Kind kind, SILValue isolationSource)
-      : kind(kind), actorIsolation(), isolationSource(isolationSource) {}
+  SILIsolationInfo(Kind kind, SILValue isolatedValue)
+      : kind(kind), actorIsolation(), isolatedValue(isolatedValue) {}
 
   SILIsolationInfo(Kind kind) : kind(kind), actorIsolation() {}
 
@@ -156,46 +166,58 @@ public:
     return actorIsolation;
   }
 
-  // If we are actor or task isolated and could find a specific value that
-  // caused the isolation, put it here. Used for isolation history.
+  /// If we are actor or task isolated and could find a specific value that
+  /// caused the isolation, put it here. Used for isolation history.
   SILValue getIsolatedValue() const {
     assert(kind == Task || kind == Actor);
-    return isolationSource;
+    return isolatedValue;
+  }
+
+  /// Return the specific SILValue for the actor that our isolated value is
+  /// isolated to if one exists.
+  SILValue getActorInstance() const {
+    assert(kind == Actor);
+    return actorInstance;
   }
 
   bool hasActorIsolation() const { return kind == Actor; }
 
   bool hasIsolatedValue() const {
-    return (kind == Task || kind == Actor) && bool(isolationSource);
+    return (kind == Task || kind == Actor) && bool(isolatedValue);
   }
 
   [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const;
 
   SILIsolationInfo withActorIsolated(SILValue isolatedValue,
+                                     SILValue actorInstance,
                                      ActorIsolation isolation) {
-    return SILIsolationInfo::getActorIsolated(isolatedValue, isolation);
+    return SILIsolationInfo::getActorIsolated(isolatedValue, actorInstance,
+                                              isolation);
   }
 
   static SILIsolationInfo getDisconnected() { return {Kind::Disconnected}; }
 
   static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
+                                           SILValue actorInstance,
                                            ActorIsolation actorIsolation) {
-    return {actorIsolation, isolatedValue};
+    return {actorIsolation, isolatedValue, actorInstance};
   }
 
   static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
+                                           SILValue actorInstance,
                                            NominalTypeDecl *typeDecl) {
     if (typeDecl->isActor())
-      return {ActorIsolation::forActorInstanceSelf(typeDecl), isolatedValue};
+      return {ActorIsolation::forActorInstanceSelf(typeDecl), isolatedValue,
+              actorInstance};
     auto isolation = swift::getActorIsolation(typeDecl);
     if (isolation.isGlobalActor())
-      return {isolation, isolatedValue};
+      return {isolation, isolatedValue, actorInstance};
     return {};
   }
 
   static SILIsolationInfo getGlobalActorIsolated(SILValue value,
                                                  Type globalActorType) {
-    return getActorIsolated(value,
+    return getActorIsolated(value, SILValue() /*no actor instance*/,
                             ActorIsolation::forGlobalActor(globalActorType));
   }
 
