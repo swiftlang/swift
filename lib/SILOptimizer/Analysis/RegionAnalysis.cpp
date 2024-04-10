@@ -3336,12 +3336,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
     if (storage.storage) {
-      if (auto *reai = dyn_cast<RefElementAddrInst>(storage.base)) {
-        auto *nomDecl = reai->getOperand()
-                            ->getType()
-                            .getNominalOrBoundGenericNominal();
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(reai->getOperand(), nomDecl));
+      if (auto isolation = SILIsolationInfo::get(storage.base)) {
+        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
       }
     }
   }
