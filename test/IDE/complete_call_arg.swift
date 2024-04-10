@@ -576,17 +576,17 @@ func testStaticMemberCall() {
 func testImplicitMember() {
   let _: TestStaticMemberCall = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_1^#)
 // IMPLICIT_MEMBER_AFTERPAREN_1: Begin completions, 1 items
-// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
+// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
 
   let _: TestStaticMemberCall = .create2(#^IMPLICIT_MEMBER_AFTERPAREN_2^#)
-// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
-// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
 // IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Convertible]: Int[#Int#];
 // IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#];
 
   let _: TestStaticMemberCall? = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_3^#)
 // IMPLICIT_MEMBER_AFTERPAREN_3: Begin completions, 1 items
-// IMPLICIT_MEMBER_AFTERPAREN_3: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
+// IMPLICIT_MEMBER_AFTERPAREN_3: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
 
   let _: TestStaticMemberCall = .create2(1, #^IMPLICIT_MEMBER_SECOND^#)
 // IMPLICIT_MEMBER_SECOND: Begin completions, 3 items
@@ -600,7 +600,7 @@ func testImplicitMember() {
 
   let _: TestStaticMemberCall = .createOverloaded(#^IMPLICIT_MEMBER_OVERLOADED^#)
 // IMPLICIT_MEMBER_OVERLOADED: Begin completions, 1 item
-// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
+// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
 }
 func testImplicitMemberInArrayLiteral() {
   struct Receiver {
@@ -1325,8 +1325,8 @@ func testSubscriptWithExistingRhs(someString: String) {
 
 // SUBSCRIPT_WITH_EXISTING_RHS: Begin completions
 // SUBSCRIPT_WITH_EXISTING_RHS-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<[String : Any], Value>#}[']'][#Value#];
-// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(key): String#}[']'][#@lvalue Any?#];
-// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(key): String#}, {#default: Any#}[']'][#@lvalue Any#];
+// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(key): String#}[']'][#@lvalue Any?#];
+// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(key): String#}, {#default: Any#}[']'][#@lvalue Any#];
 // SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: someString[#String#];
 // SUBSCRIPT_WITH_EXISTING_RHS: End completions
 }
@@ -1348,8 +1348,8 @@ func testOptionalConversionInSrcOfAssignment(myArray: [Int]) {
   var optInt: Int?
   optInt = myArray[#^OPTIONAL_CONVERSION_IN_ASSIGNMENT^#]
 // OPTIONAL_CONVERSION_IN_ASSIGNMENT: Begin completions
-// OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Pattern/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['[']{#keyPath: KeyPath<[Int], Value>#}[']'][#Value#]; name=keyPath:
-// OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(index): Int#}[']'][#Int#]; name=:
+// OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<[Int], Value>#}[']'][#Value#]; name=keyPath:
+// OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(index): Int#}[']'][#Int#]; name=:
 // OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#]; name=0
 // OPTIONAL_CONVERSION_IN_ASSIGNMENT: End completions
 }
@@ -1359,7 +1359,7 @@ func testAnyConversionInDestOfAssignment(_ message: String) {
   userInfo[#^ANY_CONVERSION_IN_ASSIGNMENT^#] = message
 // ANY_CONVERSION_IN_ASSIGNMENT: Begin completions
 // ANY_CONVERSION_IN_ASSIGNMENT-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<[String : Any], Value>#}[']'][#Value#]; name=keyPath:
-// ANY_CONVERSION_IN_ASSIGNMENT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(key): String#}, {#default: Any#}[']'][#@lvalue Any#]; name=:default:
+// ANY_CONVERSION_IN_ASSIGNMENT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(key): String#}, {#default: Any#}[']'][#@lvalue Any#]; name=:default:
 // ANY_CONVERSION_IN_ASSIGNMENT-DAG: Decl[LocalVar]/Local:               userInfo[#[String : Any]#]; name=userInfo
 // ANY_CONVERSION_IN_ASSIGNMENT-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: message[#String#]; name=message
 // ANY_CONVERSION_IN_ASSIGNMENT: End completions
@@ -1427,18 +1427,19 @@ struct NestedCallsWithoutClosingParen {
   func testInDictionaryLiteral() {
     let a = 1
     let b = 2
-    _ = [a: foo(#^IN_DICTIONARY_LITERAL?check=NESTED_CALL_AT_START^#, b: 1]
+    _ = [a: foo(#^IN_DICTIONARY_LITERAL?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, b: 1]
+      // NESTED_CALL_WITHOUT_TYPE_RELATION-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#arg: Int#}, {#arg2: Int#}[')'][#Int#];
   } 
 
   func testInArrayLiteral() {
-    _ = [foo(#^IN_ARRAY_LITERAL?check=NESTED_CALL_AT_START^#, 1]
+    _ = [foo(#^IN_ARRAY_LITERAL?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, 1]
   }
 
   func testInParen() {
-    _ = (foo(#^IN_PAREN?check=NESTED_CALL_AT_START^#)
+    _ = (foo(#^IN_PAREN?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#)
   }
 
   func testInTuple() {
-    _ = (foo(#^IN_TUPLE?check=NESTED_CALL_AT_START^#, 1)
+    _ = (foo(#^IN_TUPLE?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, 1)
   }
 }
