@@ -13,10 +13,13 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+using namespace swift::PatternMatch;
 using namespace swift::PartitionPrimitives;
 
 //===----------------------------------------------------------------------===//
@@ -41,6 +44,28 @@ static llvm::cl::opt<bool, true> // The parser
 //===----------------------------------------------------------------------===//
 //                           MARK: SILIsolationInfo
 //===----------------------------------------------------------------------===//
+
+static std::optional<ActorIsolation>
+getGlobalActorInitIsolation(SILFunction *fn) {
+  auto block = fn->begin();
+
+  // Make sure our function has a single block. We should always have a single
+  // block today. Return nullptr otherwise.
+  if (block == fn->end() || std::next(block) != fn->end())
+    return {};
+
+  GlobalAddrInst *gai = nullptr;
+  if (!match(cast<SILInstruction>(block->getTerminator()),
+             m_ReturnInst(m_AddressToPointerInst(m_GlobalAddrInst(gai)))))
+    return {};
+
+  auto *globalDecl = gai->getReferencedGlobal()->getDecl();
+  if (!globalDecl)
+    return {};
+
+  // See if our globalDecl is specifically guarded.
+  return getActorIsolation(globalDecl);
+}
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
@@ -148,28 +173,113 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  return SILIsolationInfo();
-}
+  // See if we have a struct_extract from a global actor isolated type.
+  if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
+    return SILIsolationInfo::getActorIsolated(sei, sei->getStructDecl());
+  }
 
-SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
-  // Transferring is always disconnected.
-  if (!arg->isIndirectResult() && !arg->isIndirectErrorResult() &&
-      arg->isTransferring())
-    return SILIsolationInfo::getDisconnected();
+  // See if we have an unchecked_enum_data from a global actor isolated type.
+  if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
+    return SILIsolationInfo::getActorIsolated(uedi, uedi->getEnumDecl());
+  }
 
-  // If we have self and our function is actor isolated, all of our arguments
-  // should be marked as actor isolated.
-  if (auto *self = arg->getFunction()->maybeGetSelfArgument()) {
-    if (auto functionIsolation = arg->getFunction()->getActorIsolation()) {
-      if (functionIsolation.isActorIsolated()) {
-        if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
-          return SILIsolationInfo::getActorIsolated(arg, nomDecl);
+  // Check if we have an unsafeMutableAddressor from a global actor, mark the
+  // returned value as being actor derived.
+  if (auto applySite = FullApplySite::isa(inst)) {
+    if (auto *calleeFunction = applySite.getCalleeFunction()) {
+      if (calleeFunction->isGlobalInit()) {
+        auto isolation = getGlobalActorInitIsolation(calleeFunction);
+        if (isolation && isolation->isGlobalActor()) {
+          return SILIsolationInfo::getActorIsolated(SILValue(), *isolation);
         }
       }
     }
   }
 
-  if (auto *decl = arg->getDecl()) {
+  // See if we have a convert function from a Sendable actor isolated function,
+  // we want to treat the result of the convert function as being actor isolated
+  // so that we cannot escape the value.
+  //
+  // NOTE: At this point, we already know that cfi's result is not sendable,
+  // since we would have exited above already.
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(inst)) {
+    SILValue operand = cfi->getOperand();
+    if (operand->getType().getAs<SILFunctionType>()->isSendable()) {
+      SILValue newValue = operand;
+      do {
+        operand = newValue;
+
+        newValue = lookThroughOwnershipInsts(operand);
+        if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(newValue)) {
+          newValue = ttfi->getOperand();
+        }
+
+        if (auto *cfi = dyn_cast<ConvertFunctionInst>(newValue)) {
+          newValue = cfi->getOperand();
+        }
+
+        if (auto *pai = dyn_cast<PartialApplyInst>(newValue)) {
+          newValue = pai->getCallee();
+        }
+      } while (newValue != operand);
+
+      if (auto *ai = dyn_cast<ApplyInst>(operand)) {
+        if (auto *callExpr = ai->getLoc().getAsASTNode<ApplyExpr>()) {
+          if (auto *callType = callExpr->getType()->getAs<AnyFunctionType>()) {
+            if (callType->hasGlobalActor()) {
+              return SILIsolationInfo::getGlobalActorIsolated(
+                  ai, callType->getGlobalActor());
+            }
+          }
+        }
+      }
+
+      if (auto *fri = dyn_cast<FunctionRefInst>(operand)) {
+        if (auto isolation = SILIsolationInfo::get(fri)) {
+          return isolation;
+        }
+      }
+    }
+  }
+
+  return SILIsolationInfo();
+}
+
+SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
+  // Handle a switch_enum from a global actor isolated type.
+  if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
+    if (auto *singleTerm = phiArg->getSingleTerminator()) {
+      if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
+        auto enumDecl =
+            swi->getOperand()->getType().getEnumOrBoundGenericEnum();
+        return SILIsolationInfo::getActorIsolated(arg, enumDecl);
+      }
+    }
+    return SILIsolationInfo();
+  }
+
+  auto *fArg = cast<SILFunctionArgument>(arg);
+
+  // Transferring is always disconnected.
+  if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
+      ((fArg->isClosureCapture() &&
+        fArg->getFunction()->getLoweredFunctionType()->isSendable()) ||
+       fArg->isTransferring()))
+    return SILIsolationInfo::getDisconnected();
+
+  // If we have self and our function is actor isolated, all of our arguments
+  // should be marked as actor isolated.
+  if (auto *self = fArg->getFunction()->maybeGetSelfArgument()) {
+    if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
+      if (functionIsolation.isActorIsolated()) {
+        if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
+          return SILIsolationInfo::getActorIsolated(fArg, nomDecl);
+        }
+      }
+    }
+  }
+
+  if (auto *decl = fArg->getDecl()) {
     auto isolation = swift::getActorIsolation(const_cast<ValueDecl *>(decl));
     if (!bool(isolation)) {
       if (auto *dc = decl->getDeclContext()) {
@@ -178,11 +288,11 @@ SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
     }
 
     if (isolation.isActorIsolated()) {
-      return SILIsolationInfo::getActorIsolated(arg, isolation);
+      return SILIsolationInfo::getActorIsolated(fArg, isolation);
     }
   }
 
-  return SILIsolationInfo::getTaskIsolated(arg);
+  return SILIsolationInfo::getTaskIsolated(fArg);
 }
 
 void SILIsolationInfo::print(llvm::raw_ostream &os) const {
