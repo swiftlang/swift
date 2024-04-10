@@ -288,7 +288,9 @@ bool AbstractionPattern::conformsToKnownProtocol(
   CanType substTy, KnownProtocolKind protocolKind) const {
   auto suppressible
     = substTy->getASTContext().getProtocol(protocolKind);
-    
+  if (!suppressible)
+    return false;
+
   auto definitelyConforms = [&](CanType t) -> bool {
     auto result = suppressible->getParentModule()
       ->checkConformanceWithoutContext(t, suppressible,
