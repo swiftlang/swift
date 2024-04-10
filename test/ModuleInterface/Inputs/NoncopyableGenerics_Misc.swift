@@ -98,7 +98,7 @@ extension Outer: Copyable {}
 extension Outer.InnerStruct: Copyable {}
 
 extension Outer.InnerVariation1: Copyable {}
-extension Outer.InnerVariation2: Escapable {}
+extension Outer.InnerVariation2: Escapable where A: ~Copyable {}
 
 extension Outer.InnerStruct {
     public func hello<T: ~Escapable>(_ t: T) {}
