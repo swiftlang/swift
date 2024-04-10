@@ -92,34 +92,6 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
   return foundExpr;
 }
 
-static std::optional<Identifier> inferNameFromValue(SILValue value) {
-  auto *fn = value->getFunction();
-  if (!fn)
-    return {};
-  VariableNameInferrer::Options options;
-  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
-  SmallString<64> resultingName;
-  VariableNameInferrer inferrer(fn, options, resultingName);
-  if (!inferrer.inferByWalkingUsesToDefsReturningRoot(value))
-    return {};
-  return fn->getASTContext().getIdentifier(resultingName);
-}
-
-static std::optional<std::pair<Identifier, SILValue>>
-inferNameAndRootFromValue(SILValue value) {
-  auto *fn = value->getFunction();
-  if (!fn)
-    return {};
-  VariableNameInferrer::Options options;
-  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
-  SmallString<64> resultingName;
-  VariableNameInferrer inferrer(fn, options, resultingName);
-  SILValue rootValue = inferrer.inferByWalkingUsesToDefsReturningRoot(value);
-  if (!rootValue)
-    return {};
-  return {{fn->getASTContext().getIdentifier(resultingName), rootValue}};
-}
-
 //===----------------------------------------------------------------------===//
 //                             MARK: Diagnostics
 //===----------------------------------------------------------------------===//
@@ -693,7 +665,8 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
     emittedDiagnostic = true;
 
     auto &state = transferringOpToStateMap.get(transferOp);
-    if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
+    if (auto rootValueAndName =
+            VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
       diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
           RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
           state.isolationInfo, std::get<2>(p));
@@ -815,7 +788,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
 
       // First try to do the named diagnostic if we can find a name.
       if (auto rootValueAndName =
-              inferNameAndRootFromValue(transferOp->get())) {
+              VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
         return diagnosticEmitter.emitNamedUseOfStronglyTransferredValue(
             baseLoc, rootValueAndName->first);
       }
@@ -841,7 +814,8 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
     // Before we do anything further, see if we can find a name and emit a name
     // error.
-    if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
+    if (auto rootValueAndName =
+            VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
       auto &state = transferringOpToStateMap.get(transferOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
           baseLoc, rootValueAndName->first, state.isolationInfo,
@@ -1178,7 +1152,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
         // See if we can infer a name from the value.
         SmallString<64> resultingName;
-        if (auto varName = inferNameFromValue(op->get())) {
+        if (auto varName = VariableNameInferrer::inferName(op->get())) {
           diagnosticEmitter.emitNamedFunctionArgumentApplyStronglyTransferred(
               loc, *varName);
           return true;
@@ -1218,7 +1192,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
     // See if we can infer a name from the value.
     SmallString<64> resultingName;
-    if (auto name = inferNameFromValue(op->get())) {
+    if (auto name = VariableNameInferrer::inferName(op->get())) {
       diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
       return true;
     }
@@ -1266,7 +1240,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
              "All result info must be the same... if that changes... update "
              "this code!");
       SmallString<64> resultingName;
-      if (auto name = inferNameFromValue(op->get())) {
+      if (auto name = VariableNameInferrer::inferName(op->get())) {
         diagnosticEmitter.emitNamedTransferringReturn(loc, *name);
         return true;
       }
