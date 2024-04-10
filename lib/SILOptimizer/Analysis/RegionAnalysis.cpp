@@ -557,28 +557,6 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
   return *kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer;
 }
 
-static std::optional<ActorIsolation>
-getGlobalActorInitIsolation(SILFunction *fn) {
-  auto block = fn->begin();
-
-  // Make sure our function has a single block. We should always have a single
-  // block today. Return nullptr otherwise.
-  if (block == fn->end() || std::next(block) != fn->end())
-    return {};
-
-  GlobalAddrInst *gai = nullptr;
-  if (!match(cast<SILInstruction>(block->getTerminator()),
-             m_ReturnInst(m_AddressToPointerInst(m_GlobalAddrInst(gai)))))
-    return {};
-
-  auto *globalDecl = gai->getReferencedGlobal()->getDecl();
-  if (!globalDecl)
-    return {};
-
-  // See if our globalDecl is specifically guarded.
-  return getActorIsolation(globalDecl);
-}
-
 /// Returns true if this is a function argument that is able to be transferred
 /// in the body of our function.
 static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
@@ -3340,123 +3318,13 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         iter.first->getSecond().mergeIsolationRegionInfo(isolation);
       }
     }
+
+    return {iter.first->first, iter.first->second};
   }
 
-  // See if we have a struct_extract from a global actor isolated type.
-  if (auto *sei = dyn_cast<StructExtractInst>(iter.first->first.getValue())) {
-    iter.first->getSecond().mergeIsolationRegionInfo(
-        SILIsolationInfo::getActorIsolated(sei, sei->getStructDecl()));
-  }
-
-  // See if we have an unchecked_enum_data from a global actor isolated type.
-  if (auto *uedi =
-          dyn_cast<UncheckedEnumDataInst>(iter.first->first.getValue())) {
-    iter.first->getSecond().mergeIsolationRegionInfo(
-        SILIsolationInfo::getActorIsolated(uedi, uedi->getEnumDecl()));
-  }
-
-  // Handle a switch_enum from a global actor isolated type.
-  if (auto *arg = dyn_cast<SILPhiArgument>(iter.first->first.getValue())) {
-    if (auto *singleTerm = arg->getSingleTerminator()) {
-      if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
-        auto enumDecl =
-            swi->getOperand()->getType().getEnumOrBoundGenericEnum();
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(arg, enumDecl));
-      }
-    }
-  }
-
-  // Check if we have an unsafeMutableAddressor from a global actor, mark the
-  // returned value as being actor derived.
-  if (auto applySite = FullApplySite::isa(iter.first->first.getValue())) {
-    if (auto *calleeFunction = applySite.getCalleeFunction()) {
-      if (calleeFunction->isGlobalInit()) {
-        auto isolation = getGlobalActorInitIsolation(calleeFunction);
-        if (isolation && isolation->isGlobalActor()) {
-          iter.first->getSecond().mergeIsolationRegionInfo(
-              // TODO: What to do about this.
-              SILIsolationInfo::getActorIsolated(SILValue(), *isolation));
-        }
-      }
-    }
-  }
-
-  // See if we have a non-transferring argument from a function. In such a case,
-  // mark the value as actor isolated if self is actor isolated and task
-  // isolated otherwise.
-  if (auto *fArg =
-          dyn_cast<SILFunctionArgument>(iter.first->first.getValue())) {
-    if (!isTransferrableFunctionArgument(fArg)) {
-      iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::get(fArg));
-      return {iter.first->first, iter.first->second};
-    }
-  }
-
-  // See if we have a convert function from a Sendable actor isolated function,
-  // we want to treat the result of the convert function as being actor isolated
-  // so that we cannot escape the value.
-  //
-  // NOTE: At this point, we already know that cfi's result is not sendable,
-  // since we would have exited above already.
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(iter.first->first.getValue())) {
-    SILValue operand = cfi->getOperand();
-    if (operand->getType().getAs<SILFunctionType>()->isSendable()) {
-      SILValue newValue = operand;
-      do {
-        operand = newValue;
-
-        newValue = lookThroughOwnershipInsts(operand);
-        if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(newValue)) {
-          newValue = ttfi->getOperand();
-        }
-
-        if (auto *cfi = dyn_cast<ConvertFunctionInst>(newValue)) {
-          newValue = cfi->getOperand();
-        }
-
-        if (auto *pai = dyn_cast<PartialApplyInst>(newValue)) {
-          newValue = pai->getCallee();
-        }
-      } while (newValue != operand);
-
-      if (auto *ai = dyn_cast<ApplyInst>(operand)) {
-        if (auto *callExpr = ai->getLoc().getAsASTNode<ApplyExpr>()) {
-          if (auto *callType = callExpr->getType()->getAs<AnyFunctionType>()) {
-            if (callType->hasGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getGlobalActorIsolated(
-                      ai, callType->getGlobalActor()));
-              return {iter.first->first, iter.first->second};
-            }
-          }
-        }
-      }
-
-      if (auto *fri = dyn_cast<FunctionRefInst>(operand)) {
-        if (auto actorIsolation =
-                fri->getReferencedFunction()->getActorIsolation()) {
-          if (actorIsolation.isActorIsolated()) {
-            iter.first->getSecond().mergeIsolationRegionInfo(
-                SILIsolationInfo::getActorIsolated(fri, actorIsolation));
-            return {iter.first->first, iter.first->second};
-          }
-        }
-
-        // See if the function ref statically is known to have actor isolation.
-        //
-        // TODO: We should make it so that the closure constructed has actor
-        // isolation.
-        if (auto value = tryToTrackValue(fri)) {
-          auto isolation = value->getIsolationRegionInfo();
-          if (isolation.isActorIsolated()) {
-            iter.first->getSecond().mergeIsolationRegionInfo(isolation);
-            return {iter.first->first, iter.first->second};
-          }
-        }
-      }
-    }
+  // Ok, we have a non-Sendable type, attempt to infer its isolation.
+  if (auto isolation = SILIsolationInfo::get(iter.first->first.getValue())) {
+    iter.first->getSecond().mergeIsolationRegionInfo(isolation);
   }
 
   return {iter.first->first, iter.first->second};
