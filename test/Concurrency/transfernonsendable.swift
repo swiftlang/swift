@@ -15,7 +15,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 38{{}}
+class NonSendableKlass { // expected-complete-note 40{{}}
   // expected-typechecker-only-note @-1 4{{}}
   // expected-tns-note @-2 2{{}}
   var field: NonSendableKlass? = nil
@@ -42,12 +42,19 @@ final actor FinalActor {
 }
 
 @MainActor
-final class MainActorIsolatedKlass {
+class MainActorIsolatedKlass {
+  var klass = NonSendableKlass()
+  let klassLet = NonSendableKlass()
+}
+
+@MainActor
+final class FinalMainActorIsolatedKlass {
   var klass = NonSendableKlass()
 }
 
 func useInOut<T>(_ x: inout T) {}
 func useValue<T>(_ x: T) {}
+func useValueAsync<T>(_ x: T) async {}
 
 @MainActor func transferToMain<T>(_ t: T) async {}
 
@@ -580,7 +587,7 @@ func testSendableClosureCapturesNonSendable(a: Actor) {
   }
 }
 
-func testSendableClosureCapturesNonSendable2(a: MainActorIsolatedKlass) {
+func testSendableClosureCapturesNonSendable2(a: FinalMainActorIsolatedKlass) {
   let klass = NonSendableKlass()
   let _ = { @Sendable @MainActor in
     a.klass = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
@@ -1534,5 +1541,35 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let _ = { @MainActor in
     let _ = x // expected-tns-warning {{transferring 'x' may cause a data race}}
     // expected-tns-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+  }
+}
+
+// Make sure we handle the merge of the actor isolated and disconnected state
+// appropriately.
+//
+// TODO: Since we are accessing the var field, we miss an
+// error. rdar://126170563.
+@MainActor func actorMergeInLoopVar() async {
+  let a = MainActorIsolatedKlass()
+  var c = NonSendableKlass()
+  for _ in 0..<1024 {
+    await useValueAsync(c) // expected-tns-warning {{transferring 'c' may cause a data race}}
+    // expected-tns-note @-1 {{transferring disconnected 'c' to nonisolated callee could cause races in between callee nonisolated and local main actor-isolated uses}}
+    // expected-tns-note @-2 {{use here could race}}
+    // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
+    c = a.klass
+  }
+}
+
+@MainActor func actorMergeInLoopLet() async {
+  let a = MainActorIsolatedKlass()
+  var c = NonSendableKlass()
+  for _ in 0..<1024 {
+    await useValueAsync(c) // expected-tns-warning 2{{transferring 'c' may cause a data race}}
+    // expected-tns-note @-1 {{transferring disconnected 'c' to nonisolated callee could cause races in between callee nonisolated and local main actor-isolated uses}}
+    // expected-tns-note @-2 {{use here could race}}
+    // expected-tns-note @-3 {{transferring main actor-isolated 'c' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+    // expected-complete-warning @-4 {{passing argument of non-sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
+    c = a.klassLet
   }
 }

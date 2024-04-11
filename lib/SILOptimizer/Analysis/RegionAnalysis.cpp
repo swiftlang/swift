@@ -2955,10 +2955,12 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
 BlockPartitionState::BlockPartitionState(
     SILBasicBlock *basicBlock, PartitionOpTranslator &translator,
     TransferringOperandSetFactory &ptrSetFactory,
-    IsolationHistory::Factory &isolationHistoryFactory)
+    IsolationHistory::Factory &isolationHistoryFactory,
+    TransferringOperandToStateMap &transferringOpToStateMap)
     : entryPartition(isolationHistoryFactory.get()),
       exitPartition(isolationHistoryFactory.get()), basicBlock(basicBlock),
-      ptrSetFactory(ptrSetFactory) {
+      ptrSetFactory(ptrSetFactory),
+      transferringOpToStateMap(transferringOpToStateMap) {
   translator.translateSILBasicBlock(basicBlock, blockPartitionOps);
 }
 
@@ -2972,8 +2974,10 @@ bool BlockPartitionState::recomputeExitFromEntry(
 
     ComputeEvaluator(Partition &workingPartition,
                      TransferringOperandSetFactory &ptrSetFactory,
-                     PartitionOpTranslator &translator)
-        : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
+                     PartitionOpTranslator &translator,
+                     TransferringOperandToStateMap &transferringOpToStateMap)
+        : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory,
+                                       transferringOpToStateMap),
           translator(translator) {}
 
     SILIsolationInfo getIsolationRegionInfo(Element elt) const {
@@ -2990,7 +2994,8 @@ bool BlockPartitionState::recomputeExitFromEntry(
       return translator.isClosureCaptured(value, op->getUser());
     }
   };
-  ComputeEvaluator eval(workingPartition, ptrSetFactory, translator);
+  ComputeEvaluator eval(workingPartition, ptrSetFactory, translator,
+                        transferringOpToStateMap);
   for (const auto &partitionOp : blockPartitionOps) {
     // By calling apply without providing any error handling callbacks, errors
     // will be surpressed.  will be suppressed
@@ -3002,6 +3007,8 @@ bool BlockPartitionState::recomputeExitFromEntry(
   exitPartition = workingPartition;
   LLVM_DEBUG(llvm::dbgs() << "    Exit Partition: ";
              exitPartition.print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "    Updated Partition: "
+                          << (exitUpdated ? "yes\n" : "no\n"));
   return exitUpdated;
 }
 
@@ -3073,8 +3080,9 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
 RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     SILFunction *fn, PostOrderFunctionInfo *pofi)
     : allocator(), fn(fn), valueMap(fn), translator(), ptrSetFactory(allocator),
-      isolationHistoryFactory(allocator), blockStates(), pofi(pofi),
-      solved(false), supportedFunction(true) {
+      isolationHistoryFactory(allocator),
+      transferringOpToStateMap(isolationHistoryFactory), blockStates(),
+      pofi(pofi), solved(false), supportedFunction(true) {
   // Before we do anything, make sure that we support processing this function.
   //
   // NOTE: See documentation on supportedFunction for criteria.
@@ -3087,7 +3095,8 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
       PartitionOpTranslator(fn, pofi, valueMap, isolationHistoryFactory);
   blockStates.emplace(fn, [this](SILBasicBlock *block) -> BlockPartitionState {
     return BlockPartitionState(block, *translator, ptrSetFactory,
-                               isolationHistoryFactory);
+                               isolationHistoryFactory,
+                               transferringOpToStateMap);
   });
   // Mark all blocks as needing to be updated.
   for (auto &block : *fn) {
