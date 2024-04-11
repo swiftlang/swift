@@ -105,7 +105,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           for (auto &op : as.getArgumentOperands()) {
             if (as.getArgumentParameterInfo(op).hasOption(
                     SILParameterInfo::Isolated)) {
-              actorInstance = pai->getAllOperands().back().get();
+              actorInstance = op.get();
               break;
             }
           }
