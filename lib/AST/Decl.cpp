@@ -8718,6 +8718,7 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 
 void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
   assert(DefaultValueAndFlags.getPointer());
+  assert(captures.hasBeenComputed());
   DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 

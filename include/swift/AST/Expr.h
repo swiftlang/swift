@@ -3913,7 +3913,11 @@ public:
           &foundIsolationCrossings);
 
   CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    assert(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
   /// Retrieve the parameters of this closure.
   ParameterList *getParameters() { return parameterList; }
