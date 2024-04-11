@@ -12,3 +12,14 @@ module Categories_C {
   header "Categories_C.h"
   export *
 }
+
+module Categories_D {
+  header "Categories_D.h"
+  export *
+
+  explicit module Submodule {
+    header "Submodule.h"
+    export *
+  }
+}
+
