@@ -21,6 +21,8 @@
 
 #include "llvm/Support/CommandLine.h"
 
+#pragma clang optimize off
+
 using namespace swift;
 using namespace swift::PatternMatch;
 using namespace swift::PartitionPrimitives;
@@ -71,14 +73,6 @@ getGlobalActorInitIsolation(SILFunction *fn) {
 }
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
-  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
-    if (auto crossing = apply->getIsolationCrossing()) {
-      if (crossing->getCalleeIsolation().isActorIsolated())
-        return SILIsolationInfo::getActorIsolated(
-            SILValue(), SILValue(), crossing->getCalleeIsolation());
-    }
-  }
-
   if (auto fas = FullApplySite::isa(inst)) {
     if (auto crossing = fas.getIsolationCrossing()) {
       if (crossing->getCalleeIsolation().isActorIsolated()) {
@@ -149,7 +143,9 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // Treat function ref as either actor isolated or sendable.
   if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
     auto isolation = fri->getReferencedFunction()->getActorIsolation();
-    if (isolation.isActorIsolated()) {
+    if (isolation.isActorIsolated() &&
+        (isolation.getKind() != ActorIsolation::ActorInstance ||
+         isolation.getActorInstanceParameter() == 0)) {
       return SILIsolationInfo::getActorIsolated(fri, SILValue(), isolation);
     }
 
@@ -178,11 +174,15 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   }
 
   if (auto *cmi = dyn_cast<ClassMethodInst>(inst)) {
+    // Ok, we know that we do not have an actor... but we might have a global
+    // actor isolated method. Use the AST to compute the actor isolation and
+    // check if we are self. If we are not self, we want this to be
+    // disconnected.
     if (auto *declRefExpr = cmi->getLoc().getAsASTNode<DeclRefExpr>()) {
-      // See if we are actor isolated. If so, treat this as non-Sendable so we
-      // propagate actor isolation.
       if (auto isolation = swift::getActorIsolation(declRefExpr->getDecl())) {
-        if (isolation.isActorIsolated()) {
+        if (isolation.isActorIsolated() &&
+            (isolation.getKind() != ActorIsolation::ActorInstance ||
+             isolation.getActorInstanceParameter() == 0)) {
           auto actor = cmi->getOperand()->getType().isActor()
                            ? cmi->getOperand()
                            : SILValue();
@@ -261,6 +261,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           return isolation;
         }
       }
+    }
+  }
+
+  // Try to infer using SIL first since we might be able to get the source name
+  // of the actor.
+  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
+    if (auto crossing = apply->getIsolationCrossing()) {
+      if (crossing->getCalleeIsolation().isActorIsolated())
+        return SILIsolationInfo::getActorIsolated(
+            SILValue(), SILValue(), crossing->getCalleeIsolation());
     }
   }
 

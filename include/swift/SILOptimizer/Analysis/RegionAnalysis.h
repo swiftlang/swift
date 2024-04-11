@@ -186,7 +186,7 @@ public:
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
        << "][region_value_kind: ";
-    getIsolationRegionInfo().print(os);
+    getIsolationRegionInfo().printForDiagnostics(os);
     os << "].";
   }
 
