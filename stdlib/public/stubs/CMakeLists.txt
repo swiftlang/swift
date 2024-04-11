@@ -4,7 +4,6 @@ set(swift_stubs_sources
     LibcShims.cpp
     Random.cpp
     Stubs.cpp
-    ThreadLocalStorage.cpp
     MathStubs.cpp
     Unicode/UnicodeData.cpp
     Unicode/UnicodeGrapheme.cpp
