@@ -12,7 +12,7 @@
 // loaded too late").
 // REQUIRES: no_asan
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
 

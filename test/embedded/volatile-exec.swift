@@ -7,7 +7,7 @@
 
 import _Volatile
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
 
