@@ -51,26 +51,26 @@ let dictNonCost = [1:2, 3:d]
 
 // RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-ITERATOR %s
 // CHECK-ITERATOR-NOT: _AnyIteratorBase
-// CHECK-ITERATOR: <Group>Collection/Type-erased</Group>
+// CHECK-ITERATOR: <Group>Sequences+Collections</Group>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:10 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-REPLACEMENT1 %s
-// CHECK-REPLACEMENT1: <Group>Collection/Array</Group>
+// CHECK-REPLACEMENT1: <Group>Array</Group>
 // CHECK-REPLACEMENT1: <Declaration>{{.*}}func sorted() -&gt; [<Type usr="s:Si">Int</Type>]</Declaration>
 // CHECK-REPLACEMENT1: RELATED BEGIN
 // CHECK-REPLACEMENT1: sorted(by:)</RelatedName>
 // CHECK-REPLACEMENT1: RELATED END
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-REPLACEMENT2 %s
-// CHECK-REPLACEMENT2: <Group>Collection/Array</Group>
+// CHECK-REPLACEMENT2: <Group>Array</Group>
 // CHECK-REPLACEMENT2: <Declaration>{{.*}}mutating func append(_ newElement: <Type usr="s:Si">Int</Type>)</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
-// CHECK-REPLACEMENT3: <Group>Collection/Array</Group>
+// CHECK-REPLACEMENT3: <Group>Array</Group>
 // CHECK-REPLACEMENT3: func sorted(by areInIncreasingOrder: (<Type usr="s:13cursor_stdlib2S1V">S1</Type>
 // CHECK-REPLACEMENT3: sorted()</RelatedName>
 
 // RUN: %sourcekitd-test -req=cursor -req-opts=retrieve_symbol_graph=1 -pos=18:8 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
-// CHECK-REPLACEMENT4: <Group>Collection/Array</Group>
+// CHECK-REPLACEMENT4: <Group>Array</Group>
 // CHECK-REPLACEMENT4: <Declaration>{{.*}}mutating func append(_ newElement: <Type usr="s:13cursor_stdlib2S1V">S1</Type>)</Declaration>
 // CHECK-REPLACEMENT4: SYMBOL GRAPH BEGIN
 // CHECK-REPLACEMENT4: {
@@ -225,9 +225,9 @@ let dictNonCost = [1:2, 3:d]
 
 // RUN: %sourcekitd-test -req=cursor -pos=21:10 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-MODULE-GROUP1 %s
 // CHECK-MODULE-GROUP1: MODULE GROUPS BEGIN
-// CHECK-MODULE-GROUP1-DAG: Math
-// CHECK-MODULE-GROUP1-DAG: Collection
-// CHECK-MODULE-GROUP1-DAG: Collection/Array
+// CHECK-MODULE-GROUP1-DAG: Array
+// CHECK-MODULE-GROUP1-DAG: Sequences+Collections
+// CHECK-MODULE-GROUP1-DAG: String
 // CHECK-MODULE-GROUP1: MODULE GROUPS END
 
 // RUN: %sourcekitd-test -req=cursor -pos=22:17 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-FLOAT1 %s
@@ -255,7 +255,7 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-ARRAY1-NEXT: <Element> (Array<Element>.Type) -> (Element...) -> Array<Element>
 // CHECK-ARRAY1-NEXT: $s12arrayLiteralSayxGxd_tcD
 // CHECK-ARRAY1-NEXT: Swift
-// CHECK-ARRAY1-NEXT: <Group>Collection/Array</Group>
+// CHECK-ARRAY1-NEXT: <Group>Array</Group>
 // CHECK-ARRAY1-NEXT: SYSTEM
 
 // RUN: %sourcekitd-test -req=cursor -pos=32:19 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-ARRAY2 %s
@@ -266,7 +266,7 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-ARRAY2-NEXT: <Element> (Array<Element>.Type) -> (Element...) -> Array<Element>
 // CHECK-ARRAY2-NEXT: $s12arrayLiteralSayxGxd_tcD
 // CHECK-ARRAY2-NEXT: Swift
-// CHECK-ARRAY2-NEXT: <Group>Collection/Array</Group>
+// CHECK-ARRAY2-NEXT: <Group>Array</Group>
 // CHECK-ARRAY2-NEXT: SYSTEM
 
 // RUN: %sourcekitd-test -req=cursor -pos=34:19 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-DICT1 %s
@@ -277,7 +277,7 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-DICT1-NEXT: <Key, Value where Key : Hashable> (Dictionary<Key, Value>.Type) -> ((Key, Value)...) -> Dictionary<Key, Value>
 // CHECK-DICT1-NEXT: $s17dictionaryLiteralSDyxq_Gx_q_td_tcD
 // CHECK-DICT1-NEXT: Swift
-// CHECK-DICT1-NEXT: <Group>Collection/HashedCollections</Group>
+// CHECK-DICT1-NEXT: <Group>HashedCollections</Group>
 // CHECK-DICT1-NEXT: SYSTEM
 
 // RUN: %sourcekitd-test -req=cursor -pos=35:19 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-DICT2 %s
@@ -288,5 +288,5 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-DICT2-NEXT: <Key, Value where Key : Hashable> (Dictionary<Key, Value>.Type) -> ((Key, Value)...) -> Dictionary<Key, Value>
 // CHECK-DICT2-NEXT: $s17dictionaryLiteralSDyxq_Gx_q_td_tcD
 // CHECK-DICT2-NEXT: Swift
-// CHECK-DICT2-NEXT: <Group>Collection/HashedCollections</Group>
+// CHECK-DICT2-NEXT: <Group>HashedCollections</Group>
 // CHECK-DICT2-NEXT: SYSTEM
