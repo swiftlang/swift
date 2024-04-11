@@ -2441,7 +2441,9 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-      if (D->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(structType)) {
         properties.setNonTrivial();
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2538,10 +2540,11 @@ namespace {
         return new (TC)
             MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
-
-      assert(D->canBeEscapable() == TypeDecl::CanBeInvertible::Always
-             && "missing typelowering case here!");
-
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(enumType)) {
+        properties.setNonTrivial();
+      }
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
     }
