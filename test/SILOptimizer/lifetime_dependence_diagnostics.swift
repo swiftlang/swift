@@ -48,6 +48,16 @@ public struct NEInt: ~Escapable {
   }
 }
 
+public enum NEOptional<Wrapped: ~Escapable>: ~Escapable {
+  case none
+  case some(Wrapped)
+}
+
+extension NEOptional where Wrapped: ~Escapable {
+  // Test that enum initialization passes diagnostics.
+  public init(_ some: consuming Wrapped) { self = .some(some) }
+}
+
 func takeClosure(_: () -> ()) {}
 
 // No mark_dependence is needed for a inherited scope.
