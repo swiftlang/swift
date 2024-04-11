@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-sil \
 // RUN:     %s \
 // RUN:     -enable-builtin-module \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
+// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -enable-experimental-feature BorrowingSwitch \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -sil-verify-all \
