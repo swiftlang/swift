@@ -57,7 +57,6 @@ split_embedded_sources(
   EMBEDDED Floats/FloatingPointRandom.swift
 
 ### HashedCollections
-  EMBEDDED HashedCollections/AnyHashable.swift
   EMBEDDED HashedCollections/Bitset.swift
   EMBEDDED HashedCollections/Dictionary.swift
   EMBEDDED HashedCollections/DictionaryBridging.swift
@@ -223,6 +222,7 @@ split_embedded_sources(
     NORMAL Unsafe/VarArgs.swift
 
 ### Misc
+  EMBEDDED AnyHashable.swift
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
   EMBEDDED Availability.swift
