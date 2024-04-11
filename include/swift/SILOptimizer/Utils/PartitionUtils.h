@@ -161,6 +161,11 @@ public:
 
   void printForDiagnostics(llvm::raw_ostream &os) const;
 
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
+    printForDiagnostics(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
+
   ActorIsolation getActorIsolation() const {
     assert(kind == Actor);
     return actorIsolation;
