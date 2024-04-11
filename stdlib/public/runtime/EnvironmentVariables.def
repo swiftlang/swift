@@ -85,9 +85,19 @@ VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED, bool, true,
          "Enable use of prespecializations library.")
 
 VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH, string, "",
-         "A path to a prespecializations library to use at runtime. In order to"
-         "be used, this library must be loaded into the process by other means"
-         "(such as DYLD_INSERT_LIBRARIES) before Swift tries to use it.")
+         "A path to a prespecializations library to use at runtime. In order "
+         "to be used, this library must be loaded into the process by other "
+         "means (such as DYLD_INSERT_LIBRARIES) before Swift tries to use it.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES, string, "",
+         "A colon-separated list of process names where the prespecializations "
+         "library will be forcibly disabled.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES, string, "",
+         "A colon-separated list of process names where the prespecializations "
+         "library will be forcibly enabled. This overrides the disabled "
+         "processes list in the prespecializations library, as well as the "
+         "list in SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES.")
 
 VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING, bool, false,
          "Enable debug logging of prespecializations library use.")
