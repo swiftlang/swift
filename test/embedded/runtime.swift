@@ -7,7 +7,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
 
