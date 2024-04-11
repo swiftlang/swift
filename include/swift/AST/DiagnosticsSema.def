@@ -5687,8 +5687,6 @@ ERROR(preconcurrency_not_inheritance_clause,none,
       "'preconcurrency' attribute only applies in inheritance clauses", ())
 ERROR(preconcurrency_not_existential,none,
       "'preconcurrency' attribute cannot apply to non-protocol type %0", (Type))
-ERROR(preconcurrency_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature DynamicActorIsolation'", ())
 
 ERROR(redundant_any_in_existential,none,
        "redundant 'any' in type %0",
