@@ -3317,28 +3317,21 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   }
 
   if (auto preconcurrencyAttr = claim<PreconcurrencyTypeAttr>(attrs)) {
-    auto &ctx = getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
-      if (ty->hasError())
-        return ty;
+    if (ty->hasError())
+      return ty;
 
-      if (!options.is(TypeResolverContext::Inherited) ||
-          getDeclContext()->getSelfProtocolDecl()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_inheritance_clause);
-        ty = ErrorType::get(getASTContext());
-      } else if (!ty->isConstraintType()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_existential, ty);
-        ty = ErrorType::get(getASTContext());
-      }
-
-      // Nothing to record in the type.
-    } else {
+    if (!options.is(TypeResolverContext::Inherited) ||
+        getDeclContext()->getSelfProtocolDecl()) {
       diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_attr_disabled);
+                      diag::preconcurrency_not_inheritance_clause);
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->isConstraintType()) {
+      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
+                      diag::preconcurrency_not_existential, ty);
       ty = ErrorType::get(getASTContext());
     }
+
+    // Nothing to record in the type.
   }
 
   if (auto retroactiveAttr = claim<RetroactiveTypeAttr>(attrs)) {
