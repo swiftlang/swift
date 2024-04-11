@@ -185,15 +185,13 @@ public:
   }
 
   bool isTrivial() const {
+    assert(hasBeenComputed());
     return getCaptures().empty() && !hasGenericParamCaptures() &&
            !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
   }
 
   ArrayRef<CapturedValue> getCaptures() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return std::nullopt;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getCaptures();
   }
 
@@ -208,10 +206,7 @@ public:
 
   /// \returns true if the function captures any generic type parameters.
   bool hasGenericParamCaptures() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return false;
+    assert(hasBeenComputed());
     return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
   }
 
@@ -222,22 +217,17 @@ public:
 
   /// \returns the captured dynamic Self type, if any.
   DynamicSelfType *getDynamicSelfType() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return nullptr;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getDynamicSelfType();
   }
 
   bool hasOpaqueValueCapture() const {
+    assert(hasBeenComputed());
     return getOpaqueValue() != nullptr;
   }
 
   OpaqueValueExpr *getOpaqueValue() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return nullptr;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getOpaqueValue();
   }
 

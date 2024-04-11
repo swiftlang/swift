@@ -60,6 +60,7 @@ CaptureInfo CaptureInfo::empty() {
 }
 
 bool CaptureInfo::hasLocalCaptures() const {
+  assert(hasBeenComputed());
   for (auto capture : getCaptures()) {
     if (capture.isLocalCapture())
       return true;
