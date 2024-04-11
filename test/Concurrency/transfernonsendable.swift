@@ -1617,3 +1617,12 @@ extension FinalActor {
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into actor-isolated context may introduce data races}}
   }
 }
+
+actor DictionaryActorTest {
+  var data: [Int: Int] = [:]
+
+  // We used to crash on this due to isolation merging.
+  func doSomething(_ key: Int) {
+    assert(self.data[key] == 0)
+  }
+}
