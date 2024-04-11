@@ -1513,6 +1513,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.DisableDynamicActorIsolation |=
+      Args.hasArg(OPT_disable_dynamic_actor_isolation);
+
 #if SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
   /// explicitly. The new Swift parser can have mismatches with C++ parser -
