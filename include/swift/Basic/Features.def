@@ -191,6 +191,7 @@ UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
 UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
+UPCOMING_FEATURE(MoveOnlyPartialConsumption, 429, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -217,7 +218,6 @@ EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
 EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
 EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
-EXPERIMENTAL_FEATURE(MoveOnlyPartialConsumption, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)

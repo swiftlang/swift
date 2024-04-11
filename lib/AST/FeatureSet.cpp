@@ -449,10 +449,8 @@ static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
 
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 
-static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
-  // Partial consumption does not affect declarations directly.
-  return false;
-}
+// Partial consumption does not affect declarations directly.
+UNINTERESTING_FEATURE(MoveOnlyPartialConsumption)
 
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
 
