@@ -175,33 +175,32 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
 
 StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
-  case llvm::Triple::ZOS:
-  case llvm::Triple::Ananas:
-  case llvm::Triple::CloudABI:
+  case llvm::Triple::AIX:
+  case llvm::Triple::AMDHSA:
+  case llvm::Triple::AMDPAL:
+  case llvm::Triple::BridgeOS:
+  case llvm::Triple::CUDA:
   case llvm::Triple::DragonFly:
   case llvm::Triple::DriverKit:
-  case llvm::Triple::XROS:
+  case llvm::Triple::ELFIAMCU:
   case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
-  case llvm::Triple::KFreeBSD:
-  case llvm::Triple::Lv2:
-  case llvm::Triple::NetBSD:
-  case llvm::Triple::PS5:
-  case llvm::Triple::ShaderModel:
-  case llvm::Triple::Solaris:
-  case llvm::Triple::Minix:
-  case llvm::Triple::RTEMS:
-  case llvm::Triple::NaCl:
-  case llvm::Triple::AIX:
-  case llvm::Triple::CUDA:
-  case llvm::Triple::NVCL:
-  case llvm::Triple::AMDHSA:
-  case llvm::Triple::ELFIAMCU:
-  case llvm::Triple::Mesa3D:
-  case llvm::Triple::Contiki:
-  case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
+  case llvm::Triple::KFreeBSD:
+  case llvm::Triple::Lv2:
+  case llvm::Triple::Mesa3D:
+  case llvm::Triple::NaCl:
+  case llvm::Triple::NetBSD:
+  case llvm::Triple::NVCL:
+  case llvm::Triple::PS5:
+  case llvm::Triple::RTEMS:
+  case llvm::Triple::Serenity:
+  case llvm::Triple::ShaderModel:
+  case llvm::Triple::Solaris:
+  case llvm::Triple::Vulkan:
+  case llvm::Triple::XROS:
+  case llvm::Triple::ZOS:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:

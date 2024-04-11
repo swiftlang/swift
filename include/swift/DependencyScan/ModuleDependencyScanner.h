@@ -145,7 +145,7 @@ private:
   /// The available pool of workers for filesystem module search
   unsigned NumThreads;
   std::list<std::unique_ptr<ModuleDependencyScanningWorker>> Workers;
-  llvm::ThreadPool ScanningThreadPool;
+  llvm::StdThreadPool ScanningThreadPool;
   /// Protect worker access.
   std::mutex WorkersLock;
 };

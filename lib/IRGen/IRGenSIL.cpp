@@ -6330,8 +6330,6 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
   case SILAccessEnforcement::Signed: {
     auto &ti = getTypeInfo(access->getType());
     auto *sea = cast<StructElementAddrInst>(access->getOperand());
-    auto *Int64PtrTy = llvm::Type::getInt64PtrTy(IGM.getLLVMContext());
-    auto *Int64PtrPtrTy = Int64PtrTy->getPointerTo();
     if (access->getAccessKind() == SILAccessKind::Read) {
       // When we see a signed read access, generate code to:
       // authenticate the signed pointer if non-null, and store the
@@ -6339,19 +6337,17 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       // of the access to this stack location.
       auto pointerAuthQual = sea->getField()->getPointerAuthQualifier();
       auto *pointerToSignedFptr = getLoweredAddress(sea).getAddress();
-      auto *pointerToIntPtr =
-          Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
-      auto *signedFptr = Builder.CreateLoad(pointerToIntPtr, Int64PtrTy,
+      auto *signedFptr = Builder.CreateLoad(pointerToSignedFptr, IGM.PtrTy,
                                             IGM.getPointerAlignment());
 
       // Create a stack temporary.
       auto temp = ti.allocateStack(*this, access->getType(), "ptrauth.temp");
       auto *tempAddressToIntPtr =
-          Builder.CreateBitCast(temp.getAddressPointer(), Int64PtrPtrTy);
+          Builder.CreateBitCast(temp.getAddressPointer(), IGM.PtrTy);
 
       // Branch based on pointer is null or not.
       llvm::Value *cond = Builder.CreateICmpNE(
-          signedFptr, llvm::ConstantPointerNull::get(Int64PtrTy));
+          signedFptr, llvm::ConstantPointerNull::get(IGM.PtrTy));
       auto *resignNonNull = createBasicBlock("resign-nonnull");
       auto *resignNull = createBasicBlock("resign-null");
       auto *resignCont = createBasicBlock("resign-cont");
@@ -6484,23 +6480,17 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
     // access which is the shadow stack slot, sign the value if non-null and
     // write back to the struct field.
     auto *sea = cast<StructElementAddrInst>(access->getOperand());
-    auto *Int64PtrTy = llvm::Type::getInt64PtrTy(IGM.getLLVMContext());
-    auto *Int64PtrPtrTy = Int64PtrTy->getPointerTo();
     auto pointerAuthQual = cast<StructElementAddrInst>(access->getOperand())
                                ->getField()
                                ->getPointerAuthQualifier();
     auto *pointerToSignedFptr =
         getLoweredAddress(access->getOperand()).getAddress();
-    auto *pointerToIntPtr =
-        Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
-    auto tempAddress = getLoweredAddress(access);
-    auto *tempAddressToIntPtr =
-        Builder.CreateBitCast(tempAddress.getAddress(), Int64PtrPtrTy);
-    auto *tempAddressValue = Builder.CreateLoad(tempAddressToIntPtr, Int64PtrTy,
+    auto tempAddress = getLoweredAddress(access).getAddress();
+    auto *tempAddressValue = Builder.CreateLoad(tempAddress, IGM.PtrTy,
                                                 IGM.getPointerAlignment());
     // Branch based on value is null or not.
     llvm::Value *cond = Builder.CreateICmpNE(
-        tempAddressValue, llvm::ConstantPointerNull::get(Int64PtrTy));
+        tempAddressValue, llvm::ConstantPointerNull::get(IGM.PtrTy));
     auto *resignNonNull = createBasicBlock("resign-nonnull");
     auto *resignNull = createBasicBlock("resign-null");
     auto *resignCont = createBasicBlock("resign-cont");
@@ -6515,18 +6505,18 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
         sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
     auto oldAuthInfo = PointerAuthInfo::emit(
         *this, IGM.getOptions().PointerAuth.FunctionPointers,
-        tempAddress.getAddress(), entity);
+        tempAddress, entity);
     auto newAuthInfo =
         PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
     auto *signedFptr = emitPointerAuthResign(*this, tempAddressValue,
                                              oldAuthInfo, newAuthInfo);
-    Builder.CreateStore(signedFptr, pointerToIntPtr, IGM.getPointerAlignment());
+    Builder.CreateStore(signedFptr, pointerToSignedFptr, IGM.getPointerAlignment());
 
     Builder.CreateBr(resignCont);
 
     // If null, no need to resign
     Builder.emitBlock(resignNull);
-    Builder.CreateStore(tempAddressValue, pointerToIntPtr, IGM.getPointerAlignment());
+    Builder.CreateStore(tempAddressValue, pointerToSignedFptr, IGM.getPointerAlignment());
     Builder.CreateBr(resignCont);
 
     Builder.emitBlock(resignCont);

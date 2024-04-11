@@ -147,12 +147,12 @@ namespace {
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       uint32_t keyID = S.addUniquedStringRef(key);
-      endian::write<uint32_t>(out, keyID, little);
+      endian::write<uint32_t>(out, keyID, llvm::endianness::little);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      endian::write<uint32_t>(out, data, little);
+      endian::write<uint32_t>(out, data, llvm::endianness::little);
     }
   };
 
@@ -2791,7 +2791,7 @@ static void writeIndexTable(Serializer &S,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0.
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream, tableInfo);
   }
   SmallVector<uint64_t, 8> scratch;

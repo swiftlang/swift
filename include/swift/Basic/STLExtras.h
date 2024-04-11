@@ -259,7 +259,7 @@ public:
   }
 };
 
-/// An iterator that transforms the result of an underlying bidirectional
+/// An iterator that transforms the result of an underlying random access
 /// iterator with a given operation.
 ///
 /// Slightly different semantics from llvm::map_iterator, but we should
@@ -281,7 +281,7 @@ class TransformIterator {
   using OpTraits = function_traits<Operation>;
 
 public:
-  using iterator_category = std::bidirectional_iterator_tag;
+  using iterator_category = std::random_access_iterator_tag;
   using value_type = typename OpTraits::result_type;
   using reference = value_type;
   using pointer = void; // FIXME: Should provide a pointer proxy.
@@ -318,6 +318,17 @@ public:
     --*this;
     return old;
   }
+
+  int operator-(const TransformIterator &rhs) const {
+    return Current - rhs.Current;
+  }
+
+  TransformIterator &operator+=(int rhs) {
+    Current = Current + rhs;
+    return *this;
+  }
+
+  TransformIterator &operator-=(int rhs) { return operator+=(-rhs); }
 
   friend bool operator==(TransformIterator lhs, TransformIterator rhs) {
     return lhs.Current == rhs.Current;

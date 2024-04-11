@@ -31,31 +31,32 @@
 #include "swift/LLVMPasses/Passes.h"
 #include "clang/AST/StableHash.h"
 #include "clang/Basic/PointerAuthOptions.h"
-#include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/Utils/FunctionComparator.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/StructuralHash.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/IR/ValueMap.h"
-#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Triple.h"
+#include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/Utils/FunctionComparator.h"
 #include <vector>
 
 using namespace llvm;
@@ -256,11 +257,12 @@ private:
     FunctionEntry *First;
 
     /// A very cheap hash, used to early exit if functions do not match.
-    FunctionComparator::FunctionHash Hash;
+    llvm::IRHash Hash;
+
   public:
     // Note the hash is recalculated potentially multiple times, but it is cheap.
     EquivalenceClass(FunctionEntry *First)
-      : First(First), Hash(FunctionComparator::functionHash(*First->F)) {
+        : First(First), Hash(llvm::StructuralHash(*First->F)) {
       assert(!First->Next);
     }
   };
@@ -710,21 +712,18 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
 
   // All functions in the module, ordered by hash. Functions with a unique
   // hash value are easily eliminated.
-  std::vector<std::pair<FunctionComparator::FunctionHash, Function *>>
-    HashedFuncs;
+  std::vector<std::pair<IRHash, Function *>> HashedFuncs;
 
   for (Function &Func : M) {
     if (isEligibleFunction(&Func)) {
-      HashedFuncs.push_back({FunctionComparator::functionHash(Func), &Func});
+      HashedFuncs.push_back({llvm::StructuralHash(Func), &Func});
     }
   }
 
   std::stable_sort(
       HashedFuncs.begin(), HashedFuncs.end(),
-      [](const std::pair<FunctionComparator::FunctionHash, Function *> &a,
-         const std::pair<FunctionComparator::FunctionHash, Function *> &b) {
-        return a.first < b.first;
-      });
+      [](const std::pair<IRHash, Function *> &a,
+         const std::pair<IRHash, Function *> &b) { return a.first < b.first; });
 
   std::vector<FunctionEntry> FuncEntryStorage;
   FuncEntryStorage.reserve(HashedFuncs.size());
@@ -1079,6 +1078,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   Function *NewFunction = Function::Create(funcType,
                                            FirstF->getLinkage(),
                                            FirstF->getName() + "Tm");
+  NewFunction->setIsNewDbgInfoFormat(FirstF->IsNewDbgInfoFormat);
   NewFunction->copyAttributesFrom(FirstF);
   // NOTE: this function is not externally available, do ensure that we reset
   // the DLL storage

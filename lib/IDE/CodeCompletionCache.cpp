@@ -304,8 +304,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 static void writeCachedModule(llvm::raw_ostream &out,
                               const CodeCompletionCache::Key &K,
                               CodeCompletionCache::Value &V) {
-  using namespace llvm::support;
-  endian::Writer LE(out, little);
+  llvm::support::endian::Writer LE(out, llvm::endianness::little);
 
   // HEADER
   // Metadata required for reading the completions.
@@ -321,7 +320,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     llvm::raw_svector_ostream OSS(scratch);
     OSS << K.ModuleFilename << "\0";
     OSS << K.ModuleName << "\0";
-    endian::Writer OSSLE(OSS, little);
+    llvm::support::endian::Writer OSSLE(OSS, llvm::endianness::little);
     OSSLE.write(K.AccessPath.size());
     for (StringRef p : K.AccessPath)
       OSS << p << "\0";
@@ -340,7 +339,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
   llvm::raw_string_ostream results(results_);
   std::string chunks_;
   llvm::raw_string_ostream chunks(chunks_);
-  endian::Writer chunksLE(chunks, little);
+  llvm::support::endian::Writer chunksLE(chunks, llvm::endianness::little);
   std::string strings_;
   llvm::raw_string_ostream strings(strings_);
   llvm::StringMap<uint32_t> knownStrings;
@@ -356,7 +355,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       return found->second;
     }
     auto size = strings.tell();
-    endian::Writer LE(strings, little);
+    llvm::support::endian::Writer LE(strings, llvm::endianness::little);
     LE.write(static_cast<uint32_t>(str.size()));
     strings << str;
     knownStrings[str] = size;
@@ -381,7 +380,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     }
 
     auto size = types.tell();
-    endian::Writer LE(types, little);
+    llvm::support::endian::Writer LE(types, llvm::endianness::little);
     StringRef USR = type->getUSR();
     LE.write(static_cast<uint32_t>(USR.size()));
     types << USR;
@@ -414,7 +413,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
 
   // RESULTS
   {
-    endian::Writer LE(results, little);
+    llvm::support::endian::Writer LE(results, llvm::endianness::little);
     for (const ContextFreeCodeCompletionResult *R : V.Results) {
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));

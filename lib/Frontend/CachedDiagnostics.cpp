@@ -777,7 +777,7 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
     // Write the uncompressed size in the end.
     if (!Compression.empty()) {
       llvm::raw_svector_ostream BufOS((SmallVectorImpl<char> &)Compression);
-      llvm::support::endian::Writer Writer(BufOS, llvm::support::little);
+      llvm::support::endian::Writer Writer(BufOS, llvm::endianness::little);
       Writer.write(uint32_t(Output.size()));
     }
 
@@ -825,7 +825,7 @@ CachingDiagnosticsProcessor::replayCachedDiagnostics(llvm::StringRef Buffer) {
           std::make_error_code(std::errc::message_size));
 
     uint32_t UncompressedSize =
-        llvm::support::endian::read<uint32_t, llvm::support::little>(
+        llvm::support::endian::read<uint32_t, llvm::endianness::little>(
             Buffer.data() + Buffer.size() - sizeof(uint32_t));
 
     StringRef CompressedData = Buffer.drop_back(sizeof(uint32_t));

@@ -40,8 +40,6 @@ enum class DiagID : uint32_t;
 
 namespace diag {
 
-using namespace llvm::support;
-
 enum LocalizationProducerState : uint8_t {
   NotInitialized,
   Initialized,
@@ -77,14 +75,15 @@ public:
                                                         key_type_ref key,
                                                         data_type_ref data) {
     offset_type dataLength = static_cast<offset_type>(data.size());
-    endian::write<offset_type>(out, dataLength, little);
+    llvm::support::endian::write<offset_type>(out, dataLength,
+                                              llvm::endianness::little);
     // No need to write the key length; it's constant.
     return {sizeof(key_type), dataLength};
   }
 
   void EmitKey(llvm::raw_ostream &out, key_type_ref key, unsigned len) {
     assert(len == sizeof(key_type));
-    endian::write<key_type>(out, key, little);
+    llvm::support::endian::write<key_type>(out, key, llvm::endianness::little);
   }
 
   void EmitData(llvm::raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -120,12 +119,15 @@ public:
   static std::pair<offset_type, offset_type>
   ReadKeyDataLength(const unsigned char *&data) {
     offset_type dataLength =
-        endian::readNext<offset_type, little, unaligned>(data);
+        llvm::support::endian::readNext<offset_type, llvm::endianness::little,
+                                        llvm::support::unaligned>(data);
     return {sizeof(uint32_t), dataLength};
   }
 
   internal_key_type ReadKey(const unsigned char *data, offset_type length) {
-    return endian::readNext<internal_key_type, little, unaligned>(data);
+    return llvm::support::endian::readNext<
+        internal_key_type, llvm::endianness::little, llvm::support::unaligned>(
+        data);
   }
 
   data_type ReadData(internal_key_type Key, const unsigned char *data,

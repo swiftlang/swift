@@ -30,7 +30,9 @@
 #include "DebugTypeInfo.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/Require.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Support/BLAKE3.h"
 
 using namespace swift;
@@ -321,8 +323,16 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
       }
       case BuiltinValueKind::ZExtOrBitCast: {
         auto *val = emitConstantValue(IGM, args[0]).claimNextConstant();
-        return llvm::ConstantExpr::getZExtOrBitCast(val,
-                                                    IGM.getStorageType(BI->getType()));
+        auto storageTy = IGM.getStorageType(BI->getType());
+
+        if (val->getType() == storageTy)
+          return val;
+
+        auto *result = llvm::ConstantFoldCastOperand(
+            llvm::Instruction::ZExt, val, storageTy, IGM.DataLayout);
+        require(result != nullptr,
+                "couldn't constant fold initializer expression");
+        return result;
       }
       case BuiltinValueKind::StringObjectOr: {
         // It is a requirement that the or'd bits in the left argument are

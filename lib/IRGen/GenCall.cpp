@@ -1025,6 +1025,10 @@ namespace {
         llvm_unreachable("ConstantMatrix type in ABI lowering?");
       }
 
+      case clang::Type::ArrayParameter:
+        llvm_unreachable("HLSL type in ABI lowering");
+
+
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
         auto elt = Ctx.getCanonicalType(array->getElementType());

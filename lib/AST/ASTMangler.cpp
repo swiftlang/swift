@@ -3026,7 +3026,7 @@ void ASTMangler::appendClangType(FnType *fn, llvm::raw_svector_ostream &out) {
       fn->getASTContext().getClangModuleLoader()->getClangASTContext();
   std::unique_ptr<clang::ItaniumMangleContext> mangler{
       clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
-  mangler->mangleTypeName(clang::QualType(clangType, 0), scratchOS);
+  mangler->mangleCanonicalTypeName(clang::QualType(clangType, 0), scratchOS);
   out << scratchOS.str().size() << scratchOS.str();
 }
 

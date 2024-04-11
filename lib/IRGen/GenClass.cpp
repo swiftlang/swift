@@ -1605,8 +1605,7 @@ namespace {
       std::optional<CanType> specializedGenericType;
       if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
         //     ClassMetadata *NonMetaClass;
-        b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),
-                     IGM.Int8PtrTy);
+        b.add(IGM.getAddrOfTypeMetadata(*specializedGenericType));
       } else {
         //     const uint8_t *IvarLayout;
         // GC/ARC layout.  TODO.

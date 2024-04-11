@@ -617,9 +617,9 @@ swiftscan_string_set_t *
 swiftscan_compiler_supported_arguments_query() {
   std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
   std::vector<std::string> frontendFlags;
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  addFrontendFlagOption(*table, swift::options::OPT_##ID, frontendFlags);
+#define OPTION(...)                                                            \
+  addFrontendFlagOption(*table, swift::options::LLVM_MAKE_OPT_ID(__VA_ARGS__), \
+                        frontendFlags);
 #include "swift/Option/Options.inc"
 #undef OPTION
   return swift::c_string_utils::create_set(frontendFlags);
