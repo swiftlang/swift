@@ -12,7 +12,7 @@
 // RUN:   -I %t \
 // RUN:   -disable-availability-checking \
 // RUN:   -module-name Client \
-// RUN:   -enable-experimental-feature DynamicActorIsolation \
+// RUN:   -enable-upcoming-feature DynamicActorIsolation \
 // RUN:    %t/src/Client.swift -verify | %FileCheck %s
 
 // Delete swiftmodule to test building against swiftinterface
@@ -23,7 +23,7 @@
 // RUN:   -I %t \
 // RUN:   -disable-availability-checking \
 // RUN:   -module-name Client \
-// RUN:   -enable-experimental-feature DynamicActorIsolation \
+// RUN:   -enable-upcoming-feature DynamicActorIsolation \
 // RUN:    %t/src/Client.swift -verify | %FileCheck %s
 
 // REQUIRES: asserts
