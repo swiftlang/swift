@@ -421,34 +421,9 @@ struct TransferredNonTransferrableInfo {
         isolationRegionInfo(isolationRegionInfo) {}
 };
 
-/// A pointer to a TransferringOperand pointer that sorts according to the
-/// Operand pointer in the TransferringOperand rather than the pointer of the
-/// TransferringOperand itself.
-class TransferringOperandRef {
-  TransferringOperand *operand;
-
-public:
-  TransferringOperandRef(TransferringOperand *operand) : operand(operand) {}
-
-  TransferringOperand *operator*() const { return operand; }
-  TransferringOperand *operator->() const { return operand; }
-
-  bool operator==(const TransferringOperandRef &other) const {
-    return operand->getOperand() == other->getOperand();
-  }
-
-  bool operator!=(const TransferringOperandRef &other) const {
-    return !(*this == other);
-  }
-
-  bool operator<(const TransferringOperandRef &other) const {
-    return operand->getOperand() < other->getOperand();
-  }
-};
-
 class TransferNonSendableImpl {
   RegionAnalysisFunctionInfo *regionInfo;
-  SmallFrozenMultiMap<TransferringOperandRef, SILInstruction *, 8>
+  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
       transferOpToRequireInstMultiMap;
   SmallVector<TransferredNonTransferrableInfo, 8>
       transferredNonTransferrableInfoList;
@@ -651,9 +626,10 @@ private:
 };
 
 class UseAfterTransferDiagnosticInferrer {
-  TransferringOperand *transferOp;
+  Operand *transferOp;
   UseAfterTransferDiagnosticEmitter diagnosticEmitter;
   RegionAnalysisValueMap &valueMap;
+  TransferringOperandToStateMap &transferringOpToStateMap;
   SILLocation baseLoc = SILLocation::invalid();
   Type baseInferredType;
 
@@ -661,17 +637,16 @@ class UseAfterTransferDiagnosticInferrer {
 
 public:
   UseAfterTransferDiagnosticInferrer(
-      TransferringOperand *transferOp,
-      SmallVectorImpl<SILInstruction *> &requireInsts,
-      RegionAnalysisValueMap &valueMap)
-      : transferOp(transferOp),
-        diagnosticEmitter(transferOp->getOperand(), requireInsts),
-        valueMap(valueMap), baseLoc(transferOp->getUser()->getLoc()),
-        baseInferredType(
-            transferOp->getOperand()->get()->getType().getASTType()) {}
+      Operand *transferOp, SmallVectorImpl<SILInstruction *> &requireInsts,
+      RegionAnalysisValueMap &valueMap,
+      TransferringOperandToStateMap &transferringOpToStateMap)
+      : transferOp(transferOp), diagnosticEmitter(transferOp, requireInsts),
+        valueMap(valueMap), transferringOpToStateMap(transferringOpToStateMap),
+        baseLoc(transferOp->getUser()->getLoc()),
+        baseInferredType(transferOp->get()->getType().getASTType()) {}
   void infer();
 
-  Operand *getTransferringOperand() const { return transferOp->getOperand(); }
+  Operand *getTransferringOperand() const { return transferOp; }
 
 private:
   bool initForIsolatedPartialApply(Operand *op, AbstractClosureExpr *ace);
@@ -717,10 +692,11 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
       continue;
     emittedDiagnostic = true;
 
+    auto &state = transferringOpToStateMap.get(transferOp);
     if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
       diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
           RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
-          transferOp->getIsolationInfo(), std::get<2>(p));
+          state.isolationInfo, std::get<2>(p));
       continue;
     }
 
@@ -832,10 +808,9 @@ struct UseAfterTransferDiagnosticInferrer::AutoClosureWalker : ASTWalker {
 void UseAfterTransferDiagnosticInferrer::infer() {
   // Otherwise, see if our operand's instruction is a transferring parameter.
   if (auto fas = FullApplySite::isa(transferOp->getUser())) {
-    assert(!fas.getArgumentConvention(*transferOp->getOperand())
-                .isIndirectOutParameter() &&
+    assert(!fas.getArgumentConvention(*transferOp).isIndirectOutParameter() &&
            "We should never transfer an indirect out parameter");
-    if (fas.getArgumentParameterInfo(*transferOp->getOperand())
+    if (fas.getArgumentParameterInfo(*transferOp)
             .hasOption(SILParameterInfo::Transferring)) {
 
       // First try to do the named diagnostic if we can find a name.
@@ -857,7 +832,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   // transfer error due to us transferring a value into it.
   if (auto *ace = loc.getAsASTNode<AbstractClosureExpr>()) {
     if (ace->getActorIsolation().isActorIsolated()) {
-      if (initForIsolatedPartialApply(transferOp->getOperand(), ace)) {
+      if (initForIsolatedPartialApply(transferOp, ace)) {
         return;
       }
     }
@@ -867,13 +842,14 @@ void UseAfterTransferDiagnosticInferrer::infer() {
     // Before we do anything further, see if we can find a name and emit a name
     // error.
     if (auto rootValueAndName = inferNameAndRootFromValue(transferOp->get())) {
+      auto &state = transferringOpToStateMap.get(transferOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
-          baseLoc, rootValueAndName->first, transferOp->getIsolationInfo(),
+          baseLoc, rootValueAndName->first, state.isolationInfo,
           *sourceApply->getIsolationCrossing());
     }
 
     // Otherwise, try to infer from the ApplyExpr.
-    return initForApply(transferOp->getOperand(), sourceApply);
+    return initForApply(transferOp, sourceApply);
   }
 
   if (auto fas = FullApplySite::isa(transferOp->getUser())) {
@@ -890,12 +866,13 @@ void UseAfterTransferDiagnosticInferrer::infer() {
 
   auto *i = transferOp->getUser();
   auto pai = ApplySite::isa(i);
-  unsigned captureIndex = pai.getAppliedArgIndex(*transferOp->getOperand());
+  unsigned captureIndex = pai.getAppliedArgIndex(*transferOp);
 
+  auto &state = transferringOpToStateMap.get(transferOp);
   auto captureInfo =
       autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
   auto *captureDecl = captureInfo.getDecl();
-  AutoClosureWalker walker(*this, captureDecl, transferOp->getIsolationInfo());
+  AutoClosureWalker walker(*this, captureDecl, state.isolationInfo);
   autoClosureExpr->walk(walker);
 }
 
@@ -912,10 +889,8 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
 
   LLVM_DEBUG(llvm::dbgs() << "Emitting use after transfer diagnostics.\n");
 
-  for (auto [transferOpRef, requireInsts] :
+  for (auto [transferOp, requireInsts] :
        transferOpToRequireInstMultiMap.getRange()) {
-    auto *transferOp = *transferOpRef;
-
     LLVM_DEBUG(llvm::dbgs()
                << "Transfer Op. Number: " << transferOp->getOperandNumber()
                << ". User: " << *transferOp->getUser());
@@ -924,8 +899,8 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // single we don't understand error if we do not find the require.
     bool didEmitRequireNote = false;
     InstructionSet requireInstsUnique(function);
-    RequireLiveness liveness(blockLivenessInfoGeneration,
-                             transferOp->getOperand(), blockLivenessInfo);
+    RequireLiveness liveness(blockLivenessInfoGeneration, transferOp,
+                             blockLivenessInfo);
     ++blockLivenessInfoGeneration;
     liveness.process(requireInsts);
 
@@ -950,13 +925,13 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // tells the user to file a bug. This importantly ensures that we can
     // guarantee that we always find the require if we successfully compile.
     if (!didEmitRequireNote) {
-      diagnoseError(transferOp->getOperand(),
-                    diag::regionbasedisolation_unknown_pattern);
+      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
       continue;
     }
 
     UseAfterTransferDiagnosticInferrer diagnosticInferrer(
-        transferOp, requireInstsForError, regionInfo->getValueMap());
+        transferOp, requireInstsForError, regionInfo->getValueMap(),
+        regionInfo->getTransferringOpToStateMap());
     diagnosticInferrer.infer();
   }
 }
@@ -1333,7 +1308,7 @@ namespace {
 struct DiagnosticEvaluator final
     : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
   RegionAnalysisFunctionInfo *info;
-  SmallFrozenMultiMap<TransferringOperandRef, SILInstruction *, 8>
+  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
       &transferOpToRequireInstMultiMap;
 
   /// First value is the operand that was transferred... second value is the
@@ -1341,21 +1316,24 @@ struct DiagnosticEvaluator final
   /// is what is non-transferrable.
   SmallVectorImpl<TransferredNonTransferrableInfo> &transferredNonTransferrable;
 
-  DiagnosticEvaluator(
-      Partition &workingPartition, RegionAnalysisFunctionInfo *info,
-      SmallFrozenMultiMap<TransferringOperandRef, SILInstruction *, 8>
-          &transferOpToRequireInstMultiMap,
-      SmallVectorImpl<TransferredNonTransferrableInfo>
-          &transferredNonTransferrable)
-      : PartitionOpEvaluatorBaseImpl(workingPartition,
-                                     info->getOperandSetFactory()),
+  DiagnosticEvaluator(Partition &workingPartition,
+                      RegionAnalysisFunctionInfo *info,
+                      SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+                          &transferOpToRequireInstMultiMap,
+                      SmallVectorImpl<TransferredNonTransferrableInfo>
+                          &transferredNonTransferrable,
+                      TransferringOperandToStateMap &operandToStateMap)
+      : PartitionOpEvaluatorBaseImpl(
+            workingPartition, info->getOperandSetFactory(), operandToStateMap),
         info(info),
         transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
         transferredNonTransferrable(transferredNonTransferrable) {}
 
   void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
                                    TrackableValueID transferredVal,
-                                   TransferringOperand *transferringOp) const {
+                                   Operand *transferringOp) const {
+    auto &operandState = operandToStateMap.get(transferringOp);
+
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and transferringOp was not set with closure
     // capture.
@@ -1364,7 +1342,7 @@ struct DiagnosticEvaluator final
       if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
           !regionanalysisimpl::isNonSendableType(svi->getType(),
                                                  svi->getFunction())) {
-        bool isCapture = transferringOp->isClosureCaptured();
+        bool isCapture = operandState.isClosureCaptured;
         if (!isCapture) {
           return;
         }
@@ -1375,13 +1353,12 @@ struct DiagnosticEvaluator final
     LLVM_DEBUG(llvm::dbgs()
                << "    Emitting Use After Transfer Error!\n"
                << "        Transferring Inst: " << *transferringOp->getUser()
-               << "        Transferring Op Value: "
-               << transferringOp->getOperand()->get()
+               << "        Transferring Op Value: " << transferringOp->get()
                << "        Require Inst: " << *partitionOp.getSourceInst()
                << "        ID:  %%" << transferredVal << "\n"
                << "        Rep: " << *rep << "        Transferring Op Num: "
-               << transferringOp->getOperand()->getOperandNumber() << '\n');
-    transferOpToRequireInstMultiMap.insert({transferringOp},
+               << transferringOp->getOperandNumber() << '\n');
+    transferOpToRequireInstMultiMap.insert(transferringOp,
                                            partitionOp.getSourceInst());
   }
 
@@ -1494,7 +1471,8 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
     Partition workingPartition = blockState.getEntryPartition();
     DiagnosticEvaluator eval(workingPartition, regionInfo,
                              transferOpToRequireInstMultiMap,
-                             transferredNonTransferrableInfoList);
+                             transferredNonTransferrableInfoList,
+                             regionInfo->getTransferringOpToStateMap());
 
     // And then evaluate all of our partition ops on the entry partition.
     for (auto &partitionOp : blockState.getPartitionOps()) {
