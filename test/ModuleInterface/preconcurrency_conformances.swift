@@ -12,17 +12,17 @@
 // RUN:   -module-name Client -I %t -swift-version 5 -enable-library-evolution \
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
-// RUN:   -enable-experimental-feature DynamicActorIsolation \
+// RUN:   -enable-upcoming-feature DynamicActorIsolation \
 // RUN:   -disable-availability-checking \
 // RUN:   -verify
 
 // RUN: %FileCheck %s < %t/Client.swiftinterface
 
 // RUN: %target-swift-emit-module-interface(%t/Client.swiftinterface) -I %t %t/src/Client.swift -module-name Client \
-// RUN:   -disable-availability-checking -enable-experimental-feature DynamicActorIsolation -verify
+// RUN:   -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -verify
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -module-name Client \
-// RUN:   -disable-availability-checking -enable-experimental-feature DynamicActorIsolation -verify
+// RUN:   -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -verify
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
