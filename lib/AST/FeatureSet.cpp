@@ -682,6 +682,7 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
+UNINTERESTING_FEATURE(ExtensionImportVisibility)
 UNINTERESTING_FEATURE(IsolatedAny2)
 
 UNINTERESTING_FEATURE(ObjCImplementation)
