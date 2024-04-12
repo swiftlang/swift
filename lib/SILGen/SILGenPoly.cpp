@@ -7021,7 +7021,10 @@ void SILGenFunction::emitProtocolWitness(
 
     if (!F.isAsync()) {
       assert(isPreconcurrency);
-      emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+
+      if (getASTContext().LangOpts.isDynamicActorIsolationCheckingEnabled()) {
+        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+      }
     } else {
       emitHopToTargetActor(loc, enterIsolation, actorSelf);
     }

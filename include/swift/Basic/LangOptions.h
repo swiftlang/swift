@@ -608,6 +608,11 @@ namespace swift {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }
 
+    bool isDynamicActorIsolationCheckingEnabled() const {
+      return !DisableDynamicActorIsolation &&
+             hasFeature(Feature::DynamicActorIsolation);
+    }
+
     LangOptions();
 
     /// Sets the target we are building for and updates platform conditions
