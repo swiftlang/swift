@@ -5,7 +5,7 @@
 // RUN:     %t/Library.swift                                        \
 // RUN:     -emit-module                                            \
 // RUN:     -enable-library-evolution                               \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
+// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -module-name Library                                    \
 // RUN:     -emit-module-path %t/Library.swiftmodule
 
@@ -14,7 +14,7 @@
 // RUN:     -emit-sil -verify                                       \
 // RUN:     -debug-diagnostic-names                                 \
 // RUN:     -sil-verify-all                                         \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
+// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -I %t
 
 
