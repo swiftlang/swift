@@ -141,7 +141,6 @@ func check(_ t: inout any NoEscapeP & ~Escapable) {}
 struct MyStruct<T: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
   var x: T
 
-  // 60_MERGE: an explicit initializer is temporarily required until initializer inferrence is merged.
   init(x: consuming T) { self.x = x }
 }
 
