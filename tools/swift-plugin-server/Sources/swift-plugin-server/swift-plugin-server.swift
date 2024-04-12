@@ -12,7 +12,6 @@
 
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 import SwiftSyntaxMacros
-import swiftLLVMJSON
 import CSwiftPluginServer
 
 @main
@@ -114,14 +113,18 @@ final class PluginHostConnection: MessageConnection {
   }
 
   func sendMessage<TX: Encodable>(_ message: TX) throws {
-    try LLVMJSON.encoding(message) { buffer in
-      try self.sendMessageData(buffer)
+    try JSON.encode(message).withUnsafeBufferPointer { buffer in
+      try buffer.withMemoryRebound(to: Int8.self) { buffer in
+        try self.sendMessageData(buffer)
+      }
     }
   }
 
   func waitForNextMessage<RX: Decodable>(_ type: RX.Type) throws -> RX? {
     return try self.withReadingMessageData { jsonData in
-      try LLVMJSON.decode(RX.self, from: jsonData)
+      try jsonData.withMemoryRebound(to: UInt8.self) { buffer in
+        try JSON.decode(RX.self, from: buffer)
+      }
     }
   }
 
