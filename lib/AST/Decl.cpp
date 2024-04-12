@@ -8716,6 +8716,16 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   defaultInfo->InitContextAndIsTypeChecked.setPointer(initContext);
 }
 
+CaptureInfo ParamDecl::getDefaultArgumentCaptureInfo() const {
+  if (!DefaultValueAndFlags.getPointer())
+    return CaptureInfo::empty();
+
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ParamCaptureInfoRequest{const_cast<ParamDecl *>(this)},
+                           CaptureInfo::empty());
+}
+
 void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
   assert(DefaultValueAndFlags.getPointer());
   assert(captures.hasBeenComputed());
@@ -9169,6 +9179,13 @@ const ParamDecl *swift::getParameterAt(const DeclContext *source,
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
+}
+
+CaptureInfo AbstractFunctionDecl::getCaptureInfo() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           CaptureInfoRequest{const_cast<AbstractFunctionDecl *>(this)},
+                           CaptureInfo::empty());
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {

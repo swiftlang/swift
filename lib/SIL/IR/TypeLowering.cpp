@@ -4169,8 +4169,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   };
 
   collectCaptures = [&](CaptureInfo captureInfo) {
-    assert(captureInfo.hasBeenComputed());
-
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
     if (captureInfo.hasDynamicSelfCapture())
