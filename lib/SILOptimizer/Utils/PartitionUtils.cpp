@@ -21,8 +21,6 @@
 
 #include "llvm/Support/CommandLine.h"
 
-#pragma clang optimize off
-
 using namespace swift;
 using namespace swift::PatternMatch;
 using namespace swift::PartitionPrimitives;
