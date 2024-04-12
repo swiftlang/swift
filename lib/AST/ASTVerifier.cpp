@@ -3594,28 +3594,6 @@ public:
       abort();
     }
 
-    void checkSameOrSubType(Type T0, Type T1, const char *what) {
-      if (T0->isEqual(T1))
-        return;
-
-      // Protocol subtyping.
-      if (auto Proto0 = T0->getAs<ProtocolType>())
-        if (auto Proto1 = T1->getAs<ProtocolType>())
-          if (Proto0->getDecl()->inheritsFrom(Proto1->getDecl()))
-            return;
-      
-      // FIXME: Actually check this?
-      if (T0->isExistentialType() || T1->isExistentialType())
-        return;
-      
-      Out << "incompatible types for " << what << ": ";
-      T0.print(Out);
-      Out << " vs. ";
-      T1.print(Out);
-      Out << "\n";
-      abort();
-    }
-
     Type checkExceptionTypeExists(const char *where) {
       if (!Ctx.getErrorDecl()) {
         Out << "exception type does not exist in " << where << "\n";
