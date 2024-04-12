@@ -369,6 +369,8 @@ static void emitMarkFunctionEscape(SILGenFunction &SGF,
   if (AFD->getDeclContext()->isLocalContext())
     return;
   auto CaptureInfo = AFD->getCaptureInfo();
+  if (!CaptureInfo.hasBeenComputed())
+    return;
   SGF.emitMarkFunctionEscapeForTopLevelCodeGlobals(AFD, std::move(CaptureInfo));
 }
 
