@@ -67,7 +67,7 @@ extension Maybe: Copyable {}
 extension Maybe: Show where Value: Show & ~Copyable {
   public borrowing func show() -> String {
     switch self {
-      case let .just(_borrowing elm):
+      case let .just(borrowing elm):
         return elm.show()
       case .nothing:
         return "<nothing>"
@@ -78,9 +78,9 @@ extension Maybe: Show where Value: Show & ~Copyable {
 extension Maybe: Eq where Value: Eq, Value: ~Copyable {
   public static func ==(_ a: borrowing Self, _ b: borrowing Self) -> Bool {
     switch a {
-      case let .just(_borrowing a1):
+      case let .just(borrowing a1):
         switch b {
-          case let .just(_borrowing b1):
+          case let .just(borrowing b1):
             return a1 == b1
           case .nothing:
             return false

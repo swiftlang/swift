@@ -996,8 +996,10 @@ ERROR(extra_var_in_multiple_pattern_list,none,
       "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern cannot appear nested in an already immutable context", ())
+WARNING(borrowing_syntax_change,none,
+      "'_borrowing' spelling is deprecated; use 'borrowing' without the underscore", ())
 ERROR(borrowing_subpattern_unsupported,none,
-      "'_borrowing' pattern modifier must be directly applied to pattern variable name", ())
+      "'borrowing' pattern modifier must be directly applied to pattern variable name", ())
 ERROR(specifier_must_have_type,none,
       "%0 arguments must have a type specified", (StringRef))
 ERROR(expected_rparen_parameter,PointsToFirstBadToken,
