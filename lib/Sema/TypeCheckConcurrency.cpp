@@ -2625,6 +2625,13 @@ namespace {
     }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
+      // Don't walk into local types because nothing in them can
+      // change the outcome of our analysis, and we don't want to
+      // assume things there have been type checked yet.
+      if (isa<TypeDecl>(decl)) {
+        return Action::SkipChildren();
+      }
+
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (func->isLocalContext()) {
           checkLocalCaptures(func);
