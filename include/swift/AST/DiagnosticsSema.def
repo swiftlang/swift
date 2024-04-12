@@ -7877,37 +7877,31 @@ ERROR(lifetime_dependence_only_on_function_method_init_result, none,
        "functions, methods, initializers", ())
 ERROR(lifetime_dependence_invalid_return_type, none,
       "lifetime dependence can only be specified on ~Escapable results", ())
- ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
-      "cannot infer lifetime dependence, multiple ~Escapable or ~Copyable "
-      "parameters with ownership modifiers, specify explicit lifetime "
-       "dependence", ())
-ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
-       "cannot infer lifetime dependence, no parameters with ownership "
-       "modifiers present", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected nil or self as return values in an initializer with "
-       "lifetime dependent specifiers", ())
-ERROR(lifetime_dependence_on_bitwise_copyable, none,
-      "invalid lifetime dependence on bitwise copyable type", ())
-ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
-      "cannot infer lifetime dependence on implicit initializer of ~Escapable"
-      " type, define an initializer with explicit lifetime dependence"
-      " specifiers", ())
-ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
-      "lifetime dependence specifiers cannot be applied to tuple elements", ())
+ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
+      "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
+ ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
+       "cannot infer lifetime dependence %0, no parameters found that are "
+       "~Escapable or Escapable with a borrowing ownership", (StringRef))
+ ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
+       "expected nil or self as return values in an initializer with "
+       "lifetime dependent specifiers",
+       ())
+ ERROR(lifetime_dependence_on_bitwise_copyable, none,
+       "invalid lifetime dependence on bitwise copyable type", ())
+ ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
+       "lifetime dependence specifiers cannot be applied to tuple elements", ())
 
-//===----------------------------------------------------------------------===//
-//                             MARK: Transferring
-//===----------------------------------------------------------------------===//
+ //===----------------------------------------------------------------------===//
+ //                             MARK: Transferring
+ //===----------------------------------------------------------------------===//
 
-ERROR(transferring_unsupported_param_specifier, none,
-      "'%0' cannot be applied to a 'transferring' parameter", (StringRef))
+ ERROR(transferring_unsupported_param_specifier, none,
+       "'%0' cannot be applied to a 'transferring' parameter", (StringRef))
 
-ERROR(transferring_only_on_parameters_and_results, none,
-      "'transferring' may only be used on parameters and results", ())
-ERROR(transferring_cannot_be_applied_to_tuple_elt, none,
-      "'transferring' cannot be applied to tuple elements", ())
-
+ ERROR(transferring_only_on_parameters_and_results, none,
+       "'transferring' may only be used on parameters and results", ())
+ ERROR(transferring_cannot_be_applied_to_tuple_elt, none,
+       "'transferring' cannot be applied to tuple elements", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
