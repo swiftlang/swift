@@ -31,6 +31,7 @@ swift_compiler_sources(Optimizer
   SimplifyStrongRetainRelease.swift
   SimplifyStructExtract.swift
   SimplifySwitchEnum.swift
+  SimplifyTuple.swift
   SimplifyTupleExtract.swift
   SimplifyUncheckedEnumData.swift
   SimplifyValueToBridgeObject.swift)
