@@ -2610,6 +2610,13 @@ namespace {
       return MacroWalking::Expansion;
     }
 
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+      // Walking into patterns leads to nothing good because then we
+      // end up visiting the AccessorDecls of a top-level
+      // PatternBindingDecl twice.
+      return Action::SkipNode(pattern);
+    }
+
     PreWalkAction walkToDeclPre(Decl *decl) override {
       // Don't walk into local types because nothing in them can
       // change the outcome of our analysis, and we don't want to
