@@ -1023,7 +1023,7 @@ function Build-Compilers() {
       if ($TestLLD) { $Targets += @("check-lld") }
       if ($TestLLDB) { $Targets += @("check-lldb") }
       if ($TestLLVM) { $Targets += @("check-llvm") }
-      if ($TestSwift) { $Targets += @("check-swift") }
+      if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
     } else {
       $Targets = @("distribution", "install-distribution")
       $TestingDefines = @{
