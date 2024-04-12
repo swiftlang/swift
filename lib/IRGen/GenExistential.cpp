@@ -247,7 +247,7 @@ namespace {
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
-      if (isOutlined) {
+      if (isOutlined || T.hasLocalArchetype()) {
         Address destValue = projectValue(IGF, dest);
         Address srcValue = projectValue(IGF, src);
         asDerived().emitValueAssignWithCopy(IGF, destValue, srcValue);
@@ -262,7 +262,7 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
-      if (isOutlined) {
+      if (isOutlined || T.hasLocalArchetype()) {
         Address destValue = projectValue(IGF, dest);
         Address srcValue = projectValue(IGF, src);
         asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
@@ -277,7 +277,7 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
-      if (isOutlined) {
+      if (isOutlined || T.hasLocalArchetype()) {
         Address destValue = projectValue(IGF, dest);
         Address srcValue = projectValue(IGF, src);
         asDerived().emitValueAssignWithTake(IGF, destValue, srcValue);
@@ -291,8 +291,9 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      if (isOutlined) {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      if (isOutlined || T.hasLocalArchetype()) {
         Address destValue = projectValue(IGF, dest);
         Address srcValue = projectValue(IGF, src);
         asDerived().emitValueInitializeWithTake(IGF, destValue, srcValue);
@@ -307,7 +308,7 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address existential, SILType T,
                  bool isOutlined) const override {
-      if (isOutlined) {
+      if (isOutlined || T.hasLocalArchetype()) {
         Address valueAddr = projectValue(IGF, existential);
         asDerived().emitValueDestroy(IGF, valueAddr);
       } else {
@@ -955,7 +956,7 @@ public:
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
-    if (isOutlined) {
+    if (isOutlined || T.hasLocalArchetype()) {
       llvm::Value *metadata = copyType(IGF, dest, src);
 
       auto layout = getLayout();
@@ -976,8 +977,9 @@ public:
   }
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
-    if (isOutlined) {
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
+    if (isOutlined || T.hasLocalArchetype()) {
       // memcpy the existential container. This is safe because: either the
       // value is stored inline and is therefore by convention bitwise takable
       // or the value is stored in a reference counted heap buffer, in which

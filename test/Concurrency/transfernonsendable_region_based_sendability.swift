@@ -58,7 +58,7 @@ func test_isolation_crossing_sensitivity(a : A) async {
   foo_noniso(ns0);
 
   // This call consumes ns1
-  await a.foo(ns1); // expected-tns-warning {{transferring 'ns1' may cause a race}}
+  await a.foo(ns1); // expected-tns-warning {{transferring 'ns1' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -76,7 +76,7 @@ func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
   await a.foo(ns_let); // expected-complete-warning {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
   // Not safe to consume an arg.
-  await a.foo(ns_arg); // expected-tns-warning {{transferring 'ns_arg' may cause a race}}
+  await a.foo(ns_arg); // expected-tns-warning {{transferring 'ns_arg' may cause a data race}}
   // expected-tns-note @-1 {{transferring task-isolated 'ns_arg' to actor-isolated callee could cause races between actor-isolated and task-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -155,7 +155,7 @@ func test_regions(a : A, b : Bool) async {
   // check for each of the above pairs that consuming half of it consumes the other half
 
   if (b) {
-    await a.foo(ns0_0) // expected-tns-warning {{transferring 'ns0_0' may cause a race}}
+    await a.foo(ns0_0) // expected-tns-warning {{transferring 'ns0_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns0_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -165,7 +165,7 @@ func test_regions(a : A, b : Bool) async {
       print(ns0_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns0_1) // expected-tns-warning {{transferring 'ns0_1' may cause a race}}
+    await a.foo(ns0_1) // expected-tns-warning {{transferring 'ns0_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns0_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -177,7 +177,7 @@ func test_regions(a : A, b : Bool) async {
   }
 
   if (b) {
-    await a.foo(ns1_0) // expected-tns-warning {{transferring 'ns1_0' may cause a race}}
+    await a.foo(ns1_0) // expected-tns-warning {{transferring 'ns1_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns1_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -187,7 +187,7 @@ func test_regions(a : A, b : Bool) async {
       print(ns1_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns1_1) // expected-tns-warning {{transferring 'ns1_1' may cause a race}}
+    await a.foo(ns1_1) // expected-tns-warning {{transferring 'ns1_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns1_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -199,7 +199,7 @@ func test_regions(a : A, b : Bool) async {
   }
 
   if (b) {
-    await a.foo(ns2_0) // expected-tns-warning {{transferring 'ns2_0' may cause a race}}
+    await a.foo(ns2_0) // expected-tns-warning {{transferring 'ns2_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns2_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -209,7 +209,7 @@ func test_regions(a : A, b : Bool) async {
       print(ns2_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns2_1) // expected-tns-warning {{transferring 'ns2_1' may cause a race}}
+    await a.foo(ns2_1) // expected-tns-warning {{transferring 'ns2_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns2_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -260,7 +260,7 @@ func test_indirect_regions(a : A, b : Bool) async {
   // now check for each pair that consuming half of it consumed the other half
 
   if (b) {
-    await a.foo(ns0_0) // expected-tns-warning {{transferring 'ns0_0' may cause a race}}
+    await a.foo(ns0_0) // expected-tns-warning {{transferring 'ns0_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns0_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -270,7 +270,7 @@ func test_indirect_regions(a : A, b : Bool) async {
       print(ns0_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns0_1) // expected-tns-warning {{transferring 'ns0_1' may cause a race}}
+    await a.foo(ns0_1) // expected-tns-warning {{transferring 'ns0_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns0_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -282,7 +282,7 @@ func test_indirect_regions(a : A, b : Bool) async {
   }
 
   if (b) {
-    await a.foo(ns1_0) // expected-tns-warning {{transferring 'ns1_0' may cause a race}}
+    await a.foo(ns1_0) // expected-tns-warning {{transferring 'ns1_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns1_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -292,7 +292,7 @@ func test_indirect_regions(a : A, b : Bool) async {
       print(ns1_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns1_1) // expected-tns-warning {{transferring 'ns1_1' may cause a race}}
+    await a.foo(ns1_1) // expected-tns-warning {{transferring 'ns1_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns1_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -304,7 +304,7 @@ func test_indirect_regions(a : A, b : Bool) async {
   }
 
   if (b) {
-    await a.foo(ns2_0) // expected-tns-warning {{transferring 'ns2_0' may cause a race}}
+    await a.foo(ns2_0) // expected-tns-warning {{transferring 'ns2_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns2_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -314,7 +314,7 @@ func test_indirect_regions(a : A, b : Bool) async {
       print(ns2_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns2_1) // expected-tns-warning {{transferring 'ns2_1' may cause a race}}
+    await a.foo(ns2_1) // expected-tns-warning {{transferring 'ns2_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns2_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -326,7 +326,7 @@ func test_indirect_regions(a : A, b : Bool) async {
   }
 
   if (b) {
-    await a.foo(ns3_0) // expected-tns-warning {{transferring 'ns3_0' may cause a race}}
+    await a.foo(ns3_0) // expected-tns-warning {{transferring 'ns3_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns3_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -336,7 +336,7 @@ func test_indirect_regions(a : A, b : Bool) async {
       print(ns3_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns3_1) // expected-tns-warning {{transferring 'ns3_1' may cause a race}}
+    await a.foo(ns3_1) // expected-tns-warning {{transferring 'ns3_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns3_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -348,7 +348,7 @@ func test_indirect_regions(a : A, b : Bool) async {
   }
 
   if (b) {
-    await a.foo(ns4_0) // expected-tns-warning {{transferring 'ns4_0' may cause a race}}
+    await a.foo(ns4_0) // expected-tns-warning {{transferring 'ns4_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns4_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -358,7 +358,7 @@ func test_indirect_regions(a : A, b : Bool) async {
       print(ns4_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns4_1) // expected-tns-warning {{transferring 'ns4_1' may cause a race}}
+    await a.foo(ns4_1) // expected-tns-warning {{transferring 'ns4_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns4_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -370,7 +370,7 @@ func test_indirect_regions(a : A, b : Bool) async {
   }
 
   if (b) {
-    await a.foo(ns5_0) // expected-tns-warning {{transferring 'ns5_0' may cause a race}}
+    await a.foo(ns5_0) // expected-tns-warning {{transferring 'ns5_0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns5_0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
@@ -380,7 +380,7 @@ func test_indirect_regions(a : A, b : Bool) async {
       print(ns5_1) // expected-tns-note {{use here could race}}
     }
   } else {
-    await a.foo(ns5_1) // expected-tns-warning {{transferring 'ns5_1' may cause a race}}
+    await a.foo(ns5_1) // expected-tns-warning {{transferring 'ns5_1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns5_1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
@@ -404,7 +404,7 @@ class C_NonSendable {
     foo_noniso(captures_self)
 
     // this is a cross-isolation call that captures non-Sendable self, so it should not be permitted
-    await a.foo(captures_self) // expected-tns-warning {{transferring 'captures_self' may cause a race}}
+    await a.foo(captures_self) // expected-tns-warning {{transferring 'captures_self' may cause a data race}}
     // expected-tns-note @-1 {{transferring task-isolated 'captures_self' to actor-isolated callee could cause races between actor-isolated and task-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
     // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -441,7 +441,7 @@ actor A_Sendable {
     // actor and is non-Sendable. For now, we ban this since we do not
     // support the ability to dynamically invoke the synchronous closure on
     // the specific actor.
-    await a.foo(captures_self) // expected-tns-warning {{transferring 'captures_self' may cause a race}}
+    await a.foo(captures_self) // expected-tns-warning {{transferring 'captures_self' may cause a data race}}
     // expected-tns-note @-1 {{transferring actor-isolated 'captures_self' to actor-isolated callee could cause races between actor-isolated and actor-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
     // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -452,7 +452,7 @@ func basic_loopiness(a : A, b : Bool) async {
   let ns = NonSendable()
 
   while (b) {
-    await a.foo(ns) // expected-tns-warning {{transferring 'ns' may cause a race}}
+    await a.foo(ns) // expected-tns-warning {{transferring 'ns' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-tns-note @-2 {{use here could race}}
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
@@ -470,7 +470,7 @@ func basic_loopiness_unsafe(a : A, b : Bool) async {
     (ns0, ns1, ns2, ns3) = (ns1, ns2, ns3, ns0)
   }
 
-  await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a race}}
+  await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
   await a.foo(ns3) // expected-tns-note {{use here could race}}
@@ -535,7 +535,7 @@ func test_class_assign_merges(a : A, b : Bool) async {
   box.contents = ns0
   box.contents = ns1
 
-  await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a race}}
+  await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
   await a.foo(ns1) // expected-tns-note {{use here could race}}
@@ -572,7 +572,7 @@ func test_stack_assign_and_capture_merges(a : A, b : Bool) async {
   contents = ns0
   contents = ns1
 
-  await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a race}}
+  await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
   await a.foo(ns1) // expected-tns-note {{use here could race}}
@@ -590,7 +590,7 @@ func test_tuple_formation(a : A, i : Int) async {
 
   switch (i) {
   case 0:
-    await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a race}}
+    await a.foo(ns0) // expected-tns-warning {{transferring 'ns0' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -610,7 +610,7 @@ func test_tuple_formation(a : A, i : Int) async {
       foo_noniso(ns13); // expected-tns-note {{use here could race}}
     }
   case 1:
-    await a.foo(ns1) // expected-tns-warning {{transferring 'ns1' may cause a race}}
+    await a.foo(ns1) // expected-tns-warning {{transferring 'ns1' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -630,7 +630,7 @@ func test_tuple_formation(a : A, i : Int) async {
       foo_noniso(ns13); // expected-tns-note {{use here could race}}
     }
   case 2:
-    await a.foo(ns2) // expected-tns-warning {{transferring 'ns2' may cause a race}}
+    await a.foo(ns2) // expected-tns-warning {{transferring 'ns2' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns2' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -650,7 +650,7 @@ func test_tuple_formation(a : A, i : Int) async {
       foo_noniso(ns13); // expected-tns-note {{use here could race}}
     }
   case 3:
-    await a.foo(ns4) // expected-tns-warning {{transferring 'ns4' may cause a race}}
+    await a.foo(ns4) // expected-tns-warning {{transferring 'ns4' may cause a data race}}
     // expected-tns-note @-1 {{transferring disconnected 'ns4' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -723,11 +723,11 @@ func one_consume_many_require(a : A) async {
 
   await a.foo_multi(ns0, ns1, ns2);
   // expected-complete-warning @-1 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 'ns0' may cause a race}}
+  // expected-tns-warning @-2 {{transferring 'ns0' may cause a data race}}
   // expected-tns-note @-3 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
-  // expected-tns-warning @-4 {{transferring 'ns1' may cause a race}}
+  // expected-tns-warning @-4 {{transferring 'ns1' may cause a data race}}
   // expected-tns-note @-5 {{transferring disconnected 'ns1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
-  // expected-tns-warning @-6 {{transferring 'ns2' may cause a race}}
+  // expected-tns-warning @-6 {{transferring 'ns2' may cause a data race}}
   // expected-tns-note @-7 {{transferring disconnected 'ns2' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
 
   foo_noniso_multi(ns0, ns3, ns4); // expected-tns-note {{use here could race}}
@@ -742,11 +742,11 @@ func one_consume_one_require(a : A) async {
 
   await a.foo_multi(ns0, ns1, ns2);
   // expected-complete-warning @-1 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 'ns0' may cause a race}}
+  // expected-tns-warning @-2 {{transferring 'ns0' may cause a data race}}
   // expected-tns-note @-3 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
-  // expected-tns-warning @-4 {{transferring 'ns1' may cause a race}}
+  // expected-tns-warning @-4 {{transferring 'ns1' may cause a data race}}
   // expected-tns-note @-5 {{transferring disconnected 'ns1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
-  // expected-tns-warning @-6 {{transferring 'ns2' may cause a race}}
+  // expected-tns-warning @-6 {{transferring 'ns2' may cause a data race}}
   // expected-tns-note @-7 {{transferring disconnected 'ns2' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
 
   foo_noniso_multi(ns0, ns1, ns2); // expected-tns-note 3{{use here could race}}
@@ -760,13 +760,13 @@ func many_consume_one_require(a : A) async {
   let ns4 = NonSendable();
   let ns5 = NonSendable();
 
-  await a.foo_multi(ns0, ns3, ns3) // expected-tns-warning {{transferring 'ns0' may cause a race}}
+  await a.foo_multi(ns0, ns3, ns3) // expected-tns-warning {{transferring 'ns0' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
-  await a.foo_multi(ns4, ns1, ns4) // expected-tns-warning {{transferring 'ns1' may cause a race}}
+  await a.foo_multi(ns4, ns1, ns4) // expected-tns-warning {{transferring 'ns1' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
-  await a.foo_multi(ns5, ns5, ns2) // expected-tns-warning {{transferring 'ns2' may cause a race}}
+  await a.foo_multi(ns5, ns5, ns2) // expected-tns-warning {{transferring 'ns2' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns2' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
   foo_noniso_multi(ns0, ns1, ns2); //expected-tns-note 3{{use here could race}}
@@ -782,13 +782,13 @@ func many_consume_many_require(a : A) async {
   let ns6 = NonSendable();
   let ns7 = NonSendable();
 
-  await a.foo_multi(ns0, ns3, ns3) // expected-tns-warning {{transferring 'ns0' may cause a race}}
+  await a.foo_multi(ns0, ns3, ns3) // expected-tns-warning {{transferring 'ns0' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns0' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
-  await a.foo_multi(ns4, ns1, ns4) // expected-tns-warning {{transferring 'ns1' may cause a race}}
+  await a.foo_multi(ns4, ns1, ns4) // expected-tns-warning {{transferring 'ns1' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
-  await a.foo_multi(ns5, ns5, ns2) // expected-tns-warning {{transferring 'ns2' may cause a race}}
+  await a.foo_multi(ns5, ns5, ns2) // expected-tns-warning {{transferring 'ns2' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'ns2' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 3{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
@@ -929,7 +929,7 @@ func enum_test(a : A) async {
         foo_noniso(e4);
   }
 
-  await a.foo(e1); // expected-tns-warning {{transferring 'e1' may cause a race}}
+  await a.foo(e1); // expected-tns-warning {{transferring 'e1' may cause a data race}}
   // expected-tns-note @-1 {{transferring disconnected 'e1' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'E' into actor-isolated context may introduce data races}}
   foo_noniso(e2); // expected-tns-note {{use here could race}}

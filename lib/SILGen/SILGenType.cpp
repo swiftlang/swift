@@ -554,11 +554,7 @@ public:
     PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
 
-    // Check whether the conformance is valid first.
     Conformance->resolveValueWitnesses();
-    if (Conformance->isInvalid())
-      return nullptr;
-
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
 
@@ -619,13 +615,12 @@ public:
     return Conformance->getWitness(decl);
   }
 
-  void addPlaceholder(MissingMemberDecl *placeholder) {
-    llvm_unreachable("generating a witness table with placeholders in it");
-  }
-
-  void addMissingMethod(SILDeclRef requirement) {
-    llvm_unreachable("generating a witness table with placeholders in it");
-  }
+  // Treat placeholders and missing methods as no-ops. These may be encountered
+  // during lazy typechecking when SILGen triggers witness resolution and
+  // discovers and invalid conformance. The diagnostics emitted during witness
+  // resolution should cause compilation to fail.
+  void addPlaceholder(MissingMemberDecl *placeholder) {}
+  void addMissingMethod(SILDeclRef requirement) {}
 
   void addMethodImplementation(SILDeclRef requirementRef,
                                SILDeclRef witnessRef,
@@ -635,7 +630,12 @@ public:
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerialized = Serialized;
     if (witnessSerialized &&
-        fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+        // If package optimization is enabled, this is false;
+        // witness thunk should get a `shared` linkage in the
+        // else block below.
+        fixmeWitnessHasLinkageThatNeedsToBePublic(
+            witnessRef,
+            witnessRef.getASTContext().SILOpts.EnableSerializePackage)) {
       witnessLinkage = SILLinkage::Public;
       witnessSerialized = IsNotSerialized;
     } else {

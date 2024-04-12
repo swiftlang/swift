@@ -19,7 +19,7 @@ func consumeAndCreate(_ x: consuming BufferView) -> _inherit(x) BufferView
 
 sil hidden [unsafe_nonescapable_result] @bufferviewinit1 : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView {
 bb0(%0 : $UnsafeRawBufferPointer, %1 : $@thin BufferView.Type):
-  %2 = alloc_stack [var_decl] $BufferView, var, name "self", implicit 
+  %2 = alloc_stack [var_decl] $BufferView, var, name "self"
   debug_value %0 : $UnsafeRawBufferPointer, let, name "ptr", argno 1 
   %4 = begin_access [modify] [static] %2 : $*BufferView 
   %5 = struct_element_addr %4 : $*BufferView, #BufferView.ptr 
@@ -31,10 +31,10 @@ bb0(%0 : $UnsafeRawBufferPointer, %1 : $@thin BufferView.Type):
   return %8 : $BufferView                         
 } 
 
-// CHECK-LABEL: sil hidden @bufferviewtest2 : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(2) @owned BufferView {
-sil hidden @bufferviewtest2 : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(2) @owned BufferView {
+// CHECK-LABEL: sil hidden @bufferviewtest2 : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
+sil hidden @bufferviewtest2 : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
 bb0(%0 : $UnsafeRawBufferPointer, %1 : @noImplicitCopy $Array<Int>, %2 : $@thin BufferView.Type):
-  %3 = alloc_stack [var_decl] $BufferView, var, name "self", implicit 
+  %3 = alloc_stack [var_decl] $BufferView, var, name "self"
   %6 = begin_access [modify] [static] %3 : $*BufferView 
   %7 = struct_element_addr %6 : $*BufferView, #BufferView.ptr 
   store %0 to %7 : $*UnsafeRawBufferPointer       
@@ -45,8 +45,8 @@ bb0(%0 : $UnsafeRawBufferPointer, %1 : @noImplicitCopy $Array<Int>, %2 : $@thin 
   return %10 : $BufferView                        
 } 
 
-// CHECK-LABEL: sil hidden @derive : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView {
-sil hidden @derive : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView {
+// CHECK-LABEL: sil hidden @derive : $@convention(thin) (@guaranteed BufferView) -> _scope(0) @owned BufferView {
+sil hidden @derive : $@convention(thin) (@guaranteed BufferView) -> _scope(0) @owned BufferView {
 bb0(%0 : @noImplicitCopy $BufferView):
   %2 = metatype $@thin BufferView.Type            
   %3 = struct_extract %0 : $BufferView, #BufferView.ptr 
@@ -55,8 +55,8 @@ bb0(%0 : @noImplicitCopy $BufferView):
   return %5 : $BufferView                         
 } 
 
-// CHECK-LABEL: sil hidden @consumeAndCreate : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView {
-sil hidden @consumeAndCreate : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView {
+// CHECK-LABEL: sil hidden @consumeAndCreate : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView {
+sil hidden @consumeAndCreate : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView {
 bb0(%0 : @noImplicitCopy @_eagerMove $BufferView):
   %1 = alloc_stack [var_decl] [moveable_value_debuginfo] $BufferView, var, name "x" 
   %2 = struct_extract %0 : $BufferView, #BufferView.ptr 

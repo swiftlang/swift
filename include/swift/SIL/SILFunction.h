@@ -1354,6 +1354,20 @@ public:
     WasmImportModuleAndField = std::make_pair(module, field);
   }
 
+  bool isExternForwardDeclaration() const {
+    if (isExternalDeclaration()) {
+      if (auto declContext = getDeclContext()) {
+        if (auto decl = declContext->getAsDecl()) {
+          if (decl->getAttrs().hasAttribute<ExternAttr>())
+            return true;
+          if (decl->getAttrs().hasAttribute<SILGenNameAttr>())
+            return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Returns true if this function belongs to a declaration that returns
   /// an opaque result type with one or more availability conditions that are
   /// allowed to produce a different underlying type at runtime.

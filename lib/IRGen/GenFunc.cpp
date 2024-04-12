@@ -2309,7 +2309,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
           auto addr =
               fieldLayout.getType().getAddressForPointer(args.claimNext());
           fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr,
-                                                   fieldTy, isOutlined);
+                                                   fieldTy, isOutlined,
+                                                   /*zeroizeIfSensitive=*/ true);
         }
         break;
       }

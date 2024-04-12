@@ -203,6 +203,8 @@ public:
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
 
+  void emitClearSensitive(Address address, llvm::Value *size);
+
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
 
@@ -808,6 +810,21 @@ public:
   LocalTypeDataCache const *getLocalTypeData() { return LocalTypeData; }
 #endif
 
+  /// A forwardable argument is a load that is immediately preceeds the apply it
+  /// is used as argument to. If there is no side-effecting instructions between
+  /// said load and the apply, we can memcpy the loads address to the apply's
+  /// indirect argument alloca.
+  void clearForwardableArguments() {
+    forwardableArguments.clear();
+  }
+
+  void setForwardableArgument(unsigned idx) {
+    forwardableArguments.insert(idx);
+  }
+
+  bool isForwardableArgument(unsigned idx) const {
+    return forwardableArguments.contains(idx);
+  }
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -826,6 +843,8 @@ private:
   CanType SelfType;
   bool SelfTypeIsExact = false;
   DynamicSelfKind SelfKind;
+
+  llvm::SmallSetVector<unsigned, 16> forwardableArguments;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

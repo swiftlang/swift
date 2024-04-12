@@ -227,9 +227,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       )
   elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
     set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
-      "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
-      "arm64    arm64-apple-macos         arm64-apple-macos10.13"
-      "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+      "x86_64   x86_64-apple-macos        x86_64-apple-macos14"
+      "arm64    arm64-apple-macos         arm64-apple-macos14"
+      "arm64e   arm64e-apple-macos        arm64e-apple-macos14"
       )
   endif()
 endif()
@@ -280,6 +280,8 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
   if(SWIFT_ENABLE_SYNCHRONIZATION)
     add_subdirectory(Synchronization)
   endif()
+
+  add_subdirectory(Volatile)
 endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)

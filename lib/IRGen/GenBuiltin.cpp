@@ -1229,7 +1229,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       case BuiltinValueKind::TakeArrayNoAlias:
       case BuiltinValueKind::TakeArrayFrontToBack:
       case BuiltinValueKind::TakeArrayBackToFront:
-        elemTI.initializeWithTake(IGF, destAddr, srcAddr, elemTy, isOutlined);
+        elemTI.initializeWithTake(IGF, destAddr, srcAddr, elemTy, isOutlined,
+                                  /*zeroizeIfSensitive=*/ true);
         break;
       case BuiltinValueKind::AssignCopyArrayNoAlias:
       case BuiltinValueKind::AssignCopyArrayFrontToBack:

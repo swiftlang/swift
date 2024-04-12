@@ -19,8 +19,12 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+
 #include <algorithm>
 #include <variant>
 
@@ -107,24 +111,26 @@ public:
 
 private:
   Kind kind;
-  // clang-format off
-  std::variant<
-    // Used for actor isolated when we have ActorIsolation info from the AST.
-    ActorIsolation,
-    // The task isolated parameter when we find a task isolated value.
-    SILValue
-  > data;
-  // clang-format on
 
-  SILIsolationInfo(ActorIsolation actorIsolation)
-      : kind(Actor), data(actorIsolation) {}
+  /// The actor isolation if this value has one. The default unspecified case
+  /// otherwise.
+  ActorIsolation actorIsolation;
 
-  SILIsolationInfo(Kind kind, SILValue value) : kind(kind), data(value) {}
+  /// This is the value that we got isolation from if we were able to find
+  /// one. Used for isolation history.
+  SILValue isolationSource;
 
-  SILIsolationInfo(Kind kind) : kind(kind), data() {}
+  SILIsolationInfo(ActorIsolation actorIsolation, SILValue isolationSource)
+      : kind(Actor), actorIsolation(actorIsolation),
+        isolationSource(isolationSource) {}
+
+  SILIsolationInfo(Kind kind, SILValue isolationSource)
+      : kind(kind), actorIsolation(), isolationSource(isolationSource) {}
+
+  SILIsolationInfo(Kind kind) : kind(kind), actorIsolation() {}
 
 public:
-  SILIsolationInfo() : kind(Kind::Unknown), data() {}
+  SILIsolationInfo() : kind(Kind::Unknown), actorIsolation() {}
 
   operator bool() const { return kind != Kind::Unknown; }
 
@@ -147,47 +153,50 @@ public:
 
   ActorIsolation getActorIsolation() const {
     assert(kind == Actor);
-    assert(std::holds_alternative<ActorIsolation>(data) &&
-           "Doesn't have an actor isolation?!");
-    return std::get<ActorIsolation>(data);
+    return actorIsolation;
   }
 
-  SILValue getTaskIsolatedValue() const {
-    assert(kind == Task);
-    assert(std::holds_alternative<SILValue>(data) &&
-           "Doesn't have a task isolated value");
-    return std::get<SILValue>(data);
+  // If we are actor or task isolated and could find a specific value that
+  // caused the isolation, put it here. Used for isolation history.
+  SILValue getIsolatedValue() const {
+    assert(kind == Task || kind == Actor);
+    return isolationSource;
   }
 
   bool hasActorIsolation() const { return kind == Actor; }
 
-  bool hasTaskIsolatedValue() const {
-    return kind == Task && std::holds_alternative<SILValue>(data);
+  bool hasIsolatedValue() const {
+    return (kind == Task || kind == Actor) && bool(isolationSource);
   }
 
   [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const;
 
-  SILIsolationInfo withActorIsolated(ActorIsolation isolation) {
-    return SILIsolationInfo::getActorIsolated(isolation);
+  SILIsolationInfo withActorIsolated(SILValue isolatedValue,
+                                     ActorIsolation isolation) {
+    return SILIsolationInfo::getActorIsolated(isolatedValue, isolation);
   }
 
   static SILIsolationInfo getDisconnected() { return {Kind::Disconnected}; }
 
-  static SILIsolationInfo getActorIsolated(ActorIsolation actorIsolation) {
-    return {actorIsolation};
+  static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
+                                           ActorIsolation actorIsolation) {
+    return {actorIsolation, isolatedValue};
   }
 
-  static SILIsolationInfo getActorIsolated(NominalTypeDecl *typeDecl) {
+  static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
+                                           NominalTypeDecl *typeDecl) {
     if (typeDecl->isActor())
-      return {ActorIsolation::forActorInstanceSelf(typeDecl)};
+      return {ActorIsolation::forActorInstanceSelf(typeDecl), isolatedValue};
     auto isolation = swift::getActorIsolation(typeDecl);
     if (isolation.isGlobalActor())
-      return {isolation};
+      return {isolation, isolatedValue};
     return {};
   }
 
-  static SILIsolationInfo getGlobalActorIsolated(Type globalActorType) {
-    return getActorIsolated(ActorIsolation::forGlobalActor(globalActorType));
+  static SILIsolationInfo getGlobalActorIsolated(SILValue value,
+                                                 Type globalActorType) {
+    return getActorIsolated(value,
+                            ActorIsolation::forGlobalActor(globalActorType));
   }
 
   static SILIsolationInfo getTaskIsolated(SILValue value) {
@@ -200,70 +209,297 @@ public:
   /// Attempt to infer the isolation region info for \p arg.
   static SILIsolationInfo get(SILFunctionArgument *arg);
 
-  bool operator==(const SILIsolationInfo &other) const;
+  bool hasSameIsolation(ActorIsolation actorIsolation) const;
+
+  /// Returns true if \p this and \p other have the same isolation. It allows
+  /// for the isolated values if any to not match.
+  ///
+  /// This is useful if one has two non-Sendable values projected from the same
+  /// actor or global actor isolated value. E.x.: two different ref_element_addr
+  /// from the same actor.
+  bool hasSameIsolation(const SILIsolationInfo &other) const;
+
+  /// Returns true if this SILIsolationInfo is deeply equal to other. This means
+  /// that the isolation and the isolated value match.
+  bool isEqual(const SILIsolationInfo &other) const;
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 };
 
-} // namespace swift
+class Partition;
+class TransferringOperandToStateMap;
 
-namespace swift {
+/// A persistent data structure that is used to "rewind" partition history so
+/// that we can discover when values become part of the same region.
+///
+/// NOTE: This does not track whether or not values are transferred. This is
+/// because from the perspective of determining when two values become part of
+/// the same region, that information is not important. To unroll history, a
+/// Partition must have no transfers to use this. NOTE: There is a method that
+/// takes a Partition and produces a new Partition that does not have any
+/// transfers.
+class IsolationHistory {
+public:
+  class Factory;
 
-class TransferringOperand {
-  using ValueType = llvm::PointerIntPair<Operand *, 1>;
-  ValueType value;
+private:
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
+  class Node;
 
-  /// The dynamic isolation info of the region of value when we transferred.
-  SILIsolationInfo isolationInfo;
+  // TODO: This shouldn't need to be a friend.
+  friend class Partition;
+  friend TransferringOperandToStateMap;
 
-  TransferringOperand(ValueType newValue, SILIsolationInfo isolationRegionInfo)
-      : value(newValue), isolationInfo(isolationRegionInfo) {
-    assert(isolationInfo && "Should never see unknown isolation info");
-  }
+  /// First node in the immutable linked list.
+  Node *head = nullptr;
+  Factory *factory = nullptr;
+
+  IsolationHistory(Factory *factory) : head(nullptr), factory(factory) {}
 
 public:
-  TransferringOperand(Operand *op, bool isClosureCaptured,
-                      SILIsolationInfo isolationRegionInfo)
-      : TransferringOperand({op, isClosureCaptured}, isolationRegionInfo) {}
-  explicit TransferringOperand(Operand *op,
-                               SILIsolationInfo isolationRegionInfo)
-      : TransferringOperand({op, false}, isolationRegionInfo) {}
+  IsolationHistory(const IsolationHistory &otherIsolation)
+      : head(otherIsolation.head), factory(otherIsolation.factory) {}
 
-  operator bool() const { return bool(value.getPointer()); }
-
-  Operand *getOperand() const { return value.getPointer(); }
-
-  SILValue get() const { return getOperand()->get(); }
-
-  bool isClosureCaptured() const { return value.getInt(); }
-
-  SILInstruction *getUser() const { return getOperand()->getUser(); }
-
-  SILIsolationInfo getIsolationInfo() const { return isolationInfo; }
-
-  unsigned getOperandNumber() const { return getOperand()->getOperandNumber(); }
-
-  void print(llvm::raw_ostream &os) const {
-    os << "Op Num: " << getOperand()->getOperandNumber() << ". "
-       << "Capture: " << (isClosureCaptured() ? "yes. " : "no.  ")
-       << "IsolationInfo: ";
-    isolationInfo.print(os);
-    os << "\nUser: " << *getUser();
+  IsolationHistory &operator=(const IsolationHistory &otherIsolation) {
+    assert(factory == otherIsolation.factory);
+    head = otherIsolation.head;
+    return *this;
   }
 
-  static void Profile(llvm::FoldingSetNodeID &id, Operand *op,
-                      bool isClosureCaptured,
-                      SILIsolationInfo isolationRegionInfo) {
-    id.AddPointer(op);
-    id.AddBoolean(isClosureCaptured);
-    isolationRegionInfo.Profile(id);
+  Node *getHead() const { return head; }
+
+  /// Push a node that signals the end of a new sequence of history nodes that
+  /// should execute together. Must be explicitly ended by a push sequence
+  /// end. Is non-rentrant, so one cannot have multiple sequence starts.
+  ///
+  /// \p loc the SILLocation that identifies the instruction that the "package"
+  /// of history nodes that this sequence boundary ends is associated with.
+  Node *pushHistorySequenceBoundary(SILLocation loc);
+
+  /// Push onto the history list that \p value should be added into its own
+  /// independent region.
+  Node *pushNewElementRegion(Element element);
+
+  /// Push onto the history that \p value should be removed from a region and
+  /// that element is the last element in that region (so the region is empty
+  /// afterwards).
+  void pushRemoveLastElementFromRegion(Element element);
+
+  /// Push onto the history that \p element should be removed from a region that
+  /// contains \p otherElementInOldRegion.
+  void pushRemoveElementFromRegion(Element otherElementInOldRegion,
+                                   Element element);
+
+  /// \p elementToMergeInto is the element whose region we merge \p otherRegions
+  /// into.
+  void pushMergeElementRegions(Element elementToMergeInto,
+                               ArrayRef<Element> otherRegions);
+
+  /// Assign \p elementToMerge's region to \p elementToMergeInto's region.
+  void pushAssignElementRegions(Element elementToMergeInto,
+                                Element elementToMerge);
+
+  /// Push that \p other should be merged into this region.
+  void pushCFGHistoryJoin(Node *otherNode);
+
+  /// Push the top node of \p history as a CFG history join.
+  void pushCFGHistoryJoin(IsolationHistory history) {
+    return pushCFGHistoryJoin(history.getHead());
   }
 
-  void Profile(llvm::FoldingSetNodeID &id) const {
-    Profile(id, getOperand(), isClosureCaptured(), isolationInfo);
+  Node *pop();
+};
+
+class IsolationHistory::Node final
+    : private llvm::TrailingObjects<IsolationHistory::Node, Element> {
+  friend IsolationHistory;
+  friend TrailingObjects;
+
+public:
+  enum Kind {
+    /// Add a new element to its own region. The region will only consist of
+    /// element.
+    AddNewRegionForElement,
+
+    /// Remove an element from a region which it is the only element of.
+    RemoveLastElementFromRegion,
+
+    /// Remove an element from a region which still has elements remaining.
+    ///
+    /// This is different from RemoveLastElementFromRegion since we store the
+    /// other element.
+    RemoveElementFromRegion,
+
+    /// Given two elements, data and otherData, merge otherData into data's
+    /// region.
+    MergeElementRegions,
+
+    /// At a CFG merge point, we merged two histories. We need to visit it
+    /// recursively.
+    CFGHistoryJoin,
+
+    /// Signals that a sequence boundary has been found in the history and if we
+    /// are processing a sequence, should stop processing.
+    ///
+    /// Clients may want to ensure that a set of history elements are pushed or
+    /// popped together since the effects happen at the same time.
+    /// HistorySequenceStart
+    /// signifies that.
+    SequenceBoundary,
+  };
+
+private:
+  Kind kind;
+  Node *parent;
+
+  /// Child node. Never set on construction.
+  Node *child = nullptr;
+
+  /// Contains:
+  ///
+  /// 1. Node * if we have a CFGHistoryJoin.
+  /// 2. A SILLocation if we have a SequenceBoundary.
+  /// 3. An element otherwise.
+  std::variant<Element, Node *, SILLocation> subject;
+
+  /// Number of additional element arguments stored in the tail allocated array.
+  unsigned numAdditionalElements;
+
+  /// Access the tail allocated buffer of additional element arguments.
+  MutableArrayRef<Element> getAdditionalElementArgs() {
+    return {getTrailingObjects<Element>(), numAdditionalElements};
   }
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  Node(Kind kind, Node *parent)
+      : kind(kind), parent(parent), subject(nullptr) {}
+  Node(Kind kind, Node *parent, SILLocation loc)
+      : kind(kind), parent(parent), subject(loc) {}
+  Node(Kind kind, Node *parent, Element value)
+      : kind(kind), parent(parent), subject(value), numAdditionalElements(0) {}
+  Node(Kind kind, Node *parent, Element primaryElement,
+       std::initializer_list<Element> restOfTheElements)
+      : kind(kind), parent(parent), subject(primaryElement),
+        numAdditionalElements(restOfTheElements.size()) {
+    unsigned writeIndex = 0;
+    for (Element restElt : restOfTheElements) {
+      if (primaryElement == restElt) {
+        continue;
+      }
+
+      getAdditionalElementArgs()[writeIndex] = restElt;
+      ++writeIndex;
+    }
+
+    // Set writeIndex to n - 1.
+    numAdditionalElements = writeIndex;
+  }
+
+  Node(Kind kind, Node *parent, Element lhsValue, ArrayRef<Element> rhsValue)
+      : kind(kind), parent(parent), subject(lhsValue),
+        numAdditionalElements(rhsValue.size()) {
+    std::uninitialized_copy(rhsValue.begin(), rhsValue.end(),
+                            getAdditionalElementArgs().data());
+  }
+
+  Node(Kind kind, Node *parent, Node *node)
+      : kind(kind), parent(parent), subject(node), numAdditionalElements(0) {}
+
+public:
+  Kind getKind() const { return kind; }
+
+  Node *getParent() const { return parent; }
+
+  Node *getChild() const { return child; }
+  void setChild(Node *newChild) { child = newChild; }
+
+  Element getFirstArgAsElement() const {
+    assert(kind != CFGHistoryJoin);
+    assert(std::holds_alternative<Element>(subject));
+    return std::get<Element>(subject);
+  }
+
+  Node *getFirstArgAsNode() const {
+    assert(kind == CFGHistoryJoin);
+    assert(std::holds_alternative<Node *>(subject));
+    return std::get<Node *>(subject);
+  }
+
+  ArrayRef<Element> getAdditionalElementArgs() const {
+    assert(kind == MergeElementRegions || kind == RemoveElementFromRegion);
+    return const_cast<Node *>(this)->getAdditionalElementArgs();
+  }
+
+  bool isHistorySequenceBoundary() const {
+    return getKind() == SequenceBoundary;
+  }
+
+  /// If this node is a history sequence join, return its node. Otherwise,
+  /// return nullptr.
+  Node *getHistorySequenceJoin() const {
+    if (kind != CFGHistoryJoin)
+      return nullptr;
+    return getFirstArgAsNode();
+  }
+
+  std::optional<SILLocation> getHistoryBoundaryLoc() const {
+    if (kind != SequenceBoundary)
+      return {};
+    return std::get<SILLocation>(subject);
+  }
+};
+
+class IsolationHistory::Factory {
+  friend IsolationHistory;
+  using Node = IsolationHistory::Node;
+
+  llvm::BumpPtrAllocator &allocator;
+
+public:
+  Factory(llvm::BumpPtrAllocator &allocator) : allocator(allocator) {}
+
+  Factory(IsolationHistory::Factory &&other) = delete;
+  Factory &operator=(IsolationHistory::Factory &&other) = delete;
+  Factory(const IsolationHistory::Factory &other) = delete;
+  Factory &operator=(const IsolationHistory::Factory &other) = delete;
+
+  /// Returns a new isolation history without any history.
+  IsolationHistory get() { return IsolationHistory(this); }
+};
+
+struct TransferringOperandState {
+  /// The dynamic isolation info of the region of value when we transferred.
+  ///
+  /// This will contain the isolated value if we found one.
+  SILIsolationInfo isolationInfo;
+
+  /// The dynamic isolation history at this point.
+  IsolationHistory isolationHistory;
+
+  /// Set to true if the element associated with the operand's vlaue is closure
+  /// captured by the user. In such a case, if our element is a sendable var of
+  /// a non-Sendable type, we cannot access it since we could race against an
+  /// assignment to the var in a closure.
+  bool isClosureCaptured;
+
+  TransferringOperandState(IsolationHistory history)
+      : isolationInfo(), isolationHistory(history), isClosureCaptured(false) {}
+};
+
+class TransferringOperandToStateMap {
+  llvm::SmallDenseMap<Operand *, TransferringOperandState> internalMap;
+  IsolationHistory::Factory &isolationHistoryFactory;
+
+public:
+  TransferringOperandToStateMap(
+      IsolationHistory::Factory &isolationHistoryFactory)
+      : isolationHistoryFactory(isolationHistoryFactory) {}
+  TransferringOperandState &get(Operand *op) const {
+    auto *self = const_cast<TransferringOperandToStateMap *>(this);
+    auto history = IsolationHistory(&isolationHistoryFactory);
+    return self->internalMap.try_emplace(op, TransferringOperandState(history))
+        .first->getSecond();
+  }
 };
 
 } // namespace swift
@@ -392,6 +628,8 @@ public:
     return source.get<SILInstruction *>();
   }
 
+  bool hasSourceInst() const { return source.is<SILInstruction *>(); }
+
   Operand *getSourceOp() const { return source.get<Operand *>(); }
 
   SILLocation getSourceLoc() const { return getSourceInst()->getLoc(); }
@@ -402,8 +640,6 @@ public:
 };
 
 /// A map from Element -> Region that represents the current partition set.
-///
-///
 class Partition {
 public:
   /// A class defined in PartitionUtils unittest used to grab state from
@@ -412,9 +648,9 @@ public:
 
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSet = ImmutablePointerSet<TransferringOperand *>;
-  using TransferringOperandSetFactory =
-      ImmutablePointerSetFactory<TransferringOperand *>;
+  using TransferringOperandSet = ImmutablePointerSet<Operand *>;
+  using TransferringOperandSetFactory = ImmutablePointerSetFactory<Operand *>;
+  using IsolationHistoryNode = IsolationHistory::Node;
 
 private:
   /// A map from a region number to a instruction that consumes it.
@@ -425,7 +661,7 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  llvm::SmallDenseMap<Region, TransferringOperandSet *, 2>
+  llvm::SmallMapVector<Region, TransferringOperandSet *, 2>
       regionToTransferredOpMap;
 
   /// Label each index with a non-negative (unsigned) label if it is associated
@@ -436,6 +672,9 @@ private:
   /// and therefore safe for use as a fresh label.
   Region fresh_label = Region(0);
 
+  /// An immutable data structure that we use to push/pop isolation history.
+  IsolationHistory history;
+
   /// In a canonical partition, all regions are labelled with the smallest index
   /// of any member. Certain operations like join and equals rely on
   /// canonicality so when it's invalidated this boolean tracks that, and it
@@ -443,19 +682,23 @@ private:
   bool canonical;
 
 public:
-  Partition() : elementToRegionMap({}), canonical(true) {}
+  Partition(IsolationHistory history)
+      : elementToRegionMap({}), history(history), canonical(true) {}
 
   /// 1-arg constructor used when canonicality will be immediately invalidated,
   /// so set to false to begin with
-  Partition(bool canonical) : elementToRegionMap({}), canonical(canonical) {}
+  Partition(IsolationHistory history, bool canonical)
+      : elementToRegionMap({}), history(history), canonical(canonical) {}
 
   /// Return a new Partition that has a single region containing the elements of
   /// \p indices.
-  static Partition singleRegion(ArrayRef<Element> indices);
+  static Partition singleRegion(SILLocation loc, ArrayRef<Element> indices,
+                                IsolationHistory inputHistory);
 
   /// Return a new Partition that has each element of \p indices in their own
   /// region.
-  static Partition separateRegions(ArrayRef<Element> indices);
+  static Partition separateRegions(SILLocation loc, ArrayRef<Element> indices,
+                                   IsolationHistory inputHistory);
 
   /// Test two partititons for equality by first putting them in canonical form
   /// then comparing for exact equality.
@@ -465,7 +708,16 @@ public:
     fst.canonicalize();
     snd.canonicalize();
 
-    return fst.elementToRegionMap == snd.elementToRegionMap;
+    return fst.elementToRegionMap == snd.elementToRegionMap &&
+           fst.regionToTransferredOpMap.size() ==
+               snd.regionToTransferredOpMap.size() &&
+           llvm::all_of(
+               fst.regionToTransferredOpMap,
+               [&snd](const std::pair<Region, TransferringOperandSet *> &p) {
+                 auto sndIter = snd.regionToTransferredOpMap.find(p.first);
+                 return sndIter != snd.regionToTransferredOpMap.end() &&
+                        sndIter->second == p.second;
+               });
   }
 
   bool isTrackingElement(Element val) const {
@@ -482,10 +734,13 @@ public:
 
   /// If \p newElt is not being tracked, create a new region for \p newElt. If
   /// \p newElt is already being tracked, remove it from its old region as well.
-  void trackNewElement(Element newElt);
+  ///
+  /// \arg updateHistory internal parameter used to determine if we should
+  /// update the history. External users shouldn't use this
+  void trackNewElement(Element newElt, bool updateHistory = true);
 
   /// Assigns \p oldElt to the region associated with \p newElt.
-  void assignElement(Element oldElt, Element newElt);
+  void assignElement(Element oldElt, Element newElt, bool updateHistory = true);
 
   bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
     return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
@@ -498,11 +753,62 @@ public:
   iterator end() { return elementToRegionMap.end(); }
   llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
+  void clearTransferState() { regionToTransferredOpMap.clear(); }
+
+  Partition removingTransferState() const {
+    Partition p = *this;
+    p.clearTransferState();
+    return p;
+  }
+
+  /// Rewind one PartitionOp worth of history from the partition.
+  ///
+  /// If we rewind through a join, the joined isolation history before merging
+  /// is inserted into \p foundJoinedHistories which should be processed
+  /// afterwards if the current linear history does not find what one is looking
+  /// for.
+  ///
+  /// NOTE: This can only be used if one has cleared transfer state using
+  /// Partition::clearTransferState or constructed a new Partiton using
+  /// Partition::withoutTransferState(). This is because history rewinding
+  /// doesn't use transfer information so just to be careful around potential
+  /// invariants being broken, we just require the elimination of the transfer
+  /// information.
+  ///
+  /// \returns true if there is more history that can be popped.
+  bool popHistory(SmallVectorImpl<IsolationHistory> &foundJoinedHistories);
+
+  /// Returns true if this value has any isolation history stored.
+  bool hasHistory() const { return bool(history.getHead()); }
+
+  /// Returns the number of nodes of stored history.
+  ///
+  /// NOTE: Do not use this in real code... only intended to be used in testing
+  /// code.
+  unsigned historySize() const {
+    unsigned count = 0;
+    auto *head = history.getHead();
+    if (!head)
+      return count;
+    ++count;
+
+    while ((head = head->getParent()))
+      ++count;
+
+    return count;
+  }
+
+  /// Return a copy of our isolation history.
+  IsolationHistory getIsolationHistory() const { return history; }
+
   /// Construct the partition corresponding to the union of the two passed
   /// partitions.
   ///
+  /// NOTE: snd is passed in as mutable since we may canonicalize snd. We will
+  /// not perform any further mutations to snd.
+  ///
   /// Runs in quadratic time.
-  static Partition join(const Partition &fst, const Partition &snd);
+  static Partition join(const Partition &fst, Partition &snd);
 
   /// Return a vector of the transferred values in this partition.
   std::vector<Element> getTransferredVals() const {
@@ -549,6 +855,14 @@ public:
 
   void printVerbose(llvm::raw_ostream &os) const;
 
+  SWIFT_DEBUG_DUMPER(dumpHistory()) { printHistory(llvm::dbgs()); }
+  void printHistory(llvm::raw_ostream &os) const;
+
+  /// See docs on \p history.pushHistorySequenceBoundary().
+  IsolationHistoryNode *pushHistorySequenceBoundary(SILLocation loc) {
+    return history.pushHistorySequenceBoundary(loc);
+  }
+
   bool isTransferred(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
@@ -594,24 +908,70 @@ public:
   /// the final region used.
   ///
   /// This runs in linear time.
-  Region merge(Element fst, Element snd);
+  Region merge(Element fst, Element snd, bool updateHistory = true);
 
 private:
-  /// For each region label that occurs, find the first index at which it occurs
-  /// and relabel all instances of it to that index.  This excludes the -1 label
-  /// for transferred regions.
+  /// Pop one history node. Multiple history nodes can make up one PartitionOp
+  /// worth of history, so this is called by popHistory.
+  ///
+  /// Returns true if we succesfully popped a single history node.
+  bool popHistoryOnce(SmallVectorImpl<IsolationHistory> &foundJoinHistoryNodes);
+
+  /// A canonical region is defined to have its region number as equal to the
+  /// minimum element number of all of its assigned element numbers. This
+  /// routine goes through the element -> region map and transforms the
+  /// partition state to restore this property.
   ///
   /// This runs in linear time.
   void canonicalize();
 
-  /// For the passed `map`, ensure that `key` maps to `val`. If `key` already
-  /// mapped to a different value, ensure that all other keys mapped to that
-  /// value also now map to `val`. This is a relatively expensive (linear time)
-  /// operation that's unfortunately used pervasively throughout PartitionOp
-  /// application. If this is a performance bottleneck, let's consider
-  /// optimizing it to a true union-find or other tree-based data structure.
-  static void horizontalUpdate(std::map<Element, Region> &map, Element key,
-                               Region val);
+  /// Walk the elementToRegionMap updating all elements in the region of \p
+  /// targetElement will be changed to now point at \p newRegion.
+  void horizontalUpdate(Element targetElement, Region newRegion,
+                        SmallVectorImpl<Element> &mergedElements);
+
+  /// Push onto the history list that \p element should be added into its own
+  /// independent region.
+  IsolationHistoryNode *pushNewElementRegion(Element element) {
+    return history.pushNewElementRegion(element);
+  }
+
+  /// Push onto the history that \p element should be removed from the region it
+  /// belongs to and that \p element is the last element in that region.
+  void pushRemoveLastElementFromRegion(Element element) {
+    history.pushRemoveLastElementFromRegion(element);
+  }
+
+  /// Push onto the history that \p elementToRemove should be removed from the
+  /// region which \p elementFromOldRegion belongs to.
+  void pushRemoveElementFromRegion(Element elementFromOldRegion,
+                                   Element elementToRemove) {
+    history.pushRemoveElementFromRegion(elementFromOldRegion, elementToRemove);
+  }
+
+  /// Push that \p other should be merged into this region.
+  void pushCFGHistoryJoin(IsolationHistory otherHistory) {
+    if (auto *head = otherHistory.head)
+      history.pushCFGHistoryJoin(head);
+  }
+
+  /// NOTE: Assumes that \p elementToMergeInto and \p otherRegions are disjoint.
+  void pushMergeElementRegions(Element elementToMergeInto,
+                               ArrayRef<Element> otherRegions) {
+    history.pushMergeElementRegions(elementToMergeInto, otherRegions);
+  }
+
+  /// Remove a single element without touching the region to transferring inst
+  /// multimap. Assumes that the element is never the last element in a region.
+  ///
+  /// Just a helper routine.
+  void removeElement(Element e) {
+    // We added an element to its own region... so we should remove it and it
+    // should be the last element in the region.
+    bool result = elementToRegionMap.erase(e);
+    canonical = false;
+    assert(result && "Failed to erase?!");
+  }
 };
 
 /// A data structure that applies a series of PartitionOps to a single Partition
@@ -634,13 +994,16 @@ public:
 
 protected:
   TransferringOperandSetFactory &ptrSetFactory;
+  TransferringOperandToStateMap &operandToStateMap;
 
   Partition &p;
 
 public:
   PartitionOpEvaluator(Partition &p,
-                       TransferringOperandSetFactory &ptrSetFactory)
-      : ptrSetFactory(ptrSetFactory), p(p) {}
+                       TransferringOperandSetFactory &ptrSetFactory,
+                       TransferringOperandToStateMap &operandToStateMap)
+      : ptrSetFactory(ptrSetFactory), operandToStateMap(operandToStateMap),
+        p(p) {}
 
   /// Call shouldEmitVerboseLogging on our CRTP subclass.
   bool shouldEmitVerboseLogging() const {
@@ -649,7 +1012,7 @@ public:
 
   /// Call handleLocalUseAfterTransfer on our CRTP subclass.
   void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   TransferringOperand *transferringOp) const {
+                                   Operand *transferringOp) const {
     return asImpl().handleLocalUseAfterTransfer(op, elt, transferringOp);
   }
 
@@ -713,6 +1076,16 @@ public:
     return asImpl().isClosureCaptured(elt, op);
   }
 
+  /// Some evaluators pass in mock instructions that one cannot call getLoc()
+  /// upon. So to allow for this, provide a routine that our impl can override
+  /// if they need to.
+  static SILLocation getLoc(SILInstruction *inst) { return Impl::getLoc(inst); }
+
+  /// Some evaluators pass in mock operands that one cannot call getLoc()
+  /// upon. So to allow for this, provide a routine that our impl can override
+  /// if they need to.
+  static SILLocation getLoc(Operand *op) { return Impl::getLoc(op); }
+
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) const {
     if (shouldEmitVerboseLogging()) {
@@ -728,6 +1101,12 @@ public:
       }
       assert(p.is_canonical_correct());
     };
+
+    // Set the boundary so that as we push, this shows when to stop processing
+    // for this PartitionOp.
+    SILLocation loc = op.hasSourceInst() ? getLoc(op.getSourceInst())
+                                         : getLoc(op.getSourceOp());
+    p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
     case PartitionOpKind::Assign:
@@ -781,7 +1160,8 @@ public:
       if (transferredRegionIsolation.isActorIsolated()) {
         if (auto calleeIsolationInfo =
                 SILIsolationInfo::get(op.getSourceInst())) {
-          if (transferredRegionIsolation == calleeIsolationInfo) {
+          if (transferredRegionIsolation.hasSameIsolation(
+                  calleeIsolationInfo)) {
             return;
           }
         }
@@ -797,8 +1177,13 @@ public:
       }
 
       // Mark op.getOpArgs()[0] as transferred.
-      auto *ptrSet = ptrSetFactory.emplace(
-          op.getSourceOp(), isClosureCapturedElt, transferredRegionIsolation);
+      TransferringOperandState &state = operandToStateMap.get(op.getSourceOp());
+      state.isClosureCaptured |= isClosureCapturedElt;
+      state.isolationInfo =
+          state.isolationInfo.merge(transferredRegionIsolation);
+      assert(state.isolationInfo && "Cannot have unknown");
+      state.isolationHistory.pushCFGHistoryJoin(p.getIsolationHistory());
+      auto *ptrSet = ptrSetFactory.get(op.getSourceOp());
       p.markTransferred(op.getOpArgs()[0], ptrSet);
       return;
     }
@@ -868,13 +1253,13 @@ public:
 private:
   // Private helper that squelches the error if our transfer instruction and our
   // use have the same isolation.
-  void
-  handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
-                                    TransferringOperand *transferringOp) const {
+  void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
+                                         Operand *transferringOp) const {
     if (shouldTryToSquelchErrors()) {
       if (auto isolationInfo = SILIsolationInfo::get(op.getSourceInst())) {
         if (isolationInfo.isActorIsolated() &&
-            isolationInfo == SILIsolationInfo::get(transferringOp->getUser()))
+            isolationInfo.hasSameIsolation(
+                SILIsolationInfo::get(transferringOp->getUser())))
           return;
       }
 
@@ -884,8 +1269,8 @@ private:
       if (auto functionIsolation =
               transferringOp->getUser()->getFunction()->getActorIsolation()) {
         if (functionIsolation.isActorIsolated() &&
-            SILIsolationInfo::getActorIsolated(functionIsolation) ==
-                SILIsolationInfo::get(transferringOp->getUser()))
+            SILIsolationInfo::get(transferringOp->getUser())
+                .hasSameIsolation(functionIsolation))
           return;
       }
     }
@@ -907,8 +1292,9 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   using Super = PartitionOpEvaluator<Subclass>;
 
   PartitionOpEvaluatorBaseImpl(Partition &workingPartition,
-                               TransferringOperandSetFactory &ptrSetFactory)
-      : Super(workingPartition, ptrSetFactory) {}
+                               TransferringOperandSetFactory &ptrSetFactory,
+                               TransferringOperandToStateMap &operandToStateMap)
+      : Super(workingPartition, ptrSetFactory, operandToStateMap) {}
 
   /// Should we emit extra verbose logging statements when evaluating
   /// PartitionOps.
@@ -927,7 +1313,7 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// region. Can be used to get the immediate value transferred or the
   /// transferring instruction.
   void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   TransferringOperand *transferringOp) const {}
+                                   Operand *transferringOp) const {}
 
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.
@@ -965,6 +1351,9 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   /// By default squelch errors.
   bool shouldTryToSquelchErrors() const { return true; }
+
+  static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
+  static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
 };
 
 /// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special
@@ -972,8 +1361,10 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 struct PartitionOpEvaluatorBasic final
     : PartitionOpEvaluatorBaseImpl<PartitionOpEvaluatorBasic> {
   PartitionOpEvaluatorBasic(Partition &workingPartition,
-                            TransferringOperandSetFactory &ptrSetFactory)
-      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory) {}
+                            TransferringOperandSetFactory &ptrSetFactory,
+                            TransferringOperandToStateMap &operandToStateMap)
+      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory,
+                                     operandToStateMap) {}
 };
 
 } // namespace swift

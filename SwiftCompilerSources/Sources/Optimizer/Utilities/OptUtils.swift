@@ -289,6 +289,10 @@ extension Instruction {
       if bi.id == .OnFastPath {
         return false
       }
+    case is UncheckedEnumDataInst:
+      // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
+      // for consuming an enum value.
+      return !parentFunction.hasOwnership
     default:
       break
     }
@@ -622,7 +626,7 @@ extension InstructionRange {
         case let endBorrow as EndBorrowInst:
           self.insert(endBorrow)
         case let branch as BranchInst:
-          worklist.pushIfNotVisited(branch.getArgument(for: use))
+          worklist.pushIfNotVisited(branch.getArgument(for: use).lookThroughBorrowedFromUser)
         default:
           break
         }

@@ -426,7 +426,6 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
       /* SharedFS */ nullptr);
-  SharedFilesystemCache.emplace();
 }
 
 bool
@@ -738,6 +737,13 @@ ModuleDependenciesCache::findDependency(StringRef moduleName) const {
       return found;
   }
   return std::nullopt;
+}
+
+const ModuleDependencyInfo &ModuleDependenciesCache::findKnownDependency(
+    const ModuleDependencyID &moduleID) const {
+  auto dep = findDependency(moduleID);
+  assert(dep && "dependency unknown");
+  return **dep;
 }
 
 bool ModuleDependenciesCache::hasDependency(const ModuleDependencyID &moduleID) const {

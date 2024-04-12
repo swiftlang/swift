@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: VENDOR=apple

@@ -38,7 +38,7 @@ foo1.bar = 2
 // CHECK-LABEL: sil hidden [ossa] @$s28lazy_property_with_observers4Foo1V3barSivs : $@convention(method) (Int, @inout Foo1) -> () {
 // CHECK: bb0([[VALUE:%.*]] : $Int, [[FOO1:%.*]] : $*Foo1):
 // CHECK-NEXT:  debug_value [[VALUE]] : $Int, let, name "value", argno 1
-// CHECK-NEXT:  debug_value [[FOO1]] : $*Foo1, var, name "self", argno 2, {{.*}} expr op_deref
+// CHECK-NEXT:  debug_value [[FOO1]] : $*Foo1, var, name "self", argno 2, expr op_deref
 // CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [unknown] %1 : $*Foo1
 // CHECK-NEXT: // function_ref Foo1.bar.getter
 // CHECK-NEXT:  [[GETTER:%.*]] = function_ref @$s28lazy_property_with_observers4Foo1V3barSivg : $@convention(method) (@inout Foo1) -> Int

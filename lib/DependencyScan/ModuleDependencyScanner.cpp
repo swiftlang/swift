@@ -153,6 +153,17 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
   auto ClangModuleCachePath = getModuleCachePathFromClang(
       ScanASTContext.getClangModuleLoader()->getClangInstance());
   auto &FEOpts = ScanCompilerInvocation.getFrontendOptions();
+
+  // Configure the filesystem to use the same shared `stat` cache as the Clang
+  // worker uses.
+  if (!globalScanningService.CacheFS) {
+    auto DepFS = llvm::makeIntrusiveRefCnt<
+        clang::tooling::dependencies::DependencyScanningWorkerFilesystem>(
+        globalScanningService.ClangScanningService->getSharedCache(),
+        ScanASTContext.SourceMgr.getFileSystem());
+    ScanASTContext.SourceMgr.setFileSystem(std::move(DepFS));
+  }
+
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   ScanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
       ScanASTContext.SourceMgr, &ScanASTContext.Diags,
@@ -174,7 +185,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       ScanASTContext,
       *static_cast<ModuleInterfaceCheckerImpl *>(
           ScanASTContext.getModuleInterfaceChecker()),
-      &DependencyTracker, ModuleLoadingMode::OnlyInterface);
+      &DependencyTracker,
+      ScanCompilerInvocation.getSearchPathOptions().ModuleLoadMode);
 }
 
 ModuleDependencyVector

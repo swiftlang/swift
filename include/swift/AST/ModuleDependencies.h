@@ -886,11 +886,6 @@ class SwiftDependencyScanningService {
   /// File prefix mapper.
   std::unique_ptr<llvm::TreePathPrefixMapper> Mapper;
 
-  /// The global file system cache.
-  std::optional<
-      clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
-      SharedFilesystemCache;
-
   /// A map from a String representing the target triple of a scanner invocation
   /// to the corresponding cached dependencies discovered so far when using this
   /// triple.
@@ -918,19 +913,6 @@ public:
   SwiftDependencyScanningService &
   operator=(const SwiftDependencyScanningService &) = delete;
   virtual ~SwiftDependencyScanningService() {}
-
-  /// Query the service's filesystem cache
-  clang::tooling::dependencies::DependencyScanningFilesystemSharedCache &getSharedCache() {
-    assert(SharedFilesystemCache && "Expected a shared cache");
-    return *SharedFilesystemCache;
-  }
-
-  /// Query the service's filesystem cache
-  clang::tooling::dependencies::DependencyScanningFilesystemSharedCache &
-  getSharedFilesystemCache() {
-    assert(SharedFilesystemCache && "Expected a shared cache");
-    return *SharedFilesystemCache;
-  }
 
   bool usingCachingFS() const { return !UseClangIncludeTree && (bool)CacheFS; }
   llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> getCachingFS() const { return CacheFS; }
@@ -1114,6 +1096,12 @@ public:
   /// \returns the cached result, or \c None if there is no cached entry.
   std::optional<const ModuleDependencyInfo *>
   findDependency(StringRef moduleName) const;
+
+  /// Look for known existing dependencies.
+  ///
+  /// \returns the cached result.
+  const ModuleDependencyInfo &
+  findKnownDependency(const ModuleDependencyID &moduleID) const;
 
   /// Record dependencies for the given module.
   void recordDependency(StringRef moduleName,

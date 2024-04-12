@@ -128,7 +128,7 @@ func invalidSpecifier3(_ x: borrowing BufferView) -> dependsOn(*) BufferView { /
 } 
 
 // TODO: Diagnose using param indices on func decls in sema
-func invalidSpecifier4(_ x: borrowing BufferView) -> dependsOn(0) BufferView { // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+func invalidSpecifier4(_ x: borrowing BufferView) -> dependsOn(self) BufferView { // expected-error{{invalid lifetime dependence specifier on non-existent self}}
   return BufferView(x.ptr)
 }
 

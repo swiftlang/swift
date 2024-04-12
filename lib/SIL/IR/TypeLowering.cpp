@@ -2400,6 +2400,13 @@ namespace {
         return handleMoveOnlyAddressOnly(structType, properties);
       }
 
+      if (D->getAttrs().hasAttribute<SensitiveAttr>()) {
+        properties.setAddressOnly();
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return handleAddressOnly(structType, properties);
+      }
+
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
       // Classify the type according to its stored properties.
@@ -2441,7 +2448,9 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-      if (D->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(structType)) {
         properties.setNonTrivial();
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2538,10 +2547,11 @@ namespace {
         return new (TC)
             MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
-
-      assert(D->canBeEscapable() == TypeDecl::CanBeInvertible::Always
-             && "missing typelowering case here!");
-
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(enumType)) {
+        properties.setNonTrivial();
+      }
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
     }
@@ -3294,7 +3304,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                              AbstractionPattern origType)
         : TC(TC), forExpansion(forExpansion), origType(origType) {
       if (auto origEltType = origType.getVanishingTupleElementPatternType())
-        origType = *origEltType;
+        this->origType = *origEltType;
     }
 
     // AST function types are turned into SIL function types:

@@ -408,7 +408,8 @@ public:
   virtual void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                                   SILType T, bool isOutlined) const = 0;
   virtual void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                                  SILType T, bool isOutlined) const = 0;
+                                  SILType T, bool isOutlined,
+                                  bool zeroizeIfSensitive) const = 0;
 
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,

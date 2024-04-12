@@ -88,9 +88,13 @@ class BlockPartitionState {
 
   TransferringOperandSetFactory &ptrSetFactory;
 
+  TransferringOperandToStateMap &transferringOpToStateMap;
+
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator,
-                      TransferringOperandSetFactory &ptrSetFactory);
+                      TransferringOperandSetFactory &ptrSetFactory,
+                      IsolationHistory::Factory &isolationHistoryFactory,
+                      TransferringOperandToStateMap &transferringOpToStateMap);
 
 public:
   bool getLiveness() const { return isLive; }
@@ -394,6 +398,10 @@ class RegionAnalysisFunctionInfo {
 
   TransferringOperandSetFactory ptrSetFactory;
 
+  IsolationHistory::Factory isolationHistoryFactory;
+
+  TransferringOperandToStateMap transferringOpToStateMap;
+
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different
   // field.
@@ -487,6 +495,16 @@ public:
   RegionAnalysisValueMap &getValueMap() {
     assert(supportedFunction && "Unsupported Function?!");
     return valueMap;
+  }
+
+  IsolationHistory::Factory &getIsolationHistoryFactory() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return isolationHistoryFactory;
+  }
+
+  TransferringOperandToStateMap &getTransferringOpToStateMap() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return transferringOpToStateMap;
   }
 
   bool isClosureCaptured(SILValue value, Operand *op);

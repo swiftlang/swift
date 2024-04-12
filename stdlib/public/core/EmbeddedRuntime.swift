@@ -338,3 +338,31 @@ func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 public func swift_stdlib_random(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
   arc4random_buf(buf: buf, nbytes: nbytes)
 }
+
+@_cdecl("swift_clearSensitive")
+@inline(never)
+public func swift_clearSensitive(buf: UnsafeMutableRawPointer, nbytes: Int) {
+  // TODO: use memset_s if available
+  // Though, it shouldn't make too much difference because the `@inline(never)` should prevent
+  // the optimizer from removing the loop below.
+  let bytePtr = buf.assumingMemoryBound(to: UInt8.self)
+  for i in 0..<nbytes {
+    bytePtr[i] = 0
+  }
+}
+
+@usableFromInline
+func _embeddedReportFatalError(prefix: StaticString, message: StaticString) {
+  print(prefix, terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+}
+
+@usableFromInline
+func _embeddedReportFatalErrorInFile(prefix: StaticString, message: StaticString, file: StaticString, line: UInt) {
+  print(file, terminator: ":")
+  print(line, terminator: ": ")
+  print(prefix, terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+}

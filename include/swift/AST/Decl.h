@@ -173,11 +173,13 @@ enum class DescriptiveDeclKind : uint8_t {
   Struct,
   Class,
   Actor,
+  DistributedActor,
   Protocol,
   GenericEnum,
   GenericStruct,
   GenericClass,
   GenericActor,
+  GenericDistributedActor,
   GenericType,
   Subscript,
   StaticSubscript,
@@ -7299,6 +7301,7 @@ public:
 
   /// Add the given derivative function configuration.
   void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
+  std::optional<LifetimeDependenceInfo> getLifetimeDependenceInfo() const;
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or

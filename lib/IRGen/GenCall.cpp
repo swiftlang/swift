@@ -31,6 +31,7 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
@@ -1477,7 +1478,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   bool formalIndirectResult = FnType->getNumResults() > 0 &&
                               FnType->getSingleResult().isFormalIndirect();
   assert(
-      (cxxCtorDecl || !formalIndirectResult || returnInfo.isIndirect()) &&
+      (cxxCtorDecl || !formalIndirectResult || returnInfo.isIndirect() || SILResultTy.isSensitive()) &&
       "swift and clang disagree on whether the result is returned indirectly");
 #endif
 
@@ -2395,10 +2396,6 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
   return {fn, size};
 }
 
-static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
-                                 Explosion &in, Explosion &out,
-                                 TemporarySet &temporaries, bool isOutlined);
-
 namespace {
 
 class SyncCallEmission final : public CallEmission {
@@ -2637,11 +2634,19 @@ public:
       return;
     }
 
-    // Get the natural IR type in the body of the function that makes
-    // the call. This may be different than the IR type returned by the
-    // call itself due to ABI type coercion.
-    auto resultType =
-        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+    SILType resultType;
+    if (convertDirectToIndirectReturn) {
+      resultType = SILType::getPrimitiveObjectType(
+              origFnType->getSingleResult().getReturnValueType(
+              IGF.IGM.getSILModule(), origFnType, TypeExpansionContext::minimal()));
+    } else {
+      // Get the natural IR type in the body of the function that makes
+      // the call. This may be different than the IR type returned by the
+      // call itself due to ABI type coercion.
+      resultType =
+          fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+    }
+
     auto &nativeSchema = IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
 
     // For ABI reasons the result type of the call might not actually match the
@@ -2656,6 +2661,10 @@ public:
     if (result->getType() != expectedNativeResultType) {
       result =
           IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
+    }
+    if (convertDirectToIndirectReturn) {
+      IGF.Builder.CreateStore(result, indirectReturnAddress);
+      return;
     }
 
     // Gather the values.
@@ -3966,7 +3975,27 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
   swiftTI.deallocateStack(IGF, tempAlloc, swiftType);
 }
 
-static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
+Address getForwardableAlloca(const TypeInfo &TI, bool isForwardableArgument,
+                             Explosion &in) {
+  if (!isForwardableArgument)
+    return Address();
+
+  auto *load = dyn_cast<llvm::LoadInst>(*in.begin());
+  if (!load)
+    return Address();
+
+  auto *gep = dyn_cast<llvm::GetElementPtrInst>(load->getPointerOperand());
+  if (!gep)
+    return Address();
+
+  auto *alloca = dyn_cast<llvm::AllocaInst>(getUnderlyingObject(gep));
+  if (!alloca)
+    return Address();
+
+  return TI.getAddressForPointer(alloca);
+}
+
+void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                                  TemporarySet &temporaries,
                                  bool isOutlined) {
@@ -4003,11 +4032,26 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
   bool formalIndirectResult = fnType->getNumResults() > 0 &&
                               fnType->getSingleResult().isFormalIndirect();
+  if (!FI.getReturnInfo().isIndirect() && formalIndirectResult) {
+    // clang returns directly and swift returns indirectly
 
-  // If clang returns directly and swift returns indirectly, this must be a c++
-  // constructor call. In that case, skip the "self" param.
-  if (!FI.getReturnInfo().isIndirect() && formalIndirectResult)
-    firstParam += 1;
+    SILType returnTy = SILType::getPrimitiveObjectType(
+        fnType->getSingleResult().getReturnValueType(
+            IGF.IGM.getSILModule(), fnType, TypeExpansionContext::minimal()));
+
+    if (returnTy.isSensitive()) {
+      // Sensitive return types are represented as indirect return value in SIL,
+      // but are returned as values (if small) in LLVM IR.
+      assert(out.size() == 1 && "expect a single address for the return value");
+      llvm::Value *returnAddr = out.claimNext();
+      out.reset();
+      assert(returnAddr == indirectReturnAddress.getAddress());
+      convertDirectToIndirectReturn = true;
+    } else {
+      // This must be a constructor call. In that case, skip the "self" param.
+      firstParam += 1;
+    }
+  }
 
   for (unsigned i = firstParam; i != paramEnd; ++i) {
     auto clangParamTy = FI.arg_begin()[i].type;
@@ -4022,8 +4066,11 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     if (auto *padType = AI.getPaddingType())
       out.add(llvm::UndefValue::get(padType));
 
+    const SILParameterInfo &paramInfo = params[i - firstParam];
     SILType paramType = silConv.getSILType(
-        params[i - firstParam], IGF.IGM.getMaximalTypeExpansionContext());
+        paramInfo, IGF.IGM.getMaximalTypeExpansionContext());
+
+    bool isForwardableArgument = IGF.isForwardableArgument(i - firstParam);
 
     // In Swift, values that are foreign references types will always be
     // pointers. Additionally, we only import functions which use foreign
@@ -4041,6 +4088,35 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       continue;
     }
 
+    bool passIndirectToDirect = paramInfo.isIndirectInGuaranteed() && paramType.isSensitive();
+    if (passIndirectToDirect) {
+      llvm::Value *ptr = in.claimNext();
+
+      if (AI.getKind() == clang::CodeGen::ABIArgInfo::Indirect) {
+        // It's a large struct which is also passed indirectl in LLVM IR.
+        // The C function (= the callee) is allowed to modify the memory used
+        // for passing arguments, therefore we need to copy the argument value
+        // to a temporary.
+        // TODO: avoid the temporary if the SIL parameter value in memory is
+        //       not used anymore after the call.
+        auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
+        auto temp = ti.allocateStack(IGF, paramType, "indirect-temporary");
+        Address tempAddr = temp.getAddress();
+        temporaries.add({temp, paramType});
+        Address paramAddr = ti.getAddressForPointer(ptr);
+        ti.initializeWithCopy(IGF, tempAddr, paramAddr, paramType, isOutlined);
+
+        out.add(tempAddr.getAddress());
+        continue;
+      }
+
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
+      Explosion loadedValue;
+      ti.loadAsCopy(IGF, ti.getAddressForPointer(ptr), loadedValue);
+      in.transferInto(loadedValue, in.size());
+      in = std::move(loadedValue);
+    }
+
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend: {
       bool signExt = clangParamTy->hasSignedIntegerRepresentation();
@@ -4053,7 +4129,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       auto toTy = AI.getCoerceToType();
 
       // Indirect parameters are bridged as Clang pointer types.
-      if (silConv.isSILIndirect(params[i - firstParam])) {
+      if (silConv.isSILIndirect(params[i - firstParam]) && !passIndirectToDirect) {
         assert(paramType.isAddress() && "SIL type is not an address?");
 
         auto addr = in.claimNext();
@@ -4086,8 +4162,18 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                          Alignment(ABIAlign.getQuantity()));
         }
       }
-
-      ti.initialize(IGF, in, addr, isOutlined);
+      Address forwardFromAddr = getForwardableAlloca(ti, isForwardableArgument,
+                                                     in);
+      // Try to forward the address from a `load` instruction "immediately"
+      // preceeding the apply.
+      if (isForwardableArgument && forwardFromAddr.isValid()) {
+        ti.initializeWithTake(IGF, addr, forwardFromAddr,
+                              paramType.getAddressType(), isOutlined,
+                              /*zeroizeIfSensitive=*/ true);
+        (void)in.claim(ti.getSchema().size());
+      } else {
+        ti.initialize(IGF, in, addr, isOutlined);
+      }
 
       out.add(addr.getAddress());
       break;

@@ -90,18 +90,51 @@ unwrapExistential(const Metadata *T, OpaqueValue *Value) {
   // TODO: Should look through existential metatypes too, but it doesn't
   // really matter yet since we don't have any special mirror behavior for
   // concrete metatypes yet.
-  while (T->getKind() == MetadataKind::Existential) {
-    auto *existential
-      = static_cast<const ExistentialTypeMetadata *>(T);
-
-    // Unwrap the existential container.
-    T = existential->getDynamicType(Value);
-    Value = existential->projectValue(Value);
-
-    // Existential containers can end up nested in some cases due to generic
-    // abstraction barriers.  Repeat in case we have a nested existential.
+  for (;;) {
+    switch (T->getKind()) {
+    case MetadataKind::Existential: {
+      auto *existential
+	= static_cast<const ExistentialTypeMetadata *>(T);
+      T = existential->getDynamicType(Value);
+      Value = existential->projectValue(Value);
+      break;
+    }
+    case MetadataKind::ExtendedExistential: {
+      auto *existential
+	= static_cast<const ExtendedExistentialTypeMetadata *>(T);
+      switch (existential->Shape->Flags.getSpecialKind()) {
+      case ExtendedExistentialTypeShape::SpecialKind::None: {
+	auto opaqueContainer =
+	  reinterpret_cast<OpaqueExistentialContainer *>(Value);
+	T = opaqueContainer->Type;
+	Value = const_cast<OpaqueValue *>(opaqueContainer->projectValue());
+	break;
+      }
+      case ExtendedExistentialTypeShape::SpecialKind::Class: {
+	auto classContainer =
+	  reinterpret_cast<ClassExistentialContainer *>(Value);
+	T = swift_getObjectType((HeapObject *)classContainer->Value);
+	Value = reinterpret_cast<OpaqueValue *>(&classContainer->Value);
+	break;
+      }
+      case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
+	auto srcExistentialContainer =
+	  reinterpret_cast<ExistentialMetatypeContainer *>(Value);
+	T = swift_getMetatypeMetadata(srcExistentialContainer->Value);
+	Value = reinterpret_cast<OpaqueValue *>(&srcExistentialContainer->Value);
+	break;
+      }
+      case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout: {
+	swift_unreachable("Extended Existential with explicit layout not supported");
+	break;
+      }
+      }
+      break;
+    }
+    default:
+      return std::make_tuple(T, Value);
+    }
   }
-  return std::make_tuple(T, Value);
 }
 
 static void copyWeakFieldContents(OpaqueValue *destContainer, const Metadata *type, OpaqueValue *fieldData) {

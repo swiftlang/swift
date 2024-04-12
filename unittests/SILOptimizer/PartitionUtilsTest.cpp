@@ -40,8 +40,10 @@ using PartitionTester = Partition::PartitionTester;
 struct MockedPartitionOpEvaluator final
     : PartitionOpEvaluatorBaseImpl<MockedPartitionOpEvaluator> {
   MockedPartitionOpEvaluator(Partition &workingPartition,
-                             TransferringOperandSetFactory &ptrSetFactory)
-      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory) {}
+                             TransferringOperandSetFactory &ptrSetFactory,
+                             TransferringOperandToStateMap &operandToStateMap)
+      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory,
+                                     operandToStateMap) {}
 
   // Just say that we always have a disconnected value.
   SILIsolationInfo getIsolationRegionInfo(Element elt) const {
@@ -49,6 +51,50 @@ struct MockedPartitionOpEvaluator final
   }
 
   bool shouldTryToSquelchErrors() const { return false; }
+
+  static SILLocation getLoc(SILInstruction *inst) {
+    return SILLocation::invalid();
+  }
+
+  static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
+};
+
+} // namespace
+
+namespace {
+
+struct MockedPartitionOpEvaluatorWithFailureCallback final
+    : PartitionOpEvaluatorBaseImpl<
+          MockedPartitionOpEvaluatorWithFailureCallback> {
+  using FailureCallbackTy =
+      std::function<void(const PartitionOp &, unsigned, Operand *)>;
+  FailureCallbackTy failureCallback;
+
+  MockedPartitionOpEvaluatorWithFailureCallback(
+      Partition &workingPartition, TransferringOperandSetFactory &ptrSetFactory,
+      TransferringOperandToStateMap &operandToStateMap,
+      FailureCallbackTy failureCallback)
+      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory,
+                                     operandToStateMap),
+        failureCallback(failureCallback) {}
+
+  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
+                                   Operand *transferringOp) const {
+    failureCallback(op, elt, transferringOp);
+  }
+
+  // Just say that we always have a disconnected value.
+  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
+    return SILIsolationInfo::getDisconnected();
+  }
+
+  bool shouldTryToSquelchErrors() const { return false; }
+
+  static SILLocation getLoc(SILInstruction *inst) {
+    return SILLocation::invalid();
+  }
+
+  static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
 };
 
 } // namespace
@@ -71,19 +117,23 @@ SILInstruction *instSingletons[5] = {
     (SILInstruction *)0xBBDA0000,
 };
 
+SILLocation fakeLoc = SILLocation::invalid();
+
 // This test tests that if a series of merges is split between two partitions
 // p1 and p2, but also applied in its entirety to p3, then joining p1 and p2
 // yields p3.
 TEST(PartitionUtilsTest, TestMergeAndJoin) {
-  Partition p1;
-  Partition p2;
-  Partition p3;
-
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
+
+  Partition p1(historyFactory.get());
+  Partition p2(historyFactory.get());
+  Partition p3(historyFactory.get());
 
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -91,7 +141,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    MockedPartitionOpEvaluator eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(5)),
                 PartitionOp::AssignFresh(Element(6)),
                 PartitionOp::AssignFresh(Element(7)),
@@ -99,7 +149,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    MockedPartitionOpEvaluator eval(p3, factory);
+    MockedPartitionOpEvaluator eval(p3, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3)),
                 PartitionOp::AssignFresh(Element(4)),
@@ -111,7 +161,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   EXPECT_FALSE(Partition::equals(p1, p3));
 
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(4)),
                 PartitionOp::AssignFresh(Element(5)),
                 PartitionOp::AssignFresh(Element(6)),
@@ -120,7 +170,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    MockedPartitionOpEvaluator eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3)),
@@ -129,7 +179,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
   }
 
   {
-    MockedPartitionOpEvaluator eval(p3, factory);
+    MockedPartitionOpEvaluator eval(p3, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(6)),
                 PartitionOp::AssignFresh(Element(7)),
                 PartitionOp::AssignFresh(Element(0)),
@@ -148,12 +198,12 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
 
   auto apply_to_p1_and_p3 = [&](PartitionOp op) {
     {
-      MockedPartitionOpEvaluator eval(p1, factory);
+      MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
       eval.apply(op);
     }
 
     {
-      MockedPartitionOpEvaluator eval(p3, factory);
+      MockedPartitionOpEvaluator eval(p3, factory, transferringOpToStateMap);
       eval.apply(op);
     }
     expect_join_eq();
@@ -161,12 +211,12 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
 
   auto apply_to_p2_and_p3 = [&](PartitionOp op) {
     {
-      MockedPartitionOpEvaluator eval(p2, factory);
+      MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
       eval.apply(op);
     }
 
     {
-      MockedPartitionOpEvaluator eval(p3, factory);
+      MockedPartitionOpEvaluator eval(p3, factory, transferringOpToStateMap);
       eval.apply(op);
     }
     expect_join_eq();
@@ -193,13 +243,16 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
 TEST(PartitionUtilsTest, Join1) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
 
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -208,9 +261,10 @@ TEST(PartitionUtilsTest, Join1) {
                 PartitionOp::Assign(Element(5), Element(2))});
   }
 
-  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data1));
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -232,13 +286,16 @@ TEST(PartitionUtilsTest, Join1) {
 TEST(PartitionUtilsTest, Join2) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
 
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -249,9 +306,10 @@ TEST(PartitionUtilsTest, Join2) {
 
   Element data2[] = {Element(4), Element(5), Element(6),
                      Element(7), Element(8), Element(9)};
-  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data2),
+                                            historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
                 PartitionOp::Assign(Element(5), Element(5)),
                 PartitionOp::Assign(Element(6), Element(4)),
@@ -277,13 +335,16 @@ TEST(PartitionUtilsTest, Join2) {
 TEST(PartitionUtilsTest, Join2Reversed) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
 
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
                 PartitionOp::Assign(Element(1), Element(0)),
                 PartitionOp::Assign(Element(2), Element(2)),
@@ -294,9 +355,10 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 
   Element data2[] = {Element(4), Element(5), Element(6),
                      Element(7), Element(8), Element(9)};
-  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data2),
+                                            historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
                 PartitionOp::Assign(Element(5), Element(5)),
                 PartitionOp::Assign(Element(6), Element(4)),
@@ -322,6 +384,8 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 TEST(PartitionUtilsTest, JoinLarge) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {
       Element(0),  Element(1),  Element(2),  Element(3),  Element(4),
@@ -330,9 +394,10 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(15), Element(16), Element(17), Element(18), Element(19),
       Element(20), Element(21), Element(22), Element(23), Element(24),
       Element(25), Element(26), Element(27), Element(28), Element(29)};
-  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
+  Partition p1 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data1),
+                                            historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(0), Element(29)),
                 PartitionOp::Assign(Element(1), Element(17)),
                 PartitionOp::Assign(Element(2), Element(0)),
@@ -372,9 +437,10 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(30), Element(31), Element(32), Element(33), Element(34),
       Element(35), Element(36), Element(37), Element(38), Element(39),
       Element(40), Element(41), Element(42), Element(43), Element(44)};
-  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
+  Partition p2 = Partition::separateRegions(fakeLoc, llvm::ArrayRef(data2),
+                                            historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::Assign(Element(15), Element(31)),
                 PartitionOp::Assign(Element(16), Element(34)),
                 PartitionOp::Assign(Element(17), Element(35)),
@@ -459,24 +525,26 @@ TEST(PartitionUtilsTest, JoinLarge) {
 TEST(PartitionUtilsTest, TestAssign) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
-  Partition p1;
-  Partition p2;
-  Partition p3;
+  Partition p1(historyFactory.get());
+  Partition p2(historyFactory.get());
+  Partition p3(historyFactory.get());
 
-  MockedPartitionOpEvaluator evalP1(p1, factory);
+  MockedPartitionOpEvaluator evalP1(p1, factory, transferringOpToStateMap);
   evalP1.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3))});
 
-  MockedPartitionOpEvaluator evalP2(p2, factory);
+  MockedPartitionOpEvaluator evalP2(p2, factory, transferringOpToStateMap);
   evalP2.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
                 PartitionOp::AssignFresh(Element(3))});
 
-  MockedPartitionOpEvaluator evalP3(p3, factory);
+  MockedPartitionOpEvaluator evalP3(p3, factory, transferringOpToStateMap);
   evalP3.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -544,45 +612,17 @@ TEST(PartitionUtilsTest, TestAssign) {
   EXPECT_TRUE(Partition::equals(p1, p3));
 }
 
-namespace {
-
-struct MockedPartitionOpEvaluatorWithFailureCallback final
-    : PartitionOpEvaluatorBaseImpl<
-          MockedPartitionOpEvaluatorWithFailureCallback> {
-  using FailureCallbackTy =
-      std::function<void(const PartitionOp &, unsigned, TransferringOperand *)>;
-  FailureCallbackTy failureCallback;
-
-  MockedPartitionOpEvaluatorWithFailureCallback(
-      Partition &workingPartition, TransferringOperandSetFactory &ptrSetFactory,
-      FailureCallbackTy failureCallback)
-      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
-        failureCallback(failureCallback) {}
-
-  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   TransferringOperand *transferringOp) const {
-    failureCallback(op, elt, transferringOp);
-  }
-
-  // Just say that we always have a disconnected value.
-  SILIsolationInfo getIsolationRegionInfo(Element elt) const {
-    return SILIsolationInfo::getDisconnected();
-  }
-
-  bool shouldTryToSquelchErrors() const { return false; }
-};
-
-} // namespace
-
 // This test tests that consumption consumes entire regions as expected
 TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
-  Partition p;
+  Partition p(historyFactory.get());
 
   {
-    MockedPartitionOpEvaluator eval(p, factory);
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -615,17 +655,18 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (Element(11)))
 
-  auto never_called = [](const PartitionOp &, unsigned, TransferringOperand *) {
+  auto never_called = [](const PartitionOp &, unsigned, Operand *) {
     EXPECT_TRUE(false);
   };
 
   int times_called = 0;
-  auto increment_times_called = [&](const PartitionOp &, unsigned,
-                                    TransferringOperand *) { times_called++; };
+  auto increment_times_called = [&](const PartitionOp &, unsigned, Operand *) {
+    times_called++;
+  };
 
   {
-    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                       increment_times_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
+        p, factory, transferringOpToStateMap, increment_times_called);
     eval.apply({PartitionOp::Require(Element(0)),
                 PartitionOp::Require(Element(1)),
                 PartitionOp::Require(Element(2))});
@@ -633,36 +674,36 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   EXPECT_EQ(times_called, 3);
 
   {
-    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                       never_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
+        p, factory, transferringOpToStateMap, never_called);
     eval.apply({PartitionOp::Require(Element(3)),
                 PartitionOp::Require(Element(4)),
                 PartitionOp::Require(Element(5))});
   }
 
   {
-    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                       increment_times_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
+        p, factory, transferringOpToStateMap, increment_times_called);
     eval.apply(
         {PartitionOp::Require(Element(6)), PartitionOp::Require(Element(7))});
   }
 
   {
-    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                       never_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
+        p, factory, transferringOpToStateMap, never_called);
     eval.apply(
         {PartitionOp::Require(Element(8)), PartitionOp::Require(Element(9))});
   }
 
   {
-    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                       increment_times_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
+        p, factory, transferringOpToStateMap, increment_times_called);
     eval.apply(PartitionOp::Require(Element(10)));
   }
 
   {
-    MockedPartitionOpEvaluatorWithFailureCallback eval(p, factory,
-                                                       never_called);
+    MockedPartitionOpEvaluatorWithFailureCallback eval(
+        p, factory, transferringOpToStateMap, never_called);
     eval.apply(PartitionOp::Require(Element(11)));
   }
 
@@ -674,10 +715,12 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 TEST(PartitionUtilsTest, TestCopyConstructor) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
-  Partition p1;
+  Partition p1(historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply(PartitionOp::AssignFresh(Element(0)));
   }
 
@@ -686,25 +729,23 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
 
   // Change p1 again.
   {
-    MockedPartitionOpEvaluator eval(p1, factory);
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
     eval.apply(PartitionOp::Transfer(Element(0), transferSingletons[0]));
   }
 
   {
     bool failure = false;
     MockedPartitionOpEvaluatorWithFailureCallback eval(
-        p1, factory, [&](const PartitionOp &, unsigned, TransferringOperand *) {
-          failure = true;
-        });
+        p1, factory, transferringOpToStateMap,
+        [&](const PartitionOp &, unsigned, Operand *) { failure = true; });
     eval.apply(PartitionOp::Require(Element(0)));
     EXPECT_TRUE(failure);
   }
 
   {
     MockedPartitionOpEvaluatorWithFailureCallback eval(
-        p2, factory, [](const PartitionOp &, unsigned, TransferringOperand *) {
-          EXPECT_TRUE(false);
-        });
+        p2, factory, transferringOpToStateMap,
+        [](const PartitionOp &, unsigned, Operand *) { EXPECT_TRUE(false); });
     eval.apply(PartitionOp::Require(Element(0)));
   }
 }
@@ -712,12 +753,13 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
 TEST(PartitionUtilsTest, TestUndoTransfer) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
-  Partition p;
+  Partition p(historyFactory.get());
   MockedPartitionOpEvaluatorWithFailureCallback eval(
-      p, factory, [&](const PartitionOp &, unsigned, TransferringOperand *) {
-        EXPECT_TRUE(false);
-      });
+      p, factory, transferringOpToStateMap,
+      [&](const PartitionOp &, unsigned, Operand *) { EXPECT_TRUE(false); });
 
   // Shouldn't error on this.
   eval.apply({PartitionOp::AssignFresh(Element(0)),
@@ -729,11 +771,13 @@ TEST(PartitionUtilsTest, TestUndoTransfer) {
 TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
   llvm::BumpPtrAllocator allocator;
   Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
 
   // First make sure that we do this correctly with an assign fresh.
-  Partition p;
+  Partition p(historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p, factory);
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -743,9 +787,9 @@ TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
   p.validateRegionToTransferredOpMapRegions();
 
   // Now make sure that we do this correctly with assign.
-  Partition p2;
+  Partition p2(historyFactory.get());
   {
-    MockedPartitionOpEvaluator eval(p2, factory);
+    MockedPartitionOpEvaluator eval(p2, factory, transferringOpToStateMap);
     eval.apply({PartitionOp::AssignFresh(Element(0)),
                 PartitionOp::AssignFresh(Element(1)),
                 PartitionOp::AssignFresh(Element(2)),
@@ -753,4 +797,210 @@ TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
                 PartitionOp::Assign(Element(0), Element(2))});
   }
   p2.validateRegionToTransferredOpMapRegions();
+}
+
+TEST(PartitionUtilsTest, TestHistory_CreateVariable) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  SmallVector<IsolationHistory, 8> joinedHistories;
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
+
+  // First make sure that we do this correctly with an assign fresh.
+  Partition p(historyFactory.get());
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(0)),
+                PartitionOp::AssignFresh(Element(1))});
+  }
+
+  Partition pSnapshot = p;
+
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(2))});
+  }
+
+  p.popHistory(joinedHistories);
+
+  EXPECT_TRUE(Partition::equals(p, pSnapshot));
+  EXPECT_TRUE(joinedHistories.empty());
+}
+
+TEST(PartitionUtilsTest, TestHistory_AssignRegion) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
+  SmallVector<IsolationHistory, 8> joinedHistories;
+
+  // First make sure that we do this correctly with an assign fresh.
+  Partition p(historyFactory.get());
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(0)),
+                PartitionOp::AssignFresh(Element(1)),
+                PartitionOp::AssignFresh(Element(2))});
+  }
+
+  Partition pSnapshot = p;
+
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::Assign(Element(1), Element(2))});
+  }
+
+  Partition pSnapshot2 = p;
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::Assign(Element(0), Element(2))});
+  }
+
+  p.popHistory(joinedHistories);
+
+  EXPECT_TRUE(Partition::equals(p, pSnapshot2));
+  EXPECT_TRUE(joinedHistories.empty());
+
+  p.popHistory(joinedHistories);
+
+  EXPECT_TRUE(Partition::equals(p, pSnapshot));
+  EXPECT_TRUE(joinedHistories.empty());
+}
+
+TEST(PartitionUtilsTest, TestHistory_BuildNewRegionRepIsMergee) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
+  SmallVector<IsolationHistory, 8> joinedHistories;
+
+  Partition p(historyFactory.get());
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(2)),
+                PartitionOp::AssignFresh(Element(3)),
+                PartitionOp::AssignFresh(Element(10)),
+                PartitionOp::AssignFresh(Element(0)),
+                PartitionOp::Assign(Element(3), Element(2)),
+                PartitionOp::Assign(Element(10), Element(2)),
+                PartitionOp::Merge(Element(2), Element(0))});
+  }
+
+  Partition pSnapshot = p;
+
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::Assign(Element(1), Element(2))});
+  }
+
+  Partition pSnapshot2 = p;
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::Assign(Element(0), Element(2))});
+  }
+
+  // Even though we pushed a new instruction, nothing changed in our region.
+  EXPECT_TRUE(Partition::equals(p, pSnapshot2));
+
+  // We pop but nothing changes since we did not need to change anything.
+  p.popHistory(joinedHistories);
+
+  EXPECT_TRUE(Partition::equals(p, pSnapshot2));
+  EXPECT_TRUE(joinedHistories.empty());
+
+  // We pop a last time to return to our original value.
+  p.popHistory(joinedHistories);
+
+  EXPECT_TRUE(Partition::equals(p, pSnapshot));
+  EXPECT_TRUE(joinedHistories.empty());
+}
+
+TEST(PartitionUtilsTest, TestHistory_ReturnFalseWhenNoneLeft) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  SmallVector<IsolationHistory, 8> joinedHistories;
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
+
+  Partition p(historyFactory.get());
+
+  EXPECT_FALSE(p.popHistory(joinedHistories));
+  EXPECT_TRUE(joinedHistories.empty());
+
+  {
+    MockedPartitionOpEvaluator eval(p, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(2)),
+                PartitionOp::AssignFresh(Element(3))});
+  }
+
+  EXPECT_TRUE(p.popHistory(joinedHistories));
+  EXPECT_TRUE(joinedHistories.empty());
+
+  EXPECT_FALSE(p.popHistory(joinedHistories));
+  EXPECT_TRUE(joinedHistories.empty());
+}
+
+TEST(PartitionUtilsTest, TestHistory_JoiningTwoEmpty) {
+  // Make sure that we do sane things when we join empty history.
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  SmallVector<IsolationHistory, 8> joinedHistories;
+
+  Partition p1(historyFactory.get());
+  Partition p2(historyFactory.get());
+
+  auto result = Partition::join(p1, p2);
+  EXPECT_TRUE(result.begin() == result.end());
+  EXPECT_FALSE(result.hasHistory());
+}
+
+TEST(PartitionUtilsTest, TestHistory_JoiningNotEmptyAndEmpty) {
+  // Make sure that we do sane things when we join empty history.
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  SmallVector<IsolationHistory, 8> joinedHistories;
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
+
+  Partition p1(historyFactory.get());
+  Partition p2(historyFactory.get());
+
+  {
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(2))});
+  }
+
+  EXPECT_TRUE(p1.historySize() == 2);
+  EXPECT_TRUE(p2.historySize() == 0);
+  auto result = Partition::join(p1, p2);
+  EXPECT_TRUE(std::next(result.begin()) == result.end());
+  // Since p2 doesn't have any history, we do not actually perform any join and
+  // thus do not insert a CFGHistory change.
+  EXPECT_TRUE(result.historySize() == 2);
+}
+
+TEST(PartitionUtilsTest, TestHistory_JoiningEmptyAndNotEmpty) {
+  // Make sure that we do sane things when we join empty history.
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  TransferringOperandToStateMap transferringOpToStateMap(historyFactory);
+  SmallVector<IsolationHistory, 8> joinedHistories;
+
+  Partition p1(historyFactory.get());
+  Partition p2(historyFactory.get());
+
+  {
+    MockedPartitionOpEvaluator eval(p1, factory, transferringOpToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(2))});
+  }
+
+  EXPECT_TRUE(p1.historySize() == 2);
+  EXPECT_TRUE(p2.historySize() == 0);
+  auto result = Partition::join(p1, p2);
+  EXPECT_TRUE(std::next(result.begin()) == result.end());
+  // Since p2 doesn't have any history, we do not actually perform any join and
+  // thus do not insert a CFGHistory change.
+  EXPECT_TRUE(result.historySize() == 2);
 }

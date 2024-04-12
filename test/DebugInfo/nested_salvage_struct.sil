@@ -19,7 +19,7 @@ sil private @pop : $@convention(method) (UInt64, Wrapper) -> Wrapper {
 [global: ]
 bb0(%0 : $UInt64, %1 : $Wrapper):
   debug_value %0 : $UInt64, let, name "numBits", argno 1, scope 3
-  debug_value %1 : $Wrapper, let, name "self", argno 2, implicit, scope 3
+  debug_value %1 : $Wrapper, let, name "self", argno 2, scope 3
   %4 = struct_extract %1 : $Wrapper, #Wrapper.bytes, scope 3
   %5 = struct_extract %4 : $UInt64, #UInt64._value, scope 3
   %6 = struct_extract %0 : $UInt64, #UInt64._value, scope 3
@@ -46,15 +46,15 @@ sil hidden @maker : $@convention(method) (UInt64, @thin Wrapper.Type) -> Wrapper
 bb0(%0 : $UInt64, %1 : $@thin Wrapper.Type):
   // CHECK: debug_value %0 : $UInt64, let, name "bits", argno 1
   debug_value %0 : $UInt64, let, name "bits", argno 1, scope 7
-  // CHECK: debug_value %1 : $@thin Wrapper.Type, let, name "self", argno 2, implicit
-  debug_value %1 : $@thin Wrapper.Type, let, name "self", argno 2, implicit, scope 7
+  // CHECK: debug_value %1 : $@thin Wrapper.Type, let, name "self", argno 2
+  debug_value %1 : $@thin Wrapper.Type, let, name "self", argno 2, scope 7
   %4 = integer_literal $Builtin.Int64, 3735928559, scope 7
   %5 = struct $UInt64 (%4 : $Builtin.Int64), scope 7
   %6 = struct $Wrapper (%5 : $UInt64), loc * "e.swift":3:8
   // CHECK-DAG: debug_value %0 : $UInt64, let, name "numBits", argno 1
   debug_value %0 : $UInt64, let, name "numBits", argno 1, scope 11
-  // CHECK-DAG: debug_value %{{.*}} : $Builtin.Int64, let, name "self", {{.*}}, implicit, type $Wrapper, expr op_fragment:#Wrapper.bytes:op_fragment:#UInt64._value
-  debug_value %6 : $Wrapper, let, name "self", argno 2, implicit, scope 11
+  // CHECK-DAG: debug_value %{{.*}} : $Builtin.Int64, let, name "self", {{.*}}, type $Wrapper, expr op_fragment:#Wrapper.bytes:op_fragment:#UInt64._value
+  debug_value %6 : $Wrapper, let, name "self", argno 2, scope 11
   %9 = struct_extract %6 : $Wrapper, #Wrapper.bytes, scope 11
   %10 = struct_extract %9 : $UInt64, #UInt64._value, scope 11
   %11 = struct_extract %0 : $UInt64, #UInt64._value, scope 11

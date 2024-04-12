@@ -1,11 +1,15 @@
-import extensions_A
+@_exported import extensions_A
 import extensions_B
 
-public extension X {
+
+extension X {
   public func XinC() { }
+
+  public static func <>(a: Self, b: Self) -> Self { a }
 }
 
-public extension Y {
+extension Y {
   public func YinC() { }
-}
 
+  public static func <>(a: Self, b: Self) -> Self { a }
+}

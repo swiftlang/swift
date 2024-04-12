@@ -6,6 +6,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// REQUIRES: rdar125805695
+
 protocol P {
   func speak()
 }

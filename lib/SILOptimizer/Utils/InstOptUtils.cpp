@@ -36,6 +36,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -175,6 +176,10 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<DebugValueInst>(inst))
     return false;
 
+  // A dead borrowed-from can only be removed if the argument (= operand) is also removed.
+  if (isa<BorrowedFromInst>(inst))
+    return false;
+
   // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
   if (isa<UncheckedTakeEnumDataAddrInst>(inst))
@@ -238,11 +243,7 @@ bool swift::hasOnlyEndOfScopeOrEndOfLifetimeUses(SILInstruction *inst) {
       // Include debug uses only in Onone mode.
       if (isDebugUser && inst->getFunction()->getEffectiveOptimizationMode() <=
                              OptimizationMode::NoOptimization)
-        if (auto DbgVarInst = DebugVarCarryingInst(user)) {
-          auto VarInfo = DbgVarInst.getVarInfo();
-          if (VarInfo && !VarInfo->Implicit)
-            return false;
-        }
+        return false;
     }
   }
   return true;
@@ -590,7 +591,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// handle all cases recognized by SILFunctionType::isABICompatibleWith (see
 /// areABICompatibleParamsOrReturns()).
 std::pair<SILValue, bool /* changedCFG */>
-swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
+swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
+                                    SILLocation loc,
                                     SILValue value, SILType srcTy,
                                     SILType destTy,
                                     ArrayRef<SILInstruction *> usePoints) {
@@ -673,7 +675,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     // Cast the unwrapped value.
     SILValue castedUnwrappedValue;
     std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
-      builder, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
+      builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
     // Wrap into optional. An owned value is forwarded through the cast and into
     // the Optional. A borrowed value will have a nested borrow for the
     // rewrapped Optional.
@@ -687,7 +689,9 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 
-    return {phi, true};
+    updateBorrowedFromPhis(pm, { phi });
+
+    return {lookThroughBorrowedFromUser(phi), true};
   }
 
   // Src is not optional, but dest is optional.
@@ -701,7 +705,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     SILValue wrappedValue =
         builder->createOptionalSome(loc, value, loweredOptionalSrcType);
     // Cast the wrapped value.
-    return castValueToABICompatibleType(builder, loc, wrappedValue,
+    return castValueToABICompatibleType(builder, pm, loc, wrappedValue,
                                         wrappedValue->getType(), destTy,
                                         usePoints);
   }
@@ -715,7 +719,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
       // Cast the value if necessary.
       bool neededCFGChange;
       std::tie(element, neededCFGChange) = castValueToABICompatibleType(
-          builder, loc, element, srcTy.getTupleElementType(idx),
+          builder, pm, loc, element, srcTy.getTupleElementType(idx),
           destTy.getTupleElementType(idx), usePoints);
       changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
@@ -1848,8 +1852,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   }
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,
-  // we need to make sure any of its related `debug_value` instruction
-  // is preserved.
+  // we need to make sure any of its related `debug_value` instructions
+  // are preserved.
   if (auto *STI = dyn_cast<StructInst>(I)) {
     auto STVal = STI->getResult(0);
     llvm::ArrayRef<VarDecl *> FieldDecls =
@@ -1872,6 +1876,31 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         // Create a new debug_value
         SILBuilder(STI, DbgInst->getDebugScope())
           .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+      }
+    }
+  }
+  // Similarly, if a `tuple` SIL instruction is "unwrapped" and removed,
+  // we need to make sure any of its related `debug_value` instructions
+  // are preserved.
+  if (auto *TTI = dyn_cast<TupleInst>(I)) {
+    auto TTVal = TTI->getResult(0);
+    for (Operand *U : getDebugUses(TTVal)) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      auto VarInfo = DbgInst->getVarInfo();
+      if (!VarInfo)
+        continue;
+      TupleType *TT = TTI->getTupleType();
+      for (auto i : indices(TT->getElements())) {
+        SILDebugVariable NewVarInfo = *VarInfo;
+        auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(TT, i);
+        NewVarInfo.DIExpr.append(FragDIExpr);
+
+        if (!NewVarInfo.Type)
+          NewVarInfo.Type = TTI->getType();
+
+        // Create a new debug_value
+        SILBuilder(TTI, DbgInst->getDebugScope())
+          .createDebugValue(DbgInst->getLoc(), TTI->getElement(i), NewVarInfo);
       }
     }
   }

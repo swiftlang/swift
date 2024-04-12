@@ -4,6 +4,9 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: VENDOR=apple
 
+// rdar://126118470
+// UNSUPPORTED: CPU=arm64e
+
 @available(SwiftStdlib 5.1, *)
 func isolatedFunc(isolation: isolated (any Actor)? = #isolation) {}
 

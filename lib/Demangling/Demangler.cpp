@@ -354,40 +354,6 @@ using namespace Demangle;
 // Node member functions        //
 //////////////////////////////////
 
-size_t Node::getNumChildren() const {
-  switch (NodePayloadKind) {
-    case PayloadKind::OneChild: return 1;
-    case PayloadKind::TwoChildren: return 2;
-    case PayloadKind::ManyChildren: return Children.Number;
-    default: return 0;
-  }
-}
-
-Node::iterator Node::begin() const {
-  switch (NodePayloadKind) {
-    case PayloadKind::OneChild:
-    case PayloadKind::TwoChildren:
-      return &InlineChildren[0];
-    case PayloadKind::ManyChildren:
-      return Children.Nodes;
-    default:
-      return nullptr;
-  }
-}
-
-Node::iterator Node::end() const {
-  switch (NodePayloadKind) {
-    case PayloadKind::OneChild:
-      return &InlineChildren[1];
-    case PayloadKind::TwoChildren:
-      return &InlineChildren[2];
-    case PayloadKind::ManyChildren:
-      return Children.Nodes + Children.Number;
-    default:
-      return nullptr;
-  }
-}
-
 void Node::addChild(NodePointer Child, NodeFactory &Factory) {
   DEMANGLER_ALWAYS_ASSERT(Child, this);
   switch (NodePayloadKind) {
@@ -635,6 +601,58 @@ NodePointer NodeFactory::createNode(Node::Kind K, const char *Text) {
 int NodeFactory::nestingLevel = 0;
 #endif
 
+// Fast integer formatting
+namespace {
+
+// Format an unsigned integer into a buffer
+template <typename U,
+          typename std::enable_if<std::is_unsigned<U>::value, bool>::type = true>
+size_t int2str(U n, char *buf) {
+  // The easy case is zero
+  if (n == 0) {
+    *buf++ = '0';
+    *buf++ = '\0';
+    return 1;
+  }
+
+  // Do the digits one a time (for really high speed we could do these in
+  // chunks, but that's probably not necessary here.)
+  char *ptr = buf;
+  while (n) {
+    char digit = '0' + (n % 10);
+    n /= 10;
+    *ptr++ = digit;
+  }
+  size_t len = ptr - buf;
+
+  // Terminate the string
+  *ptr = '\0';
+
+  // Now reverse the digits
+  while (buf < ptr) {
+    char tmp = *--ptr;
+    *ptr = *buf;
+    *buf++ = tmp;
+  }
+
+  return len;
+}
+
+// Deal with negative numbers
+template <typename S,
+          typename std::enable_if<std::is_signed<S>::value, bool>::type = true>
+size_t int2str(S n, char *buf) {
+  using U = typename std::make_unsigned<S>::type;
+
+  if (n < 0) {
+    *buf++ = '-';
+    return int2str(static_cast<U>(-n), buf);
+  }
+  return int2str(static_cast<U>(n), buf);
+}
+
+} // namespace
+
 //////////////////////////////////
 // CharVector member functions  //
 //////////////////////////////////
@@ -651,7 +669,7 @@ void CharVector::append(int Number, NodeFactory &Factory) {
   const int MaxIntPrintSize = 11;
   if (NumElems + MaxIntPrintSize > Capacity)
     Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxIntPrintSize);
-  int Length = snprintf(Elems + NumElems, MaxIntPrintSize, "%d", Number);
+  int Length = int2str(Number, Elems + NumElems);
   assert(Length > 0 && Length < MaxIntPrintSize);
   NumElems += Length;
 }
@@ -660,7 +678,7 @@ void CharVector::append(unsigned long long Number, NodeFactory &Factory) {
   const int MaxPrintSize = 21;
   if (NumElems + MaxPrintSize > Capacity)
     Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxPrintSize);
-  int Length = snprintf(Elems + NumElems, MaxPrintSize, "%llu", Number);
+  int Length = int2str(Number, Elems + NumElems);
   assert(Length > 0 && Length < MaxPrintSize);
   NumElems += Length;
 }

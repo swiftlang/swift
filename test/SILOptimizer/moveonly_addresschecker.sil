@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name moveonly_addresschecker -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyPartialConsumption -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name moveonly_addresschecker -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-upcoming-feature MoveOnlyPartialConsumption -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage raw
 
@@ -377,9 +377,9 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
 // CHECK: } // end sil function 'myBufferViewSetter'
 sil [ossa] @myBufferViewSetter : $@convention(method) <T> (UnsafeBufferPointer<T>, @inout MyBufferView<T>) -> () {
 bb0(%0 : $UnsafeBufferPointer<T>, %1 : $*MyBufferView<T>):
-  debug_value %0 : $UnsafeBufferPointer<T>, let, name "value", argno 1, implicit
+  debug_value %0 : $UnsafeBufferPointer<T>, let, name "value", argno 1
   %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*MyBufferView<T>
-  debug_value %3 : $*MyBufferView<T>, var, name "self", argno 2, implicit, expr op_deref
+  debug_value %3 : $*MyBufferView<T>, var, name "self", argno 2, expr op_deref
   %5 = begin_access [modify] [static] %3 : $*MyBufferView<T>
   %6 = struct_element_addr %5 : $*MyBufferView<T>, #MyBufferView.ptr
   store %0 to [trivial] %6 : $*UnsafeBufferPointer<T>
@@ -721,7 +721,7 @@ sil @get_fixedsize_queue : $@convention(thin) () -> @owned FixedSizeQueue
 // CHECK: } // end sil function 'test_return_trivial_type'
 sil [ossa] @test_return_trivial_type : $@convention(thin) (@owned FixedSizeQueue) -> Builtin.Int32 {
 bb0(%0 : @owned $FixedSizeQueue):
-  %1 = alloc_stack [lexical] $FixedSizeQueue, var, name "self", implicit
+  %1 = alloc_stack [lexical] $FixedSizeQueue, var, name "self"
   %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*FixedSizeQueue
   store %0 to [init] %2 : $*FixedSizeQueue
   %4 = begin_access [modify] [static] %2 : $*FixedSizeQueue
@@ -790,7 +790,7 @@ sil @testUseCorrectBitsClosureUser : $@convention(thin) (@guaranteed @noescape @
 sil [ossa] @testUseCorrectBits : $@convention(method) (Int, @inout NonCopyableNativeObjectIntPair) -> () {
 bb0(%0 : $Int, %1a : $*NonCopyableNativeObjectIntPair):
   debug_value %0 : $Int, let, name "index", argno 1
-  debug_value %1a : $*NonCopyableNativeObjectIntPair, var, name "self", argno 2, implicit, expr op_deref
+  debug_value %1a : $*NonCopyableNativeObjectIntPair, var, name "self", argno 2, expr op_deref
   %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1a : $*NonCopyableNativeObjectIntPair
   %4 = function_ref @testUseCorrectBitsClosureCallee : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectIntPair) -> Bool
   %5 = partial_apply [callee_guaranteed] [on_stack] %4(%0, %1) : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectIntPair) -> Bool
@@ -798,7 +798,7 @@ bb0(%0 : $Int, %1a : $*NonCopyableNativeObjectIntPair):
   %7 = function_ref @testUseCorrectBitsClosureUser : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
   %8 = apply %7(%6) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
   %9 = struct_element_addr %1 : $*NonCopyableNativeObjectIntPair, #NonCopyableNativeObjectIntPair.currentPosition
-  debug_value undef : $*NonCopyableNativeObjectIntPair, var, name "self", argno 2, implicit, expr op_deref
+  debug_value undef : $*NonCopyableNativeObjectIntPair, var, name "self", argno 2, expr op_deref
   destroy_value %6 : $@noescape @callee_guaranteed () -> Bool
   %12 = begin_access [modify] [static] %1 : $*NonCopyableNativeObjectIntPair
   %13 = struct_element_addr %12 : $*NonCopyableNativeObjectIntPair, #NonCopyableNativeObjectIntPair.currentPosition
@@ -825,7 +825,7 @@ sil @testUseCorrectBits2ClosureCallee : $@convention(thin) (Int, @inout_aliasabl
 sil [ossa] @testUseCorrectBits2 : $@convention(method) (Int, @inout NonCopyableNativeObjectPair) -> () {
 bb0(%0 : $Int, %1a : $*NonCopyableNativeObjectPair):
   debug_value %0 : $Int, let, name "index", argno 1
-  debug_value %1a : $*NonCopyableNativeObjectPair, var, name "self", argno 2, implicit, expr op_deref
+  debug_value %1a : $*NonCopyableNativeObjectPair, var, name "self", argno 2, expr op_deref
   %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1a : $*NonCopyableNativeObjectPair
   %4 = function_ref @testUseCorrectBits2ClosureCallee : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectPair) -> Bool
   %5 = partial_apply [callee_guaranteed] [on_stack] %4(%0, %1) : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectPair) -> Bool
@@ -833,7 +833,7 @@ bb0(%0 : $Int, %1a : $*NonCopyableNativeObjectPair):
   %7 = function_ref @testUseCorrectBitsClosureUser : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
   %8 = apply %7(%6) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
   %9 = struct_element_addr %1 : $*NonCopyableNativeObjectPair, #NonCopyableNativeObjectPair.currentPosition
-  debug_value undef : $*NonCopyableNativeObjectPair, var, name "self", argno 2, implicit, expr op_deref
+  debug_value undef : $*NonCopyableNativeObjectPair, var, name "self", argno 2, expr op_deref
   destroy_value %6 : $@noescape @callee_guaranteed () -> Bool
   %12 = begin_access [modify] [static] %1 : $*NonCopyableNativeObjectPair
   %13 = struct_element_addr %12 : $*NonCopyableNativeObjectPair, #NonCopyableNativeObjectPair.currentPosition

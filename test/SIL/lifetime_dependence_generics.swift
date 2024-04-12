@@ -34,4 +34,4 @@ public func test(pview: borrowing PView) -> dependsOn(pview) View {
 
 // CHECK: sil private [transparent] [thunk] @$s28lifetime_dependence_generics5PViewVAA1PA2aDP4getE1EQzyYLsFTW : $@convention(witness_method: P) (@in_guaranteed PView) -> _scope(0) @out View {
 
-// CHECK: sil @$s28lifetime_dependence_generics4test5pviewAA4ViewVAA5PViewVYls_tF : $@convention(thin) (PView) -> _scope(1) @owned View {
+// CHECK: sil @$s28lifetime_dependence_generics4test5pviewAA4ViewVAA5PViewVYls_tF : $@convention(thin) (PView) -> _scope(0) @owned View {

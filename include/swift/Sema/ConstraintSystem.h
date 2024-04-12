@@ -908,7 +908,7 @@ private:
                         bool lookThroughAutoclosure) const {
     auto param = fnTy->getParams()[ParamIdx];
     auto paramTy = param.getPlainType();
-    if (lookThroughAutoclosure && param.isAutoClosure())
+    if (lookThroughAutoclosure && param.isAutoClosure() && paramTy->is<FunctionType>())
       paramTy = paramTy->castTo<FunctionType>()->getResult();
     return paramTy;
   }

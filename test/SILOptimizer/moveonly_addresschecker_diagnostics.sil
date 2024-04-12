@@ -1,8 +1,8 @@
-// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
-// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
+// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
 // This file contains specific SIL test cases that we expect to emit
 // diagnostics. These are cases where we want to make it easy to validate
@@ -93,7 +93,7 @@ sil @addressOnlyGenericUse : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_g
 
 sil hidden [ossa] @initWithSplitStores : $@convention(thin) (Int) -> @owned AggStruct {
 bb0(%0 : $Int):
-  %2 = alloc_stack [lexical] $AggStruct, var, name "self", implicit
+  %2 = alloc_stack [lexical] $AggStruct, var, name "self"
   %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*AggStruct // expected-error {{'self' consumed more than once}}
   debug_value %0 : $Int, let, name "myInit3", argno 1
   %5 = function_ref @get_aggstruct : $@convention(thin) () -> @owned AggStruct

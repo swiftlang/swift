@@ -3094,7 +3094,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     if (afd->hasImplicitSelfDecl()) {
       auto lifetimeDependenceKind =
           fn->getLifetimeDependenceInfo().getLifetimeDependenceOnParam(
-              /*paramIndex*/ 0);
+              /*selfIndex*/ afd->getParameters()->size());
       if (lifetimeDependenceKind) {
         appendLifetimeDependenceKind(*lifetimeDependenceKind,
                                      /*isSelfDependence*/ true);
@@ -3183,7 +3183,7 @@ void ASTMangler::appendFunctionInputType(
           Identifier(), type,
           getParameterFlagsForMangling(param.getParameterFlags(),
                                        defaultSpecifier),
-          lifetimeDependenceInfo.getLifetimeDependenceOnParam(/*paramIndex*/ 1),
+          lifetimeDependenceInfo.getLifetimeDependenceOnParam(/*paramIndex*/ 0),
           sig, nullptr);
       break;
     }
@@ -3195,7 +3195,7 @@ void ASTMangler::appendFunctionInputType(
 
   default:
     bool isFirstParam = true;
-    unsigned paramIndex = 1; /* 0 is reserved for self*/
+    unsigned paramIndex = 0;
     for (auto &param : params) {
       // Note that we pass `nullptr` as the `forDecl` argument, since the type
       // of the input is no longer directly the type of the declaration, so we

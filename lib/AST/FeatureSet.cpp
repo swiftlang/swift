@@ -449,10 +449,8 @@ static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
 
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 
-static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
-  // Partial consumption does not affect declarations directly.
-  return false;
-}
+// Partial consumption does not affect declarations directly.
+UNINTERESTING_FEATURE(MoveOnlyPartialConsumption)
 
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
 
@@ -505,6 +503,7 @@ static bool usesFeatureRawLayout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(Embedded)
+UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
@@ -692,6 +691,10 @@ static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
 
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(CImplementation)
+
+static bool usesFeatureSensitive(Decl *decl) {
+  return decl->getAttrs().hasAttribute<SensitiveAttr>();
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

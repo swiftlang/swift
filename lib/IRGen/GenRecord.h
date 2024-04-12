@@ -141,6 +141,13 @@ protected:
                             this->template getTrailingObjects<FieldImpl>());
   }
 
+  void fillWithZerosIfSensitive(IRGenFunction &IGF, Address address, SILType T) const {
+    if (T.isSensitive()) {
+      llvm::Value *size = asImpl().getSize(IGF, T);
+      IGF.emitClearSensitive(address, size);
+    }
+  }
+
 public:
   /// Allocate and initialize a type info of this type.
   template <class... As>
@@ -206,6 +213,7 @@ public:
         field.getTypeInfo().assignWithTake(
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
+      fillWithZerosIfSensitive(IGF, src, T);
     } else {
       this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
     }
@@ -242,22 +250,19 @@ public:
   }
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
       IGF.Builder.CreateMemCpy(
           dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
           src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
           asImpl().Impl::getSize(IGF, T));
-      return;
-    }
-
-    // If the fields are not ABI-accessible, use the value witness table.
-    if (!AreFieldsABIAccessible) {
+    } else if (!AreFieldsABIAccessible) {
+      // If the fields are not ABI-accessible, use the value witness table.
       return emitInitializeWithTakeCall(IGF, T, dest, src);
-    }
 
-    if (isOutlined || T.hasParameterizedExistential()) {
+    } else if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -266,11 +271,14 @@ public:
         Address destField = field.projectAddress(IGF, dest, offsets);
         Address srcField = field.projectAddress(IGF, src, offsets);
         field.getTypeInfo().initializeWithTake(
-            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined,
+              zeroizeIfSensitive);
       }
     } else {
       this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
     }
+    if (zeroizeIfSensitive)
+      fillWithZerosIfSensitive(IGF, src, T);
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T,
@@ -283,12 +291,15 @@ public:
     if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
-        if (field.isTriviallyDestroyable())
+        SILType fieldType = field.getType(IGF.IGM, T);
+        if (field.isTriviallyDestroyable() &&
+            !((bool)fieldType && fieldType.isSensitive())) {
           continue;
+        }
 
         field.getTypeInfo().destroy(IGF,
                                     field.projectAddress(IGF, addr, offsets),
-                                    field.getType(IGF.IGM, T), isOutlined);
+                                    fieldType, isOutlined);
       }
     } else {
       this->callOutlinedDestroy(IGF, addr, T);

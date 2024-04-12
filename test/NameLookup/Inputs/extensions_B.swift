@@ -1,10 +1,15 @@
 import extensions_A
 
-public extension X {
+
+extension X {
   public func XinB() { }
+
+  public static func >>>(a: Self, b: Self) -> Self { b }
 }
 
-public extension Y {
+extension Y {
   public func YinB() { }
+
+  public static func >>>(a: Self, b: Self) -> Self { b }
 }
 

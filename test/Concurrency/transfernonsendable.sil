@@ -226,7 +226,7 @@ bb0(%0 : @guaranteed $NonSendableStruct):
   debug_value %0 : $NonSendableStruct, var, name "myname"
   %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a race}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
   // expected-note @-1 {{task-isolated 'myname.ns' cannot be a transferring result. task-isolated uses may race with caller uses}}
 }
 
@@ -235,7 +235,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
   debug_value %0 : $MainActorIsolatedStruct, var, name "myname"
   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a race}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
   // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -244,7 +244,7 @@ bb0(%0 : $*MainActorIsolatedStruct):
   debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = load [copy] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a race}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
   // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -253,7 +253,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedEnum):
   debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_enum_data %0 : $MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a race}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a data race}}
   // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -262,7 +262,7 @@ bb0(%0 : $*MainActorIsolatedEnum):
   debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = load [take] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a race}}
+  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a data race}}
   // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -281,13 +281,13 @@ bb2(%1 : @guaranteed $NonSendableKlass):
   br bb3(%3 : $FakeOptional<NonSendableKlass>)
 
 bb3(%4 : @owned $FakeOptional<NonSendableKlass>):
-  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{transferring 'myname.some' may cause a race}}
+  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{transferring 'myname.some' may cause a data race}}
   // expected-note @-1 {{main actor-isolated 'myname.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @warningIfCallingGetter : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
-  debug_value %0 : $MyActor, let, name "self", argno 1, implicit
+  debug_value %0 : $MyActor, let, name "self", argno 1
   hop_to_executor %0 : $MyActor
   %3 = class_method %0 : $MyActor, #MyActor.klass!getter : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
   %4 = apply %3(%0) : $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
@@ -301,7 +301,7 @@ bb0(%0 : @guaranteed $MyActor):
 
 sil [ossa] @assignIntoSetter : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor):
-  debug_value %0 : $MyActor, let, name "self", argno 1, implicit
+  debug_value %0 : $MyActor, let, name "self", argno 1
   hop_to_executor %0 : $MyActor
   %4 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
   %5 = apply %4() : $@convention(thin) () -> @owned NonSendableKlass
