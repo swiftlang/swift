@@ -5369,11 +5369,9 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
       return ActorIsolation::forUnspecified();
 
     auto i = pbd->getPatternEntryIndexForVarDecl(var);
-    if (!pbd->isInitializerChecked(i))
-      TypeChecker::typeCheckPatternBinding(pbd, i);
 
     dc = cast<Initializer>(pbd->getInitContext(i));
-    initExpr = pbd->getInit(i);
+    initExpr = pbd->getCheckedAndContextualizedInit(i);
     enclosingIsolation = getActorIsolation(var);
   } else if (auto *param = dyn_cast<ParamDecl>(var)) {
     // If this parameter corresponds to a stored property for a

@@ -2722,7 +2722,16 @@ public:
 
         // Trigger a request that will complete typechecking for the
         // initializer.
-        (void)PBD->getCheckedAndContextualizedInit(i);
+        (void) PBD->getCheckedAndContextualizedInit(i);
+
+        if (auto *var = PBD->getSingleVar()) {
+          if (var->hasAttachedPropertyWrapper())
+            return;
+        }
+
+        if (!PBD->getDeclContext()->isLocalContext()) {
+          (void) PBD->getInitializerIsolation(i);
+        }
       }
     }
 
