@@ -2053,7 +2053,10 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   auto *fnTy = FunctionType::get(params, voidTy, extInfo);
 
   builder.addParameter(makeConcrete(fnTy));
-  builder.setResult(makeGenericParam());
+
+  auto resultTy = makeGenericParam();
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.setResult(resultTy);
 
   builder.setAsync();
   if (throws)
