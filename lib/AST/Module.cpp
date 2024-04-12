@@ -3468,6 +3468,7 @@ void SourceFile::typeCheckDelayedFunctions() {
     auto *AFD = DelayedFunctions[i];
     assert(!AFD->getDeclContext()->isLocalContext());
     AFD->getTypecheckedBody();
+    (void) AFD->getCaptureInfo();
   }
 
   DelayedFunctions.clear();

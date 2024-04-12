@@ -6814,9 +6814,14 @@ public:
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 
-  CaptureInfo getDefaultArgumentCaptureInfo() const {
+  CaptureInfo getDefaultArgumentCaptureInfo() const;
+
+  std::optional<CaptureInfo> getCachedDefaultArgumentCaptureInfo() const {
     assert(DefaultValueAndFlags.getPointer());
-    return DefaultValueAndFlags.getPointer()->Captures;
+    const auto &captures = DefaultValueAndFlags.getPointer()->Captures;
+    if (!captures.hasBeenComputed())
+      return std::nullopt;
+    return captures;
   }
 
   void setDefaultArgumentCaptureInfo(CaptureInfo captures);
@@ -7754,7 +7759,13 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
+  CaptureInfo getCaptureInfo() const;
+
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+    return Captures;
+  }
 
   void setCaptureInfo(CaptureInfo captures) {
     assert(captures.hasBeenComputed());
