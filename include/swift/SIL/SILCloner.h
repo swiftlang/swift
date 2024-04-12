@@ -293,14 +293,18 @@ public:
         continue;
       }
 
-      // Substitute the shape class of the expansion.
+      // Substitute the shape class of the expansion.  If this doesn't
+      // give us a pack (e.g. if this isn't a substituting clone),
+      // we're never erasing tuple structure.
       auto newShapeClass = getOpASTType(expansion.getCountType());
       auto newShapePack = dyn_cast<PackType>(newShapeClass);
+      if (!newShapePack)
+        return false;
 
       // If the element has a name, then the tuple sticks around unless
       // the expansion disappears completely.
       if (type->getElement(index).hasName()) {
-        if (newShapePack && newShapePack->getNumElements() == 0)
+        if (newShapePack->getNumElements() == 0)
           continue;
         return false;
       }
