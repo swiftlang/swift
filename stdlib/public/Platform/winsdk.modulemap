@@ -468,6 +468,12 @@ module WinSDK [system] {
     link "User32.Lib"
   }
 
+  module UserEnv {
+    header "UserEnv.h"
+    export *
+    link "UserEnv.Lib"
+  }
+
   module WER {
     header "WerApi.h"
     export *
