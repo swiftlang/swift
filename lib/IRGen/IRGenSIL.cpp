@@ -534,7 +534,7 @@ public:
     setLoweredValue(tokenResult, std::move(state));
   }
 
-  LoweredValue &getUndefLoweredValue(SILType t) {
+  LoweredValue &getUndefLoweredValue(SILType t, IRBuilder *b = nullptr) {
     auto found = LoweredUndefs.find(t);
     if (found != LoweredUndefs.end())
       return found->second;
@@ -554,7 +554,11 @@ public:
       for (auto &elt : schema) {
         assert(!elt.isAggregate()
                && "non-scalar element in loadable type schema?!");
-        e.add(llvm::UndefValue::get(elt.getScalarType()));
+        llvm::Value *undef = llvm::UndefValue::get(elt.getScalarType());
+        if (b) {
+          undef = b->CreateFreeze(undef);
+        }
+        e.add(undef);
       }
       LoweredUndefs.insert({t, LoweredValue(e)});
       break;
@@ -568,9 +572,9 @@ public:
   
   /// Get the LoweredValue corresponding to the given SIL value, which must
   /// have been lowered.
-  LoweredValue &getLoweredValue(SILValue v) {
+  LoweredValue &getLoweredValue(SILValue v, IRBuilder *b = nullptr) {
     if (isa<SILUndef>(v))
-      return getUndefLoweredValue(v->getType());
+      return getUndefLoweredValue(v->getType(), b);
     
     auto foundValue = LoweredValues.find(v);
     assert(foundValue != LoweredValues.end() &&
@@ -580,8 +584,8 @@ public:
   
   /// Get the Address of a SIL value of address type, which must have been
   /// lowered.
-  Address getLoweredAddress(SILValue v) {
-    return getLoweredValue(v).getAnyAddress();
+  Address getLoweredAddress(SILValue v, IRBuilder *b = nullptr) {
+    return getLoweredValue(v, b).getAnyAddress();
   }
 
   StackAddress getLoweredStackAddress(SILValue v) {
@@ -602,8 +606,8 @@ public:
   }
   /// Create an Explosion containing the unmanaged LLVM values lowered from a
   /// SIL value.
-  Explosion getLoweredExplosion(SILValue v) {
-    return getLoweredValue(v).getExplosion(*this, v->getType());
+  Explosion getLoweredExplosion(SILValue v, IRBuilder *b = nullptr) {
+    return getLoweredValue(v, b).getExplosion(*this, v->getType());
   }
 
   /// Get the lowered value for the given value of optional type in a
@@ -4680,7 +4684,7 @@ static llvm::BasicBlock *emitBBMapForSwitchEnum(
 }
 
 void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
-  Explosion value = getLoweredExplosion(inst->getOperand());
+  Explosion value = getLoweredExplosion(inst->getOperand(), &Builder);
   
   // Map the SIL dest bbs to their LLVM bbs.
   SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
@@ -4701,7 +4705,7 @@ void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
       
       Builder.emitBlock(waypointBB);
       
-      Explosion inValue = getLoweredExplosion(inst->getOperand());
+      Explosion inValue = getLoweredExplosion(inst->getOperand(), &Builder);
       Explosion projected;
       emitProjectLoadableEnum(*this, inst->getOperand()->getType(),
                                inValue, casePair.first, projected);
@@ -4716,7 +4720,7 @@ void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
 
 void
 IRGenSILFunction::visitSwitchEnumAddrInst(SwitchEnumAddrInst *inst) {
-  Address value = getLoweredAddress(inst->getOperand());
+  Address value = getLoweredAddress(inst->getOperand(), &Builder);
   
   // Map the SIL dest bbs to their LLVM bbs.
   SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
@@ -4932,12 +4936,12 @@ void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
              (inst->getNumCases() == 2 && !inst->hasDefault())) {
     // If this is testing for one case, do simpler codegen.  This is
     // particularly common when testing optionals.
-    Explosion value = getLoweredExplosion(inst->getEnumOperand());
+    Explosion value = getLoweredExplosion(inst->getEnumOperand(), &Builder);
     auto isTrue = EIS.emitValueCaseTest(*this, value, inst->getCase(0).first);
     emitSingleEnumMemberSelectResult(*this, SelectEnumOperation(inst), isTrue,
                                      result);
   } else {
-    Explosion value = getLoweredExplosion(inst->getEnumOperand());
+    Explosion value = getLoweredExplosion(inst->getEnumOperand(), &Builder);
 
     // Map the SIL dest bbs to their LLVM bbs.
     SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
@@ -4956,7 +4960,7 @@ void IRGenSILFunction::visitSelectEnumInst(SelectEnumInst *inst) {
 }
 
 void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
-  Address value = getLoweredAddress(inst->getEnumOperand());
+  Address value = getLoweredAddress(inst->getEnumOperand(), &Builder);
   auto seo = SelectEnumOperation(inst);
   Explosion result;
 
@@ -5065,7 +5069,7 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   LoweredBB &trueBB = getLoweredBB(i->getTrueBB());
   LoweredBB &falseBB = getLoweredBB(i->getFalseBB());
   llvm::Value *condValue =
-    getLoweredExplosion(i->getCondition()).claimNext();
+    getLoweredExplosion(i->getCondition(), &Builder).claimNext();
 
   addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
   addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
