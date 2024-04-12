@@ -139,7 +139,7 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable {
+// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where A : ~Copyable {
 // CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
