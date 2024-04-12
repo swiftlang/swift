@@ -24,6 +24,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -190,7 +191,12 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     SILArgument *Arg = *AI;
 
     // We were able to fold, so all users should use the new folded value.
-    Arg->replaceAllUsesWith(Args[Idx]);
+    if (auto *bfi = getBorrowedFromUser(Arg)) {
+      bfi->replaceAllUsesWith(Args[Idx]);
+      bfi->eraseFromParent();
+    } else {
+      Arg->replaceAllUsesWith(Args[Idx]);
+    }
     ++NumBasicBlockArgsPropagated;
   }
 
