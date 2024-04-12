@@ -799,12 +799,11 @@ class ModuleInterfaceLoaderImpl {
     return pathStartsWith(frameworksPath, path);
   }
 
-  std::pair<std::string, std::string> getCompiledModuleCandidates() {
+  CandidateModules getCompiledModuleCandidates() {
     using ReasonIgnored = ModuleRebuildInfo::ReasonIgnored;
     using ReasonModuleInterfaceIgnored =
                                ModuleRebuildInfo::ReasonModuleInterfaceIgnored;
-    std::pair<std::string, std::string> result;
-
+    CandidateModules result;
     bool ignoreByDefault = ctx.blockListConfig.hasBlockListAction(
                                        "Swift_UseSwiftinterfaceByDefault",
                                        BlockListKeyKind::ModuleName,
@@ -830,6 +829,7 @@ class ModuleInterfaceLoaderImpl {
       if (shouldLoadAdjacentModule) {
         // Prefer the swiftmodule.
         rebuildInfo.addIgnoredModuleInterface(modulePath, ignore);
+        result.interfaceIgnored = true;
       } else {
         // Prefer the swiftinterface.
         rebuildInfo.addIgnoredModule(modulePath,
@@ -891,7 +891,7 @@ class ModuleInterfaceLoaderImpl {
 
     if (shouldLoadAdjacentModule) {
       if (fs.exists(modulePath)) {
-        result.first = modulePath.str();
+        result.adjacentModule = modulePath.str();
       }
     }
 
@@ -908,7 +908,7 @@ class ModuleInterfaceLoaderImpl {
       }
       if (path) {
         if (fs.exists(*path)) {
-          result.second = path->str();
+          result.prebuiltModule = path->str();
         }
       }
     }
@@ -919,30 +919,32 @@ class ModuleInterfaceLoaderImpl {
   llvm::ErrorOr<DiscoveredModule>
   discoverUpToDateCompiledModuleForInterface(SmallVectorImpl<FileDependency> &deps,
                                              std::string &UsableModulePath) {
-    std::string adjacentMod, prebuiltMod;
-    std::tie(adjacentMod, prebuiltMod) = getCompiledModuleCandidates();
-    if (!adjacentMod.empty()) {
-      auto adjacentModuleBuffer = fs.getBufferForFile(adjacentMod);
+    auto candidates = getCompiledModuleCandidates();
+    if (!candidates.adjacentModule.empty()) {
+      auto adjacentModuleBuffer = fs.getBufferForFile(candidates.adjacentModule);
       if (adjacentModuleBuffer) {
-        if (upToDateChecker.serializedASTBufferIsUpToDate(adjacentMod, *adjacentModuleBuffer.get(),
-                                                          rebuildInfo, deps)) {
+        if (upToDateChecker.serializedASTBufferIsUpToDate(
+                candidates.adjacentModule, *adjacentModuleBuffer.get(),
+                rebuildInfo, deps)) {
           LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
-                                  << adjacentMod
+                                  << candidates.adjacentModule
                                   << "; deferring to serialized module loader\n");
-          UsableModulePath = adjacentMod;
+          UsableModulePath = candidates.adjacentModule;
           return std::make_error_code(std::errc::not_supported);
-        } else if (isInResourceDir(adjacentMod) &&
-                   loadMode == ModuleLoadingMode::PreferSerialized &&
-                   !version::isCurrentCompilerTagged() &&
-                   rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
-                     serialization::Status::SDKMismatch) {
-          // Special-case here: If we're loading a .swiftmodule from the resource
-          // dir adjacent to the compiler, defer to the serialized loader instead
-          // of falling back. This is to support local development of Swift,
-          // where one might change the module format version but forget to
-          // recompile the standard library. If that happens, don't fall back
-          // and silently recompile the standard library, raise an error
-          // instead.
+        }
+        if (isInResourceDir(candidates.adjacentModule) &&
+            loadMode == ModuleLoadingMode::PreferSerialized &&
+            !version::isCurrentCompilerTagged() &&
+            rebuildInfo.getOrInsertCandidateModule(candidates.adjacentModule)
+                    .serializationStatus !=
+                serialization::Status::SDKMismatch) {
+          // Special-case here: If we're loading a .swiftmodule from the
+          // resource dir adjacent to the compiler, defer to the serialized
+          // loader instead of falling back. This is to support local
+          // development of Swift, where one might change the module format
+          // version but forget to recompile the standard library. If that
+          // happens, don't fall back and silently recompile the standard
+          // library, raise an error instead.
           //
           // This logic is disabled for tagged compilers, so distributed
           // compilers should ignore this restriction and rebuild all modules
@@ -952,38 +954,37 @@ class ModuleInterfaceLoaderImpl {
           // of one toolchain against a different SDK.
           LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
                                      "resource-dir at "
-                                  << adjacentMod
+                                  << candidates.adjacentModule
                                   << "; deferring to serialized module loader "
                                      "to diagnose\n");
           return std::make_error_code(std::errc::not_supported);
-        } else {
-          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
-                                  << adjacentMod << "\n");
-          rebuildInfo.setModuleKind(adjacentMod,
-                                    ModuleRebuildInfo::ModuleKind::Normal);
         }
+        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
+                                << candidates.adjacentModule << "\n");
+        rebuildInfo.setModuleKind(candidates.adjacentModule,
+                                  ModuleRebuildInfo::ModuleKind::Normal);
       } else {
-        LLVM_DEBUG(llvm::dbgs() << "Found unreadable module at "
-                                << adjacentMod
-                                << "; deferring to serialized module loader\n");
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Found unreadable module at " << candidates.adjacentModule
+                   << "; deferring to serialized module loader\n");
         return std::make_error_code(std::errc::not_supported);
       }
     }
 
-    if(!prebuiltMod.empty()) {
+    if (!candidates.prebuiltModule.empty()) {
       std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-      if (upToDateChecker.swiftModuleIsUpToDate(prebuiltMod, rebuildInfo,
-                                                deps, moduleBuffer)) {
+      if (upToDateChecker.swiftModuleIsUpToDate(
+              candidates.prebuiltModule, rebuildInfo, deps, moduleBuffer)) {
         LLVM_DEBUG(llvm::dbgs() << "Found up-to-date prebuilt module at "
-                                << prebuiltMod << "\n");
-        UsableModulePath = prebuiltMod;
-        return DiscoveredModule::prebuilt(prebuiltMod, std::move(moduleBuffer));
-      } else {
-        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
-                                << prebuiltMod << "\n");
-        rebuildInfo.setModuleKind(prebuiltMod,
-                                  ModuleRebuildInfo::ModuleKind::Prebuilt);
+                                << candidates.prebuiltModule << "\n");
+        UsableModulePath = candidates.prebuiltModule;
+        return DiscoveredModule::prebuilt(candidates.prebuiltModule,
+                                          std::move(moduleBuffer));
       }
+      LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
+                              << candidates.prebuiltModule << "\n");
+      rebuildInfo.setModuleKind(candidates.prebuiltModule,
+                                ModuleRebuildInfo::ModuleKind::Prebuilt);
     }
     // We cannot find any proper compiled module to use.
     return std::make_error_code(std::errc::no_such_file_or_directory);
@@ -1371,7 +1372,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
-std::vector<std::string>
+CandidateModules
 ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
     StringRef moduleName, StringRef interfacePath) {
   // Derive .swiftmodule path from the .swiftinterface path.
@@ -1395,31 +1396,35 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
                                  CacheDir, PrebuiltCacheDir, BackupInterfaceDir,
                                  SourceLoc(), Opts, RequiresOSSAModules,
                                  nullptr, Ctx.SearchPathOpts.ModuleLoadMode);
-  std::vector<std::string> results;
-  std::string adjacentMod, prebuiltMod;
-  std::tie(adjacentMod, prebuiltMod) = Impl.getCompiledModuleCandidates();
+  auto candidates = Impl.getCompiledModuleCandidates();
+  bool foundModule = false;
 
-  auto validateModule = [&](StringRef modulePath) {
+  // Clear the module path if it is invalid.
+  auto validateModule = [&](std::string &modulePath) {
     // Legacy behavior do not validate module.
     if (Ctx.SearchPathOpts.NoScannerModuleValidation)
-      return true;
+      return;
 
     // If we picked the other module already, no need to validate this one since
     // it should not be used anyway.
-    if (!results.empty())
-      return false;
+    if (foundModule)
+      modulePath.clear();
+
+    if (modulePath.empty())
+      return;
+
     SmallVector<FileDependency, 16> deps;
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-    return Impl.upToDateChecker.swiftModuleIsUpToDate(
-        modulePath, Impl.rebuildInfo, deps, moduleBuffer);
+    if (!Impl.upToDateChecker.swiftModuleIsUpToDate(
+        modulePath, Impl.rebuildInfo, deps, moduleBuffer))
+      modulePath.clear();
+    foundModule = true;
   };
 
   // Add compiled module candidates only when they are non-empty and up-to-date.
-  if (!adjacentMod.empty() && validateModule(adjacentMod))
-    results.push_back(adjacentMod);
-  if (!prebuiltMod.empty() && validateModule(prebuiltMod))
-    results.push_back(prebuiltMod);
-  return results;
+  validateModule(candidates.adjacentModule);
+  validateModule(candidates.prebuiltModule);
+  return candidates;
 }
 
 bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(

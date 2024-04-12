@@ -187,10 +187,16 @@ struct SubCompilerInstanceInfo {
   ArrayRef<StringRef> ExtraPCMArgs;
 };
 
+struct CandidateModules {
+  std::string adjacentModule;
+  std::string prebuiltModule;
+  bool interfaceIgnored = false;
+};
+
 /// Abstract interface for a checker of module interfaces and prebuilt modules.
 class ModuleInterfaceChecker {
 public:
-  virtual std::vector<std::string>
+  virtual CandidateModules
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) = 0;
 

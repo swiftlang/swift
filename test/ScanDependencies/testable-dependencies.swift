@@ -6,9 +6,9 @@
 // RUN:   -emit-module-interface-path %t/internal/B.swiftinterface -enable-library-evolution -I %t \
 // RUN:   %t/B.swift
 
-// RUN: %target-swift-frontend -emit-module -module-name A -o %t/testable/A.swiftmodule -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name A -o %t/testable.sdk/A.swiftmodule -swift-version 5 \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -emit-module-interface-path %t/testable/A.swiftinterface -enable-library-evolution -I %t/internal -enable-testing \
+// RUN:   -emit-module-interface-path %t/testable.sdk/A.swiftinterface -enable-library-evolution -I %t/internal -enable-testing \
 // RUN:   %t/A.swift
 
 // RUN: %target-swift-frontend -emit-module -module-name A -o %t/regular/A.swiftmodule -swift-version 5 \
@@ -19,7 +19,7 @@
 /// Import testable build, should use interface.
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -o %t/deps1.json -I %t/testable -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix DIAG
+// RUN:   -o %t/deps1.json -I %t/testable.sdk -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix DIAG
 // DIAG: remark: skip swiftmodule built with '-enable-testing'
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps1.json Test directDependencies | %FileCheck %s --check-prefix TEST1
 // TEST1: "swift": "A"
@@ -37,7 +37,7 @@
 /// Testable import testable build, should use binary, even interface is preferred.
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/testable.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
-// RUN:   -o %t/deps3.json -I %t/testable -I %t/internal -swift-version 5 -Rmodule-loading
+// RUN:   -o %t/deps3.json -I %t/testable.sdk -I %t/internal -swift-version 5 -Rmodule-loading
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps3.json Test directDependencies | %FileCheck %s --check-prefix TEST3
 // TEST3:  "swiftPrebuiltExternal": "A"
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps3.json swiftPrebuiltExternal:A directDependencies | %FileCheck %s --check-prefix TEST3-A
@@ -56,11 +56,18 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading
 
+/// Use a block list to prevent loading A.swiftinterface.
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/main.swift -blocklist-file %t/block.yml \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
+// RUN:   -o %t/deps6.json -I %t/testable.sdk -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix ERROR-A
+// ERROR-A: warning: no valid binary module found for ignored interface
+// ERROR-A: error: Unable to find module dependency: 'A'
+
 /// Regular import a testable module with no interface, will try to import binary module but fail to look up the dependency.
-// RUN: rm %t/testable/A.swiftinterface
+// RUN: rm %t/testable.sdk/A.swiftinterface
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
-// RUN:   -o %t/deps6.json -I %t/testable -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix ERROR
+// RUN:   -o %t/deps6.json -I %t/testable.sdk -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix ERROR
 // ERROR: error: Unable to find module dependency: 'B'
 
 //--- main.swift
@@ -75,4 +82,9 @@ internal import B
 
 //--- B.swift
 public func b() {}
-
+//--- block.yml
+---
+ShouldUseBinaryModule:
+  ModuleName:
+    - Swift_UseSwiftinterfaceByDefault
+    - A

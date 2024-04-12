@@ -522,7 +522,7 @@ public:
                                 RequireOSSAModules_t requiresOSSAModules):
     ModuleInterfaceCheckerImpl(Ctx, cacheDir, prebuiltCacheDir, StringRef(),
                                opts, requiresOSSAModules) {}
-  std::vector<std::string>
+  CandidateModules
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) override;
 
