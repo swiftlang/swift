@@ -962,7 +962,9 @@ endif()
 
 # Check what linux distribution is being used.
 # This can be used to determine the default linker to use.
-cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
+  cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
+endif()
 
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)
