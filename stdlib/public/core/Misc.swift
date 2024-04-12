@@ -169,6 +169,54 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()
 }
 
+/// A type whose values can be implicitly or explicitly copied.
+///
+/// XXX this protocol has no symbol requirements, but it does have semantic requirements
+///
+/// Conformance to the `Copyable` protocol
+/// is implicitly included in the following places:
+///
+/// * Structures declarations
+/// * Enumerations declarations
+/// * Class declarations
+/// * Protocol declarations
+/// * Associated type declarations
+/// * The `Self` type in a protocol extension
+///
+/// In a declaration that includes generic type parameters,
+/// each generic type parameter implicitly includes `Copyable`
+/// in its list of requirements.
+/// Metatypes and tuples of copyable types are also implicitly copyable.
+/// For example,
+/// all of the following pairs of declarations are equivalent:
+///
+/// ```swift
+/// struct MyStructure { }
+/// struct MyStructere: Copyable { }
+///
+/// protocol MyProtocol { }
+/// protocol MyProtocol: Copyable { }
+///
+/// XXX example of assoc type or Self
+///
+/// func genericFunction<T>(t: T) { }
+/// func genericFunction<T>(t: T) where T: Copyable { }
+/// ```
+///
+/// To suppress an implicit conformance to `Copyable`
+/// you write `~Copyable`.
+/// For example,
+/// only copyable types can conform to `MyProtocol` in the example above,
+/// but both copyable and noncopyable types
+/// can conform to the following protocol:
+///
+/// ```swift
+/// protocol NoRequirements: ~Copyable { }
+/// ```
+///
+/// Extensions on the `Copyable` protocol are not allowed.
+///
+/// XXX xref to TSPL
 @_marker public protocol Copyable {}
 
 @_documentation(visibility: internal)
