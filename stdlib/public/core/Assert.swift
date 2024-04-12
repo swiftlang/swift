@@ -278,8 +278,14 @@ public func fatalError(
   _ message: @autoclosure () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  _assertionFailure("Fatal error", message(), file: file, line: line,
-    flags: _fatalErrorFlags())
+  if _isDebugAssertConfiguration() {
+    _assertionFailure("Fatal error", message(), file: file, line: line,
+      flags: _fatalErrorFlags())
+  } else {
+    Builtin.condfail_message(true._value,
+      StaticString("fatal error").unsafeRawPointer)
+    Builtin.unreachable()
+  }
 }
 #endif
 

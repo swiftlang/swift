@@ -3,7 +3,7 @@
 // RUN:     %s                                                      \
 // RUN:     -enable-experimental-feature BuiltinModule              \
 // RUN:     -enable-experimental-feature NoncopyableGenerics        \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
+// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -sil-verify-all
 
 // REQUIRES: asserts

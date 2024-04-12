@@ -32,9 +32,85 @@ using namespace swift;
 
 static std::atomic<bool> disablePrespecializedMetadata = false;
 
+static bool prespecializedLoggingEnabled = false;
+
+#define LOG(fmt, ...)                                                          \
+  do {                                                                         \
+    if (SWIFT_UNLIKELY(prespecializedLoggingEnabled))                          \
+      fprintf(stderr, "Prespecializations library: " fmt "\n", __VA_ARGS__);   \
+  } while (0)
+
+static bool environmentProcessListContainsProcess(const char *list,
+                                                  const char *progname) {
+  auto prognameLen = strlen(progname);
+
+  const char *cursor = list;
+  while (true) {
+    const char *next = strchr(cursor, ':');
+    if (!next) {
+      // Last entry in the list. Compare with the entire rest of the string.
+      return strcmp(progname, cursor) == 0;
+    }
+
+    // Entry at beginning or middle of the list. Compare against this substring.
+    size_t len = next - cursor;
+    if (len == prognameLen && strncmp(cursor, progname, len) == 0)
+      return true;
+
+    cursor = next + 1;
+  }
+}
+
+static bool isThisProcessEnabled(const LibPrespecializedData<InProcess> *data) {
+  extern const char *__progname;
+
+  if (!__progname)
+    return true;
+
+  auto envEnabledProcesses =
+      runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES();
+  if (envEnabledProcesses && *envEnabledProcesses) {
+    if (environmentProcessListContainsProcess(envEnabledProcesses,
+                                              __progname)) {
+      LOG("Found %s in SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES, "
+          "enabling",
+          __progname);
+      return true;
+    }
+  }
+
+  auto envDisabledProcesses =
+      runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES();
+  if (envDisabledProcesses && *envDisabledProcesses) {
+    if (environmentProcessListContainsProcess(envDisabledProcesses,
+                                              __progname)) {
+      LOG("Found %s in SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES, "
+          "disabling",
+          __progname);
+      return false;
+    }
+  }
+
+  if (auto *disabledProcesses = data->getDisabledProcessesTable()) {
+    auto *cursor = disabledProcesses;
+    while (auto *name = *cursor) {
+      if (strcmp(name, __progname) == 0) {
+        LOG("Found %s in disabled processes list, disabling", name);
+        return false;
+      }
+      cursor++;
+    }
+  }
+
+  return true;
+}
+
 static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
-  if (!runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED())
+  if (!runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED()) {
+    LOG("Disabling, SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED = %d",
+        runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED());
     return nullptr;
+  }
 
   const void *dataPtr = nullptr;
 #if USE_DLOPEN
@@ -51,6 +127,7 @@ static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
     }
 
     dataPtr = dlsym(handle, LIB_PRESPECIALIZED_TOP_LEVEL_SYMBOL_NAME);
+    LOG("Loaded custom library from %s, found dataPtr %p", path, dataPtr);
   }
 #if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
   else if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_get_swift_prespecialized_data)) {
@@ -58,8 +135,14 @@ static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
     // overridden. Eventually we want to be cleverer and only disable the
     // prespecializations that have been invalidated, but we'll start with the
     // simplest approach.
-    if (!dyld_shared_cache_some_image_overridden())
+    if (!dyld_shared_cache_some_image_overridden()) {
       dataPtr = SWIFT_RUNTIME_WEAK_USE(_dyld_get_swift_prespecialized_data());
+      LOG("Got dataPtr %p from _dyld_get_swift_prespecialized_data", dataPtr);
+    } else {
+      LOG("Not calling _dyld_get_swift_prespecialized_data "
+          "dyld_shared_cache_some_image_overridden = %d",
+          dyld_shared_cache_some_image_overridden());
+    }
   }
 #endif
 #endif
@@ -70,8 +153,16 @@ static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
   auto *data =
       reinterpret_cast<const LibPrespecializedData<InProcess> *>(dataPtr);
   if (data->majorVersion !=
-      LibPrespecializedData<InProcess>::currentMajorVersion)
+      LibPrespecializedData<InProcess>::currentMajorVersion) {
+    LOG("Unknown major version %" PRIu32 ", disabling", data->majorVersion);
     return nullptr;
+  }
+
+  if (!isThisProcessEnabled(data))
+    return nullptr;
+
+  LOG("Returning data %p, major version %" PRIu32 " minor %" PRIu32, data,
+      data->majorVersion, data->minorVersion);
 
   return data;
 }
@@ -85,13 +176,12 @@ struct LibPrespecializedState {
     }
   };
 
-  bool loggingEnabled;
   const LibPrespecializedData<InProcess> *data;
   AddressRange sharedCacheRange{0, 0};
   AddressRange metadataAllocatorInitialPoolRange{0, 0};
 
   LibPrespecializedState() {
-    loggingEnabled =
+    prespecializedLoggingEnabled =
         runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING();
     data = findLibPrespecialized();
 
@@ -111,12 +201,6 @@ struct LibPrespecializedState {
 };
 
 static Lazy<LibPrespecializedState> LibPrespecialized;
-
-#define LOG(fmt, ...)                                                          \
-  do {                                                                         \
-    if (SWIFT_UNLIKELY(prespecialized.loggingEnabled))                         \
-      fprintf(stderr, "Prespecializations library: " fmt "\n", __VA_ARGS__);   \
-  } while (0)
 
 const LibPrespecializedData<InProcess> *swift::getLibPrespecializedData() {
   return SWIFT_LAZY_CONSTANT(findLibPrespecialized());

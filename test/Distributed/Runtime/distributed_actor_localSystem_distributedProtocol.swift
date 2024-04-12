@@ -14,6 +14,9 @@
 // rdar://90373022
 // UNSUPPORTED: OS=watchos
 
+// rdar://125628060
+// UNSUPPORTED: CPU=arm64e
+ 
 import Distributed
 
 @_DistributedProtocol

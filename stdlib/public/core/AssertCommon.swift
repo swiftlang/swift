@@ -110,6 +110,11 @@ internal func _assertionFailure(
       }
     }
   }
+#else
+  if _isDebugAssertConfiguration() {
+    _embeddedReportFatalErrorInFile(prefix: prefix, message: message,
+      file: file, line: line)
+  }
 #endif
   Builtin.int_trap()
 }
@@ -183,6 +188,10 @@ internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
   flags: UInt32
 ) -> Never {
+  if _isDebugAssertConfiguration() {
+    _embeddedReportFatalError(prefix: prefix, message: message)
+  }
+
   Builtin.int_trap()
 }
 #endif

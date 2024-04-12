@@ -225,7 +225,7 @@ int TestRunner::run() {
     // Handle
     auto *item = findMatchItem(*request_obj);
     if (!item) {
-      llvm::errs() << "cound't find matching item for request: " << *request_obj
+      llvm::errs() << "couldn't find matching item for request: " << *request_obj
                    << "\n";
       return 1;
     }

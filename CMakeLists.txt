@@ -108,8 +108,9 @@ if(CMAKE_Swift_COMPILER)
   enable_language(Swift)
   set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION "${CMAKE_Swift_COMPILER_VERSION}")
 else()
-  message(STATUS "WARNING! Did not find a host compiler swift?! Can not build
-                  any compiler host sources written in Swift")
+  message(WARNING "Swift compiler not found on path.
+  Cannot build compiler sources written in Swift.
+  If this is unexpected, please pass the path to the swiftc binary by defining the `CMAKE_Swift_COMPILER` variable.")
   set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION)
 endif()
 
@@ -959,6 +960,10 @@ if(XCODE)
   swift_common_xcode_cxx_config()
 endif()
 
+# Check what linux distribution is being used.
+# This can be used to determine the default linker to use.
+cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
+
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)
 # build environment.
@@ -970,6 +975,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_HOST_SYSTEM_NAME STREQ
   set(SWIFT_USE_LINKER_default "lld")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(SWIFT_USE_LINKER_default "")
+elseif(DISTRO_NAME STREQUAL "Amazon Linux 2023")
+  set(SWIFT_USE_LINKER_default "lld")
 else()
   set(SWIFT_USE_LINKER_default "gold")
 endif()

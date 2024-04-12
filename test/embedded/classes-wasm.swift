@@ -13,6 +13,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+int putchar(int c) { return c; }
 void free(void *ptr) {}
 
 int posix_memalign(void **memptr, size_t alignment, size_t size) {

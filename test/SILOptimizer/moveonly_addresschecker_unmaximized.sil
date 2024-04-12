@@ -2,7 +2,7 @@
 // RUN:     -sil-move-only-address-checker                             \
 // RUN:     %s                                                         \
 // RUN:     -module-name moveonly_addresschecker                       \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption    \
+// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption    \
 // RUN:     -enable-experimental-feature MoveOnlyClasses               \
 // RUN:     -enable-sil-verify-all                                     \
 // RUN:     -move-only-address-checker-disable-lifetime-extension=true \

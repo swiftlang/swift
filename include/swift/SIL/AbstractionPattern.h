@@ -1014,7 +1014,10 @@ public:
 
   bool requiresClass() const;
   LayoutConstraint getLayoutConstraint() const;
+  bool conformsToKnownProtocol(
+    CanType substTy, KnownProtocolKind protocolKind) const;
   bool isNoncopyable(CanType substTy) const;
+  bool isEscapable(CanType substTy) const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.

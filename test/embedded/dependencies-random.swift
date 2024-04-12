@@ -32,7 +32,7 @@
 
 // REQUIRES: rdar121923818
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
 

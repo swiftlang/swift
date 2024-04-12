@@ -16,7 +16,7 @@ import SwiftShims
 // embedded Swift, in an embedded-programming friendly way (we mainly need
 // printing to not need to heap allocate).
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
 
