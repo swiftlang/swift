@@ -623,8 +623,10 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (AFR.getCaptureInfo().hasBeenComputed())
     return;
 
-  if (!AFR.getBody())
+  if (!AFR.getBody()) {
+    AFR.setCaptureInfo(CaptureInfo::empty());
     return;
+  }
 
   PrettyStackTraceAnyFunctionRef trace("computing captures for", AFR);
 
