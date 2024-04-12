@@ -313,6 +313,7 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
     break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_Out:
   case SILArgumentConvention::Pack_Inout:
   case SILArgumentConvention::Pack_Out:

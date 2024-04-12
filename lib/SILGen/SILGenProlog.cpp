@@ -926,6 +926,12 @@ private:
                   MarkUnresolvedNonCopyableValueInst::CheckKind::
                       ConsumableAndAssignable);
               break;
+            case SILArgumentConvention::Indirect_In_CXX:
+              argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+                  loc, argrv,
+                  MarkUnresolvedNonCopyableValueInst::CheckKind::
+                      AssignableButNotConsumable);
+              break;
             case SILArgumentConvention::Indirect_In_Guaranteed:
               argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
                   loc, argrv,

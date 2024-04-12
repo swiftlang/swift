@@ -423,6 +423,7 @@ static bool visitScopeEndsRequiringInit(
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
@@ -1015,6 +1016,7 @@ void UseState::initializeLiveness(
       case swift::SILArgumentConvention::Indirect_In_Guaranteed:
       case swift::SILArgumentConvention::Indirect_Inout:
       case swift::SILArgumentConvention::Indirect_InoutAliasable:
+      case swift::SILArgumentConvention::Indirect_In_CXX:
         // We need to add our address to the initInst array to make sure that
         // later invariants that we assert upon remain true.
         LLVM_DEBUG(
@@ -2520,6 +2522,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Direct_Unowned:

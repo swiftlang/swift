@@ -7807,3 +7807,22 @@ bool importer::isCxxConstReferenceType(const clang::Type *type) {
   auto pointeeType = getCxxReferencePointeeTypeOrNone(type);
   return pointeeType && pointeeType->isConstQualified();
 }
+
+const clang::CXXConstructorDecl *
+importer::findCopyConstructor(const clang::Decl *decl) {
+  auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl);
+
+  if (!cxxRecordDecl)
+    return nullptr;
+
+  for (auto method : cxxRecordDecl->methods())
+    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method))
+      if (ctor->isCopyConstructor() &&
+          ctor->getAccess() == clang::AS_public &&
+          // rdar://106964356
+          // ctor->doesThisDeclarationHaveABody() &&
+          !ctor->isDeleted())
+        return ctor;
+
+  return nullptr;
+}

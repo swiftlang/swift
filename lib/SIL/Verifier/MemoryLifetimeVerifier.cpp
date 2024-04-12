@@ -578,6 +578,7 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
@@ -901,6 +902,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       locations.setBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_Inout:
       requireBitsSetForArgument(bits, &argumentOp);
       break;

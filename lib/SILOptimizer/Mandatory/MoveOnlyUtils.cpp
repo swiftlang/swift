@@ -259,7 +259,8 @@ bool noncopyable::memInstMustReinitialize(Operand *memOper) {
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
     FullApplySite applySite(memInst);
-    return applySite.getCaptureConvention(*memOper).isInoutConvention();
+    auto conv = applySite.getCaptureConvention(*memOper);
+    return conv.isInoutConvention() || conv == SILArgumentConvention::Indirect_In_CXX;
   }
   case SILInstructionKind::StoreInst:
     return cast<StoreInst>(memInst)->getOwnershipQualifier() ==

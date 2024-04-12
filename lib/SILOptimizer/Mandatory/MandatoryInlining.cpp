@@ -125,6 +125,7 @@ static  bool fixupReferenceCounts(
     case ParameterConvention::Pack_Inout:
       break;
 
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In_Guaranteed: {
       // Do the same as for Direct_Guaranteed, just the address version.
       // (See comment below).

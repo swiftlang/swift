@@ -3226,6 +3226,7 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
     return;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
     return;
   case ParameterConvention::Indirect_In:
     ownership = OwnershipKind::Owned;

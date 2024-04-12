@@ -573,6 +573,7 @@ static ManagedValue createInputFunctionArgument(
 
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Pack_Inout:
     // An inout parameter is +0 and guaranteed, but represents an lvalue.
     return ManagedValue::forLValue(arg);

@@ -544,6 +544,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
     break;
   }
 
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In_Guaranteed: {
     // The argument is +0, so we can use the address of the param in
     // the context directly.

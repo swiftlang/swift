@@ -136,6 +136,7 @@ enum class BridgedArgumentConvention {
   Indirect_In_Guaranteed,
   Indirect_Inout,
   Indirect_InoutAliasable,
+  Indirect_In_CXX,
   Indirect_Out,
   Direct_Owned,
   Direct_Unowned,
@@ -167,6 +168,7 @@ struct BridgedParameterInfo {
       case BridgedArgumentConvention::Indirect_In_Guaranteed:  return swift::ParameterConvention::Indirect_In_Guaranteed;
       case BridgedArgumentConvention::Indirect_Inout:          return swift::ParameterConvention::Indirect_Inout;
       case BridgedArgumentConvention::Indirect_InoutAliasable: return swift::ParameterConvention::Indirect_InoutAliasable;
+      case BridgedArgumentConvention::Indirect_In_CXX:         return swift::ParameterConvention::Indirect_In_CXX;
       case BridgedArgumentConvention::Indirect_Out:            break;
       case BridgedArgumentConvention::Direct_Owned:            return swift::ParameterConvention::Direct_Owned;
       case BridgedArgumentConvention::Direct_Unowned:          return swift::ParameterConvention::Direct_Unowned;

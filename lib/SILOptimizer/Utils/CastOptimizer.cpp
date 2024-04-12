@@ -721,6 +721,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   case ParameterConvention::Indirect_InoutAliasable:
     // TODO handle remaining indirect argument types
     return nullptr;
+  case ParameterConvention::Indirect_In_CXX:
+    llvm_unreachable("Should never hit this");
   }
 
   // Generate a code to invoke the bridging function.

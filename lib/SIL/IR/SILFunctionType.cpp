@@ -713,6 +713,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
       conv = ResultConvention::Indirect;
       break;
     }
@@ -1050,6 +1051,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
       newConv = ResultConvention::Indirect;
       break;
     }
@@ -3335,6 +3337,9 @@ static ParameterConvention getIndirectCParameterConvention(clang::QualType type)
   // A trivial const * parameter in C should be considered @in.
   if (importer::isCxxConstReferenceType(type.getTypePtr()))
     return ParameterConvention::Indirect_In_Guaranteed;
+  if (auto *decl = type->getAsRecordDecl())
+    if (!decl->isParamDestroyedInCallee())
+      return ParameterConvention::Indirect_In_CXX;
   return ParameterConvention::Indirect_In;
 }
 

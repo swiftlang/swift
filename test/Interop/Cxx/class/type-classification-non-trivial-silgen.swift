@@ -93,8 +93,8 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 // CHECK: [[AS:%.*]] = alloc_stack [lexical] [var_decl] $StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
 // CHECK: [[MEMBER_1:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
 // CHECK: copy_addr [[MEMBER_0]] to [init] [[MEMBER_1]] : $*StructWithCopyConstructorAndValue
-// CHECK: [[FN:%.*]] = function_ref @{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC1E33StructWithCopyConstructorAndValue|\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z}} : $@convention(c) (@in StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
-// CHECK: apply [[FN]]([[AS]], [[MEMBER_1]]) : $@convention(c) (@in StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC1E33StructWithCopyConstructorAndValue|\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z}} : $@convention(c) (@in_cxx StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
+// CHECK: apply [[FN]]([[AS]], [[MEMBER_1]]) : $@convention(c) (@in_cxx StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
 // CHECK: [[OBJ_MEMBER_ADDR:%.*]] = struct_element_addr [[AS]] : $*StructWithCopyConstructorAndSubobjectCopyConstructorAndValue, #StructWithCopyConstructorAndSubobjectCopyConstructorAndValue.member
 // CHECK: [[MEMBER_2:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
 // CHECK: copy_addr [[OBJ_MEMBER_ADDR]] to [init] [[MEMBER_2]] : $*StructWithCopyConstructorAndValue

@@ -23,6 +23,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -549,21 +550,7 @@ namespace {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
-      if (!cxxRecordDecl)
-        return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              // rdar://106964356
-              // ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
-      }
-      return nullptr;
+      return importer::findCopyConstructor(ClangDecl);
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {

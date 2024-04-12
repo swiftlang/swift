@@ -402,6 +402,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
       // If this is an @inout parameter, it is like both a load and store.
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_InoutAliasable: {
         // If we're in the initializer for a struct, and this is a call to a
         // mutating method, we model that as an escape of self.  If an

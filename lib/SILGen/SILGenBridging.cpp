@@ -317,6 +317,9 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
   case ParameterConvention::Indirect_Inout:
     return ManagedValue::forLValue(value);
 
+  case ParameterConvention::Indirect_In_CXX:
+    return ManagedValue::forLValue(value);
+
   case ParameterConvention::Indirect_In_Guaranteed:
     if (valueTL.isLoadable()) {
       return SGF.B.createLoadBorrow(
@@ -438,6 +441,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Pack_Guaranteed:
       case ParameterConvention::Pack_Owned:
       case ParameterConvention::Pack_Inout:
@@ -2175,6 +2179,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         case ParameterConvention::Indirect_In:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Indirect_In_Guaranteed: {
           auto tmp = emitTemporaryAllocation(fd, paramValue->getType());
           B.createCopyAddr(fd, paramValue, tmp, IsNotTake, IsInitialization);

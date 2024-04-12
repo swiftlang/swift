@@ -671,6 +671,8 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
 
+const clang::CXXConstructorDecl *
+findCopyConstructor(const clang::Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

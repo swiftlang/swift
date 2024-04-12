@@ -181,6 +181,8 @@ static bool isSimplePartialApply(SILModule &M,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Indirect_In:
       return false;
+    case ParameterConvention::Indirect_In_CXX:
+      llvm_unreachable("Should never hit this");
     }
   } else {
     if (contextParam.isFormalIndirect()) {
@@ -454,6 +456,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Pack_Guaranteed:
     case ParameterConvention::Pack_Owned:
       boxFields.push_back(SILField(param.getInterfaceType(), /*mutable*/false));
@@ -619,6 +622,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           break;
         }
         case ParameterConvention::Indirect_In_Guaranteed:
+        case ParameterConvention::Indirect_In_CXX:
           // We can borrow the value in-place in the box.
           projectedArg = proj;
           break;
@@ -665,6 +669,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           break;
         }
         case ParameterConvention::Indirect_In_Guaranteed:
+        case ParameterConvention::Indirect_In_CXX:
           // We can borrow the value in-place in the box.
           projectedArg = proj;
           break;
@@ -790,6 +795,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_CXX:
         // Move the value from its current memory location to the box.
         B.createCopyAddr(loc, arg, proj, IsTake, IsInitialization);
         break;

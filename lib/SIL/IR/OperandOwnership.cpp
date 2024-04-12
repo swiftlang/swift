@@ -505,6 +505,9 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   case SILArgumentConvention::Direct_Unowned:
     return OperandOwnership::UnownedInstantaneousUse;
 
+  case SILArgumentConvention::Indirect_In_CXX:
+    return OperandOwnership::InstantaneousUse;
+
   case SILArgumentConvention::Indirect_Out:
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:

@@ -149,6 +149,7 @@ static void getAssignByWrapperArgsRecursively(SmallVectorImpl<SILValue> &args,
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Pack_Guaranteed:
     case SILArgumentConvention::Pack_Owned:
