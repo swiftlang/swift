@@ -306,7 +306,7 @@ else()
 
   elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
 
-    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
+    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0 copy-legacy-layouts)
     set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
     if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       list(APPEND b0_deps swiftCore-bootstrapping0)
