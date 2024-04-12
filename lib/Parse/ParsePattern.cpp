@@ -1352,10 +1352,17 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // The `borrowing` modifier is a contextual keyword, so it's only accepted
   // directly applied to a binding name, as in `case .foo(borrowing x)`.
   if (Context.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-    if (Tok.isContextualKeyword("_borrowing")
+    if ((Tok.isContextualKeyword("_borrowing")
+         || Tok.isContextualKeyword("borrowing"))
         && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
                              tok::code_complete)
         && !peekToken().isAtStartOfLine()) {
+      if (Tok.isContextualKeyword("_borrowing")) {
+        diagnose(Tok.getLoc(),
+                 diag::borrowing_syntax_change)
+          .fixItReplace(Tok.getLoc(), "borrowing");
+      }
+
       Tok.setKind(tok::contextual_keyword);
       SourceLoc borrowingLoc = consumeToken();
       
@@ -1464,7 +1471,8 @@ Parser::parseMatchingPatternAsBinding(PatternBindingState newState,
 
 bool Parser::isOnlyStartOfMatchingPattern() {
   if (Context.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-    if (Tok.isContextualKeyword("_borrowing")
+    if ((Tok.isContextualKeyword("_borrowing")
+         || Tok.isContextualKeyword("borrowing"))
         && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
                              tok::code_complete)
         && !peekToken().isAtStartOfLine()) {
