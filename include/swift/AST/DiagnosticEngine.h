@@ -727,6 +727,9 @@ namespace swift {
 
     static const char *fixItStringFor(const FixItID id);
 
+    /// Get the best location where an 'import' fixit might be offered.
+    SourceLoc getBestAddImportFixItLoc(const Decl *Member) const;
+
     /// Add a token-based replacement fix-it to the currently-active
     /// diagnostic.
     template <typename... ArgTypes>
@@ -782,6 +785,9 @@ namespace swift {
     InFlightDiagnostic &fixItInsert(SourceLoc L, StringRef Str) {
       return fixItReplaceChars(L, L, "%0", {Str});
     }
+
+    /// Add a fix-it suggesting to 'import' some module.
+    InFlightDiagnostic &fixItAddImport(StringRef ModuleName);
 
     /// Add an insertion fix-it to the currently-active diagnostic.  The
     /// text is inserted immediately *after* the token specified.
@@ -1390,6 +1396,11 @@ namespace swift {
     void resetBufferIndirectlyCausingDiagnostic();
     SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
+    }
+    SourceLoc getBestAddImportFixItLoc(const Decl *Member,
+                                       SourceFile *sourceFile) const;
+    SourceLoc getBestAddImportFixItLoc(const Decl *Member) const {
+      return getBestAddImportFixItLoc(Member, nullptr);
     }
   };
 
