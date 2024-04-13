@@ -9,6 +9,8 @@
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
+// REQUIRES: rdar126415070
+
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
 public protocol ExpressibleByNilLiteral: ~Copyable & ~Escapable {
