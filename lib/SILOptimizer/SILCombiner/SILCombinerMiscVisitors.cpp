@@ -1984,6 +1984,9 @@ SILCombiner::visitKeyPathInst(KeyPathInst *KPI) {
 
   // Specialize every getter/setter in our component list if we have any.
   for (auto component : pattern->getComponents()) {
+    auto specializedComponentTy =
+        component.getComponentType().subst(subs)->getCanonicalType();
+
     switch (component.getKind()) {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty: {
@@ -2007,7 +2010,7 @@ SILCombiner::visitKeyPathInst(KeyPathInst *KPI) {
                                               component.getSubscriptIndexHash(),
                                               component.getExternalDecl(),
                                               component.getExternalSubstitutions(),
-                                              kpType->getCanonicalType());
+                                              specializedComponentTy);
 
         specializedComponents.push_back(specializedComponent);
         break;
@@ -2033,15 +2036,32 @@ SILCombiner::visitKeyPathInst(KeyPathInst *KPI) {
                                               component.getSubscriptIndexHash(),
                                               component.getExternalDecl(),
                                               component.getExternalSubstitutions(),
-                                              kpType->getCanonicalType());
+                                              specializedComponentTy);
 
       specializedComponents.push_back(specializedComponent);
       break;
     }
 
-    // Other keypath component kinds can remain as they are.
-    default: {
-      specializedComponents.push_back(component);
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      specializedComponents.push_back(
+        KeyPathPatternComponent::forStoredProperty(component.getStoredPropertyDecl(),
+                                                   specializedComponentTy));
+      break;
+    }
+
+    case KeyPathPatternComponent::Kind::TupleElement: {
+      specializedComponents.push_back(
+        KeyPathPatternComponent::forTupleElement(component.getTupleIndex(),
+                                                 specializedComponentTy));
+      break;
+    }
+
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap: {
+      specializedComponents.push_back(
+        KeyPathPatternComponent::forOptional(component.getKind(),
+                                             specializedComponentTy));
       break;
     }
     }
