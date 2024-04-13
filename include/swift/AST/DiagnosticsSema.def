@@ -5436,7 +5436,7 @@ ERROR(conflicting_default_argument_isolation,none,
       "default argument cannot be both %0 and %1",
       (ActorIsolation, ActorIsolation))
 ERROR(distributed_decl_needs_explicit_distributed_import,none,
-      "%kind0 requires explicit import of Distributed module",
+      "%kind0 declared without importing module 'Distributed'",
       (const ValueDecl *))
 NOTE(distributed_func_cannot_overload_on_async_only,none,
      "%0 previously declared here, cannot overload distributed methods on effect only", (const ValueDecl *))

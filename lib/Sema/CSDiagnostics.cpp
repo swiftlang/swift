@@ -6195,34 +6195,8 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
                      Member->getDescriptiveKind(), Member->getName(),
                      definingModule->getName());
 
-    auto enclosingSF = getDC()->getParentSourceFile();
-    SourceLoc bestLoc;
-    SourceManager &srcMgr = Member->getASTContext().SourceMgr;
-    for (auto item : enclosingSF->getTopLevelItems()) {
-      // If we found an import declaration, we want to insert after it.
-      if (auto importDecl =
-              dyn_cast_or_null<ImportDecl>(item.dyn_cast<Decl *>())) {
-        SourceLoc loc = importDecl->getEndLoc();
-        if (loc.isValid()) {
-          bestLoc = Lexer::getLocForEndOfLine(srcMgr, loc);
-        }
-
-        // Keep looking for more import declarations.
-        continue;
-      }
-
-      // If we got a location based on import declarations, we're done.
-      if (bestLoc.isValid())
-        break;
-
-      // For any other item, we want to insert before it.
-      SourceLoc loc = item.getStartLoc();
-      if (loc.isValid()) {
-        bestLoc = Lexer::getLocForStartOfLine(srcMgr, loc);
-        break;
-      }
-    }
-
+    SourceLoc bestLoc =
+        getBestAddImportFixItLocation(Member, getDC()->getParentSourceFile());
     if (bestLoc.isValid()) {
       llvm::SmallString<64> importText;
 
