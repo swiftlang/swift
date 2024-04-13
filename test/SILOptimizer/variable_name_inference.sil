@@ -415,7 +415,7 @@ bb0(%0 : @owned $Klass, %1 : @guaranteed $KlassWithKlassPair):
 sil [ossa] @function_argument_inference_through_structextract : $@convention(thin) (@guaranteed KlassPair) -> @owned Klass {
 bb0(%0 : @guaranteed $KlassPair):
   specify_test "variable-name-inference @trace[0]"
-  debug_value %0 : $KlassPair, let, name "self", argno 1, implicit
+  debug_value %0 : $KlassPair, let, name "self", argno 1
   %2 = struct_extract %0 : $KlassPair, #KlassPair.lhs
   %3 = copy_value %2 : $Klass
   debug_value [trace] %3 : $Klass
@@ -430,7 +430,7 @@ bb0(%0 : @guaranteed $KlassPair):
 sil [ossa] @function_argument_inference_through_uncheckedenumdata : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> @owned Klass {
 bb0(%0 : @guaranteed $FakeOptional<Klass>):
   specify_test "variable-name-inference @trace[0]"
-  debug_value %0 : $FakeOptional<Klass>, let, name "self", argno 1, implicit
+  debug_value %0 : $FakeOptional<Klass>, let, name "self", argno 1
   %2 = unchecked_enum_data %0 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
   %3 = copy_value %2 : $Klass
   debug_value [trace] %3 : $Klass
@@ -445,7 +445,7 @@ bb0(%0 : @guaranteed $FakeOptional<Klass>):
 sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr : $@convention(thin) (@in FakeOptional<Klass>) -> @owned Klass {
 bb0(%0 : $*FakeOptional<Klass>):
   specify_test "variable-name-inference @trace[0]"
-  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1, implicit
+  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1
   %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   %3 = load [take] %2 : $*Klass
   debug_value [trace] %3 : $Klass
@@ -460,7 +460,7 @@ bb0(%0 : $*FakeOptional<Klass>):
 sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr_2 : $@convention(thin) (@in FakeOptional<Klass>) -> @owned Klass {
 bb0(%0 : $*FakeOptional<Klass>):
   specify_test "variable-name-inference @trace[0]"
-  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1, implicit
+  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1
   %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   debug_value [trace] %2 : $*Klass
   %3 = load [take] %2 : $*Klass

@@ -1680,7 +1680,7 @@ bb0(%arg : $Builtin.Word):
 
 sil hidden [ossa] @test_unconditional_checked_cast : $@convention(method) (@guaranteed ChildClass) -> @owned ChildClass {
 bb0(%0 : @guaranteed $ChildClass):
-  debug_value %0 : $ChildClass, let, name "self", argno 1, implicit
+  debug_value %0 : $ChildClass, let, name "self", argno 1
   %2 = copy_value %0 : $ChildClass
   %3 = upcast %2 : $ChildClass to $ParentClass
   %4 = function_ref @copyParentClass : $@convention(thin) (@guaranteed ParentClass) -> @owned ParentClass

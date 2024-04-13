@@ -89,7 +89,7 @@ sil @$s4main6do_fooyyyyXEF : $@convention(thin) (@guaranteed @noescape @callee_g
 sil hidden [ossa] @$s4main5FooerC3fooyyF : $@convention(method) (@owned Fooer) -> () {
 // %0 "self"                                      // users: %13, %5, %1
 bb0(%0 : @owned $Fooer):
-  debug_value %0 : $Fooer, let, name "self", argno 1, implicit // id: %1
+  debug_value %0 : $Fooer, let, name "self", argno 1 // id: %1
   %2 = alloc_box ${ var @sil_weak Optional<Fooer> }, var, name "weakSelf" // users: %16, %3
   %3 = begin_borrow [lexical] %2 : ${ var @sil_weak Optional<Fooer> } // users: %10, %15, %4
   %4 = project_box %3 : ${ var @sil_weak Optional<Fooer> }, 0 // user: %7
