@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/Basic/Defer.h"
 #include "swift/AST/ASTPrinter.h"
@@ -33,7 +34,7 @@ using namespace swift;
 
 // ==== ------------------------------------------------------------------------
 
-bool swift::ensureDistributedModuleLoaded(Decl *decl) {
+bool swift::ensureDistributedModuleLoaded(const ValueDecl *decl) {
   auto &C = decl->getASTContext();
   auto moduleAvailable = evaluateOrDefault(
       C.evaluator, DistributedModuleIsAvailableRequest{decl}, false);
@@ -42,14 +43,25 @@ bool swift::ensureDistributedModuleLoaded(Decl *decl) {
 
 bool
 DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
-                                              Decl *decl) const {
+                                              const ValueDecl *decl) const {
   auto &C = decl->getASTContext();
 
-  if (C.getLoadedModule(C.Id_Distributed))
+  auto DistributedModule = C.getLoadedModule(C.Id_Distributed);
+  if (!DistributedModule) {
+    decl->diagnose(diag::distributed_decl_needs_explicit_distributed_import,
+                   decl)
+        .fixItAddImport("Distributed");
+    return false;
+  }
+
+  auto &importCache = C.getImportCache();
+  if (importCache.isImportedBy(DistributedModule, decl->getDeclContext())) {
     return true;
+  }
 
   // seems we're missing the Distributed module, ask to import it explicitly
-  decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
+  decl->diagnose(diag::distributed_decl_needs_explicit_distributed_import,
+                 decl);
   return false;
 }
 
@@ -502,6 +514,10 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
   if (!func->isDistributed())
     return false;
 
+  // ==== Ensure the Distributed module is available,
+  if (!swift::ensureDistributedModuleLoaded(func))
+    return true;
+
   auto &C = func->getASTContext();
   return evaluateOrDefault(C.evaluator,
                            CheckDistributedFunctionRequest{func},
@@ -521,13 +537,11 @@ bool CheckDistributedFunctionRequest::evaluate(
   auto module = func->getParentModule();
 
   /// If no distributed module is available, then no reason to even try checks.
-  if (!C.getLoadedModule(C.Id_Distributed))
+  if (!C.getLoadedModule(C.Id_Distributed)) {
+    func->diagnose(diag::distributed_decl_needs_explicit_distributed_import,
+                   func);
     return true;
-
-//  // No checking for protocol requirements because they are not required
-//  // to have `SerializationRequirement`.
-//  if (isa<ProtocolDecl>(func->getDeclContext()))
-//    return false;
+  }
 
   Type serializationReqType =
       getDistributedActorSerializationType(func->getDeclContext());

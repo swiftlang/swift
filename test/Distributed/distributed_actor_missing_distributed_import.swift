@@ -5,7 +5,7 @@
 actor SomeActor {}
 
 distributed actor DA {}
-// expected-error@-1{{'Distributed' module not imported, required for 'distributed actor'}}
+// expected-error@-1{{distributed actor 'DA' declared without importing module 'Distributed'}}
 
 distributed actor class DAC {}
 // expected-error@-1{{distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
@@ -18,18 +18,24 @@ actor A {
 }
 
 actor B {
-  distributed var neverOk: String { // expected-error{{'Distributed' module not imported, required for 'distributed actor'}}
+  distributed var neverOk: String { // expected-error{{distributed property 'neverOk' declared without importing module 'Distributed'}}
     ""
   }
 }
 
+  // expected-error@+1{{distributed actor 'DA2' declared without importing module 'Distributed'}}
 distributed actor DA2 {
-  // expected-error@-1{{'Distributed' module not imported, required for 'distributed actor'}}
+
   func normal() async {}
+
+  // expected-error@+1{{distributed instance method 'dist()' declared without importing module 'Distributed'}}
   distributed func dist() {}
+
+  // expected-error@+1{{distributed instance method 'distAsync()' declared without importing module 'Distributed'}}
   distributed func distAsync() async {}
 
-  distributed var neverOk: String { // expected-error{{'Distributed' module not imported, required for 'distributed actor'}}
+  // expected-error@+1{{distributed property 'neverOk' declared without importing module 'Distributed'}}
+  distributed var neverOk: String {
     ""
   }
 }
