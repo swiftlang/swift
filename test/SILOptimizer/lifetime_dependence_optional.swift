@@ -59,7 +59,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch self {
-    case .some(_borrowing y):
+    case .some(borrowing y):
       return .some(try transform(y))
     case .none:
       return .none
@@ -83,7 +83,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
-    case .some(_borrowing y):
+    case .some(borrowing y):
       return try transform(y)
     case .none:
       return .none
