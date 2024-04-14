@@ -9,8 +9,6 @@
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-// REQUIRES: rdar126415070
-
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
 public protocol ExpressibleByNilLiteral: ~Copyable & ~Escapable {
@@ -61,7 +59,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch self {
-    case .some(_borrowing y):
+    case .some(borrowing y):
       return .some(try transform(y))
     case .none:
       return .none
@@ -85,7 +83,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
-    case .some(_borrowing y):
+    case .some(borrowing y):
       return try transform(y)
     case .none:
       return .none
