@@ -1,38 +1,61 @@
 if (SWIFT_BUILD_SWIFT_SYNTAX)
+  # _swiftCSwiftPluginServer is just a C support library for swift-plugin-server
+  # Don't bother to create '.a' for that.
+  add_swift_host_library(_swiftCSwiftPluginServer OBJECT
+    Sources/CSwiftPluginServer/PluginServer.cpp
+  )
+  target_link_libraries(_swiftCSwiftPluginServer PRIVATE
+    swiftDemangling
+  )
+  target_include_directories(_swiftCSwiftPluginServer PUBLIC
+    Sources/CSwiftPluginServer/include
+  )
+
+  add_pure_swift_host_library(SwiftPluginServerSupport EMIT_MODULE
+    Sources/SwiftPluginServerSupport/SwiftPluginServerSupport.swift
+    DEPENDENCIES
+      $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
+  )
+  target_include_directories(SwiftPluginServerSupport PRIVATE
+    Sources/CSwiftPluginServer/include
+  )
+
   add_pure_swift_host_tool(swift-plugin-server
     Sources/swift-plugin-server/swift-plugin-server.swift
+    DEPENDENCIES
+      swiftDemangling
+      $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
+    SWIFT_COMPONENT
+      compiler
+    SWIFT_DEPENDENCIES
+      SwiftSyntaxMacros
+      SwiftSyntaxMacroExpansion
+      SwiftCompilerPluginMessageHandling
+      swiftLLVMJSON
+      SwiftPluginServerSupport
+  )
+  target_include_directories(swift-plugin-server PRIVATE
+    Sources/CSwiftPluginServer/include
+  )
+
+  add_pure_swift_host_tool(swift-wasm-plugin-server
+    Sources/swift-wasm-plugin-server/swift-wasm-plugin-server.swift
+    Sources/swift-wasm-plugin-server/JSCWasmPlugin.swift
+    DEPENDENCIES
+      $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
     SWIFT_COMPONENT
       compiler
     SWIFT_DEPENDENCIES
       SwiftCompilerPluginMessageHandling
-      SwiftLibraryPluginProvider
-    PACKAGE_NAME Toolchain
+      swiftLLVMJSON
+      SwiftPluginServerSupport
   )
-
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
-  add_pure_swift_host_library(SwiftInProcPluginServer SHARED
-    Sources/SwiftInProcPluginServer/InProcPluginServer.swift
-    SWIFT_DEPENDENCIES
-      SwiftCompilerPluginMessageHandling
-      SwiftLibraryPluginProvider
-    PACKAGE_NAME Toolchain
+  target_include_directories(swift-wasm-plugin-server PRIVATE
+    Sources/CSwiftPluginServer/include
   )
-
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    set_property(TARGET SwiftInProcPluginServer
-      APPEND PROPERTY INSTALL_RPATH
-      "@loader_path")
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
-    set_property(TARGET SwiftInProcPluginServer
-      APPEND PROPERTY INSTALL_RPATH
-        "$ORIGIN")
-    _set_pure_swift_link_flags(SwiftInProcPluginServer "../../")
+    add_custom_command(TARGET swift-wasm-plugin-server POST_BUILD COMMAND
+      codesign -fs - $<TARGET_FILE:swift-wasm-plugin-server> --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/allow-jit.plist
+    )
   endif()
-
-  add_dependencies(compiler SwiftInProcPluginServer)
-  swift_install_in_component(TARGETS SwiftInProcPluginServer
-    ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler
-    LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler
-    RUNTIME DESTINATION "bin" COMPONENT compiler)
 endif()
