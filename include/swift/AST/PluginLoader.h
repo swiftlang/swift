@@ -31,6 +31,7 @@ public:
   struct PluginEntry {
     StringRef libraryPath;
     StringRef executablePath;
+    bool forceDisableSandbox;
 
     /// The paths as passed to the frontend, before the loader unmapped them to
     /// load the plugin from disk. Empty if no prefix mapping is in effect.
