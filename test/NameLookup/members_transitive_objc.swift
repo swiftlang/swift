@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_C.swift
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_E.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/Categories -verify -enable-experimental-feature MemberImportVisibility
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/Categories -import-objc-header %S/Inputs/Categories/Bridging.h -verify -enable-experimental-feature MemberImportVisibility
 
 // REQUIRES: objc_interop
 
@@ -20,6 +20,7 @@ func test(x: X) {
   x.fromC() // expected-error {{class method 'fromC()' is not available due to missing import of defining module 'Categories_C'}}
   x.fromOverlayForC() // expected-error {{instance method 'fromOverlayForC()' is not available due to missing import of defining module 'Categories_C'}}
   x.fromSubmoduleOfD() // expected-error {{class method 'fromSubmoduleOfD()' is not available due to missing import of defining module 'Categories_D'}}
+  x.fromBridgingHeader()
 }
 
 func testAnyObject(a: AnyObject) {
@@ -32,4 +33,15 @@ func testAnyObject(a: AnyObject) {
   // `MemberImportVisibility` has no effect on these diagnostics.
   a.fromC() // expected-error {{value of type 'AnyObject' has no member 'fromC'}}
   a.fromOverlayForCObjC() // expected-error {{value of type 'AnyObject' has no member 'fromOverlayForCObjC'}}
+  a.fromBridgingHeader()
+}
+
+extension StructInBridgingHeader {
+  init(_ x: Int32) {
+    self.init(member: x)
+  }
+
+  var wrappedMember: Int32 {
+    return member
+  }
 }
