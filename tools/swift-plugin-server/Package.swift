@@ -5,29 +5,57 @@ import PackageDescription
 let package = Package(
   name: "swift-plugin-server",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v10_15)
   ],
   products: [
-    .executable(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
-    .library(name: "SwiftInProcPluginServer", type: .dynamic, targets: ["SwiftInProcPluginServer"]),
+    .library(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
+    .library(name: "swift-wasm-plugin-server", targets: ["swift-wasm-plugin-server"]),
   ],
   dependencies: [
     .package(path: "../../../swift-syntax"),
+    .package(path: "../../lib/ASTGen"),
   ],
   targets: [
-    .executableTarget(
-      name: "swift-plugin-server",
-      dependencies: [
-        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
+    .target(
+      name: "CSwiftPluginServer",
+      cxxSettings: [
+        .unsafeFlags([
+          "-I", "../../include",
+          "-I", "../../stdlib/public/SwiftShims",
+          "-I", "../../../build/Default/swift/include",
+          "-I", "../../../build/Default/llvm/include",
+          "-I", "../../../llvm-project/llvm/include",
+        ])
       ]
     ),
     .target(
-      name: "SwiftInProcPluginServer",
+      name: "SwiftPluginServerSupport",
       dependencies: [
-        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
-      ]
+        .product(name: "swiftLLVMJSON", package: "ASTGen"),
+        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        "CSwiftPluginServer"
+      ],
+      swiftSettings: [.interoperabilityMode(.Cxx)]
+    ),
+    .target(
+      name: "swift-plugin-server",
+      dependencies: [
+        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+        "CSwiftPluginServer",
+        "SwiftPluginServerSupport",
+      ],
+      swiftSettings: [.interoperabilityMode(.Cxx)]
+    ),
+    .target(
+      name: "swift-wasm-plugin-server",
+      dependencies: [
+        .product(name: "swiftLLVMJSON", package: "ASTGen"),
+        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        "CSwiftPluginServer",
+        "SwiftPluginServerSupport",
+      ],
+      swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
   ],
   cxxLanguageStandard: .cxx17
