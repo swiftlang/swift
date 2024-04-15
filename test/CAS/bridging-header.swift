@@ -13,6 +13,8 @@
 // CHECK-NEXT:    "A"
 // CHECK-NEXT:  ],
 // CHECK-NEXT:  "commandLine": [
+// CHECK:         "-fmodule-format=obj"
+// CHECK:         "-dwarf-ext-refs"
 // CHECK:         "-fmodule-file-cache-key",
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "{{.*}}{{/|\\}}A-{{.*}}.pcm", 
