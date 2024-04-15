@@ -29,12 +29,10 @@ final class SwiftPluginServer {
     try connection.sendMessage(message)
   }
 
-  @MainActor private func loadPluginLibrary(path: String, moduleName: String) async throws -> WasmPlugin {
-    // TODO: fall back to WasmKit for non-macOS and macOS < 10.15
-    guard #available(macOS 10.15, *) else { throw PluginServerError(message: "Wasm plugins currently require macOS 10.15+") }
+  private func loadPluginLibrary(path: String, moduleName: String) async throws -> WasmPlugin {
     guard path.hasSuffix(".wasm") else { throw PluginServerError(message: "swift-wasm-plugin-server can only load wasm") }
     let wasm = try Data(contentsOf: URL(fileURLWithPath: path))
-    return try await JSCWasmPlugin(wasm: wasm)
+    return try await defaultWasmPlugin.init(wasm: wasm)
   }
 
   private func expandMacro(
@@ -100,5 +98,8 @@ final class SwiftPluginServer {
 }
 
 protocol WasmPlugin {
+  init(wasm: Data) async throws
   func handleMessage(_ json: Data) async throws -> Data
 }
+
+private var defaultWasmPlugin: (some WasmPlugin).Type { DefaultWasmPlugin.self }

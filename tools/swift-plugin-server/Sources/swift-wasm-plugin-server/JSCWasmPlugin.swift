@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if os(macOS)
+
 import JavaScriptCore
+
+typealias DefaultWasmPlugin = JSCWasmPlugin
 
 // returns: (wasm: ArrayBuffer) => Promise<(input: ArrayBuffer) => ArrayBuffer>
 private let js = """
@@ -40,13 +44,16 @@ async (wasmData) => {
 }
 """
 
-@available(macOS 10.15, *)
 final class JSCWasmPlugin: WasmPlugin {
   private static let factory = JSContext()?.evaluateScript(js)
 
   private let handler: JSValue
 
   @MainActor init(wasm data: Data) async throws {
+    guard #available(macOS 10.15, *) else {
+      throw JSCWasmError(message: "JSC Wasm plugins currently require macOS 10.15+")
+    }
+
     guard let factory = Self.factory, let context = factory.context else {
       throw JSCWasmError(message: "Failed to load plugin")
     }
@@ -131,3 +138,5 @@ extension JSValue {
     }
   }
 }
+
+#endif
