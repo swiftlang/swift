@@ -12,6 +12,7 @@
 
 import JavaScriptCore
 
+// returns: Promise<(ArrayBuffer) => ArrayBuffer>
 private let js = """
 (async () => {
   const mod = await WebAssembly.compile(wasmData);
@@ -41,12 +42,10 @@ private let js = """
 
 @available(macOS 10.15, *)
 final class JSCWasmPlugin: WasmPlugin {
-  private let context: JSContext
-  private let fn: JSValue
+  private let handler: JSValue
 
   @MainActor init(wasm data: Data) async throws {
     guard let context = JSContext() else { throw PluginServerError(message: "Could not create JSContext") }
-    self.context = context
 
     let jsBuf = try JSValue(newBufferWithData: data, in: context)
     context.globalObject.setObject(jsBuf, forKeyedSubscript: "wasmData")
@@ -59,13 +58,15 @@ final class JSCWasmPlugin: WasmPlugin {
       throw PluginServerError(message: "Failed to load plugin: \(error)")
     }
 
-    fn = try await promise.promiseValue
+    handler = try await promise.promiseValue
   }
 
   @MainActor func handleMessage(_ json: Data) throws -> Data {
-    let jsonJS = try JSValue(newBufferWithData: json, in: context)
-    let res = fn.call(withArguments: [jsonJS])
-    return res!.toData()
+    let jsonJS = try JSValue(newBufferWithData: json, in: handler.context)
+    guard let result = handler.call(withArguments: [jsonJS]) else {
+      throw PluginServerError(message: "Wasm plugin did not provide a valid response")
+    }
+    return result.arrayBufferData()
   }
 }
 
@@ -82,7 +83,7 @@ extension JSValue {
     self.init(jsValueRef: rawBuf, in: context)
   }
 
-  fileprivate func toData() -> Data {
+  fileprivate func arrayBufferData() -> Data {
     let base = JSObjectGetArrayBufferBytesPtr(context.jsGlobalContextRef, jsValueRef, nil)
     let count = JSObjectGetArrayBufferByteLength(context.jsGlobalContextRef, jsValueRef, nil)
     let buf = UnsafeBufferPointer(start: base?.assumingMemoryBound(to: UInt8.self), count: count)
@@ -93,14 +94,26 @@ extension JSValue {
   fileprivate var promiseValue: JSValue {
     get async throws {
       try await withCheckedThrowingContinuation { continuation in
-        invokeMethod("then", withArguments: [
-          JSValue(object: { val in
-            continuation.resume(returning: val)
-          } as @convention(block) (JSValue) -> Void, in: context)!,
-          JSValue(object: { err in
-            continuation.resume(throwing: PluginServerError(message: "\(err)"))
-          } as @convention(block) (JSValue) -> Void, in: context)!
-        ])
+        typealias Handler = @convention(block) (JSValue) -> Void
+        let successFunc = JSValue(
+          object: {
+            continuation.resume(returning: $0)
+          } as Handler,
+          in: context
+        )
+        let rejectFunc = JSValue(
+          object: { error in
+            continuation.resume(
+              throwing: PluginServerError(message: "\(error)")
+            )
+          } as @convention(block) (JSValue) -> Void,
+          in: context
+        )
+        guard let successFunc, let rejectFunc else {
+          continuation.resume(throwing: PluginServerError(message: "Could not await promise"))
+          return
+        }
+        invokeMethod("then", withArguments: [successFunc, rejectFunc])
         if let exception = context.exception {
           continuation.resume(throwing: PluginServerError(message: "\(exception)"))
         }
