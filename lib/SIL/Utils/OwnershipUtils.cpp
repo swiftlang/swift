@@ -937,7 +937,6 @@ void BorrowedValue::getLocalScopeEndingInstructions(
 bool BorrowedValue::visitLocalScopeEndingUses(
     function_ref<bool(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
-  SILValue v = value;
   switch (kind) {
   case BorrowedValueKind::Invalid:
     llvm_unreachable("Using invalid case?!");
