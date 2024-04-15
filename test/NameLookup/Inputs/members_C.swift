@@ -1,5 +1,5 @@
-@_exported import extensions_A
-import extensions_B
+@_exported import members_A
+import members_B
 
 
 extension X {

@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_C.swift
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_E.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/Categories -verify -enable-experimental-feature ExtensionImportVisibility
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/Categories -verify -enable-experimental-feature MemberImportVisibility
 
 // REQUIRES: objc_interop
 
@@ -29,7 +29,7 @@ func testAnyObject(a: AnyObject) {
   a.fromOverlayForBObjC()
   // FIXME: Better diagnostics?
   // Name lookup for AnyObject already ignored transitive imports, so
-  // ExtensionImportVisibility has no effect on these diagnostics.
+  // `MemberImportVisibility` has no effect on these diagnostics.
   a.fromC() // expected-error {{value of type 'AnyObject' has no member 'fromC'}}
   a.fromOverlayForCObjC() // expected-error {{value of type 'AnyObject' has no member 'fromOverlayForCObjC'}}
 }
