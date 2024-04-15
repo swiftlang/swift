@@ -53,7 +53,9 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_include_directories(swift-wasm-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include
   )
-  add_custom_command(TARGET swift-wasm-plugin-server POST_BUILD COMMAND
-    codesign -fs - $<TARGET_FILE:swift-wasm-plugin-server> --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/allow-jit.plist
-  )
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    add_custom_command(TARGET swift-wasm-plugin-server POST_BUILD COMMAND
+      codesign -fs - $<TARGET_FILE:swift-wasm-plugin-server> --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/allow-jit.plist
+    )
+  endif()
 endif()
