@@ -15,7 +15,6 @@ import Foundation
 import swiftLLVMJSON
 import SwiftPluginServerSupport
 
-@available(macOS 10.15, *)
 @main
 final class SwiftPluginServer {
   let connection: PluginHostConnection
@@ -31,6 +30,8 @@ final class SwiftPluginServer {
   }
 
   @MainActor private func loadPluginLibrary(path: String, moduleName: String) async throws -> WasmPlugin {
+    // TODO: fall back to WasmKit for non-macOS and macOS < 10.15
+    guard #available(macOS 10.15, *) else { throw PluginServerError(message: "Wasm plugins currently require macOS 10.15+") }
     guard path.hasSuffix(".wasm") else { throw PluginServerError(message: "swift-wasm-plugin-server can only load wasm") }
     let wasm = try Data(contentsOf: URL(fileURLWithPath: path))
     return try await JSCWasmPlugin(wasm: wasm)
