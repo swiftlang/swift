@@ -30,10 +30,9 @@ final class SwiftPluginServer {
   }
 
   @MainActor private func loadPluginLibrary(path: String, moduleName: String) async throws -> WasmPlugin {
-    guard #available(macOS 10.15, *) else { throw PluginServerError(message: "Wasm support requires macOS 12+") }
     guard path.hasSuffix(".wasm") else { throw PluginServerError(message: "swift-wasm-plugin-server can only load wasm") }
     let wasm = try Data(contentsOf: URL(fileURLWithPath: path))
-    return try await JSCWasmPlugin(wasm: wasm)
+    return try JSCWasmPlugin(wasm: wasm)
   }
 
   private func expandMacro(
@@ -83,6 +82,10 @@ final class SwiftPluginServer {
       case .expandAttachedMacro(let macro, _, _, _, _, _, _, _, _),
            .expandFreestandingMacro(let macro, _, _, _, _):
         try await expandMacro(moduleName: macro.moduleName, message: message)
+      #if !SWIFT_PACKAGE
+      @unknown default:
+        break
+      #endif
       }
     }
   }
@@ -222,12 +225,11 @@ struct PluginServerError: Error, CustomStringConvertible {
 
 import JavaScriptCore
 
-@available(macOS 10.15, *)
 final class JSCWasmPlugin: WasmPlugin {
   private let context: JSContext
   private let fn: JSValue
 
-  @MainActor init(wasm data: Data) async throws {
+  @MainActor init(wasm data: Data) throws {
     guard let context = JSContext() else { throw PluginServerError(message: "Could not create JSContext") }
     self.context = context
 
@@ -287,7 +289,7 @@ final class JSCWasmPlugin: WasmPlugin {
     }().get()
   }
 
-  @MainActor func handleMessage(_ json: Data) async throws -> Data {
+  @MainActor func handleMessage(_ json: Data) throws -> Data {
     let jsonJS = try JSValue(newBufferWithData: json, in: context)
     let res = fn.call(withArguments: [jsonJS])
     return res!.toData()
