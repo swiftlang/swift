@@ -32,7 +32,6 @@ public:
   struct PluginEntry {
     StringRef libraryPath;
     StringRef executablePath;
-    bool forceDisableSandbox;
   };
 
 private:
@@ -87,7 +86,7 @@ public:
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
   llvm::Expected<LoadedExecutablePlugin *>
-  loadExecutablePlugin(llvm::StringRef path, bool forceDisableSandbox);
+  loadExecutablePlugin(llvm::StringRef path);
 
   /// Add the specified plugin associated with the module name to the dependency
   /// tracker if needed.

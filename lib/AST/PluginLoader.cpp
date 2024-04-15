@@ -72,7 +72,7 @@ PluginLoader::getPluginMap() {
   // Helper function to try inserting an entry if there's no existing entry
   // associated with the module name.
   auto try_emplace = [&](StringRef moduleName, StringRef libPath,
-                         StringRef execPath, bool forceDisableSandbox = false) {
+                         StringRef execPath) {
     auto moduleNameIdentifier = Ctx.getIdentifier(moduleName);
     if (map.find(moduleNameIdentifier) != map.end()) {
       // Specified module name is already in the map.
@@ -81,9 +81,7 @@ PluginLoader::getPluginMap() {
 
     libPath = libPath.empty() ? "" : Ctx.AllocateCopy(libPath);
     execPath = execPath.empty() ? "" : Ctx.AllocateCopy(execPath);
-    auto result = map.insert({moduleNameIdentifier, {
-      libPath, execPath, forceDisableSandbox
-    }});
+    auto result = map.insert({moduleNameIdentifier, {libPath, execPath}});
     assert(result.second);
     (void)result;
   };
@@ -115,7 +113,7 @@ PluginLoader::getPluginMap() {
         // TODO: improve path resolution: we really want tools_dir
         llvm::sys::path::append(runner, Ctx.SearchPathOpts.RuntimeResourcePath, "../../bin/swift-wasm-plugin-server");
         for (auto &moduleName : val.ModuleNames) {
-          try_emplace(moduleName, val.ExecutablePath, runner, true);
+          try_emplace(moduleName, val.ExecutablePath, runner);
         }
       } else {
         for (auto &moduleName : val.ModuleNames) {
@@ -164,7 +162,7 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
   auto &map = getPluginMap();
   auto found = map.find(moduleName);
   if (found == map.end()) {
-    static PluginEntry notFound{"", "", false};
+    static PluginEntry notFound{"", ""};
     return notFound;
   }
 
@@ -198,7 +196,7 @@ PluginLoader::loadLibraryPlugin(StringRef path) {
 }
 
 llvm::Expected<LoadedExecutablePlugin *>
-PluginLoader::loadExecutablePlugin(StringRef path, bool forceDisableSandbox) {
+PluginLoader::loadExecutablePlugin(StringRef path) {
   auto fs = Ctx.SourceMgr.getFileSystem();
   SmallString<128> resolvedPath;
   if (auto err = fs->getRealPath(path, resolvedPath)) {
@@ -207,7 +205,7 @@ PluginLoader::loadExecutablePlugin(StringRef path, bool forceDisableSandbox) {
 
   // Load the plugin.
   auto plugin =
-    getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox || forceDisableSandbox);
+      getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox);
   if (!plugin) {
     resolvedPath.push_back(0);
     return llvm::handleErrors(

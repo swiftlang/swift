@@ -346,7 +346,7 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
 
   if (!entry.executablePath.empty()) {
     llvm::Expected<LoadedExecutablePlugin *> executablePlugin =
-        loader.loadExecutablePlugin(entry.executablePath, entry.forceDisableSandbox);
+        loader.loadExecutablePlugin(entry.executablePath);
     if (executablePlugin) {
       if (ctx->LangOpts.EnableMacroLoadingRemarks) {
         unsigned tag = entry.libraryPath.empty() ? 1 : 2;
