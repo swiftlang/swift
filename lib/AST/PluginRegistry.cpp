@@ -93,7 +93,10 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
   std::lock_guard<std::mutex> lock(mtx);
 
   // See if the plugin is already loaded.
-  auto &storage = LoadedPluginExecutables[path];
+  // include disableSandbox in the key so that we can have a plugin loaded
+  // as both sandboxed and unsandboxed at the same time.
+  const std::string key = (disableSandbox ? "0" : "1") + path.str();
+  auto &storage = LoadedPluginExecutables[key];
   if (storage) {
     // See if the loaded one is still usable.
     if (storage->getLastModificationTime() == stat.getLastModificationTime())

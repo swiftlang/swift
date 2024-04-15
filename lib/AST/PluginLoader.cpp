@@ -106,8 +106,17 @@ PluginLoader::getPluginMap() {
     case PluginSearchOption::Kind::LoadPluginExecutable: {
       auto &val = entry.get<PluginSearchOption::LoadPluginExecutable>();
       assert(!val.ExecutablePath.empty() && "empty plugin path");
-      for (auto &moduleName : val.ModuleNames) {
-        try_emplace(moduleName, /*libraryPath=*/"", val.ExecutablePath);
+      if (llvm::sys::path::filename(val.ExecutablePath).ends_with(".wasm")) {
+        SmallString<128> runner;
+        // TODO: improve path resolution: we really want tools_dir
+        llvm::sys::path::append(runner, Ctx.SearchPathOpts.RuntimeResourcePath, "../../bin/swift-plugin-server");
+        for (auto &moduleName : val.ModuleNames) {
+          try_emplace(moduleName, val.ExecutablePath, runner);
+        }
+      } else {
+        for (auto &moduleName : val.ModuleNames) {
+          try_emplace(moduleName, /*libraryPath=*/"", val.ExecutablePath);
+        }
       }
       continue;
     }
@@ -185,7 +194,7 @@ PluginLoader::loadLibraryPlugin(StringRef path) {
 }
 
 llvm::Expected<LoadedExecutablePlugin *>
-PluginLoader::loadExecutablePlugin(StringRef path) {
+PluginLoader::loadExecutablePlugin(StringRef path, bool forceDisableSandbox) {
   auto fs = Ctx.SourceMgr.getFileSystem();
   SmallString<128> resolvedPath;
   if (auto err = fs->getRealPath(path, resolvedPath)) {
@@ -194,7 +203,7 @@ PluginLoader::loadExecutablePlugin(StringRef path) {
 
   // Load the plugin.
   auto plugin =
-      getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox);
+    getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox || forceDisableSandbox);
   if (!plugin) {
     resolvedPath.push_back(0);
     return llvm::handleErrors(

@@ -1,4 +1,4 @@
-// swift-tools-version: 5.6
+// swift-tools-version: 5.9
 
 import PackageDescription
 
@@ -17,11 +17,14 @@ let package = Package(
       cxxSettings: [
         .unsafeFlags([
           "-I", "../../include",
+          "-I", "../../stdlib/public/SwiftShims",
+          "-I", "../../../build/Default/swift/include",
+          "-I", "../../../build/Default/llvm/include",
           "-I", "../../../llvm-project/llvm/include",
         ])
       ]
     ),
-    .executableTarget(
+    .target(
       name: "swift-plugin-server",
       dependencies: [
         .product(name: "swiftLLVMJSON", package: "ASTGen"),
@@ -32,7 +35,8 @@ let package = Package(
         .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         "CSwiftPluginServer"
-      ]
+      ],
+      swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
   ],
   cxxLanguageStandard: .cxx17

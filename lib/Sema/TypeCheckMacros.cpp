@@ -345,8 +345,9 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   SmallString<0> errorMessage;
 
   if (!entry.executablePath.empty()) {
+    bool forceDisableSandbox = entry.libraryPath.ends_with(".wasm");
     llvm::Expected<LoadedExecutablePlugin *> executablePlugin =
-        loader.loadExecutablePlugin(entry.executablePath);
+        loader.loadExecutablePlugin(entry.executablePath, forceDisableSandbox);
     if (executablePlugin) {
       if (ctx->LangOpts.EnableMacroLoadingRemarks) {
         unsigned tag = entry.libraryPath.empty() ? 1 : 2;
