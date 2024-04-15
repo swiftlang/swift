@@ -295,3 +295,13 @@ public func getEmptySet() -> Set<Int> {
   return Set()
 }
 
+public protocol Visitable {
+  func visit()
+}
+@available(SwiftStdlib 6.0, *)
+public struct S<each T : Visitable> {
+  var storage: (repeat each T)
+  public func visit() {
+    _ = (repeat (each storage).visit())
+  }
+}
