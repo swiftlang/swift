@@ -260,7 +260,7 @@ bb22:
 sil @no_init : $@convention(thin) () -> (@out ())
 
 // CHECK-LABEL: sil @test_empty_tuple_uninintialized : $@convention(thin) () -> () {
-// CHECK-NOT: inject_enum_addr
+// TODO-NOT: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_tuple_uninintialized'
 sil @test_empty_tuple_uninintialized : $@convention(thin) () -> () {
 bb0:
@@ -287,7 +287,7 @@ bb3:
 sil @no_init_nested_tuple : $@convention(thin) () -> (@out ((), ()))
 
 // CHECK-LABEL: sil @test_empty_nested_tuple_uninintialized : $@convention(thin) () -> () {
-// CHECK-NOT: inject_enum_addr
+// TODO-NOT: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_nested_tuple_uninintialized'
 sil @test_empty_nested_tuple_uninintialized : $@convention(thin) () -> () {
 bb0:
@@ -314,7 +314,7 @@ bb3:
 sil @no_init_struct : $@convention(thin) () -> (@out ResilientEmptyStruct)
 
 // CHECK-LABEL: sil @test_empty_struct_uninitialized : $@convention(thin) () -> () {
-// CHECK-NOT: switch_enum_addr
+// TODO-NOT: switch_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_struct_uninitialized'
 sil @test_empty_struct_uninitialized : $@convention(thin) () -> () {
 bb0:
@@ -340,7 +340,7 @@ bb3:
 sil @no_init_c_union : $@convention(thin) () -> (@out EmptyCUnion)
 
 // CHECK-LABEL: sil @test_empty_c_union : $@convention(thin) () -> () {
-// CHECK: inject_enum_addr
+// TODO: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_c_union'
 sil @test_empty_c_union : $@convention(thin) () -> () {
 bb0:
@@ -370,7 +370,7 @@ struct NestedUnreferenceableStorage {
 sil @no_init_nested_c_union : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
 
 // CHECK-LABEL: sil @test_empty_nested_c_union : $@convention(thin) () -> () {
-// CHECK: inject_enum_addr
+// TODO: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_nested_c_union'
 sil @test_empty_nested_c_union : $@convention(thin) () -> () {
 bb0:

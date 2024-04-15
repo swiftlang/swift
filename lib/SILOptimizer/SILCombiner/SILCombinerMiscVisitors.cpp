@@ -948,6 +948,16 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   if (IEAI->getFunction()->hasOwnership())
     return nullptr;
 
+  // Disable this for empty typle type because empty tuple stack locations maybe
+  // uninitialized. And converting to value form loses tag information.
+  if (IEAI->getElement()->hasAssociatedValues()) {
+    SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
+        IEAI->getElement(), IEAI->getFunction());
+    if (elemType.isEmpty(*IEAI->getFunction())) {
+      return nullptr;
+    }
+  }
+
   // Given an inject_enum_addr of a concrete type without payload, promote it to
   // a store of an enum. Mem2reg/load forwarding will clean things up for us. We
   // can't handle the payload case here due to the flow problems caused by the
