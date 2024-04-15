@@ -72,7 +72,7 @@ PluginLoader::getPluginMap() {
   // Helper function to try inserting an entry if there's no existing entry
   // associated with the module name.
   auto try_emplace = [&](StringRef moduleName, StringRef libPath,
-                         StringRef execPath) {
+                         StringRef execPath, bool forceDisableSandbox = false) {
     auto moduleNameIdentifier = Ctx.getIdentifier(moduleName);
     if (map.find(moduleNameIdentifier) != map.end()) {
       // Specified module name is already in the map.
@@ -81,7 +81,9 @@ PluginLoader::getPluginMap() {
 
     libPath = libPath.empty() ? "" : Ctx.AllocateCopy(libPath);
     execPath = execPath.empty() ? "" : Ctx.AllocateCopy(execPath);
-    auto result = map.insert({moduleNameIdentifier, {libPath, execPath}});
+    auto result = map.insert({moduleNameIdentifier, {
+      libPath, execPath, forceDisableSandbox
+    }});
     assert(result.second);
     (void)result;
   };
@@ -107,11 +109,13 @@ PluginLoader::getPluginMap() {
       auto &val = entry.get<PluginSearchOption::LoadPluginExecutable>();
       assert(!val.ExecutablePath.empty() && "empty plugin path");
       if (llvm::sys::path::filename(val.ExecutablePath).ends_with(".wasm")) {
+        // we treat wasm plugins like library plugins that can be loaded by an external
+        // "macro runner" executable
         SmallString<128> runner;
         // TODO: improve path resolution: we really want tools_dir
         llvm::sys::path::append(runner, Ctx.SearchPathOpts.RuntimeResourcePath, "../../bin/swift-plugin-server");
         for (auto &moduleName : val.ModuleNames) {
-          try_emplace(moduleName, val.ExecutablePath, runner);
+          try_emplace(moduleName, val.ExecutablePath, runner, true);
         }
       } else {
         for (auto &moduleName : val.ModuleNames) {
@@ -160,7 +164,7 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
   auto &map = getPluginMap();
   auto found = map.find(moduleName);
   if (found == map.end()) {
-    static PluginEntry notFound{"", ""};
+    static PluginEntry notFound{"", "", false};
     return notFound;
   }
 
