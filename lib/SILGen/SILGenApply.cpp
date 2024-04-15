@@ -616,6 +616,69 @@ public:
     return result;
   }
 
+
+  /// Determine if the target `func` should be replaced with a
+  /// 'distributed thunk'.
+  ///
+  /// This only applies to distributed functions when calls are made cross-actor
+  /// isolation. One notable exception is a distributed thunk calling the "real
+  /// underlying method", in which case (to avoid the thunk calling into itself,
+  /// the real method must be called).
+  ///
+  /// Witness calls which may need to be replaced with a distributed thunk call
+  /// happen either when the target type is generic, or if we are inside an
+  /// extension on a protocol. This method checks if we are in a context
+  /// where we should be calling the distributed thunk of the `func` or not.
+  /// Notably, if we are inside a distributed thunk already and are trying to
+  /// apply distributed method calls, all those must be to the "real" method,
+  /// because the thunks' responsibility is to call the real method, so this
+  /// replacement cannot be applied (or we'd recursively keep calling the same
+  /// thunk via witness).
+  ///
+  /// In situations which do not use a witness call, distributed methods are always
+  /// invoked Direct, and never ClassMethod, because distributed are effectively
+  /// final.
+  ///
+  /// \param constant the target that we want to dispatch to
+  /// \return true when the function should be considered for replacement
+  ///         with distributed thunk when applying it
+  bool shouldDispatchWitnessViaDistributedThunk(
+      SILGenFunction &SGF,
+      std::optional<SILDeclRef> constant
+      ) const {
+    if (!constant.has_value())
+      return false;
+
+    auto func = dyn_cast<FuncDecl>(constant->getDecl());
+    if (!func)
+      return false;
+
+    auto isDistributedFuncOrAccessor =
+        func->isDistributed();
+    if (auto acc = dyn_cast<AccessorDecl>(func)) {
+      isDistributedFuncOrAccessor =
+          acc->getStorage()->isDistributed();
+    }
+
+    if (!isDistributedFuncOrAccessor)
+      return false;
+
+    // If we are inside a distributed thunk, we want to call the "real" method,
+    // in order to avoid infinitely recursively calling the thunk from itself.
+    if (SGF.F.isDistributed() && SGF.F.isThunk())
+      return false;
+
+    // If caller and called func are isolated to the same (distributed) actor,
+    // (i.e. we are "inside the distributed actor"), there is no need to call
+    // the thunk.
+    if (isSameActorIsolated(func, SGF.FunctionDC))
+      return false;
+
+    // In all other situations, we may have to replace the called function,
+    // depending on isolation (to be checked in SILGenApply).
+    return true;
+  }
+
   ManagedValue getFnValue(SILGenFunction &SGF,
                           std::optional<ManagedValue> borrowedSelf) const & {
     std::optional<SILDeclRef> constant = std::nullopt;
@@ -681,22 +744,12 @@ public:
       return fn;
     }
     case Kind::WitnessMethod: {
-      if (auto func = constant->getFuncDecl()) {
-        auto isDistributedFuncOrAccessor =
-            func->isDistributed();
-        if (auto acc = dyn_cast<AccessorDecl>(func)) {
-          isDistributedFuncOrAccessor =
-              acc->getStorage()->isDistributed();
-        }
-        if (isa<ProtocolDecl>(func->getDeclContext()) && isDistributedFuncOrAccessor) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            // the protocol witness must always be a distributed thunk, as we
-            // may be crossing a remote boundary here.
-            auto thunk = func->getDistributedThunk();
-            constant = SILDeclRef(thunk).asDistributed();
-          }
-        }
+      if (shouldDispatchWitnessViaDistributedThunk(SGF, constant)) {
+        auto func = dyn_cast<FuncDecl>(constant->getDecl());
+        assert(func); // guaranteed be non-null if shouldDispatch returned true
+
+        auto thunk = func->getDistributedThunk();
+        constant = SILDeclRef(thunk).asDistributed();
       }
 
       auto constantInfo =
@@ -783,12 +836,8 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            /// We must adjust the constant to use a distributed thunk.
-            constant = constant->asDistributed();
-          }
+        if (shouldDispatchWitnessViaDistributedThunk(SGF, constant)) {
+          constant = constant->asDistributed();
         }
       }
 
