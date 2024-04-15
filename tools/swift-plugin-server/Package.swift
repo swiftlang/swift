@@ -5,29 +5,38 @@ import PackageDescription
 let package = Package(
   name: "swift-plugin-server",
   platforms: [
-    .macOS(.v13)
-  ],
-  products: [
-    .executable(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
-    .library(name: "SwiftInProcPluginServer", type: .dynamic, targets: ["SwiftInProcPluginServer"]),
+    .macOS(.v10_15)
   ],
   dependencies: [
     .package(path: "../../../swift-syntax"),
+    .package(path: "../../lib/ASTGen"),
   ],
   targets: [
-    .executableTarget(
-      name: "swift-plugin-server",
-      dependencies: [
-        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
+    .target(
+      name: "CSwiftPluginServer",
+      cxxSettings: [
+        .unsafeFlags([
+          "-I", "../../include",
+          "-I", "../../stdlib/public/SwiftShims",
+          "-I", "../../../build/Default/swift/include",
+          "-I", "../../../build/Default/llvm/include",
+          "-I", "../../../llvm-project/llvm/include",
+        ])
       ]
     ),
     .target(
-      name: "SwiftInProcPluginServer",
+      name: "swift-plugin-server",
       dependencies: [
-        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
-      ]
+        .product(name: "swiftLLVMJSON", package: "ASTGen"),
+        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+        .product(name: "SwiftSyntax", package: "swift-syntax"),
+        .product(name: "SwiftOperators", package: "swift-syntax"),
+        .product(name: "SwiftParser", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+        "CSwiftPluginServer"
+      ],
+      swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
   ],
   cxxLanguageStandard: .cxx17
