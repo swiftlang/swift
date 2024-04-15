@@ -78,7 +78,7 @@ inline bool isApplicationExtensionPlatform(PlatformKind Platform) {
 /// triple will be used rather than the target to determine whether the
 /// platform is active.
 bool isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
-                      bool ForTargetVariant = false);
+                      bool ForTargetVariant = false, bool ForRuntimeQuery = false);
 
 /// Returns the target platform for the given language options.
 PlatformKind targetPlatform(const LangOptions &LangOpts);

@@ -28,7 +28,7 @@ let RequestDone = "d"
 let RequestPointerSize = "p"
 
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 import MachO
 import Darwin
 

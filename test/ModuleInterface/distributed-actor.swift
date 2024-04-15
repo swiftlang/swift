@@ -67,7 +67,7 @@ public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSys
 // CHECK:   get
 // CHECK: }
 // CHECK: public init(actorSystem system: ActorSystem)
-// CHECK: @available(iOS 9999, tvOS 9999, watchOS 9999, macOS 9999, *)
+// CHECK: @available(iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, macOS 9999, *)
 // CHECK: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
 // CHECK:   get
 // CHECK: }
@@ -84,7 +84,7 @@ public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSys
 // CHECK-NEXT:extension Library.DA : Swift.Decodable {}
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
-// CHECK: @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+// CHECK: @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *)
 // CHECK-NEXT: extension Library.DAG : Distributed.DistributedActor {}
 
 //--- Client.swift

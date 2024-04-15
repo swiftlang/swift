@@ -80,7 +80,7 @@ extension Enum {
 // CHECK-PUBLIC:      @available(macOS, unavailable)
 // CHECK-PUBLIC-NEXT: @available(iOS, unavailable)
 // CHECK-PUBLIC-NEXT: @available(watchOS, unavailable)
-// CHECK-PUBLIC-NEXT: @available(tvOS, unavailable)
+// CHECK-PUBLIC-NEXT: @available(tvOS, unavailable
 // CHECK-PUBLIC-NEXT: public struct SPIAvailableStruct
 // CHECK-PRIVATE: @_spi_available(macOS, introduced: 10.15.4)
 // CHECK-PRIVATE-NEXT: @_spi_available(iOS, introduced: 13.4)

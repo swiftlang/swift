@@ -201,7 +201,9 @@ class CMakeProduct(product.Product):
         elif host_target.startswith('macosx') or \
                 host_target.startswith('iphone') or \
                 host_target.startswith('appletv') or \
-                host_target.startswith('watch'):
+                host_target.startswith('watch') or \
+                host_target.startswith('xros-') or \
+                host_target.startswith('xrsimulator-'):
 
             swift_cmake_options.define('Python3_EXECUTABLE',
                                        self.toolchain.find_tool('python3'))
@@ -327,6 +329,27 @@ class CMakeProduct(product.Product):
                     self.args.darwin_deployment_version_watchos)
                 llvm_target_arch = 'AArch64'
                 swift_host_variant_sdk = 'WATCHOS'
+                cmake_osx_deployment_target = None
+
+            elif host_target == 'xrsimulator-arm64':
+                swift_host_triple = 'arm64-apple-xros{}-simulator'.format(
+                    self.args.darwin_deployment_version_xros)
+                llvm_target_arch = 'AARCH64'
+                swift_host_variant_sdk = 'XROS_SIMULATOR'
+                cmake_osx_deployment_target = None
+
+            elif host_target == 'xros-arm64':
+                swift_host_triple = 'arm64-apple-xros{}'.format(
+                    self.args.darwin_deployment_version_xros)
+                llvm_target_arch = 'AARCH64'
+                swift_host_variant_sdk = 'XROS'
+                cmake_osx_deployment_target = None
+
+            elif host_target == 'xros-arm64e':
+                swift_host_triple = 'arm64e-apple-xros{}'.format(
+                    self.args.darwin_deployment_version_xros)
+                llvm_target_arch = 'AARCH64'
+                swift_host_variant_sdk = 'XROS'
                 cmake_osx_deployment_target = None
 
             darwin_sdk_deployment_targets = os.environ.get(
