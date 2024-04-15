@@ -612,6 +612,13 @@ void importer::getNormalInvocationArguments(
     if (clangSupportsPragmaAttributeWithSwiftAttr())
       invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS=1");
 
+    if (triple.isXROS()) {
+      // FIXME: This is a gnarly hack until some macros get adjusted in the SDK.
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-DOS_OBJECT_HAVE_OBJC_SUPPORT=1",
+      });
+    }
+
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
     auto V = version::getCurrentCompilerVersion();
@@ -826,6 +833,9 @@ importer::addCommonInvocationArguments(
       invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
              (triple.isiOS() || triple.isWatchOS()))
+      invocationArgStrs.push_back("-mcpu=apple-a12");
+    else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
+             triple.isXROS())
       invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.getArch() == llvm::Triple::aarch64 ||
              triple.getArch() == llvm::Triple::aarch64_32 ||
@@ -2399,6 +2409,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
       "'async'";
     break;
 
+  case PlatformKind::visionOS:
+  case PlatformKind::visionOSApplicationExtension:
+    break;
+
   case PlatformKind::OpenBSD:
     deprecatedAsUnavailableMessage = "";
     break;
@@ -2439,6 +2453,12 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
     return name == "watchos";
   case PlatformKind::watchOSApplicationExtension:
     return name == "watchos" || name == "watchos_app_extension";
+
+  case PlatformKind::visionOS:
+    return name == "xros" || name == "visionos";
+  case PlatformKind::visionOSApplicationExtension:
+    return name == "xros" || name == "xros_app_extension" ||
+           name == "visionos" || name == "visionos_app_extension";
 
   case PlatformKind::OpenBSD:
     return name == "openbsd";
@@ -2504,6 +2524,11 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
     }
 
     // No deprecation filter on watchOS
+    return false;
+
+  case PlatformKind::visionOS:
+  case PlatformKind::visionOSApplicationExtension:
+    // No deprecation filter on xrOS
     return false;
 
   case PlatformKind::OpenBSD:

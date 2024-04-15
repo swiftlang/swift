@@ -505,6 +505,8 @@ static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
     return VersionRange::allGTE(llvm::VersionTuple(13, 0, 0));
   if (target.isWatchOS())
     return VersionRange::allGTE(llvm::VersionTuple(6, 0, 0));
+  if (target.isXROS())
+    return VersionRange::allGTE(llvm::VersionTuple(1, 0, 0));
   return VersionRange::all();
 }
 

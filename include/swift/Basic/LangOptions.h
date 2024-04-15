@@ -627,6 +627,8 @@ namespace swift {
         return Target.getiOSVersion();
       } else if (Target.isWatchOS()) {
         return Target.getOSVersion();
+      } else if (Target.isXROS()) {
+        return Target.getOSVersion();
       }
       return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
     }

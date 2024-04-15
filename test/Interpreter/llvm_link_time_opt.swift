@@ -3,6 +3,8 @@
 
 // XFAIL: OS=linux-android, OS=linux-androideabi
 
+// UNSUPPORTED: OS=xros
+
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
