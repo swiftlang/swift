@@ -11,6 +11,15 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     Sources/CSwiftPluginServer/include
   )
 
+  add_pure_swift_host_library(SwiftPluginServerSupport EMIT_MODULE
+    Sources/SwiftPluginServerSupport/SwiftPluginServerSupport.swift
+    DEPENDENCIES
+      $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
+  )
+  target_include_directories(SwiftPluginServerSupport PRIVATE
+    Sources/CSwiftPluginServer/include
+  )
+
   add_pure_swift_host_tool(swift-plugin-server
     Sources/swift-plugin-server/swift-plugin-server.swift
     DEPENDENCIES
@@ -23,6 +32,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftSyntaxMacroExpansion
       SwiftCompilerPluginMessageHandling
       swiftLLVMJSON
+      SwiftPluginServerSupport
   )
   target_include_directories(swift-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include
@@ -38,6 +48,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SWIFT_DEPENDENCIES
       SwiftCompilerPluginMessageHandling
       swiftLLVMJSON
+      SwiftPluginServerSupport
   )
   target_include_directories(swift-wasm-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include

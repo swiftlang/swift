@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import JavaScriptCore
+import SwiftPluginServerSupport
 
 // returns: Promise<(ArrayBuffer) => ArrayBuffer>
 private let js = """
