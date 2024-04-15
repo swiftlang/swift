@@ -30,10 +30,10 @@ final class SwiftPluginServer {
   }
 
   @MainActor private func loadPluginLibrary(path: String, moduleName: String) async throws -> WasmPlugin {
-    guard #available(macOS 12, *) else { throw PluginServerError(message: "Wasm support requires macOS 12+") }
+    guard #available(macOS 10.15, *) else { throw PluginServerError(message: "Wasm support requires macOS 12+") }
     guard path.hasSuffix(".wasm") else { throw PluginServerError(message: "swift-wasm-plugin-server can only load wasm") }
     let wasm = try Data(contentsOf: URL(fileURLWithPath: path))
-    return try WebKitWasmPlugin(wasm: wasm)
+    return try await JSCWasmPlugin(wasm: wasm)
   }
 
   private func expandMacro(
@@ -43,16 +43,15 @@ final class SwiftPluginServer {
     let response: PluginToHostMessage
     do {
       guard let plugin = loadedWasmPlugins[module] else { throw PluginServerError(message: "Could not find module \(module)") }
-      let request = try LLVMJSON.encoding(message) { String(decoding: UnsafeRawBufferPointer($0), as: UTF8.self) }
-      var responseRaw = try plugin.handleMessage(request)
-      response = try responseRaw.withUTF8 {
+      let request = try LLVMJSON.encoding(message) { Data(UnsafeRawBufferPointer($0)) }
+      let responseRaw = try await plugin.handleMessage(request)
+      response = try responseRaw.withUnsafeBytes {
         try $0.withMemoryRebound(to: Int8.self) {
           try LLVMJSON.decode(PluginToHostMessage.self, from: $0)
         }
       }
     } catch {
-      try sendMessage(.expandMacroResult(expandedSource: nil, diagnostics: [
-      ]))
+      try sendMessage(.expandMacroResult(expandedSource: nil, diagnostics: []))
       return
     }
     try sendMessage(response)
@@ -96,7 +95,7 @@ final class SwiftPluginServer {
 }
 
 protocol WasmPlugin {
-  func handleMessage(_ json: String) throws -> String
+  func handleMessage(_ json: Data) async throws -> Data
 }
 
 final class PluginHostConnection {
@@ -221,117 +220,97 @@ struct PluginServerError: Error, CustomStringConvertible {
   }
 }
 
-import WebKit
+import JavaScriptCore
 
-@available(macOS 12, *)
-final class WebKitWasmPlugin: WasmPlugin {
-    private let webView: WKWebView
+@available(macOS 10.15, *)
+final class JSCWasmPlugin: WasmPlugin {
+  private let context: JSContext
+  private let fn: JSValue
 
-    private init<Chunks: AsyncSequence>(_ data: Chunks) throws where Chunks.Element == Data {
-        let configuration = WKWebViewConfiguration()
-        configuration.setURLSchemeHandler(SchemeHandler { request in
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [
-                "access-control-allow-origin": "*",
-                "content-type": "application/wasm"
-            ])!
-            return (data, response)
-        }, forURLScheme: "wasm-runner-data")
-        webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.evaluateJavaScript("""
-        const initPromise = (async () => {
-            // somehow compile(await fetch.arrayBuf) is faster than
-            // compileStreaming(fetch). Beats me.
-            const data = await (await fetch("wasm-runner-data://")).arrayBuffer();
-            const mod = await WebAssembly.compile(data);
-            // stub WASI imports
-            const imports = WebAssembly.Module.imports(mod)
-                .filter(x => x.module === "wasi_snapshot_preview1")
-                .map(x => [x.name, () => {}]);
-            const instance = await WebAssembly.instantiate(mod, {
-                wasi_snapshot_preview1: Object.fromEntries(imports)
-            });
-            api = instance.exports;
-            enc = new TextEncoder();
-            dec = new TextDecoder();
-            api._start();
-        })()
-        """, in: nil, in: .defaultClient)
+  @MainActor init(wasm data: Data) async throws {
+    guard let context = JSContext() else { throw PluginServerError(message: "Could not create JSContext") }
+    self.context = context
+
+    let jsBuf = try JSValue(newBufferWithData: data, in: context)
+    context.globalObject.setObject(jsBuf, forKeyedSubscript: "wasmData")
+
+    let promise = context.evaluateScript("""
+    (async () => {
+      const mod = await WebAssembly.compile(wasmData);
+      // stub WASI imports
+      const imports = WebAssembly.Module.imports(mod)
+        .filter(x => x.module === "wasi_snapshot_preview1")
+        .map(x => [x.name, () => {}]);
+      const instance = await WebAssembly.instantiate(mod, {
+        wasi_snapshot_preview1: Object.fromEntries(imports)
+      });
+      const api = instance.exports;
+      api._start();
+      return ((json) => {
+        const inAddr = api.wacro_malloc(json.byteLength);
+        const mem = api.memory;
+        const arr = new Uint8Array(mem.buffer, inAddr, json.byteLength);
+        arr.set(new Uint8Array(json));
+        const outAddr = api.wacro_parse(inAddr, json.byteLength);
+        const len = new Uint32Array(mem.buffer, outAddr)[0];
+        const outArr = new Uint8Array(mem.buffer, outAddr + 4, len);
+        const copy = new Uint8Array(outArr);
+        api.wacro_free(outAddr);
+        return copy.buffer;
+      })
+    })()
+    """)!
+
+    if let error = context.exception {
+      throw PluginServerError(message: "Failed to load plugin: \(error)")
     }
 
-    package convenience init(wasm: Data) throws {
-        try self.init(AsyncStream {
-            $0.yield(wasm)
-            $0.finish()
-        })
+    var result: Result<JSValue, Error>?
+
+    promise
+      .invokeMethod("then", withArguments: [JSValue(object: { val in
+        result = .success(val)
+      } as @convention(block) (JSValue) -> Void, in: context)!])
+      .invokeMethod("catch", withArguments: [JSValue(object: { err in
+        result = .failure(PluginServerError(message: "\(err)"))
+      } as @convention(block) (JSValue) -> Void, in: context)!])
+
+    if let error = context.exception {
+      throw PluginServerError(message: "Failed to load plugin: \(error)")
     }
 
-    @MainActor func handleMessage(_ json: String) throws -> String {
-        var res: Result<String, Error>?
-        let utf8Length = json.utf8.count
-        Task {
-          do {
-            let out = try await webView.callAsyncJavaScript("""
-            await initPromise;
-            const inAddr = api.wacro_malloc(\(utf8Length));
-            const mem = api.memory;
-            const arr = new Uint8Array(mem.buffer, inAddr, \(utf8Length));
-            enc.encodeInto(json, arr);
-            const outAddr = api.wacro_parse(inAddr, \(utf8Length));
-            const len = new Uint32Array(mem.buffer, outAddr)[0];
-            const outArr = new Uint8Array(mem.buffer, outAddr + 4, len);
-            const text = dec.decode(outArr);
-            api.wacro_free(outAddr);
-            return text;
-            """, arguments: ["json": json], contentWorld: .defaultClient)
-            guard let str = out as? String else { throw PluginServerError(message: "invalid wasm output") }
-            res = .success(str)
-          } catch {
-            res = .failure(error)
-          }
-        }
-        // can't use a semaphore because it would block the main runloop
-        while true {
-          RunLoop.main.run(until: .now.addingTimeInterval(0.01))
-          if let res { return try res.get() }
-        }
-    }
+    fn = try {
+      while true {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        if let result { return result }
+      }
+    }().get()
+  }
+
+  @MainActor func handleMessage(_ json: Data) async throws -> Data {
+    let jsonJS = try JSValue(newBufferWithData: json, in: context)
+    let res = fn.call(withArguments: [jsonJS])
+    return res!.toData()
+  }
 }
 
-@available(macOS 11, *)
-private final class SchemeHandler<Chunks: AsyncSequence>: NSObject, WKURLSchemeHandler where Chunks.Element == Data {
-    typealias RequestHandler<Output> = (URLRequest) async throws -> (Output, URLResponse)
+extension JSValue {
+  convenience init(newBufferWithData data: Data, in context: JSContext) throws {
+    let copy = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: data.count)
+    _ = copy.initialize(from: data)
+    let rawBuf = JSObjectMakeArrayBufferWithBytesNoCopy(
+      context.jsGlobalContextRef,
+      copy.baseAddress, copy.count,
+      { buf, _ in buf?.deallocate() }, nil,
+      nil
+    )
+    self.init(jsValueRef: rawBuf, in: context)
+  }
 
-    private var tasks: [ObjectIdentifier: Task<Void, Never>] = [:]
-    private let onRequest: RequestHandler<Chunks>
-
-    init(onRequest: @escaping RequestHandler<Chunks>) {
-        self.onRequest = onRequest
-    }
-
-    func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
-        tasks[ObjectIdentifier(task)] = Task {
-            var err: Error?
-            do {
-                let (stream, response) = try await onRequest(task.request)
-                try Task.checkCancellation()
-                task.didReceive(response)
-                for try await data in stream {
-                    try Task.checkCancellation()
-                    task.didReceive(data)
-                }
-            } catch {
-                err = error
-            }
-            guard !Task.isCancelled else { return }
-            if let err {
-                task.didFailWithError(err)
-            } else {
-                task.didFinish()
-            }
-        }
-    }
-
-    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
-        tasks.removeValue(forKey: ObjectIdentifier(urlSchemeTask))?.cancel()
-    }
+  func toData() -> Data {
+    let base = JSObjectGetArrayBufferBytesPtr(context.jsGlobalContextRef, jsValueRef, nil)
+    let count = JSObjectGetArrayBufferByteLength(context.jsGlobalContextRef, jsValueRef, nil)
+    let buf = UnsafeBufferPointer(start: base?.assumingMemoryBound(to: UInt8.self), count: count)
+    return Data(buf)
+  }
 }
