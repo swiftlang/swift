@@ -5174,9 +5174,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
         llvm_unreachable("context cannot have erased isolation");
 
       case ActorIsolation::ActorInstance:
-        if (auto param = func->getCaptureInfo().getIsolatedParamCapture())
-          return inferredIsolation(enclosingIsolation);
-        break;
+        return inferredIsolation(enclosingIsolation);
 
       case ActorIsolation::GlobalActor:
         return inferredIsolation(enclosingIsolation);
