@@ -29,16 +29,21 @@ let package = Package(
       ]
     ),
     .target(
-      name: "swift-plugin-server",
+      name: "SwiftPluginServerSupport",
       dependencies: [
         .product(name: "swiftLLVMJSON", package: "ASTGen"),
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "SwiftDiagnostics", package: "swift-syntax"),
-        .product(name: "SwiftSyntax", package: "swift-syntax"),
-        .product(name: "SwiftOperators", package: "swift-syntax"),
-        .product(name: "SwiftParser", package: "swift-syntax"),
-        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         "CSwiftPluginServer"
+      ],
+      swiftSettings: [.interoperabilityMode(.Cxx)]
+    ),
+    .target(
+      name: "swift-plugin-server",
+      dependencies: [
+        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+        "CSwiftPluginServer",
+        "SwiftPluginServerSupport",
       ],
       swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
@@ -47,7 +52,8 @@ let package = Package(
       dependencies: [
         .product(name: "swiftLLVMJSON", package: "ASTGen"),
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        "CSwiftPluginServer"
+        "CSwiftPluginServer",
+        "SwiftPluginServerSupport",
       ],
       swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
