@@ -27,4 +27,18 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_include_directories(swift-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include
   )
+
+  add_pure_swift_host_tool(swift-wasm-plugin-server
+    Sources/swift-wasm-plugin-server/swift-wasm-plugin-server.swift
+    DEPENDENCIES
+      $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
+    SWIFT_COMPONENT
+      compiler
+    SWIFT_DEPENDENCIES
+      SwiftCompilerPluginMessageHandling
+      swiftLLVMJSON
+  )
+  target_include_directories(swift-wasm-plugin-server PRIVATE
+          Sources/CSwiftPluginServer/include
+  )
 endif()

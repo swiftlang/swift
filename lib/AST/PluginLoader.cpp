@@ -113,7 +113,7 @@ PluginLoader::getPluginMap() {
         // "macro runner" executable
         SmallString<128> runner;
         // TODO: improve path resolution: we really want tools_dir
-        llvm::sys::path::append(runner, Ctx.SearchPathOpts.RuntimeResourcePath, "../../bin/swift-plugin-server");
+        llvm::sys::path::append(runner, Ctx.SearchPathOpts.RuntimeResourcePath, "../../bin/swift-wasm-plugin-server");
         for (auto &moduleName : val.ModuleNames) {
           try_emplace(moduleName, val.ExecutablePath, runner, true);
         }
