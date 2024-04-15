@@ -682,20 +682,9 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        auto isDistributedFuncOrAccessor =
-            func->isDistributed();
-        if (auto acc = dyn_cast<AccessorDecl>(func)) {
-          isDistributedFuncOrAccessor =
-              acc->getStorage()->isDistributed();
-        }
-        if (isa<ProtocolDecl>(func->getDeclContext()) && isDistributedFuncOrAccessor) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            // the protocol witness must always be a distributed thunk, as we
-            // may be crossing a remote boundary here.
-            auto thunk = func->getDistributedThunk();
-            constant = SILDeclRef(thunk).asDistributed();
-          }
+        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
+          auto thunk = func->getDistributedThunk();
+          constant = SILDeclRef(thunk).asDistributed();
         }
       }
 
@@ -783,12 +772,8 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            /// We must adjust the constant to use a distributed thunk.
-            constant = constant->asDistributed();
-          }
+        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
+          constant = constant->asDistributed();
         }
       }
 
