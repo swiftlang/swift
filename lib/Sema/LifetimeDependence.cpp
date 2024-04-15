@@ -399,6 +399,7 @@ std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
+  auto *mod = afd->getModuleContext();
 
   if (!ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
     return std::nullopt;
@@ -430,6 +431,19 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
 
   if (afd->getKind() != DeclKind::Constructor && afd->hasImplicitSelfDecl()) {
     Type selfTypeInContext = dc->getSelfTypeInContext();
+    if (selfTypeInContext->isEscapable()) {
+      if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+        auto *bitwiseCopyableProtocol =
+            ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+        if (bitwiseCopyableProtocol &&
+            mod->checkConformance(selfTypeInContext, bitwiseCopyableProtocol)) {
+          diags.diagnose(
+              returnLoc,
+              diag::lifetime_dependence_method_escapable_bitwisecopyable_self);
+          return std::nullopt;
+        }
+      }
+    }
     auto kind = getLifetimeDependenceKindFromType(selfTypeInContext);
     auto selfOwnership = afd->getImplicitSelfDecl()->getValueOwnership();
     if (!isLifetimeDependenceCompatibleWithOwnership(kind, selfOwnership,
