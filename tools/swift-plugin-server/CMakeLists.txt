@@ -30,6 +30,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
 
   add_pure_swift_host_tool(swift-wasm-plugin-server
     Sources/swift-wasm-plugin-server/swift-wasm-plugin-server.swift
+    Sources/swift-wasm-plugin-server/JSCWasmPlugin.swift
     DEPENDENCIES
       $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
     SWIFT_COMPONENT
