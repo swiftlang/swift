@@ -9,6 +9,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 struct NCInt : ~Copyable {
   var i: Builtin.Int64
