@@ -165,7 +165,7 @@ static LifetimeDependenceKind getLifetimeDependenceKindFromDecl(
     return LifetimeDependenceKind::Scope;
   }
   if (parsedLifetimeDependenceKind == ParsedLifetimeDependenceKind::Inherit) {
-    // TODO: assert that this can happen only on deserialized decls
+    // TODO: assert that this can happen in SIL tests
     return LifetimeDependenceKind::Inherit;
   }
   return paramType->isEscapable() ? LifetimeDependenceKind::Scope
@@ -277,7 +277,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
     }
     case LifetimeDependenceSpecifier::SpecifierKind::Ordered: {
       auto index = specifier.getIndex();
-      if (index > afd->getParameters()->size()) {
+      if (index >= afd->getParameters()->size()) {
         diags.diagnose(specifier.getLoc(),
                        diag::lifetime_dependence_invalid_param_index, index);
         return std::nullopt;
@@ -495,7 +495,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     if (cd && afd->isImplicit()) {
       diags.diagnose(returnLoc,
                      diag::lifetime_dependence_cannot_infer_no_candidates,
-                     "on implicit initializer");
+                     " on implicit initializer");
       return std::nullopt;
     }
     diags.diagnose(returnLoc,
