@@ -1,6 +1,6 @@
 // RUN: %target-swiftxx-frontend -I %S/Inputs -emit-silgen %s | %FileCheck %s
 
-import NonTrivialClasses
+import Closure
 
 // CHECK: sil [ossa] @$s4main20testClosureToFuncPtryyF : $@convention(thin) () -> () {
 // CHECK: %[[V0:.*]] = function_ref @$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_To : $@convention(c) (@in NonTrivial) -> ()
