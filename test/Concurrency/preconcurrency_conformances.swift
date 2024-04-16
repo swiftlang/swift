@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-experimental-feature DynamicActorIsolation -strict-concurrency=complete -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-upcoming-feature DynamicActorIsolation -strict-concurrency=complete -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
