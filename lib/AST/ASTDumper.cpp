@@ -1402,6 +1402,7 @@ namespace {
         printField(PD->getDefaultArgumentKind(), "default_arg");
       }
       if (PD->hasDefaultExpr() &&
+          PD->getDefaultArgumentCaptureInfo().hasBeenComputed() &&
           !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
         printFieldRaw([&](raw_ostream &OS) {
           PD->getDefaultArgumentCaptureInfo().print(OS);
@@ -1488,7 +1489,8 @@ namespace {
 
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type, StringRef Label) {
       printCommon(D, Type, Label, FuncColor);
-      if (!D->getCaptureInfo().isTrivial()) {
+      if (D->getCaptureInfo().hasBeenComputed() &&
+          !D->getCaptureInfo().isTrivial()) {
         printFlagRaw([&](raw_ostream &OS) {
           D->getCaptureInfo().print(OS);
         });
@@ -2826,7 +2828,8 @@ public:
       break;
     }
 
-    if (!E->getCaptureInfo().isTrivial()) {
+    if (E->getCaptureInfo().hasBeenComputed() &&
+        !E->getCaptureInfo().isTrivial()) {
       printFieldRaw([&](raw_ostream &OS) {
         E->getCaptureInfo().print(OS);
       }, "", CapturesColor);
