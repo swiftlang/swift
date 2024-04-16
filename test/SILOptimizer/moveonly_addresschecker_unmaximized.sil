@@ -9,14 +9,13 @@
 // RUN: | %FileCheck %s
 
 import Builtin
+import Swift
 
-@_moveOnly
-struct M {
+struct M: ~Copyable {
   deinit {}
 }
 
-@_moveOnly
-struct M4 {
+struct M4: ~Copyable {
   let s1: M
   let s2: M
   let s3: M
