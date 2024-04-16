@@ -446,41 +446,37 @@ function Fetch-Dependencies {
 
   $WebClient = New-Object Net.WebClient
 
-  $WiXVersion = "4.0.4"
-  $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
-  $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
+  function DownloadAndVerify($URL, $Destination, $Hash) {
+    if (Test-Path $Destination) {
+      return
+    }
 
-  if (-not (Test-Path $BinaryCache\WiX-$WiXVersion.zip)) {
-    Write-Output "WiX not found. Downloading from nuget.org ..."
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache | Out-Null
+    Write-Output "$Destination not found. Downloading ..."
     if ($ToBatch) {
-      Write-Output "curl.exe -sL $WiXURL -o $BinaryCache\WiX-$WiXVersion.zip"
+      Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
+      Write-Output "curl.exe -sL $URL -o $Destination"
+      Write-Output "(certutil -HashFile $Destination SHA256) == $Hash || (exit /b)"
     } else {
-      $WebClient.DownloadFile($WiXURL, "$BinaryCache\WiX-$WiXVersion.zip")
-      $SHA256 = Get-FileHash -Path "$BinaryCache\WiX-$WiXVersion.zip" -Algorithm SHA256
-      if ($SHA256.Hash -ne $WiXHash) {
-        throw "WiX SHA256 mismatch ($($SHA256.Hash) vs $WiXHash)"
+      New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
+      $WebClient.DownloadFile($URL, $Destination)
+      $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+      if ($SHA256.Hash -ne $Hash) {
+        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
       }
     }
   }
+
+  $WiXVersion = "4.0.4"
+  $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
+  $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
+  DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
 
   # TODO(compnerd) stamp/validate that we need to re-extract
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\WiX-$WiXVersion | Out-Null
   Write-Output "Extracting WiX ..."
   Expand-Archive -Path $BinaryCache\WiX-$WiXVersion.zip -Destination $BinaryCache\WiX-$WiXVersion -Force
 
-  if (-not (Test-Path $BinaryCache\$PinnedToolchain.exe)) {
-    Write-Output "Swift toolchain not found. Downloading from swift.org..."
-    if ($ToBatch) {
-      Write-Output "curl.exe -sL $PinnedBuild -o $BinaryCache\$PinnedToolchain.exe"
-    } else {
-      $WebClient.DownloadFile("$PinnedBuild", "$BinaryCache\$PinnedToolchain.exe")
-      $SHA256 = Get-FileHash -Path "$BinaryCache\$PinnedToolchain.exe" -Algorithm SHA256
-      if ($SHA256.Hash -ne $PinnedSHA256) {
-        throw "$PinnedToolchain SHA256 mismatch ($($SHA256.Hash) vs $PinnedSHA256)"
-      }
-    }
-  }
+  DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
   # TODO(compnerd) stamp/validate that we need to re-extract
   Write-Output "Extracting $PinnedToolchain ..."
