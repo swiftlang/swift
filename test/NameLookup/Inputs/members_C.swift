@@ -8,6 +8,8 @@ extension X {
   public var propXinC: Bool { return true }
 
   public static func <>(a: Self, b: Self) -> Self { a }
+
+  public struct NestedInC {}
 }
 
 extension Y {

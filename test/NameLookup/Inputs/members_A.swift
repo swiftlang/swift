@@ -18,6 +18,8 @@ extension X {
   public var propXinA: Bool { return true }
 
   public static func <<<(a: Self, b: Self) -> Self { a }
+
+  public struct NestedInA {}
 }
 
 extension Y {

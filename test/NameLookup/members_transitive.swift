@@ -46,4 +46,24 @@ extension X {
       propXinC
     )
   }
+
+  func testNestedTypes() {
+    _ = NestedInA.self
+    _ = NestedInB.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+    _ = NestedInC.self
+  }
+
+  var nestedInA: NestedInA { fatalError() }
+  var nestedInB: NestedInB { fatalError() } // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+  var nestedInC: NestedInC { fatalError() }
+}
+
+extension X.NestedInA {}
+extension X.NestedInB {} // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+extension X.NestedInC {}
+
+func testTopLevelTypes() {
+  _ = EnumInA.self
+  _ = EnumInB.self // expected-error{{cannot find 'EnumInB' in scope}}
+  _ = EnumInC.self
 }

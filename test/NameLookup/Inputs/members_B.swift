@@ -7,6 +7,8 @@ extension X {
   public var propXinB: Bool { return true }
 
   public static func >>>(a: Self, b: Self) -> Self { b }
+
+  public struct NestedInB {}
 }
 
 extension Y {
