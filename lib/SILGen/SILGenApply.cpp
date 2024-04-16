@@ -3263,7 +3263,20 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
-      return nullptr;
+      
+      // Proceed if the storage references a global or static let.
+      // TODO: We should treat any storage reference as a borrow, it seems, but
+      // that currently disrupts what the move checker expects. It would also
+      // be valuable to borrow copyable global lets, but this is a targeted
+      // fix to allow noncopyable globals to work properly.
+      bool isGlobal = false;
+      if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
+        isGlobal = vd->isGlobalStorage();
+      }
+      
+      if (!isGlobal) {
+        return nullptr;
+      }
     }
   }
 
