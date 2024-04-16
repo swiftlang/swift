@@ -4866,6 +4866,25 @@ public:
   bool isCached() const { return true; }
 };
 
+class LifetimeDependenceInfoRequest
+    : public SimpleRequest<LifetimeDependenceInfoRequest,
+                           std::optional<LifetimeDependenceInfo>(
+                               AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<LifetimeDependenceInfo>
+  evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
