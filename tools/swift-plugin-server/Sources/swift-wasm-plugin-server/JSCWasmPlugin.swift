@@ -17,6 +17,10 @@ import JavaScriptCore
 typealias DefaultWasmPlugin = JSCWasmPlugin
 
 // returns: (wasm: ArrayBuffer) => Promise<(input: ArrayBuffer) => ArrayBuffer>
+// FIXME: stubbing WASI by always returning 0 triggers UB in the guest.
+// (e.g. if we return 0 from args_sizes_get we must populate the out pointers.)
+// we could adapt WasmKit.WASI to work with the JSC engine, since the host
+// function code should be runtime-agnostic.
 private let js = """
 async (wasmData) => {
   const mod = await WebAssembly.compile(wasmData);
@@ -45,28 +49,25 @@ async (wasmData) => {
 """
 
 struct JSCWasmPlugin: WasmPlugin {
-  private static let factory = JSContext()?.evaluateScript(js)
-
   private let handler: JSValue
 
-  @MainActor init(wasm data: Data) async throws {
+  init(wasm data: Data) async throws {
     guard #available(macOS 10.15, *) else {
       throw JSCWasmError(message: "JSC Wasm plugins currently require macOS 10.15+")
     }
 
-    guard let factory = Self.factory, let context = factory.context else {
-      throw JSCWasmError(message: "Failed to load plugin")
-    }
+    let factory = try await JSCWasmFactory.shared
+    let context = factory.context
 
     let jsBuf = try JSValue(newBufferWithData: data, in: context)
-    guard let promise = factory.call(withArguments: [jsBuf]), context.exception == nil else {
+    guard let promise = factory.value.call(withArguments: [jsBuf]), context.exception == nil else {
       throw JSCWasmError(message: "Failed to load plugin", value: context.exception)
     }
 
     handler = try await promise.promiseValue
   }
 
-  @MainActor func handleMessage(_ json: Data) throws -> Data {
+  func handleMessage(_ json: Data) throws -> Data {
     guard let context = handler.context else {
       throw JSCWasmError(message: "Failed to invoke plugin")
     }
@@ -75,6 +76,32 @@ struct JSCWasmPlugin: WasmPlugin {
       throw JSCWasmError(message: "Wasm plugin did not provide a valid response", value: context.exception)
     }
     return result.arrayBufferData()
+  }
+}
+
+@available(macOS 10.15, *)
+private struct JSCWasmFactory {
+  let context: JSContext
+  let value: JSValue
+
+  private init() async throws {
+    // the VM must be created on the MainActor for async methods to work.
+    let vm = await MainActor.run { JSVirtualMachine() }
+    guard let context = JSContext(virtualMachine: vm) else {
+      throw JSCWasmError(message: "Failed to load plugin")
+    }
+    self.context = context
+    self.value = context.evaluateScript(js)
+  }
+
+  private static let _shared = Task {
+    try await JSCWasmFactory()
+  }
+
+  static var shared: JSCWasmFactory {
+    get async throws {
+      try await _shared.value
+    }
   }
 }
 
@@ -100,11 +127,22 @@ extension JSValue {
     self.init(jsValueRef: rawBuf, in: context)
   }
 
+  // it's unsafe to call JavaScriptCore APIs inside the `perform` block as this
+  // might invalidate the buffer.
+  fileprivate func withUnsafeArrayBuffer<Result>(
+    _ perform: (UnsafeRawBufferPointer) throws -> Result
+  ) rethrows -> Result {
+    let rawContext = context.jsGlobalContextRef
+    guard let base = JSObjectGetArrayBufferBytesPtr(rawContext, jsValueRef, nil) else {
+      return try perform(UnsafeRawBufferPointer(start: nil, count: 0))
+    }
+    let count = JSObjectGetArrayBufferByteLength(rawContext, jsValueRef, nil)
+    let buffer = UnsafeRawBufferPointer(start: base, count: count)
+    return try perform(buffer)
+  }
+
   fileprivate func arrayBufferData() -> Data {
-    let base = JSObjectGetArrayBufferBytesPtr(context.jsGlobalContextRef, jsValueRef, nil)
-    let count = JSObjectGetArrayBufferByteLength(context.jsGlobalContextRef, jsValueRef, nil)
-    let buf = UnsafeBufferPointer(start: base?.assumingMemoryBound(to: UInt8.self), count: count)
-    return Data(buf)
+    withUnsafeArrayBuffer { Data($0) }
   }
 
   @available(macOS 10.15, *)
