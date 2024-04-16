@@ -1962,6 +1962,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_wasm_plugin_server_path)) {
+    Opts.PluginWasmServerPath = A->getValue();
+  }
+
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }

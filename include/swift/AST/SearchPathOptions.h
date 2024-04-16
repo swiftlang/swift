@@ -468,6 +468,9 @@ public:
   /// Plugin search path options.
   std::vector<PluginSearchOption> PluginSearchOpts;
 
+  /// Path to swift-wasm-plugin-server executable.
+  std::string PluginWasmServerPath;
+
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
 

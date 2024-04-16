@@ -277,6 +277,11 @@ def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
 def block_list_file
   : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
     HelpText<"The path to a blocklist configuration file">;
+
+def wasm_plugin_server_path : Separate<["-"], "wasm-plugin-server-path">,
+  Flags<[DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to the swift-wasm-plugin-server executable">,
+  MetaVarName<"<path>">;
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;

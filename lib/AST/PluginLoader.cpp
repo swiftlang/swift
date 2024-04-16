@@ -108,12 +108,11 @@ PluginLoader::getPluginMap() {
       assert(!val.ExecutablePath.empty() && "empty plugin path");
       if (llvm::sys::path::filename(val.ExecutablePath).ends_with(".wasm")) {
         // we treat wasm plugins like library plugins that can be loaded by an external
-        // "macro runner" executable
-        SmallString<128> runner;
-        // TODO: improve path resolution: we really want tools_dir
-        llvm::sys::path::append(runner, Ctx.SearchPathOpts.RuntimeResourcePath, "../../bin/swift-wasm-plugin-server");
+        // "wasm server" that in turn invokes the wasm runtime.
+        const auto &wasmServerPath = Ctx.SearchPathOpts.PluginWasmServerPath;
+        assert(!wasmServerPath.empty() && "wasm load requested but got empty wasm server path");
         for (auto &moduleName : val.ModuleNames) {
-          try_emplace(moduleName, val.ExecutablePath, runner);
+          try_emplace(moduleName, val.ExecutablePath, wasmServerPath);
         }
       } else {
         for (auto &moduleName : val.ModuleNames) {
