@@ -2,26 +2,39 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/members_A.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/members_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/members_C.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -enable-experimental-feature MemberImportVisibility
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/members_transitive_other.swift -I %t -verify -swift-version 5
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/members_transitive_other.swift -I %t -verify -swift-version 6
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/members_transitive_other.swift -I %t -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-note 2{{add import of module 'members_B'}}{{1-1=import members_B\n}}
-func test(x: X, y: Y<Z>) {
-  // Declared in members_A
+// expected-member-visibility-note 7{{add import of module 'members_B'}}{{1-1=import members_B\n}}
+
+
+func testExtensionMembers(x: X, y: Y<Z>) {
   x.XinA()
   y.YinA()
+
+  x.XinB() // expected-member-visibility-error{{instance method 'XinB()' is not available due to missing import of defining module 'members_B'}}
+  y.YinB() // expected-member-visibility-error{{instance method 'YinB()' is not available due to missing import of defining module 'members_B'}}
+
+  x.XinC()
+  y.YinC()
+}
+
+func testOperatorMembers(x: X, y: Y<Z>) {
   _ = x <<< x
   _ = y <<< y
 
-  // Declared in members_B
-  x.XinB() // expected-error{{instance method 'XinB()' is not available due to missing import of defining module 'members_B'}}
-  y.YinB() // expected-error{{instance method 'YinB()' is not available due to missing import of defining module 'members_B'}}
   _ = x >>> x // expected-error{{cannot find operator '>>>' in scope}}
   _ = y >>> y // expected-error{{cannot find operator '>>>' in scope}}
 
-  // Declared in members_C
-  x.XinC()
-  y.YinC()
   _ = x <> x
   _ = y <> y
 }
+
+func testMembersWithContextualBase() {
+  takesEnumInA(.caseInA)
+  takesEnumInB(.caseInB) // expected-member-visibility-error{{enum case 'caseInB' is not available due to missing import of defining module 'members_B'}}
+  takesEnumInC(.caseInC)
+}
+
