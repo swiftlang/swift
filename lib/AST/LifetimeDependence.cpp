@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
-
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/LifetimeDependence.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
