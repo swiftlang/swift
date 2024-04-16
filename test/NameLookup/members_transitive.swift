@@ -2,12 +2,12 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/MemberImportVisibility/members_A.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/MemberImportVisibility/members_transitive_other.swift -I %t -verify -swift-version 5
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/MemberImportVisibility/members_transitive_other.swift -I %t -verify -swift-version 6
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/MemberImportVisibility/members_transitive_other.swift -I %t -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 6
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-member-visibility-note 7{{add import of module 'members_B'}}{{1-1=import members_B\n}}
+// expected-member-visibility-note 6{{add import of module 'members_B'}}{{1-1=import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -30,12 +30,6 @@ func testOperatorMembers(x: X, y: Y<Z>) {
 
   _ = x <> x
   _ = y <> y
-}
-
-func testMembersWithContextualBase() {
-  takesEnumInA(.caseInA)
-  takesEnumInB(.caseInB) // expected-member-visibility-error{{enum case 'caseInB' is not available due to missing import of defining module 'members_B'}}
-  takesEnumInC(.caseInC)
 }
 
 extension X {
