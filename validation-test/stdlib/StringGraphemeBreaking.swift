@@ -5,6 +5,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
 
+ // rdar://124539686
+ // UNSUPPORTED: CPU=arm64
+
 import StdlibUnittest
 import StdlibUnicodeUnittest
 import Foundation
