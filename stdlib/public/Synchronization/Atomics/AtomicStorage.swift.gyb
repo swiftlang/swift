@@ -53,7 +53,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
     let result = switch ordering {
 %   for (name, api, doc, llvm) in loadOrderings:
     case .${name}:
-      Builtin.atomicload_${llvm}_Int${size}(rawAddress)
+      Builtin.atomicload_${llvm}_Int${size}(_rawAddress)
 %   end
 
     default:
@@ -87,7 +87,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 %   for (name, api, doc, llvm) in storeOrderings:
     case .${name}:
       Builtin.atomicstore_${llvm}_Int${size}(
-        rawAddress,
+        _rawAddress,
         Value.encodeAtomicRepresentation(desired)._storage
       )
 %   end
@@ -123,7 +123,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
     let result = switch ordering {
 %   for (name, api, _, llvm, _) in updateOrderings:
     case .${name}:
-      Builtin.atomicrmw_xchg_${llvm}_Int${size}(rawAddress, desired)
+      Builtin.atomicrmw_xchg_${llvm}_Int${size}(_rawAddress, desired)
 %   end
 
     default:
@@ -229,7 +229,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 %     for (failureName, _, _, failureLLVM) in loadOrderings:
     case (.${successName}, .${failureName}):
       Builtin.cmpxchg_${actualOrders(successLLVM, failureLLVM)}_Int${size}(
-        rawAddress,
+        _rawAddress,
         expected,
         desired
       )
@@ -359,7 +359,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 %     for (failureName, _, _, failureLLVM) in loadOrderings:
     case (.${successName}, .${failureName}):
       Builtin.cmpxchg_${actualOrders(successLLVM, failureLLVM)}_weak_Int${size}(
-        rawAddress,
+        _rawAddress,
         expected,
         desired
       )

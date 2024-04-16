@@ -17,7 +17,6 @@ set(sources
   SwiftStdbool.h
   SwiftStddef.h
   SwiftStdint.h
-  SynchronizationShims.h
   System.h
   Target.h
   ThreadLocalStorage.h
@@ -25,6 +24,7 @@ set(sources
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
+  _SynchronizationShims.h
 
   module.modulemap
   )

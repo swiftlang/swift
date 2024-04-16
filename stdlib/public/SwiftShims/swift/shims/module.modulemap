@@ -32,7 +32,7 @@ module SwiftOverlayShims {
   export *
 }
 
-module SynchronizationShims {
-  header "SynchronizationShims.h"
+module _SynchronizationShims {
+  header "_SynchronizationShims.h"
   export *
 }

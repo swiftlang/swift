@@ -120,12 +120,12 @@ extension Atomic where Value == ${intType} {
 %     if intType == "Int" or intType == "UInt":
 #if _pointerBitWidth(_64)
       Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_Int64(
-        rawAddress,
+        _rawAddress,
         operand._value
       )
 #elseif _pointerBitWidth(_32)
       Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_Int32(
-        rawAddress,
+        _rawAddress,
         operand._value
       )
 #else
@@ -133,7 +133,7 @@ extension Atomic where Value == ${intType} {
 #endif
 %     else:
       Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_Int${bits}(
-        rawAddress,
+        _rawAddress,
         operand._value
       )
 %     end

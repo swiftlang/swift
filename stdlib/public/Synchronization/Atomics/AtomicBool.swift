@@ -93,31 +93,31 @@ extension Atomic where Value == Bool {
     let original = switch ordering {
     case .relaxed:
       Builtin.atomicrmw_and_monotonic_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .acquiring:
       Builtin.atomicrmw_and_acquire_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .releasing:
       Builtin.atomicrmw_and_release_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .acquiringAndReleasing:
       Builtin.atomicrmw_and_acqrel_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .sequentiallyConsistent:
       Builtin.atomicrmw_and_seqcst_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
@@ -151,31 +151,31 @@ extension Atomic where Value == Bool {
     let original = switch ordering {
     case .relaxed:
       Builtin.atomicrmw_or_monotonic_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .acquiring:
       Builtin.atomicrmw_or_acquire_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .releasing:
       Builtin.atomicrmw_or_release_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .acquiringAndReleasing:
       Builtin.atomicrmw_or_acqrel_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .sequentiallyConsistent:
       Builtin.atomicrmw_or_seqcst_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
@@ -209,31 +209,31 @@ extension Atomic where Value == Bool {
     let original = switch ordering {
     case .relaxed:
       Builtin.atomicrmw_xor_monotonic_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .acquiring:
       Builtin.atomicrmw_xor_acquire_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .releasing:
       Builtin.atomicrmw_xor_release_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .acquiringAndReleasing:
       Builtin.atomicrmw_xor_acqrel_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 
     case .sequentiallyConsistent:
       Builtin.atomicrmw_xor_seqcst_Int8(
-        rawAddress,
+        _rawAddress,
         builtinOperand
       )
 

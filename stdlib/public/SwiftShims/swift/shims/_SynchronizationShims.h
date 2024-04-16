@@ -17,6 +17,7 @@
 #include "SwiftStdint.h"
 
 #if defined(__linux__)
+#include <errno.h>
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -31,18 +32,36 @@ static inline __swift_uint32_t _swift_stdlib_gettid() {
   return tid;
 }
 
-static inline __swift_bool _swift_stdlib_futex_lock(__swift_uint32_t *lock) {
-  return syscall(SYS_futex, lock, FUTEX_LOCK_PI_PRIVATE,
-                 /* val */ 0, // this value is ignored by this futex op
-                 /* timeout */ NULL); // block indefinitely
+static inline __swift_uint32_t _swift_stdlib_futex_lock(__swift_uint32_t *lock) {
+  int ret = syscall(SYS_futex, lock, FUTEX_LOCK_PI_PRIVATE,
+                    /* val */ 0, // this value is ignored by this futex op
+                    /* timeout */ NULL); // block indefinitely
+
+  if (ret == 0) {
+    return ret;
+  }
+
+  return errno;
 }
 
-static inline __swift_bool _swift_stdlib_futex_trylock(__swift_uint32_t *lock) {
-  return syscall(SYS_futex, lock, FUTEX_TRYLOCK_PI);
+static inline __swift_uint32_t _swift_stdlib_futex_trylock(__swift_uint32_t *lock) {
+  int ret = syscall(SYS_futex, lock, FUTEX_TRYLOCK_PI);
+
+  if (ret == 0) {
+    return ret;
+  }
+
+  return errno;
 }
 
-static inline __swift_bool _swift_stdlib_futex_unlock(__swift_uint32_t *lock) {
-  return syscall(SYS_futex, lock, FUTEX_UNLOCK_PI_PRIVATE);
+static inline __swift_uint32_t _swift_stdlib_futex_unlock(__swift_uint32_t *lock) {
+  int ret = syscall(SYS_futex, lock, FUTEX_UNLOCK_PI_PRIVATE);
+
+  if (ret == 0) {
+    return ret;
+  }
+
+  return errno;
 }
 
 #endif // defined(__linux__)

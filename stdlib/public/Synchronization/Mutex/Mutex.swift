@@ -71,7 +71,8 @@ extension Mutex where Value: ~Copyable {
   /// - Warning: Recursive calls to `withLock` within the
   ///   closure parameter has behavior that is platform dependent.
   ///   Some platforms may choose to panic the process, deadlock,
-  ///   or leave this behavior unspecified.
+  ///   or leave this behavior unspecified. This will never
+  ///   reacquire the lock however.
   ///
   /// - Parameter body: A closure with a parameter of `Value`
   ///   that has exclusive access to the value being stored within
@@ -83,16 +84,16 @@ extension Mutex where Value: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func withLock<Result: ~Copyable & Sendable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> Result
-  ) throws(E) -> Result {
-    handle.lock()
+  public borrowing func withLock<Result: ~Copyable, E: Error>(
+    _ body: @Sendable (inout Value) throws(E) -> transferring Result
+  ) throws(E) -> transferring Result {
+    handle._lock()
 
     defer {
-      handle.unlock()
+      handle._unlock()
     }
 
-    return try body(&value.address.pointee)
+    return try body(&value._address.pointee)
   }
 
   /// Attempts to acquire the lock and then calls the given closure if
@@ -116,7 +117,8 @@ extension Mutex where Value: ~Copyable {
   /// - Warning: Recursive calls to `withLockIfAvailable` within the
   ///   closure parameter has behavior that is platform dependent.
   ///   Some platforms may choose to panic the process, deadlock,
-  ///   or leave this behavior unspecified.
+  ///   or leave this behavior unspecified. This will never
+  ///   reacquire the lock however.
   ///
   /// - Parameter body: A closure with a parameter of `Value`
   ///   that has exclusive access to the value being stored within
@@ -129,18 +131,18 @@ extension Mutex where Value: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func withLockIfAvailable<Result: ~Copyable & Sendable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> Result
-  ) throws(E) -> Result? {
-    guard handle.tryLock() else {
+  public borrowing func withLockIfAvailable<Result: ~Copyable, E: Error>(
+    _ body: @Sendable (inout Value) throws(E) -> transferring Result
+  ) throws(E) -> transferring Result? {
+    guard handle._tryLock() else {
       return nil
     }
 
     defer {
-      handle.unlock()
+      handle._unlock()
     }
 
-    return try body(&value.address.pointee)
+    return try body(&value._address.pointee)
   }
 }
 
@@ -150,20 +152,44 @@ extension Mutex where Value == Void {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func _unsafeLock() {
-    handle.lock()
+    handle._lock()
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func _unsafeTryLock() -> Bool {
-    handle.tryLock()
+    handle._tryLock()
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func _unsafeUnlock() {
-    handle.unlock()
+    handle._unlock()
+  }
+}
+
+@available(SwiftStdlib 6.0, *)
+extension _MutexHandle {
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public borrowing func unsafeLock() {
+    _lock()
+  }
+
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public borrowing func unsafeTryLock() -> Bool {
+    _tryLock()
+  }
+
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public borrowing func unsafeUnlock() {
+    _unlock()
   }
 }

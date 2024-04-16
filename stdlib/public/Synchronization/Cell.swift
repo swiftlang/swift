@@ -20,14 +20,14 @@ internal struct _Cell<Value: ~Copyable>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  var address: UnsafeMutablePointer<Value> {
-    UnsafeMutablePointer<Value>(rawAddress)
+  internal var _address: UnsafeMutablePointer<Value> {
+    UnsafeMutablePointer<Value>(_rawAddress)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  var rawAddress: Builtin.RawPointer {
+  internal var _rawAddress: Builtin.RawPointer {
 #if $BuiltinAddressOfRawLayout
     Builtin.addressOfRawLayout(self)
 #else
@@ -38,14 +38,14 @@ internal struct _Cell<Value: ~Copyable>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  init(_ initialValue: consuming Value) {
-    address.initialize(to: initialValue)
+  internal init(_ initialValue: consuming Value) {
+    _address.initialize(to: initialValue)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   deinit {
-    address.deinitialize(count: 1)
+    _address.deinitialize(count: 1)
   }
 }

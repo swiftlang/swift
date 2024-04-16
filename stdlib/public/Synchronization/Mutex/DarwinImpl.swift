@@ -10,42 +10,40 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Builtin
 import Darwin
 
 @available(SwiftStdlib 6.0, *)
 @frozen
-@usableFromInline
 @_staticExclusiveOnly
-internal struct _MutexHandle: ~Copyable {
+public struct _MutexHandle: ~Copyable {
   @usableFromInline
   let value: _Cell<os_unfair_lock>
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  init() {
+  public init() {
     value = _Cell(os_unfair_lock())
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  borrowing func lock() {
-    os_unfair_lock_lock(value.address)
+  internal borrowing func _lock() {
+    os_unfair_lock_lock(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  borrowing func tryLock() -> Bool {
-    os_unfair_lock_trylock(value.address)
+  internal borrowing func _tryLock() -> Bool {
+    os_unfair_lock_trylock(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  borrowing func unlock() {
-    os_unfair_lock_unlock(value.address)
+  internal borrowing func _unlock() {
+    os_unfair_lock_unlock(value._address)
   }
 }

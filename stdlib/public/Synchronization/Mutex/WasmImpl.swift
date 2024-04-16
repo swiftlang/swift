@@ -14,19 +14,19 @@
 // what ordering we tell LLVM to use.
 
 @_extern(c, "llvm.wasm32.memory.atomic.wait32")
-func _swift_stdlib_wait(
+internal func _swift_stdlib_wait(
   on: UnsafePointer<UInt32>,
   expected: UInt32,
   timeout: Int64
 ) -> UInt32
 
 @_extern(c, "llvm.wasm32.memory.atomic.notify")
-func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32)
+internal func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32)
 
 extension Atomic where Value == UInt32 {
-  borrowing func wait(expected: _MutexHandle.State) {
+  internal borrowing func _wait(expected: _MutexHandle.State) {
     _swift_stdlib_wait(
-      on: .init(rawAddress),
+      on: .init(_rawAddress),
       expected: expected.rawValue,
 
       // A timeout of < 0 means indefinitely.
@@ -34,9 +34,9 @@ extension Atomic where Value == UInt32 {
     )
   }
 
-  borrowing func wake() {
+  internal borrowing func _wake() {
     // Only wake up 1 thread
-    _swift_stdlib_wake(on: .init(rawAddress), count: 1)
+    _swift_stdlib_wake(on: .init(_rawAddress), count: 1)
   }
 }
 
@@ -54,22 +54,21 @@ extension _MutexHandle {
 
 @available(SwiftStdlib 6.0, *)
 @frozen
-@usableFromInline
 @_staticExclusiveOnly
-internal struct _MutexHandle: ~Copyable {
+public struct _MutexHandle: ~Copyable {
   @usableFromInline
   let storage: Atomic<State>
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  init() {
+  public init() {
     storage = Atomic(.unlocked)
   }
 
   @available(SwiftStdlib 6.0, *)
   @usableFromInline
-  borrowing func lock() {
+  internal borrowing func _lock() {
     // Note: We could probably merge this cas into a do/while style loop, but we
     // really want to perform the strong variant before attempting to do weak
     // ones in the loop.
@@ -106,7 +105,7 @@ internal struct _MutexHandle: ~Copyable {
       // Block until unlock has been called. This will return early if the call
       // to unlock happened between attempting to acquire and attempting to
       // wait while nobody else managed to acquire it yet.
-      storage.wait(expected: .contended)
+      storage._wait(expected: .contended)
 
       (exchanged, state) = storage.weakCompareExchange(
         expected: .unlocked,
@@ -121,7 +120,7 @@ internal struct _MutexHandle: ~Copyable {
 
   @available(SwiftStdlib 6.0, *)
   @usableFromInline
-  borrowing func tryLock() -> Bool {
+  internal borrowing func _tryLock() -> Bool {
     storage.compareExchange(
       expected: .unlocked,
       desired: .locked,
@@ -132,7 +131,7 @@ internal struct _MutexHandle: ~Copyable {
 
   @available(SwiftStdlib 6.0, *)
   @usableFromInline
-  borrowing func unlock() {
+  internal borrowing func _unlock() {
     // Transition our state from being either .locked or .contended to .unlocked.
     // At this point the mutex is freely acquirable. If the value that was
     // stored in the mutex was .locked, then no one else was waiting on this
@@ -144,7 +143,7 @@ internal struct _MutexHandle: ~Copyable {
 
     // Otherwise, wake up our next lucky random thread to acquire the mutex.
     // (Assuming no new thread acquires the lock before it does)
-    storage.wake()
+    storage._wake()
 
     // Unlocked!
   }

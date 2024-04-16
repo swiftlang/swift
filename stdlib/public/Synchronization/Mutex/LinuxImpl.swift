@@ -10,34 +10,33 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SynchronizationShims
+import _SynchronizationShims
 import Glibc
 
 extension Atomic where Value == UInt32 {
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specifc error value.
-  borrowing func futexLock() -> Bool {
-    _swift_stdlib_futex_lock(.init(rawAddress))
+  internal borrowing func _futexLock() -> UInt32 {
+    _swift_stdlib_futex_lock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specifc error value.
-  borrowing func futexTryLock() -> Bool {
-    _swift_stdlib_futex_trylock(.init(rawAddress))
+  internal borrowing func _futexTryLock() -> UInt32 {
+    _swift_stdlib_futex_trylock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
-  borrowing func futexUnlock() -> Bool {
-    _swift_stdlib_futex_unlock(.init(rawAddress))
+  internal borrowing func _futexUnlock() -> UInt32 {
+    _swift_stdlib_futex_unlock(.init(_rawAddress))
   }
 }
 
 @available(SwiftStdlib 6.0, *)
 @frozen
-@usableFromInline
 @_staticExclusiveOnly
-internal struct _MutexHandle: ~Copyable {
+public struct _MutexHandle: ~Copyable {
   // There are only 3 different values that storage can hold at a single time.
   // 0: unlocked
   // TID: locked, current thread's id (uncontended)
@@ -48,7 +47,7 @@ internal struct _MutexHandle: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  init() {
+  public init() {
     storage = Atomic(0)
   }
 }
@@ -58,7 +57,7 @@ extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  borrowing func lock() {
+  internal borrowing func _lock() {
     // Note: This is being TLS cached.
     let selfId = _swift_stdlib_gettid()
 
@@ -74,12 +73,12 @@ extension _MutexHandle {
       return
     }
 
-    lockSlow(selfId)
+    _lockSlow(selfId)
   }
 
   @available(SwiftStdlib 6.0, *)
   @usableFromInline
-  borrowing func lockSlow(_ selfId: UInt32) {
+  internal borrowing func _lockSlow(_ selfId: UInt32) {
     // Before relinquishing control to the kernel to block this particular
     // thread, run a little spin lock to keep this thread busy in the scenario
     // where the current owner thread's critical section is somewhat quick. We
@@ -129,16 +128,14 @@ extension _MutexHandle {
     // could succeed if the owner releases in between finishing spinning the
     // futex syscall.
     while true {
-      // Block until an equivalent 'futexUnlock' has been called by the owner.
-      // This returns 'false' on success which means the kernel has acquired the
+      // Block until an equivalent '_futexUnlock' has been called by the owner.
+      // This returns '0' on success which means the kernel has acquired the
       // lock for us.
-      if !storage.futexLock() {
+      switch storage._futexLock() {
+      case 0:
         // Locked!
         return
-      }
 
-      // Our futex returned a non-false value which indicates an error occured.
-      switch errno {
       // EINTR  - "A FUTEX_WAIT or FUTEX_WAIT_BITSET operation was interrupted
       //           by a signal (see signal(7)). Before Linux 2.6.22, this error
       //           could also be returned for a spurious wakeup; since Linux
@@ -196,7 +193,7 @@ extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  borrowing func tryLock() -> Bool {
+  internal borrowing func _tryLock() -> Bool {
     // Do a user space cmpxchg to see if we can easily acquire the lock.
     if storage.compareExchange(
       expected: 0,
@@ -212,12 +209,12 @@ extension _MutexHandle {
 
     // The quick atomic op failed, ask the kernel to see if it can acquire the
     // lock for us.
-    return tryLockSlow()
+    return _tryLockSlow()
   }
 
   @available(SwiftStdlib 6.0, *)
   @usableFromInline
-  borrowing func tryLockSlow() -> Bool {
+  internal borrowing func _tryLockSlow() -> Bool {
     // Note: "Because the kernel has access to more state information than user
     //        space, acquisition of the lock might succeed if performed by the
     //        kernel in cases where the futex word (i.e., the state information
@@ -225,12 +222,11 @@ extension _MutexHandle {
     //        and/or FUTEX_OWNER_DIED). This can happen when the owner of the
     //        futex died. User space cannot handle this condition in a race-free
     //        manner, but the kernel can fix this up and acquire the futex."
-    if !storage.futexTryLock() {
+    switch storage._futexTryLock() {
+    case 0:
       // Locked!
       return true
-    }
 
-    switch errno {
     // EDEADLK - "The futex word at uaddr is already locked by the caller."
     case 35:
       // TODO: Replace with a colder function / one that takes a StaticString
@@ -281,7 +277,7 @@ extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  borrowing func unlock() {
+  internal borrowing func _unlock() {
     // Note: This is being TLS cached.
     let selfId = _swift_stdlib_gettid()
 
@@ -300,19 +296,18 @@ extension _MutexHandle {
       return
     }
 
-    unlockSlow()
+    _unlockSlow()
   }
 
   @available(SwiftStdlib 6.0, *)
   @usableFromInline
-  borrowing func unlockSlow() {
+  internal borrowing func _unlockSlow() {
     while true {
-      if !storage.futexUnlock() {
+      switch storage._futexUnlock() {
+      case 0:
         // Unlocked!
         return
-      }
 
-      switch errno {
       // EINTR  - "A FUTEX_WAIT or FUTEX_WAIT_BITSET operation was interrupted
       //           by a signal (see signal(7)). Before Linux 2.6.22, this error
       //           could also be returned for a spurious wakeup; since Linux
