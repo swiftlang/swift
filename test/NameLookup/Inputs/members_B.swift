@@ -4,6 +4,8 @@ import members_A
 extension X {
   public func XinB() { }
 
+  public var propXinB: Bool { return true }
+
   public static func >>>(a: Self, b: Self) -> Self { b }
 }
 

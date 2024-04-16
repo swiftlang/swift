@@ -38,3 +38,12 @@ func testMembersWithContextualBase() {
   takesEnumInC(.caseInC)
 }
 
+extension X {
+  var testProperties: (Bool, Bool, Bool) {
+    return (
+      propXinA,
+      propXinB, // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+      propXinC
+    )
+  }
+}
