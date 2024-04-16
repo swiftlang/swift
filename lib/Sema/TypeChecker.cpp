@@ -312,7 +312,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
         TypeChecker::typeCheckDecl(decl);
       }
     }
-    SF->typeCheckDelayedFunctions();
   }
 
   diagnoseUnnecessaryPreconcurrencyImports(*SF);

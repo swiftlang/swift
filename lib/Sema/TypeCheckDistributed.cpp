@@ -720,7 +720,7 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
         continue;
 
       if (auto thunk = var->getDistributedThunk())
-        SF->addDelayedFunction(thunk);
+        (void) thunk->getTypecheckedBody();
 
       continue;
     }
@@ -740,9 +740,8 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
         }
       }
 
-      if (auto thunk = func->getDistributedThunk()) {
-        SF->addDelayedFunction(thunk);
-      }
+      if (auto thunk = func->getDistributedThunk())
+        (void) thunk->getTypecheckedBody();
     }
   }
 

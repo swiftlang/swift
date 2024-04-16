@@ -2224,14 +2224,19 @@ public:
   explicit DeclChecker(ASTContext &ctx, SourceFile *SF) : Ctx(ctx), SF(SF) {}
 
   ASTContext &getASTContext() const { return Ctx; }
-  void addDelayedFunction(AbstractFunctionDecl *AFD) {
-    if (!SF)
+
+  void typeCheckFunctionBody(AbstractFunctionDecl *FD) {
+    if (FD->isBodySkipped()) {
       return;
+    }
 
-    while (auto *ESF = SF->getEnclosingSourceFile())
-      SF = ESF;
+    if (Ctx.TypeCheckerOpts.DeferToRuntime &&
+        Ctx.LangOpts.hasFeature(Feature::LazyImmediate)) {
+      return;
+    }
 
-    SF->addDelayedFunction(AFD);
+    (void) FD->getTypecheckedBody();
+    (void) FD->getCaptureInfo();
   }
 
   void visit(Decl *decl) {
@@ -3621,14 +3626,6 @@ public:
     if (FD->getAsyncLoc().isValid() &&
         !hasHistoricallyWrongAvailability(FD))
       TypeChecker::checkConcurrencyAvailability(FD->getAsyncLoc(), FD);
-    
-    if (FD->getDeclContext()->isLocalContext()) {
-      // Check local function bodies right away.
-      (void) FD->getTypecheckedBody();
-      (void) FD->getCaptureInfo();
-    } else if (!FD->isBodySkipped()) {
-      addDelayedFunction(FD);
-    }
 
     checkExplicitAvailability(FD);
 
@@ -3699,6 +3696,8 @@ public:
     }
 
     TypeChecker::checkObjCImplementation(FD);
+
+    typeCheckFunctionBody(FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -4129,17 +4128,12 @@ public:
 
     checkExplicitAvailability(CD);
 
-    if (CD->getDeclContext()->isLocalContext()) {
-      // Check local function bodies right away.
-      (void)CD->getTypecheckedBody();
-    } else if (!CD->isBodySkipped()) {
-      addDelayedFunction(CD);
-    }
-
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
 
     TypeChecker::checkObjCImplementation(CD);
+
+    typeCheckFunctionBody(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -4163,12 +4157,7 @@ public:
 
     TypeChecker::checkDeclAttributes(DD);
 
-    if (DD->getDeclContext()->isLocalContext()) {
-      // Check local function bodies right away.
-      (void)DD->getTypecheckedBody();
-    } else if (!DD->isBodySkipped()) {
-      addDelayedFunction(DD);
-    }
+    typeCheckFunctionBody(DD);
   }
 
   void visitBuiltinTupleDecl(BuiltinTupleDecl *BTD) {

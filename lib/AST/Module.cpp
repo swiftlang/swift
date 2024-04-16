@@ -3452,28 +3452,6 @@ void SourceFile::prependTopLevelDecl(Decl *d) {
   ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
 }
 
-void SourceFile::addDelayedFunction(AbstractFunctionDecl *AFD) {
-  // If we defer type checking to runtime, we won't
-  // have to type check `AFD` ahead of time
-  auto &Ctx = getASTContext();
-  if (Ctx.TypeCheckerOpts.DeferToRuntime &&
-      Ctx.LangOpts.hasFeature(Feature::LazyImmediate))
-    return;
-  DelayedFunctions.push_back(AFD);
-}
-
-void SourceFile::typeCheckDelayedFunctions() {
-
-  for (unsigned i = 0; i < DelayedFunctions.size(); i++) {
-    auto *AFD = DelayedFunctions[i];
-    assert(!AFD->getDeclContext()->isLocalContext());
-    AFD->getTypecheckedBody();
-    (void) AFD->getCaptureInfo();
-  }
-
-  DelayedFunctions.clear();
-}
-
 ArrayRef<ASTNode> SourceFile::getTopLevelItems() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);

@@ -210,14 +210,6 @@ private:
   /// if it were done from OpaqueResultTypeRequest.
   llvm::SetVector<OpaqueTypeDecl *> UnvalidatedOpaqueReturnTypes;
 
-  /// The list of functions defined in this file whose bodies have yet to be
-  /// typechecked. They must be held in this list instead of eagerly validated
-  /// because their bodies may force us to perform semantic checks of arbitrary
-  /// complexity, and we currently cannot handle those checks in isolation. E.g.
-  /// we cannot, in general, perform witness matching on singular requirements
-  /// unless the entire conformance has been evaluated.
-  std::vector<AbstractFunctionDecl *> DelayedFunctions;
-
   /// The list of top-level items in the source file. This is \c None if
   /// they have not yet been parsed.
   /// FIXME: Once addTopLevelDecl/prependTopLevelDecl
@@ -320,12 +312,6 @@ public:
   /// Retrieve the \c ExportedSourceFile instance produced by ASTGen, which
   /// includes the SourceFileSyntax node corresponding to this source file.
   void *getExportedSourceFile() const;
-
-  /// Defer type checking of `AFD` to the end of `Sema`
-  void addDelayedFunction(AbstractFunctionDecl *AFD);
-
-  /// Typecheck the bodies of all lazily checked functions
-  void typeCheckDelayedFunctions();
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
