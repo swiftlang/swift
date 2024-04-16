@@ -44,7 +44,7 @@ async (wasmData) => {
 }
 """
 
-final class JSCWasmPlugin: WasmPlugin {
+struct JSCWasmPlugin: WasmPlugin {
   private static let factory = JSContext()?.evaluateScript(js)
 
   private let handler: JSValue
