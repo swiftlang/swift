@@ -48,8 +48,21 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance with the result of evaluating `transform`
   ///   as the new success value if this instance represents a success.
-  @inlinable
-  public func map<NewSuccess>(
+  @_alwaysEmitIntoClient
+  public func map<NewSuccess: ~Copyable>(
+    _ transform: (Success) -> NewSuccess
+  ) -> Result<NewSuccess, Failure> {
+    switch self {
+    case let .success(success):
+      return .success(transform(success))
+    case let .failure(failure):
+      return .failure(failure)
+    }
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal func map<NewSuccess>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -173,8 +186,21 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.failure`.
-  @inlinable
-  public func flatMap<NewSuccess>(
+  @_alwaysEmitIntoClient
+  public func flatMap<NewSuccess: ~Copyable>(
+    _ transform: (Success) -> Result<NewSuccess, Failure>
+  ) -> Result<NewSuccess, Failure> {
+    switch self {
+    case let .success(success):
+      return transform(success)
+    case let .failure(failure):
+      return .failure(failure)
+    }
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal func flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -215,7 +241,7 @@ extension Result where Success: ~Copyable {
   }
 }
 
-extension Result {
+extension Result where Success: ~Copyable {
   /// Returns a new result, mapping any failure value using the given
   /// transformation and unwrapping the produced result.
   ///
@@ -223,8 +249,24 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.success`.
-  @inlinable
-  public func flatMapError<NewFailure>(
+  @_alwaysEmitIntoClient
+  public consuming func flatMapError<NewFailure>(
+    _ transform: (Failure) -> Result<Success, NewFailure>
+  ) -> Result<Success, NewFailure> {
+    switch consume self {
+    case let .success(success):
+      return .success(success)
+    case let .failure(failure):
+      return transform(failure)
+    }
+  }
+}
+
+extension Result {
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO12flatMapErroryAByxqd__GADq_XEs0D0Rd__lF")
+  @usableFromInline
+  internal func flatMapError<NewFailure>(
     _ transform: (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
     switch self {
