@@ -18,12 +18,13 @@ import WASI
 
 typealias DefaultWasmPlugin = WasmKitPlugin
 
-struct WasmKitMacroRunner: WasmPlugin {
+struct WasmKitPlugin: WasmPlugin {
     let instance: ModuleInstance
     let runtime: Runtime
 
     init(wasm: Data) throws {
         let module = try parseWasm(bytes: Array(wasm))
+        // TODO: we should air-gap this bridge. Wasm macros don't need IO.
         let bridge = try WASIBridgeToHost()
         runtime = Runtime(hostModules: bridge.hostModules)
         instance = try runtime.instantiate(module: module)
@@ -36,23 +37,18 @@ struct WasmKitMacroRunner: WasmPlugin {
         guard case let .function(malloc) = exports["wacro_malloc"] else { fatalError("bad wacro_malloc") }
         guard case let .function(parse) = exports["wacro_parse"] else { fatalError("bad wacro_parse") }
         guard case let .function(free) = exports["wacro_free"] else { fatalError("bad wacro_free") }
+        let memory = GuestMemory(store: runtime.store, address: memoryAddr)
 
-        let inAddr = try malloc.invoke([.i32(UInt32(json.count))], runtime: runtime)[0].i32
+        let jsonLen = UInt32(json.count)
+        let inAddr = try malloc.invoke([.i32(jsonLen)], runtime: runtime)[0].i32
+        let rawInAddr = UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: inAddr)
+        _ = UnsafeGuestBufferPointer(baseAddress: rawInAddr, count: jsonLen)
+            .withHostPointer { $0.initialize(from: json) }
 
-        runtime.store.withMemory(at: memoryAddr) { mem in
-            mem.data.replaceSubrange(Int(inAddr)..<(Int(inAddr) + json.count), with: json)
-        }
-
-        let outAddr = try parse.invoke([.i32(inAddr), .i32(UInt32(json.count))], runtime: runtime)[0].i32
-        let out = runtime.store.withMemory(at: memoryAddr) { mem in
-            let bytes = Array(mem.data[Int(outAddr)..<(Int(outAddr) + 4)])
-            let len =
-              (UInt32(bytes[0]) << 0)  |
-              (UInt32(bytes[1]) << 8)  |
-              (UInt32(bytes[2]) << 16) |
-              (UInt32(bytes[3]) << 24)
-            return Data(mem.data[(Int(outAddr) + 4)...].prefix(Int(len)))
-        }
+        let outAddr = try parse.invoke([.i32(inAddr), .i32(jsonLen)], runtime: runtime)[0].i32
+        let outLen = UnsafeGuestPointer<UInt32>(memorySpace: memory, offset: outAddr).pointee
+        let outBase = UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: outAddr + 4)
+        let out = UnsafeGuestBufferPointer(baseAddress: outBase, count: outLen).withHostPointer { Data($0) }
 
         _ = try free.invoke([.i32(outAddr)], runtime: runtime)
 
