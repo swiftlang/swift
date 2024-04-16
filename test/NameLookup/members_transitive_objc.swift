@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_A.swift
-// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_B.swift
-// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_C.swift
-// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/Categories -o %t %S/Inputs/Categories/Categories_E.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/Categories -import-objc-header %S/Inputs/Categories/Bridging.h -verify -swift-version 5
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/Categories -import-objc-header %S/Inputs/Categories/Bridging.h -verify -swift-version 6
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/Categories -import-objc-header %S/Inputs/Categories/Bridging.h -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/MemberImportVisibility -o %t %S/Inputs/MemberImportVisibility/Categories_A.swift
+// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/MemberImportVisibility -o %t %S/Inputs/MemberImportVisibility/Categories_B.swift
+// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/MemberImportVisibility -o %t %S/Inputs/MemberImportVisibility/Categories_C.swift
+// RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/MemberImportVisibility -o %t %S/Inputs/MemberImportVisibility/Categories_E.swift
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 5
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 6
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: objc_interop
 

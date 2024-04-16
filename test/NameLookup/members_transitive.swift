@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/members_A.swift
-// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/members_B.swift
-// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/members_C.swift
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/members_transitive_other.swift -I %t -verify -swift-version 5
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/members_transitive_other.swift -I %t -verify -swift-version 6
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/members_transitive_other.swift -I %t -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/MemberImportVisibility/members_A.swift
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_B.swift
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/MemberImportVisibility/members_transitive_other.swift -I %t -verify -swift-version 5
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/MemberImportVisibility/members_transitive_other.swift -I %t -verify -swift-version 6
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/MemberImportVisibility/members_transitive_other.swift -I %t -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
 // expected-member-visibility-note 7{{add import of module 'members_B'}}{{1-1=import members_B\n}}
