@@ -95,7 +95,7 @@ extension Result where Success: ~Copyable {
     _ transform: (borrowing Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
-    case .success(_borrowing success):
+    case .success(borrowing success):
       return .success(transform(success))
     case let .failure(failure):
       return .failure(failure)
@@ -233,7 +233,7 @@ extension Result where Success: ~Copyable {
     _ transform: (borrowing Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
-    case .success(_borrowing success):
+    case .success(borrowing success):
       return transform(success)
     case let .failure(failure):
       return .failure(failure)
