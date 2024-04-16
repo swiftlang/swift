@@ -42,6 +42,8 @@ WARNING(could_not_rewrite_bridging_header,none,
 ERROR(bridging_header_pch_error,Fatal,
    "failed to emit precompiled header '%0' for bridging header '%1'",
    (StringRef, StringRef))
+ERROR(err_rewrite_bridging_header,none,
+  "failed to serialize bridging header: '%0'", (StringRef))
 
 ERROR(emit_pcm_error,Fatal,
    "failed to emit precompiled module '%0' for module map '%1'",
