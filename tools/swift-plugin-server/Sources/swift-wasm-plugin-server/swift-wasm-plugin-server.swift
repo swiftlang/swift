@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) import SwiftPluginServerSupport
 import Foundation
 import swiftLLVMJSON
-import SwiftPluginServerSupport
 
 @main
 final class SwiftPluginServer {
@@ -30,8 +30,14 @@ final class SwiftPluginServer {
   }
 
   private func loadPluginLibrary(path: String, moduleName: String) async throws -> WasmPlugin {
-    guard path.hasSuffix(".wasm") else { throw PluginServerError(message: "swift-wasm-plugin-server can only load wasm") }
-    let wasm = try Data(contentsOf: URL(fileURLWithPath: path))
+    // it's worth the effort jumping through these hoops because
+    // wasm modules can be really large (30M+) so we want to avoid making
+    // copies if possible.
+    let data = try NSData(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+    let wasm = UnsafeByteBuffer(
+      data: UnsafeRawBufferPointer(start: data.bytes, count: data.count),
+      deallocator: { [box = data as AnyObject] in _ = box }
+    )
     return try await defaultWasmPlugin.init(wasm: wasm)
   }
 
@@ -50,6 +56,7 @@ final class SwiftPluginServer {
         }
       }
     } catch {
+      try? FileHandle.standardError.write(contentsOf: Data("Error: \(error)\n".utf8))
       try sendMessage(.expandMacroResult(expandedSource: nil, diagnostics: []))
       return
     }
@@ -75,6 +82,7 @@ final class SwiftPluginServer {
         do {
           loadedWasmPlugins[moduleName] = try await loadPluginLibrary(path: libraryPath, moduleName: moduleName)
         } catch {
+          try? FileHandle.standardError.write(contentsOf: Data("Error: \(error)\n".utf8))
           try sendMessage(.loadPluginLibraryResult(loaded: false, diagnostics: []))
           continue
         }
@@ -98,8 +106,24 @@ final class SwiftPluginServer {
 }
 
 protocol WasmPlugin {
-  init(wasm: Data) async throws
+  init(wasm: UnsafeByteBuffer) async throws
+
   func handleMessage(_ json: Data) async throws -> Data
 }
 
 private var defaultWasmPlugin: (some WasmPlugin).Type { DefaultWasmPlugin.self }
+
+// An immutable data buffer with a stable address.
+//
+// The pointer is valid until the receiver is deallocated.
+final class UnsafeByteBuffer: @unchecked Sendable {
+  let data: UnsafeRawBufferPointer
+  private let deallocator: @Sendable () -> Void
+
+  init(data: UnsafeRawBufferPointer, deallocator: @escaping @Sendable () -> Void) {
+    self.data = data
+    self.deallocator = deallocator
+  }
+
+  deinit { deallocator() }
+}
