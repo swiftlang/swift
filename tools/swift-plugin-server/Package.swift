@@ -14,6 +14,7 @@ let package = Package(
   dependencies: [
     .package(path: "../../../swift-syntax"),
     .package(path: "../../lib/ASTGen"),
+    .package(path: "../../../wasmkit"),
   ],
   targets: [
     .target(
@@ -54,6 +55,8 @@ let package = Package(
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         "CSwiftPluginServer",
         "SwiftPluginServerSupport",
+        .product(name: "WasmKit", package: "WasmKit", condition: .when(platforms: [.linux, .windows])),
+        .product(name: "WASI", package: "WasmKit", condition: .when(platforms: [.linux, .windows])),
       ],
       swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
