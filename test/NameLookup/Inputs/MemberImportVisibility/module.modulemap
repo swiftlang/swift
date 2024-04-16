@@ -23,3 +23,7 @@ module Categories_D {
   }
 }
 
+module Underlying {
+  header "Underlying.h"
+  export *
+}
