@@ -521,9 +521,14 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
-      Context.Diags.diagnose(
-          Loc, diag::candidate_inaccessible, first,
-          first->getFormalAccessScope().accessLevelForDiagnostics());
+      auto accessLevel =
+          first->getFormalAccessScope().accessLevelForDiagnostics();
+      if (accessLevel == AccessLevel::Public &&
+          diagnoseMissingImportForMember(first, DC, Loc))
+        return errorResult();
+
+      Context.Diags.diagnose(Loc, diag::candidate_inaccessible, first,
+                             accessLevel);
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
