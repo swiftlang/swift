@@ -1513,6 +1513,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  // @DebugDescription uses @_section and @_used attributes.
+  if (Opts.hasFeature(Feature::DebugDescriptionMacro))
+    Opts.enableFeature(Feature::SymbolLinkageMarkers);
+
 #if SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
   /// explicitly. The new Swift parser can have mismatches with C++ parser -

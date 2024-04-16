@@ -13,7 +13,7 @@
 import SwiftShims
 
 // Macros are disabled when Swift is built without swift-syntax.
-#if $Macros && hasAttribute(attached)
+#if $Macros && $DebugDescriptionMacro && hasAttribute(attached)
 
 /// Converts description definitions to a debugger Type Summary.
 ///
@@ -65,10 +65,10 @@ import SwiftShims
 ///   logic and computed properties are not supported.
 /// * Overloaded string interpolation cannot be used.
 @attached(memberAttribute)
-public macro _DebugDescription() =
+public macro DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
 
-/// Internal-only macro. See `@_DebugDescription`.
+/// Internal-only macro. See `@DebugDescription`.
 @attached(peer, names: named(_lldb_summary))
 public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
   #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
