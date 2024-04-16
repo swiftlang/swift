@@ -1269,6 +1269,11 @@ void collectParsedExportedImports(const ModuleDecl *M,
                                   llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
                                   llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
 
+/// If the import that would make the given declaration visibile is absent,
+/// emit a diagnostic and a fix-it suggesting adding the missing import.
+bool diagnoseMissingImportForMember(const ValueDecl *decl,
+                                    const DeclContext *dc, SourceLoc loc);
+
 } // end namespace swift
 
 #endif

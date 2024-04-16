@@ -4001,3 +4001,40 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
 
   return version::Version();
 }
+
+bool swift::diagnoseMissingImportForMember(const ValueDecl *decl,
+                                           const DeclContext *dc,
+                                           SourceLoc loc) {
+  if (decl->findImport(dc))
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  auto definingModule = decl->getModuleContext();
+  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
+                     decl->getDescriptiveKind(), decl->getName(),
+                     definingModule);
+
+  SourceLoc bestLoc =
+      ctx.Diags.getBestAddImportFixItLoc(decl, dc->getParentSourceFile());
+  if (bestLoc.isValid()) {
+    llvm::SmallString<64> importText;
+
+    // @_spi imports.
+    if (decl->isSPI()) {
+      auto spiGroups = decl->getSPIGroups();
+      if (!spiGroups.empty()) {
+        importText += "@_spi(";
+        importText += spiGroups[0].str();
+        importText += ") ";
+      }
+    }
+
+    importText += "import ";
+    importText += definingModule->getName().str();
+    importText += "\n";
+    ctx.Diags.diagnose(bestLoc, diag::candidate_add_import, definingModule)
+        .fixItInsert(bestLoc, importText);
+  }
+
+  return true;
+}
