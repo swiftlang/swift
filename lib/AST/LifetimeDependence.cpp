@@ -455,9 +455,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
   unsigned paramIndex = 0;
   bool hasParamError = false;
   for (auto *param : *afd->getParameters()) {
-    SWIFT_DEFER {
-      paramIndex++;
-    };
+    SWIFT_DEFER { paramIndex++; };
     Type paramTypeInContext =
         afd->mapTypeIntoContext(param->getInterfaceType());
     if (paramTypeInContext->hasError()) {
@@ -465,13 +463,14 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
       continue;
     }
     auto paramOwnership = param->getValueOwnership();
-    if (paramTypeInContext->isEscapable() && paramOwnership == ValueOwnership::Default) {
+    if (paramTypeInContext->isEscapable() &&
+        paramOwnership == ValueOwnership::Default) {
       continue;
     }
 
     auto lifetimeKind = getLifetimeDependenceKindFromType(paramTypeInContext);
-    if (!isLifetimeDependenceCompatibleWithOwnership(lifetimeKind, paramOwnership,
-                                                     afd)) {
+    if (!isLifetimeDependenceCompatibleWithOwnership(lifetimeKind,
+                                                     paramOwnership, afd)) {
       continue;
     }
     if (candidateParam) {
@@ -500,8 +499,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
       return std::nullopt;
     }
     diags.diagnose(returnLoc,
-                   diag::lifetime_dependence_cannot_infer_no_candidates,
-                   "");
+                   diag::lifetime_dependence_cannot_infer_no_candidates, "");
     return std::nullopt;
   }
   return lifetimeDependenceInfo;
