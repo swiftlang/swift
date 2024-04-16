@@ -13,3 +13,7 @@ extension Y {
 
   public static func <>(a: Self, b: Self) -> Self { a }
 }
+
+public enum EnumInC {
+  case caseInC
+}

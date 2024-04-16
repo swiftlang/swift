@@ -13,3 +13,6 @@ extension Y {
   public static func >>>(a: Self, b: Self) -> Self { b }
 }
 
+public enum EnumInB {
+  case caseInB
+}
