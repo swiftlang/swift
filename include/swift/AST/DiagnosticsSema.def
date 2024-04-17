@@ -167,9 +167,9 @@ ERROR(init_candidate_inaccessible,none,
 
 ERROR(candidate_from_missing_import,none,
       "%0 %1 is not available due to missing import of defining module %2",
-      (DescriptiveDeclKind, DeclName, DeclName))
+      (DescriptiveDeclKind, DeclName, ModuleDecl *))
 NOTE(candidate_add_import,none,
-     "add import of module %0", (DeclName))
+     "add import of module %0", (ModuleDecl *))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",

@@ -364,9 +364,8 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
 
-
-// Whether members of extensions respect the enclosing file's imports.
-EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(ExtensionImportVisibility, true)
+// Whether lookup of members respects the enclosing file's imports.
+EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true)
 
 // Alias for IsolatedAny
 EXPERIMENTAL_FEATURE(IsolatedAny2, true)
