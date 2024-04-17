@@ -2788,7 +2788,7 @@ protected:
 public:
   /// Find the import that makes the given declaration available.
   std::optional<AttributedImport<ImportedModule>>
-  findImport(const DeclContext *fromDC);
+  findImport(const DeclContext *fromDC) const;
 
   /// Return true if this protocol member is a protocol requirement.
   ///

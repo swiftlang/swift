@@ -2702,6 +2702,15 @@ bool SourceFile::hasImportsWithFlag(ImportFlags flag) const {
       ctx.evaluator, HasImportsMatchingFlagRequest{mutableThis, flag}, false);
 }
 
+ImportFlags SourceFile::getImportFlags(const ModuleDecl *module) const {
+  unsigned flags = 0x0;
+  for (auto import : *Imports) {
+    if (import.module.importedModule == module)
+      flags |= import.options.toRaw();
+  }
+  return ImportFlags(flags);
+}
+
 bool SourceFile::hasTestableOrPrivateImport(
     AccessLevel accessLevel, const swift::ValueDecl *ofDecl,
     SourceFile::ImportQueryKind queryKind) const {
@@ -4000,4 +4009,63 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
   }
 
   return version::Version();
+}
+
+bool swift::diagnoseMissingImportForMember(const ValueDecl *decl,
+                                           const DeclContext *dc,
+                                           SourceLoc loc) {
+  if (decl->findImport(dc))
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  auto definingModule = decl->getModuleContext();
+  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
+                     decl->getDescriptiveKind(), decl->getName(),
+                     definingModule);
+
+  SourceLoc bestLoc =
+      ctx.Diags.getBestAddImportFixItLoc(decl, dc->getParentSourceFile());
+  if (!bestLoc.isValid())
+    return false;
+
+  llvm::SmallString<64> importText;
+
+  // Check other source files for import flags that should be applied to the
+  // fix-it for consistency with the rest of the imports in the module.
+  auto parentModule = dc->getParentModule();
+  OptionSet<ImportFlags> flags;
+  for (auto file : parentModule->getFiles()) {
+    if (auto sf = dyn_cast<SourceFile>(file))
+      flags |= sf->getImportFlags(definingModule);
+  }
+
+  if (flags.contains(ImportFlags::Exported) ||
+      parentModule->isClangOverlayOf(definingModule))
+    importText += "@_exported ";
+  if (flags.contains(ImportFlags::ImplementationOnly))
+    importText += "@_implementationOnly ";
+  if (flags.contains(ImportFlags::WeakLinked))
+    importText += "@_weakLinked ";
+  if (flags.contains(ImportFlags::SPIOnly))
+    importText += "@_spiOnly ";
+
+  // FIXME: Access level should be considered, too.
+
+  // @_spi imports.
+  if (decl->isSPI()) {
+    auto spiGroups = decl->getSPIGroups();
+    if (!spiGroups.empty()) {
+      importText += "@_spi(";
+      importText += spiGroups[0].str();
+      importText += ") ";
+    }
+  }
+
+  importText += "import ";
+  importText += definingModule->getName().str();
+  importText += "\n";
+  ctx.Diags.diagnose(bestLoc, diag::candidate_add_import, definingModule)
+      .fixItInsert(bestLoc, importText);
+
+  return true;
 }
