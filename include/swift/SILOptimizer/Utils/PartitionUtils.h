@@ -130,7 +130,7 @@ private:
         isolatedValue(isolatedValue), actorInstance(actorInstance) {
     assert((!actorInstance ||
             (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
-             actorInstance->getType().isActor())) &&
+             actorInstance->getType().isAnyActor())) &&
            "actorInstance must be an actor if it is non-empty");
   }
 
@@ -211,7 +211,7 @@ public:
   static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
                                            SILValue actorInstance,
                                            NominalTypeDecl *typeDecl) {
-    if (typeDecl->isActor())
+    if (typeDecl->isAnyActor())
       return {ActorIsolation::forActorInstanceSelf(typeDecl), isolatedValue,
               actorInstance};
     auto isolation = swift::getActorIsolation(typeDecl);

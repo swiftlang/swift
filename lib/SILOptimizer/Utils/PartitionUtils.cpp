@@ -122,7 +122,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     auto *nomDecl =
         rei->getOperand()->getType().getNominalOrBoundGenericNominal();
     SILValue actorInstance =
-        nomDecl->isActor() ? rei->getOperand() : SILValue();
+        nomDecl->isAnyActor() ? rei->getOperand() : SILValue();
     return SILIsolationInfo::getActorIsolated(rei, actorInstance, nomDecl);
   }
 
@@ -181,7 +181,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         if (isolation.isActorIsolated() &&
             (isolation.getKind() != ActorIsolation::ActorInstance ||
              isolation.getActorInstanceParameter() == 0)) {
-          auto actor = cmi->getOperand()->getType().isActor()
+          auto actor = cmi->getOperand()->getType().isAnyActor()
                            ? cmi->getOperand()
                            : SILValue();
           return SILIsolationInfo::getActorIsolated(cmi, actor, isolation);

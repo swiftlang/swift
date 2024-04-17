@@ -3262,7 +3262,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // underlying object, use that. It is never wrong.
     if (info.actorIsolation) {
       SILValue actorInstance =
-          info.value->getType().isActor() ? info.value : SILValue();
+          info.value->getType().isAnyActor() ? info.value : SILValue();
       iter.first->getSecond().mergeIsolationRegionInfo(
           SILIsolationInfo::getActorIsolated(value, actorInstance,
                                              *info.actorIsolation));
