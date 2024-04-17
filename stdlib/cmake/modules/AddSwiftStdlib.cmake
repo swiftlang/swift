@@ -1835,6 +1835,9 @@ endfunction()
 # SWIFT_SOURCES_DEPENDS_WATCHOS
 #   Sources that are built when this library is being built for watchOS
 #
+# SWIFT_SOURCES_DEPENDS_VISIONOS
+#   Sources that are built when this library is being built for visionOS
+#
 # SWIFT_SOURCES_DEPENDS_FREESTANDING
 #   Sources that are built when this library is being built for freestanding
 #
@@ -1939,6 +1942,7 @@ function(add_swift_target_library name)
         SWIFT_SOURCES_DEPENDS_IOS
         SWIFT_SOURCES_DEPENDS_TVOS
         SWIFT_SOURCES_DEPENDS_WATCHOS
+        SWIFT_SOURCES_DEPENDS_VISIONOS
         SWIFT_SOURCES_DEPENDS_FREESTANDING
         SWIFT_SOURCES_DEPENDS_FREEBSD
         SWIFT_SOURCES_DEPENDS_OPENBSD
@@ -2227,6 +2231,8 @@ function(add_swift_target_library name)
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_TVOS})
     elseif(sdk STREQUAL "WATCHOS" OR sdk STREQUAL "WATCHOS_SIMULATOR")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_WATCHOS})
+    elseif(sdk STREQUAL "XROS" OR sdk STREQUAL "XROS_SIMULATOR")
+      list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_VISIONOS})
     elseif(sdk STREQUAL "FREESTANDING")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_FREESTANDING})
     elseif(sdk STREQUAL "FREEBSD")
