@@ -39,6 +39,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
         return self.args.test_wasmstdlib
 
     def build(self, host_target):
+        self._build(host_target, 'wasm32-wasi')
+
+    def _build(self, host_target, target_triple):
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
         self.cmake_options.define(
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
@@ -61,7 +64,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING',
-                                  self._wasi_sysroot_path)
+                                  self._wasi_sysroot_path(target_triple))
 
         # It's ok to use the host LLVM build dir just for CMake functionalities
         llvm_cmake_dir = os.path.join(self._host_llvm_build_dir(
@@ -117,7 +120,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         test_driver_options = [
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir
-            '-Xclang-linker', '-resource-dir=' + self._wasi_sysroot_path,
+            '-Xclang-linker', '-resource-dir=' + self._wasi_sysroot_path(target_triple),
         ]
         # Leading space is needed to separate from other options
         self.cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
@@ -169,10 +172,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
         build_root = os.path.dirname(self.build_dir)
         return os.path.join('..', build_root, '%s-%s' % ('swift', host_target))
 
-    @property
-    def _wasi_sysroot_path(self):
+    def _wasi_sysroot_path(self, target_triple):
         build_root = os.path.dirname(self.build_dir)
-        return wasisysroot.WASILibc.sysroot_install_path(build_root)
+        return wasisysroot.WASILibc.sysroot_install_path(build_root, target_triple)
 
     def should_install(self, host_target):
         return False
@@ -187,6 +189,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
 
 class WasmThreadsStdlib(WasmStdlib):
+    def build(self, host_target):
+        self._build(host_target, 'wasm32-wasip1-threads')
+
     def should_test_executable(self):
         # TODO(katei): Enable tests once WasmKit supports WASI threads
         return False
