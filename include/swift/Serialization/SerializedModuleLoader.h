@@ -174,7 +174,7 @@ protected:
   static BinaryModuleImports
   getImportsOfModule(const ModuleFileSharedCore &loadedModule,
                      ModuleLoadingBehavior transitiveBehavior,
-                     StringRef packageName);
+                     StringRef packageName, bool isTestableImport);
 
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>

@@ -395,7 +395,8 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
 SerializedModuleLoaderBase::BinaryModuleImports
 SerializedModuleLoaderBase::getImportsOfModule(
     const ModuleFileSharedCore &loadedModuleFile,
-    ModuleLoadingBehavior transitiveBehavior, StringRef packageName) {
+    ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
+    bool isTestableImport) {
   llvm::StringSet<> importedModuleNames;
   std::string importedHeader = "";
   for (const auto &dependency : loadedModuleFile.getDependencies()) {
@@ -410,8 +411,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
         loadedModuleFile.getTransitiveLoadingBehavior(
             dependency,
             /*debuggerMode*/ false,
-            /*isPartialModule*/ false, packageName,
-            loadedModuleFile.isTestable());
+            /*isPartialModule*/ false, packageName, isTestableImport);
     if (dependencyTransitiveBehavior > transitiveBehavior)
       continue;
 
@@ -454,13 +454,6 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
                            modulePath.str());
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
-
-    if (loadedModuleFile->isTestable() && !isTestableImport) {
-      if (Ctx.LangOpts.EnableModuleLoadingRemarks)
-        Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_testable,
-                           modulePath.str());
-      return std::make_error_code(std::errc::no_such_file_or_directory);
-    }
   }
 
   // Some transitive dependencies of binary modules are not required to be
@@ -471,12 +464,12 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
   //       optional.
   auto binaryModuleImports =
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Required,
-                         Ctx.LangOpts.PackageName);
+                         Ctx.LangOpts.PackageName, isTestableImport);
 
   // Lookup optional imports of this module also
   auto binaryModuleOptionalImports =
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
-                         Ctx.LangOpts.PackageName);
+                         Ctx.LangOpts.PackageName, isTestableImport);
 
   auto importedModuleSet = binaryModuleImports.moduleImports;
   std::vector<std::string> importedModuleNames;
