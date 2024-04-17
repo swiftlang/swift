@@ -422,8 +422,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
-      auto partialConsumptionEnabled =
-          Ctx.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
       auto *subExpr = consumeExpr->getSubExpr();
       bool noncopyable =
           subExpr->getType()->getCanonicalType()->isNoncopyable();
@@ -447,7 +445,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           continue;
         }
         auto *mre = dyn_cast<MemberRefExpr>(current);
-        if (mre && partialConsumptionEnabled) {
+        if (mre) {
           auto *vd = dyn_cast<VarDecl>(mre->getMember().getDecl());
           if (!vd) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
@@ -475,7 +473,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           continue;
         }
         auto *ce = dyn_cast<CallExpr>(current);
-        if (ce && partialConsumptionEnabled) {
+        if (ce) {
           if (noncopyable) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
                                diag::consume_expression_non_storage);
@@ -488,7 +486,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
         }
         auto *se = dyn_cast<SubscriptExpr>(current);
-        if (se && partialConsumptionEnabled) {
+        if (se) {
           if (noncopyable) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
                                diag::consume_expression_non_storage);
