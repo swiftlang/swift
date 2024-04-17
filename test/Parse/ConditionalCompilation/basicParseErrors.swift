@@ -79,6 +79,12 @@ struct S {
 // expected-note@-3{{did you mean 'Android'?}} {{8-15=Android}}
 // expected-note@-4{{did you mean 'OSX'?}} {{8-15=OSX}}
 // expected-note@-5{{did you mean 'OpenBSD'?}} {{8-15=OpenBSD}}
+// expected-note@-6{{did you mean 'xrOS'?}} {{8-15=xrOS}}
+#endif
+
+#if os(bisionos) // expected-warning {{unknown operating system for build configuration 'os'}}
+// expected-note@-1{{did you mean 'visionOS'?}} {{8-16=visionOS}}
+
 #endif
 
 #if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note{{did you mean 'arm'?}} {{10-13=arm}}
@@ -137,6 +143,7 @@ fn_k()
 // expected-warning@-4 {{unknown architecture for build configuration 'arch'}}
 // expected-note@-5 {{did you mean 'arm'?}} {{26-29=arm}}
 // expected-note@-6 {{did you mean 'i386'?}} {{26-29=i386}}
+// expected-note@-7 {{did you mean 'visionOS'?}} {{8-16=visionOS}}
 func undefinedFunc() // ignored.
 #endif
 undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}

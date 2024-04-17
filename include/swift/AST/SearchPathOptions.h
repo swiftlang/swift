@@ -500,6 +500,10 @@ public:
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
 
+  /// Path to the file that defines platform mapping for availability
+  /// version inheritance.
+  std::optional<std::string> PlatformAvailabilityInheritanceMapPath;
+
   /// Debug path mappings to apply to serialized search paths. These are
   /// specified in LLDB from the target.source-map entries.
   PathRemapper SearchPathRemapper;

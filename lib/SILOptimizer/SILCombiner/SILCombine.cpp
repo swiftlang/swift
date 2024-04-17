@@ -615,6 +615,7 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst);
   } else {
+    swift::salvageDebugInfo(inst);
     if (inst->isStaticInitializerInst()) {
       inst->getParent()->erase(inst, *getPassManager()->getModule());
     } else {

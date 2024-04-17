@@ -43,6 +43,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     SWIFT_MODULE_DEPENDS_OSX ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_TVOS ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_WATCHOS ${swift_cxxstdlib_darwin_dependencies}
+    SWIFT_MODULE_DEPENDS_XROS ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_cxxstdlib_darwin_dependencies}
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

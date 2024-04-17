@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BitwiseCopyable
 // REQUIRES: asserts
 
 struct BufferView : ~Escapable, ~Copyable {
@@ -24,7 +24,15 @@ struct ImplicitInit3 : ~Escapable, ~Copyable { // expected-error{{cannot infer l
   let mbv2: BufferView
 }
 
-func foo() -> BufferView { // expected-error{{cannot infer lifetime dependence , no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+func foo1() -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+  return BufferView(nil, 0)
+}
+
+func foo2(_ i: borrowing Int) -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+  return BufferView(nil, 0)
+}
+
+func foo3<T: _BitwiseCopyable>(arg: borrowing T) -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
   return BufferView(nil, 0)
 }
 

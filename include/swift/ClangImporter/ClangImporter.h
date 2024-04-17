@@ -402,8 +402,10 @@ public:
   getWrapperForModule(const clang::Module *mod,
                       bool returnOverlayIfPossible = false) const override;
 
-  std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
-                                        time_t &fileModTime);
+  std::string
+  getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
+                            time_t &fileModTime,
+                            StringRef pchIncludeTree);
 
   /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads
   /// an Objective-C header file into the replica and emits a PCH file of its

@@ -987,7 +987,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   assert(!isa<ClangModuleUnit>(dc->getModuleScopeContext())
          && "should not have serialized a conformance from a clang module");
-  Type conformingType = dc->getDeclaredInterfaceType();
+  Type conformingType = dc->getSelfInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
   auto protoOrError = MF.getDeclChecked(protoID);

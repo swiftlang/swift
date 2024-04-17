@@ -103,6 +103,8 @@ class BuildScriptInvocation(object):
                 args.darwin_deployment_version_tvos),
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
+            "--darwin-deployment-version-xros=%s" % (
+                args.darwin_deployment_version_xros),
             "--cmake", toolchain.cmake,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,

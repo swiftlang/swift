@@ -645,29 +645,7 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureDynamicActorIsolation(Decl *decl) {
-  auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
-    return llvm::any_of(
-        inherited.getEntries(),
-        [](const InheritedEntry &entry) { return entry.isPreconcurrency(); });
-  };
-
-  if (auto *T = dyn_cast<TypeDecl>(decl))
-    return usesPreconcurrencyConformance(T->getInherited());
-
-  if (auto *E = dyn_cast<ExtensionDecl>(decl)) {
-    // If type has `@preconcurrency` conformance(s) all of its
-    // extensions have to be guarded by the flag too.
-    if (auto *T = dyn_cast<TypeDecl>(E->getExtendedNominal())) {
-      if (usesPreconcurrencyConformance(T->getInherited()))
-        return true;
-    }
-
-    return usesPreconcurrencyConformance(E->getInherited());
-  }
-
-  return false;
-}
+UNINTERESTING_FEATURE(DynamicActorIsolation)
 
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
