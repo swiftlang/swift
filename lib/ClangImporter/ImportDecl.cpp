@@ -2630,6 +2630,13 @@ namespace {
         return nullptr;
       }
 
+      // Bail if this is `std::tzdb`. This type causes issues in copy
+      // constructor instantiation.
+      // FIXME: https://github.com/apple/swift/issues/73037
+      if (decl->isInStdNamespace() && decl->getIdentifier() &&
+          decl->getName() == "tzdb")
+        return nullptr;
+
       auto &clangSema = Impl.getClangSema();
       // Make Clang define any implicit constructors it may need (copy,
       // default). Make sure we only do this if the class has been fully defined
