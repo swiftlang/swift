@@ -98,13 +98,6 @@ function(add_swift_compiler_modules_library name)
                         "DEPENDS"
                         ${ARGN})
 
-  # Prior to 5.9, we have to use the experimental flag for C++ interop.
-  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-    set(cxx_interop_flag "-enable-experimental-cxx-interop")
-  else()
-    set(cxx_interop_flag "-cxx-interoperability-mode=default")
-  endif()
-
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
@@ -113,6 +106,12 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    list(APPEND swift_compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
+  else()
+    list(APPEND swift_compile_options "-cxx-interoperability-mode=default")
+  endif()
 
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
