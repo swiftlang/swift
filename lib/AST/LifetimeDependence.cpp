@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
-
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/LifetimeDependence.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
@@ -165,11 +165,23 @@ static LifetimeDependenceKind getLifetimeDependenceKindFromDecl(
     return LifetimeDependenceKind::Scope;
   }
   if (parsedLifetimeDependenceKind == ParsedLifetimeDependenceKind::Inherit) {
-    // TODO: assert that this can happen only on deserialized decls
+    // TODO: assert that this can happen in SIL tests
     return LifetimeDependenceKind::Inherit;
   }
   return paramType->isEscapable() ? LifetimeDependenceKind::Scope
                                   : LifetimeDependenceKind::Inherit;
+}
+
+static bool isBitwiseCopyable(Type type, ModuleDecl *mod, ASTContext &ctx) {
+  if (!ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+    return false;
+  }
+  auto *bitwiseCopyableProtocol =
+      ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+  if (!bitwiseCopyableProtocol) {
+    return false;
+  }
+  return (bool)(mod->checkConformance(type, bitwiseCopyableProtocol));
 }
 
 std::optional<LifetimeDependenceInfo>
@@ -205,14 +217,9 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
     // error.
     // TODO: Diagnose ~Escapable types are always non-trivial in SIL.
     if (paramType->isEscapable()) {
-      if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-        auto *bitwiseCopyableProtocol =
-            ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
-        if (bitwiseCopyableProtocol &&
-            mod->checkConformance(paramType, bitwiseCopyableProtocol)) {
-          diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
-          return true;
-        }
+      if (isBitwiseCopyable(paramType, mod, ctx)) {
+        diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
+        return true;
       }
     }
 
@@ -277,7 +284,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
     }
     case LifetimeDependenceSpecifier::SpecifierKind::Ordered: {
       auto index = specifier.getIndex();
-      if (index > afd->getParameters()->size()) {
+      if (index >= afd->getParameters()->size()) {
         diags.diagnose(specifier.getLoc(),
                        diag::lifetime_dependence_invalid_param_index, index);
         return std::nullopt;
@@ -426,16 +433,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
   if (!cd && afd->hasImplicitSelfDecl()) {
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->isEscapable()) {
-      if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-        auto *bitwiseCopyableProtocol =
-            ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
-        if (bitwiseCopyableProtocol &&
-            mod->checkConformance(selfTypeInContext, bitwiseCopyableProtocol)) {
+      if (isBitwiseCopyable(selfTypeInContext, mod, ctx)) {
           diags.diagnose(
               returnLoc,
               diag::lifetime_dependence_method_escapable_bitwisecopyable_self);
           return std::nullopt;
-        }
       }
     }
     auto kind = getLifetimeDependenceKindFromType(selfTypeInContext);
@@ -455,9 +457,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
   unsigned paramIndex = 0;
   bool hasParamError = false;
   for (auto *param : *afd->getParameters()) {
-    SWIFT_DEFER {
-      paramIndex++;
-    };
+    SWIFT_DEFER { paramIndex++; };
     Type paramTypeInContext =
         afd->mapTypeIntoContext(param->getInterfaceType());
     if (paramTypeInContext->hasError()) {
@@ -465,13 +465,18 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
       continue;
     }
     auto paramOwnership = param->getValueOwnership();
-    if (paramTypeInContext->isEscapable() && paramOwnership == ValueOwnership::Default) {
-      continue;
+    if (paramTypeInContext->isEscapable()) {
+      if (isBitwiseCopyable(paramTypeInContext, mod, ctx)) {
+        continue;
+      }
+      if (paramOwnership == ValueOwnership::Default) {
+        continue;
+      }
     }
 
     auto lifetimeKind = getLifetimeDependenceKindFromType(paramTypeInContext);
-    if (!isLifetimeDependenceCompatibleWithOwnership(lifetimeKind, paramOwnership,
-                                                     afd)) {
+    if (!isLifetimeDependenceCompatibleWithOwnership(lifetimeKind,
+                                                     paramOwnership, afd)) {
       continue;
     }
     if (candidateParam) {
@@ -496,12 +501,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     if (cd && afd->isImplicit()) {
       diags.diagnose(returnLoc,
                      diag::lifetime_dependence_cannot_infer_no_candidates,
-                     "on implicit initializer");
+                     " on implicit initializer");
       return std::nullopt;
     }
     diags.diagnose(returnLoc,
-                   diag::lifetime_dependence_cannot_infer_no_candidates,
-                   "");
+                   diag::lifetime_dependence_cannot_infer_no_candidates, "");
     return std::nullopt;
   }
   return lifetimeDependenceInfo;
