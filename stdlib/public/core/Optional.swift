@@ -186,6 +186,9 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original map
+                       // (rdar://125016028)
   public func map<E: Error, U: ~Copyable>(
     _ transform: (Wrapped) throws(E) -> U
   ) throws(E) -> U? {
@@ -264,6 +267,9 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original flatMap
+                       // (rdar://125016028)
   public func flatMap<E: Error, U: ~Copyable>(
     _ transform: (Wrapped) throws(E) -> U?
   ) throws(E) -> U? {

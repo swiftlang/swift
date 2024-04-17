@@ -49,6 +49,9 @@ extension Result {
   /// - Returns: A `Result` instance with the result of evaluating `transform`
   ///   as the new success value if this instance represents a success.
   @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original map
+                       // (rdar://125016028)
   public func map<NewSuccess: ~Copyable>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
@@ -187,6 +190,9 @@ extension Result {
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.failure`.
   @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original flatMap
+                       // (rdar://125016028)
   public func flatMap<NewSuccess: ~Copyable>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
