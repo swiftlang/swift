@@ -1354,4 +1354,8 @@ def module_load_mode: Separate<["-"], "module-load-mode">,
     MetaVarName<"only-interface|prefer-interface|prefer-serialized|only-serialized">,
     HelpText<"Module loading mode">;
 
+def platform_availability_inheritance_map_path
+  : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,
+    HelpText<"Path of the platform inheritance platform map">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

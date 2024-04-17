@@ -1412,7 +1412,7 @@ public:
       else
         *this << ", var";
 
-      if ((Var->Loc || Var->Scope) && SM) {
+      if ((Var->Loc || Var->Scope) && SM && Ctx.printDebugInfo()) {
         *this << ", (name \"" << Var->Name << '"';
         if (Var->Loc)
           printDebugLocRef(*Var->Loc, *SM);

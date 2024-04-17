@@ -2994,12 +2994,10 @@ bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
-  // We intentionally use typeCheckStmt instead of typeCheckBody here
-  // because we want to contextualize all the TopLevelCode
-  // declarations simultaneously.
   BraceStmt *Body = TLCD->getBody();
-  StmtChecker(TLCD).typeCheckStmt(Body);
+  StmtChecker(TLCD).typeCheckBody(Body);
   TLCD->setBody(Body);
+
   checkTopLevelActorIsolation(TLCD);
   checkTopLevelEffects(TLCD);
   performTopLevelDeclDiagnostics(TLCD);

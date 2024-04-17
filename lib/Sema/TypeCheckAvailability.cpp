@@ -1212,7 +1212,7 @@ private:
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
       if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts,
-                           forTargetVariant)) {
+                           forTargetVariant, /* ForRuntimeQuery */ true)) {
         if (!BestSpec ||
             inheritsAvailabilityFromPlatform(VersionSpec->getPlatform(),
                                              BestSpec->getPlatform())) {
@@ -2676,6 +2676,11 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     return;
   }
 
+  llvm::VersionTuple RemappedDeprecatedVersion;
+  if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+      Attr, Context, Platform, RemappedDeprecatedVersion))
+    DeprecatedVersion = RemappedDeprecatedVersion;
+
   SmallString<32> newNameBuf;
   std::optional<ReplacementDeclKind> replacementDeclKind =
       describeRename(Context, Attr, /*decl*/ nullptr, newNameBuf);
@@ -2744,6 +2749,11 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   llvm::VersionTuple deprecatedVersion;
   if (attr->Deprecated)
     deprecatedVersion = attr->Deprecated.value();
+
+  llvm::VersionTuple remappedDeprecatedVersion;
+  if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+      attr, ctx, platform, remappedDeprecatedVersion))
+    deprecatedVersion = remappedDeprecatedVersion;
 
   if (attr->Message.empty()) {
     ctx.Diags.diagnose(
@@ -3247,10 +3257,12 @@ bool swift::diagnoseExplicitUnavailability(
     // Skip the note emitted below.
     return true;
   } else {
+    auto unavailableDiagnosticPlatform = platform;
+    AvailabilityInference::updatePlatformStringForFallback(Attr, ctx, unavailableDiagnosticPlatform);
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D, platform.empty(),
-                  platform, EncodedMessage.Message)
+                  unavailableDiagnosticPlatform, EncodedMessage.Message)
         .highlight(R)
         .limitBehavior(limit);
   }

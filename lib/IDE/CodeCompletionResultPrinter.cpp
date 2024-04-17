@@ -516,8 +516,7 @@ static void printCodeCompletionResultFilterName(
       case ChunkKind::CallArgumentColon:
       case ChunkKind::ParameterDeclColon:
         // Since we don't add the type, also don't add the space after ':'.
-        if (shouldPrint)
-          OS << ":";
+        OS << ":";
         ++i;
         continue;
       case ChunkKind::Text:

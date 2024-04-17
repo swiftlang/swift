@@ -8297,6 +8297,8 @@ void ClangImporter::Implementation::importAttributes(
               .Case("maccatalyst", PlatformKind::macCatalyst)
               .Case("tvos", PlatformKind::tvOS)
               .Case("watchos", PlatformKind::watchOS)
+              .Case("xros", PlatformKind::visionOS)
+              .Case("visionos", PlatformKind::visionOS)
               .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
               .Case("maccatalyst_app_extension",
                     PlatformKind::macCatalystApplicationExtension)
@@ -8306,6 +8308,8 @@ void ClangImporter::Implementation::importAttributes(
                     PlatformKind::tvOSApplicationExtension)
               .Case("watchos_app_extension",
                     PlatformKind::watchOSApplicationExtension)
+              .Case("xros_app_extension",
+                    PlatformKind::visionOSApplicationExtension)
               .Default(std::nullopt);
       if (!platformK)
         continue;

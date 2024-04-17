@@ -112,6 +112,10 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
     return "watchos";
   case DarwinPlatformKind::WatchOSSimulator:
     return "watchossim";
+  case DarwinPlatformKind::VisionOS:
+    return "xros";
+  case DarwinPlatformKind::VisionOSSimulator:
+    return "xrossim";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -502,6 +506,8 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
         RT = "ios";
     } else if (Triple.isWatchOS()) {
       RT = "watchos";
+    } else if (Triple.isXROS()) {
+      RT = "xros";
     } else {
       assert(Triple.isMacOSX());
       RT = "osx";
@@ -563,6 +569,12 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::WatchOSSimulator:
         platformName = "watchos-simulator";
         break;
+      case DarwinPlatformKind::VisionOS:
+        platformName = "xros";
+        break;
+      case DarwinPlatformKind::VisionOSSimulator:
+        platformName = "xros-simulator";
+        break;
       }
     }
 
@@ -611,6 +623,17 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::WatchOS:
       case DarwinPlatformKind::WatchOSSimulator:
         osVersion = triple.getOSVersion();
+        break;
+      case DarwinPlatformKind::VisionOS:
+      case DarwinPlatformKind::VisionOSSimulator:
+        osVersion = triple.getOSVersion();
+
+        // The first deployment of 64-bit xrOS simulator is version 1.0.
+        if (triple.isArch64Bit() && triple.isSimulatorEnvironment() &&
+            osVersion.getMajor() < 1) {
+          osVersion = llvm::VersionTuple(/*Major=*/1, /*Minor=*/0);
+        }
+
         break;
       }
     }

@@ -305,6 +305,10 @@ void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
 }
 
+void CompilerInvocation::setPlatformAvailabilityInheritanceMapPath(StringRef Path) {
+  SearchPathOpts.PlatformAvailabilityInheritanceMapPath = Path.str();
+}
+
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
   setTargetTriple(llvm::Triple(Triple));
 }
@@ -1180,6 +1184,24 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
 
+    const bool targetNeedsRemapping = Target.isXROS();
+    if (targetNeedsRemapping && Target.getOSMajorVersion() == 0) {
+      // FIXME(xrOS): Work around an LLVM-ism until we have something
+      // akin to Target::get*Version for this platform. The Clang driver
+      // also has to pull version numbers up to 1.0.0 when a triple for an
+      // unknown platform with no explicit version number is passed.
+      if (Target.getEnvironmentName().empty()) {
+        Target = llvm::Triple(Target.getArchName(),
+                              Target.getVendorName(),
+                              Target.getOSName() + "1.0");
+      } else {
+        Target = llvm::Triple(Target.getArchName(),
+                              Target.getVendorName(),
+                              Target.getOSName() + "1.0",
+                              Target.getEnvironmentName());
+      }
+    }
+
     // Backward compatibility hack: infer "simulator" environment for x86
     // iOS/tvOS/watchOS. The driver takes care of this for the frontend
     // most of the time, but loading of old .swiftinterface files goes
@@ -1512,6 +1534,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
   }
+
+  Opts.DisableDynamicActorIsolation |=
+      Args.hasArg(OPT_disable_dynamic_actor_isolation);
 
 #if SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -2007,6 +2032,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
+
+  if (const Arg *A = Args.getLastArg(OPT_platform_availability_inheritance_map_path))
+    Opts.PlatformAvailabilityInheritanceMapPath = A->getValue();
 
   for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
     auto SplitMap = StringRef(A).split('=');

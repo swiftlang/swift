@@ -856,6 +856,8 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
       osName = swift::prettyPlatformString(PlatformKind::tvOS);
     } else if (triple.isiOS()) {
       osName = swift::prettyPlatformString(PlatformKind::iOS);
+    }  else if (triple.isXROS()) {
+      osName = swift::prettyPlatformString(PlatformKind::visionOS);
     } else {
       assert(!triple.isOSDarwin() && "unknown Apple OS");
       // Fallback to the LLVM triple name. This isn't great (it won't be

@@ -2958,7 +2958,12 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   // Because there's no good way to cross the CU boundary to insert a nested
   // DISubprogram definition in one CU into a type defined in another CU when
   // doing LTO builds.
-  if (llvm::isa<llvm::DICompositeType>(Scope)) {
+  if (llvm::isa<llvm::DICompositeType>(Scope) &&
+      (Rep == SILFunctionTypeRepresentation::Method ||
+       Rep == SILFunctionTypeRepresentation::ObjCMethod ||
+       Rep == SILFunctionTypeRepresentation::WitnessMethod ||
+       Rep == SILFunctionTypeRepresentation::CXXMethod ||
+       Rep == SILFunctionTypeRepresentation::Thin)) {
     llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
         /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
         /*IsDefinition=*/false, /*IsOptimized=*/Opts.shouldOptimize());
@@ -3180,7 +3185,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
-  uint16_t DVarCol = 0;
+  uint16_t DVarCol = DInstLoc.Column;
   if (VarInfo.Loc) {
     auto DVarLoc = getStartLocation(VarInfo.Loc);
     DVarLine = DVarLoc.Line;

@@ -69,10 +69,12 @@ actor MyGenericGlobalActor<T> {
 // AVAILABILITY1-NEXT: Keyword/None:                       iOS[#Platform#]; name=iOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       tvOS[#Platform#]; name=tvOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       watchOS[#Platform#]; name=watchOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       visionOS[#Platform#]; name=visionOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macOS[#Platform#]; name=macOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       iOSApplicationExtension[#Platform#]; name=iOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       tvOSApplicationExtension[#Platform#]; name=tvOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       watchOSApplicationExtension[#Platform#]; name=watchOSApplicationExtension{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       visionOSApplicationExtension[#Platform#]; name=visionOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension

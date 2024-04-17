@@ -233,6 +233,8 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
+
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string

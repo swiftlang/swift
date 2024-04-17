@@ -617,7 +617,6 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
   if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeInitializer(initContext, init);
-    (void)binding->getInitializerIsolation(i);
     TypeChecker::checkInitializerEffects(initContext, init);
   }
 }

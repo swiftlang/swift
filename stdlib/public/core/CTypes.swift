@@ -69,7 +69,7 @@ public typealias CFloat = Float
 public typealias CDouble = Double
 
 /// The C 'long double' type.
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
@@ -273,7 +273,7 @@ extension UInt {
 }
 
 /// A wrapper around a C `va_list` pointer.
-#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
+#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) ||  os(Windows))
 @frozen
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance
