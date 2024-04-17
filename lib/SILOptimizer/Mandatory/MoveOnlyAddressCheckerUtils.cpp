@@ -1791,10 +1791,11 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   }
 
   auto feature = partialMutationFeature(kind);
-  if (!fn->getModule().getASTContext().LangOpts.hasFeature(feature) &&
+  if (feature &&
+      !fn->getModule().getASTContext().LangOpts.hasFeature(*feature) &&
       !isa<DropDeinitInst>(user)) {
     LLVM_DEBUG(llvm::dbgs()
-               << "    " << getFeatureName(feature) << " disabled!\n");
+               << "    " << getFeatureName(*feature) << " disabled!\n");
     // If the types equal, just bail early.
     // Emit the error.
     return {PartialMutationError::featureDisabled(iterType, kind)};
