@@ -13,7 +13,20 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// Property wrapper that defines a task-local value key.
+
+// Macros are disabled when Swift is built without swift-syntax.
+#if $Macros && hasAttribute(attached)
+
+// TODO: docs
+@available(SwiftStdlib 5.1, *)
+@attached(accessor)
+@attached(peer, names: prefixed(`$`))
+public macro TaskLocal() =
+  #externalMacro(module: "SwiftMacros", type: "TaskLocalMacro")
+
+#endif
+
+/// Wrapper that defines a task-local value key.
 ///
 /// A task-local value is a value that can be bound and read in the context of a
 /// `Task`. It is implicitly carried with the task, and is accessible by any
@@ -137,7 +150,6 @@ import Swift
 ///         read() // traceID: nil
 ///       }
 ///     }
-@propertyWrapper
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value
