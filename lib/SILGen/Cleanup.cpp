@@ -162,15 +162,27 @@ bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from) {
 /// emitBranchAndCleanups - Emit a branch to the given jump destination,
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
-void CleanupManager::emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
+void CleanupManager::emitBranchAndCleanups(JumpDest dest,
+                                           SILLocation branchLoc,
+                                           ArrayRef<SILValue> args,
+                                           ForUnwind_t forUnwind) {
+  emitCleanupsForBranch(dest, branchLoc, args, forUnwind);
+  SGF.getBuilder().createBranch(branchLoc, dest.getBlock(), args);
+}
+
+/// emitBranchAndCleanups - Emit the cleanups necessary before branching to
+/// the given jump destination. This does not pop the cleanup stack, nor does
+/// it emit the actual branch.
+void CleanupManager::emitCleanupsForBranch(JumpDest dest,
+                                           SILLocation branchLoc,
                                            ArrayRef<SILValue> args,
                                            ForUnwind_t forUnwind) {
   SILGenBuilder &builder = SGF.getBuilder();
   assert(builder.hasValidInsertionPoint() && "Emitting branch in invalid spot");
   emitCleanups(dest.getDepth(), dest.getCleanupLocation(),
                forUnwind, /*popCleanups=*/false);
-  builder.createBranch(branchLoc, dest.getBlock(), args);
 }
+
 
 void CleanupManager::emitCleanupsForReturn(CleanupLocation loc,
                                            ForUnwind_t forUnwind) {
