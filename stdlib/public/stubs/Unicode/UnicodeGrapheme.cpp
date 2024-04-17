@@ -51,7 +51,7 @@ __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) 
         2 * index + 1;
   }
   if (index >= GRAPHEME_BREAK_DATA_COUNT * 2) {
-    return index - (GRAPHEME_BREAK_DATA_COUNT * 2);
+    return (__swift_uint8_t)(index - (GRAPHEME_BREAK_DATA_COUNT * 2));
   }
   // If we made it out here, then our scalar was not found in the grapheme
   // array (this occurs when a scalar doesn't map to any grapheme break

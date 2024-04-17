@@ -42,7 +42,7 @@ __swift_uint8_t _swift_stdlib_getWordBreakProperty(__swift_uint32_t scalar) {
         2 * index + 1;
   }
   if (index >= WORD_BREAK_DATA_COUNT * 2) {
-    return index - (WORD_BREAK_DATA_COUNT * 2);
+    return (__swift_uint8_t)(index - (WORD_BREAK_DATA_COUNT * 2));
   }
   // If we made it out here, then our scalar was not found in the word
   // array (this occurs when a scalar doesn't map to any word break
