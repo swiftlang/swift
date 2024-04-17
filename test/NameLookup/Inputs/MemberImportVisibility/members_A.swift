@@ -15,11 +15,19 @@ infix operator <>
 extension X {
   public func XinA() { }
 
+  public var propXinA: Bool { return true }
+
   public static func <<<(a: Self, b: Self) -> Self { a }
+
+  public struct NestedInA {}
 }
 
 extension Y {
   public func YinA() { }
 
   public static func <<<(a: Self, b: Self) -> Self { a }
+}
+
+public enum EnumInA {
+  case caseInA
 }
