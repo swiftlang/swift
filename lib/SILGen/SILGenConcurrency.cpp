@@ -463,8 +463,7 @@ static ManagedValue emitLoadOfCaptureIsolation(SILGenFunction &SGF,
   auto &TC = SGF.SGM.Types;
   auto captureInfo = TC.getLoweredLocalCaptures(constant);
 
-  auto isolatedVarType = SGF.F.mapTypeIntoContext(
-    isolatedCapture->getInterfaceType())->getCanonicalType();
+  auto isolatedVarType = isolatedCapture->getTypeInContext()->getCanonicalType();
 
   // Capture arguments are 1-1 with the lowered capture info.
   auto captures = captureInfo.getCaptures();
