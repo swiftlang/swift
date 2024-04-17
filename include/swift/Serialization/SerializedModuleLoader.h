@@ -163,10 +163,8 @@ protected:
   }
 
   /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencyInfo> scanModuleFile(Twine modulePath,
-                                                     bool isFramework,
-                                                     bool isTestableImport,
-                                                     bool hasInterface);
+  llvm::ErrorOr<ModuleDependencyInfo>
+  scanModuleFile(Twine modulePath, bool isFramework, bool isTestableImport);
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;

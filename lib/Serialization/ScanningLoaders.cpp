@@ -57,8 +57,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies =
-          scanModuleFile(ModPath, IsFramework, isTestableDependencyLookup,
-                         /*hasInterface=*/false);
+          scanModuleFile(ModPath, IsFramework, isTestableDependencyLookup);
       if (dependencies) {
         this->dependencies = std::move(dependencies.get());
         return std::error_code();
@@ -160,9 +159,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             !Ctx.SearchPathOpts.NoScannerModuleValidation) {
           assert(compiledCandidates.size() == 1 &&
                  "Should only have 1 candidate module");
-          auto BinaryDep =
-              scanModuleFile(compiledCandidates[0], isFramework,
-                             isTestableImport, /*hasInterface=*/true);
+          auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
+                                          isTestableImport);
           if (BinaryDep) {
             Result = *BinaryDep;
             return std::error_code();

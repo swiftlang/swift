@@ -431,8 +431,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
 
 llvm::ErrorOr<ModuleDependencyInfo>
 SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
-                                           bool isTestableImport,
-                                           bool hasInterface) {
+                                           bool isTestableImport) {
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
 
@@ -456,10 +455,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
 
-    // If the module file has interface file and not testable imported, don't
-    // import the testable module because it contains more interfaces than
-    // needed and can pull in more dependencies.
-    if (loadedModuleFile->isTestable() && !isTestableImport && hasInterface) {
+    if (loadedModuleFile->isTestable() && !isTestableImport) {
       if (Ctx.LangOpts.EnableModuleLoadingRemarks)
         Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_testable,
                            modulePath.str());
