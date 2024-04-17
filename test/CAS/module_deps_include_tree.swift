@@ -173,11 +173,18 @@ import SubE
 // CHECK: "contextHash"
 // CHECK-SAME: "{{.*}}"
 
+// CHECK: "commandLine": [
+// CHECK:   "-fmodule-format=obj"
+// CHECK:   "-dwarf-ext-refs"
+
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}B-{{.*}}.pcm",
 // CHECK: "contextHash": "[[B_CONTEXT:.*]]",
-// CHECK: "-o"
+// CHECK: "commandLine": [
+// CHECK:      "-o"
 // CHECK-NEXT: B-{{.*}}[[B_CONTEXT]].pcm
+// CHECK:      "-fmodule-format=obj"
+// CHECK:      "-dwarf-ext-refs"
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps_include_tree.swift

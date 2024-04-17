@@ -167,9 +167,9 @@ ERROR(init_candidate_inaccessible,none,
 
 ERROR(candidate_from_missing_import,none,
       "%0 %1 is not available due to missing import of defining module %2",
-      (DescriptiveDeclKind, DeclName, DeclName))
+      (DescriptiveDeclKind, DeclName, ModuleDecl *))
 NOTE(candidate_add_import,none,
-     "add import of module %0", (DeclName))
+     "add import of module %0", (ModuleDecl *))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
@@ -5697,8 +5697,6 @@ ERROR(preconcurrency_not_inheritance_clause,none,
       "'preconcurrency' attribute only applies in inheritance clauses", ())
 ERROR(preconcurrency_not_existential,none,
       "'preconcurrency' attribute cannot apply to non-protocol type %0", (Type))
-ERROR(preconcurrency_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature DynamicActorIsolation'", ())
 
 ERROR(redundant_any_in_existential,none,
        "redundant 'any' in type %0",
@@ -7902,14 +7900,14 @@ ERROR(lifetime_dependence_invalid_return_type, none,
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
       "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
  ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
-       "cannot infer lifetime dependence %0, no parameters found that are either "
+       "cannot infer lifetime dependence%0, no parameters found that are either "
        "~Escapable or Escapable with a borrowing ownership", (StringRef))
  ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
        "expected nil or self as return values in an initializer with "
        "lifetime dependent specifiers",
        ())
  ERROR(lifetime_dependence_on_bitwise_copyable, none,
-       "invalid lifetime dependence on bitwise copyable type", ())
+       "invalid lifetime dependence on BitwiseCopyable type", ())
  ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
        "lifetime dependence specifiers cannot be applied to tuple elements", ())
  ERROR(lifetime_dependence_method_escapable_bitwisecopyable_self, none,

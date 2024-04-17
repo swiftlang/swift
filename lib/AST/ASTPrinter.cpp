@@ -1683,14 +1683,11 @@ void PrintAST::printGenericSignature(GenericSignature genericSig,
 static void eraseInvertibleProtocolConformances(
     SmallVectorImpl<Requirement> &requirements) {
   llvm::erase_if(requirements, [&](Requirement req) {
-      if (req.getKind() == RequirementKind::Conformance) {
-        if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
-          auto proto = protoType->getDecl();
-          return proto->getInvertibleProtocolKind().has_value();
-        }
-      }
+      if (req.getKind() != RequirementKind::Conformance)
+        return false;
 
-      return false;
+      return req.getProtocolDecl()
+          ->getInvertibleProtocolKind().has_value();
     });
 }
 

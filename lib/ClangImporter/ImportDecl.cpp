@@ -2650,6 +2650,13 @@ namespace {
         return nullptr;
       }
 
+      // Bail if this is `std::tzdb`. This type causes issues in copy
+      // constructor instantiation.
+      // FIXME: https://github.com/apple/swift/issues/73037
+      if (decl->isInStdNamespace() && decl->getIdentifier() &&
+          decl->getName() == "tzdb")
+        return nullptr;
+
       auto &clangSema = Impl.getClangSema();
       // Make Clang define any implicit constructors it may need (copy,
       // default). Make sure we only do this if the class has been fully defined
@@ -8321,6 +8328,8 @@ void ClangImporter::Implementation::importAttributes(
               .Case("maccatalyst", PlatformKind::macCatalyst)
               .Case("tvos", PlatformKind::tvOS)
               .Case("watchos", PlatformKind::watchOS)
+              .Case("xros", PlatformKind::visionOS)
+              .Case("visionos", PlatformKind::visionOS)
               .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
               .Case("maccatalyst_app_extension",
                     PlatformKind::macCatalystApplicationExtension)
@@ -8330,6 +8339,8 @@ void ClangImporter::Implementation::importAttributes(
                     PlatformKind::tvOSApplicationExtension)
               .Case("watchos_app_extension",
                     PlatformKind::watchOSApplicationExtension)
+              .Case("xros_app_extension",
+                    PlatformKind::visionOSApplicationExtension)
               .Default(std::nullopt);
       if (!platformK)
         continue;

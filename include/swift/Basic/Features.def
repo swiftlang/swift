@@ -191,6 +191,7 @@ UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
 UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
+UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
 UPCOMING_FEATURE(MoveOnlyPartialConsumption, 429, 6)
 
 // Swift 7
@@ -354,11 +355,6 @@ EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 // Allow for the 'transferring' keyword to be applied to arguments and results.
 EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
 
-// Enable `@preconcurrency` attribute on protocol conformances and runtime checks
-// of actor isolation in @obj thunks and arguments of APIs that haven't yet adopted
-// strict concurrency checking.
-EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
-
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
 
@@ -368,9 +364,8 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
 
-
-// Whether members of extensions respect the enclosing file's imports.
-EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(ExtensionImportVisibility, true)
+// Whether lookup of members respects the enclosing file's imports.
+EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true)
 
 // Alias for IsolatedAny
 EXPERIMENTAL_FEATURE(IsolatedAny2, true)

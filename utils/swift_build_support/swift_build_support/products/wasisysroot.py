@@ -56,7 +56,8 @@ class WASILibc(product.Product):
         clang_tools_path = self.args.native_clang_tools_path or llvm_build_bin_dir
         build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
 
-        sysroot_build_dir = WASILibc.sysroot_build_path(build_root, host_target)
+        sysroot_build_dir = WASILibc.sysroot_build_path(
+            build_root, host_target, target_triple)
         # FIXME: Manually create an empty dir that is usually created during
         # check-symbols. The directory is required during sysroot installation step.
         os.makedirs(os.path.join(sysroot_build_dir, "share"), exist_ok=True)
@@ -73,7 +74,7 @@ class WASILibc(product.Product):
             '-C', self.source_dir,
             'OBJDIR=' + os.path.join(self.build_dir, 'obj-' + thread_model),
             'SYSROOT=' + sysroot_build_dir,
-            'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root),
+            'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root, target_triple),
             'CC=' + os.path.join(clang_tools_path, 'clang'),
             'AR=' + os.path.join(llvm_tools_path, 'llvm-ar'),
             'NM=' + os.path.join(llvm_tools_path, 'llvm-nm'),
@@ -86,21 +87,22 @@ class WASILibc(product.Product):
         return [llvm.LLVM]
 
     @classmethod
-    def sysroot_build_path(cls, build_root, host_target):
+    def sysroot_build_path(cls, build_root, host_target, target_triple):
         """
         Returns the path to the sysroot build directory, which contains only the
         artifacts of wasi-libc (Not including the artifacts of LLVM runtimes).
         """
         return os.path.join(build_root,
-                            '%s-%s' % (cls.product_name(), host_target), 'sysroot')
+                            '%s-%s' % (cls.product_name(), host_target),
+                            'sysroot', target_triple)
 
     @classmethod
-    def sysroot_install_path(cls, build_root):
+    def sysroot_install_path(cls, build_root, target_triple):
         """
         Returns the path to the sysroot install directory, which contains artifacts
         of wasi-libc and LLVM runtimes.
         """
-        return os.path.join(build_root, 'wasi-sysroot')
+        return os.path.join(build_root, 'wasi-sysroot', target_triple)
 
 
 class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
@@ -130,7 +132,8 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
     def build(self, host_target):
         self._build(host_target)
 
-    def _build(self, host_target, enable_wasi_threads=False):
+    def _build(self, host_target, enable_wasi_threads=False,
+               compiler_rt_os_dir='wasi', target_triple='wasm32-wasi'):
         build_root = os.path.dirname(self.build_dir)
         llvm_build_bin_dir = os.path.join(
             '..', build_root, '%s-%s' % ('llvm', host_target), 'bin')
@@ -139,18 +142,14 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
 
         cmake_has_threads = 'TRUE' if enable_wasi_threads else 'FALSE'
 
-        self.cmake_options.define('CMAKE_SYSROOT:PATH',
-                                  WASILibc.sysroot_build_path(build_root, host_target))
-        enable_runtimes = ['libcxx', 'libcxxabi']
-        if not enable_wasi_threads:
-            # compiler-rt can be shared between wasi and wasip1-threads
-            enable_runtimes.append('compiler-rt')
+        self.cmake_options.define(
+            'CMAKE_SYSROOT:PATH',
+            WASILibc.sysroot_build_path(build_root, host_target, target_triple))
+        enable_runtimes = ['libcxx', 'libcxxabi', 'compiler-rt']
         self.cmake_options.define('LLVM_ENABLE_RUNTIMES:STRING',
                                   ';'.join(enable_runtimes))
 
-        libdir_suffix = '/wasm32-wasi'
-        if enable_wasi_threads:
-            libdir_suffix = '/wasm32-wasip1-threads'
+        libdir_suffix = '/' + target_triple
         self.cmake_options.define('LIBCXX_LIBDIR_SUFFIX:STRING', libdir_suffix)
         self.cmake_options.define('LIBCXXABI_LIBDIR_SUFFIX:STRING', libdir_suffix)
         self.cmake_options.define('CMAKE_STAGING_PREFIX:PATH', '/')
@@ -162,7 +161,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.cmake_options.define('COMPILER_RT_INCLUDE_TESTS:BOOL', 'FALSE')
         self.cmake_options.define('COMPILER_RT_HAS_FPIC_FLAG:BOOL', 'FALSE')
         self.cmake_options.define('COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN:BOOL', 'FALSE')
-        self.cmake_options.define('COMPILER_RT_OS_DIR:STRING', 'wasi')
+        self.cmake_options.define('COMPILER_RT_OS_DIR:STRING', compiler_rt_os_dir)
 
         self.cmake_options.define('CMAKE_C_COMPILER_WORKS:BOOL', 'TRUE')
         self.cmake_options.define('CMAKE_CXX_COMPILER_WORKS:BOOL', 'TRUE')
@@ -190,10 +189,6 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.cmake_options.define('CMAKE_C_FLAGS:STRING', ' '.join(c_flags))
         self.cmake_options.define('CMAKE_CXX_FLAGS:STRING', ' '.join(cxx_flags))
 
-        if enable_wasi_threads:
-            target_triple = 'wasm32-wasip1-threads'
-        else:
-            target_triple = 'wasm32-wasi'
         self.cmake_options.define('CMAKE_C_COMPILER_TARGET:STRING', target_triple)
         self.cmake_options.define('CMAKE_CXX_COMPILER_TARGET:STRING', target_triple)
 
@@ -227,7 +222,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.build_with_cmake([], self.args.build_variant, [],
                               prefer_native_toolchain=True)
         self.install_with_cmake(
-            ["install"], WASILibc.sysroot_install_path(build_root))
+            ["install"], WASILibc.sysroot_install_path(build_root, target_triple))
 
     @classmethod
     def get_dependencies(cls):
@@ -236,12 +231,5 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
 
 class WasmThreadsLLVMRuntimeLibs(WasmLLVMRuntimeLibs):
     def build(self, host_target):
-        self._build(host_target, enable_wasi_threads=True)
-
-        build_root = os.path.dirname(self.build_dir)
-        wasi_sysroot = WASILibc.sysroot_install_path(build_root)
-        # Copy compiler-rt os dirs to the WASI variant
-        os_dir = os.path.join(wasi_sysroot, 'lib', 'wasip1')
-        if os.path.exists(os_dir):
-            shell.rmtree(os_dir)
-        shell.copytree(os.path.join(wasi_sysroot, 'lib', 'wasi'), os_dir)
+        self._build(host_target, enable_wasi_threads=True,
+                    compiler_rt_os_dir='wasip1', target_triple='wasm32-wasip1-threads')

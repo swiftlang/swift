@@ -19,20 +19,28 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
-extension FakeRoundtripActorSystemDistributedActor {
+protocol KappaProtocol : DistributedActor where ActorSystem == FakeRoundtripActorSystem {
+  distributed func echo(name: String) -> String
+}
+
+extension KappaProtocol {
   distributed func echo(name: String) -> String {
     return "Echo: \(name)"
   }
 }
 
+distributed actor KappaProtocolImpl: KappaProtocol {
+  // empty, gets default impl from extension on protocol
+}
+
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = FakeRoundtripActorSystemDistributedActor(actorSystem: system)
-  let ref = try FakeRoundtripActorSystemDistributedActor.resolve(id: local.id, using: system)
+  let local = KappaProtocolImpl(actorSystem: system)
+  let ref = try KappaProtocolImpl.resolve(id: local.id, using: system)
 
   let reply = try await ref.echo(name: "Caplin")
-  // CHECK: >> remoteCall: on:main.FakeRoundtripActorSystemDistributedActor, target:main.FakeRoundtripActorSystemDistributedActor.echo(name:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.KappaProtocolImpl, target:main.$KappaProtocol.echo(name:), invocation:FakeInvocationEncoder(genericSubs: [main.KappaProtocolImpl], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
 
   // CHECK: << remoteCall return: Echo: Caplin
   print("reply: \(reply)")

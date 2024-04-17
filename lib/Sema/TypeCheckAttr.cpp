@@ -714,6 +714,9 @@ static bool iswatchOS(ASTContext &ctx) {
 }
 
 static bool isRelaxedIBAction(ASTContext &ctx) {
+  if (ctx.LangOpts.Target.isXROS())
+    return true;
+
   return isiOS(ctx) || iswatchOS(ctx);
 }
 
@@ -2059,6 +2062,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // an iOS attribute while building for macCatalyst.
   if (attr->Platform == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
+
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
       return;
     }
@@ -4594,6 +4604,11 @@ void AttributeChecker::checkBackDeployedAttrs(
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
 
+        llvm::VersionTuple ignoredVersion;
+
+        AvailabilityInference::updateBeforePlatformForFallback(
+            Attr, Ctx, platformString, ignoredVersion);
+
         diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                  platformString);
         diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
@@ -4612,6 +4627,11 @@ void AttributeChecker::checkBackDeployedAttrs(
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr->Introduced.value();
       StringRef introPlatformString = availableAttr->prettyPlatformString();
+
+      AvailabilityInference::updateBeforePlatformForFallback(
+          Attr, Ctx, beforePlatformString, beforeVersion);
+      AvailabilityInference::updateIntroducedPlatformForFallback(
+          availableAttr, Ctx, introPlatformString, introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,

@@ -94,6 +94,11 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   if (Attr->Deprecated)
     DeprecatedVersion = Attr->Deprecated.value();
 
+  llvm::VersionTuple RemappedDeprecatedVersion;
+  if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+      Attr, Ctx, Platform, RemappedDeprecatedVersion))
+    DeprecatedVersion = RemappedDeprecatedVersion;
+
   if (!isSoftDeprecated) {
     if (Attr->Message.empty() && Attr->Rename.empty()) {
       getDiagnostics(severity, Out, diag::availability_deprecated,

@@ -451,6 +451,52 @@ extension MyActor {
   }
 }
 
+/*-- Generic actors --*/
+
+actor GenericActor<T> {
+  func asyncAction() async {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test12GenericActorC0a5ErasebC0yyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test12GenericActorC0a5ErasebC0yyFyyYaYbcfU_ : $@convention(thin) @Sendable @async <τ_0_0> (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed GenericActor<τ_0_0>) -> ()
+// CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $GenericActor<T>
+// CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $GenericActor<T>
+// CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $GenericActor<T> : $GenericActor<T>, $any Actor
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_OBJECT]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]<T>([[ISOLATION]], [[CAPTURE]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYbYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+extension GenericActor {
+  func testEraseGenericActor() {
+    takeInheritingAsyncIsolatedAny {
+      await self.asyncAction()
+    }
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test12GenericActorCAASiRszlE0a16EraseSpecializedbC0yyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test12GenericActorCAASiRszlE0a16EraseSpecializedbC0yyFyyYaYbcfU_ : $@convention(thin) @Sendable @async (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed GenericActor<Int>) -> ()
+// CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $GenericActor<Int>
+// CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $GenericActor<Int>
+// CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $GenericActor<Int> : $GenericActor<Int>, $any Actor
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_OBJECT]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]], [[CAPTURE]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYbYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+extension GenericActor where T == Int {
+  func testEraseSpecializedGenericActor() {
+    takeInheritingAsyncIsolatedAny {
+      await self.asyncAction()
+    }
+  }
+}
+
 /*-- Partial applications --*/
 
 //   FIXME: this is wrong; we need to capture the actor value

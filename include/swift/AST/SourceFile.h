@@ -457,6 +457,9 @@ public:
   /// If not, we can fast-path module checks.
   bool hasImportsWithFlag(ImportFlags flag) const;
 
+  /// Returns the import flags that are active on imports of \p module.
+  ImportFlags getImportFlags(const ModuleDecl *module) const;
+
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
 

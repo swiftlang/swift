@@ -98,8 +98,15 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
     auto type = getFixedType(opened.second);
-    if (opened.first->isParameterPack() && !type->is<PackType>())
-      type = PackType::getSingletonPackExpansion(type);
+    if (opened.first->isParameterPack()) {
+      if (type->is<PlaceholderType>()) {
+        auto &ctx = type->getASTContext();
+        type =
+        PackType::get(ctx, {PackExpansionType::get(ctx.TheUnresolvedType,
+                                                   ctx.TheUnresolvedType)});
+      } else if (!type->is<PackType>())
+        type = PackType::getSingletonPackExpansion(type);
+    }
     subs[opened.first] = type;
   }
 
@@ -7455,7 +7462,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
+    if (ctx.LangOpts.isDynamicActorIsolationCheckingEnabled()) {
       // Passing a synchronous global actor-isolated function value and
       // parameter that expects a synchronous non-isolated function type could
       // require a runtime check to ensure that function is always called in

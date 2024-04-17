@@ -497,6 +497,13 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
         return AvAttr;
 
       std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+
+      StringRef DeprecatedPlatform = AvAttr->prettyPlatformString();
+      llvm::VersionTuple RemappedDeprecatedVersion;
+      if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+          AvAttr, ctx, DeprecatedPlatform, RemappedDeprecatedVersion))
+        DeprecatedVersion = RemappedDeprecatedVersion;
+
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -2335,18 +2342,32 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
     return AvailableVersionComparison::Unavailable;
 
   llvm::VersionTuple queryVersion = getActiveVersion(ctx);
+  std::optional<llvm::VersionTuple> ObsoletedVersion = Obsoleted;
+
+  StringRef ObsoletedPlatform = prettyPlatformString();
+  llvm::VersionTuple RemappedObsoletedVersion;
+  if (AvailabilityInference::updateObsoletedPlatformForFallback(
+      this, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
+    ObsoletedVersion = RemappedObsoletedVersion;
 
   // If this entity was obsoleted before or at the query platform version,
   // consider it obsolete.
-  if (Obsoleted && *Obsoleted <= queryVersion)
+  if (ObsoletedVersion && *ObsoletedVersion <= queryVersion)
     return AvailableVersionComparison::Obsoleted;
+
+  std::optional<llvm::VersionTuple> IntroducedVersion = Introduced;
+  StringRef IntroducedPlatform = prettyPlatformString();
+  llvm::VersionTuple RemappedIntroducedVersion;
+  if (AvailabilityInference::updateIntroducedPlatformForFallback(
+      this, ctx, IntroducedPlatform, RemappedIntroducedVersion))
+    IntroducedVersion = RemappedIntroducedVersion;
 
   // If this entity was introduced after the query version and we're doing a
   // platform comparison, true availability can only be determined dynamically;
   // if we're doing a _language_ version check, the query version is a
   // static requirement, so we treat "introduced later" as just plain
   // unavailable.
-  if (Introduced && *Introduced > queryVersion) {
+  if (IntroducedVersion && *IntroducedVersion > queryVersion) {
     if (isLanguageVersionSpecific() || isPackageDescriptionVersionSpecific())
       return AvailableVersionComparison::Unavailable;
     else

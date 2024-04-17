@@ -124,6 +124,11 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
   // ObjectFilePCHContainer and contain -gmodules debug info.
   commandLineArgs.push_back("-gmodules");
 
+  // To use -gmodules we need to have a real path for the PCH; this option has
+  // no effect if caching is disabled.
+  commandLineArgs.push_back("-Xclang");
+  commandLineArgs.push_back("-finclude-tree-preserve-pch-path");
+
   return commandLineArgs;
 }
 
