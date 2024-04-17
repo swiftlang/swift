@@ -329,7 +329,7 @@ endif()
 
 list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
   "${swift_lib_dir}/swift/host/plugins#${swift_bin_dir}/swift-plugin-server")
-list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "DebugDescriptionMacro")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)

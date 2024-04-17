@@ -710,6 +710,8 @@ static bool usesFeatureSensitive(Decl *decl) {
   return decl->getAttrs().hasAttribute<SensitiveAttr>();
 }
 
+UNINTERESTING_FEATURE(DebugDescriptionMacro)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
