@@ -372,7 +372,7 @@ SIMPLE_DECL_ATTR(_nonescapable, NonEscapable,
   OnNominalType | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   148)
 SIMPLE_DECL_ATTR(_unsafeNonescapableResult, UnsafeNonEscapableResult,
-  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnAbstractFunction | OnSubscript | OnAccessor | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   149)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
   OnClass | OnFunc | OnAccessor | OnVar | OnSubscript | DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,

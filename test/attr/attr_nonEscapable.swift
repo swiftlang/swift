@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: asserts
 
-@_nonescapable public struct NES {
+public struct NES : ~Escapable {
   let x: Int
 
   @_unsafeNonescapableResult
@@ -13,5 +13,14 @@
   @_unsafeNonescapableResult
   static func makeS() -> NES {
     return NES()
+  }
+}
+
+struct BC {
+  public var nes: NES {
+    @_unsafeNonescapableResult
+    get {
+      NES()
+    }
   }
 }
