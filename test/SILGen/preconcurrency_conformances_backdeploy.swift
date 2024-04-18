@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -target %target-cpu-apple-macosx10.14 -enable-experimental-feature DynamicActorIsolation -emit-silgen -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -target %target-cpu-apple-macosx10.14 -enable-upcoming-feature DynamicActorIsolation -emit-silgen -o - | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: concurrency

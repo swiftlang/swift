@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
-// RUN: %target-build-swift %t/src/Interface.swift -swift-version 5 -emit-module -emit-library \
+// RUN: %target-build-swift %t/src/Interface.swift -emit-module -emit-library \
 // RUN:    -target %target-cpu-apple-macosx10.15 -swift-version 5 \
 // RUN:    -enable-library-evolution \
 // RUN:    -module-name Interface \
@@ -12,23 +12,24 @@
 // RUN:    -target %target-cpu-apple-macosx10.15 \
 // RUN:    -I %t -L %t -l Interface \
 // RUN:    -emit-module-interface-path %t/Types.swiftinterface \
-// RUN:    -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation
+// RUN:    -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation \
+// RUN:    -Xfrontend -disable-dynamic-actor-isolation
 
-// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash1.swift -o %t/crash1.out
-// RUN: %target-codesign %t/crash1.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift
+// RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test1.swift -o %t/test1.out
+// RUN: %target-codesign %t/test1.out
+// RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test1.out 2>&1 | %FileCheck %t/src/Test1.swift
 
-// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash2.swift -o %t/crash2.out
-// RUN: %target-codesign %t/crash2.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift
+// RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test2.swift -o %t/test2.out
+// RUN: %target-codesign %t/test2.out
+// RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test2.out 2>&1 | %FileCheck %t/src/Test2.swift
 
-// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash3.swift -o %t/crash3.out
-// RUN: %target-codesign %t/crash3.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift
+// RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test3.swift -o %t/test3.out
+// RUN: %target-codesign %t/test3.out
+// RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test3.out 2>&1 | %FileCheck %t/src/Test3.swift
 
-// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash4.swift -o %t/crash4.out
-// RUN: %target-codesign %t/crash4.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash4.out 2>&1 | %FileCheck %t/src/Crash4.swift
+// RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test4.swift -o %t/test4.out
+// RUN: %target-codesign %t/test4.out
+// RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test4.out 2>&1 | %FileCheck %t/src/Test4.swift
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -83,22 +84,22 @@ extension ActorTest : @preconcurrency P {
   public func test() -> Int { x }
 }
 
-//--- Crash1.swift
+//--- Test1.swift
 import Types
 print(await runTest(Test.self))
-// CHECK: Incorrect actor executor assumption; Expected MainActor executor
+// CHECK-NOT: Incorrect actor executor assumption; Expected MainActor executor
 
-//--- Crash2.swift
+//--- Test2.swift
 import Types
 print(await runAccessors(Test.self))
-// CHECK: Incorrect actor executor assumption; Expected MainActor executor
+// CHECK-NOT: Incorrect actor executor assumption; Expected MainActor executor
 
-//--- Crash3.swift
+//--- Test3.swift
 import Types
 print(await runTest(ActorTest.self))
-// CHECK: Incorrect actor executor assumption
+// CHECK-NOT: Incorrect actor executor assumption
 
-//--- Crash4.swift
+//--- Test4.swift
 import Types
 print(await runAccessors(ActorTest.self))
-// CHECK: Incorrect actor executor assumption
+// CHECK-NOT: Incorrect actor executor assumption
