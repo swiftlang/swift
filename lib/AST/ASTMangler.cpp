@@ -2514,10 +2514,19 @@ void ASTMangler::appendModule(const ModuleDecl *module,
   // For example, if a module Foo has 'import Bar', and '-module-alias Bar=Baz'
   // was passed, the name 'Baz' will be used for mangling besides loading.
   StringRef ModName = module->getRealName().str();
-  if (RespectOriginallyDefinedIn &&
-      module->getABIName() != module->getName()) { // check if the ABI name is set
+
+  // If RespectOriginallyDefinedIn is not set, ignore the ABI name only for
+  // _Concurrency and swift-syntax (which adds "Compiler" as a prefix when
+  // building swift-syntax as part of the compiler).
+  // TODO: Mangling for the debugger should respect originally defined in, but
+  // as of right now there is not enough information in the mangled name to
+  // reconstruct AST types from mangled names when using that attribute.
+  if ((RespectOriginallyDefinedIn ||
+       (module->getName().str() != SWIFT_CONCURRENCY_NAME &&
+        !module->getABIName().str().starts_with(
+            SWIFT_MODULE_ABI_NAME_PREFIX))) &&
+      module->getABIName() != module->getName())
     ModName = module->getABIName().str();
-  }
 
   // Try the special 'swift' substitution.
   if (ModName == STDLIB_NAME) {
