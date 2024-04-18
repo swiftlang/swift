@@ -1262,10 +1262,10 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
-    _ body: (_ buffer: ${Self}<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ buffer: ${Self}<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     guard let base = _position?._rawValue else {
       return try body(.init(start: nil, count: 0))
     }
@@ -1314,8 +1314,11 @@ extension Unsafe${Mutable}BufferPointer {
 }
 
 @_unavailableInEmbedded
-extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible {
+@_preInverseGenerics
+extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible
+where Element: ~Copyable {
   /// A textual representation of the buffer, suitable for debugging.
+  @_preInverseGenerics
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"

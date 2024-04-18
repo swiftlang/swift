@@ -185,9 +185,24 @@ extension Optional {
   ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @inlinable
-  public func map<U>(
-    // FIXME: This needs to support typed throws.
+  @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original map
+                       // (rdar://125016028)
+  public func map<E: Error, U: ~Copyable>(
+    _ transform: (Wrapped) throws(E) -> U
+  ) throws(E) -> U? {
+    switch self {
+    case .some(let y):
+      return .some(try transform(y))
+    case .none:
+      return .none
+    }
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal func map<U>(
     _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
     switch self {
@@ -220,7 +235,7 @@ extension Optional where Wrapped: ~Copyable {
   ) throws(E) -> U? {
     #if $NoncopyableGenerics
     switch self {
-    case .some(_borrowing y):
+    case .some(borrowing y):
       return .some(try transform(y))
     case .none:
       return .none
@@ -251,9 +266,24 @@ extension Optional {
   ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @inlinable
-  public func flatMap<U>(
-    // FIXME: This needs to support typed throws.
+  @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original flatMap
+                       // (rdar://125016028)
+  public func flatMap<E: Error, U: ~Copyable>(
+    _ transform: (Wrapped) throws(E) -> U?
+  ) throws(E) -> U? {
+    switch self {
+    case .some(let y):
+      return try transform(y)
+    case .none:
+      return .none
+    }
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal func flatMap<U>(
     _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
     switch self {
@@ -286,7 +316,7 @@ extension Optional where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
-    case .some(_borrowing y):
+    case .some(borrowing y):
       return try transform(y)
     case .none:
       return .none
@@ -770,10 +800,9 @@ extension Optional where Wrapped: ~Copyable {
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
 @_alwaysEmitIntoClient
-// FIXME: This needs to support typed throws.
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
-  defaultValue: @autoclosure () throws -> T
+  defaultValue: @autoclosure () throws -> T // FIXME: typed throw
 ) rethrows -> T {
   switch consume optional {
   case .some(let value):
@@ -784,8 +813,9 @@ public func ?? <T: ~Copyable>(
 }
 
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss2qqoiyxxSg_xyKXKtKlF")
 @usableFromInline
-internal func ?? <T>(
+internal func _legacy_abi_optionalNilCoalescingOperator <T>(
   optional: T?,
   defaultValue: @autoclosure () throws -> T
 ) rethrows -> T {

@@ -19,11 +19,20 @@
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@inlinable
-@_preInverseGenerics
+@_alwaysEmitIntoClient
 public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
   _ x: borrowing T,
-  _ body: () throws -> Result
+  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
+) rethrows -> Result {
+  defer { _fixLifetime(x) }
+  return try body()
+}
+
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@usableFromInline
+internal func withExtendedLifetime<T, Result>(
+  _ x: T,
+  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -38,10 +47,18 @@ public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@inlinable
-public func withExtendedLifetime<T, Result>(
-  // FIXME(NCG): This should have T, Result as ~Copyable, but then the closure would need to take a borrow
-  _ x: T, _ body: (T) throws -> Result
+@_alwaysEmitIntoClient
+public func withExtendedLifetime<T, Result: ~Copyable>(
+  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
+) rethrows -> Result {
+  defer { _fixLifetime(x) }
+  return try body(x)
+}
+
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@usableFromInline
+internal func withExtendedLifetime<T, Result>(
+  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
