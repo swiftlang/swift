@@ -21,7 +21,7 @@ struct TL {
   var notStatic: String?
 }
 
-@TaskLocal // expected-error{{'@TaskLocal' can only be applied to 'static' property}}
+@TaskLocal
 var global: Int = 0
 
 class NotSendable {}
@@ -35,4 +35,13 @@ func test () async {
 
   let _: Int = TL.number
   let _: Int = TL.$number.get()
+}
+
+@TaskLocal // expected-error{{'accessor' macro cannot be attached to global function ('test')}}
+func test() {}
+
+class X {
+  @TaskLocal // expected-error{{'accessor' macro cannot be attached to static method ('test')}}
+  static func test() {
+  }
 }
