@@ -659,6 +659,11 @@ public:
     return Core->Bits.AllowNonResilientAccess;
   }
 
+  /// Whether this module was built with -experimental-package-cmo.
+  bool serializePackageEnabled() const {
+    return Core->Bits.SerializePackageEnabled;
+  }
+
   /// Whether this module is compiled with implicit dynamic.
   bool isImplicitDynamicEnabled() const {
     return Core->Bits.IsImplicitDynamicEnabled;

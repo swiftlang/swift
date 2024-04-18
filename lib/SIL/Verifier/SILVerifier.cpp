@@ -153,13 +153,28 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
 
 namespace {
 
-/// When resilience is bypassed, direct access is legal, but the decls are still
-/// resilient.
+/// When resilience is bypassed for debugging or package serialization is enabled,
+/// direct access is legal, but the decls are still resilient.
 template <typename DeclType>
 bool checkResilience(DeclType *D, ModuleDecl *M,
                      ResilienceExpansion expansion) {
-  return !D->getModuleContext()->getBypassResilience() &&
-         D->isResilient(M, expansion);
+  auto refDeclModule = D->getModuleContext();
+  // Explicitly bypassed for debugging with `bypass-resilience-checks`
+  if (refDeclModule->getBypassResilience())
+    return false;
+
+  // If package serialization is enabled with `experimental-package-cmo`,
+  // decls can be serialized in a resiliently built module. In such case,
+  // a direct access should be allowed.
+  auto packageSerialized = expansion == ResilienceExpansion::Minimal &&
+                           refDeclModule->isResilient() &&
+                           refDeclModule->allowNonResilientAccess() &&
+                           refDeclModule->serializePackageEnabled() &&
+                           refDeclModule->inSamePackage(M);
+  if (packageSerialized)
+    return false;
+
+  return D->isResilient(M, expansion);
 }
 
 bool checkTypeABIAccessible(SILFunction const &F, SILType ty) {

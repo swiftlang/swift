@@ -697,7 +697,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -756,7 +756,10 @@ protected:
     HasCxxInteroperability : 1,
 
     /// Whether this module has been built with -experimental-allow-non-resilient-access.
-    AllowNonResilientAccess : 1
+    AllowNonResilientAccess : 1,
+
+    /// Whether this module has been built with -experimental-package-cmo.
+    SerializePackageEnabled : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
