@@ -1663,10 +1663,20 @@ struct CopiedLoadBorrowEliminationVisitor
       }
 
       case OperandOwnership::ForwardingConsume:
-      case OperandOwnership::DestroyingConsume:
+      case OperandOwnership::DestroyingConsume: {
+        if (auto *dvi = dyn_cast<DestroyValueInst>(nextUse->getUser())) {
+          auto value = dvi->getOperand();
+          auto *pai = dyn_cast_or_null<PartialApplyInst>(
+              value->getDefiningInstruction());
+          if (pai && pai->isOnStack()) {
+            // A destroy_value of an on_stack partial apply isn't actually a
+            // consuming use--it closes a borrow scope.
+            continue;
+          }
+        }
         // We can only hit this if our load_borrow was copied.
         llvm_unreachable("We should never hit this");
-
+      }
       case OperandOwnership::GuaranteedForwarding: {
         SmallVector<SILValue, 8> forwardedValues;
         auto *fn = nextUse->getUser()->getFunction();
