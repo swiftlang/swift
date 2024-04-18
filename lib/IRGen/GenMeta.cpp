@@ -3954,6 +3954,7 @@ namespace {
 
   public:
     const ClassLayout &getFieldLayout() const { return FieldLayout; }
+    using super::isPureObjC;
 
     SILType getLoweredType() {
       return IGM.getLoweredType(Target->getDeclaredTypeInContext());
@@ -3967,9 +3968,7 @@ namespace {
     ClassFlags getClassFlags() { return ::getClassFlags(Target); }
 
     void addClassFlags() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.addInt32((uint32_t)asImpl().getClassFlags());
     }
 
@@ -4005,9 +4004,7 @@ namespace {
     }
 
     void addValueWitnessTable() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.add(asImpl().getValueWitnessTable(false).getValue());
     }
 
@@ -4125,9 +4122,7 @@ namespace {
     }
 
     void addLayoutStringPointer() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       if (auto *layoutString = getLayoutString()) {
         B.addSignedPointer(layoutString,
                            IGM.getOptions().PointerAuth.TypeLayoutString,
@@ -4152,8 +4147,7 @@ namespace {
         return;
       }
 
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
+      assert(!isPureObjC());
 
       if (auto ptr = getAddrOfDestructorFunction(IGM, Target)) {
         B.addSignedPointer(*ptr,
@@ -4184,8 +4178,7 @@ namespace {
         return;
       }
 
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
+      assert(!isPureObjC());
 
       auto dtorFunc = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
@@ -4209,9 +4202,7 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.addSignedPointer(asImpl().getNominalTypeDescriptor(),
                          IGM.getOptions().PointerAuth.TypeDescriptors,
                          PointerAuthEntity::Special::TypeDescriptor);
@@ -4226,9 +4217,7 @@ namespace {
     }
 
     void addInstanceAddressPoint() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       // Right now, we never allocate fields before the address point.
       B.addInt32(0);
     }
@@ -4238,9 +4227,7 @@ namespace {
     const ClassLayout &getFieldLayout() { return FieldLayout; }
 
     void addInstanceSize() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       if (asImpl().hasFixedLayout()) {
         B.addInt32(asImpl().getFieldLayout().getSize().getValue());
       } else {
@@ -4250,9 +4237,7 @@ namespace {
     }
     
     void addInstanceAlignMask() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       if (asImpl().hasFixedLayout()) {
         B.addInt16(asImpl().getFieldLayout().getAlignMask().getValue());
       } else {
@@ -4262,24 +4247,18 @@ namespace {
     }
 
     void addRuntimeReservedBits() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.addInt16(0);
     }
 
     void addClassSize() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       auto size = MetadataLayout.getSize();
       B.addInt32(size.FullSize.getValue());
     }
 
     void addClassAddressPoint() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       // FIXME: Wrong
       auto size = MetadataLayout.getSize();
       B.addInt32(size.AddressPoint.getValue());
@@ -4516,12 +4495,12 @@ namespace {
       : IGM(IGM), Target(theClass), B(builder), FieldLayout(fieldLayout) {}
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      if (FieldLayout.hasObjCImplementation())
-        return nullptr;
       return ClassContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
     }
 
     void layout() {
+      assert(!FieldLayout.hasObjCImplementation()
+                && "Resilient class metadata not supported for @objcImpl");
       emitNominalTypeDescriptor();
 
       addRelocationFunction();
@@ -4544,17 +4523,11 @@ namespace {
     }
 
     void addDestructorFunction() {
-      if (FieldLayout.hasObjCImplementation())
-        return;
-
       auto function = getAddrOfDestructorFunction(IGM, Target);
       B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     void addIVarDestroyer() {
-      if (FieldLayout.hasObjCImplementation())
-        return;
-
       auto function = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
@@ -4563,9 +4536,6 @@ namespace {
     }
 
     void addClassFlags() {
-      if (FieldLayout.hasObjCImplementation())
-        return;
-
       B.addInt32((uint32_t) getClassFlags(Target));
     }
 
@@ -4628,7 +4598,7 @@ namespace {
       // @_objcImplementation on true (non-ObjC) generic classes doesn't make
       // much sense, and we haven't updated this builder to handle it.
       assert(!FieldLayout.hasObjCImplementation()
-             && "@_objcImplementation class with generic metadata?");
+             && "Generic metadata not supported for @objcImpl");
 
       super::layoutHeader();
 
