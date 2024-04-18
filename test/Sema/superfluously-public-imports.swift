@@ -17,6 +17,7 @@
 // RUN: %target-swift-frontend -emit-module %t/ExtendedDefinitionNonPublic.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedPackageImport.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/ExtendedPackageTypeImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportNotUseFromAPI.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportUsedInPackage.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ExportedUnused.swift -o %t -I %t
@@ -96,6 +97,9 @@ public struct NonPublicExtendedType {}
 //--- UnusedImport.swift
 
 //--- UnusedPackageImport.swift
+//--- ExtendedPackageTypeImport.swift
+
+public struct ExtendedPackageType {}
 
 //--- ImportNotUseFromAPI.swift
 public struct NotAnAPIType {}
@@ -143,6 +147,7 @@ package import UnusedImport // expected-warning {{package import of 'UnusedImpor
 // expected-warning @-1 {{module 'UnusedImport' is imported as 'public' from the same file; this 'package' access level will be ignored}}
 
 package import UnusedPackageImport // expected-warning {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
+package import ExtendedPackageTypeImport
 public import ImportNotUseFromAPI // expected-warning {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
 public import ImportUsedInPackage // expected-warning {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
 
@@ -239,6 +244,10 @@ public protocol Countable {
 }
 
 extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
+}
+
+extension ExtendedPackageType { // expected-remark {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
+  package func useExtendedPackageType() { }
 }
 
 /// Tests for imports of clang modules.
