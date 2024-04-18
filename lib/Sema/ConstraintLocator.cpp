@@ -810,7 +810,7 @@ void ConstraintLocatorBuilder::dump(SourceManager *SM, llvm::raw_ostream &out) c
     prev->dump(SM, out);
   }
   if (element) {
-    out << " -> ";
+    out << " → ";
     element->dump(out);
   }
 }

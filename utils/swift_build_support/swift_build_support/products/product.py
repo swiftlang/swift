@@ -288,6 +288,9 @@ class Product(object):
             target = '{}-apple-watchos{}'.format(
                 arch,
                 self.args.darwin_deployment_version_watchos if include_version else "")
+        elif platform in ['xrsimulator', 'xros']:
+            target = '{}-apple-xros{}'.format(
+                arch, self.args.darwin_deployment_version_xros)
         return target
 
     def generate_darwin_toolchain_file(self, platform, arch):

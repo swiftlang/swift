@@ -146,8 +146,7 @@ private:
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
   bool isLinkAll() const {
-    return Mode == LinkingMode::LinkAll ||
-           Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+    return Mode == LinkingMode::LinkAll || Mod.getOptions().EmbeddedSwift;
   }
 
   void linkInVTable(ClassDecl *D);

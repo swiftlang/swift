@@ -446,41 +446,37 @@ function Fetch-Dependencies {
 
   $WebClient = New-Object Net.WebClient
 
-  $WiXVersion = "4.0.4"
-  $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
-  $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
+  function DownloadAndVerify($URL, $Destination, $Hash) {
+    if (Test-Path $Destination) {
+      return
+    }
 
-  if (-not (Test-Path $BinaryCache\WiX-$WiXVersion.zip)) {
-    Write-Output "WiX not found. Downloading from nuget.org ..."
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache | Out-Null
+    Write-Output "$Destination not found. Downloading ..."
     if ($ToBatch) {
-      Write-Output "curl.exe -sL $WiXURL -o $BinaryCache\WiX-$WiXVersion.zip"
+      Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
+      Write-Output "curl.exe -sL $URL -o $Destination"
+      Write-Output "(certutil -HashFile $Destination SHA256) == $Hash || (exit /b)"
     } else {
-      $WebClient.DownloadFile($WiXURL, "$BinaryCache\WiX-$WiXVersion.zip")
-      $SHA256 = Get-FileHash -Path "$BinaryCache\WiX-$WiXVersion.zip" -Algorithm SHA256
-      if ($SHA256.Hash -ne $WiXHash) {
-        throw "WiX SHA256 mismatch ($($SHA256.Hash) vs $WiXHash)"
+      New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
+      $WebClient.DownloadFile($URL, $Destination)
+      $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+      if ($SHA256.Hash -ne $Hash) {
+        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
       }
     }
   }
+
+  $WiXVersion = "4.0.4"
+  $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
+  $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
+  DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
 
   # TODO(compnerd) stamp/validate that we need to re-extract
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\WiX-$WiXVersion | Out-Null
   Write-Output "Extracting WiX ..."
   Expand-Archive -Path $BinaryCache\WiX-$WiXVersion.zip -Destination $BinaryCache\WiX-$WiXVersion -Force
 
-  if (-not (Test-Path $BinaryCache\$PinnedToolchain.exe)) {
-    Write-Output "Swift toolchain not found. Downloading from swift.org..."
-    if ($ToBatch) {
-      Write-Output "curl.exe -sL $PinnedBuild -o $BinaryCache\$PinnedToolchain.exe"
-    } else {
-      $WebClient.DownloadFile("$PinnedBuild", "$BinaryCache\$PinnedToolchain.exe")
-      $SHA256 = Get-FileHash -Path "$BinaryCache\$PinnedToolchain.exe" -Algorithm SHA256
-      if ($SHA256.Hash -ne $PinnedSHA256) {
-        throw "$PinnedToolchain SHA256 mismatch ($($SHA256.Hash) vs $PinnedSHA256)"
-      }
-    }
-  }
+  DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
   # TODO(compnerd) stamp/validate that we need to re-extract
   Write-Output "Extracting $PinnedToolchain ..."
@@ -1023,7 +1019,7 @@ function Build-Compilers() {
       if ($TestLLD) { $Targets += @("check-lld") }
       if ($TestLLDB) { $Targets += @("check-lldb") }
       if ($TestLLVM) { $Targets += @("check-llvm") }
-      if ($TestSwift) { $Targets += @("check-swift") }
+      if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
     } else {
       $Targets = @("distribution", "install-distribution")
       $TestingDefines = @{
@@ -1093,16 +1089,16 @@ function Build-ZLib([Platform]$Platform, $Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\zlib `
-    -Bin "$($Arch.BinaryCache)\$Platform\zlib-1.3" `
-    -InstallTo $LibraryRoot\zlib-1.3\usr `
+    -Bin "$($Arch.BinaryCache)\$Platform\zlib-1.3.1" `
+    -InstallTo $LibraryRoot\zlib-1.3.1\usr `
     -Arch $Arch `
     -Platform $Platform `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
-      INSTALL_BIN_DIR = "$LibraryRoot\zlib-1.3\usr\bin\$Platform\$ArchName";
-      INSTALL_LIB_DIR = "$LibraryRoot\zlib-1.3\usr\lib\$Platform\$ArchName";
+      INSTALL_BIN_DIR = "$LibraryRoot\zlib-1.3.1\usr\bin\$Platform\$ArchName";
+      INSTALL_LIB_DIR = "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ArchName";
     }
 }
 
@@ -1143,8 +1139,8 @@ function Build-CURL([Platform]$Platform, $Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\curl `
-    -Bin "$($Arch.BinaryCache)\$Platform\curl-8.4.0" `
-    -InstallTo "$LibraryRoot\curl-8.4.0\usr" `
+    -Bin "$($Arch.BinaryCache)\$Platform\curl-8.5.0" `
+    -InstallTo "$LibraryRoot\curl-8.5.0\usr" `
     -Arch $Arch `
     -Platform $Platform `
     -BuildTargets default `
@@ -1228,8 +1224,8 @@ function Build-CURL([Platform]$Platform, $Arch) {
       USE_WIN32_IDN = if ($Platform -eq "Windows") { "YES" } else { "NO" };
       USE_WIN32_LARGE_FILES = if ($Platform -eq "Windows") { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
-      ZLIB_ROOT = "$LibraryRoot\zlib-1.3\usr";
-      ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$Platform\$ArchName\zlibstatic.lib";
+      ZLIB_ROOT = "$LibraryRoot\zlib-1.3.1\usr";
+      ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ArchName\zlibstatic.lib";
     })
 }
 
@@ -1357,7 +1353,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         # and fails with an ICU data object file icudt69l_dat.obj. This
         # matters to X86 only.
         CMAKE_Swift_FLAGS = if ($Arch -eq $ArchX86) { @("-Xlinker", "/SAFESEH:NO") } else { "" };
-        CURL_DIR = "$LibraryRoot\curl-8.4.0\usr\lib\$Platform\$ShortArch\cmake\CURL";
+        CURL_DIR = "$LibraryRoot\curl-8.5.0\usr\lib\$Platform\$ShortArch\cmake\CURL";
         ICU_DATA_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicudt69.lib";
         ICU_I18N_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicuin69.lib";
         ICU_ROOT = "$LibraryRoot\icu-69.1\usr";
@@ -1365,8 +1361,8 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         LIBXML2_LIBRARY = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
         LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
         LIBXML2_DEFINITIONS = "/DLIBXML_STATIC";
-        ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$Platform\$ShortArch\zlibstatic.lib";
-        ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3\usr\include";
+        ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib";
+        ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
       } + $TestingDefines)
   }

@@ -302,6 +302,8 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
+      static_assert((unsigned)RequirementKind::LAST_KIND == 4,
+                    "update %select in diagnostic!");
       ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
                          req.getFirstType().getString(),
                          static_cast<unsigned>(req.getKind()),

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -emit-irgen %s -enable-experimental-feature Embedded -enable-builtin-module | %FileCheck %s
+// RUN: %target-swift-frontend -emit-irgen %s -enable-experimental-feature Embedded -enable-builtin-module | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib

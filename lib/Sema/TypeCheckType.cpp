@@ -30,6 +30,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
@@ -1364,8 +1365,14 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
-      diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                     first, first->getFormalAccess());
+      auto formalAccess = first->getFormalAccess();
+      auto nameLoc = repr->getNameLoc();
+      if (formalAccess >= AccessLevel::Public &&
+          diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
+        return ErrorType::get(ctx);
+
+      diags.diagnose(nameLoc, diag::candidate_inaccessible, first,
+                     formalAccess);
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
@@ -1454,8 +1461,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
     const TypeDecl *first = inaccessibleMembers.front().Member;
-    diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                   first, first->getFormalAccess());
+    auto formalAccess = first->getFormalAccess();
+    auto nameLoc = repr->getNameLoc();
+    if (formalAccess >= AccessLevel::Public &&
+        diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
+      return ErrorType::get(ctx);
+
+    diags.diagnose(nameLoc, diag::candidate_inaccessible, first, formalAccess);
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
@@ -3317,28 +3329,21 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   }
 
   if (auto preconcurrencyAttr = claim<PreconcurrencyTypeAttr>(attrs)) {
-    auto &ctx = getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
-      if (ty->hasError())
-        return ty;
+    if (ty->hasError())
+      return ty;
 
-      if (!options.is(TypeResolverContext::Inherited) ||
-          getDeclContext()->getSelfProtocolDecl()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_inheritance_clause);
-        ty = ErrorType::get(getASTContext());
-      } else if (!ty->isConstraintType()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_existential, ty);
-        ty = ErrorType::get(getASTContext());
-      }
-
-      // Nothing to record in the type.
-    } else {
+    if (!options.is(TypeResolverContext::Inherited) ||
+        getDeclContext()->getSelfProtocolDecl()) {
       diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_attr_disabled);
+                      diag::preconcurrency_not_inheritance_clause);
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->isConstraintType()) {
+      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
+                      diag::preconcurrency_not_existential, ty);
       ty = ErrorType::get(getASTContext());
     }
+
+    // Nothing to record in the type.
   }
 
   if (auto retroactiveAttr = claim<RetroactiveTypeAttr>(attrs)) {

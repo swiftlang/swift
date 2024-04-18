@@ -3,14 +3,14 @@
 // RUN:     %s                                                      \
 // RUN:     -emit-sil -verify -verify-additional-prefix fragile-    \
 // RUN:     -sil-verify-all                                         \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
+// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -module-name Library
 // RUN: %target-swift-frontend                                      \
 // RUN:     %s                                                      \
 // RUN:     -emit-sil -verify -verify-additional-prefix resilient-  \
 // RUN:     -sil-verify-all                                         \
 // RUN:     -enable-library-evolution                               \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
+// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -module-name Library
 
 public func take(_ u: consuming Ur) {}

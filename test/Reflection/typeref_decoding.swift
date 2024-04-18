@@ -1,5 +1,8 @@
 // REQUIRES: no_asan
-
+//
+// LC_DYLD_CHAINED_FIXUPS decode not currently supported (default on visionOS)
+// UNSUPPORTED: OS=xros
+//
 // rdar://100805115
 // UNSUPPORTED: CPU=arm64e
 

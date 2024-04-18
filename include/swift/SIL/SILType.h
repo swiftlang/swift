@@ -917,7 +917,15 @@ public:
 
   bool isMarkedAsImmortal() const;
 
+  /// Returns true if this type is an actor type. Returns false if this is any
+  /// other type. This includes distributed actors. To check for distributed
+  /// actors and actors, use isAnyActor().
   bool isActor() const { return getASTType()->isActorType(); }
+
+  bool isDistributedActor() const { return getASTType()->isDistributedActor(); }
+
+  /// Returns true if this type is an actor or a distributed actor.
+  bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
   bool isSendable(SILFunction *fn) const;

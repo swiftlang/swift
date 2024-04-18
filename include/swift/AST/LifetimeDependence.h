@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_LIFETIMEDEPENDENCE_H
 #define SWIFT_AST_LIFETIMEDEPENDENCE_H
 
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Ownership.h"

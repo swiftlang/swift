@@ -249,6 +249,14 @@ checkAvailability(const EnumElementDecl *elt, ASTContext &C,
   if (!attr)
     return true;
 
+  // For type-checking purposes, iOS availability is inherited for visionOS
+  // targets. However, it is not inherited for the sake of code-generation
+  // of runtime availability queries, and is assumed to be available.
+  if ((attr->Platform == PlatformKind::iOS ||
+       attr->Platform == PlatformKind::iOSApplicationExtension) &&
+      C.LangOpts.Target.isXROS())
+    return true;
+
   AvailableVersionComparison availability = attr->getVersionAvailability(C);
 
   assert(availability != AvailableVersionComparison::Available &&

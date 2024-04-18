@@ -292,7 +292,7 @@ bb0(%0 : @guaranteed $MyActor):
   %3 = class_method %0 : $MyActor, #MyActor.klass!getter : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
   %4 = apply %3(%0) : $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
   %5 = class_method %4 : $NonSendableKlass, #NonSendableKlass.asyncCall : (NonSendableKlass) -> () async -> (), $@convention(method) @async (@guaranteed NonSendableKlass) -> ()
-  %6 = apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %5(%4) : $@convention(method) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{actor-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+  %6 = apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %5(%4) : $@convention(method) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{'self'-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
   destroy_value %4 : $NonSendableKlass
   hop_to_executor %0 : $MyActor
   %9 = tuple ()
@@ -313,7 +313,7 @@ bb0(%0 : @guaranteed $MyActor):
   %11 = alloc_stack $NonSendableKlass
   %12 = store_borrow %6 to %11 : $*NonSendableKlass
   %13 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  %14 = apply [caller_isolation=actor_instance] [callee_isolation=global_actor] %13<NonSendableKlass>(%12) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{actor-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
+  %14 = apply [caller_isolation=actor_instance] [callee_isolation=global_actor] %13<NonSendableKlass>(%12) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{'self'-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
   end_borrow %12 : $*NonSendableKlass
   dealloc_stack %11 : $*NonSendableKlass
   hop_to_executor %0 : $MyActor

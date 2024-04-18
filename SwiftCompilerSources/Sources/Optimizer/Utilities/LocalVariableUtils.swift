@@ -365,12 +365,19 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   // Handle storage type projections, like MarkUninitializedInst. Path projections should not be visited. They only
   // occur inside the access.
+  //
+  // Exception: stack-allocated temporaries may be treated like local variables for the purpose of finding all
+  // uses. Such temporaries do not have access scopes, so we need to walk down any projection that may be used to
+  // initialize the temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
     // TODO: we need an abstraction for path projections. For local variables, these cannot occur outside of an access.
     switch operand.instruction {
-    case is StructExtractInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst, is InitEnumDataAddrInst,
-         is UncheckedTakeEnumDataAddrInst, is InitExistentialAddrInst, is OpenExistentialAddrInst:
+    case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst,
+         is UncheckedTakeEnumDataAddrInst, is OpenExistentialAddrInst:
       return .abortWalk
+    // Projections used to initialize a temporary
+    case is InitEnumDataAddrInst, is InitExistentialAddrInst:
+      fallthrough
     default:
       return walkDownAddressUses(address: value)
     }
@@ -401,7 +408,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   mutating func leafAddressUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
-    case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst:
+    case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst, is DeinitExistentialAddrInst,
+         is InjectEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst, is PackElementSetInst:
+      // Handle instructions that initialize both temporaries and local variables.
       visit(LocalVariableAccess(.store, operand))
     case is DeallocStackInst:
       break

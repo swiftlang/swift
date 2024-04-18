@@ -954,7 +954,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
         // If it's a Sendable requirement, skip it.
         const auto &req = requirements[reqIdx];
         if (req.getKind() == RequirementKind::Conformance &&
-            req.getSecondType()->castTo<ProtocolType>()->getDecl()
+            req.getProtocolDecl()
               ->isSpecificProtocol(KnownProtocolKind::Sendable))
           continue;
 

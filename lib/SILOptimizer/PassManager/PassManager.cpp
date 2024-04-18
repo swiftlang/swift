@@ -204,6 +204,11 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::location(DebugOnlyPassNumberOptLoc),
               llvm::cl::ValueRequired);
 
+static llvm::cl::opt<bool> SILPrintEverySubpass(
+    "sil-print-every-subpass", llvm::cl::init(false),
+    llvm::cl::desc("Print the function before every subpass run of passes that "
+                   "have multiple subpasses"));
+
 static bool isInPrintFunctionList(SILFunction *F) {
   for (const std::string &printFnName : SILPrintFunction) {
     if (printFnName == F->getName())
@@ -478,13 +483,22 @@ bool SILPassManager::continueTransforming() {
 bool SILPassManager::continueWithNextSubpassRun(SILInstruction *forInst,
                                                 SILFunction *function,
                                                 SILTransform *trans) {
+  unsigned subPass = numSubpassesRun++;
+
+  if (forInst && isFunctionSelectedForPrinting(function) &&
+      SILPrintEverySubpass) {
+    dumpPassInfo("*** SIL function before ", trans, function);
+    if (forInst) {
+      llvm::dbgs() << "  *** sub-pass " << subPass << " for " << *forInst;
+    }
+    function->dump(getOptions().EmitVerboseSIL);
+  }
+
   if (isMandatory)
     return true;
   if (NumPassesRun != maxNumPassesToRun - 1)
     return true;
 
-  unsigned subPass = numSubpassesRun++;
-  
   if (subPass == maxNumSubpassesToRun - 1 && SILPrintLast) {
     dumpPassInfo("*** SIL function before ", trans, function);
     if (forInst) {
@@ -1618,8 +1632,9 @@ bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure, bool n
 
 BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(BridgedInstruction apply,
                                                                           bool isMandatory) const {
-  auto cha = invocation->getPassManager()->getAnalysis<ClassHierarchyAnalysis>();
-  auto result = ::tryDevirtualizeApply(ApplySite(apply.unbridged()), cha,
+  SILPassManager *pm = invocation->getPassManager();
+  auto cha = pm->getAnalysis<ClassHierarchyAnalysis>();
+  auto result = ::tryDevirtualizeApply(pm, ApplySite(apply.unbridged()), cha,
                                        nullptr, isMandatory);
   if (result.first) {
     OptionalBridgedInstruction newApply(result.first.getInstruction()->asSILNode());

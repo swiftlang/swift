@@ -23,7 +23,7 @@ struct SourceBreakTest {
     func callAsFunction() -> Bar { fatalError() }
 }
 
-let _borrowing = SourceBreakTest()
+let borrowing = SourceBreakTest()
 
 func ~=(_: borrowing Bar, _: borrowing Bar) -> Bool { fatalError() }
 
@@ -33,19 +33,22 @@ func useBorrowPayload(_: borrowing Payload) { fatalError() }
 
 func testBorrowingPatterns(bar: borrowing Bar) {
     switch bar {
-    case _borrowing .foo(): // parses as `_borrowing.foo()` as before
+    case borrowing .foo(): // parses as `borrowing.foo()` as before
         break
-    case _borrowing (): // parses as `_borrowing()` as before
+    case borrowing (): // parses as `borrowing()` as before
         break
 
-    case _borrowing x: 
+    case borrowing x: 
         useBorrowBar(x)
 
-    case .payload(_borrowing x):
+    case .payload(borrowing x):
         useBorrowFoo(x)
 
-    case _borrowing x.member: // expected-error{{'_borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
+    case borrowing x.member: // expected-error{{'borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
         break
+
+    case _borrowing x: // expected-warning{{'_borrowing' spelling is deprecated}} {{10-20=borrowing}}
+        useBorrowBar(x)
 
     default:
         break

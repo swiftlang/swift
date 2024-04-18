@@ -1412,7 +1412,7 @@ public:
       else
         *this << ", var";
 
-      if ((Var->Loc || Var->Scope) && SM) {
+      if ((Var->Loc || Var->Scope) && SM && Ctx.printDebugInfo()) {
         *this << ", (name \"" << Var->Name << '"';
         if (Var->Loc)
           printDebugLocRef(*Var->Loc, *SM);
@@ -1749,6 +1749,20 @@ public:
       *this << "[fixed] ";
     }
     *this << getIDAndType(BBI->getOperand());
+  }
+
+  void visitBorrowedFromInst(BorrowedFromInst *bfi) {
+    *this << getIDAndType(bfi->getBorrowedValue());
+    *this << " from (";
+    bool first = true;
+    for (SILValue ev : bfi->getEnclosingValues()) {
+      if (!first) {
+        *this << ", ";
+      }
+      first = false;
+      *this << getIDAndType(ev);
+    }
+    *this << ")";
   }
 
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {

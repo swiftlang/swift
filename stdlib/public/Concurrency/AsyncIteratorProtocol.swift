@@ -133,6 +133,10 @@ extension AsyncIteratorProtocol {
   @available(SwiftStdlib 6.0, *)
   @inlinable
   public mutating func next() async throws(Failure) -> Element? {
+#if $OptionalIsolatedParameters
     return try await next(isolation: nil)
+#else
+    fatalError("unsupported compiler")
+#endif
   }
 }

@@ -2202,16 +2202,20 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
   if (Tok.is(tok::kw_catch)) {
     // Parse 'catch' clauses
     SmallVector<CaseStmt *, 4> allClauses;
+    ParserStatus catchClausesStatus;
     do {
       ParserResult<CaseStmt> clause = parseStmtCatch();
-      status |= clause;
-      if (status.hasCodeCompletion() && clause.isNull())
+      catchClausesStatus |= clause;
+      if (catchClausesStatus.hasCodeCompletion() && clause.isNull()) {
+        status |= catchClausesStatus;
         return makeParserResult<Stmt>(status, nullptr);
+      }
 
       // parseStmtCatch promises to return non-null unless we are
       // completing inside the catch's pattern.
       allClauses.push_back(clause.get());
-    } while (Tok.is(tok::kw_catch) && !status.hasCodeCompletion());
+    } while (Tok.is(tok::kw_catch) && !catchClausesStatus.hasCodeCompletion());
+    status |= catchClausesStatus;
 
     // Recover from all of the clauses failing to parse by returning a
     // normal do-statement.

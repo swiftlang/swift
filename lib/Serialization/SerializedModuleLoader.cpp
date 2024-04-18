@@ -431,7 +431,8 @@ SerializedModuleLoaderBase::getImportsOfModule(
 
 llvm::ErrorOr<ModuleDependencyInfo>
 SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
-                                           bool isTestableImport) {
+                                           bool isTestableImport,
+                                           bool hasInterface) {
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
 
@@ -455,7 +456,10 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
 
-    if (loadedModuleFile->isTestable() && !isTestableImport) {
+    // If the module file has interface file and not testable imported, don't
+    // import the testable module because it contains more interfaces than
+    // needed and can pull in more dependencies.
+    if (loadedModuleFile->isTestable() && !isTestableImport && hasInterface) {
       if (Ctx.LangOpts.EnableModuleLoadingRemarks)
         Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_testable,
                            modulePath.str());
@@ -852,6 +856,8 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
       osName = swift::prettyPlatformString(PlatformKind::tvOS);
     } else if (triple.isiOS()) {
       osName = swift::prettyPlatformString(PlatformKind::iOS);
+    }  else if (triple.isXROS()) {
+      osName = swift::prettyPlatformString(PlatformKind::visionOS);
     } else {
       assert(!triple.isOSDarwin() && "unknown Apple OS");
       // Fallback to the LLVM triple name. This isn't great (it won't be

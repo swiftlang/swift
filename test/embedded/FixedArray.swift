@@ -4,8 +4,8 @@
 
 // Also test in non-embedded mode
 
-// RUN: %target-run-simple-swift(%S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macosx10.13 %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macosx10.13 -O %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib

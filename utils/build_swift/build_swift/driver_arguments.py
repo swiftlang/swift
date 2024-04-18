@@ -143,6 +143,10 @@ def _apply_default_arguments(args):
         raise ValueError('error: --watchos-all is unavailable in open-source '
                          'Swift.\nUse --watchos to skip watchOS device tests.')
 
+    if args.xros_all:
+        raise ValueError('error: --xros-all is unavailable in open-source '
+                         'Swift.\nUse --xros to skip xrOS device tests.')
+
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
     # merely shorthands for --skip-build-{**os}-{device,simulator}
     if not args.ios or not args.build_ios:
@@ -156,6 +160,10 @@ def _apply_default_arguments(args):
     if not args.watchos or not args.build_watchos:
         args.build_watchos_device = False
         args.build_watchos_simulator = False
+
+    if not args.xros or not args.build_xros:
+        args.build_xros_device = False
+        args.build_xros_simulator = False
 
     if not args.android or not args.build_android:
         args.build_android = False
@@ -199,6 +207,7 @@ def _apply_default_arguments(args):
         args.test_ios = False
         args.test_tvos = False
         args.test_watchos = False
+        args.test_xros = False
         args.test_android = False
         args.test_cmark = False
         args.test_swiftpm = False
@@ -230,6 +239,11 @@ def _apply_default_arguments(args):
     if not args.test_watchos:
         args.test_watchos_host = False
         args.test_watchos_simulator = False
+    # --skip-test-xros is merely a shorthand for host and simulator
+    # --tests.
+    if not args.test_xros:
+        args.test_xros_host = False
+        args.test_xros_simulator = False
 
     # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
     # --skip-test-{ios,tvos,watchos}-{host,simulator}
@@ -248,6 +262,11 @@ def _apply_default_arguments(args):
     if not args.build_watchos_simulator:
         args.test_watchos_simulator = False
 
+    if not args.build_xros_device:
+        args.test_xros_host = False
+    if not args.build_xros_simulator:
+        args.test_xros_simulator = False
+
     if not args.build_android:
         # If building natively on an Android host, allow running the test suite
         # without the NDK config.
@@ -263,6 +282,7 @@ def _apply_default_arguments(args):
         args.test_ios_host = False
         args.test_tvos_host = False
         args.test_watchos_host = False
+        args.test_xros_host = False
         args.test_android_host = False
 
 
@@ -344,6 +364,15 @@ def create_argument_parser():
                 'tests')
     option('--skip-watchos', store_false('watchos'),
            help='set to skip everything watchOS-related')
+
+    option('--xros', toggle_true,
+           help='also build for xrOS, but disallow tests that require an '
+                'xrOS device')
+    option('--xros-all', toggle_true('xros_all'),
+           help='also build for Apple xrOS, and allow all Apple xrOS '
+                'tests')
+    option('--skip-xros', store_false('xros'),
+           help='set to skip everything xrOS-related')
 
     option('--maccatalyst', toggle_true,
            help='Enable building Swift with macCatalyst support')
@@ -497,6 +526,10 @@ def create_argument_parser():
            default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for watchOS')
+    option('--darwin-deployment-version-xros', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+           metavar='MAJOR.MINOR',
+           help='minimum deployment target version for xrOS')
 
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
@@ -1151,6 +1184,16 @@ def create_argument_parser():
            help='skip building Swift stdlibs for watchOS simulator '
                 '(i.e. build devices only)')
 
+    option('--skip-build-xros', toggle_false('build_xros'),
+           help='skip building Swift stdlibs for xrOS')
+    option('--skip-build-xros-device', toggle_false('build_xros_device'),
+           help='skip building Swift stdlibs for xrOS devices '
+                '(i.e. build simulators only)')
+    option('--skip-build-xros-simulator',
+           toggle_false('build_xros_simulator'),
+           help='skip building Swift stdlibs for xrOS simulator '
+                '(i.e. build devices only)')
+
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
 
@@ -1211,6 +1254,17 @@ def create_argument_parser():
            toggle_false('test_watchos_host'),
            help='skip testing watchOS device targets on the host machine (the '
                 'watch itself)')
+
+    option('--skip-test-xros',
+           toggle_false('test_xros'),
+           help='skip testing all xrOS targets. Equivalent to specifying both '
+                '--skip-test-xros-simulator and --skip-test-xros-host')
+    option('--skip-test-xros-simulator',
+           toggle_false('test_xros_simulator'),
+           help='skip testing xrOS simulator targets')
+    option('--skip-test-xros-host',
+           toggle_false('test_xros_host'),
+           help='skip testing xrOS device targets on the host machine')
 
     option('--skip-test-android',
            toggle_false('test_android'),
@@ -1364,6 +1418,10 @@ def create_argument_parser():
     option('--enable-synchronization', toggle_true,
            default=True,
            help='Enable Swift Synchronization.')
+
+    option('--enable-experimental-parser-validation', toggle_true,
+           default=False,
+           help='Enable experimental Swift Parser validation by default.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

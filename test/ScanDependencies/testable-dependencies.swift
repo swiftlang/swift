@@ -56,12 +56,12 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading
 
-/// Regular import a testable module with no interface, this is a dependency scanning error.
+/// Regular import a testable module with no interface, will try to import binary module but fail to look up the dependency.
 // RUN: rm %t/testable/A.swiftinterface
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps6.json -I %t/testable -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix ERROR
-// ERROR: error: Unable to find module dependency: 'A'
+// ERROR: error: Unable to find module dependency: 'B'
 
 //--- main.swift
 import A

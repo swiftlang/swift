@@ -101,10 +101,12 @@ function(get_test_dependencies SDK result_var_name)
   if(("${SDK}" STREQUAL "IOS") OR
      ("${SDK}" STREQUAL "TVOS") OR
      ("${SDK}" STREQUAL "WATCHOS") OR
+     ("${SDK}" STREQUAL "XROS") OR
      ("${SDK}" STREQUAL "OSX") OR
      ("${SDK}" STREQUAL "IOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
+     ("${SDK}" STREQUAL "XROS_SIMULATOR") OR
      ("${SDK}" STREQUAL "FREESTANDING") OR
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
@@ -343,7 +345,7 @@ foreach(SDK ${SWIFT_SDKS})
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)
-      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
+      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS" OR "${SDK}" STREQUAL "XROS")
         # These are supported testing SDKs, but their implementation of
         # `command_upload_stdlib` is hidden.
       elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")

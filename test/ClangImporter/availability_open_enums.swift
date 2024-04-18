@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -enable-nonfrozen-enum-exhaustivity-diagnostics %s
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=xros
 
 import Foundation
 import AvailabilityExtras

@@ -3798,8 +3798,14 @@ static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
     TypeConverter &TC, AbstractionPattern origType,
     CanAnyFunctionType substType, SILExtInfoBuilder extInfoBuilder,
     std::optional<SILDeclRef> constant) {
-  if (origType.isClangType()) {
-    auto clangType = origType.getClangType();
+  const clang::Type *clangType = nullptr;
+
+  if (origType.isClangType())
+    clangType = origType.getClangType();
+  else
+    clangType = extInfoBuilder.getClangTypeInfo().getType();
+
+  if (clangType) {
     const clang::FunctionType *fnType;
     if (auto blockPtr = clangType->getAs<clang::BlockPointerType>()) {
       fnType = blockPtr->getPointeeType()->castAs<clang::FunctionType>();
