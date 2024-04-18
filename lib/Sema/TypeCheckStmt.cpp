@@ -1669,6 +1669,14 @@ public:
     bool limitExhaustivityChecks = true;
 
     Type caughtErrorType = TypeChecker::catchErrorType(DC, S);
+
+    // If there was no throwing expression in the body, let's pretend it can
+    // throw 'any Error' just for type checking the pattern. That avoids
+    // superfluous diagnostics. Note that we still diagnose unreachable 'catch'
+    // separately in TypeCheckEffects.
+    if (caughtErrorType->isNever())
+      caughtErrorType = Ctx.getErrorExistentialType();
+
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
