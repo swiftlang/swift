@@ -935,6 +935,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setIsConcurrencyChecked();
     if (loadedModuleFile->hasCxxInteroperability())
       M.setHasCxxInteroperability();
+    if (loadedModuleFile->hasSealedCxxInteroperability())
+      M.setHasSealedCxxInteroperability();
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
@@ -1032,6 +1034,17 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     Ctx.Diags.diagnose(loc, diag::need_cxx_interop_to_import_module,
                        M.getName());
     Ctx.Diags.diagnose(loc, diag::enable_cxx_interop_docs);
+  }
+
+  // The use of custom C++ stdlib in the current context might be incompatible
+  // with the loaded module that uses C++ interoperability with default system's
+  // C++ stdlib, so enforce a separation boundary between them.
+  if (Ctx.LangOpts.EnableCXXInterop && Ctx.LangOpts.isUsingCustomCxxStdLib() &&
+      M.hasCxxInteroperability() && !M.hasSealedCxxInteroperability() &&
+      M.getName() != Ctx.Id_Cxx) {
+    Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
+                       diag::need_custom_cxx_stdlib_to_import_module,
+                       M.getName());
   }
 
   return fileUnit;

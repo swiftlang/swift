@@ -513,6 +513,24 @@ void importer::getNormalInvocationArguments(
       "-isystem", searchPathOpts.RuntimeResourcePath,
   });
 
+  if (ctx.LangOpts.isUsingCustomCxxStdLib()) {
+    // Add a define that ensures Clang differentiates between imported Clang
+    // modules with a
+    // custom libc++ path and regular Clang modules that use system's C++
+    // standard library.
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-D__swift_use_custom_cxx_stdlib__"});
+
+    // Add a placeholder custom C++ stdlib directory before other system include
+    // directories. The importer will substitute the actual directory value
+    // after preloading any modules that are incompatible with the custom C++
+    // stdlib. It's important to put it before other system include directories
+    // as even with -nostdinc++, platforms like Windows might still keep the
+    // search paths for system's C++ headers active in the Clang instance.
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-isystem<placeholder-custom-cxx-stdlib-dir>"});
+  }
+
   // Enable Position Independence.  `-fPIC` is not supported on Windows, which
   // is implicitly position independent.
   if (!triple.isOSWindows())
@@ -912,6 +930,12 @@ importer::addCommonInvocationArguments(
   if (importerOpts.ValidateModulesOnce) {
     invocationArgStrs.push_back("-fmodules-validate-once-per-build-session");
     invocationArgStrs.push_back("-fbuild-session-file=" + importerOpts.BuildSessionFilePath);
+  }
+
+  if (ctx.LangOpts.isUsingCustomCxxStdLib()) {
+    // Do not add system's C++ standard library include paths when using
+    // a custom C++ standard libary.
+    invocationArgStrs.push_back("-nostdinc++");
   }
 
   for (auto extraArg : importerOpts.ExtraArgs) {
@@ -1314,11 +1338,29 @@ ClangImporter::create(ASTContext &ctx,
       return nullptr;
   }
 
+  llvm::SmallVector<StringRef, 2> extraPreImports;
+  // Prebuild 'SwiftShims' before using a custom C++ stdlib, to
+  // ensure that SwiftShims won't depend on the custom C++ stdlib.
+  if (ctx.LangOpts.isUsingCustomCxxStdLib()) {
+    extraPreImports.push_back("SwiftShims");
+    // On Windows, prebuild 'ucrt' before using a custom C++ stdlib,
+    // to ensure there's no circular dependencies between the two
+    // modules.
+    if (ctx.LangOpts.Target.isOSWindows())
+      extraPreImports.push_back("ucrt");
+  }
+
   {
     // Create an almost-empty memory buffer.
-    auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
-      "extern int __swift __attribute__((unavailable));",
-      Implementation::moduleImportBufferName);
+    SmallString<128> defaultBuffer(
+        "extern int __swift __attribute__((unavailable));");
+    for (const auto &import : extraPreImports) {
+      defaultBuffer.append("\n#pragma clang module import ");
+      defaultBuffer.append(import);
+      defaultBuffer.push_back('\n');
+    }
+    auto sourceBuffer = llvm::MemoryBuffer::getMemBufferCopy(
+        defaultBuffer, Implementation::moduleImportBufferName);
     clang::PreprocessorOptions &ppOpts =
         importer->Impl.Invocation->getPreprocessorOpts();
     ppOpts.addRemappedFile(Implementation::moduleImportBufferName,
@@ -1497,6 +1539,34 @@ ClangImporter::create(ASTContext &ctx,
   // FIXME: This is missing implicit includes.
   auto *CB = new HeaderImportCallbacks(importer->Impl);
   clangPP.addPPCallbacks(std::unique_ptr<clang::PPCallbacks>(CB));
+
+  if (ctx.LangOpts.isUsingCustomCxxStdLib()) {
+    // Adjust the header search options to point to the custom C++ stdlib
+    // include directory instead of the placeholder custom C++ stdlib, after
+    // making sure some incompatible requirements are prebuilt already.
+    bool hasAdjusted = false;
+    for (auto &E : instance.getHeaderSearchOpts().UserEntries) {
+      if (E.Path == "<placeholder-custom-cxx-stdlib-dir>") {
+        E.Path = ctx.LangOpts.cxxInteropCustomLibcxxPath;
+        hasAdjusted = true;
+      }
+    }
+    (void)hasAdjusted; // in case of no asserts.
+    assert(hasAdjusted && "unable to set custom c++ stdlib include path");
+    // Recreate the header search info for the current instance to match
+    // the updated header search options.
+    clang::ApplyHeaderSearchOptions(
+        clangPP.getHeaderSearchInfo(), instance.getHeaderSearchOpts(),
+        instance.getLangOpts(), instance.getTarget().getTriple());
+
+    if (importerOpts.DumpClangDiagnostics) {
+      llvm::errs()
+          << "Adjusted include paths to account for custom C++ stdlib:";
+      for (auto &E : instance.getHeaderSearchOpts().UserEntries)
+        llvm::errs() << " '" << E.Path << "'";
+      llvm::errs() << "\n";
+    }
+  }
 
   // Create the selectors we'll be looking for.
   auto &clangContext = importer->Impl.Instance->getASTContext();
@@ -2344,6 +2414,10 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
       path.front().Item.str().starts_with("std_"))
     return nullptr;
   if (path.front().Item == ctx.Id_CxxStdlib) {
+    // The 'CxxStdlib' module is not importable when using a custom
+    // C++ standard libary.
+    if (ctx.LangOpts.isUsingCustomCxxStdLib())
+      return nullptr;
     ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
     path = adjustedPath.copyTo(ctx).getModulePath(ImportKind::Module);
@@ -2725,6 +2799,27 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   auto &cacheEntry = ModuleWrappers[underlying];
   if (ClangModuleUnit *cached = cacheEntry.getPointer())
     return cached;
+
+  // Ensure system's C++ stdlib modules aren't imported when
+  // using a custom C++ standard library. This is especially important for
+  // Windows with MSVC STL, as the MSVC C++ module is located in a directory
+  // shared with other system modules, and thus could be still found using
+  // Clang's header search. However, MSVC's 'std_config' module is exempt from
+  // this check as it contains some common config macros that are needed by
+  // other parts of the SDK.
+  if (SwiftContext.LangOpts.isUsingCustomCxxStdLib() &&
+      isCxxStdModule(underlying) &&
+      !(SwiftContext.LangOpts.Target.isOSWindows() &&
+        underlying->Name == "std_config")) {
+    auto maybeCustomDir = Instance->getFileManager().getOptionalDirectoryRef(
+        SwiftContext.LangOpts.cxxInteropCustomLibcxxPath);
+    if (underlying->Directory.has_value() && maybeCustomDir &&
+        !underlying->Directory->isSameRef(*maybeCustomDir)) {
+      diagnose(SourceLoc(),
+               diag::libcxx_custom_prohibits_system_cxxstdlib_module,
+               underlying->Name);
+    }
+  }
 
   // FIXME: Handle hierarchical names better.
   Identifier name = underlying->Name == "std"

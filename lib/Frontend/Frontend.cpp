@@ -1378,8 +1378,19 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
-        Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
-      MainModule->setHasCxxInteroperability();
+        Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule) {
+      // By default, mark this module as using C++ interoperability, which
+      // will require users to also turn on C++ interoperability.
+      if (Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
+        MainModule->setHasCxxInteroperability();
+      // Using C++ interoperability with a custom C++ stdlib enforces
+      // a best-effort seal that prevents the use of C++ types accross module
+      // boundaries, while ensuring that type layout from such module will
+      // not be constructed incorrectly without correct C++ libraries when used
+      // accross a non-resilient module boundary.
+      if (Invocation.getLangOptions().isUsingCustomCxxStdLib())
+        MainModule->setHasSealedCxxInteroperability();
+    }
     if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
 

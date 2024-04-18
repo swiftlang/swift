@@ -328,6 +328,10 @@ namespace swift {
     /// when importing Swift modules that enable C++ interoperability.
     bool RequireCxxInteropToImportCxxInteropModule = true;
 
+    /// Use a custom libc++ at the specified path when importing
+    // and building Clang modules with C++ interoperability enabled.
+    std::string cxxInteropCustomLibcxxPath;
+
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
     /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
@@ -771,6 +775,12 @@ namespace swift {
       if (VariantSDKVersion.has_value())
         hashValue = llvm::hash_combine(hashValue, VariantSDKVersion.value().getAsString());
       return hashValue;
+    }
+
+    /// Return true when using a custom C++ standard library for imported
+    /// C and C++ modules.
+    bool isUsingCustomCxxStdLib() const {
+      return !cxxInteropCustomLibcxxPath.empty();
     }
 
   private:

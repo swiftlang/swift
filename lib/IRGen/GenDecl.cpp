@@ -487,10 +487,13 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // (std) if available.
   if (Context.LangOpts.EnableCXXInterop) {
     const llvm::Triple &target = Context.LangOpts.Target;
-    if (target.isOSDarwin())
-      this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
-    else if (target.isOSLinux())
-      this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
+    bool useCustomCxxLib = Context.LangOpts.isUsingCustomCxxStdLib();
+    if (!useCustomCxxLib) {
+      if (target.isOSDarwin())
+        this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
+      else if (target.isOSLinux())
+        this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
+    }
 
     // Do not try to link Cxx with itself.
     if (!getSwiftModule()->getName().is("Cxx")) {
@@ -504,11 +507,13 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     }
 
     // Do not try to link CxxStdlib with the C++ standard library, Cxx or
-    // itself.
+    // itself. Also, do not link CxxStdlib when using a custom C++
+    // standard library.
     if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
                       [M = getSwiftModule()->getName().str()](StringRef Name) {
                         return M == Name;
-                      })) {
+                      }) &&
+        !useCustomCxxLib) {
       // Only link with CxxStdlib on platforms where the overlay is available.
       switch (target.getOS()) {
       case llvm::Triple::Linux:
