@@ -671,6 +671,42 @@ UNINTERESTING_FEATURE(BorrowingSwitch)
 
 UNINTERESTING_FEATURE(ClosureIsolation)
 
+static bool usesFeatureConformanceSuppression(Decl *decl) {
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominal)
+    return false;
+
+  auto inherited = InheritedTypes(nominal);
+  for (auto index : indices(inherited.getEntries())) {
+    // Ensure that InheritedTypeRequest has set the isSuppressed bit if
+    // appropriate.
+    auto resolvedTy = inherited.getResolvedType(index);
+    (void)resolvedTy;
+
+    auto entry = inherited.getEntry(index);
+
+    if (!entry.isSuppressed())
+      continue;
+
+    auto ty = entry.getType();
+
+    if (!ty)
+      continue;
+
+    auto kp = ty->getKnownProtocol();
+    if (!kp)
+      continue;
+
+    auto rpk = getRepressibleProtocolKind(*kp);
+    if (!rpk)
+      continue;
+
+    return true;
+  }
+
+  return false;
+}
+
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {
     if (auto fnType = type->getAs<AnyFunctionType>()) {

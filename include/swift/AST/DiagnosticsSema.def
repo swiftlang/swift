@@ -7674,6 +7674,8 @@ ERROR(non_bitwise_copyable_type_indirect_enum_element,none,
       "enum with indirect case cannot conform to 'BitwiseCopyable'", ())
 NOTE(note_non_bitwise_copyable_type_indirect_enum_element,none,
      "indirect case is here", ())
+ERROR(non_bitwise_copyable_type_suppressed,none,
+      "cannot both conform to and suppress conformance to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_cxx_nontrivial,none,
       "non-trivial C++ type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_c_type_nontrivial,none,
@@ -7699,6 +7701,12 @@ NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
 ERROR(bitwise_copyable_outside_module,none,
       "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
       (const ValueDecl *))
+ERROR(suppress_inferrable_protocol_extension,none,
+      "conformance to inferrable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))
+ERROR(suppress_nonsuppressable_protocol,none,
+      "conformance to %0 cannot be suppressed", (const ProtocolDecl *))
+WARNING(suppress_already_suppressed_protocol,none,
+      "already suppressed conformance to %0", (const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,

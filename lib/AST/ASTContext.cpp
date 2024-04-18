@@ -130,6 +130,33 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << getProtocolName(getKnownProtocolKind(value));
 }
 
+std::optional<RepressibleProtocolKind>
+swift::getRepressibleProtocolKind(KnownProtocolKind kp) {
+  switch (kp) {
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name)                               \
+  case KnownProtocolKind::Id:                                                  \
+    return RepressibleProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  default:
+    return std::nullopt;
+  }
+}
+
+/// Returns the KnownProtocolKind corresponding to an RepressibleProtocolKind.
+KnownProtocolKind swift::getKnownProtocolKind(RepressibleProtocolKind ip) {
+  switch (ip) {
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name)                               \
+  case RepressibleProtocolKind::Id:                                            \
+    return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const RepressibleProtocolKind &value) {
+  out << getProtocolName(getKnownProtocolKind(value));
+}
+
 // Metadata stores a 16-bit field for invertible protocols. Trigger a build
 // error when we assign the 15th bit so we can think about what to do.
 #define INVERTIBLE_PROTOCOL(Name, Bit) \

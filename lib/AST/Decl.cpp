@@ -1669,7 +1669,8 @@ Type InheritedTypes::getResolvedType(unsigned i,
                         ? Decl.get<const ExtensionDecl *>()->getASTContext()
                         : Decl.get<const TypeDecl *>()->getASTContext();
   return evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
-                           Type());
+                           InheritedTypeResult::forDefault())
+      .getInheritedTypeOrNull(getASTContext());
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
@@ -5363,6 +5364,13 @@ bool NominalTypeDecl::isAnyActor() const {
 bool NominalTypeDecl::isMainActor() const {
   return getName().is("MainActor") &&
          getParentModule()->getName() == getASTContext().Id_Concurrency;
+}
+
+bool NominalTypeDecl::suppressesConformance(KnownProtocolKind kp) const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SuppressesConformanceRequest{mutableThis, kp},
+                           false);
 }
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,

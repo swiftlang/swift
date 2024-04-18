@@ -1628,17 +1628,29 @@ private:
   /// Whether there was an @preconcurrency attribute.
   bool IsPreconcurrency : 1;
 
+  /// Whether there was a ~ indicating suppression.
+  ///
+  /// This is true in cases like ~Copyable but not (P & ~Copyable).
+  bool IsSuppressed : 1;
+
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
   InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
-                 bool isPreconcurrency)
+                 bool isPreconcurrency, bool isSuppressed = false)
       : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
-        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency) {}
+        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency),
+        IsSuppressed(isSuppressed) {}
 
   bool isUnchecked() const { return IsUnchecked; }
   bool isRetroactive() const { return IsRetroactive; }
   bool isPreconcurrency() const { return IsPreconcurrency; }
+  bool isSuppressed() const { return IsSuppressed; }
+
+  void setSuppressed() {
+    assert(!IsSuppressed && "setting suppressed again!?");
+    IsSuppressed = true;
+  }
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -4435,6 +4447,8 @@ public:
   /// If you need a more precise answer, ask this Decl's corresponding
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
+
+  bool suppressesConformance(KnownProtocolKind kp) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

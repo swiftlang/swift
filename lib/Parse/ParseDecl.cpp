@@ -6815,7 +6815,7 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    if (!EnabledNoncopyableGenerics && Tok.isTilde()) {
+    if (!canSuppressConformancesWithTilde() && Tok.isTilde()) {
       ErrorTypeRepr *error = nullptr;
       if (parseTildeCopyable) {
         const auto &nextTok = peekToken(); // lookahead
