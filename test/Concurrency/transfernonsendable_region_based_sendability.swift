@@ -442,7 +442,7 @@ actor A_Sendable {
     // support the ability to dynamically invoke the synchronous closure on
     // the specific actor.
     await a.foo(captures_self) // expected-tns-warning {{transferring 'captures_self' may cause a data race}}
-    // expected-tns-note @-1 {{transferring actor-isolated 'captures_self' to actor-isolated callee could cause races between actor-isolated and actor-isolated uses}}
+    // expected-tns-note @-1 {{transferring 'self'-isolated 'captures_self' to actor-isolated callee could cause races between actor-isolated and 'self'-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
     // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }

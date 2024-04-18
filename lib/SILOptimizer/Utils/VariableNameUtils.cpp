@@ -320,6 +320,27 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
   return SILValue();
 }
 
+static BeginBorrowInst *hasOnlyBorrowingNonDestroyUse(SILValue searchValue) {
+  BeginBorrowInst *result = nullptr;
+  for (auto *use : searchValue->getUses()) {
+    if (isIncidentalUse(use->getUser()))
+      continue;
+    if (use->isConsuming()) {
+      if (!isa<DestroyValueInst>(use->getUser()))
+        return nullptr;
+      continue;
+    }
+
+    auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser());
+    if (!bbi || !bbi->isFromVarDecl())
+      return nullptr;
+    if (result)
+      return nullptr;
+    result = bbi;
+  }
+  return result;
+}
+
 SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     SILValue searchValue, ValueSet &visitedValues) {
   assert(searchValue);
@@ -334,6 +355,56 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       return SILValue();
 
     LLVM_DEBUG(llvm::dbgs() << "Value: " << *searchValue);
+
+    // Before we do anything, lets see if we have an explicit match due to a
+    // debug_value use.
+    if (auto *use = getAnyDebugUse(searchValue)) {
+      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
+        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+        variableNamePath.push_back(use->getUser());
+
+        // We return the value, not the debug_info.
+        return searchValue;
+      }
+    }
+
+    // If we are in Ownership SSA, see if we have an owned value that has one
+    // use, a move_value [var decl]. In such a case, check the move_value [var
+    // decl] for a debug_value.
+    //
+    // This pattern comes up if we are asked to get a name for an apply that is
+    // used to initialize a value. The name will not yet be associated with the
+    // value so we have to compensate.
+    //
+    // NOTE: This is a heuristic. Feel free to tweak accordingly.
+    if (auto *singleUse = searchValue->getSingleUse()) {
+      if (auto *mvi = dyn_cast<MoveValueInst>(singleUse->getUser())) {
+        if (mvi->isFromVarDecl()) {
+          if (auto *debugUse = getAnyDebugUse(mvi)) {
+            if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
+              assert(debugVar.getKind() ==
+                     DebugVarCarryingInst::Kind::DebugValue);
+              variableNamePath.push_back(debugUse->getUser());
+
+              // We return the value, not the debug_info.
+              return searchValue;
+            }
+          }
+        }
+      }
+    }
+
+    if (auto *bbi = hasOnlyBorrowingNonDestroyUse(searchValue)) {
+      if (auto *debugUse = getAnyDebugUse(bbi)) {
+        if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
+          assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+          variableNamePath.push_back(debugUse->getUser());
+
+          // We return the value, not the debug_info.
+          return searchValue;
+        }
+      }
+    }
 
     if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
       // If the instruction itself doesn't carry any variable info, see
@@ -543,18 +614,6 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
     }
 
-    // If we do not do an exact match, see if we can find a debug_var inst. If
-    // we do, we always break since we have a root value.
-    if (auto *use = getAnyDebugUse(searchValue)) {
-      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
-        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-        variableNamePath.push_back(use->getUser());
-
-        // We return the value, not the debug_info.
-        return searchValue;
-      }
-    }
-
     // Otherwise, try to see if we have a single value instruction we can look
     // through.
     if (isa<BeginBorrowInst>(searchValue) || isa<LoadInst>(searchValue) ||
@@ -697,6 +756,34 @@ void VariableNameInferrer::drainVariableNamePath() {
 
     resultingString += '.';
   }
+}
+
+std::optional<Identifier> VariableNameInferrer::inferName(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  if (!inferrer.inferByWalkingUsesToDefsReturningRoot(value))
+    return {};
+  return fn->getASTContext().getIdentifier(resultingName);
+}
+
+std::optional<std::pair<Identifier, SILValue>>
+VariableNameInferrer::inferNameAndRoot(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  SILValue rootValue = inferrer.inferByWalkingUsesToDefsReturningRoot(value);
+  if (!rootValue)
+    return {};
+  return {{fn->getASTContext().getIdentifier(resultingName), rootValue}};
 }
 
 //===----------------------------------------------------------------------===//

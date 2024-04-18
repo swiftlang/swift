@@ -28,7 +28,7 @@ class RegionAnalysisFunctionInfo;
 namespace regionanalysisimpl {
 
 using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
-using TrackableValueID = PartitionPrimitives::Element;
+using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
 
 /// Check if the passed in type is NonSendable.
@@ -175,7 +175,7 @@ public:
 
   SILIsolationInfo getIsolationRegionInfo() const { return regionInfo; }
 
-  TrackableValueID getID() const { return TrackableValueID(id); }
+  Element getID() const { return Element(id); }
 
   void addFlag(TrackableValueFlag flag) { flagSet |= flag; }
 
@@ -186,7 +186,7 @@ public:
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
        << "][region_value_kind: ";
-    getIsolationRegionInfo().print(os);
+    getIsolationRegionInfo().printForDiagnostics(os);
     os << "].";
   }
 
@@ -276,9 +276,7 @@ public:
     return valueState.getIsolationRegionInfo();
   }
 
-  TrackableValueID getID() const {
-    return TrackableValueID(valueState.getID());
-  }
+  Element getID() const { return Element(valueState.getID()); }
 
   /// Return the representative value of this equivalence class of values.
   RepresentativeValue getRepresentative() const { return representativeValue; }
@@ -288,6 +286,11 @@ public:
   /// Returns true if this TrackableValue is an alloc_stack from a transferring
   /// parameter.
   bool isTransferringParameter() const;
+
+  void printIsolationInfo(SmallString<64> &outString) const {
+    llvm::raw_svector_ostream os(outString);
+    getIsolationRegionInfo().printForDiagnostics(os);
+  }
 
   void print(llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
@@ -315,7 +318,6 @@ public:
   using Region = PartitionPrimitives::Region;
   using TrackableValue = regionanalysisimpl::TrackableValue;
   using TrackableValueState = regionanalysisimpl::TrackableValueState;
-  using TrackableValueID = Element;
   using RepresentativeValue = regionanalysisimpl::RepresentativeValue;
 
 private:
@@ -369,14 +371,14 @@ public:
       SILInstruction *introducingInst) const;
 
 private:
-  std::optional<TrackableValue> getValueForId(TrackableValueID id) const;
+  std::optional<TrackableValue> getValueForId(Element id) const;
   std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
   bool mergeIsolationRegionInfo(SILValue value, SILIsolationInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
-  TrackableValueID lookupValueID(SILValue value);
+  Element lookupValueID(SILValue value);
 };
 
 class RegionAnalysisFunctionInfo {

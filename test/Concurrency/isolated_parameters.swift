@@ -3,7 +3,6 @@
 
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser
-// REQUIRES: rdar126006489
 
 @available(SwiftStdlib 5.1, *)
 actor A {
