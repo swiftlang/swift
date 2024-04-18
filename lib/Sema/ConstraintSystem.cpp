@@ -1316,6 +1316,14 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
     return getFixedTypeRecursive(simplified, flags, wantRValue);
   }
 
+  if (auto metatype = type->getAs<AnyMetatypeType>()) {
+    auto simplified = simplifyType(type);
+    if (simplified.getPointer() == type.getPointer())
+      return type;
+
+    return getFixedTypeRecursive(simplified, flags, wantRValue);
+  }
+
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     if (auto fixed = getFixedType(typeVar))
       return getFixedTypeRecursive(fixed, flags, wantRValue);
@@ -2420,10 +2428,25 @@ Type constraints::typeEraseOpenedArchetypesWithRoot(
       /*force=*/true);
 }
 
+static bool isExistentialMemberAccessWithExplicitBaseExpression(
+    Type baseInstanceTy, ValueDecl *member, ConstraintLocator *locator,
+    bool isDynamicLookup) {
+  if (isDynamicLookup) {
+    return false;
+  }
+
+  // '.x' does not have an explicit base expression.
+  if (locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+    return false;
+  }
+
+  return baseInstanceTy->isExistentialType() &&
+         member->getDeclContext()->getSelfProtocolDecl();
+}
+
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
-    ConstraintLocator *locator, bool hasAppliedSelf,
-    bool isStaticMemberRefOnProtocol, bool isDynamicResult,
+    ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
     OpenedTypeMap &replacements) {
   Type type = openedType;
 
@@ -2450,7 +2473,7 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
   // Check if we need to apply a layer of optionality to the uncurried type.
   if (!isRequirementOrWitness(locator)) {
-    if (isDynamicResult || value->getAttrs().hasAttribute<OptionalAttr>()) {
+    if (isDynamicLookup || value->getAttrs().hasAttribute<OptionalAttr>()) {
       const auto applyOptionality = [&](FunctionType *fnTy) -> Type {
         Type resultTy;
         // Optional and dynamic subscripts are a special case, because the
@@ -2490,12 +2513,13 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     type = type->replaceSelfParameterType(baseObjTy);
   }
 
-  // Superficially, protocol members with an existential base are accessed
-  // directly on the existential, and not an opened archetype, and we may have
-  // to adjust the type of the reference (e.g. covariant 'Self' type-erasure) to
-  // support certain accesses.
-  if (!isStaticMemberRefOnProtocol && !isDynamicResult &&
-      baseObjTy->isExistentialType() && outerDC->getSelfProtocolDecl() &&
+  // From the user perspective, protocol members that are accessed with an
+  // existential base are accessed directly on the existential, and not an
+  // opened archetype, so the type of the member reference must be abstracted
+  // away (upcast) from context-specific types like `Self` in covariant
+  // position.
+  if (isExistentialMemberAccessWithExplicitBaseExpression(
+          baseObjTy, value, locator, isDynamicLookup) &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
     const auto selfGP = cast<GenericTypeParamType>(
@@ -2504,13 +2528,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
                                                TypePosition::Covariant);
-
-    Type contextualTy;
-
-    if (auto *anchor = getAsExpr(simplifyLocatorToAnchor(locator))) {
-      contextualTy =
-          getContextualType(getParentExpr(anchor), /*forConstraint=*/false);
-    }
   }
 
   // Construct an idealized parameter type of the initializer associated
@@ -2591,12 +2608,9 @@ bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
   return level < (baseTy->is<MetatypeType>() ? 1 : 2);
 }
 
-DeclReferenceType
-ConstraintSystem::getTypeOfMemberReference(
-    Type baseTy, ValueDecl *value, DeclContext *useDC,
-    bool isDynamicResult,
-    FunctionRefKind functionRefKind,
-    ConstraintLocator *locator,
+DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+    Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
+    FunctionRefKind functionRefKind, ConstraintLocator *locator,
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
@@ -2619,10 +2633,11 @@ ConstraintSystem::getTypeOfMemberReference(
   // metatype and `bar` is static member declared in a protocol  or its
   // extension.
   bool isStaticMemberRefOnProtocol = false;
-  if (resolvedBaseTy->is<MetatypeType>() && baseObjTy->isExistentialType() &&
-      value->isStatic()) {
-    isStaticMemberRefOnProtocol =
-        locator->isLastElement<LocatorPathElt::UnresolvedMember>();
+  if (baseObjTy->isExistentialType() && value->isStatic() &&
+      locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+    assert(resolvedBaseTy->is<MetatypeType>() &&
+           "Assumed base of unresolved member access must be a metatype");
+    isStaticMemberRefOnProtocol = true;
   }
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
@@ -2791,7 +2806,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // if it didn't conform.
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator));
-  } else if (!isDynamicResult) {
+  } else if (!isDynamicLookup) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
   }
 
@@ -2857,14 +2872,14 @@ ConstraintSystem::getTypeOfMemberReference(
   // Compute the type of the reference.
   Type type = getMemberReferenceTypeFromOpenedType(
       openedType, baseObjTy, value, outerDC, locator, hasAppliedSelf,
-      isStaticMemberRefOnProtocol, isDynamicResult, replacements);
+      isDynamicLookup, replacements);
 
   // Do the same thing for the original type, if there can be any difference.
   Type origType = type;
   if (openedType.getPointer() != origOpenedType.getPointer()) {
     origType = getMemberReferenceTypeFromOpenedType(
         origOpenedType, baseObjTy, value, outerDC, locator, hasAppliedSelf,
-        isStaticMemberRefOnProtocol, isDynamicResult, replacements);
+        isDynamicLookup, replacements);
   }
 
   // If we opened up any type variables, record the replacements.
@@ -4035,6 +4050,35 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 
   if (auto *decl = choice.getDeclOrNull()) {
+    // If this is an existential member access and adjustments were made to the
+    // member reference type, require that the constraint system is happy with
+    // the ensuing conversion.
+    if (auto baseTy = choice.getBaseType()) {
+      baseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
+      const auto instanceTy = baseTy->getMetatypeInstanceType();
+
+      if (isExistentialMemberAccessWithExplicitBaseExpression(
+              instanceTy, decl, locator,
+              /*isDynamicLookup=*/choice.getKind() ==
+                  OverloadChoiceKind::DeclViaDynamic)) {
+
+        // Strip curried 'self' parameters.
+        auto fromTy = openedType->castTo<AnyFunctionType>()->getResult();
+        auto toTy = refType;
+        if (!doesMemberRefApplyCurriedSelf(baseTy, decl)) {
+          toTy = toTy->castTo<AnyFunctionType>()->getResult();
+        }
+
+        if (!fromTy->isEqual(toTy)) {
+          ConstraintLocatorBuilder conversionLocator = locator;
+          conversionLocator = conversionLocator.withPathElement(
+              ConstraintLocator::ExistentialMemberAccessConversion);
+          addConstraint(ConstraintKind::Conversion, fromTy, toTy,
+                        conversionLocator);
+        }
+      }
+    }
+
     // If the declaration is unavailable, note that in the score.
     if (isDeclUnavailable(decl, locator))
       increaseScore(SK_Unavailable, locator);
@@ -6293,6 +6337,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
+    case ConstraintLocator::ExistentialMemberAccessConversion:
       break;
     }
 
