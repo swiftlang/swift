@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-sil \
 // RUN:     %s \
-// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -sil-verify-all \
 // RUN:     -verify

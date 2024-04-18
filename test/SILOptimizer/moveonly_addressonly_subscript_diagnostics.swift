@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -enable-upcoming-feature MoveOnlyPartialConsumption -sil-verify-all -verify %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature NoncopyableGenerics -enable-upcoming-feature MoveOnlyPartialConsumption -sil-verify-all -verify %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature NoncopyableGenerics -sil-verify-all -verify %s
 
 
 class CopyableKlass {}
