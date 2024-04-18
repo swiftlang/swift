@@ -1123,9 +1123,11 @@ func rdar17170728() {
   var j: Int?
   var k: Int? = 2
 
-  let _ = [i, j, k].reduce(0 as Int?) {
+  let _ = [i, j, k].reduce(0 as Int?) {  // expected-error {{missing argument label 'into:' in call}}
+    // expected-error@-1 {{cannot convert value of type 'Int?' to expected argument type '(inout @escaping (Bool, Bool) -> Bool?, Int?) throws -> ()'}}
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
+    // expected-error@-2 4 {{cannot force unwrap value of non-optional type 'Bool'}}
   }
 
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
@@ -1556,18 +1558,17 @@ func testNilCoalescingOperatorRemoveFix() {
   let _ = "" /* This is a comment */ ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{13-43=}}
 
   let _ = "" // This is a comment
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1558:13-1559:10=}}
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1560:13-1561:10=}}
 
   let _ = "" // This is a comment
     /*
      * The blank line below is part of the test case, do not delete it
      */
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1563:13-1567:10=}}
 
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1561:13-1566:10=}}
-
-  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1569:9=}}
+  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1570:9=}}
       "").isEmpty {}
 
   if ("" // This is a comment
-      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1571:9-1572:12=}}
+      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1572:9-1573:12=}}
 }
