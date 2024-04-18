@@ -36,6 +36,7 @@
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -226,7 +227,6 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   default:
     return false;
   case SILInstructionKind::BeginAccessInst:
-  case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::BridgeObjectToRefInst:
@@ -249,7 +249,6 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
-  case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::ProjectBlockStorageInst:
@@ -269,6 +268,12 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::InitExistentialValueInst:
     return true;
+  case SILInstructionKind::MoveValueInst:
+    // Look through if it isn't from a var decl.
+    return !cast<MoveValueInst>(inst)->isFromVarDecl();
+  case SILInstructionKind::BeginBorrowInst:
+    // Look through if it isn't from a var decl.
+    return !cast<BeginBorrowInst>(inst)->isFromVarDecl();
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
     assert(cast);
@@ -367,14 +372,23 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
 static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
-    return UnderlyingTrackedValueInfo(getUnderlyingTrackedObjectValue(value));
+    SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
+
+    if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
+      return UnderlyingTrackedValueInfo(underlyingValue);
+    }
+
+    // If we got an address, lets see if we can do even better by looking at the
+    // address.
+    value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
   }
+  assert(value->getType().isAddress());
 
   UseDefChainVisitor visitor;
   SILValue base = visitor.visitAll(value);
   assert(base);
   if (base->getType().isObject())
-    return {getUnderlyingObject(base), visitor.actorIsolation};
+    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
   return {base, visitor.actorIsolation};
 }
 
@@ -553,28 +567,6 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
   return *kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer;
 }
 
-static std::optional<ActorIsolation>
-getGlobalActorInitIsolation(SILFunction *fn) {
-  auto block = fn->begin();
-
-  // Make sure our function has a single block. We should always have a single
-  // block today. Return nullptr otherwise.
-  if (block == fn->end() || std::next(block) != fn->end())
-    return {};
-
-  GlobalAddrInst *gai = nullptr;
-  if (!match(cast<SILInstruction>(block->getTerminator()),
-             m_ReturnInst(m_AddressToPointerInst(m_GlobalAddrInst(gai)))))
-    return {};
-
-  auto *globalDecl = gai->getReferencedGlobal()->getDecl();
-  if (!globalDecl)
-    return {};
-
-  // See if our globalDecl is specifically guarded.
-  return getActorIsolation(globalDecl);
-}
-
 /// Returns true if this is a function argument that is able to be transferred
 /// in the body of our function.
 static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
@@ -609,27 +601,6 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
   // Otherwise, we only allow for the argument to be transferred if it is
   // explicitly marked as a strong transferring parameter.
   return arg->isTransferring();
-}
-
-//===----------------------------------------------------------------------===//
-//                           MARK: SILIsolationInfo
-//===----------------------------------------------------------------------===//
-
-void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
-  switch (Kind(*this)) {
-  case Unknown:
-    llvm::report_fatal_error("Printing unknown for diagnostics?!");
-    return;
-  case Disconnected:
-    os << "disconnected";
-    return;
-  case Actor:
-    getActorIsolation().printForDiagnostics(os);
-    return;
-  case Task:
-    os << "task-isolated";
-    return;
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1145,11 +1116,10 @@ struct PartitionOpBuilder {
     currentInstPartitionOps.clear();
   }
 
-  TrackableValueID lookupValueID(SILValue value);
+  Element lookupValueID(SILValue value);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
 
-  TrackableValueID
-  getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
+  Element getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
 
   void addAssignFresh(SILValue value) {
     currentInstPartitionOps.emplace_back(
@@ -1160,7 +1130,7 @@ struct PartitionOpBuilder {
     assert(valueHasID(src, /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
-    TrackableValueID srcID = lookupValueID(src);
+    Element srcID = lookupValueID(src);
     if (lookupValueID(tgt) == srcID) {
       LLVM_DEBUG(llvm::dbgs() << "    Skipping assign since tgt and src have "
                                  "the same representative.\n");
@@ -1501,7 +1471,7 @@ public:
     return partialApplyReachabilityDataflow.isReachable(value, inst);
   }
 
-  std::optional<TrackableValue> getValueForId(TrackableValueID id) const {
+  std::optional<TrackableValue> getValueForId(Element id) const {
     return valueMap.getValueForId(id);
   }
 
@@ -1542,7 +1512,7 @@ private:
     return valueMap.valueHasID(value, dumpIfHasNoID);
   }
 
-  TrackableValueID lookupValueID(SILValue value) {
+  Element lookupValueID(SILValue value) {
     return valueMap.lookupValueID(value);
   }
 
@@ -2288,11 +2258,11 @@ public:
 } // namespace regionanalysisimpl
 } // namespace swift
 
-TrackableValueID PartitionOpBuilder::lookupValueID(SILValue value) {
+Element PartitionOpBuilder::lookupValueID(SILValue value) {
   return translator->lookupValueID(value);
 }
 
-TrackableValueID PartitionOpBuilder::getActorIntroducingRepresentative(
+Element PartitionOpBuilder::getActorIntroducingRepresentative(
     SILIsolationInfo actorIsolation) {
   return translator
       ->getActorIntroducingRepresentative(currentInst, actorIsolation)
@@ -2332,17 +2302,17 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 
   // Now print out a translation from region to equivalence class value.
   llvm::dbgs() << " └─────╼ Used Values\n";
-  llvm::SmallVector<TrackableValueID, 8> opsToPrint;
+  llvm::SmallVector<Element, 8> opsToPrint;
   SWIFT_DEFER { opsToPrint.clear(); };
   for (const PartitionOp &op : ops) {
     // Now dump our the root value we map.
     for (unsigned opArg : op.getOpArgs()) {
       // If we didn't insert, skip this. We only emit this once.
-      opsToPrint.push_back(TrackableValueID(opArg));
+      opsToPrint.push_back(Element(opArg));
     }
   }
   sortUnique(opsToPrint);
-  for (TrackableValueID opArg : opsToPrint) {
+  for (Element opArg : opsToPrint) {
     llvm::dbgs() << "          └╼ ";
     auto trackableValue = translator->getValueForId(opArg);
     assert(trackableValue);
@@ -2412,8 +2382,6 @@ CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, AssignFresh)
 // example, a cast would be inappropriate here. This is implemented by
 // propagating the operand's region into the result's region and by
 // requiring all operands.
-CONSTANT_TRANSLATION(LoadInst, Assign)
-CONSTANT_TRANSLATION(LoadBorrowInst, Assign)
 CONSTANT_TRANSLATION(LoadWeakInst, Assign)
 CONSTANT_TRANSLATION(StrongCopyUnownedValueInst, Assign)
 CONSTANT_TRANSLATION(ClassMethodInst, Assign)
@@ -2461,7 +2429,6 @@ CONSTANT_TRANSLATION(TupleInst, Assign)
 // and whose operand and result are guaranteed to be mapped to the same
 // underlying region.
 CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
-CONSTANT_TRANSLATION(BeginBorrowInst, LookThrough)
 CONSTANT_TRANSLATION(BorrowedFromInst, LookThrough)
 CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
@@ -2474,7 +2441,6 @@ CONSTANT_TRANSLATION(InitEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(OpenExistentialAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedRefCastInst, LookThrough)
 CONSTANT_TRANSLATION(UpcastInst, LookThrough)
-CONSTANT_TRANSLATION(MoveValueInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUnresolvedNonCopyableValueInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUnresolvedReferenceBindingInst, LookThrough)
 CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperValueInst, LookThrough)
@@ -2742,6 +2708,37 @@ LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitMoveValueInst(MoveValueInst *mvi) {
+  if (mvi->isFromVarDecl())
+    return TranslationSemantics::Assign;
+  return TranslationSemantics::LookThrough;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitBeginBorrowInst(BeginBorrowInst *bbi) {
+  if (bbi->isFromVarDecl())
+    return TranslationSemantics::Assign;
+  return TranslationSemantics::LookThrough;
+}
+
+/// LoadInst is technically a statically look through instruction, but we want
+/// to handle it especially in the infrastructure, so we cannot mark it as
+/// such. This makes marking it as a normal lookthrough instruction impossible
+/// since the routine checks that invariant.
+TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *limvi) {
+  return TranslationSemantics::Special;
+}
+
+/// LoadBorrowInst is technically a statically look through instruction, but we
+/// want to handle it especially in the infrastructure, so we cannot mark it as
+/// such. This makes marking it as a normal lookthrough instruction impossible
+/// since the routine checks that invariant.
+TranslationSemantics
+PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
   if (ri->getFunction()->getLoweredFunctionType()->hasTransferringResult()) {
@@ -3202,7 +3199,7 @@ SILInstruction *RegionAnalysisValueMap::maybeGetActorIntroducingInst(
 }
 
 std::optional<TrackableValue>
-RegionAnalysisValueMap::getValueForId(TrackableValueID id) const {
+RegionAnalysisValueMap::getValueForId(Element id) const {
   auto iter = stateIndexToEquivalenceClass.find(id);
   if (iter == stateIndexToEquivalenceClass.end())
     return {};
@@ -3264,8 +3261,11 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // If we were able to find this was actor isolated from finding our
     // underlying object, use that. It is never wrong.
     if (info.actorIsolation) {
+      SILValue actorInstance =
+          info.value->getType().isAnyActor() ? info.value : SILValue();
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(value, *info.actorIsolation));
+          SILIsolationInfo::getActorIsolated(value, actorInstance,
+                                             *info.actorIsolation));
     }
 
     auto storage = AccessStorageWithBase::compute(value);
@@ -3277,90 +3277,23 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
         iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
       }
 
-      // Then see if the memory base is a ref_element_addr from an address. If
-      // so, add the actor derived flag.
-      //
-      // This is important so we properly handle setters.
-      if (auto *rei = dyn_cast<RefElementAddrInst>(storage.base)) {
-        auto *nomDecl =
-            rei->getOperand()->getType().getNominalOrBoundGenericNominal();
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(rei, nomDecl));
-      }
-
-      // See if the memory base is a global_addr from a global actor protected global.
-      if (auto *ga = dyn_cast<GlobalAddrInst>(storage.base)) {
-        if (auto *global = ga->getReferencedGlobal()) {
-          if (auto *globalDecl = global->getDecl()) {
-            auto isolation = getActorIsolation(globalDecl);
-            if (isolation.isGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getActorIsolated(ga, isolation));
-            }
-          }
-        }
+      if (auto isolation = SILIsolationInfo::get(storage.base)) {
+        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
       }
     }
   }
 
-  if (auto *defInst = value.getDefiningInstruction()) {
-    // Treat function ref as either actor isolated or sendable.
-    if (auto *fri = dyn_cast<FunctionRefInst>(defInst)) {
-      auto isolation = fri->getReferencedFunction()->getActorIsolation();
-      if (isolation.isActorIsolated()) {
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(value, isolation));
-        return {iter.first->first, iter.first->second};
-      }
-
-      // Otherwise, lets look at the AST and see if our function ref is from an
-      // autoclosure.
-      if (auto *autoclosure = fri->getLoc().getAsASTNode<AutoClosureExpr>()) {
-        if (auto *funcType = autoclosure->getType()->getAs<AnyFunctionType>()) {
-          if (funcType->hasGlobalActor()) {
-            if (funcType->hasGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getActorIsolated(
-                      fri, ActorIsolation::forGlobalActor(
-                               funcType->getGlobalActor())));
-              return {iter.first->first, iter.first->second};
-            }
-          }
-
-          if (auto *resultFType =
-                  funcType->getResult()->getAs<AnyFunctionType>()) {
-            if (resultFType->hasGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getActorIsolated(
-                      fri, ActorIsolation::forGlobalActor(
-                               resultFType->getGlobalActor())));
-              return {iter.first->first, iter.first->second};
-            }
-          }
-        }
-      }
-
-      iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+  // Treat function ref and class method as either actor isolated or
+  // sendable. Formally they are non-Sendable, so we do the check before we
+  // check the oracle.
+  if (isa<FunctionRefInst, ClassMethodInst>(value)) {
+    if (auto isolation = SILIsolationInfo::get(value)) {
+      iter.first->getSecond().mergeIsolationRegionInfo(isolation);
       return {iter.first->first, iter.first->second};
     }
 
-    if (auto *cmi = dyn_cast<ClassMethodInst>(defInst)) {
-      if (auto *declRefExpr = cmi->getLoc().getAsASTNode<DeclRefExpr>()) {
-        // See if we are actor isolated. If so, treat this as non-Sendable so we
-        // propagate actor isolation.
-        if (auto isolation = getActorIsolation(declRefExpr->getDecl())) {
-          if (isolation.isActorIsolated()) {
-            iter.first->getSecond().mergeIsolationRegionInfo(
-                SILIsolationInfo::getActorIsolated(cmi->getOperand(),
-                                                   isolation));
-            return {iter.first->first, iter.first->second};
-          }
-        }
-      }
-
-      iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
-      return {iter.first->first, iter.first->second};
-    }
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
   }
 
   // Otherwise refer to the oracle. If we have a Sendable value, just return.
@@ -3382,137 +3315,23 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     auto parentAddrInfo = getUnderlyingTrackedValue(svi);
     if (parentAddrInfo.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(svi,
+          SILIsolationInfo::getActorIsolated(svi, parentAddrInfo.value,
                                              *parentAddrInfo.actorIsolation));
     }
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
     if (storage.storage) {
-      if (auto *reai = dyn_cast<RefElementAddrInst>(storage.base)) {
-        auto *nomDecl = reai->getOperand()
-                            ->getType()
-                            .getNominalOrBoundGenericNominal();
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(reai->getOperand(), nomDecl));
+      if (auto isolation = SILIsolationInfo::get(storage.base)) {
+        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
       }
     }
+
+    return {iter.first->first, iter.first->second};
   }
 
-  // See if we have a struct_extract from a global actor isolated type.
-  if (auto *sei = dyn_cast<StructExtractInst>(iter.first->first.getValue())) {
-    iter.first->getSecond().mergeIsolationRegionInfo(
-        SILIsolationInfo::getActorIsolated(sei, sei->getStructDecl()));
-  }
-
-  // See if we have an unchecked_enum_data from a global actor isolated type.
-  if (auto *uedi =
-          dyn_cast<UncheckedEnumDataInst>(iter.first->first.getValue())) {
-    iter.first->getSecond().mergeIsolationRegionInfo(
-        SILIsolationInfo::getActorIsolated(uedi, uedi->getEnumDecl()));
-  }
-
-  // Handle a switch_enum from a global actor isolated type.
-  if (auto *arg = dyn_cast<SILPhiArgument>(iter.first->first.getValue())) {
-    if (auto *singleTerm = arg->getSingleTerminator()) {
-      if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
-        auto enumDecl =
-            swi->getOperand()->getType().getEnumOrBoundGenericEnum();
-        iter.first->getSecond().mergeIsolationRegionInfo(
-            SILIsolationInfo::getActorIsolated(arg, enumDecl));
-      }
-    }
-  }
-
-  // Check if we have an unsafeMutableAddressor from a global actor, mark the
-  // returned value as being actor derived.
-  if (auto applySite = FullApplySite::isa(iter.first->first.getValue())) {
-    if (auto *calleeFunction = applySite.getCalleeFunction()) {
-      if (calleeFunction->isGlobalInit()) {
-        auto isolation = getGlobalActorInitIsolation(calleeFunction);
-        if (isolation && isolation->isGlobalActor()) {
-          iter.first->getSecond().mergeIsolationRegionInfo(
-              // TODO: What to do about this.
-              SILIsolationInfo::getActorIsolated(SILValue(), *isolation));
-        }
-      }
-    }
-  }
-
-  // See if we have a non-transferring argument from a function. In such a case,
-  // mark the value as actor isolated if self is actor isolated and task
-  // isolated otherwise.
-  if (auto *fArg =
-          dyn_cast<SILFunctionArgument>(iter.first->first.getValue())) {
-    if (!isTransferrableFunctionArgument(fArg)) {
-      iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::get(fArg));
-      return {iter.first->first, iter.first->second};
-    }
-  }
-
-  // See if we have a convert function from a Sendable actor isolated function,
-  // we want to treat the result of the convert function as being actor isolated
-  // so that we cannot escape the value.
-  //
-  // NOTE: At this point, we already know that cfi's result is not sendable,
-  // since we would have exited above already.
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(iter.first->first.getValue())) {
-    SILValue operand = cfi->getOperand();
-    if (operand->getType().getAs<SILFunctionType>()->isSendable()) {
-      SILValue newValue = operand;
-      do {
-        operand = newValue;
-
-        newValue = lookThroughOwnershipInsts(operand);
-        if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(newValue)) {
-          newValue = ttfi->getOperand();
-        }
-
-        if (auto *cfi = dyn_cast<ConvertFunctionInst>(newValue)) {
-          newValue = cfi->getOperand();
-        }
-
-        if (auto *pai = dyn_cast<PartialApplyInst>(newValue)) {
-          newValue = pai->getCallee();
-        }
-      } while (newValue != operand);
-
-      if (auto *ai = dyn_cast<ApplyInst>(operand)) {
-        if (auto *callExpr = ai->getLoc().getAsASTNode<ApplyExpr>()) {
-          if (auto *callType = callExpr->getType()->getAs<AnyFunctionType>()) {
-            if (callType->hasGlobalActor()) {
-              iter.first->getSecond().mergeIsolationRegionInfo(
-                  SILIsolationInfo::getGlobalActorIsolated(
-                      ai, callType->getGlobalActor()));
-              return {iter.first->first, iter.first->second};
-            }
-          }
-        }
-      }
-
-      if (auto *fri = dyn_cast<FunctionRefInst>(operand)) {
-        if (auto actorIsolation =
-                fri->getReferencedFunction()->getActorIsolation()) {
-          if (actorIsolation.isActorIsolated()) {
-            iter.first->getSecond().mergeIsolationRegionInfo(
-                SILIsolationInfo::getActorIsolated(fri, actorIsolation));
-            return {iter.first->first, iter.first->second};
-          }
-        }
-
-        // See if the function ref statically is known to have actor isolation.
-        //
-        // TODO: We should make it so that the closure constructed has actor
-        // isolation.
-        if (auto value = tryToTrackValue(fri)) {
-          auto isolation = value->getIsolationRegionInfo();
-          if (isolation.isActorIsolated()) {
-            iter.first->getSecond().mergeIsolationRegionInfo(isolation);
-            return {iter.first->first, iter.first->second};
-          }
-        }
-      }
-    }
+  // Ok, we have a non-Sendable type, attempt to infer its isolation.
+  if (auto isolation = SILIsolationInfo::get(iter.first->first.getValue())) {
+    iter.first->getSecond().mergeIsolationRegionInfo(isolation);
   }
 
   return {iter.first->first, iter.first->second};
@@ -3579,7 +3398,7 @@ bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
   return hasID;
 }
 
-TrackableValueID RegionAnalysisValueMap::lookupValueID(SILValue value) {
+Element RegionAnalysisValueMap::lookupValueID(SILValue value) {
   auto state = getTrackableValue(value);
   assert(state.isNonSendable() &&
          "only non-Sendable values should be entered in the map");

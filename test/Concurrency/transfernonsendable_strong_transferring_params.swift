@@ -160,7 +160,7 @@ actor MyActor {
   func assignTransferringIntoActor2(_ x: transferring Klass) async {
     field = x
     await transferToMain(x) // expected-warning {{transferring 'x' may cause a data race}}
-    // expected-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-note @-1 {{transferring 'self'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
   }
 }
 
@@ -185,13 +185,34 @@ func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
 }
 
 func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
+  let _ = x
+  await transferToMain(x)
+  // We do not error here since we just load the value and do not do anything
+  // with it.
+  //
+  // TODO: We should change let _ = x so that it has a move_value '_' or
+  // something like that. It will also help move checking as well.
+  let _ = x
+}
 
+func canTransferAssigningIntoLocal2a(_ x: transferring Klass) async {
+  let _ = x
+  await transferToMain(x)
+  // We do not error here since we just load the value and do not do anything
+  // with it.
+  //
+  // TODO: We should change let _ = x so that it has a move_value '_' or
+  // something like that. It will also help move checking as well.
+  _ = x
+}
+
+func canTransferAssigningIntoLocal3(_ x: transferring Klass) async {
   let _ = x
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a data race}}
   // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  let _ = x // expected-note {{use here could race}}
+  let y = x // expected-note {{use here could race}}
+  _ = y
 }
-
 
 //////////////////////////////////////
 // MARK: Transferring is "var" like //
