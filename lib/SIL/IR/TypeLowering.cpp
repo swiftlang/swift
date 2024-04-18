@@ -3085,6 +3085,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     // (7) being or containing a variadic generic type which doesn't conform
     //     unconditionally but does in this case
     // (8) being or containing the error type
+    // (9) explicitly suppressing conformance
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3099,6 +3100,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // non-conformance; walk into the rest.
           if (!nominal)
             return false;
+
+          // A trivial type that suppresses conformance doesn't conform (case
+          // (9)).
+          if (nominal && nominal->suppressesConformance(
+                             KnownProtocolKind::BitwiseCopyable)) {
+            return true;
+          }
 
           // Nominals with fields that are generic may not conform
           // unconditionally (the only kind automatically derived currently)
@@ -3178,6 +3186,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                 << "of " << origType << "\n";
             assert(false);
             return true;
+          }
+
+          // A trivial type that suppresses conformance doesn't conform (case
+          // (9)).
+          if (nominal->suppressesConformance(
+                  KnownProtocolKind::BitwiseCopyable)) {
+            return false;
           }
 
           // A generic type may be trivial when instantiated with particular
