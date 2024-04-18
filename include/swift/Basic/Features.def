@@ -346,6 +346,9 @@ EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 /// Enable bitwise-copyable feature.
 EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
 
+/// Enable the suppression of inferred, non-invertible, protocols via ~.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ConformanceSuppression, true)
+
 /// Enables the FixedArray data type.
 EXPERIMENTAL_FEATURE(FixedArrays, true)
 

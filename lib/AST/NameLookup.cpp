@@ -3212,7 +3212,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     unsigned index) const {
 
   // Prefer syntactic information when we have it.
-  const TypeLoc &typeLoc = InheritedTypes(decl).getEntry(index);
+  const InheritedEntry &typeLoc = InheritedTypes(decl).getEntry(index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
@@ -3861,6 +3861,7 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   SourceLoc uncheckedLoc;
   SourceLoc preconcurrencyLoc;
   auto inheritedTypes = InheritedTypes(decl);
+  bool isSuppressed = inheritedTypes.getEntry(i).isSuppressed();
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
     uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
@@ -3869,7 +3870,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc, uncheckedLoc, preconcurrencyLoc});
+    result.push_back(
+        {nominal, loc, uncheckedLoc, preconcurrencyLoc, isSuppressed});
   }
 }
 
@@ -3899,9 +3901,9 @@ swift::getDirectlyInheritedNominalTypeDecls(
   for (auto attr :
        protoDecl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     auto loc = attr->getLocation();
-    result.push_back({attr->getProtocol(), loc,
-                      attr->isUnchecked() ? loc : SourceLoc(),
-                      /*preconcurrencyLoc=*/SourceLoc()});
+    result.push_back(
+        {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc(),
+         /*preconcurrencyLoc=*/SourceLoc(), /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -3912,7 +3914,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(), SourceLoc());
+    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(), SourceLoc(),
+                        /*isSuppressed=*/false);
 
   return result;
 }
