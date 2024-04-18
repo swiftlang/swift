@@ -163,6 +163,11 @@ public:
   // to ensure there's no parsing performance regression.
   bool EnabledNoncopyableGenerics;
 
+  bool canSuppressConformancesWithTilde() const {
+    return EnabledNoncopyableGenerics ||
+           Context.LangOpts.hasFeature(Feature::ConformanceSuppression);
+  }
+
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;

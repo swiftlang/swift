@@ -163,10 +163,8 @@ protected:
   }
 
   /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencyInfo> scanModuleFile(Twine modulePath,
-                                                     bool isFramework,
-                                                     bool isTestableImport,
-                                                     bool hasInterface);
+  llvm::ErrorOr<ModuleDependencyInfo>
+  scanModuleFile(Twine modulePath, bool isFramework, bool isTestableImport);
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
@@ -176,7 +174,7 @@ protected:
   static BinaryModuleImports
   getImportsOfModule(const ModuleFileSharedCore &loadedModule,
                      ModuleLoadingBehavior transitiveBehavior,
-                     StringRef packageName);
+                     StringRef packageName, bool isTestableImport);
 
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
