@@ -1660,11 +1660,12 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     if (exn->getType().isAddress()) {
       B.createCopyAddr(loc, exn, indirectErrorAddr,
                        IsTake, IsInitialization);
-    } else {
-      // An indirect error is written into the destination error address.
-      emitSemanticStore(loc, exn, indirectErrorAddr,
-                        getTypeLowering(destErrorType), IsInitialization);
     }
+    
+    // If the error is represented as a value, then we should forward it into
+    // the indirect error return slot. We have to wait to do that until after
+    // we pop cleanups, though, since the value may have a borrow active in
+    // scope that won't be released until the cleanups pop.
   } else if (!throwBB.getArguments().empty()) {
     // Load if we need to.
     if (exn->getType().isAddress()) {
@@ -1680,5 +1681,16 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   }
 
   // Branch to the cleanup destination.
-  Cleanups.emitBranchAndCleanups(ThrowDest, loc, args, IsForUnwind);
+  Cleanups.emitCleanupsForBranch(ThrowDest, loc, args, IsForUnwind);
+  
+  if (indirectErrorAddr && !exn->getType().isAddress()) {
+    // Forward the error value into the return slot now. This has to happen
+    // after emitting cleanups because the active scope may be borrowing the
+    // error value, and we can't forward ownership until those borrows are
+    // released.
+    emitSemanticStore(loc, exn, indirectErrorAddr,
+                      getTypeLowering(destErrorType), IsInitialization);
+  }
+  
+  getBuilder().createBranch(loc, ThrowDest.getBlock(), args);
 }
