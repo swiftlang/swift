@@ -262,10 +262,6 @@ public:
   void emitVTable() {
     PrettyStackTraceDecl("silgen emitVTable", theClass);
 
-    // Imported types don't have vtables right now.
-    if (theClass->hasClangNode())
-      return;
-
     // Populate our list of base methods and overrides.
     visitAncestor(theClass);
 
@@ -317,6 +313,10 @@ public:
   }
 
   void visitAncestor(ClassDecl *ancestor) {
+    // Imported types don't have vtables right now.
+    if (ancestor->hasClangNode())
+      return;
+
     auto *superDecl = ancestor->getSuperclassDecl();
     if (superDecl)
       visitAncestor(superDecl);
@@ -1153,8 +1153,10 @@ public:
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
-      SILGenVTable genVTable(SGM, theClass);
-      genVTable.emitVTable();
+      if (!theClass->hasClangNode()) {
+        SILGenVTable genVTable(SGM, theClass);
+        genVTable.emitVTable();
+      }
     }
 
     // If this is a nominal type that is move only, emit a deinit table for it.
