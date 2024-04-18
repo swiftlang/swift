@@ -377,7 +377,7 @@ EXPERIMENTAL_FEATURE(ObjCImplementation, true)
 EXPERIMENTAL_FEATURE(CImplementation, true)
 
 // Enable the stdlib @DebugDescription macro.
-EXPERIMENTAL_FEATURE(DebugDescriptionMacro, false)
+EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
