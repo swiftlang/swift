@@ -33,6 +33,11 @@ extension TaskLocalMacro: PeerMacro {
       return []
     }
 
+    guard varDecl.bindings.count == 1 else {
+      throw DiagnosticsError(
+        syntax: declaration,
+        message: "'@TaskLocal' property must have exactly one binding", id: .incompatibleDecl)
+    }
     guard let firstBinding = varDecl.bindings.first else {
       throw DiagnosticsError(
         syntax: declaration,
@@ -46,18 +51,18 @@ extension TaskLocalMacro: PeerMacro {
     }
 
     let type = firstBinding.typeAnnotation?.type
-    let explicitType: String
+    let explicitTypeAnnotation: TypeAnnotationSyntax?
     if let type {
-      explicitType = ": TaskLocal<\(type.trimmed)>"
+      explicitTypeAnnotation = TypeAnnotationSyntax(type: TypeSyntax("TaskLocal<\(type.trimmed)>"))
     } else {
-      explicitType = ""
+      explicitTypeAnnotation = nil
     }
 
-    let initialValue: Any
+    let initialValue: ExprSyntax
     if let initializerValue = firstBinding.initializer?.value {
-      initialValue = initializerValue
+      initialValue = ExprSyntax(initializerValue)
     } else if let type, type.isOptional {
-      initialValue = "nil"
+      initialValue = ExprSyntax(NilLiteralExprSyntax())
     } else {
       throw DiagnosticsError(
         syntax: declaration,
@@ -66,16 +71,16 @@ extension TaskLocalMacro: PeerMacro {
 
     // If the property is global, do not prefix the synthesised decl with 'static'
     let isGlobal = context.lexicalContext.isEmpty
-    let staticKeyword: String
+    let staticKeyword: TokenSyntax?
     if isGlobal {
-      staticKeyword = ""
+      staticKeyword = nil
     } else {
-      staticKeyword = "static "
+      staticKeyword = TokenSyntax.keyword(.static, trailingTrivia: .space)
     }
 
     return [
       """
-      \(raw: staticKeyword)let $\(name)\(raw: explicitType) = TaskLocal(wrappedValue: \(raw: initialValue))
+      \(staticKeyword)let $\(name)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
       """
     ]
   }
@@ -96,11 +101,11 @@ extension TaskLocalMacro: AccessorMacro {
     try requireStaticContext(varDecl, in: context)
 
     guard let firstBinding = varDecl.bindings.first else {
-      return [] // TODO: make error
+      return []
     }
 
     guard let name = firstBinding.pattern.as(IdentifierPatternSyntax.self)?.identifier else {
-      return [] // TODO: make error
+      return []
     }
 
     return ["get { $\(name).get() }"]
@@ -142,7 +147,7 @@ private func requireStaticContext(_ decl: VariableDeclSyntax,
   if diagnose {
     throw DiagnosticsError(
       syntax: decl,
-      message: "'@TaskLocal' can only be applied to 'static' property", id: .mustBeStatic)
+      message: "'@TaskLocal' can only be applied to 'static' property, or global variables", id: .mustBeStatic)
   }
 
   return false
@@ -153,10 +158,19 @@ extension TypeSyntax {
   // has no type information, but at least for the common case for Optional<T>
   // and T? we can detect the optional.
   fileprivate var isOptional: Bool {
-    let strRepr = "\(self)"
-    return strRepr.last == "?" ||
-      strRepr.starts(with: "Optional<") ||
-      strRepr.starts(with: "Swift.Optional<")
+    switch self.as(TypeSyntaxEnum.self) {
+    case .optionalType:
+      return true
+    case .identifierType(let identifierType):
+      return identifierType.name.text == "Optional"
+    case .memberType(let memberType):
+      guard let baseIdentifier = memberType.baseType.as(IdentifierTypeSyntax.self),
+            baseIdentifier.name.text == "Swift" else {
+        return false
+      }
+      return memberType.name.text == "Optional"
+    default: return false
+    }
   }
 }
 
@@ -185,8 +199,8 @@ struct TaskLocalMacroDiagnostic: DiagnosticMessage {
 }
 
 extension DiagnosticsError {
-  init<S: SyntaxProtocol>(
-    syntax: S,
+  init(
+    syntax: some SyntaxProtocol,
     message: String,
     domain: String = "Swift",
     id: TaskLocalMacroDiagnostic.ID,
