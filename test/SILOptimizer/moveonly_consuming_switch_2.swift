@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BorrowingSwitch -enable-upcoming-feature MoveOnlyPartialConsumption -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BorrowingSwitch -verify %s
 
 struct Box: ~Copyable {
     let ptr: UnsafeMutablePointer<Int>
