@@ -33,3 +33,15 @@ protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
+
+// Macro should be able to handle complex properties
+@_DistributedProtocol
+public protocol GetSet: DistributedActor, Sendable
+  where ActorSystem: DistributedActorSystem<any Codable> {
+
+  distributed var dist: String { get }
+
+  var getSet: String { get set }
+
+  var asyncGetSet: String { get async throws }
+}

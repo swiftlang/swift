@@ -31,3 +31,12 @@ protocol Fail: DistributedActor {
   distributed func method() -> String
 }
 
+@_DistributedProtocol // expected-note{{in expansion of macro '_DistributedProtocol' on protocol 'SomeRoot' here}}
+public protocol SomeRoot: DistributedActor, Sendable
+  where ActorSystem: DistributedActorSystem<any Codable> {
+
+  // TODO(distributed): we could diagnose this better?
+  associatedtype AssociatedSomething: Sendable // expected-note{{protocol requires nested type 'AssociatedSomething'; add nested type 'AssociatedSomething' for conformance}}
+  static var staticValue: String { get }
+  var value: String { get }
+}

@@ -49,6 +49,14 @@ extension DistributedProtocolMacro {
 
     let requirementStubs =
       proto.memberBlock.members // requirements
+        .filter { member in
+          switch member.decl.kind {
+          case .functionDecl: return true
+          case .variableDecl: return true
+          default:
+            return false
+          }
+        }
         .map { member in
           stubMethodDecl(access: accessModifiers, member.trimmed)
         }
@@ -66,12 +74,22 @@ extension DistributedProtocolMacro {
   static func stubMethodDecl(access: String, _ requirement: MemberBlockItemListSyntax.Element) -> String {
     // do we need to stub a computed variable?
     if let variable = requirement.decl.as(VariableDeclSyntax.self) {
-      // TODO(distributed): improve stubbing computed properties of all kinds
+      var accessorStubs: [String] = []
+
+      for binding in variable.bindings {
+        if let accessorBlock = binding.accessorBlock {
+          for accessor in accessorBlock.accessors.children(viewMode: .all) {
+            let accessorStub = "\(accessor) { \(stubFunctionBody()) }"
+            accessorStubs.append(accessorStub)
+          }
+        }
+      }
+
       let name = variable.bindings.first!.pattern.trimmed
       let typeAnnotation = variable.bindings.first?.typeAnnotation.map { "\($0.trimmed)" } ?? "Any"
       return """
              \(access)\(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
-               \(stubFunctionBody())
+               \(accessorStubs.joined(separator: "\n  "))
              }
              """
     }
