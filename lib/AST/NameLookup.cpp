@@ -2293,7 +2293,7 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
     // makes this decl visible.
     if (decl->getDeclContext()->getParentModule() != dc->getParentModule() &&
         dc->getASTContext().LangOpts.hasFeature(
-            Feature::ExtensionImportVisibility) &&
+            Feature::MemberImportVisibility) &&
         !decl->findImport(dc))
       return false;
   }
