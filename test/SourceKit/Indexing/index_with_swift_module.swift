@@ -28,5 +28,5 @@ func foo(a: TwoInts) {
 // CHECK-NEXT: key.usr: "s:11test_module7TwoIntsC"
 
 // RUN: %sourcekitd-test -req=index %S/Inputs/Swift.swiftmodule | %FileCheck %s -check-prefix=CHECK-SWIFT1
-// CHECK-SWIFT1-DAG: key.groupname: "Bool"
-// CHECK-SWIFT1-DAG: key.groupname: "Collection"
+// CHECK-SWIFT1-DAG: key.groupname: "Array"
+// CHECK-SWIFT1-DAG: key.groupname: "Sequences+Collections"

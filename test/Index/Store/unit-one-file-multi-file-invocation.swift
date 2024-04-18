@@ -18,7 +18,7 @@
 
 // CHECK: [[SWIFT]]
 // CHECK: DEPEND START
-// CHECK: Record | system | Swift.Math.Floating | [[MODULE]] | {{.+}}.swiftinterface_Math_Floating-{{.*}}
+// CHECK: Record | system | Swift.Floats | [[MODULE]] | {{.+}}.swiftinterface_Floats-{{.*}}
 // CHECK: Record | system | Swift.String | [[MODULE]] | {{.+}}.swiftinterface_String-{{.*}}
 // CHECK: DEPEND END
 

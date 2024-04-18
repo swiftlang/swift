@@ -484,17 +484,6 @@ The standard library cannot import the Darwin module (much less an ICU module), 
 
 The standard library has an internal array type of fixed size 16. This provides fast random access into contiguous (usually stack-allocated) memory. See [FixedArray.swift](https://github.com/apple/swift/blob/main/stdlib/public/core/FixedArray.swift) for implementation.
 
-#### Thread Local Storage
-
-The standard library utilizes thread local storage (TLS) to cache expensive computations or operations in a thread-safe fashion. This is currently used for tracking some ICU state for Strings. Adding new things to this struct is a little more involved, as Swift lacks some of the features required for it to be expressed elegantly (e.g. move-only structs):
-
-1. Add the new member to `_ThreadLocalStorage` and a static `getMyNewMember` method to access it. `getMyNewMember` should be implemented using `getPointer`.
-2. If the member is not trivially initializable, update `_initializeThreadLocalStorage` and `_ThreadLocalStorage.init`.
-3. If the field is not trivially destructable, update `_destroyTLS` to properly destroy the value.
-
-See [ThreadLocalStorage.swift](https://github.com/apple/swift/blob/main/stdlib/public/core/ThreadLocalStorage.swift) for more details.
-
-
 ## Working with Resilience
 
 Maintaining ABI compatibility with previously released versions of the standard library makes things more complicated. This section details some of the extra rules to remember and patterns to use.
