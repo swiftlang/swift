@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 // UNSUPPORTED: use_os_stdlib
 
 // rdar://77087867
