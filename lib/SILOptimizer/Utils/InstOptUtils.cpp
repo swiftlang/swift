@@ -1836,6 +1836,9 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   // Fix the op_deref.
   if (!isa<CopyAddrInst>(SI) && VarInfo->DIExpr.startsWithDeref())
     VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
+  else if (isa<CopyAddrInst>(SI) && !VarInfo->DIExpr.startsWithDeref())
+    VarInfo->DIExpr.prependElements({
+      SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
   // Note: The instruction should logically be in the SI's scope.
   // However, LLVM does not support variables and stores in different scopes,
   // so we use the variable's scope.
