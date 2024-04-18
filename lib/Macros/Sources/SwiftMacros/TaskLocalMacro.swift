@@ -14,7 +14,10 @@ import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
 
-// TODO: docs
+/// Macro implementing the TaskLocal functionality.
+///
+/// It introduces a peer `static let $name: TaskLocal<Type>` as well as a getter
+/// that assesses accesses the task local storage.
 public enum TaskLocalMacro {}
 
 extension TaskLocalMacro: PeerMacro {
@@ -26,25 +29,29 @@ extension TaskLocalMacro: PeerMacro {
     guard let varDecl = try requireVar(declaration, diagnose: false) else {
       return []
     }
-    guard try requireModifier(varDecl, .static, diagnose: false) else {
+    guard try requireStaticContext(varDecl, in: context, diagnose: false) else {
       return []
     }
 
     guard let firstBinding = varDecl.bindings.first else {
-      return [] // TODO: make error
+      throw DiagnosticsError(
+        syntax: declaration,
+        message: "'@TaskLocal' property must have declared binding", id: .incompatibleDecl)
     }
 
     guard let name = firstBinding.pattern.as(IdentifierPatternSyntax.self)?.identifier else {
-      return [] // TODO: make error
+      throw DiagnosticsError(
+        syntax: declaration,
+        message: "'@TaskLocal' property must have name", id: .incompatibleDecl)
     }
 
     let type = firstBinding.typeAnnotation?.type
-    let explicitType: String =
-      if let type {
-        ": TaskLocal<\(type.trimmed)>"
-      } else {
-        ""
-      }
+    let explicitType: String
+    if let type {
+      explicitType = ": TaskLocal<\(type.trimmed)>"
+    } else {
+      explicitType = ""
+    }
 
     let initialValue: Any
     if let initializerValue = firstBinding.initializer?.value {
@@ -57,9 +64,18 @@ extension TaskLocalMacro: PeerMacro {
         message: "'@TaskLocal' property must have default value, or be optional", id: .mustBeVar)
     }
 
+    // If the property is global, do not prefix the synthesised decl with 'static'
+    let isGlobal = context.lexicalContext.isEmpty
+    let staticKeyword: String
+    if isGlobal {
+      staticKeyword = ""
+    } else {
+      staticKeyword = "static "
+    }
+
     return [
       """
-      static let $\(name)\(raw: explicitType) = TaskLocal(wrappedValue: \(raw: initialValue))
+      \(raw: staticKeyword)let $\(name)\(raw: explicitType) = TaskLocal(wrappedValue: \(raw: initialValue))
       """
     ]
   }
@@ -77,7 +93,7 @@ extension TaskLocalMacro: AccessorMacro {
     guard let varDecl = try requireVar(declaration) else {
       return []
     }
-    try requireModifier(varDecl, .static)
+    try requireStaticContext(varDecl, in: context)
 
     guard let firstBinding = varDecl.bindings.first else {
       return [] // TODO: make error
@@ -107,24 +123,29 @@ private func requireVar(_ decl: some DeclSyntaxProtocol,
 }
 
 @discardableResult
-private func requireModifier(_ decl: VariableDeclSyntax,
-                             _ keyword: Keyword,
-                             diagnose: Bool = true) throws -> Bool {
+private func requireStaticContext(_ decl: VariableDeclSyntax,
+                                  in context: some MacroExpansionContext,
+                                  diagnose: Bool = true) throws -> Bool {
   let isStatic = decl.modifiers.contains { modifier in
-    modifier.name.text == "\(keyword)"
+    modifier.name.text == "\(Keyword.static)"
   }
 
-  if !isStatic {
-    if diagnose {
-      throw DiagnosticsError(
-        syntax: decl,
-        message: "'@TaskLocal' can only be applied to 'static' property", id: .mustBeStatic)
-    } else {
-      return false
-    }
+  if isStatic {
+    return true
   }
 
-  return true
+  let isGlobal = context.lexicalContext.isEmpty
+  if isGlobal {
+    return true
+  }
+
+  if diagnose {
+    throw DiagnosticsError(
+      syntax: decl,
+      message: "'@TaskLocal' can only be applied to 'static' property", id: .mustBeStatic)
+  }
+
+  return false
 }
 
 extension TypeSyntax {
@@ -141,8 +162,9 @@ extension TypeSyntax {
 
 struct TaskLocalMacroDiagnostic: DiagnosticMessage {
   enum ID: String {
-    case mustBeStatic = "must be static"
     case mustBeVar = "must be var"
+    case mustBeStatic = "must be static"
+    case incompatibleDecl = "incompatible declaration"
   }
 
   var message: String
