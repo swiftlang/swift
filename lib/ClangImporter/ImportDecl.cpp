@@ -2650,11 +2650,12 @@ namespace {
         return nullptr;
       }
 
-      // Bail if this is `std::tzdb`. This type causes issues in copy
+      // Bail if this is `std::chrono::tzdb`. This type causes issues in copy
       // constructor instantiation.
       // FIXME: https://github.com/apple/swift/issues/73037
-      if (decl->isInStdNamespace() && decl->getIdentifier() &&
-          decl->getName() == "tzdb")
+      if (decl->getDeclContext()->isNamespace() &&
+          decl->getDeclContext()->getParent()->isStdNamespace() &&
+          decl->getIdentifier() && decl->getName() == "tzdb")
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
