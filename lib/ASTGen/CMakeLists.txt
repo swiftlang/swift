@@ -94,17 +94,9 @@ foreach(c_include_path ${c_include_paths})
   list(APPEND c_include_paths_args "SHELL: -Xcc -I -Xcc ${c_include_path}")
 endforeach()
 
-# Prior to 5.9, we have to use the experimental flag for C++ interop.
-if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-  set(cxx_interop_flag "-enable-experimental-cxx-interop")
-else()
-  set(cxx_interop_flag "-cxx-interoperability-mode=default")
-endif()
-
 set(compile_options
   ${c_include_paths_args}
   "SHELL: -DRESILIENT_SWIFT_SYNTAX"
-  "SHELL: ${cxx_interop_flag}"
   "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
 
   # FIXME: Needed to work around an availability issue with CxxStdlib
@@ -115,6 +107,13 @@ set(compile_options
 
   "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
 )
+
+# Prior to 5.9, we have to use the experimental flag for C++ interop.
+if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+  list(APPEND compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
+else()
+  list(APPEND compile_options "-cxx-interoperability-mode=default")
+endif()
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
   foreach(target swiftASTGen swiftLLVMJSON swiftIDEUtilsBridging)
