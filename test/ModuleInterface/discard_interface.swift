@@ -8,6 +8,7 @@
 // CHECK: @_alwaysEmitIntoClient public consuming func AEIC_discard() { discard self }
 // CHECK: @inlinable public consuming func inlinable_discard() { discard self }
 
+@_disallowFeatureSuppression(NoncopyableGenerics)
 public struct MoveOnlyStruct: ~Copyable {
   let x = 0
 
