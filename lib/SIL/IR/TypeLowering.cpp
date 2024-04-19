@@ -4312,6 +4312,20 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
     collectCaptures(curFn.getCaptureInfo());
 
+    if (auto *afd = curFn.getAbstractFunctionDecl()) {
+      // If a local function inherits isolation from the enclosing context,
+      // make sure we capture the isolated parameter, if we haven't already.
+      if (afd->isLocalCapture()) {
+        auto actorIsolation = getActorIsolation(afd);
+        if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
+          if (auto *var = actorIsolation.getActorInstance()) {
+            assert(isa<ParamDecl>(var));
+            recordCapture(CapturedValue(var, 0, afd->getLoc()));
+          }
+        }
+      }
+    }
+
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
     // are referenced too.
