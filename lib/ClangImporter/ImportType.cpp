@@ -2609,7 +2609,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {
       paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
-      paramInfo->setDefaultExpr(defaultArgExpr, /*isTypeChecked*/ true);
+      paramInfo->setTypeCheckedDefaultExpr(defaultArgExpr);
       paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");
     }
   }

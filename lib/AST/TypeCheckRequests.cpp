@@ -1299,7 +1299,7 @@ std::optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
 
 void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
   auto *param = std::get<0>(getStorage());
-  param->setDefaultExpr(expr, /*isTypeChecked*/ true);
+  param->setTypeCheckedDefaultExpr(expr);
 }
 
 //----------------------------------------------------------------------------//
