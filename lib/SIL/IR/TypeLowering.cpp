@@ -4139,11 +4139,21 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
 
-  std::function<void (CaptureInfo captureInfo, DeclContext *dc)> collectCaptures;
+  std::function<void (CaptureInfo captureInfo)> collectCaptures;
   std::function<void (AnyFunctionRef)> collectFunctionCaptures;
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
-  collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
+  auto recordCapture = [&](CapturedValue capture) {
+    ValueDecl *value = capture.getDecl();
+    auto existing = captures.find(value);
+    if (existing != captures.end()) {
+      existing->second = existing->second.mergeFlags(capture);
+    } else {
+      captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
+    }
+  };
+
+  collectCaptures = [&](CaptureInfo captureInfo) {
     assert(captureInfo.hasBeenComputed());
 
     if (captureInfo.hasGenericParamCaptures())
@@ -4288,13 +4298,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       }
 
       // Collect non-function captures.
-      ValueDecl *value = capture.getDecl();
-      auto existing = captures.find(value);
-      if (existing != captures.end()) {
-        existing->second = existing->second.mergeFlags(capture);
-      } else {
-        captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
-      }
+      recordCapture(capture);
     }
   };
 
@@ -4306,8 +4310,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       return;
 
     PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
-    auto dc = curFn.getAsDeclContext();
-    collectCaptures(curFn.getCaptureInfo(), dc);
+    collectCaptures(curFn.getCaptureInfo());
 
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
@@ -4318,7 +4321,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (auto *AFD = curFn.getAbstractFunctionDecl()) {
       for (auto *P : *AFD->getParameters()) {
         if (P->hasDefaultExpr())
-          collectCaptures(P->getDefaultArgumentCaptureInfo(), dc);
+          collectCaptures(P->getDefaultArgumentCaptureInfo());
       }
     }
   };
@@ -4331,10 +4334,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(curFn.getDecl())) {
         auto *param = getParameterAt(static_cast<ValueDecl *>(afd),
                                      curFn.defaultArgIndex);
-        if (param->hasDefaultExpr()) {
-          auto dc = afd->getInnermostDeclContext();
-          collectCaptures(param->getDefaultArgumentCaptureInfo(), dc);
-        }
+        if (param->hasDefaultExpr())
+          collectCaptures(param->getDefaultArgumentCaptureInfo());
         return;
       }
 
