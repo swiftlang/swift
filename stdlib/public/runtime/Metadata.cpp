@@ -25,6 +25,7 @@
 #include "MetadataCache.h"
 #include "BytecodeLayouts.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
@@ -3974,60 +3975,54 @@ swift::swift_updateClassMetadata2(ClassMetadata *self,
                                         /*allowDependency*/ true);
 }
 
-static void initClassFieldOffsetVector(ObjCClass *self,
-                                       size_t numFields,
-                                       const TypeLayout * const *fieldTypes,
-                                       size_t *fieldOffsets) {
-  size_t size, alignMask;
+Class
+swift::swift_updatePureObjCClassMetadata(Class cls,
+                                         ClassLayoutFlags flags,
+                                         size_t numFields,
+                                         const TypeLayout * const *fieldTypes) {
+  auto self = (ObjCClass *)cls;
+  bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
 
-  ClassROData *rodata = getROData(self);
+  // Realize the superclass first.
+  (void)swift_getInitializedObjCClass((Class)self->Isa);
 
-  // Start layout from our static notion of where the superclass starts.
-  // Objective-C expects us to have generated a correct ivar layout, which it
-  // will simply slide if it needs to.
-  assert(self->Superclass && "Swift cannot implement a root class");
-  size = rodata->InstanceStart;
-  alignMask = 0xF; // malloc alignment guarantee
+  auto rodata = getROData(self);
 
-  // Okay, now do layout.
-  for (unsigned i = 0; i != numFields; ++i) {
-    auto *eltLayout = fieldTypes[i];
+  // If we're running on a older Objective-C runtime, just realize
+  // the class.
+  if (!requiresUpdate) {
+    // If we don't have a backward deployment layout, we cannot proceed here.
+    if (rodata->InstanceSize == 0) {
+      fatalError(0, "class %s does not have a fragile layout; "
+                 "the deployment target was newer than this OS\n",
+                 rodata->Name);
+    }
 
-    // Skip empty fields.
-    if (fieldOffsets[i] == 0 && eltLayout->size == 0)
-      continue;
-    auto offset = roundUpToAlignMask(size,
-                                     eltLayout->flags.getAlignmentMask());
-    fieldOffsets[i] = offset;
-    size = offset + eltLayout->size;
-    alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
+    // Realize the class. This causes the runtime to slide the field offsets
+    // stored in the field offset globals.
+    //
+    // Note that the field offset vector is *not* updated; however in
+    // Objective-C interop mode, we don't actually use the field offset vector
+    // of non-generic classes.
+    //
+    // In particular, class mirrors always use the Objective-C ivar descriptors,
+    // which point at field offset globals and not the field offset vector.
+    swift_getInitializedObjCClass((Class)self);
+    return cls;
   }
 
-  // Save the size into the Objective-C metadata.
-  if (rodata->InstanceSize != size)
-    rodata->InstanceSize = size;
-}
+  SWIFT_DEFER {
+    // Realize the class. This causes the runtime to slide the field offsets
+    // stored in the field offset globals.
+    SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift(cls, cls));
+  };
 
-/// Non-generic classes only. Initialize the Objective-C ivar descriptors and
-/// field offset globals. Does *not* register the class with the Objective-C
-/// runtime; that must be done by the caller.
-///
-/// This function copies the ivar descriptors and updates each ivar global with
-/// the corresponding offset in \p fieldOffsets, before asking the Objective-C
-/// runtime to realize the class. The Objective-C runtime will then slide the
-/// offsets stored in those globals.
-///
-/// Note that \p fieldOffsets remains unchanged in this case.
-static void initObjCClass(ObjCClass *self,
-                          size_t numFields,
-                          const TypeLayout * const *fieldTypes,
-                          size_t *fieldOffsets) {
-  ClassROData *rodata = getROData(self);
-
+  // Update the field offset globals using runtime type information; the layout
+  // of resilient types might be different than the statically-emitted layout.
   ClassIvarList *ivars = rodata->IvarList;
   if (!ivars) {
     assert(numFields == 0);
-    return;
+    return cls;
   }
 
   assert(ivars->Count == numFields);
@@ -4035,15 +4030,35 @@ static void initObjCClass(ObjCClass *self,
 
   bool copiedIvarList = false;
 
-  for (unsigned i = 0; i != numFields; ++i) {
-    auto *eltLayout = fieldTypes[i];
+  // Start layout from our static notion of where the superclass starts.
+  // Objective-C expects us to have generated a correct ivar layout, which it
+  // will simply slide if it needs to.
+  assert(self->Superclass && "Swift cannot implement a root class");
+  size_t size = rodata->InstanceStart;
+  size_t alignMask = 0xF; // malloc alignment guarantee
 
+  // Okay, now do layout.
+  for (unsigned i = 0; i != numFields; ++i) {
     ClassIvarEntry *ivar = &ivars->getIvars()[i];
 
-    // Fill in the field offset global, if this ivar has one.
+    size_t offset = 0;
     if (ivar->Offset) {
-      if (*ivar->Offset != fieldOffsets[i])
-        *ivar->Offset = fieldOffsets[i];
+      offset = *ivar->Offset;
+    }
+
+    auto *eltLayout = fieldTypes[i];
+
+    // Skip empty fields.
+    if (offset != 0 || eltLayout->size != 0) {
+      offset = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
+      size = offset + eltLayout->size;
+      alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
+
+      // Fill in the field offset global, if this ivar has one.
+      if (ivar->Offset) {
+        if (*ivar->Offset != offset)
+          *ivar->Offset = offset;
+      }
     }
 
     // If the ivar's size doesn't match the field layout we
@@ -4068,82 +4083,10 @@ static void initObjCClass(ObjCClass *self,
         getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
     }
   }
-}
 
-static void populateInitialFieldOffsets(ObjCClass *self,
-                                        size_t numFields,
-                                        size_t *fieldOffsets) {
-  ClassROData *rodata = getROData(self);
-
-  ClassIvarList *ivars = rodata->IvarList;
-  if (!ivars) {
-    assert(numFields == 0);
-    return;
-  }
-
-  assert(ivars->Count == numFields);
-  assert(ivars->EntrySize == sizeof(ClassIvarEntry));
-
-  for (unsigned i = 0; i != numFields; ++i) {
-    ClassIvarEntry *ivar = &ivars->getIvars()[i];
-
-    if (ivar->Offset) {
-      fieldOffsets[i] = *ivar->Offset;
-    } else {
-      fieldOffsets[i] = 0;
-    }
-  }
-}
-
-Class
-swift::swift_updatePureObjCClassMetadata(Class cls,
-                                         ClassLayoutFlags flags,
-                                         size_t numFields,
-                                         const TypeLayout * const *fieldTypes) {
-  auto self = (ObjCClass *)cls;
-  bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
-
-  // Realize the superclass first.
-  (void)swift_getInitializedObjCClass((Class)self->Isa);
-
-  auto ROData = getROData(self);
-
-  // If we're running on a older Objective-C runtime, just realize
-  // the class.
-  if (!requiresUpdate) {
-    // If we don't have a backward deployment layout, we cannot proceed here.
-    if (ROData->InstanceSize == 0) {
-      fatalError(0, "class %s does not have a fragile layout; "
-                 "the deployment target was newer than this OS\n",
-                 ROData->Name);
-    }
-
-    // Realize the class. This causes the runtime to slide the field offsets
-    // stored in the field offset globals.
-    //
-    // Note that the field offset vector is *not* updated; however in
-    // Objective-C interop mode, we don't actually use the field offset vector
-    // of non-generic classes.
-    //
-    // In particular, class mirrors always use the Objective-C ivar descriptors,
-    // which point at field offset globals and not the field offset vector.
-    swift_getInitializedObjCClass((Class)self);
-  } else {
-    // Fake up a field offsets vector based on the ivars.
-    // FIXME: Temporary; we should just combine the other two functions' logic.
-    size_t *fieldOffsets = (size_t *)alloca(numFields * sizeof(size_t));
-    populateInitialFieldOffsets(self, numFields, fieldOffsets);
-
-    // Update the field offset vector using runtime type information; the layout
-    // of resilient types might be different than the statically-emitted layout.
-    initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
-
-    // Copy field offset vector entries to the field offset globals.
-    initObjCClass(self, numFields, fieldTypes, fieldOffsets);
-
-    // See remark above about how this slides field offset globals.
-    SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift(cls, cls));
-  }
+  // Save the size into the Objective-C metadata.
+  if (rodata->InstanceSize != size)
+    rodata->InstanceSize = size;
 
   return cls;
 }
