@@ -2508,6 +2508,11 @@ NOTE(decl_import_via_here,none,
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
      "from %2 here",
      (const Decl *, AccessLevel, const ModuleDecl*))
+NOTE(decl_import_via_local,none,
+     "%kind0 is imported by this file as "
+     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
+     "from %2",
+     (const Decl *, AccessLevel, const ModuleDecl*))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
