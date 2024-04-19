@@ -755,6 +755,8 @@ func checkLocalFunctions() async {
   print(k)
 }
 
+func callee(_: () -> ()) {}
+
 @available(SwiftStdlib 5.1, *)
 actor LocalFunctionIsolatedActor {
   func a() -> Bool { // expected-note{{calls to instance method 'a()' from outside of its actor context are implicitly asynchronous}}
@@ -774,6 +776,30 @@ actor LocalFunctionIsolatedActor {
     }
     return c()
   }
+
+  func hasRecursiveLocalFunction() {
+    func recursiveLocalFunction(n: Int) {
+      _ = a()
+      callee { _ = a() }
+      if n > 0 { recursiveLocalFunction(n: n - 1) }
+    }
+
+    recursiveLocalFunction(n: 10)
+  }
+
+  func hasRecursiveLocalFunctions() {
+    recursiveLocalFunction()
+
+    func recursiveLocalFunction() {
+      anotherRecursiveLocalFunction()
+    }
+
+    func anotherRecursiveLocalFunction() {
+      callee { _ = a() }
+      _ = a()
+    }
+  }
+
 }
 
 // ----------------------------------------------------------------------
