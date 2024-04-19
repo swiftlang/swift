@@ -584,6 +584,32 @@ function Fetch-Dependencies {
     }
   }
 
+  function Extract-ZipFile {
+    param (
+        [string]$ZipFileName,
+        [string]$BinaryCache,
+        [string]$ExtractPath
+    )
+
+    $zipFilePath = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
+    $extractedPath = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
+
+    # Check if the extracted directory already exists and is up to date.
+    if (Test-Path $extractedPath) {
+        $zipLastWriteTime = (Get-Item $zipFilePath).LastWriteTime
+        $extractedLastWriteTime = (Get-Item $extractedPath).LastWriteTime
+        # Compare the last write times
+        if ($zipLastWriteTime -le $extractedLastWriteTime) {
+            Write-Output "'$ZipFileName' is already extracted and up to date."
+            return
+        }
+    }
+
+    Write-Output "Extracting '$ZipFileName' ..."
+    New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
+    Expand-Archive -Path $zipFilePath -DestinationPath $BinaryCache -Force
+  }
+
   $WiXVersion = "4.0.4"
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
   $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
@@ -635,10 +661,7 @@ function Fetch-Dependencies {
     $NDKHash = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
     DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
 
-    # TODO(compnerd) stamp/validate that we need to re-extract
-    Write-Output "Extracting Android NDK $AndroidNDKVersion ..."
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache | Out-Null
-    Expand-Archive -Path $BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip -Destination $BinaryCache -Force
+    Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion"
   }
 
   if ($WinSDKVersion) {
