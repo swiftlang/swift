@@ -6796,18 +6796,18 @@ WARNING(discardable_result_on_void_never_function, none,
 //------------------------------------------------------------------------------
 
 ERROR(fixed_layout_attr_on_internal_type,
-      none, "'@_fixed_layout' attribute can only be applied to '@usableFromInline' "
-      "or public declarations, but %0 is "
-      "%select{private|fileprivate|internal|package|%error|%error}1",
+      none, "'@_fixed_layout' attribute can only be applied to '@usableFromInline', "
+      "package, or public declarations, but %0 is "
+      "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
 WARNING(fixed_layout_struct,
       none, "'@frozen' attribute is now used for fixed-layout structs", ())
 
 ERROR(frozen_attr_on_internal_type,
-      none, "'@frozen' attribute can only be applied to '@usableFromInline' "
-      "or public declarations, but %0 is "
-      "%select{private|fileprivate|internal|package|%error|%error}1",
+      none, "'@frozen' attribute can only be applied to '@usableFromInline', "
+      "package, or public declarations, but %0 is "
+      "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
 ERROR(usable_from_inline_attr_with_explicit_access,
@@ -6899,8 +6899,8 @@ ERROR(inlinable_dynamic_not_supported,
       none, "'@inlinable' attribute cannot be applied to 'dynamic' declarations", ())
 
 ERROR(inlinable_decl_not_public,
-      none, "'@inlinable' attribute can only be applied to public declarations, "
-      "but %0 is %select{private|fileprivate|internal|package|%error|%error}1",
+      none, "'@inlinable' attribute can only be applied to internal, package, or public declarations, "
+      "but %0 is %select{private|fileprivate|%error|%error|%error|%error}1",
       (DeclBaseName, AccessLevel))
 
 ERROR(inlinable_resilient_deinit,
