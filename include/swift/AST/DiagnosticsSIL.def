@@ -21,6 +21,12 @@
 #include "DefineDiagnosticMacros.h"
 
 // SILGen issues.
+WARNING(return_borrowing_switch_binding,none,
+        "returning the non-'Copyable' value of a pattern binding from a "
+        "switch that borrows by default; the switch will be performed as a "
+        "consume for compatibility for now, but this will require an explicit "
+        "'switch consume' in the future", ())
+
 ERROR(bridging_module_missing,none,
       "unable to find module '%0' for implicit conversion function '%0.%1'",
       (StringRef, StringRef))

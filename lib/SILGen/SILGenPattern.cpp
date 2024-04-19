@@ -3366,6 +3366,32 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       for (auto item : caseLabel->getCaseLabelItems()) {
         ownership = std::max(ownership, item.getPattern()->getOwnership());
       }
+      // To help migrate early adopters of the feature, if the case body is
+      // obviously trying to return out one of the pattern bindings, which
+      // would necessitate a consuming switch, perform the switch as a consume,
+      // and warn that this will need to be made explicit in the future.
+      if (ownership == ValueOwnership::Shared) {
+        if (auto ret = dyn_cast_or_null<ReturnStmt>(
+              caseLabel->getBody()->getSingleActiveElement()
+                       .dyn_cast<Stmt*>())) {
+          Expr *result = ret->getResult()->getSemanticsProvidingExpr();
+          if (result->getType()->isNoncopyable()) {
+            while (auto conv = dyn_cast<ImplicitConversionExpr>(result)) {
+              result = conv->getSubExpr()->getSemanticsProvidingExpr();
+            }
+            if (auto dr = dyn_cast<DeclRefExpr>(result)) {
+              if (std::find(caseLabel->getCaseBodyVariables().begin(),
+                            caseLabel->getCaseBodyVariables().end(),
+                            dr->getDecl())
+                    != caseLabel->getCaseBodyVariables().end()) {
+                SGM.diagnose(result->getLoc(),
+                             diag::return_borrowing_switch_binding);
+                ownership = ValueOwnership::Owned;
+              }
+            }
+          }
+        }
+      }
     }
   }
 
