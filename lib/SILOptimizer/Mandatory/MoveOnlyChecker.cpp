@@ -202,6 +202,7 @@ void MoveOnlyChecker::checkAddresses() {
 
   MoveOnlyAddressChecker checker{fn, diagnosticEmitter, allocator, domTree,
                                  poa};
+  madeChange |= checker.completeLifetimes();
   madeChange |= checker.check(moveIntroducersToProcess);
 }
 

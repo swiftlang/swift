@@ -242,6 +242,7 @@
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
@@ -3985,4 +3986,30 @@ bool MoveOnlyAddressChecker::check(
                fn->dump());
   }
   return pimpl.changed;
+}
+bool MoveOnlyAddressChecker::completeLifetimes() {
+  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup
+  bool changed = false;
+
+  // Lifetimes must be completed inside out (bottom-up in the CFG).
+  PostOrderFunctionInfo *postOrder = poa->get(fn);
+  OSSALifetimeCompletion completion(fn, domTree);
+  for (auto *block : postOrder->getPostOrder()) {
+    for (SILInstruction &inst : reverse(*block)) {
+      for (auto result : inst.getResults()) {
+        if (completion.completeOSSALifetime(result) ==
+            LifetimeCompletion::WasCompleted) {
+          changed = true;
+        }
+      }
+    }
+    for (SILArgument *arg : block->getArguments()) {
+      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
+      if (completion.completeOSSALifetime(arg) ==
+          LifetimeCompletion::WasCompleted) {
+        changed = true;
+      }
+    }
+  }
+  return changed;
 }
