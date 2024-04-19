@@ -511,16 +511,6 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
     return true;
 
   if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
-    if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
-      auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
-
-      InvertibleProtocolSet inverses;
-      bool anyObject = false;
-      getDirectlyInheritedNominalTypeDecls(nominalDecl, inverses, anyObject);
-      if (!inverses.empty())
-        return true;
-    }
-
     if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
       auto reqSig = proto->getRequirementSignature();
 
