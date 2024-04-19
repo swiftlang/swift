@@ -549,6 +549,10 @@ eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
   auto next = std::next(inst->getIterator());
   if (isa<DropDeinitInst>(inst))
     return next;
+  if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
+    if (uedi->getOperand()->getType().isValueTypeWithDeinit())
+      return next;
+  }
   for (auto *use : getNonDebugUses(inst)) {
     if (auto *destroy = dyn_cast<DestroyValueInst>(use->getUser())) {
       if (destroy->isFullDeinitialization())
