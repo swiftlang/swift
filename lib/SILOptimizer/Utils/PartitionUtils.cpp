@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -68,6 +69,37 @@ getGlobalActorInitIsolation(SILFunction *fn) {
 
   // See if our globalDecl is specifically guarded.
   return getActorIsolation(globalDecl);
+}
+
+static DeclRefExpr *getDeclRefExprFromExpr(Expr *expr) {
+  struct LocalWalker final : ASTWalker {
+    DeclRefExpr *result = nullptr;
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      assert(!result && "Shouldn't have a result yet");
+
+      if (auto *dre = dyn_cast<DeclRefExpr>(expr)) {
+        result = dre;
+        return Action::Stop();
+      }
+
+      if (isa<CoerceExpr, MemberRefExpr, ImplicitConversionExpr, IdentityExpr>(
+              expr))
+        return Action::Continue(expr);
+
+      return Action::Stop();
+    }
+  };
+
+  LocalWalker walker;
+
+  if (auto *ae = dyn_cast<AssignExpr>(expr)) {
+    ae->getSrc()->walk(walker);
+  } else {
+    expr->walk(walker);
+  }
+
+  return walker.result;
 }
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
@@ -176,15 +208,30 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     // actor isolated method. Use the AST to compute the actor isolation and
     // check if we are self. If we are not self, we want this to be
     // disconnected.
-    if (auto *declRefExpr = cmi->getLoc().getAsASTNode<DeclRefExpr>()) {
-      if (auto isolation = swift::getActorIsolation(declRefExpr->getDecl())) {
-        if (isolation.isActorIsolated() &&
-            (isolation.getKind() != ActorIsolation::ActorInstance ||
-             isolation.getActorInstanceParameter() == 0)) {
-          auto actor = cmi->getOperand()->getType().isAnyActor()
-                           ? cmi->getOperand()
-                           : SILValue();
-          return SILIsolationInfo::getActorIsolated(cmi, actor, isolation);
+    if (auto *expr = cmi->getLoc().getAsASTNode<Expr>()) {
+      if (auto *dre = getDeclRefExprFromExpr(expr)) {
+        if (auto isolation = swift::getActorIsolation(dre->getDecl())) {
+          if (isolation.isActorIsolated() &&
+              (isolation.getKind() != ActorIsolation::ActorInstance ||
+               isolation.getActorInstanceParameter() == 0)) {
+            auto actor = cmi->getOperand()->getType().isAnyActor()
+                             ? cmi->getOperand()
+                             : SILValue();
+            return SILIsolationInfo::getActorIsolated(cmi, actor, isolation);
+          }
+        }
+
+        if (auto type = dre->getType()->getNominalOrBoundGenericNominal()) {
+          if (auto isolation = swift::getActorIsolation(type)) {
+            if (isolation.isActorIsolated() &&
+                (isolation.getKind() != ActorIsolation::ActorInstance ||
+                 isolation.getActorInstanceParameter() == 0)) {
+              auto actor = cmi->getOperand()->getType().isAnyActor()
+                               ? cmi->getOperand()
+                               : SILValue();
+              return SILIsolationInfo::getActorIsolated(cmi, actor, isolation);
+            }
+          }
         }
       }
     }
@@ -266,9 +313,15 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // of the actor.
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
     if (auto crossing = apply->getIsolationCrossing()) {
-      if (crossing->getCalleeIsolation().isActorIsolated())
+      auto calleeIsolation = crossing->getCalleeIsolation();
+      if (calleeIsolation.isActorIsolated()) {
         return SILIsolationInfo::getActorIsolated(
             SILValue(), SILValue(), crossing->getCalleeIsolation());
+      }
+
+      if (calleeIsolation.isNonisolated()) {
+        return SILIsolationInfo::getDisconnected();
+      }
     }
   }
 
