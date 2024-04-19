@@ -2478,9 +2478,9 @@ namespace {
 
     /// Check closure captures for Sendable violations.
     void checkLocalCaptures(AnyFunctionRef localFunc) {
-      SmallVector<CapturedValue, 2> captures;
-      localFunc.getCaptureInfo().getLocalCaptures(captures);
-      for (const auto &capture : captures) {
+      for (const auto &capture : localFunc.getCaptureInfo().getCaptures()) {
+        if (!capture.isLocalCapture())
+          continue;
         if (capture.isDynamicSelfMetadata())
           continue;
         if (capture.isOpaqueValue())

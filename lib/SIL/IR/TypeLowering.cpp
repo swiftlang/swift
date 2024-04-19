@@ -4153,9 +4153,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (captureInfo.hasOpaqueValueCapture())
       capturesOpaqueValue = captureInfo.getOpaqueValue();
 
-    SmallVector<CapturedValue, 4> localCaptures;
-    captureInfo.getLocalCaptures(localCaptures);
-    for (auto capture : localCaptures) {
+    for (auto capture : captureInfo.getCaptures()) {
+      if (!capture.isLocalCapture())
+        continue;
+
       // If the capture is of another local function, grab its transitive
       // captures instead.
       if (auto capturedFn = getAnyFunctionRefFromCapture(capture)) {

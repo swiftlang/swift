@@ -83,10 +83,6 @@ public:
     TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
   }
 
-  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
-    getCaptureInfo().getLocalCaptures(Result);
-  }
-
   bool hasType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->hasInterfaceType();
