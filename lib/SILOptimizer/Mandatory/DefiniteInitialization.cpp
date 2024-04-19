@@ -2642,6 +2642,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       }
     }
 
+    // Cast back down from an upcast.
+    if (auto *UI = dyn_cast<UpcastInst>(Pointer)) {
+      Pointer =
+          B.createUncheckedRefCast(Loc, Pointer, UI->getOperand()->getType());
+    }
+
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass
     // constructors that delegated to us, and finally free the memory.
