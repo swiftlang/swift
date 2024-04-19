@@ -385,6 +385,9 @@ EXPERIMENTAL_FEATURE(CImplementation, true)
 // Enable @sensitive attribute.
 EXPERIMENTAL_FEATURE(Sensitive, true)
 
+// Enable the stdlib @DebugDescription macro.
+EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
