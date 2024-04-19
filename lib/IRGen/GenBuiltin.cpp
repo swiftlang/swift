@@ -1103,8 +1103,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           IsTriviallyDestroyable)
         return;
 
-      llvm::Value *firstElem = IGF.Builder.CreateBitCast(
-          ptr, elemTI.getStorageType()->getPointerTo());
+      llvm::Value *firstElem =
+          IGF.Builder.CreatePtrToInt(IGF.Builder.CreateBitCast(
+              ptr, elemTI.getStorageType()->getPointerTo()));
 
       auto *origBB = IGF.Builder.GetInsertBlock();
       auto *headerBB = IGF.createBasicBlock("loop_header");
@@ -1118,8 +1119,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       IGF.Builder.CreateCondBr(cmp, loopBB, exitBB);
 
       IGF.Builder.emitBlock(loopBB);
-      auto *addr = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
-                                                 firstElem, phi);
+
+      llvm::Value *offset =
+          IGF.Builder.CreateMul(phi, elemTI.getStaticStride(IGF.IGM));
+      llvm::Value *added = IGF.Builder.CreateAdd(firstElem, offset);
+      llvm::Value *addr = IGF.Builder.CreateIntToPtr(
+          added, elemTI.getStorageType()->getPointerTo());
 
       bool isOutlined = false;
       elemTI.destroy(IGF, elemTI.getAddressForPointer(addr), elemTy,
