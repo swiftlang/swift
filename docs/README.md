@@ -136,6 +136,9 @@ documentation, please create a thread on the Swift forums under the
     operations on [currency](/docs/Lexicon.md#currency-type) data types and 
     optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
+  - [HowToUpdateDebugInfo.md](/docs/HowToUpdateDebugInfo.md): A guide for SIL
+    optimization pass authors for how to properly update debug info in SIL
+    program transformations.
 - Runtime specifics:
   - [Backtracing.rst](/docs/Backtracing.rst):
     Describes Swift's backtracing and crash catching support.
