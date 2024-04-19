@@ -59,34 +59,7 @@ CaptureInfo CaptureInfo::empty() {
   return result;
 }
 
-bool CaptureInfo::hasLocalCaptures() const {
-  for (auto capture : getCaptures()) {
-    if (capture.isLocalCapture())
-      return true;
-  }
-  return false;
-}
-
-
-void CaptureInfo::
-getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
-  if (!hasLocalCaptures()) return;
-
-  Result.reserve(getCaptures().size());
-
-  // Filter out global variables.
-  for (auto capture : getCaptures()) {
-    if (!capture.isLocalCapture())
-      continue;
-
-    Result.push_back(capture);
-  }
-}
-
 VarDecl *CaptureInfo::getIsolatedParamCapture() const {
-  if (!hasLocalCaptures())
-    return nullptr;
-
   for (const auto &capture : getCaptures()) {
     // NOTE: isLocalCapture() returns false if we have dynamic self metadata
     // since dynamic self metadata is never an isolated capture. So we can just

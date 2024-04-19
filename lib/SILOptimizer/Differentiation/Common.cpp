@@ -475,7 +475,6 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
         original->getInterfaceType()->castTo<AnyFunctionType>());
 
     if (silParameterIndices->getCapacity() < parameterIndices->getCapacity()) {
-      assert(original->getCaptureInfo().hasLocalCaptures());
       silParameterIndices =
         silParameterIndices->extendingCapacity(original->getASTContext(),
                                                parameterIndices->getCapacity());
