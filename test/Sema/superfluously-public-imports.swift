@@ -25,10 +25,12 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify \
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify \
 // RUN:   -experimental-spi-only-imports
 // RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
-// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 -verify
 
@@ -171,7 +173,7 @@ public func useConformance(_ a: any Proto = ConformingType()) {}
 // expected-remark @-3 {{struct 'ConformingType' is imported via 'ConformanceBaseTypes'}}
 // expected-remark @-4 {{initializer 'init()' is imported via 'ConformanceBaseTypes'}}
 
-@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {} // expected-remark {{struct 'TypeUsedInSignature' is imported via 'DepUsedInSignature'}}
+@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {}
 
 @inlinable
 public func publicFuncUsesPrivate() {
