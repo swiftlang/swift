@@ -1552,9 +1552,8 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   var c = NonSendableKlass()
   for _ in 0..<1024 {
     await useValueAsync(c) // expected-tns-warning {{transferring 'c' may cause a data race}}
-    // expected-tns-note @-1 {{transferring disconnected 'c' to nonisolated callee could cause races in between callee nonisolated and local main actor-isolated uses}}
-    // expected-tns-note @-2 {{use here could race}}
-    // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
+    // expected-tns-note @-1 {{transferring main actor-isolated 'c' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+    // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
     c = a.klass
   }
 }
@@ -1563,11 +1562,9 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let a = MainActorIsolatedKlass()
   var c = NonSendableKlass()
   for _ in 0..<1024 {
-    await useValueAsync(c) // expected-tns-warning 2{{transferring 'c' may cause a data race}}
-    // expected-tns-note @-1 {{transferring disconnected 'c' to nonisolated callee could cause races in between callee nonisolated and local main actor-isolated uses}}
-    // expected-tns-note @-2 {{use here could race}}
-    // expected-tns-note @-3 {{transferring main actor-isolated 'c' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
-    // expected-complete-warning @-4 {{passing argument of non-sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
+    await useValueAsync(c) // expected-tns-warning {{transferring 'c' may cause a data race}}
+    // expected-tns-note @-1 {{transferring main actor-isolated 'c' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+    // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
     c = a.klassLet
   }
 }

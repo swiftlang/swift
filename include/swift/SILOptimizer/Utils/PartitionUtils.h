@@ -1192,13 +1192,10 @@ public:
       //
       // DISCUSSION: We couldn't not emit this earlier since we needed the
       // dynamic isolation info of our value.
-      if (transferredRegionIsolation.isActorIsolated()) {
-        if (auto calleeIsolationInfo =
-                SILIsolationInfo::get(op.getSourceInst())) {
-          if (transferredRegionIsolation.hasSameIsolation(
-                  calleeIsolationInfo)) {
-            return;
-          }
+      if (auto calleeIsolationInfo =
+              SILIsolationInfo::get(op.getSourceInst())) {
+        if (transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
+          return;
         }
       }
 

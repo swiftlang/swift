@@ -97,11 +97,12 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
 @CustomActor func useCustomActor5() async {
   let x = NonSendableLinkedListNode<Int>()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'CustomActor'-isolated context may introduce data races}}
+  // This is ok since the nonisolated function cannot transfer x, so once we
+  // return x will be isolated again.
+  await transferToNonIsolated(x)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
-  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x)
 }
 
 private struct StructContainingValue { // expected-complete-note 2{{}}
@@ -113,11 +114,12 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue()
   x = StructContainingValue()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
+  // This is ok since the nonisolated function cannot transfer x meaning after
+  // we return we know that x will be disconnected upon return as well.
+  await transferToNonIsolated(x)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
-  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x)
 }
 
 @CustomActor func useCustomActor7() async {
@@ -135,12 +137,12 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
   x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
+  // This is safe since the nonisolated function cannot transfer x further.
+  await transferToNonIsolated(x)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
-  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
-  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x)
 }
 
 @CustomActor func useCustomActor9() async {
