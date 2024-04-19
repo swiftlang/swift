@@ -1,6 +1,5 @@
 /// Check that only public imports are printed in modules interfaces,
 /// package imports and below are not.
-// REQUIRES: asserts
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -68,24 +67,6 @@
 // RUN: %FileCheck --check-prefixes=CHECK-5-MUL-PRV %s < %t/MultiFiles.private.swiftinterface
 // RUN: %FileCheck --check-prefixes=CHECK-5-MUL-PKG %s < %t/MultiFiles.package.swiftinterface
 
-/// Swift 6 mode.
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name TestPackage -module-name Client_Swift6 \
-// RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -emit-module-interface-path %t/Client_Swift6.swiftinterface \
-// RUN:   -emit-private-module-interface-path %t/Client_Swift6.private.swiftinterface \
-// RUN:   -emit-package-module-interface-path %t/Client_Swift6.package.swiftinterface
-
-// RUN: %target-swift-typecheck-module-from-interface(%t/Client_Swift6.swiftinterface) -I %t
-// RUN: %target-swift-typecheck-module-from-interface(%t/Client_Swift6.private.swiftinterface) -I %t \
-// RUN:   -module-name Client_Swift6
-// RUN: %target-swift-typecheck-module-from-interface(%t/Client_Swift6.package.swiftinterface) -I %t \
-// RUN:   -module-name Client_Swift6
-
-// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6 < %t/Client_Swift6.swiftinterface
-// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6 < %t/Client_Swift6.private.swiftinterface
-// RUN: %FileCheck %s --check-prefixes=CHECK-6-PKG < %t/Client_Swift6.package.swiftinterface
-
 /// Feature flag.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name TestPackage -module-name Client_FeatureFlag \
@@ -101,15 +82,15 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client_FeatureFlag.package.swiftinterface) -I %t \
 // RUN:   -module-name Client_FeatureFlag
 
-// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6,CHECK-FLAG < %t/Client_FeatureFlag.swiftinterface
-// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6,CHECK-FLAG < %t/Client_FeatureFlag.private.swiftinterface
-// RUN: %FileCheck %s --check-prefixes=CHECK-6-PKG,CHECK-FLAG < %t/Client_FeatureFlag.package.swiftinterface
+// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-7,CHECK-FLAG < %t/Client_FeatureFlag.swiftinterface
+// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-7,CHECK-FLAG < %t/Client_FeatureFlag.private.swiftinterface
+// RUN: %FileCheck %s --check-prefixes=CHECK-7-PKG,CHECK-FLAG < %t/Client_FeatureFlag.package.swiftinterface
 
 /// Build a client with multiple files.
 // RUN: %target-swift-frontend -typecheck %t/MultiFiles?.swift -I %t \
 // RUN:   -package-name TestPackage -module-name MultiFiles_Swift6 \
 // RUN:   -experimental-spi-only-imports \
-// RUN:   -enable-library-evolution -swift-version 6 \
+// RUN:   -enable-library-evolution -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -emit-module-interface-path %t/MultiFiles_Swift6.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/MultiFiles_Swift6.private.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/MultiFiles_Swift6.package.swiftinterface
@@ -120,9 +101,9 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/MultiFiles_Swift6.package.swiftinterface) -I %t \
 // RUN:   -module-name MultiFiles_Swift6
 
-// RUN: %FileCheck --check-prefixes=CHECK-6-MUL %s < %t/MultiFiles_Swift6.swiftinterface
-// RUN: %FileCheck --check-prefixes=CHECK-6-MUL-PRV %s < %t/MultiFiles_Swift6.private.swiftinterface
-// RUN: %FileCheck --check-prefixes=CHECK-6-MUL-PKG %s < %t/MultiFiles_Swift6.package.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK-7-MUL %s < %t/MultiFiles_Swift6.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK-7-MUL-PRV %s < %t/MultiFiles_Swift6.private.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK-7-MUL-PKG %s < %t/MultiFiles_Swift6.package.swiftinterface
 
 //--- PublicLib.swift
 //--- PackageLib.swift
@@ -144,9 +125,9 @@
 // CHECK-5-PKG: import PublicLib
 
 // CHECK-FLAG: -enable-upcoming-feature InternalImportsByDefault
-// CHECK-6: public
-// CHECK-6-PKG: package import PackageLib
-// CHECK-6-PKG: public import PublicLib
+// CHECK-7: public
+// CHECK-7-PKG: package import PackageLib
+// CHECK-7-PKG: public import PublicLib
 
 public import PublicLib
 // CHECK: PublicLib
@@ -196,11 +177,11 @@ internal import LibV
 // CHECK-5-MUL: @_exported import LibY
 // CHECK-5-MUL: import PublicLib
 
-// CHECK-6-MUL: public import LibU
-// CHECK-6-MUL: public import LibV
-// CHECK-6-MUL: public import LibX
-// CHECK-6-MUL: @_exported public import LibY
-// CHECK-6-MUL: public import PublicLib
+// CHECK-7-MUL: public import LibU
+// CHECK-7-MUL: public import LibV
+// CHECK-7-MUL: public import LibX
+// CHECK-7-MUL: @_exported public import LibY
+// CHECK-7-MUL: public import PublicLib
 
 // CHECK-5-MUL-PKG: @_spiOnly import LibS
 // CHECK-5-MUL-PKG: @_spiOnly import LibT
@@ -211,14 +192,14 @@ internal import LibV
 // CHECK-5-MUL-PKG: package import PackageLib
 // CHECK-5-MUL-PKG: import PublicLib
 
-// CHECK-6-MUL-PKG: @_spiOnly public import LibS
-// CHECK-6-MUL-PKG: @_spiOnly public import LibT
-// CHECK-6-MUL-PKG: @_spi(Lib) public import LibU
-// CHECK-6-MUL-PKG: @_spi(Lib) public import LibV
-// CHECK-6-MUL-PKG: public import LibX
-// CHECK-6-MUL-PKG: @_exported public import LibY
-// CHECK-6-MUL-PKG: package import PackageLib
-// CHECK-6-MUL-PKG: public import PublicLib
+// CHECK-7-MUL-PKG: @_spiOnly public import LibS
+// CHECK-7-MUL-PKG: @_spiOnly public import LibT
+// CHECK-7-MUL-PKG: @_spi(Lib) public import LibU
+// CHECK-7-MUL-PKG: @_spi(Lib) public import LibV
+// CHECK-7-MUL-PKG: public import LibX
+// CHECK-7-MUL-PKG: @_exported public import LibY
+// CHECK-7-MUL-PKG: package import PackageLib
+// CHECK-7-MUL-PKG: public import PublicLib
 
 // CHECK-5-MUL-PRV: @_spiOnly import LibS
 // CHECK-5-MUL-PRV: @_spiOnly import LibT
@@ -228,10 +209,10 @@ internal import LibV
 // CHECK-5-MUL-PRV: @_exported import LibY
 // CHECK-5-MUL-PRV: import PublicLib
 
-// CHECK-6-MUL-PRV: @_spiOnly public import LibS
-// CHECK-6-MUL-PRV: @_spiOnly public import LibT
-// CHECK-6-MUL-PRV: @_spi(Lib) public import LibU
-// CHECK-6-MUL-PRV: @_spi(Lib) public import LibV
-// CHECK-6-MUL-PRV: public import LibX
-// CHECK-6-MUL-PRV: @_exported public import LibY
-// CHECK-6-MUL-PRV: public import PublicLib
+// CHECK-7-MUL-PRV: @_spiOnly public import LibS
+// CHECK-7-MUL-PRV: @_spiOnly public import LibT
+// CHECK-7-MUL-PRV: @_spi(Lib) public import LibU
+// CHECK-7-MUL-PRV: @_spi(Lib) public import LibV
+// CHECK-7-MUL-PRV: public import LibX
+// CHECK-7-MUL-PRV: @_exported public import LibY
+// CHECK-7-MUL-PRV: public import PublicLib
