@@ -950,19 +950,6 @@ ERROR(layout_constraints_only_inside_specialize_attr,none,
       "layout constraints are only allowed inside '_specialize' attributes", ())
 
 //------------------------------------------------------------------------------
-// MARK: Conformance suppression diagnostics
-//------------------------------------------------------------------------------
-
-ERROR(cannot_suppress_here,none,
-      "cannot suppress conformances here", ())
-
-ERROR(only_suppress_copyable,none,
-      "can only suppress 'Copyable'", ())
-
-ERROR(already_suppressed_copyable,none,
-      "duplicate suppression of 'Copyable'", ())
-
-//------------------------------------------------------------------------------
 // MARK: Pattern parsing diagnostics
 //------------------------------------------------------------------------------
 
