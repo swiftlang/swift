@@ -3123,6 +3123,13 @@ static void suppressingFeatureOptionalIsolatedParameters(
   action();
 }
 
+static void suppressingFeatureTransferringArgsAndResults(
+    PrintOptions &options, llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressTransferringArgsAndResults,
+                                   true);
+  action();
+}
+
 static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
@@ -3721,7 +3728,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
-  if (flags.isTransferring())
+  if (!options.SuppressTransferringArgsAndResults && flags.isTransferring())
     printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
@@ -4181,19 +4188,16 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           }
         }
       }
-      {
-        auto fnTy = decl->getInterfaceType();
-        bool hasTransferring = false;
-        if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
-          if (ft->hasExtInfo())
-            hasTransferring = ft->hasTransferringResult();
-        } else if (auto *ft =
-                       llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
-          if (ft->hasExtInfo())
-            hasTransferring = ft->hasTransferringResult();
-        }
-        if (hasTransferring)
+
+      if (!Options.SuppressTransferringArgsAndResults) {
+        if (decl->hasTransferringResult()) {
           Printer << "transferring ";
+        } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
+                       decl->getInterfaceType())) {
+          if (ft->hasExtInfo() && ft->hasTransferringResult()) {
+            Printer << "transferring ";
+          }
+        }
       }
 
       // HACK: When printing result types for funcs with opaque result types,
@@ -6654,7 +6658,8 @@ public:
 
     Printer << " -> ";
 
-    if (T->hasExtInfo() && T->hasTransferringResult()) {
+    if (!Options.SuppressTransferringArgsAndResults && T->hasExtInfo() &&
+        T->hasTransferringResult()) {
       Printer.printKeyword("transferring ", Options);
     }
 

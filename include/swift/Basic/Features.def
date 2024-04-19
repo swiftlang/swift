@@ -349,7 +349,7 @@ EXPERIMENTAL_FEATURE(FixedArrays, true)
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
 // Allow for the 'transferring' keyword to be applied to arguments and results.
-EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
 
 // Enable explicit isolation of closures.
 EXPERIMENTAL_FEATURE(ClosureIsolation, true)
