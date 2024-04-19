@@ -171,6 +171,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 
 @_marker public protocol Copyable {}
 
+@_documentation(visibility: internal)
 @_marker public protocol Escapable {}
 
 #if $NoncopyableGenerics && $NonescapableTypes

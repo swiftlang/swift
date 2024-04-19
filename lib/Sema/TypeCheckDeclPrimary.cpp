@@ -124,10 +124,9 @@ public:
     auto ipk = getInvertibleProtocolKind(*kp);
     if (ipk) {
       // Gate the '~Escapable' type behind a specific flag for now.
+      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
       if (*ipk == InvertibleProtocolKind::Escapable &&
           !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        diagnoseInvalid(repr, repr.getLoc(),
-                        diag::escapable_requires_feature_flag);
         return ErrorType::get(ctx);
       }
 
