@@ -197,15 +197,6 @@ public:
     return StorageAndFlags.getPointer()->getCaptures();
   }
 
-  /// Return a filtered list of the captures for this function,
-  /// filtering out global variables.  This function returns the list that
-  /// actually needs to be closed over.
-  ///
-  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const;
-
-  /// \returns true if getLocalCaptures() will return a non-empty list.
-  bool hasLocalCaptures() const;
-
   /// \returns true if the function captures any generic type parameters.
   bool hasGenericParamCaptures() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include

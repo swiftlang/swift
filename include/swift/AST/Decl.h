@@ -8033,10 +8033,6 @@ public:
   /// prior to type checking.
   bool isBinaryOperator() const;
 
-  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
-    return getCaptureInfo().getLocalCaptures(Result);
-  }
-
   ParamDecl **getImplicitSelfDeclStorage();
 
   /// Get the supertype method this method overrides, if any.
