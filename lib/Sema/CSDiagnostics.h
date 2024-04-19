@@ -1323,17 +1323,18 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose cases where a member only accessible on generic constraints
-/// requiring conformance to a protocol is used on a value of the
-/// existential protocol type e.g.
+/// Diagnose cases where a protocol member cannot be accessed with an
+/// existential, e.g. due to occurrences of `Self` in non-covariant position in
+/// the type of the member reference:
 ///
 /// ```swift
+/// struct G<T> {}
 /// protocol P {
-///   var foo: Self { get }
+///   func foo() -> G<Self>
 /// }
 ///
-/// func bar<X : P>(p: X) {
-///   p.foo
+/// func bar(p: any P) {
+///   p.foo()
 /// }
 /// ```
 class InvalidMemberRefOnExistential final : public InvalidMemberRefFailure {
