@@ -757,8 +757,11 @@ void swift::rewriting::applyInverses(
 
     // Inverses on associated types are experimental.
     if (!allowInverseOnAssocType && canSubject->is<DependentMemberType>()) {
-      errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
-      continue;
+      // Special exception: allow if we're building the stdlib.
+      if (!ctx.MainModule->isStdlibModule()) {
+        errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
+        continue;
+      }
     }
 
     // Noncopyable checking support for parameter packs is not implemented yet.
