@@ -4442,8 +4442,7 @@ public:
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
       Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
-      ConstraintLocator *locator, bool hasAppliedSelf,
-      bool isStaticMemberRefOnProtocol, bool isDynamicResult,
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
       OpenedTypeMap &replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
@@ -4453,16 +4452,14 @@ public:
   /// this routine "opens up" the type by replacing each instance of a generic
   /// parameter with a fresh type variable.
   ///
-  /// \param isDynamicResult Indicates that this declaration was found via
+  /// \param isDynamicLookup Indicates that this declaration was found via
   /// dynamic lookup.
   ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
-                          Type baseTy, ValueDecl *decl, DeclContext *useDC,
-                          bool isDynamicResult,
-                          FunctionRefKind functionRefKind,
-                          ConstraintLocator *locator,
-                          OpenedTypeMap *replacements = nullptr);
+      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
+      FunctionRefKind functionRefKind, ConstraintLocator *locator,
+      OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
