@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -verify -plugin-path %swift-plugin-dir
 
-@_DebugDescription
+@DebugDescription
 struct MyStruct {
   var flag: Bool
 
