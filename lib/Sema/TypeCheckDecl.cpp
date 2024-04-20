@@ -815,7 +815,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return false;
 
   switch (decl->getKind()) {
-    case DeclKind::Var: {
+    case DeclKind::Var:
+    case DeclKind::ExplicitCapture: {
       // Properties are final if they are declared 'static' or a 'let'
       auto *VD = cast<VarDecl>(decl);
 
@@ -1851,6 +1852,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
   }
 
   case DeclKind::Var:
+  case DeclKind::ExplicitCapture:
     if (decl->hasClangNode()) {
       // ClangImporter does not use this request to compute whether imported
       // declarations are IUOs; instead, it explicitly sets the bit itself when
@@ -2473,7 +2475,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     return validateParameterType(PD);
   }
 
-  case DeclKind::Var: {
+  case DeclKind::Var:
+  case DeclKind::ExplicitCapture: {
     auto *VD = cast<VarDecl>(D);
 
     if (auto clangDecl = VD->getClangDecl()) {

@@ -358,6 +358,7 @@ private:
     case DeclKind::GenericTypeParam:
       return genericParamTypeTag;
     case DeclKind::Var:
+    case DeclKind::ExplicitCapture:
       return "decl.var.type";
     case DeclKind::Subscript:
     case DeclKind::Func:

@@ -4764,6 +4764,7 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
   if (decl) {
     switch (decl->getKind()) {
     case DeclKind::Var:
+    case DeclKind::ExplicitCapture:
     case DeclKind::Subscript:
     case DeclKind::Constructor:
     case DeclKind::Destructor:

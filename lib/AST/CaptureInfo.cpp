@@ -96,9 +96,12 @@ VarDecl *CaptureInfo::getIsolatedParamCapture() const {
 
     // If we captured an isolated parameter, return it.
     if (auto param = dyn_cast_or_null<ParamDecl>(capture.getDecl())) {
-      // If we have captured an isolated parameter, return it.
       if (param->isIsolated())
         return param;
+    } else if (auto *explicitCapture =
+                   dyn_cast_or_null<ExplicitCaptureDecl>(capture.getDecl())) {
+      if (explicitCapture->isIsolated())
+        return explicitCapture;
     }
 
     // If we captured 'self', check whether it is (still) isolated.

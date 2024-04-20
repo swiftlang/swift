@@ -2727,8 +2727,9 @@ TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
       SubExpr(SubExpr), Body(Body) {
   assert(Body);
   assert(!Body->empty() &&
-       Body->getFirstElement().isDecl(DeclKind::Var) &&
-       "First element of Body should be a variable to init with the subExpr");
+         (Body->getFirstElement().isDecl(DeclKind::Var) ||
+          Body->getFirstElement().isDecl(DeclKind::ExplicitCapture)) &&
+         "First element of Body should be a variable to init with the subExpr");
 }
 
 VarDecl * TapExpr::getVar() const {

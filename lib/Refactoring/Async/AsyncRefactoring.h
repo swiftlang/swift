@@ -391,7 +391,7 @@ public:
   void addNode(ASTNode Node) {
     // Note we skip vars as they'll be printed as a part of their
     // PatternBindingDecl.
-    if (!Node.isDecl(DeclKind::Var))
+    if (!Node.isDecl(DeclKind::Var) && !Node.isDecl(DeclKind::ExplicitCapture))
       Nodes.push_back(Node);
   }
 

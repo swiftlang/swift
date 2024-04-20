@@ -208,6 +208,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
   case DeclKind::Param:
+  case DeclKind::ExplicitCapture:
   case DeclKind::OpaqueType:
   case DeclKind::Macro:
     return cast<ValueDecl>(decl)->getBaseName().userFacingName();
@@ -302,8 +303,7 @@ public:
                                                                D, precedenceGroups) ||
         select<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct,
         DeclKind::Class, DeclKind::Protocol>(D, topNominals) ||
-        select<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func,
-        DeclKind::Accessor>(D, topValues);
+        select<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::ExplicitCapture, DeclKind::Func, DeclKind::Accessor>(D, topValues);
       }
     // clang-format on
     // The order is important because some of these use instance variables

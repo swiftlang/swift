@@ -206,7 +206,8 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      return kind;
    }
 
-   case DeclKind::Var: {
+   case DeclKind::Var:
+   case DeclKind::ExplicitCapture: {
      auto var = cast<VarDecl>(this);
      switch (var->getCorrectStaticSpelling()) {
      case StaticSpellingKind::None:
@@ -678,6 +679,7 @@ bool Decl::isInvalid() const {
   case DeclKind::AssociatedType:
   case DeclKind::Module:
   case DeclKind::Var:
+  case DeclKind::ExplicitCapture:
   case DeclKind::Subscript:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
@@ -721,6 +723,7 @@ void Decl::setInvalid() {
   case DeclKind::Module:
   case DeclKind::Var:
   case DeclKind::Param:
+  case DeclKind::ExplicitCapture:
   case DeclKind::Subscript:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
@@ -1472,6 +1475,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Func;
 
   case DeclKind::Var:
+  case DeclKind::ExplicitCapture:
     return ImportKind::Var;
 
   case DeclKind::Module:
@@ -3150,6 +3154,7 @@ bool ValueDecl::isInstanceMember() const {
 
   case DeclKind::Subscript:
   case DeclKind::Var:
+  case DeclKind::ExplicitCapture:
     // Non-static variables and subscripts are instance members.
     return !cast<AbstractStorageDecl>(this)->isStatic();
 

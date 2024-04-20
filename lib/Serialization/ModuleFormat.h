@@ -2478,6 +2478,8 @@ static inline decls_block::RecordKind getKindForTable(const Decl *D) {
     return decls_block::VAR_DECL;
   case DeclKind::Param:
     return decls_block::PARAM_DECL;
+  case DeclKind::ExplicitCapture:
+    return decls_block::VAR_DECL;
 
   case DeclKind::Subscript:
     return decls_block::SUBSCRIPT_DECL;

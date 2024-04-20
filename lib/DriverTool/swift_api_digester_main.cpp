@@ -303,7 +303,8 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   static bool isDeclKindCrossable(DeclKind DK1, DeclKind DK2, bool First) {
     if (DK1 == DK2)
       return true;
-    if (DK1 == DeclKind::Var && DK2 == DeclKind::EnumElement)
+    if ((DK1 == DeclKind::Var || DK1 == DeclKind::ExplicitCapture) &&
+        DK2 == DeclKind::EnumElement)
       return true;
     return First && isDeclKindCrossable(DK2, DK1, false);
   }

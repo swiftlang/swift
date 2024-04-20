@@ -6530,8 +6530,9 @@ public:
   static VarDecl *createImplicitStringInterpolationVar(DeclContext *DC);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { 
-    return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param ||
+           D->getKind() == DeclKind::ExplicitCapture;
   }
 };
 
@@ -6988,7 +6989,29 @@ public:
   /// Get the source code spelling of a parameter specifier value as a string.
   static StringRef getSpecifierSpelling(Specifier spec);
 };
-  
+
+/// An explicit capture declaration.
+class ExplicitCaptureDecl : public VarDecl {
+  bool isolated = false;
+
+public:
+  ExplicitCaptureDecl(Introducer introducer, SourceLoc nameLoc, Identifier name,
+                      DeclContext *dc)
+      : VarDecl(DeclKind::ExplicitCapture, /*isStatic*/ false, introducer,
+                nameLoc, name, dc,
+                StorageIsMutable_t(introducer == Introducer::Var)) {}
+
+  /// Whether or not this capture is marked with 'isolated'.
+  bool isIsolated() const { return isolated; }
+
+  void setIsolated(bool value = true) { isolated = value; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::ExplicitCapture;
+  }
+};
+
 inline ValueOwnership
 ParameterTypeFlags::getValueOwnership() const {
   return ParamDecl::getValueOwnershipForSpecifier(getOwnershipSpecifier());

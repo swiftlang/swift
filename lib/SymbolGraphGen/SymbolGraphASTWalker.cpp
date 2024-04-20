@@ -138,6 +138,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   case swift::DeclKind::Constructor:
   case swift::DeclKind::Func:
   case swift::DeclKind::Var:
+  case swift::DeclKind::ExplicitCapture:
   case swift::DeclKind::Subscript:
   case swift::DeclKind::TypeAlias:
   case swift::DeclKind::AssociatedType:

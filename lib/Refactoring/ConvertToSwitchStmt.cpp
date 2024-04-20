@@ -33,7 +33,8 @@ bool RefactoringActionConvertToSwitchStmt::isApplicable(
       if (E->getKind() != ExprKind::DeclRef)
         return Action::Continue(E);
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
-      if (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param)
+      if (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param ||
+          D->getKind() == DeclKind::ExplicitCapture)
         ParamsUseSameVars = checkName(dyn_cast<VarDecl>(D));
       if (D->getKind() == DeclKind::Func)
         ConditionUseOnlyAllowedFunctions = checkName(dyn_cast<FuncDecl>(D));
@@ -131,7 +132,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
       if (E->getKind() != ExprKind::DeclRef)
         return Action::Continue(E);
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
-      if (D->getKind() != DeclKind::Var && D->getKind() != DeclKind::Param)
+      if (D->getKind() != DeclKind::Var && D->getKind() != DeclKind::Param &&
+          D->getKind() != DeclKind::ExplicitCapture)
         return Action::Continue(E);
       VarName = dyn_cast<VarDecl>(D)->getName().str().str();
       return Action::Stop();

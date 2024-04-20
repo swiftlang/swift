@@ -754,6 +754,7 @@ public:
     case DeclKind::TypeAlias:
     case DeclKind::AssociatedType:
     case DeclKind::Var:
+    case DeclKind::ExplicitCapture:
     case DeclKind::Subscript:
     case DeclKind::PatternBinding:
     case DeclKind::Func:

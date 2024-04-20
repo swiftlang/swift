@@ -40,6 +40,7 @@ static SourceLoc getNewFuncInsertLoc(DeclContext *DC,
       ValueDecl *SD = FD->getStorage();
       switch (SD->getKind()) {
       case DeclKind::Var:
+      case DeclKind::ExplicitCapture:
         if (auto *PBD = cast<VarDecl>(SD)->getParentPatternBinding())
           D = PBD;
         break;

@@ -16,19 +16,20 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
-#include "TypeChecker.h"
 #include "TypeCheckType.h"
-#include "swift/Strings.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Strings.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -4133,6 +4134,22 @@ namespace {
               .withPreconcurrency(preconcurrency);
       }
 
+      // If a closure has an isolated explicitly isolated capture, it is
+      // isolated to that capture.
+      auto *explicitCapture = dyn_cast_or_null<ExplicitCaptureDecl>(
+          closure->getCaptureInfo().getIsolatedParamCapture());
+      auto *explicitCaptures = closure->getExplicitCaptures();
+      if (explicitCapture && explicitCaptures) {
+        auto explicitCaptureList = explicitCaptures->getCaptureList();
+        if (std::find_if(explicitCaptureList.begin(), explicitCaptureList.end(),
+                         [explicitCapture](auto &capture) {
+                           return capture.getVar() == explicitCapture;
+                         }) != explicitCaptureList.end()) {
+          return ActorIsolation::forActorInstanceCapture(explicitCapture)
+              .withPreconcurrency(preconcurrency);
+        }
+      }
+
       // Sendable closures are nonisolated unless the closure has
       // specifically opted into inheriting actor isolation.
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
@@ -4657,6 +4674,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::Accessor:
   case DeclKind::Subscript:
   case DeclKind::Var:
+  case DeclKind::ExplicitCapture:
     return value->isInstanceMember() ? MemberIsolationPropagation::AnyIsolation
                                      : MemberIsolationPropagation::GlobalActor;
 
@@ -6550,6 +6568,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::EnumElement:
   case DeclKind::Constructor:
   case DeclKind::Param:
+  case DeclKind::ExplicitCapture:
   case DeclKind::Var:
   case DeclKind::Accessor:
   case DeclKind::Func:

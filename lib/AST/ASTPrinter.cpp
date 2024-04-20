@@ -3738,7 +3738,9 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAccess(decl);
   if (decl->isStatic() && Options.PrintStaticKeyword)
     printStaticKeyword(decl->getCorrectStaticSpelling());
-  if (decl->getKind() == DeclKind::Var || Options.PrintParameterSpecifiers) {
+  if (decl->getKind() == DeclKind::Var ||
+      decl->getKind() == DeclKind::ExplicitCapture ||
+      Options.PrintParameterSpecifiers) {
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
     
@@ -3783,6 +3785,10 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 }
 
 void PrintAST::visitParamDecl(ParamDecl *decl) {
+  visitVarDecl(decl);
+}
+
+void PrintAST::visitExplicitCaptureDecl(ExplicitCaptureDecl *decl) {
   visitVarDecl(decl);
 }
 

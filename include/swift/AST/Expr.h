@@ -3883,7 +3883,10 @@ class AbstractClosureExpr : public DeclContext, public Expr {
   CaptureInfo Captures;
 
   /// The set of parameters.
-  ParameterList *parameterList;
+  ParameterList *parameterList = nullptr;
+
+  /// The set of explicit captures.
+  CaptureListExpr *captureList = nullptr;
 
   /// Actor isolation of the closure.
   ActorIsolation actorIsolation;
@@ -3893,7 +3896,6 @@ public:
                       DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
-        parameterList(nullptr),
         actorIsolation(ActorIsolation::forUnspecified()) {
     Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
@@ -3919,6 +3921,11 @@ public:
   ParameterList *getParameters() { return parameterList; }
   const ParameterList *getParameters() const { return parameterList; }
   void setParameterList(ParameterList *P);
+
+  /// Retrieve the explicit captures of this closure.
+  CaptureListExpr *getExplicitCaptures() { return captureList; }
+  const CaptureListExpr *getExplicitCaptures() const { return captureList; }
+  void setExplicitCaptures(CaptureListExpr *CLE) { captureList = CLE; }
 
   // Expose this to users.
   using DeclContext::setParent;

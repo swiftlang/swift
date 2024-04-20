@@ -327,7 +327,8 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Protocol:
     return CodeCompletionDeclKind::Protocol;
   case DeclKind::Var:
-  case DeclKind::Param: {
+  case DeclKind::Param:
+  case DeclKind::ExplicitCapture: {
     auto DC = D->getDeclContext();
     if (DC->isTypeContext()) {
       if (cast<VarDecl>(D)->isStatic())

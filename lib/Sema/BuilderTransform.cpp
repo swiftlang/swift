@@ -181,6 +181,7 @@ protected:
       case DeclKind::PatternBinding:
       case DeclKind::Var:
       case DeclKind::Param:
+      case DeclKind::ExplicitCapture:
         newBody.push_back(element);
         return std::nullopt;
 

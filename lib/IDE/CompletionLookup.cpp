@@ -26,6 +26,7 @@ namespace {
 static bool SwiftKeyPathFilter(ValueDecl *decl, DeclVisibilityKind) {
   switch (decl->getKind()) {
   case DeclKind::Var:
+  case DeclKind::ExplicitCapture:
   case DeclKind::Subscript:
     return true;
   default:

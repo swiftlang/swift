@@ -217,6 +217,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       setFuncSymbolInfo(cast<FuncDecl>(D), info);
       break;
     case DeclKind::Var:
+    case DeclKind::ExplicitCapture:
       info.Kind = getVarSymbolKind(cast<VarDecl>(D));
       if (D->getAttrs().hasAttribute<IBOutletAttr>())
         info.Properties |= SymbolProperty::IBAnnotated;

@@ -2445,6 +2445,7 @@ private:
       return false;
 
     case DeclKind::Var:
+    case DeclKind::ExplicitCapture:
       Col = llvm::raw_ostream::GREEN;
       break;
     case DeclKind::Func:

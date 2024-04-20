@@ -2647,6 +2647,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       // "unowned(safe/unsafe)".
       SourceLoc ownershipLocStart, ownershipLocEnd;
       auto ownershipKind = ReferenceOwnership::Strong;
+      bool isIsolated = false;
       if (Tok.isContextualKeyword("weak")){
         ownershipLocStart = ownershipLocEnd = consumeToken(tok::identifier);
         ownershipKind = ReferenceOwnership::Weak;
@@ -2667,6 +2668,10 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
           if (!consumeIf(tok::r_paren, ownershipLocEnd))
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
+      } else if (Tok.isContextualKeyword("isolated")) {
+        ownershipLocStart = consumeToken(tok::identifier);
+        ownershipLocEnd = Tok.getLoc();
+        isIsolated = true;
       } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
                  peekToken().isAny(tok::equal, tok::comma, tok::r_square,
                                    tok::period)) {
@@ -2685,7 +2690,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       // The thing being capture specified is an identifier, or as an identifier
       // followed by an expression.
-      Expr *initializer;
+      Expr *initializer = nullptr;
       Identifier name;
       SourceLoc nameLoc = Tok.getLoc();
       SourceLoc equalLoc;
@@ -2745,34 +2750,35 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         initializer = ExprResult.get();
       }
 
-      // Create the VarDecl and the PatternBindingDecl for the captured
-      // expression.  This uses the parent declcontext (not the closure) since
-      // the initializer expression is evaluated before the closure is formed.
+      // Create the ExplicitCaptureDecl and the PatternBindingDecl for the
+      // captured expression.  This uses the parent declcontext (not the
+      // closure) since the initializer expression is evaluated before the
+      // closure is formed.
       auto introducer = (ownershipKind != ReferenceOwnership::Weak
                          ? VarDecl::Introducer::Let
                          : VarDecl::Introducer::Var);
-      auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
-                                       nameLoc, name, CurDeclContext);
-        
+      auto *ECD = new (Context)
+          ExplicitCaptureDecl(introducer, nameLoc, name, CurDeclContext);
+      ECD->setIsolated(isIsolated);
+
       // If we captured something under the name "self", remember that.
       if (name == Context.Id_self)
-        capturedSelfDecl = VD;
+        capturedSelfDecl = ECD;
 
       // Attributes.
       if (ownershipKind != ReferenceOwnership::Strong)
-        VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(
-          SourceRange(ownershipLocStart, ownershipLocEnd), ownershipKind));
+        ECD->getAttrs().add(new (Context) ReferenceOwnershipAttr(
+            SourceRange(ownershipLocStart, ownershipLocEnd), ownershipKind));
 
-      auto pattern = NamedPattern::createImplicit(Context, VD);
+      auto pattern = NamedPattern::createImplicit(Context, ECD);
 
       auto *PBD = PatternBindingDecl::create(
           Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
-          /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
-          CurDeclContext);
+          /*VarLoc*/ nameLoc, pattern, equalLoc, initializer, CurDeclContext);
 
       auto CLE = CaptureListEntry(PBD);
       if (CLE.isSimpleSelfCapture())
-        VD->setIsSelfParamCapture();
+        ECD->setIsSelfParamCapture();
 
       captureList.push_back(CLE);
     } while (HasNext);
@@ -3052,8 +3058,11 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;
-  if (!captureList.empty())
-    result = CaptureListExpr::create(Context, captureList, closure);
+  if (!captureList.empty()) {
+    auto *CLE = CaptureListExpr::create(Context, captureList, closure);
+    closure->setExplicitCaptures(CLE);
+    result = CLE;
+  }
 
   return makeParserResult(Status, result);
 }
