@@ -28,7 +28,7 @@ class RegionAnalysisFunctionInfo;
 namespace regionanalysisimpl {
 
 using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
-using TrackableValueID = PartitionPrimitives::Element;
+using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
 
 /// Check if the passed in type is NonSendable.
@@ -88,9 +88,13 @@ class BlockPartitionState {
 
   TransferringOperandSetFactory &ptrSetFactory;
 
+  TransferringOperandToStateMap &transferringOpToStateMap;
+
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator,
-                      TransferringOperandSetFactory &ptrSetFactory);
+                      TransferringOperandSetFactory &ptrSetFactory,
+                      IsolationHistory::Factory &isolationHistoryFactory,
+                      TransferringOperandToStateMap &transferringOpToStateMap);
 
 public:
   bool getLiveness() const { return isLive; }
@@ -171,7 +175,7 @@ public:
 
   SILIsolationInfo getIsolationRegionInfo() const { return regionInfo; }
 
-  TrackableValueID getID() const { return TrackableValueID(id); }
+  Element getID() const { return Element(id); }
 
   void addFlag(TrackableValueFlag flag) { flagSet |= flag; }
 
@@ -182,7 +186,7 @@ public:
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
        << "][region_value_kind: ";
-    getIsolationRegionInfo().print(os);
+    getIsolationRegionInfo().printForDiagnostics(os);
     os << "].";
   }
 
@@ -272,9 +276,7 @@ public:
     return valueState.getIsolationRegionInfo();
   }
 
-  TrackableValueID getID() const {
-    return TrackableValueID(valueState.getID());
-  }
+  Element getID() const { return Element(valueState.getID()); }
 
   /// Return the representative value of this equivalence class of values.
   RepresentativeValue getRepresentative() const { return representativeValue; }
@@ -284,6 +286,11 @@ public:
   /// Returns true if this TrackableValue is an alloc_stack from a transferring
   /// parameter.
   bool isTransferringParameter() const;
+
+  void printIsolationInfo(SmallString<64> &outString) const {
+    llvm::raw_svector_ostream os(outString);
+    getIsolationRegionInfo().printForDiagnostics(os);
+  }
 
   void print(llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
@@ -311,7 +318,6 @@ public:
   using Region = PartitionPrimitives::Region;
   using TrackableValue = regionanalysisimpl::TrackableValue;
   using TrackableValueState = regionanalysisimpl::TrackableValueState;
-  using TrackableValueID = Element;
   using RepresentativeValue = regionanalysisimpl::RepresentativeValue;
 
 private:
@@ -365,14 +371,14 @@ public:
       SILInstruction *introducingInst) const;
 
 private:
-  std::optional<TrackableValue> getValueForId(TrackableValueID id) const;
+  std::optional<TrackableValue> getValueForId(Element id) const;
   std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
   bool mergeIsolationRegionInfo(SILValue value, SILIsolationInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
-  TrackableValueID lookupValueID(SILValue value);
+  Element lookupValueID(SILValue value);
 };
 
 class RegionAnalysisFunctionInfo {
@@ -393,6 +399,10 @@ class RegionAnalysisFunctionInfo {
   PartitionOpTranslator *translator;
 
   TransferringOperandSetFactory ptrSetFactory;
+
+  IsolationHistory::Factory isolationHistoryFactory;
+
+  TransferringOperandToStateMap transferringOpToStateMap;
 
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different
@@ -487,6 +497,16 @@ public:
   RegionAnalysisValueMap &getValueMap() {
     assert(supportedFunction && "Unsupported Function?!");
     return valueMap;
+  }
+
+  IsolationHistory::Factory &getIsolationHistoryFactory() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return isolationHistoryFactory;
+  }
+
+  TransferringOperandToStateMap &getTransferringOpToStateMap() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return transferringOpToStateMap;
   }
 
   bool isClosureCaptured(SILValue value, Operand *op);

@@ -4,8 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser
 
-// REQUIRES: rdar126006489
-
 @available(SwiftStdlib 5.1, *)
 actor A {
   func f() { } // expected-note 5{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
