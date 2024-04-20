@@ -2623,6 +2623,12 @@ void SourceFile::setImportUsedPreconcurrency(
   PreconcurrencyImportsUsed.insert(import);
 }
 
+bool SourceFile::isMaxAccessLevelUsingImportInternal(
+    AttributedImport<ImportedModule> import) const {
+  auto maxLevel = getMaxAccessLevelUsingImport(import.module.importedModule);
+  return maxLevel < AccessLevel::Package;
+}
+
 AccessLevel
 SourceFile::getMaxAccessLevelUsingImport(
     const ModuleDecl *mod) const {
