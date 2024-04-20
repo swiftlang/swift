@@ -1121,6 +1121,13 @@ public:
   /// if they need to.
   static SILLocation getLoc(Operand *op) { return Impl::getLoc(op); }
 
+  /// Some evaluators pass in mock operands that one cannot call getUser()
+  /// upon. So to allow for this, provide a routine that our impl can override
+  /// if they need to.
+  static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
+    return Impl::getIsolationInfo(partitionOp);
+  }
+
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) const {
     if (shouldEmitVerboseLogging()) {
@@ -1192,13 +1199,9 @@ public:
       //
       // DISCUSSION: We couldn't not emit this earlier since we needed the
       // dynamic isolation info of our value.
-      if (transferredRegionIsolation.isActorIsolated()) {
-        if (auto calleeIsolationInfo =
-                SILIsolationInfo::get(op.getSourceInst())) {
-          if (transferredRegionIsolation.hasSameIsolation(
-                  calleeIsolationInfo)) {
-            return;
-          }
+      if (auto calleeIsolationInfo = getIsolationInfo(op)) {
+        if (transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
+          return;
         }
       }
 
@@ -1291,7 +1294,7 @@ private:
   void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
                                          Operand *transferringOp) const {
     if (shouldTryToSquelchErrors()) {
-      if (auto isolationInfo = SILIsolationInfo::get(op.getSourceInst())) {
+      if (auto isolationInfo = getIsolationInfo(op)) {
         if (isolationInfo.isActorIsolated() &&
             isolationInfo.hasSameIsolation(
                 SILIsolationInfo::get(transferringOp->getUser())))
@@ -1389,6 +1392,9 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
   static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
+  static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
+    return SILIsolationInfo::get(partitionOp.getSourceInst());
+  }
 };
 
 /// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special
