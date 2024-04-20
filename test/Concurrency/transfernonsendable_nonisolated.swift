@@ -117,3 +117,16 @@ func callMyFinalActor_NonIsolatedSync_SyncUseAfter(_ a: MyFinalActor) async {
   a.syncNonisolated(x)
   useValueSync(x)
 }
+
+func callIsolatedFunction() async {
+  let x = NonSendable()
+  await useValueAsync(x)
+  useValueSync(x)
+}
+
+@MainActor
+func callMainActorIsolatedFunction() async {
+  let x = NonSendable()
+  await useValueAsync(x)
+  useValueSync(x)
+}
