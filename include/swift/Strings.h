@@ -26,6 +26,9 @@ constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 constexpr static const StringLiteral SWIFT_CONCURRENCY_NAME = "_Concurrency";
 /// The name of the Concurrency Shims Clang module
 constexpr static const StringLiteral SWIFT_CONCURRENCY_SHIMS_NAME = "_SwiftConcurrencyShims";
+/// The unique ABI prefix that swift-syntax uses when it's built as part of the
+/// compiler.
+constexpr static const StringLiteral SWIFT_MODULE_ABI_NAME_PREFIX = "Compiler";
 /// The name of the Distributed module, which supports that extension.
 constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 /// The name of the StringProcessing module, which supports that extension.
