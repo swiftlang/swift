@@ -26,6 +26,8 @@ using namespace swift;
 using namespace swift::PatternMatch;
 using namespace swift::PartitionPrimitives;
 
+#pragma clang optimize off
+
 //===----------------------------------------------------------------------===//
 //                               MARK: Logging
 //===----------------------------------------------------------------------===//
