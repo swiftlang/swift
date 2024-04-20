@@ -1235,9 +1235,6 @@ void SILGenFunction::emitProlog(
     SourceLoc throwsLoc) {
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  assert(captureInfo.hasBeenComputed() &&
-         "can't emit prolog of function with uncomputed captures");
-
   bool hasErasedIsolation =
     (TypeContext && TypeContext->ExpectedLoweredType->hasErasedIsolation());
 

@@ -112,8 +112,8 @@ struct Generic<T> { // expected-note {{'T' declared as parameter to type 'Generi
 }
 
 protocol P { // expected-note {{'P' previously declared here}}
-  // expected-note@-1 2{{did you mean 'P'?}}
-  // expected-note@-2 {{'P' declared here}}
+  // expected-note@-1 {{'P' declared here}}
+  // expected-note@-2 {{did you mean 'P'?}}
   typealias a = Generic
 }
 
@@ -174,7 +174,7 @@ class CircularValidationWithTypo {
 
 protocol PP {}
 
-func boo() {
+func boo() { // expected-note {{did you mean 'boo'?}}
   extension PP { // expected-error {{declaration is only valid at file scope}}
     func g() {
       booo() // expected-error {{cannot find 'booo' in scope}}
@@ -216,7 +216,7 @@ protocol P2 {
 }
 
 extension P2 {
-  func f() { // expected-note {{did you mean 'f'?}}
+  func f() {
     _ = a // expected-error {{cannot find 'a' in scope}}
   }
 }

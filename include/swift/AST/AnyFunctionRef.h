@@ -75,20 +75,6 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
-  void setCaptureInfo(CaptureInfo captures) const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      AFD->setCaptureInfo(captures);
-      return;
-    }
-    TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
-  }
-
-  bool hasType() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasInterfaceType();
-    return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
-  }
-
   ParameterList *getParameters() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getParameters();
@@ -185,16 +171,13 @@ public:
   /// known not to escape from that function.  In this case, captures can be
   /// more efficient.
   bool isKnownNoEscape() const {
-    if (hasType() && !getType()->hasError())
-      return getType()->castTo<AnyFunctionType>()->isNoEscape();
+    if (auto *fnType = getType()->getAs<AnyFunctionType>())
+      return fnType->isNoEscape();
     return false;
   }
 
   /// Whether this function is @Sendable.
   bool isSendable() const {
-    if (!hasType())
-      return false;
-
     if (auto *fnType = getType()->getAs<AnyFunctionType>())
       return fnType->isSendable();
 
