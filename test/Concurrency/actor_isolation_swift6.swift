@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -emit-sil -o /dev/null -verify -enable-experimental-feature GlobalActorIsolatedTypesUsability %s
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 final class ImmutablePoint: Sendable {
   let x : Int = 0
@@ -55,13 +56,12 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}
   _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
   _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
-
-  // We could extend the 'nonisolated within the module' rule to vars
-  // value types types if the property type is 'Sendable'.
+  
+  // this does not need an await, since the property is 'Sendable' and of a
+  // value type
   _ = anno.point
-  // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-2 {{property access is 'async'}}
   _ = await anno.point
+  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter
