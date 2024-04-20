@@ -72,7 +72,7 @@ bool swift::isExported(const ValueDecl *VD) {
   AccessScope accessScope =
       VD->getFormalAccessScope(nullptr,
                                /*treatUsableFromInlineAsPublic*/true);
-  if (accessScope.isPublic())
+  if (accessScope.isPublicOrPackage())
     return true;
 
   // Is this a stored property in a @frozen struct or class?
@@ -89,7 +89,7 @@ static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
     AccessScope scope =
         PD->getFormalAccessScope(/*useDC*/ nullptr,
                                  /*treatUsableFromInlineAsPublic*/ true);
-    if (scope.isPublic())
+    if (scope.isPublicOrPackage())
       return true;
   }
 
