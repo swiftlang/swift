@@ -759,8 +759,8 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
                               GenericEnvironment *packElementEnv);
 
-/// Compute the set of captures for the given function or closure.
-void computeCaptures(AnyFunctionRef AFR);
+/// Compute the set of captures for the given closure.
+void computeCaptures(AbstractClosureExpr *ACE);
 
 /// Check for invalid captures from stored property initializers.
 void checkPatternBindingCaptures(IterableDeclContext *DC);

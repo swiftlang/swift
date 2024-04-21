@@ -571,3 +571,10 @@ SWIFT_REQUEST(TypeChecker, LifetimeDependenceInfoRequest,
 SWIFT_REQUEST(TypeChecker, SuppressesConformanceRequest,
               bool(NominalTypeDecl *decl, KnownProtocolKind kp),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, CaptureInfoRequest,
+              CaptureInfo(AbstractFunctionDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ParamCaptureInfoRequest,
+              CaptureInfo(ParamDecl *),
+              SeparatelyCached, NoLocationInfo)
