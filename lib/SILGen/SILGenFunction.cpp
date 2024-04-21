@@ -1002,7 +1002,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // If we're in top-level code, we don't need to physically capture script
   // globals, but we still need to mark them as escaping so that DI can flag
   // uninitialized uses.
-  if (isEmittingTopLevelCode()) {
+  if (isEmittingTopLevelCode() && dc->getParentSourceFile()) {
     auto captureInfo = closure.getCaptureInfo();
     emitMarkFunctionEscapeForTopLevelCodeGlobals(loc, captureInfo);
   }

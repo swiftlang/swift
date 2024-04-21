@@ -1402,10 +1402,10 @@ namespace {
         printField(PD->getDefaultArgumentKind(), "default_arg");
       }
       if (PD->hasDefaultExpr() &&
-          PD->getDefaultArgumentCaptureInfo().hasBeenComputed() &&
-          !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
+          PD->getCachedDefaultArgumentCaptureInfo() &&
+          !PD->getCachedDefaultArgumentCaptureInfo()->isTrivial()) {
         printFieldRaw([&](raw_ostream &OS) {
-          PD->getDefaultArgumentCaptureInfo().print(OS);
+          PD->getCachedDefaultArgumentCaptureInfo()->print(OS);
         }, "", CapturesColor);
       }
       
@@ -1489,11 +1489,12 @@ namespace {
 
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type, StringRef Label) {
       printCommon(D, Type, Label, FuncColor);
-      if (D->getCaptureInfo().hasBeenComputed() &&
-          !D->getCaptureInfo().isTrivial()) {
-        printFlagRaw([&](raw_ostream &OS) {
-          D->getCaptureInfo().print(OS);
-        });
+      if (auto captureInfo = D->getCachedCaptureInfo()) {
+        if (!captureInfo->isTrivial()) {
+          printFlagRaw([&](raw_ostream &OS) {
+            captureInfo->print(OS);
+          });
+        }
       }
 
       if (auto *attr = D->getAttrs().getAttribute<NonisolatedAttr>()) {
@@ -2828,11 +2829,12 @@ public:
       break;
     }
 
-    if (E->getCaptureInfo().hasBeenComputed() &&
-        !E->getCaptureInfo().isTrivial()) {
-      printFieldRaw([&](raw_ostream &OS) {
-        E->getCaptureInfo().print(OS);
-      }, "", CapturesColor);
+    if (auto captureInfo = E->getCachedCaptureInfo()) {
+      if (!captureInfo->isTrivial()) {
+        printFieldRaw([&](raw_ostream &OS) {
+          captureInfo->print(OS);
+        }, "", CapturesColor);
+      }
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
