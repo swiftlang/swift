@@ -1075,11 +1075,16 @@ CheckInconsistentAccessLevelOnImport::evaluate(
     auto &diags = mod->getDiags();
     {
       InFlightDiagnostic error =
-        diags.diagnose(implicitImport, diag::inconsistent_implicit_access_level_on_import,
-                       implicitImport->getModule()->getName(), otherAccessLevel);
+        diags.diagnose(implicitImport,
+                       diag::inconsistent_implicit_access_level_on_import,
+                       implicitImport->getModule()->getName(),
+                       otherAccessLevel);
       error.fixItInsert(implicitImport->getStartLoc(),
                         diag::inconsistent_implicit_access_level_on_import_fixit,
                         otherAccessLevel);
+      error.flush();
+      diags.diagnose(implicitImport,
+                     diag::inconsistent_implicit_access_level_on_import_silence);
     }
 
     SourceLoc accessLevelLoc = otherImport->getStartLoc();
