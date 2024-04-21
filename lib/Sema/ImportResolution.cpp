@@ -577,8 +577,10 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   if (ID->getAttrs().hasAttribute<TestableAttr>())
     import.options |= ImportFlags::Testable;
 
-  if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+  if (auto attr = ID->getAttrs().getAttribute<ImplementationOnlyAttr>()) {
     import.options |= ImportFlags::ImplementationOnly;
+    import.implementationOnlyRange = attr->Range;
+  }
 
   import.accessLevel = ID->getAccessLevel();
   if (auto attr = ID->getAttrs().getAttribute<AccessControlAttr>()) {
@@ -802,7 +804,21 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   // We exempt some imports using @_implementationOnly in a safe way from
   // packages that cannot be resilient.
   if (import.options.contains(ImportFlags::ImplementationOnly) &&
-      !SF.getParentModule()->isResilient() && topLevelModule &&
+      import.implementationOnlyRange.isValid()) {
+    if (SF.getParentModule()->isResilient()) {
+      // Encourage replacing `@_implementationOnly` with `internal import`.
+      if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
+        auto inFlight =
+          ctx.Diags.diagnose(import.importLoc,
+                             diag::implementation_only_deprecated_implicit);
+        inFlight.fixItRemove(import.implementationOnlyRange);
+      } else {
+        auto inFlight =
+          ctx.Diags.diagnose(import.importLoc,
+                             diag::implementation_only_deprecated_explicit);
+        inFlight.fixItReplace(import.implementationOnlyRange, "internal");
+      }
+    } else if ( // Non-resilient
       !(((targetName.str() == "CCryptoBoringSSL" ||
           targetName.str() == "CCryptoBoringSSLShims") &&
          (importerName.str() == "Crypto" ||
@@ -811,11 +827,13 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
         ((targetName.str() == "CNIOBoringSSL" ||
           targetName.str() == "CNIOBoringSSLShims") &&
          importerName.str() == "NIOSSL"))) {
-    ctx.Diags.diagnose(import.importLoc,
-                       diag::implementation_only_requires_library_evolution,
-                       importerName);
+      ctx.Diags.diagnose(import.importLoc,
+                         diag::implementation_only_requires_library_evolution,
+                         importerName);
+    }
   }
 
+  // Report public imports of non-resilient modules from a resilient module.
   if (import.options.contains(ImportFlags::ImplementationOnly) ||
       import.accessLevel < AccessLevel::Public)
     return;
