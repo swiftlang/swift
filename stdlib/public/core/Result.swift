@@ -170,7 +170,7 @@ extension Result {
   /// produces another `Result` type.
   ///
   /// In this example, note the difference in the result of using `map` and
-  /// `flatMap` with a transformation that returns an result type.
+  /// `flatMap` with a transformation that returns a result type.
   ///
   ///     func getNextInteger() -> Result<Int, Error> {
   ///         .success(4)
