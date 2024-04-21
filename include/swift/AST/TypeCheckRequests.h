@@ -4949,6 +4949,47 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
+
+};
+
+class CaptureInfoRequest :
+    public SimpleRequest<CaptureInfoRequest,
+                         CaptureInfo(AbstractFunctionDecl *),
+                         RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CaptureInfo evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<CaptureInfo> getCachedResult() const;
+  void cacheResult(CaptureInfo value) const;
+};
+
+class ParamCaptureInfoRequest :
+    public SimpleRequest<ParamCaptureInfoRequest,
+                         CaptureInfo(ParamDecl *),
+                         RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CaptureInfo evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<CaptureInfo> getCachedResult() const;
+  void cacheResult(CaptureInfo value) const;
 };
 
 class SuppressesConformanceRequest

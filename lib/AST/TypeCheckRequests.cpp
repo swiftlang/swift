@@ -2258,3 +2258,25 @@ void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
                  "body",
                  decl->getName());
 }
+
+std::optional<CaptureInfo>
+CaptureInfoRequest::getCachedResult() const {
+  auto *func = std::get<0>(getStorage());
+  return func->getCachedCaptureInfo();
+}
+
+void CaptureInfoRequest::cacheResult(CaptureInfo info) const {
+  auto *func = std::get<0>(getStorage());
+  return func->setCaptureInfo(info);
+}
+
+std::optional<CaptureInfo>
+ParamCaptureInfoRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  return param->getCachedDefaultArgumentCaptureInfo();
+}
+
+void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultArgumentCaptureInfo(info);
+}

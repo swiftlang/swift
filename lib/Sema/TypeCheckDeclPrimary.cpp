@@ -1170,6 +1170,9 @@ static void checkDefaultArguments(ParameterList *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
 
+    // Force captures since this can emit diagnostics.
+    (void) param->getDefaultArgumentCaptureInfo();
+
     // If the default argument has isolation, it must match the
     // isolation of the decl context.
     (void)param->getInitializerIsolation();
@@ -3621,8 +3624,8 @@ public:
     
     if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      (void)FD->getTypecheckedBody();
-      TypeChecker::computeCaptures(FD);
+      (void) FD->getTypecheckedBody();
+      (void) FD->getCaptureInfo();
     } else if (!FD->isBodySkipped()) {
       addDelayedFunction(FD);
     }
