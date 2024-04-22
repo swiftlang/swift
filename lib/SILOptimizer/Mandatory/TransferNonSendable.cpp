@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
@@ -54,6 +55,53 @@ using Region = PartitionPrimitives::Region;
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
+
+/// Determine whether the given nominal type has an explicit Sendable
+/// conformance (regardless of its availability).
+static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
+                                           bool applyModuleDefault = true) {
+  ASTContext &ctx = nominal->getASTContext();
+  auto nominalModule = nominal->getParentModule();
+
+  // In a concurrency-checked module, a missing conformance is equivalent to
+  // an explicitly unavailable one. If we want to apply this rule, do so now.
+  if (applyModuleDefault && nominalModule->isConcurrencyChecked())
+    return true;
+
+  // Look for any conformance to `Sendable`.
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return false;
+
+  // Look for a conformance. If it's present and not (directly) missing,
+  // we're done.
+  auto conformance = nominalModule->lookupConformance(
+      nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
+  return conformance &&
+      !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
+        cast<BuiltinProtocolConformance>(
+          conformance.getConcrete())->isMissing());
+}
+
+static std::optional<DiagnosticBehavior>
+getDiagnosticBehaviorLimitForValue(SILValue value) {
+  auto *nom = value->getType().getNominalOrBoundGenericNominal();
+  if (!nom)
+    return {};
+
+  auto attributedImport =
+      nom->findImport(value->getFunction()->getParentModule());
+  if (!attributedImport ||
+      !attributedImport->options.contains(ImportFlags::Preconcurrency))
+    return {};
+
+  if (hasExplicitSendableConformance(nom))
+    return DiagnosticBehavior::Warning;
+
+  return attributedImport->module.importedModule->isConcurrencyChecked()
+             ? DiagnosticBehavior::Warning
+             : DiagnosticBehavior::Ignore;
+}
 
 static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
                                             FullApplySite fai,
@@ -441,11 +489,13 @@ public:
   void
   emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
                                   SILIsolationInfo namedValuesIsolationInfo,
-                                  ApplyIsolationCrossing isolationCrossing) {
+                                  ApplyIsolationCrossing isolationCrossing,
+                                  std::optional<DiagnosticBehavior> behaviorLimit = {}) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(behaviorLimit);
 
     // Then emit the note with greater context.
     SmallString<64> descriptiveKindStr;
@@ -461,21 +511,25 @@ public:
   }
 
   void emitTypedIsolationCrossing(SILLocation loc, Type inferredType,
-                                  ApplyIsolationCrossing isolationCrossing) {
+                                  ApplyIsolationCrossing isolationCrossing,
+                                  std::optional<DiagnosticBehavior> behaviorLimit = {}) {
     diagnoseError(
         loc, diag::regionbasedisolation_transfer_yields_race_with_isolation,
         inferredType, isolationCrossing.getCallerIsolation(),
         isolationCrossing.getCalleeIsolation())
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(behaviorLimit);
     emitRequireInstDiagnostics();
   }
 
   void emitNamedUseOfStronglyTransferredValue(SILLocation loc,
-                                              Identifier name) {
+                                              Identifier name,
+                                              std::optional<DiagnosticBehavior> behaviorLimit = {}) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+      .limitBehaviorIf(behaviorLimit);
 
     // Then emit the note with greater context.
     diagnoseNote(
@@ -487,33 +541,39 @@ public:
   }
 
   void emitTypedUseOfStronglyTransferredValue(SILLocation loc,
-                                              Type inferredType) {
+                                              Type inferredType,
+                                              std::optional<DiagnosticBehavior> behaviorLimit = {}) {
     diagnoseError(
         loc,
         diag::
             regionbasedisolation_transfer_yields_race_stronglytransferred_binding,
         inferredType)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+      .limitBehaviorIf(behaviorLimit);
     emitRequireInstDiagnostics();
   }
 
   void emitTypedRaceWithUnknownIsolationCrossing(SILLocation loc,
-                                                 Type inferredType) {
+                                                 Type inferredType,
+                                                 std::optional<DiagnosticBehavior> behaviorLimit = {}) {
     diagnoseError(loc,
                   diag::regionbasedisolation_transfer_yields_race_no_isolation,
                   inferredType)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+      .limitBehaviorIf(behaviorLimit);
     emitRequireInstDiagnostics();
   }
 
   void emitNamedIsolationCrossingDueToCapture(
       SILLocation loc, Identifier name,
       SILIsolationInfo namedValuesIsolationInfo,
-      ApplyIsolationCrossing isolationCrossing) {
+      ApplyIsolationCrossing isolationCrossing,
+      std::optional<DiagnosticBehavior> behaviorLimit = {}) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+      .limitBehaviorIf(behaviorLimit);
 
     SmallString<64> descriptiveKindStr;
     {
@@ -531,11 +591,13 @@ public:
 
   void emitTypedIsolationCrossingDueToCapture(
       SILLocation loc, Type inferredType,
-      ApplyIsolationCrossing isolationCrossing) {
+      ApplyIsolationCrossing isolationCrossing,
+      std::optional<DiagnosticBehavior> behaviorLimit = {}) {
     diagnoseError(loc, diag::regionbasedisolation_isolated_capture_yields_race,
                   inferredType, isolationCrossing.getCalleeIsolation(),
                   isolationCrossing.getCallerIsolation())
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+      .limitBehaviorIf(behaviorLimit);
     emitRequireInstDiagnostics();
   }
 
@@ -685,6 +747,8 @@ void UseAfterTransferDiagnosticInferrer::initForApply(Operand *op,
                                                       ApplyExpr *sourceApply) {
   auto isolationCrossing = sourceApply->getIsolationCrossing().value();
 
+  auto behavior = getDiagnosticBehaviorLimitForValue(op->get());
+
   // Grab out full apply site and see if we can find a better expr.
   SILInstruction *i = const_cast<SILInstruction *>(op->getUser());
   auto fai = FullApplySite::isa(i);
@@ -696,7 +760,8 @@ void UseAfterTransferDiagnosticInferrer::initForApply(Operand *op,
   auto inferredArgType =
       foundExpr ? foundExpr->findOriginalType() : baseInferredType;
   diagnosticEmitter.emitTypedIsolationCrossing(baseLoc, inferredArgType,
-                                               isolationCrossing);
+                                               isolationCrossing,
+                                               behavior);
 }
 
 /// This walker visits an AutoClosureExpr and looks for uses of a specific
@@ -816,10 +881,11 @@ void UseAfterTransferDiagnosticInferrer::infer() {
     // error.
     if (auto rootValueAndName =
             VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
+      auto behaviorLimit = getDiagnosticBehaviorLimitForValue(transferOp->get());
       auto &state = transferringOpToStateMap.get(transferOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
           baseLoc, rootValueAndName->first, state.isolationInfo,
-          *sourceApply->getIsolationCrossing());
+          *sourceApply->getIsolationCrossing(), behaviorLimit);
     }
 
     // Otherwise, try to infer from the ApplyExpr.
