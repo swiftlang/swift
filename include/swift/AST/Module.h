@@ -721,6 +721,16 @@ public:
     Bits.ModuleDecl.AllowNonResilientAccess = flag;
   }
 
+  /// Returns true if -experimental-package-cmo was passed, which
+  /// enables serialization of package, public, and inlinable decls in a
+  /// package. This requires -experimental-allow-non-resilient-access.
+  bool serializePackageEnabled() const {
+    return Bits.ModuleDecl.SerializePackageEnabled;
+  }
+  void setSerializePackageEnabled(bool flag = true) {
+    Bits.ModuleDecl.SerializePackageEnabled = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///
