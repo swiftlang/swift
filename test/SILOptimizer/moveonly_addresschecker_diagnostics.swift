@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature BorrowingSwitch -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-experimental-feature NoncopyableGenerics -O -sil-verify-all -verify -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature BorrowingSwitch -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-experimental-feature NoncopyableGenerics -O -sil-verify-all -verify -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
 
 //////////////////
 // Declarations //

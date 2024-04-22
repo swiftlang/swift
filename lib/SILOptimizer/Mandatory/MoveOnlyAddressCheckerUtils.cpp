@@ -242,6 +242,7 @@
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
@@ -1663,10 +1664,20 @@ struct CopiedLoadBorrowEliminationVisitor
       }
 
       case OperandOwnership::ForwardingConsume:
-      case OperandOwnership::DestroyingConsume:
+      case OperandOwnership::DestroyingConsume: {
+        if (auto *dvi = dyn_cast<DestroyValueInst>(nextUse->getUser())) {
+          auto value = dvi->getOperand();
+          auto *pai = dyn_cast_or_null<PartialApplyInst>(
+              value->getDefiningInstruction());
+          if (pai && pai->isOnStack()) {
+            // A destroy_value of an on_stack partial apply isn't actually a
+            // consuming use--it closes a borrow scope.
+            continue;
+          }
+        }
         // We can only hit this if our load_borrow was copied.
         llvm_unreachable("We should never hit this");
-
+      }
       case OperandOwnership::GuaranteedForwarding: {
         SmallVector<SILValue, 8> forwardedValues;
         auto *fn = nextUse->getUser()->getFunction();
@@ -1791,10 +1802,11 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   }
 
   auto feature = partialMutationFeature(kind);
-  if (!fn->getModule().getASTContext().LangOpts.hasFeature(feature) &&
+  if (feature &&
+      !fn->getModule().getASTContext().LangOpts.hasFeature(*feature) &&
       !isa<DropDeinitInst>(user)) {
     LLVM_DEBUG(llvm::dbgs()
-               << "    " << getFeatureName(feature) << " disabled!\n");
+               << "    " << getFeatureName(*feature) << " disabled!\n");
     // If the types equal, just bail early.
     // Emit the error.
     return {PartialMutationError::featureDisabled(iterType, kind)};
@@ -3974,4 +3986,30 @@ bool MoveOnlyAddressChecker::check(
                fn->dump());
   }
   return pimpl.changed;
+}
+bool MoveOnlyAddressChecker::completeLifetimes() {
+  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup
+  bool changed = false;
+
+  // Lifetimes must be completed inside out (bottom-up in the CFG).
+  PostOrderFunctionInfo *postOrder = poa->get(fn);
+  OSSALifetimeCompletion completion(fn, domTree);
+  for (auto *block : postOrder->getPostOrder()) {
+    for (SILInstruction &inst : reverse(*block)) {
+      for (auto result : inst.getResults()) {
+        if (completion.completeOSSALifetime(result) ==
+            LifetimeCompletion::WasCompleted) {
+          changed = true;
+        }
+      }
+    }
+    for (SILArgument *arg : block->getArguments()) {
+      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
+      if (completion.completeOSSALifetime(arg) ==
+          LifetimeCompletion::WasCompleted) {
+        changed = true;
+      }
+    }
+  }
+  return changed;
 }

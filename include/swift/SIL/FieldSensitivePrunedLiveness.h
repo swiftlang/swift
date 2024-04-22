@@ -239,8 +239,11 @@ private:
 /// s a struct => count(s) := sum(s.fields, { f in count(type(f)) })
 ///                             + s.hasDeinit
 /// e an enum  => count(e) := sum(e.elements, { elt in count(type(elt)) })
-///                             + e.hasDeinit
 ///                             + 1 // discriminator
+///                             + e.hasDeinit
+///
+/// The deinit bit is at the end to make drop_deinit produce a value whose
+/// leaves are contiguous.
 struct TypeSubElementCount {
   unsigned number;
 
