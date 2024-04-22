@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-upcoming-feature MoveOnlyPartialConsumption -sil-verify-all -verify %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-experimental-feature NoncopyableGenerics -enable-upcoming-feature MoveOnlyPartialConsumption -sil-verify-all -verify %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -sil-verify-all -verify %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-experimental-feature NoncopyableGenerics -sil-verify-all -verify %s
 
 //////////////////
 // Declarations //
