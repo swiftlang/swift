@@ -32,12 +32,7 @@ final class SwiftPluginServer {
   private func loadPluginLibrary(path: String, moduleName: String) async throws -> WasmPlugin {
     guard path.hasSuffix(".wasm") else { throw PluginServerError(message: "swift-wasm-plugin-server can only load wasm") }
     let wasm = try Data(contentsOf: URL(fileURLWithPath: path))
-    let plugin = try await defaultWasmPlugin.init(wasm: wasm)
-    let abiVersion = try plugin.abiVersion()
-    guard abiVersion == 1 else {
-      throw PluginServerError(message: "Wasm plugin has unsupported ABI version: \(abiVersion)")
-    }
-    return plugin
+    return try await defaultWasmPlugin.init(wasm: wasm)
   }
 
   private func expandMacro(
@@ -106,7 +101,6 @@ final class SwiftPluginServer {
 protocol WasmPlugin {
   init(wasm: Data) async throws
 
-  func abiVersion() throws -> UInt32
   func handleMessage(_ json: Data) async throws -> Data
 }
 
