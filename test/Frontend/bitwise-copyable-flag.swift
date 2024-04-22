@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend                           \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     %s                                           \
 // RUN:     -typecheck -verify
 

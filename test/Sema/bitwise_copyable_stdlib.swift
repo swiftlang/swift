@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift                   \
 // RUN:     -parse-stdlib                                \
 // RUN:     -module-name Swift                           \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -disable-availability-checking               \
 // RUN:     -debug-diagnostic-names
 

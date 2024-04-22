@@ -8029,8 +8029,6 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       }
 
       if (swiftAttr->getAttribute() == "_BitwiseCopyable") {
-        if (!SwiftContext.LangOpts.hasFeature(Feature::BitwiseCopyable))
-          continue;
         auto *protocol =
             SwiftContext.getProtocol(KnownProtocolKind::BitwiseCopyable);
         auto *nominal = dyn_cast<NominalTypeDecl>(MappedDecl);

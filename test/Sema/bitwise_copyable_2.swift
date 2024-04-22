@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift                          \
 // RUN:     -enable-experimental-feature NonescapableTypes      \
 // RUN:     -enable-experimental-feature ConformanceSuppression \
-// RUN:     -enable-experimental-feature BitwiseCopyable        \
 // RUN:     -enable-builtin-module                              \
 // RUN:     -debug-diagnostic-names
 
