@@ -1167,13 +1167,8 @@ WARNING(implementation_only_requires_library_evolution,none,
         "using '@_implementationOnly' without enabling library evolution "
         "for %0 may lead to instability during execution",
         (Identifier))
-WARNING(implementation_only_deprecated_explicit,none,
-        "'@_implementationOnly' is deprecated, use 'internal import' "
-        "and family instead",
-        ())
-WARNING(implementation_only_deprecated_implicit,none,
-        "'@_implementationOnly' is deprecated, use a bare import "
-        "as 'InternalImportsByDefault' is enabled",
+WARNING(implementation_only_deprecated,none,
+        "'@_implementationOnly' is deprecated, use 'internal import' instead",
         ())
 
 ERROR(module_allowable_client_violation,none,

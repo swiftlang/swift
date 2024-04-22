@@ -816,17 +816,10 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       import.implementationOnlyRange.isValid()) {
     if (SF.getParentModule()->isResilient()) {
       // Encourage replacing `@_implementationOnly` with `internal import`.
-      if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
-        auto inFlight =
-          ctx.Diags.diagnose(import.importLoc,
-                             diag::implementation_only_deprecated_implicit);
-        inFlight.fixItRemove(import.implementationOnlyRange);
-      } else {
-        auto inFlight =
-          ctx.Diags.diagnose(import.importLoc,
-                             diag::implementation_only_deprecated_explicit);
-        inFlight.fixItReplace(import.implementationOnlyRange, "internal");
-      }
+      auto inFlight =
+        ctx.Diags.diagnose(import.importLoc,
+                           diag::implementation_only_deprecated);
+      inFlight.fixItReplace(import.implementationOnlyRange, "internal");
     } else if ( // Non-resilient
       !(((targetName.str() == "CCryptoBoringSSL" ||
           targetName.str() == "CCryptoBoringSSLShims") &&
