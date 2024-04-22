@@ -1260,10 +1260,10 @@ func testWeakRefOptionalObjc() {
         testGenericDestroy(ptr, of: TestOptional<WeakObjcWrapper>.self)
         testGenericDestroy(ptr2, of: TestOptional<WeakObjcWrapper>.self)
 
-        // CHECK: Before deinit
+        // CHECK-macosx: Before deinit
         print("Before deinit")
 
-        // CHECK-NEXT: ObjcClass deinitialized!
+        // CHECK-macosx-NEXT: ObjcClass deinitialized!
     }
 
     ptr.deallocate()
