@@ -24,6 +24,7 @@ async (wasmData, imports) => {
   const api = instance.exports;
   return {
     api,
+    customSections: (name) => WebAssembly.Module.customSections(mod, name),
     read: (off, size) => new Uint8Array(new Uint8Array(api.memory.buffer, off, size)).buffer,
     write: (buf, off, size) => new Uint8Array(api.memory.buffer, off, size).set(new Uint8Array(buf)),
   };
@@ -31,6 +32,7 @@ async (wasmData, imports) => {
 """
 
 final class JSCWasmEngine: WasmEngine {
+  private let runner: JSValue
   private let _memory: JSCGuestMemory
   private let api: JSValue
 
@@ -56,14 +58,21 @@ final class JSCWasmEngine: WasmEngine {
       throw JSCWasmError(message: "Failed to load plugin", value: context.exception)
     }
 
-    let runner = try await promise.promiseValue
-
+    runner = try await promise.promiseValue
     api = runner.objectForKeyedSubscript("api")!
 
     let getMemory = runner.objectForKeyedSubscript("read")!
     let setMemory = runner.objectForKeyedSubscript("write")!
     self._memory = JSCGuestMemory(getMemory: getMemory, setMemory: setMemory)
     memory = self._memory
+  }
+
+  func customSections(named name: String) throws -> [ArraySlice<UInt8>] {
+    guard let array = runner.invokeMethod("customSections", withArguments: [name]),
+          let length = array.objectForKeyedSubscript("length")?.toUInt32() else { return [] }
+    return (0..<length)
+      .compactMap { array.objectAtIndexedSubscript(Int($0)) }
+      .map { $0.withUnsafeArrayBuffer { Array($0)[...] } }
   }
 
   func invoke(_ method: String, _ args: [UInt32]) throws -> [UInt32] {

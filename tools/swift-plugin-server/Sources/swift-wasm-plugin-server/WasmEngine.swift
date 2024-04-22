@@ -20,6 +20,8 @@ protocol WasmEngine {
 
   init(wasm: Data, imports: WASIBridgeToHost) async throws
 
+  func customSections(named name: String) throws -> [ArraySlice<UInt8>]
+
   func invoke(_ method: String, _ args: [UInt32]) throws -> [UInt32]
 }
 
@@ -34,6 +36,30 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     let bridge = try WASIBridgeToHost()
     engine = try await Engine(wasm: wasm, imports: bridge)
     _ = try engine.invoke("_start", [])
+  }
+
+  func abiVersion() throws -> UInt32 {
+    let sectionName = "wacro_abi"
+    let sections = try engine.customSections(named: sectionName)
+    switch sections.count {
+    case 0:
+      throw WasmEngineError(message: "Wasm macro is missing a '\(sectionName)' section")
+    case 1:
+      break
+    default:
+      throw WasmEngineError(message: "Wasm macro has too many '\(sectionName)' sections. Expected one, got \(sections.count)")
+    }
+    let section = sections[0]
+    guard section.count == 4 else {
+      throw WasmEngineError(message: """
+      Wasm macro has incorrect '\(sectionName)' section length. Expected 4 bytes, got \(section.count).
+      """)
+    }
+    return section.withUnsafeBufferPointer { buffer in
+      buffer.withMemoryRebound(to: UInt32.self) {
+        UInt32(littleEndian: $0.baseAddress!.pointee)
+      }
+    }
   }
 
   func handleMessage(_ json: Data) async throws -> Data {
@@ -54,5 +80,13 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     _ = try engine.invoke("wacro_free", [outAddr])
 
     return out
+  }
+}
+
+struct WasmEngineError: Error, CustomStringConvertible {
+  let description: String
+
+  init(message: String) {
+    self.description = message
   }
 }

@@ -18,12 +18,13 @@ import Foundation
 typealias DefaultWasmEngine = WasmKitEngine
 
 struct WasmKitEngine: WasmEngine {
+  private let module: Module
   private let instance: ModuleInstance
   private let runtime: Runtime
   let memory: WasmKitGuestMemory
 
   init(wasm: Data, imports: WASIBridgeToHost) throws {
-    let module = try parseWasm(bytes: Array(wasm))
+    module = try parseWasm(bytes: Array(wasm))
     runtime = Runtime(hostModules: imports.hostModules)
     instance = try runtime.instantiate(module: module)
 
@@ -32,6 +33,10 @@ struct WasmKitEngine: WasmEngine {
       throw WasmKitPluginError(message: "Wasm plugin does not export a valid memory.")
     }
     self.memory = WasmKitGuestMemory(store: runtime.store, address: memoryAddr)
+  }
+
+  func customSections(named name: String) throws -> [ArraySlice<UInt8>] {
+    module.customSections.filter { $0.name == name }.map(\.bytes)
   }
 
   func invoke(_ method: String, _ args: [UInt32]) throws -> [UInt32] {
