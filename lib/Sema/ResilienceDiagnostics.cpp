@@ -215,14 +215,14 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
     const DeclContext *DC = where.getDeclContext();
     ImportAccessLevel limitImport = D->getImportAccessFrom(DC);
     assert(limitImport.has_value() &&
-           limitImport->accessLevel < AccessLevel::Public &&
+           limitImport->accessLevel < AccessLevel::Package &&
            "The import should still be non-public");
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here, D,
                        limitImport->accessLevel,
                        limitImport->module.importedModule);
   }
-
+  // ES TODO: handle ::PackageImport
   return true;
 }
 
@@ -315,14 +315,14 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   // If limited by an import, note which one.
   if (originKind == DisallowedOriginKind::NonPublicImport) {
     assert(import.has_value() &&
-           import->accessLevel < AccessLevel::Public &&
+           import->accessLevel < AccessLevel::Package &&
            "The import should still be non-public");
     ctx.Diags.diagnose(import->importLoc,
                        diag::decl_import_via_here, D,
                        import->accessLevel,
                        import->module.importedModule);
   }
-
+// ES TODO: handle ::PackageImport
   return true;
 }
 
@@ -405,13 +405,13 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
     const DeclContext *DC = where.getDeclContext();
     ImportAccessLevel limitImport = ext->getImportAccessFrom(DC);
     assert(limitImport.has_value() &&
-           limitImport->accessLevel < AccessLevel::Public &&
+           limitImport->accessLevel < AccessLevel::Package &&
            "The import should still be non-public");
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here, ext,
                        limitImport->accessLevel,
                        limitImport->module.importedModule);
   }
-
+// ES TODO: handle ::PackageImport
   return true;
 }
