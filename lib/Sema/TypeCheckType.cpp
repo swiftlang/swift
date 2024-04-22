@@ -6062,7 +6062,9 @@ public:
   }
 
 private:
-  bool existentialNeedsParens(TypeRepr *parent) const {
+  /// Returns a Boolean value indicating whether the insertion of `any` before
+  /// a type representation with the given parent requires paretheses.
+  static bool anySyntaxNeedsParens(TypeRepr *parent) {
     switch (parent->getKind()) {
     case TypeReprKind::Optional:
     case TypeReprKind::Protocol:
@@ -6108,7 +6110,7 @@ private:
     bool needsParens = (exprCount != 0);
     if (reprStack.size() > 1) {
       auto parentIt = reprStack.end() - 2;
-      needsParens = existentialNeedsParens(*parentIt);
+      needsParens = anySyntaxNeedsParens(*parentIt);
 
       // Expand to include parenthesis before checking if the parent needs
       // to be replaced.
@@ -6120,7 +6122,7 @@ private:
       if ((*parentIt)->getKind() == TypeReprKind::Metatype) {
         replaceRepr = *parentIt;
         if (parentIt != reprStack.begin())
-          needsParens = existentialNeedsParens(*(parentIt - 1));
+          needsParens = anySyntaxNeedsParens(*(parentIt - 1));
       }
     }
 
