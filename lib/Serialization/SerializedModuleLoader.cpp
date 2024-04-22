@@ -918,6 +918,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setIsBuiltFromInterface();
     if (loadedModuleFile->allowNonResilientAccess())
       M.setAllowNonResilientAccess();
+    if (loadedModuleFile->serializePackageEnabled())
+      M.setSerializePackageEnabled();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
