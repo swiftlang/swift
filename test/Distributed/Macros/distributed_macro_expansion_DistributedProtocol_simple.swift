@@ -11,12 +11,12 @@
 
 import Distributed
 
-@_DistributedProtocol
+@Resolvable
 protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func greet(name: String) -> String
 }
 
-// @_DistributedProtocol ->
+// @Resolvable ->
 
 // CHECK: distributed actor $Greeter<ActorSystem>: Greeter,
 // CHECK-NEXT: Distributed._DistributedActorStub
@@ -35,7 +35,7 @@ protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any
 // CHECK-NEXT: }
 
 // Macro should be able to handle complex properties
-@_DistributedProtocol
+@Resolvable
 public protocol GetSet: DistributedActor, Sendable
   where ActorSystem: DistributedActorSystem<any Codable> {
 
