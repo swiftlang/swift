@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) import SwiftPluginServerSupport
 import Foundation
 import swiftLLVMJSON
-import SwiftPluginServerSupport
 
 @main
 final class SwiftPluginServer {
