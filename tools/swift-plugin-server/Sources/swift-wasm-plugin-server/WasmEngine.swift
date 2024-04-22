@@ -35,10 +35,18 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     // TODO: we should air-gap this bridge. Wasm macros don't need IO.
     let bridge = try WASIBridgeToHost()
     engine = try await Engine(wasm: wasm, imports: bridge)
+    try checkABIVersion()
     _ = try engine.invoke("_start", [])
   }
 
-  func abiVersion() throws -> UInt32 {
+  private func checkABIVersion() throws {
+    let abiVersion = try abiVersion()
+    guard abiVersion == 1 else {
+      throw WasmEngineError(message: "Wasm plugin has unsupported ABI version: \(abiVersion)")
+    }
+  }
+
+  private func abiVersion() throws -> UInt32 {
     let sectionName = "wacro_abi"
     let sections = try engine.customSections(named: sectionName)
     switch sections.count {
