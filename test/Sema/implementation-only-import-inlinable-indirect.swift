@@ -8,7 +8,7 @@
 // RUN:   -enable-library-evolution -swift-version 5
 
 @_implementationOnly import directs
-// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' and family instead}}
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 // Types
 
