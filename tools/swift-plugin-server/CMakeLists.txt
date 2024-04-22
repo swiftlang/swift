@@ -5,8 +5,10 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
   include(DarwinSDKs)
   swift_get_host_triple(SWIFT_HOST_TRIPLE)
 
-  file(TO_CMAKE_PATH "${SWIFT_PATH_TO_WASMKIT_SOURCE}" wasmkit_path)
-  FetchContent_Declare(WasmKit SOURCE_DIR "${wasmkit_path}")
+  # override the remote SwiftSystem dependency in WasmKit
+  FetchContent_Declare(SwiftSystem SOURCE_DIR "${PROJECT_SOURCE_DIR}/../swift-system")
+
+  FetchContent_Declare(WasmKit SOURCE_DIR "${PROJECT_SOURCE_DIR}/../wasmkit")
   FetchContent_MakeAvailable(WasmKit)
 
   # _swiftCSwiftPluginServer is just a C support library for swift-plugin-server
@@ -25,6 +27,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     Sources/SwiftPluginServerSupport/SwiftPluginServerSupport.swift
     DEPENDENCIES
       $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
+      SwiftCompilerPluginMessageHandling
   )
   target_include_directories(SwiftPluginServerSupport PRIVATE
     Sources/CSwiftPluginServer/include
