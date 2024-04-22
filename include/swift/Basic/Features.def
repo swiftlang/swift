@@ -179,6 +179,7 @@ LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
 LANGUAGE_FEATURE(MoveOnlyPartialConsumption, 429, "Partial consumption of noncopyable values")
 /// Enable bitwise-copyable feature.
 LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
+SUPPRESSIBLE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferred conformances")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -344,9 +345,6 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
-
-/// Enable the suppression of inferred, non-invertible, protocols via ~.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ConformanceSuppression, true)
 
 /// Enables the FixedArray data type.
 EXPERIMENTAL_FEATURE(FixedArrays, true)

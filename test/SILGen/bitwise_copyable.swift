@@ -2,7 +2,6 @@
 // RUN:     %s                                                  \
 // RUN:     -emit-silgen                                        \
 // RUN:     -disable-availability-checking                      \
-// RUN:     -enable-experimental-feature ConformanceSuppression \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts
