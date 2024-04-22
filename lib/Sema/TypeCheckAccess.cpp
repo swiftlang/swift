@@ -2538,6 +2538,49 @@ void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
   }
 }
 
+/// Register the type extended by \p ED as being used in a package decl if
+/// any member is a package decl. This patches a hole in the warnings on
+/// superfluously public imports which usually relies on exportability checking
+/// that is not currently executed for package decls.
+void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
+  auto extendedType = ED->getExtendedNominal();
+  if (!extendedType)
+    return;
+
+  bool hasPackageMembers = llvm::any_of(ED->getMembers(),
+                                        [](const Decl *member) -> bool {
+    auto *VD = dyn_cast<ValueDecl>(member);
+    if (!VD)
+      return false;
+
+    AccessScope accessScope =
+        VD->getFormalAccessScope(nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+    return accessScope.isPackage();
+  });
+  if (!hasPackageMembers)
+    return;
+
+  DeclContext *DC = ED->getDeclContext();
+  ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
+  if (import.has_value()) {
+    auto SF = DC->getParentSourceFile();
+    if (SF)
+      SF->registerAccessLevelUsingImport(import.value(),
+                                         AccessLevel::Package);
+
+    auto &ctx = DC->getASTContext();
+    if (ctx.LangOpts.EnableModuleApiImportRemarks) {
+      ModuleDecl *importedVia = import->module.importedModule,
+                 *sourceModule = ED->getModuleContext();
+      ED->diagnose(diag::module_api_import,
+                   ED, importedVia, sourceModule,
+                   importedVia == sourceModule,
+                   /*isImplicit*/false);
+    }
+  }
+}
+
 void swift::checkAccessControl(Decl *D) {
   if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
     bool allowInlineable =
@@ -2546,6 +2589,7 @@ void swift::checkAccessControl(Decl *D) {
     UsableFromInlineChecker().visit(D);
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     checkExtensionGenericParamAccess(ED);
+    registerPackageAccessForPackageExtendedType(ED);
   }
 
   if (isa<AccessorDecl>(D))
