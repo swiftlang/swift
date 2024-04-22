@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) import SwiftPluginServerSupport
 import SwiftSyntaxMacros
-import SwiftPluginServerSupport
 import CSwiftPluginServer
 
 @main

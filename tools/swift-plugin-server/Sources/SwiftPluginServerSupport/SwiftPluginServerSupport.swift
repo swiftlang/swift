@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 import swiftLLVMJSON
 import CSwiftPluginServer
 
-public final class PluginHostConnection: MessageConnection {
+@_spi(PluginMessage) public final class PluginHostConnection: MessageConnection {
   let handle: UnsafeRawPointer
   public init() throws {
     var errorMessage: UnsafePointer<CChar>? = nil
