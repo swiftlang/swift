@@ -379,7 +379,7 @@ EXPERIMENTAL_FEATURE(CImplementation, true)
 EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 
 // Enable usability improvements for global-actor-isolated types.
-EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, false)
+EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
