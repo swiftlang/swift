@@ -7,7 +7,7 @@
 // REQUIRES: executable_test
 
 struct Example: ~Copyable {
-    private var failureString: String = "Goodbye."
+    private var failureString: String { "Goodbye." }
     deinit { fatalError("FATAL ERROR: \(failureString)") }
 }
 
