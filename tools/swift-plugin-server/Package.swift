@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
   name: "swift-plugin-server",
   platforms: [
-    .macOS(.v10_15)
+    .macOS(.v11),
   ],
   products: [
     .library(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
@@ -34,7 +34,7 @@ let package = Package(
       dependencies: [
         .product(name: "swiftLLVMJSON", package: "ASTGen"),
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        "CSwiftPluginServer"
+        "CSwiftPluginServer",
       ],
       swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
@@ -55,8 +55,8 @@ let package = Package(
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         "CSwiftPluginServer",
         "SwiftPluginServerSupport",
-        .product(name: "WasmKit", package: "WasmKit", condition: .when(platforms: [.linux, .windows])),
-        .product(name: "WASI", package: "WasmKit", condition: .when(platforms: [.linux, .windows])),
+        .product(name: "WASI", package: "WasmKit"),
+        .product(name: "WasmKitWASI", package: "WasmKit"),
       ],
       swiftSettings: [.interoperabilityMode(.Cxx)]
     ),

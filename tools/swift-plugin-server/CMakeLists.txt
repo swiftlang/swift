@@ -1,4 +1,14 @@
 if (SWIFT_BUILD_SWIFT_SYNTAX)
+  # hack: override macOS deployment target to 10.15.4
+  # since that's the minimum required by WasmKit
+  set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.15.4")
+  include(DarwinSDKs)
+  swift_get_host_triple(SWIFT_HOST_TRIPLE)
+
+  file(TO_CMAKE_PATH "${SWIFT_PATH_TO_WASMKIT_SOURCE}" wasmkit_path)
+  FetchContent_Declare(WasmKit SOURCE_DIR "${wasmkit_path}")
+  FetchContent_MakeAvailable(WasmKit)
+
   # _swiftCSwiftPluginServer is just a C support library for swift-plugin-server
   # Don't bother to create '.a' for that.
   add_swift_host_library(_swiftCSwiftPluginServer OBJECT
@@ -40,7 +50,9 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
 
   add_pure_swift_host_tool(swift-wasm-plugin-server
     Sources/swift-wasm-plugin-server/swift-wasm-plugin-server.swift
-    Sources/swift-wasm-plugin-server/JSCWasmPlugin.swift
+    Sources/swift-wasm-plugin-server/JSCWasmEngine.swift
+    Sources/swift-wasm-plugin-server/WasmEngine.swift
+    Sources/swift-wasm-plugin-server/WasmKitEngine.swift
     DEPENDENCIES
       $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
     SWIFT_COMPONENT
@@ -49,6 +61,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftCompilerPluginMessageHandling
       swiftLLVMJSON
       SwiftPluginServerSupport
+      WASI WasmKit WasmKitWASI WasmTypes
   )
   target_include_directories(swift-wasm-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include
