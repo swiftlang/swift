@@ -1836,13 +1836,13 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 /// Returns `true` if the current token represents the start of a conditional
 /// statement body.
 bool Parser::isStartOfConditionalStmtBody() {
-  Parser::BacktrackingScope Backtrack(*this);
-
   if (!Tok.is(tok::l_brace)) {
     // Statement bodies always start with a '{'. If there is no '{', we can't be
     // at the statement body.
     return false;
   }
+  
+  Parser::BacktrackingScope Backtrack(*this);
 
   skipSingle();
 
