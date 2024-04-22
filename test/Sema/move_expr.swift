@@ -44,24 +44,24 @@ struct StructWithField {
 
 func testLetStructAccessField() {
     let t = StructWithField()
-    let _ = consume t.k  // expected-error {{'consume' can only be applied to a local binding ('let', 'var', or parameter)}}
+    let _ = consume t.k  // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
 }
 
 func testVarStructAccessField() {
     var t = StructWithField()
     t = StructWithField()
-    let _ = consume t.k // expected-error {{'consume' can only be applied to a local binding ('let', 'var', or parameter)}}
+    let _ = consume t.k // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
 }
 
 func testLetClassAccessField() {
     let t = Klass()
-    let _ = consume t.k  // expected-error {{'consume' can only be applied to a local binding ('let', 'var', or parameter)}}
+    let _ = consume t.k  // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
 }
 
 func testVarClassAccessField() {
     var t = Klass()
     t = Klass()
-    let _ = consume t.k // expected-error {{'consume' can only be applied to a local binding ('let', 'var', or parameter)}}
+    let _ = consume t.k // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
 }
 
 func testConsumeResultImmutable() {
@@ -76,7 +76,7 @@ func testConsumeResultImmutable() {
 
   var t = Test()
   t.mutatingTest()
-  consume t.borrowingTest() // expected-error {{'consume' can only be applied to a local binding ('let', 'var', or parameter)}}
+  consume t.borrowingTest() // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
   (consume t).borrowingTest()
   (consume t).consumingTest()
   (consume t).mutatingTest() // expected-error {{cannot use mutating member on immutable value of type 'Test'}}

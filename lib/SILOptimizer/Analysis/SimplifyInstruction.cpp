@@ -172,6 +172,8 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *sei) {
 
 SILValue
 InstSimplifier::visitUncheckedEnumDataInst(UncheckedEnumDataInst *uedi) {
+  if (uedi->getOperand()->getType().isValueTypeWithDeinit())
+    return SILValue();
   // (unchecked_enum_data (enum payload)) -> payload
   auto opt = lookThroughOwnershipInsts(uedi->getOperand());
   if (auto *ei = dyn_cast<EnumInst>(opt)) {

@@ -176,6 +176,7 @@ LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
 SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
 LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
+LANGUAGE_FEATURE(MoveOnlyPartialConsumption, 429, "Partial consumption of noncopyable values")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -191,7 +192,6 @@ UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
 UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
-UPCOMING_FEATURE(MoveOnlyPartialConsumption, 429, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)

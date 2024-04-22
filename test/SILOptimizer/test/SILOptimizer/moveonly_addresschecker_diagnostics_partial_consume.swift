@@ -5,7 +5,6 @@
 // RUN:     %t/Library.swift                                        \
 // RUN:     -emit-module                                            \
 // RUN:     -package-name Package                                   \
-// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -module-name Library                                    \
 // RUN:     -emit-module-path %t/Library.swiftmodule
 
@@ -15,7 +14,6 @@
 // RUN:     -sil-verify-all                                         \
 // RUN:     -package-name Package                                   \
 // RUN:     -debug-diagnostic-names                                 \
-// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -I %t
 
 // RUN: %empty-directory(%t)
@@ -26,7 +24,6 @@
 // RUN:     -emit-module                                            \
 // RUN:     -package-name Package                                   \
 // RUN:     -enable-library-evolution                               \
-// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -module-name Library                                    \
 // RUN:     -emit-module-path %t/Library.swiftmodule
 
@@ -36,7 +33,6 @@
 // RUN:     -sil-verify-all                                         \
 // RUN:     -package-name Package                                   \
 // RUN:     -debug-diagnostic-names                                 \
-// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -I %t
 
 //--- Library.swift

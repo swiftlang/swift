@@ -59,30 +59,19 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   // owned, lets mark them as needing to be no implicit copy checked so they
   // cannot escape.
   if (selfType.isMoveOnly() && !selfType.isAnyClassReferenceType()) {
-    if (getASTContext().LangOpts.hasFeature(
-            Feature::MoveOnlyPartialConsumption)) {
-      SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
-      addr = B.createMarkUnresolvedNonCopyableValueInst(
-          selfDecl, addr,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
-      if (selfValue->getType().isObject()) {
-        B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
-      } else {
-        B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
-      }
-      // drop_deinit invalidates any user-defined struct/enum deinit
-      // before the individual members are destroyed.
-      addr = B.createDropDeinit(selfDecl, addr);
-      selfValue = addr;
+    SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
+    addr = B.createMarkUnresolvedNonCopyableValueInst(
+        selfDecl, addr,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+    if (selfValue->getType().isObject()) {
+      B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
     } else {
-      if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
-        selfValue = B.createMarkUnresolvedNonCopyableValueInst(
-            selfDecl, selfValue,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                ConsumableAndAssignable);
-      }
+      B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
     }
+    // drop_deinit invalidates any user-defined struct/enum deinit
+    // before the individual members are destroyed.
+    addr = B.createDropDeinit(selfDecl, addr);
+    selfValue = addr;
   }
 
   VarLocs[selfDecl] = VarLoc::get(selfValue);

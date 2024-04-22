@@ -807,8 +807,9 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
 
   switch (error) {
   case PartialMutationError::Kind::FeatureDisabled: {
-    assert(!astContext.LangOpts.hasFeature(
-        partialMutationFeature(error.getKind())));
+    auto feature = partialMutationFeature(error.getKind());
+    assert(feature);
+    assert(!astContext.LangOpts.hasFeature(*feature));
 
     switch (kind) {
     case PartialMutation::Kind::Consume:
