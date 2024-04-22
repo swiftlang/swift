@@ -317,6 +317,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Freestand
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowingSwitch")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ConformanceSuppression")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
@@ -328,7 +329,7 @@ endif()
 
 list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
   "${swift_lib_dir}/swift/host/plugins#${swift_bin_dir}/swift-plugin-server")
-list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "DebugDescriptionMacro")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)

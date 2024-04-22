@@ -4315,8 +4315,28 @@ ERROR(no_MaxBuiltinFloatType_found,none,
 ERROR(no_member_of_module,none,
       "module %0 has no member named %1", (Identifier, DeclNameRef))
 
-ERROR(super_with_no_base_class,none,
-      "'super' members cannot be referenced in a root class", ())
+// 'super'.
+
+ERROR(super_invalid_parent_expr,none,
+      "'super' may be used only to access a superclass member, subscript, or "
+      "initializer", ())
+ERROR(super_no_superclass,none,
+      "'super' cannot be used in %select{|extension of }0class %1 because it "
+      "has no superclass",
+      (bool, const ClassDecl *))
+ERROR(super_invalid_context,none,
+      "'super' cannot be used outside of a class computed property, method, "
+      "initializer, deinitializer, or subscript", ())
+ERROR(super_in_nonclass_type,none,
+      "'super' cannot be used in non-class type %0",
+      (const NominalTypeDecl *))
+
+ERROR(super_in_closure_with_capture,none,
+      "using 'super' in a closure where 'self' is explicitly captured is "
+      "not yet supported", ())
+NOTE(super_in_closure_with_capture_here,none,
+     "'self' explicitly captured here", ())
+
 ERROR(unqualified_init,none,
       "initializer expression requires explicit access"
       "%select{|; did you mean to prepend it with|; did you mean to prepend "
@@ -6796,18 +6816,18 @@ WARNING(discardable_result_on_void_never_function, none,
 //------------------------------------------------------------------------------
 
 ERROR(fixed_layout_attr_on_internal_type,
-      none, "'@_fixed_layout' attribute can only be applied to '@usableFromInline' "
-      "or public declarations, but %0 is "
-      "%select{private|fileprivate|internal|package|%error|%error}1",
+      none, "'@_fixed_layout' attribute can only be applied to '@usableFromInline', "
+      "package, or public declarations, but %0 is "
+      "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
 WARNING(fixed_layout_struct,
       none, "'@frozen' attribute is now used for fixed-layout structs", ())
 
 ERROR(frozen_attr_on_internal_type,
-      none, "'@frozen' attribute can only be applied to '@usableFromInline' "
-      "or public declarations, but %0 is "
-      "%select{private|fileprivate|internal|package|%error|%error}1",
+      none, "'@frozen' attribute can only be applied to '@usableFromInline', "
+      "package, or public declarations, but %0 is "
+      "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
 ERROR(usable_from_inline_attr_with_explicit_access,
@@ -6899,8 +6919,8 @@ ERROR(inlinable_dynamic_not_supported,
       none, "'@inlinable' attribute cannot be applied to 'dynamic' declarations", ())
 
 ERROR(inlinable_decl_not_public,
-      none, "'@inlinable' attribute can only be applied to public declarations, "
-      "but %0 is %select{private|fileprivate|internal|package|%error|%error}1",
+      none, "'@inlinable' attribute can only be applied to internal, package, or public declarations, "
+      "but %0 is %select{private|fileprivate|%error|%error|%error|%error}1",
       (DeclBaseName, AccessLevel))
 
 ERROR(inlinable_resilient_deinit,
@@ -7694,6 +7714,8 @@ ERROR(non_bitwise_copyable_type_indirect_enum_element,none,
       "enum with indirect case cannot conform to 'BitwiseCopyable'", ())
 NOTE(note_non_bitwise_copyable_type_indirect_enum_element,none,
      "indirect case is here", ())
+ERROR(non_bitwise_copyable_type_suppressed,none,
+      "cannot both conform to and suppress conformance to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_cxx_nontrivial,none,
       "non-trivial C++ type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_c_type_nontrivial,none,
@@ -7719,6 +7741,12 @@ NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
 ERROR(bitwise_copyable_outside_module,none,
       "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
       (const ValueDecl *))
+ERROR(suppress_inferrable_protocol_extension,none,
+      "conformance to inferrable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))
+ERROR(suppress_nonsuppressable_protocol,none,
+      "conformance to %0 cannot be suppressed", (const ProtocolDecl *))
+WARNING(suppress_already_suppressed_protocol,none,
+      "already suppressed conformance to %0", (const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,

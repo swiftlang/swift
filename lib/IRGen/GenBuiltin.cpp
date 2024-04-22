@@ -1095,6 +1095,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
 
+    // In Embedded Swift we don't have metadata and witness tables, so we can't
+    // just use TypeInfo's destroyArray, which needs metadata to emit a call to
+    // swift_arrayDestroy. Emit a loop to destroy elements directly instead.
     if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       SILType elemTy = valueTy.first;
       const TypeInfo &elemTI = valueTy.second;
@@ -1103,8 +1106,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           IsTriviallyDestroyable)
         return;
 
-      llvm::Value *firstElem = IGF.Builder.CreateBitCast(
-          ptr, elemTI.getStorageType()->getPointerTo());
+      llvm::Value *firstElem =
+          IGF.Builder.CreatePtrToInt(IGF.Builder.CreateBitCast(
+              ptr, elemTI.getStorageType()->getPointerTo()), IGF.IGM.IntPtrTy);
 
       auto *origBB = IGF.Builder.GetInsertBlock();
       auto *headerBB = IGF.createBasicBlock("loop_header");
@@ -1118,8 +1122,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       IGF.Builder.CreateCondBr(cmp, loopBB, exitBB);
 
       IGF.Builder.emitBlock(loopBB);
-      auto *addr = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
-                                                 firstElem, phi);
+
+      llvm::Value *offset =
+          IGF.Builder.CreateMul(phi, elemTI.getStaticStride(IGF.IGM));
+      llvm::Value *added = IGF.Builder.CreateAdd(firstElem, offset);
+      llvm::Value *addr = IGF.Builder.CreateIntToPtr(
+          added, elemTI.getStorageType()->getPointerTo());
 
       bool isOutlined = false;
       elemTI.destroy(IGF, elemTI.getAddressForPointer(addr), elemTy,
@@ -1168,6 +1176,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     llvm::Value *src = args.claimNext();
     llvm::Value *count = args.claimNext();
 
+    // In Embedded Swift we don't have metadata and witness tables, so we can't
+    // just use TypeInfo's initialize... and assign... APIs, which need
+    // metadata to emit calls. Emit a loop to process elements directly instead.
     if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       auto tyPair = getLoweredTypeAndTypeInfo(
           IGF.IGM, substitutions.getReplacementTypes()[0]);
@@ -1183,10 +1194,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           return;
       }
 
-      llvm::Value *firstSrcElem = IGF.Builder.CreateBitCast(
-          src, elemTI.getStorageType()->getPointerTo());
-      llvm::Value *firstDestElem = IGF.Builder.CreateBitCast(
-          dest, elemTI.getStorageType()->getPointerTo());
+      llvm::Value *firstSrcElem = IGF.Builder.CreatePtrToInt(
+          IGF.Builder.CreateBitCast(src,
+                                    elemTI.getStorageType()->getPointerTo()),
+          IGF.IGM.IntPtrTy);
+      llvm::Value *firstDestElem = IGF.Builder.CreatePtrToInt(
+          IGF.Builder.CreateBitCast(dest,
+                                    elemTI.getStorageType()->getPointerTo()),
+          IGF.IGM.IntPtrTy);
 
       auto *origBB = IGF.Builder.GetInsertBlock();
       auto *headerBB = IGF.createBasicBlock("loop_header");
@@ -1214,10 +1229,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         break;
       }
 
-      auto *srcElem = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
-                                                    firstSrcElem, idx);
-      auto *destElem = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
-                                                     firstDestElem, idx);
+      llvm::Value *offset =
+           IGF.Builder.CreateMul(idx, elemTI.getStaticStride(IGF.IGM));
+
+      llvm::Value *srcAdded = IGF.Builder.CreateAdd(firstSrcElem, offset);
+      auto *srcElem = IGF.Builder.CreateIntToPtr(
+          srcAdded, elemTI.getStorageType()->getPointerTo());
+      llvm::Value *dstAdded = IGF.Builder.CreateAdd(firstDestElem, offset);
+      auto *destElem = IGF.Builder.CreateIntToPtr(
+          dstAdded, elemTI.getStorageType()->getPointerTo());
+
       Address destAddr = elemTI.getAddressForPointer(destElem);
       Address srcAddr = elemTI.getAddressForPointer(srcElem);
 

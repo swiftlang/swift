@@ -163,10 +163,8 @@ protected:
   }
 
   /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencyInfo> scanModuleFile(Twine modulePath,
-                                                     bool isFramework,
-                                                     bool isTestableImport,
-                                                     bool hasInterface);
+  llvm::ErrorOr<ModuleDependencyInfo>
+  scanModuleFile(Twine modulePath, bool isFramework, bool isTestableImport);
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
@@ -176,7 +174,7 @@ protected:
   static BinaryModuleImports
   getImportsOfModule(const ModuleFileSharedCore &loadedModule,
                      ModuleLoadingBehavior transitiveBehavior,
-                     StringRef packageName);
+                     StringRef packageName, bool isTestableImport);
 
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
@@ -304,6 +302,9 @@ public:
 class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 
   struct MemoryBufferInfo {
+    MemoryBufferInfo(std::unique_ptr<llvm::MemoryBuffer> &&buffer,
+                     llvm::VersionTuple userVersion)
+        : buffer(std::move(buffer)), userVersion(userVersion) {}
     std::unique_ptr<llvm::MemoryBuffer> buffer;
     llvm::VersionTuple userVersion;
   };
@@ -352,11 +353,16 @@ public:
   /// discovered in the __swift_ast section of a Mach-O file (or the .swift_ast
   /// section of an ELF file) to the search path.
   ///
+  /// If a module is inserted twice, the first one wins, and the return value is
+  /// false.
+  ///
   /// FIXME: make this an actual import *path* once submodules are designed.
-  void registerMemoryBuffer(StringRef importPath,
+  bool registerMemoryBuffer(StringRef importPath,
                             std::unique_ptr<llvm::MemoryBuffer> input,
                             llvm::VersionTuple version) {
-    MemoryBuffers[importPath] = {std::move(input), version};
+    return MemoryBuffers
+        .insert({importPath, MemoryBufferInfo(std::move(input), version)})
+        .second;
   }
 
   void collectVisibleTopLevelModuleNames(

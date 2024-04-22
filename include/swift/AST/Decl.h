@@ -1628,17 +1628,29 @@ private:
   /// Whether there was an @preconcurrency attribute.
   bool IsPreconcurrency : 1;
 
+  /// Whether there was a ~ indicating suppression.
+  ///
+  /// This is true in cases like ~Copyable but not (P & ~Copyable).
+  bool IsSuppressed : 1;
+
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
   InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
-                 bool isPreconcurrency)
+                 bool isPreconcurrency, bool isSuppressed = false)
       : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
-        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency) {}
+        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency),
+        IsSuppressed(isSuppressed) {}
 
   bool isUnchecked() const { return IsUnchecked; }
   bool isRetroactive() const { return IsRetroactive; }
   bool isPreconcurrency() const { return IsPreconcurrency; }
+  bool isSuppressed() const { return IsSuppressed; }
+
+  void setSuppressed() {
+    assert(!IsSuppressed && "setting suppressed again!?");
+    IsSuppressed = true;
+  }
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -4436,6 +4448,8 @@ public:
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
 
+  bool suppressesConformance(KnownProtocolKind kp) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
@@ -6656,8 +6670,15 @@ public:
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
 
-  /// Create a new ParamDecl identical to the first except without the interface type.
-  static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
+  /// Create a new `ParamDecl` identical to the given one except without the
+  /// interface type.
+  ///
+  /// \param PD The parameter to clone.
+  /// \param defaultArgKind The default argument kind for the cloned parameter.
+  ///        If \c std::nullopt, use the default argument kind of \p PD.
+  static ParamDecl *cloneWithoutType(
+      const ASTContext &Ctx, ParamDecl *PD,
+      std::optional<DefaultArgumentKind> defaultArgKind = std::nullopt);
 
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
@@ -6674,6 +6695,13 @@ public:
                  Identifier parameterName, Type interfaceType,
                  DeclContext *Parent,
                  ParamSpecifier specifier = ParamSpecifier::Default);
+
+  static ParamDecl *createParsed(ASTContext &Context, SourceLoc specifierLoc,
+                                 SourceLoc argumentNameLoc,
+                                 Identifier argumentName,
+                                 SourceLoc parameterNameLoc,
+                                 Identifier parameterName, Expr *defaultValue,
+                                 DeclContext *dc);
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
@@ -6715,9 +6743,8 @@ public:
   bool isDefaultArgument() const {
     return getDefaultArgumentKind() != DefaultArgumentKind::None;
   }
-  void setDefaultArgumentKind(DefaultArgumentKind K) {
-    Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
-  }
+
+  void setDefaultArgumentKind(DefaultArgumentKind K);
 
   void setDefaultArgumentKind(ArgumentAttrs K) {
     setDefaultArgumentKind(K.argumentKind);
@@ -6763,13 +6790,19 @@ public:
   }
 
   /// Sets a new default argument expression for this parameter. This should
-  /// only be called internally by ParamDecl and AST walkers.
+  /// only be called internally by `ParamDecl` and `ASTWalker`.
   ///
   /// \param E The new default argument.
-  /// \param isTypeChecked Whether this argument should be used as the
-  /// parameter's fully type-checked default argument.
-  void setDefaultExpr(Expr *E, bool isTypeChecked);
+  void setDefaultExpr(Expr *E);
 
+  // FIXME: private:
+  /// Sets a type-checked default argument expression for this parameter. This
+  /// should only be called by the `DefaultArgumentExprRequest` request.
+  ///
+  /// \param E The type-checked default argument.
+  void setTypeCheckedDefaultExpr(Expr *E);
+
+public:
   /// Sets a type of default expression associated with this parameter.
   /// This should only be called by deserialization.
   void setDefaultExprType(Type type);
@@ -6781,9 +6814,14 @@ public:
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 
-  CaptureInfo getDefaultArgumentCaptureInfo() const {
+  CaptureInfo getDefaultArgumentCaptureInfo() const;
+
+  std::optional<CaptureInfo> getCachedDefaultArgumentCaptureInfo() const {
     assert(DefaultValueAndFlags.getPointer());
-    return DefaultValueAndFlags.getPointer()->Captures;
+    const auto &captures = DefaultValueAndFlags.getPointer()->Captures;
+    if (!captures.hasBeenComputed())
+      return std::nullopt;
+    return captures;
   }
 
   void setDefaultArgumentCaptureInfo(CaptureInfo captures);
@@ -7721,8 +7759,18 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const;
+
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+    return Captures;
+  }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    assert(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
@@ -8018,10 +8066,6 @@ public:
   /// This also allows the binary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isBinaryOperator() const;
-
-  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
-    return getCaptureInfo().getLocalCaptures(Result);
-  }
 
   ParamDecl **getImplicitSelfDeclStorage();
 

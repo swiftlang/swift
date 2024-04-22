@@ -39,11 +39,15 @@
 ///     let pointPointer = UnsafeMutableRawPointer.allocate(
 ///             byteCount: count * MemoryLayout<Point>.stride,
 ///             alignment: MemoryLayout<Point>.alignment)
+#if $BitwiseCopyable && $ConformanceSuppression
+@frozen // namespace
+public enum MemoryLayout<T: ~Copyable>: ~_BitwiseCopyable, Copyable {}
+#else
 @frozen // namespace
 public enum MemoryLayout<T: ~Copyable>: Copyable {}
-
 @available(*, unavailable)
 extension MemoryLayout: _BitwiseCopyable {}
+#endif
 
 extension MemoryLayout where T: ~Copyable {
   /// The contiguous memory footprint of `T`, in bytes.

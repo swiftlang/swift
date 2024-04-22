@@ -41,6 +41,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -87,6 +88,73 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
   return Type();
 }
 
+class CheckRepressions {
+  llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion;
+  ASTContext &ctx;
+
+  llvm::DenseSet<RepressibleProtocolKind> seen;
+
+public:
+  CheckRepressions(
+      llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion,
+      ASTContext &ctx)
+      : declUnion(declUnion), ctx(ctx) {}
+
+  template <typename... ArgTypes>
+  InFlightDiagnostic diagnoseInvalid(TypeRepr &repr, ArgTypes &&...Args) {
+    auto &diags = ctx.Diags;
+    repr.setInvalid();
+    return diags.diagnose(std::forward<ArgTypes>(Args)...);
+  }
+
+  /// Record the repressed kind indicated by the provided
+  /// InheritedTypeResult.Suppressed (i.e. \p ty and \p repr) if it is in fact
+  /// repressed or return the inverted type.
+  Type add(Type ty, InverseTypeRepr &repr,
+           llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl) {
+    if (!ty)
+      return Type();
+    assert(!ty->is<ExistentialMetatypeType>());
+    auto kp = ty->getKnownProtocol();
+    if (!kp) {
+      diagnoseInvalid(repr, repr.getLoc(), diag::inverse_type_not_invertible,
+                      ty);
+      return Type();
+    }
+    auto ipk = getInvertibleProtocolKind(*kp);
+    if (ipk) {
+      // Gate the '~Escapable' type behind a specific flag for now.
+      if (*ipk == InvertibleProtocolKind::Escapable &&
+          !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+        diagnoseInvalid(repr, repr.getLoc(),
+                        diag::escapable_requires_feature_flag);
+        return ErrorType::get(ctx);
+      }
+
+      return ProtocolCompositionType::getInverseOf(ctx, *ipk);
+    }
+    auto rpk = getRepressibleProtocolKind(*kp);
+    if (!rpk) {
+      diagnoseInvalid(repr, repr.getLoc(),
+                      diag::suppress_nonsuppressable_protocol,
+                      ctx.getProtocol(*kp));
+      return Type();
+    }
+    if (auto *extension = dyn_cast<const ExtensionDecl *>(decl)) {
+      diagnoseInvalid(repr, extension,
+                      diag::suppress_inferrable_protocol_extension,
+                      ctx.getProtocol(*kp));
+      return Type();
+    }
+    if (!seen.insert(*rpk).second) {
+      diagnoseInvalid(repr, repr.getLoc(),
+                      diag::suppress_already_suppressed_protocol,
+                      ctx.getProtocol(getKnownProtocolKind(*rpk)));
+    }
+    return Type();
+  }
+};
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -126,6 +194,8 @@ static void checkInheritanceClause(
   ASTContext &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
 
+  CheckRepressions checkRepressions(declUnion, ctx);
+
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
@@ -135,7 +205,26 @@ static void checkInheritanceClause(
 
     // Validate the type.
     InheritedTypeRequest request{declUnion, i, TypeResolutionStage::Interface};
-    Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
+    auto result = evaluateOrDefault(ctx.evaluator, request,
+                                    InheritedTypeResult::forDefault());
+
+    Type inheritedTy;
+    switch (result) {
+    case InheritedTypeResult::Inherited:
+      inheritedTy = result.getInheritedType();
+      break;
+    case InheritedTypeResult::Suppressed: {
+      auto pair = result.getSuppressed();
+
+      auto inverted = checkRepressions.add(pair.first, *pair.second, declUnion);
+      if (!inverted)
+        continue;
+      inheritedTy = inverted;
+      break;
+    }
+    case InheritedTypeResult::Default:
+      continue;
+    }
 
     // If we couldn't resolve an the inherited type, or it contains an error,
     // ignore it.
@@ -1080,6 +1169,9 @@ static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
+
+    // Force captures since this can emit diagnostics.
+    (void) param->getDefaultArgumentCaptureInfo();
 
     // If the default argument has isolation, it must match the
     // isolation of the decl context.
@@ -3532,8 +3624,8 @@ public:
     
     if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
-      (void)FD->getTypecheckedBody();
-      TypeChecker::computeCaptures(FD);
+      (void) FD->getTypecheckedBody();
+      (void) FD->getCaptureInfo();
     } else if (!FD->isBodySkipped()) {
       addDelayedFunction(FD);
     }

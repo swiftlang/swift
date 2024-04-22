@@ -49,6 +49,16 @@
     PROTOCOL_WITH_NAME(Id, Name)
 #endif
 
+/// \def REPRESSIBLE_PROTOCOL_WITH_NAME(id, name)
+/// \param id the internal "enum name" of this protocol
+/// \param name a string literal with the external name of this protocol
+#ifndef REPRESSIBLE_PROTOCOL_WITH_NAME
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    PROTOCOL_WITH_NAME(Id, Name)
+#endif
+
+#define REPRESSIBLE_PROTOCOL(name) REPRESSIBLE_PROTOCOL_WITH_NAME(name, #name)
+#define REPRESSIBLE_PROTOCOL_(name) REPRESSIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
 
 #define PROTOCOL(name) PROTOCOL_WITH_NAME(name, #name)
 #define PROTOCOL_(name) PROTOCOL_WITH_NAME(name, "_" #name)
@@ -140,7 +150,7 @@ PROTOCOL(FloatingPoint)
     INVERTIBLE_PROTOCOL_WITH_NAME(Name, #Name)
 #include "swift/ABI/InvertibleProtocols.def"
 
-PROTOCOL_(BitwiseCopyable)
+REPRESSIBLE_PROTOCOL_(BitwiseCopyable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
@@ -169,6 +179,9 @@ BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUnicodeScalarLitera
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 #undef BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_
 #undef BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+#undef REPRESSIBLE_PROTOCOL_WITH_NAME
+#undef REPRESSIBLE_PROTOCOL
+#undef REPRESSIBLE_PROTOCOL_
 #undef INVERTIBLE_PROTOCOL_WITH_NAME
 #undef PROTOCOL
 #undef PROTOCOL_

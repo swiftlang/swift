@@ -53,6 +53,16 @@
 
 #define DEBUG_TYPE "Serialization"
 
+// Unwrap an Expected<> variable following the typical deserialization pattern:
+// - On a value, assign it to Output.
+// - On an error, return it to bubble it up to the caller.
+#define UNWRAP(Input, Output) { \
+  auto ValueOrError = Input; \
+  if (!ValueOrError) \
+      return ValueOrError.takeError(); \
+  Output = ValueOrError.get(); \
+}
+
 STATISTIC(NumDeclsLoaded, "# of decls deserialized");
 STATISTIC(NumMemberListsLoaded,
           "# of nominals/extensions whose members were loaded");
@@ -2740,7 +2750,9 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
                                                        implicit,
                                                        discriminator,
                                                        parentID);
-    DeclContext *parent = getDeclContext(parentID);
+    DeclContext *parent;
+    UNWRAP(getDeclContextChecked(parentID), parent);
+
     auto type = getType(closureTypeID);
 
     declContextOrOffset = new (ctx)
@@ -2752,7 +2764,8 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
     DeclContextID parentID;
     decls_block::TopLevelCodeDeclContextLayout::readRecord(scratch,
                                                            parentID);
-    DeclContext *parent = getDeclContext(parentID);
+    DeclContext *parent;
+    UNWRAP(getDeclContextChecked(parentID), parent);
 
     declContextOrOffset = new (ctx) SerializedTopLevelCodeDeclContext(parent);
     break;
@@ -2782,7 +2795,8 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
     decls_block::DefaultArgumentInitializerLayout::readRecord(scratch,
                                                               parentID,
                                                               index);
-    DeclContext *parent = getDeclContext(parentID);
+    DeclContext *parent;
+    UNWRAP(getDeclContextChecked(parentID), parent);
 
     declContextOrOffset = new (ctx) DefaultArgumentInitializer(parent, index);
     break;
@@ -3242,11 +3256,15 @@ class DeclDeserializer {
                        ArrayRef<uint64_t> rawInheritedIDs) {
     SmallVector<InheritedEntry, 2> inheritedTypes;
     for (auto rawID : rawInheritedIDs) {
-      // The first low bit indicates "@preconcurrency".
+      // The first low bit indicates "~" (suppression).
+      bool isSuppressed = rawID & 0x01;
+      rawID = rawID >> 1;
+
+      // The second low bit indicates "@preconcurrency".
       bool isPreconcurrency = rawID & 0x01;
       rawID = rawID >> 1;
 
-      // The second low bit indicates "@unchecked".
+      // The third low bit indicates "@unchecked".
       bool isUnchecked = rawID & 0x01;
       rawID = rawID >> 1;
 
@@ -3256,9 +3274,9 @@ class DeclDeserializer {
         MF.diagnoseAndConsumeError(maybeType.takeError());
         continue;
       }
-      inheritedTypes.push_back(
-          InheritedEntry(TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
-                         /*isRetroactive=*/false, isPreconcurrency));
+      inheritedTypes.push_back(InheritedEntry(
+          TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
+          /*isRetroactive=*/false, isPreconcurrency, isSuppressed));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);
@@ -3353,7 +3371,8 @@ public:
       }
     }
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
 
     auto genericParams = MF.maybeReadGenericParams(DC);
     if (declOrOffset.isComplete())
@@ -3425,7 +3444,9 @@ public:
                                                       isImplicit,
                                                       rawOverriddenIDs);
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3608,7 +3629,9 @@ public:
       }
     }
 
-    auto parent = MF.getDeclContext(contextID);
+    DeclContext *parent;
+    UNWRAP(MF.getDeclContextChecked(contextID), parent);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3772,7 +3795,9 @@ public:
       }
     }
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3928,7 +3953,9 @@ public:
     auto paramName = MF.getIdentifier(paramNameID);
     PrettySupplementalDeclNameTrace trace(paramName);
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -4144,7 +4171,9 @@ public:
       }
     }
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -4366,7 +4395,9 @@ public:
                                               rawAccessLevel,
                                               exportUnderlyingType);
     
-    auto declContext = MF.getDeclContext(contextID);
+    DeclContext *declContext;
+    UNWRAP(MF.getDeclContextChecked(contextID), declContext);
+
     auto interfaceSigOrErr = MF.getGenericSignatureChecked(interfaceSigID);
     if (!interfaceSigOrErr)
       return interfaceSigOrErr.takeError();
@@ -4469,7 +4500,8 @@ public:
     if (!StaticSpelling.has_value())
       return MF.diagnoseFatal();
 
-    auto dc = MF.getDeclContext(contextID);
+    DeclContext *dc;
+    UNWRAP(MF.getDeclContextChecked(contextID), dc);
 
     SmallVector<std::pair<Pattern *, DeclContextID>, 4> patterns;
     for (unsigned i = 0; i != numPatterns; ++i) {
@@ -4505,8 +4537,11 @@ public:
 
     for (unsigned i = 0; i != patterns.size(); ++i) {
       binding->setPattern(i, patterns[i].first);
-      if (auto *context = MF.getDeclContext(patterns[i].second))
-        binding->setInitContext(i, cast<PatternBindingInitializer>(context));
+
+      DeclContext *dcPattern;
+      UNWRAP(MF.getDeclContextChecked(patterns[i].second), dcPattern);
+      if (dcPattern)
+        binding->setInitContext(i, cast<PatternBindingInitializer>(dcPattern));
     }
 
     return binding;
@@ -4539,7 +4574,9 @@ public:
       }
     }
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -4610,7 +4647,8 @@ public:
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
 
     auto result = MF.createDecl<OperatorDecl>(
         DC, SourceLoc(), name, SourceLoc());
@@ -4646,7 +4684,8 @@ public:
     if (!precedenceGroup)
       return precedenceGroup.takeError();
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), name, SourceLoc(), SourceLoc(), Identifier(),
@@ -4673,7 +4712,8 @@ public:
                                                    assignment, numHigherThan,
                                                    rawRelations);
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
 
     auto associativity = getActualAssociativity(rawAssociativity);
     if (!associativity.has_value())
@@ -4756,7 +4796,9 @@ public:
       }
     }
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -4917,7 +4959,9 @@ public:
       }
     }
 
-    DeclContext *DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -5024,7 +5068,9 @@ public:
       }
     }
 
-    auto parent = MF.getDeclContext(contextID);
+    DeclContext *parent;
+    UNWRAP(MF.getDeclContextChecked(contextID), parent);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -5099,7 +5145,8 @@ public:
                                              numConformances, numInherited,
                                              data);
 
-    auto DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
 
     auto conformanceIDs = data.slice(0, numConformances);
     data = data.slice(numConformances);
@@ -5186,7 +5233,9 @@ public:
                                               isImplicit, isObjC,
                                               genericSigID);
 
-    DeclContext *DC = MF.getDeclContext(contextID);
+    DeclContext *DC;
+    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -5261,7 +5310,9 @@ public:
       }
     }
 
-    auto parent = MF.getDeclContext(contextID);
+    DeclContext *parent;
+    UNWRAP(MF.getDeclContextChecked(contextID), parent);
+
     if (declOrOffset.isComplete())
       return declOrOffset;
 

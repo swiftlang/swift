@@ -112,6 +112,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ThrownErrorType:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
+  case ConstraintLocator::ExistentialMemberAccessConversion:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -532,6 +533,9 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "key path subscript index parameter";
     break;
   }
+  case ConstraintLocator::ExistentialMemberAccessConversion:
+    out << "existential member access conversion";
+    break;
   }
 }
 

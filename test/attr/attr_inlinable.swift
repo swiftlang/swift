@@ -109,7 +109,7 @@ public struct Struct {
 
   @inlinable
   private func privateInlinableMethod() {
-  // expected-error@-2 {{'@inlinable' attribute can only be applied to public declarations, but 'privateInlinableMethod' is private}}
+  // expected-error@-2 {{'@inlinable' attribute can only be applied to internal, package, or public declarations, but 'privateInlinableMethod' is private}}
     struct Nested {}
     // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inlinable' function}}
   }
@@ -326,7 +326,7 @@ extension P {
 
 // rdar://problem/60605117
 public struct PrivateInlinableCrash {
-  @inlinable // expected-error {{'@inlinable' attribute can only be applied to public declarations, but 'formatYesNo' is private}}
+  @inlinable // expected-error {{'@inlinable' attribute can only be applied to internal, package, or public declarations, but 'formatYesNo' is private}}
   private func formatYesNo(_ value: Bool) -> String {
     value ? "YES" : "NO"
   }

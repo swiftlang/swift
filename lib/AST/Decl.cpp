@@ -1678,7 +1678,8 @@ Type InheritedTypes::getResolvedType(unsigned i,
                         ? Decl.get<const ExtensionDecl *>()->getASTContext()
                         : Decl.get<const TypeDecl *>()->getASTContext();
   return evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
-                           Type());
+                           InheritedTypeResult::forDefault())
+      .getInheritedTypeOrNull(getASTContext());
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
@@ -5374,6 +5375,13 @@ bool NominalTypeDecl::isMainActor() const {
          getParentModule()->getName() == getASTContext().Id_Concurrency;
 }
 
+bool NominalTypeDecl::suppressesConformance(KnownProtocolKind kp) const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SuppressesConformanceRequest{mutableThis, kp},
+                           false);
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<InheritedEntry> inherited,
@@ -8245,13 +8253,19 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
     static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
-ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
+ParamDecl *
+ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD,
+                            std::optional<DefaultArgumentKind> defaultArgKind) {
   auto *Clone = new (Ctx) ParamDecl(
       SourceLoc(), SourceLoc(), PD->getArgumentName(),
       SourceLoc(), PD->getParameterName(), PD->getDeclContext());
   Clone->setOptionsAndPointers(nullptr, nullptr, PD->getOptions());
-  Clone->Bits.ParamDecl.defaultArgumentKind =
-      PD->Bits.ParamDecl.defaultArgumentKind;
+
+  if (defaultArgKind) {
+    Clone->setDefaultArgumentKind(*defaultArgKind);
+  } else {
+    Clone->setDefaultArgumentKind(PD->getDefaultArgumentKind());
+  }
 
   Clone->setSpecifier(PD->getSpecifier());
   Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
@@ -8293,7 +8307,9 @@ ParamDecl *ParamDecl::createImplicit(ASTContext &Context,
                                    interfaceType, Parent, specifier);
 }
 
-DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
+/// Determine the kind of a default argument for the given expression.
+static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
+                                                      Expr *init) {
   if (!init)
     return DefaultArgumentKind::None;
 
@@ -8305,6 +8321,19 @@ DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
 
   if (isa<MacroExpansionExpr>(init))
     return DefaultArgumentKind::ExpressionMacro;
+
+  if (isa<SuperRefExpr>(init)) {
+    // The compiler does not synthesize inherited initializers when
+    // type-checking Swift module interfaces. Instead, module interfaces are
+    // expected to include them explicitly in subclasses. A default argument of
+    // '= super' in a parameter of such initializer indicates that the default
+    // argument is inherited.
+    if (dc->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+      return DefaultArgumentKind::Inherited;
+    } else {
+      return DefaultArgumentKind::Normal;
+    }
+  }
 
   auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
@@ -8318,6 +8347,36 @@ DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
   }
 
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
+}
+
+ParamDecl *ParamDecl::createParsed(ASTContext &Context, SourceLoc specifierLoc,
+                                   SourceLoc argumentNameLoc,
+                                   Identifier argumentName,
+                                   SourceLoc parameterNameLoc,
+                                   Identifier parameterName, Expr *defaultValue,
+                                   DeclContext *dc) {
+  auto *decl =
+      new (Context) ParamDecl(specifierLoc, argumentNameLoc, argumentName,
+                              parameterNameLoc, parameterName, dc);
+
+  const auto kind = computeDefaultArgumentKind(dc, defaultValue);
+  if (kind == DefaultArgumentKind::Inherited) {
+    // The 'super' in inherited default arguments is a specifier rather than an
+    // expression.
+    // TODO: However, we may want to retain its location for diagnostics.
+    defaultValue = nullptr;
+  }
+
+  decl->setDefaultExpr(defaultValue);
+  decl->setDefaultArgumentKind(kind);
+
+  return decl;
+}
+
+void ParamDecl::setDefaultArgumentKind(DefaultArgumentKind K) {
+  assert(getDefaultArgumentKind() == DefaultArgumentKind::None &&
+         "Overwrite of default argument kind");
+  Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
 }
 
 /// Retrieve the type of 'self' for the given context.
@@ -8568,28 +8627,39 @@ Type ParamDecl::getTypeOfDefaultExpr() const {
   return Type();
 }
 
-void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
-  if (!DefaultValueAndFlags.getPointer()) {
+void ParamDecl::setDefaultExpr(Expr *E) {
+  auto *defaultInfo = DefaultValueAndFlags.getPointer();
+  if (defaultInfo) {
+    assert(defaultInfo->DefaultArg.isNull() ||
+           defaultInfo->DefaultArg.is<Expr *>());
+
+    auto *const oldE = defaultInfo->DefaultArg.dyn_cast<Expr *>();
+    assert((bool)E == (bool)oldE && "Overwrite of non-null default with null");
+    assert((!oldE || !oldE->getType() || (bool)E->getType()) &&
+           "Overwrite of type-checked default with non-type-checked default");
+  } else {
     if (!E) return;
 
-    DefaultValueAndFlags.setPointer(
-        getASTContext().Allocate<StoredDefaultArgument>());
+    defaultInfo = getASTContext().Allocate<StoredDefaultArgument>();
+    DefaultValueAndFlags.setPointer(defaultInfo);
+
+    defaultInfo->InitContextAndIsTypeChecked.setInt(false);
   }
+
+  defaultInfo->DefaultArg = E;
+}
+
+void ParamDecl::setTypeCheckedDefaultExpr(Expr *E) {
+  assert(E || getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
+  setDefaultExpr(E);
 
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
-  assert(defaultInfo->DefaultArg.isNull() ||
-         defaultInfo->DefaultArg.is<Expr *>());
-
-  if (!isTypeChecked) {
-    assert(!defaultInfo->InitContextAndIsTypeChecked.getInt() &&
-           "Can't overwrite type-checked default with un-type-checked default");
+  if (!defaultInfo) {
+    defaultInfo = getASTContext().Allocate<StoredDefaultArgument>();
+    DefaultValueAndFlags.setPointer(defaultInfo);
   }
-  defaultInfo->DefaultArg = E;
-  // `Inherited` default arguments do not have an expression,
-  // so if the storage has been pre-allocated already we need
-  // to be careful requesting type here.
-  defaultInfo->ExprType = E ? E->getType() : Type();
-  defaultInfo->InitContextAndIsTypeChecked.setInt(isTypeChecked);
+
+  defaultInfo->InitContextAndIsTypeChecked.setInt(true);
 }
 
 void ParamDecl::setDefaultExprType(Type type) {
@@ -8646,8 +8716,19 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   defaultInfo->InitContextAndIsTypeChecked.setPointer(initContext);
 }
 
+CaptureInfo ParamDecl::getDefaultArgumentCaptureInfo() const {
+  if (!DefaultValueAndFlags.getPointer())
+    return CaptureInfo::empty();
+
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ParamCaptureInfoRequest{const_cast<ParamDecl *>(this)},
+                           CaptureInfo::empty());
+}
+
 void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
   assert(DefaultValueAndFlags.getPointer());
+  assert(captures.hasBeenComputed());
   DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 
@@ -9098,6 +9179,13 @@ const ParamDecl *swift::getParameterAt(const DeclContext *source,
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
+}
+
+CaptureInfo AbstractFunctionDecl::getCaptureInfo() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           CaptureInfoRequest{const_cast<AbstractFunctionDecl *>(this)},
+                           CaptureInfo::empty());
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
@@ -10297,10 +10385,6 @@ AccessorDecl *AccessorDecl::createParsed(
 
       // The cloned parameter is implicit.
       param->setImplicit();
-
-      // It has no default arguments; these will be always be taken
-      // from the subscript declaration.
-      param->setDefaultArgumentKind(DefaultArgumentKind::None);
 
       newParams.push_back(param);
     }

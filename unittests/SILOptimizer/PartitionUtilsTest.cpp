@@ -57,6 +57,10 @@ struct MockedPartitionOpEvaluator final
   }
 
   static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
+
+  static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
+    return {};
+  }
 };
 
 } // namespace
@@ -95,6 +99,10 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
   }
 
   static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
+
+  static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
+    return {};
+  }
 };
 
 } // namespace

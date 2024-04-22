@@ -10,6 +10,8 @@
             "remote": { "id": "apple/swift-llbuild" } },
         "swift-argument-parser": {
             "remote": { "id": "apple/swift-argument-parser" } },
+        "swift-async-algorithms": {
+            "remote": { "id": "apple/swift-async-algorithms" } },
         "swift-atomics": {
             "remote": { "id": "apple/swift-atomics" } },       
         "swift-collections": {
@@ -22,6 +24,8 @@
             "remote": { "id": "apple/swift-asn1" } },
         "swift-driver": {
             "remote": { "id": "apple/swift-driver" } },
+        "swift-log": {
+            "remote": { "id": "apple/swift-log" } },
         "swift-numerics": {
             "remote": { "id": "apple/swift-numerics" } },        
         "swift-tools-support-core": {
@@ -119,7 +123,9 @@
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
+                "swift-async-algorithms": "1.0.0",
                 "swift-driver": "main",
+                "swift-log": "1.5.4",
                 "swift-numerics": "1.0.2",
                 "swift-syntax": "main",
                 "swift-system": "1.2.1",
@@ -142,7 +148,6 @@
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-nio": "2.31.2",
-                "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main",
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
@@ -264,7 +269,9 @@
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
+                "swift-async-algorithms": "1.0.0",
                 "swift-driver": "main",
+                "swift-log": "1.5.4",
                 "swift-numerics": "1.0.2",
                 "swift-syntax": "main",
                 "swift-system": "1.2.1",
@@ -639,12 +646,14 @@
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.2.3",
+                "swift-async-algorithms": "1.0.0",
                 "swift-atomics": "1.2.0",
                 "swift-collections": "1.0.5",                
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
                 "swift-driver": "main",
+                "swift-log": "1.5.4",
                 "swift-numerics": "1.0.2",
                 "swift-syntax": "main",
                 "swift-system": "1.2.1",

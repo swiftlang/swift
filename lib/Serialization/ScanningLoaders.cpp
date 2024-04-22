@@ -53,12 +53,14 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
   auto InPath = BaseName.findInterfacePath(fs, Ctx);
 
-  if (LoadMode == ModuleLoadingMode::OnlySerialized || !InPath) {
+  // Lookup binary module if it is a testable lookup, or only binary module
+  // lookup, or interface file does not exist.
+  if (LoadMode == ModuleLoadingMode::OnlySerialized ||
+      isTestableDependencyLookup || !InPath) {
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies =
-          scanModuleFile(ModPath, IsFramework, isTestableDependencyLookup,
-                         /*hasInterface=*/false);
+          scanModuleFile(ModPath, IsFramework, isTestableDependencyLookup);
       if (dependencies) {
         this->dependencies = std::move(dependencies.get());
         return std::error_code();
@@ -160,9 +162,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             !Ctx.SearchPathOpts.NoScannerModuleValidation) {
           assert(compiledCandidates.size() == 1 &&
                  "Should only have 1 candidate module");
-          auto BinaryDep =
-              scanModuleFile(compiledCandidates[0], isFramework,
-                             isTestableImport, /*hasInterface=*/true);
+          auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
+                                          isTestableImport);
           if (BinaryDep) {
             Result = *BinaryDep;
             return std::error_code();
@@ -273,10 +274,6 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
 
-  // Do not load interface module if it is testable import.
-  ModuleLoadingMode MLM =
-      isTestableDependencyLookup ? ModuleLoadingMode::OnlySerialized : LoadMode;
-
   // Instantiate dependency scanning "loaders".
   SmallVector<std::unique_ptr<SwiftModuleScanner>, 2> scanners;
   // Placeholder dependencies must be resolved first, to prevent the
@@ -285,10 +282,10 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   // dependency graph of the placeholder dependency module itself.
   // FIXME: submodules?
   scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
-      Ctx, MLM, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
+      Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
       delegate, moduleOutputPath));
   scanners.push_back(std::make_unique<SwiftModuleScanner>(
-      Ctx, MLM, moduleId, delegate, moduleOutputPath,
+      Ctx, LoadMode, moduleId, delegate, moduleOutputPath,
       SwiftModuleScanner::MDS_plain));
 
   // Check whether there is a module with this name that we can import.

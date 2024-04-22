@@ -185,33 +185,19 @@ public:
   }
 
   bool isTrivial() const {
+    assert(hasBeenComputed());
     return getCaptures().empty() && !hasGenericParamCaptures() &&
            !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
   }
 
   ArrayRef<CapturedValue> getCaptures() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return std::nullopt;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getCaptures();
   }
 
-  /// Return a filtered list of the captures for this function,
-  /// filtering out global variables.  This function returns the list that
-  /// actually needs to be closed over.
-  ///
-  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const;
-
-  /// \returns true if getLocalCaptures() will return a non-empty list.
-  bool hasLocalCaptures() const;
-
   /// \returns true if the function captures any generic type parameters.
   bool hasGenericParamCaptures() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return false;
+    assert(hasBeenComputed());
     return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
   }
 
@@ -222,22 +208,17 @@ public:
 
   /// \returns the captured dynamic Self type, if any.
   DynamicSelfType *getDynamicSelfType() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return nullptr;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getDynamicSelfType();
   }
 
   bool hasOpaqueValueCapture() const {
+    assert(hasBeenComputed());
     return getOpaqueValue() != nullptr;
   }
 
   OpaqueValueExpr *getOpaqueValue() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return nullptr;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getOpaqueValue();
   }
 

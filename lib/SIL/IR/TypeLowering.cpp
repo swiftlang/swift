@@ -3085,6 +3085,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     // (7) being or containing a variadic generic type which doesn't conform
     //     unconditionally but does in this case
     // (8) being or containing the error type
+    // (9) explicitly suppressing conformance
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3099,6 +3100,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // non-conformance; walk into the rest.
           if (!nominal)
             return false;
+
+          // A trivial type that suppresses conformance doesn't conform (case
+          // (9)).
+          if (nominal && nominal->suppressesConformance(
+                             KnownProtocolKind::BitwiseCopyable)) {
+            return true;
+          }
 
           // Nominals with fields that are generic may not conform
           // unconditionally (the only kind automatically derived currently)
@@ -3178,6 +3186,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                 << "of " << origType << "\n";
             assert(false);
             return true;
+          }
+
+          // A trivial type that suppresses conformance doesn't conform (case
+          // (9)).
+          if (nominal->suppressesConformance(
+                  KnownProtocolKind::BitwiseCopyable)) {
+            return false;
           }
 
           // A generic type may be trivial when instantiated with particular
@@ -4139,13 +4154,21 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
 
-  std::function<void (CaptureInfo captureInfo, DeclContext *dc)> collectCaptures;
+  std::function<void (CaptureInfo captureInfo)> collectCaptures;
   std::function<void (AnyFunctionRef)> collectFunctionCaptures;
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
-  collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
-    assert(captureInfo.hasBeenComputed());
+  auto recordCapture = [&](CapturedValue capture) {
+    ValueDecl *value = capture.getDecl();
+    auto existing = captures.find(value);
+    if (existing != captures.end()) {
+      existing->second = existing->second.mergeFlags(capture);
+    } else {
+      captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
+    }
+  };
 
+  collectCaptures = [&](CaptureInfo captureInfo) {
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
     if (captureInfo.hasDynamicSelfCapture())
@@ -4153,9 +4176,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (captureInfo.hasOpaqueValueCapture())
       capturesOpaqueValue = captureInfo.getOpaqueValue();
 
-    SmallVector<CapturedValue, 4> localCaptures;
-    captureInfo.getLocalCaptures(localCaptures);
-    for (auto capture : localCaptures) {
+    for (auto capture : captureInfo.getCaptures()) {
+      if (!capture.isLocalCapture())
+        continue;
+
       // If the capture is of another local function, grab its transitive
       // captures instead.
       if (auto capturedFn = getAnyFunctionRefFromCapture(capture)) {
@@ -4287,13 +4311,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       }
 
       // Collect non-function captures.
-      ValueDecl *value = capture.getDecl();
-      auto existing = captures.find(value);
-      if (existing != captures.end()) {
-        existing->second = existing->second.mergeFlags(capture);
-      } else {
-        captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
-      }
+      recordCapture(capture);
     }
   };
 
@@ -4305,8 +4323,21 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       return;
 
     PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
-    auto dc = curFn.getAsDeclContext();
-    collectCaptures(curFn.getCaptureInfo(), dc);
+    collectCaptures(curFn.getCaptureInfo());
+
+    if (auto *afd = curFn.getAbstractFunctionDecl()) {
+      // If a local function inherits isolation from the enclosing context,
+      // make sure we capture the isolated parameter, if we haven't already.
+      if (afd->isLocalCapture()) {
+        auto actorIsolation = getActorIsolation(afd);
+        if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
+          if (auto *var = actorIsolation.getActorInstance()) {
+            assert(isa<ParamDecl>(var));
+            recordCapture(CapturedValue(var, 0, afd->getLoc()));
+          }
+        }
+      }
+    }
 
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
@@ -4317,7 +4348,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (auto *AFD = curFn.getAbstractFunctionDecl()) {
       for (auto *P : *AFD->getParameters()) {
         if (P->hasDefaultExpr())
-          collectCaptures(P->getDefaultArgumentCaptureInfo(), dc);
+          collectCaptures(P->getDefaultArgumentCaptureInfo());
       }
     }
   };
@@ -4330,10 +4361,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(curFn.getDecl())) {
         auto *param = getParameterAt(static_cast<ValueDecl *>(afd),
                                      curFn.defaultArgIndex);
-        if (param->hasDefaultExpr()) {
-          auto dc = afd->getInnermostDeclContext();
-          collectCaptures(param->getDefaultArgumentCaptureInfo(), dc);
-        }
+        if (param->hasDefaultExpr())
+          collectCaptures(param->getDefaultArgumentCaptureInfo());
         return;
       }
 

@@ -16,13 +16,12 @@
 // RUN:   -emit-module-interface-path %t/regular/A.swiftinterface -enable-library-evolution -I %t/internal \
 // RUN:   %t/A.swift
 
-/// Import testable build, should use interface.
+/// Import testable build, should use binary but no extra dependencies.
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -o %t/deps1.json -I %t/testable -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix DIAG
-// DIAG: remark: skip swiftmodule built with '-enable-testing'
+// RUN:   -o %t/deps1.json -I %t/testable -swift-version 5 -Rmodule-loading
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps1.json Test directDependencies | %FileCheck %s --check-prefix TEST1
-// TEST1: "swift": "A"
+// TEST1:  "swiftPrebuiltExternal": "A"
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps1.json A directDependencies | %FileCheck %s --check-prefix EMPTY --allow-empty
 // EMPTY-NOT: B
 
@@ -56,12 +55,15 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading
 
-/// Regular import a testable module with no interface, will try to import binary module but fail to look up the dependency.
+/// Regular import a testable module with no interface, don't load optional dependencies.
 // RUN: rm %t/testable/A.swiftinterface
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
-// RUN:   -o %t/deps6.json -I %t/testable -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix ERROR
-// ERROR: error: Unable to find module dependency: 'B'
+// RUN:   -o %t/deps6.json -I %t/testable -swift-version 5 -Rmodule-loading
+// RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps6.json Test directDependencies | %FileCheck %s --check-prefix TEST6
+// TEST6:  "swiftPrebuiltExternal": "A"
+// RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps6.json swiftPrebuiltExternal:A directDependencies | %FileCheck %s --check-prefix EMPTY --allow-empty
+
 
 //--- main.swift
 import A

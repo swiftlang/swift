@@ -221,6 +221,17 @@ public:
                              ArrayRef<SILValue> args = {},
                              ForUnwind_t forUnwind = NotForUnwind);
 
+  /// Emit a branch to the given jump destination,
+  /// threading out through any cleanups we need to run. This does not pop the
+  /// cleanup stack.
+  ///
+  /// \param dest       The destination scope and block.
+  /// \param branchLoc  The location of the branch instruction.
+  /// \param args       Arguments to pass to the destination block.
+  void emitCleanupsForBranch(JumpDest dest, SILLocation branchLoc,
+                             ArrayRef<SILValue> args = {},
+                             ForUnwind_t forUnwind = NotForUnwind);
+
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
   void emitCleanupsForReturn(CleanupLocation loc, ForUnwind_t forUnwind);

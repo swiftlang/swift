@@ -185,7 +185,6 @@ UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
-UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
 UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
@@ -196,6 +195,7 @@ UPCOMING_FEATURE(MoveOnlyPartialConsumption, 429, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
+UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -346,6 +346,9 @@ EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 /// Enable bitwise-copyable feature.
 EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
 
+/// Enable the suppression of inferred, non-invertible, protocols via ~.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ConformanceSuppression, true)
+
 /// Enables the FixedArray data type.
 EXPERIMENTAL_FEATURE(FixedArrays, true)
 
@@ -371,7 +374,7 @@ EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true
 EXPERIMENTAL_FEATURE(IsolatedAny2, true)
 
 // Enable usability improvements for global-actor-isolated types.
-EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, false)
+EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
 
 // Enable @implementation on extensions of ObjC classes.
 EXPERIMENTAL_FEATURE(ObjCImplementation, true)
@@ -381,6 +384,9 @@ EXPERIMENTAL_FEATURE(CImplementation, true)
 
 // Enable @sensitive attribute.
 EXPERIMENTAL_FEATURE(Sensitive, true)
+
+// Enable the stdlib @DebugDescription macro.
+EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
