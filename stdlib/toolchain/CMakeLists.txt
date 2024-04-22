@@ -8,17 +8,6 @@ set(CXX_COMPILE_FLAGS)
 set(CXX_LINK_FLAGS)
 
 
-set(compile_flags
-  # Build the runtime with -Wall to catch, e.g., uninitialized variables
-  # warnings.
-  "-Wall"
-
-  # C++ code in the runtime and standard library should generally avoid
-  # introducing static constructors or destructors.
-  "-Wglobal-constructors"
-  "-Wexit-time-destructors")
-
-
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -27,10 +16,15 @@ else()
   list(APPEND compile_flags "-Wall")
 endif()
 
+list(APPEND compile_flags
+  # C++ code in the runtime and standard library should generally avoid
+  # introducing static constructors or destructors.
+  "-Wglobal-constructors"
+  "-Wexit-time-destructors")
 
 foreach(flag ${compile_flags})
-  check_cxx_compiler_flag("${flag}" is_supported)
-  if(is_supported)
+  check_cxx_compiler_flag("${flag}" cxx_compiler_flag_${flag}_is_supported)
+  if(cxx_compiler_flag_${flag}_is_supported)
     list(APPEND CXX_COMPILE_FLAGS "${flag}")
   endif()
 endforeach()
