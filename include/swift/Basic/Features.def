@@ -176,6 +176,8 @@ LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
 SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
 LANGUAGE_FEATURE(MoveOnlyPartialConsumption, 429, "Partial consumption of noncopyable values")
+/// Enable bitwise-copyable feature.
+LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -338,9 +340,6 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
-
-/// Enable bitwise-copyable feature.
-EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
 
 /// Enable the suppression of inferred, non-invertible, protocols via ~.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ConformanceSuppression, true)

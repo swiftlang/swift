@@ -6,7 +6,6 @@
 // RUN:     -emit-module                                 \
 // RUN:     -package-name Package                        \
 // RUN:     -enable-library-evolution                    \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -module-name Library                         \
 // RUN:     -emit-module-path %t/Library.swiftmodule     \
 // RUN:     -emit-module-interface-path %t/Library.swiftinterface
@@ -16,7 +15,6 @@
 // RUN:     -typecheck -verify                           \
 // RUN:     -package-name Package                        \
 // RUN:     -debug-diagnostic-names                      \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -I %t
 
 //--- Library.swift

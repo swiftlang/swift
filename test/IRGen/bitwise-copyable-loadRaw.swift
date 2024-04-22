@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature BuiltinModule -enable-experimental-feature BitwiseCopyable -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature BuiltinModule -Xfrontend -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: executable_test
 

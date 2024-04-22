@@ -2,7 +2,6 @@
 // RUN:     -primary-file %s                             \
 // RUN:     -emit-ir                                     \
 // RUN:     -disable-availability-checking               \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts

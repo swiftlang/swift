@@ -7,7 +7,6 @@
 // RUN:     -module-name Swift                               \
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature BuiltinModule       \
-// RUN:     -enable-experimental-feature BitwiseCopyable     \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-builtin-module

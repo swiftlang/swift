@@ -2,7 +2,6 @@
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
-// RUN:     -enable-experimental-feature BitwiseCopyable     \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
@@ -241,14 +240,6 @@ func passPointer<T : _Pointer>(_ p: T) { take3(p) }
 
 func take4<T : _BitwiseCopyable>(_ t: T) {}
 
-func passCheckedContinuation<T : _BitwiseCopyable, U : Error & _BitwiseCopyable>(
-  _ c: CheckedContinuation<T, U>
-)
-{
-  take4(c) // expected-error   {{type_does_not_conform_decl_owner}}
-           // expected-note@-7 {{where_requirement_failure_one_subst}}
-}
-
 func passUnsafeContinuation<T : _BitwiseCopyable, U : Error & _BitwiseCopyable>(
   _ c: UnsafeContinuation<T, U>
 )
@@ -256,7 +247,7 @@ func passUnsafeContinuation<T : _BitwiseCopyable, U : Error & _BitwiseCopyable>(
   take4(c)
 }
 
-extension UnsafeContinuation : @retroactive _BitwiseCopyable {} // expected-error{{conformance to 'BitwiseCopyable' must occur in the same module as generic struct 'UnsafeContinuation'}}
+extension CheckedContinuation : @retroactive _BitwiseCopyable {} // expected-error{{conformance to 'BitwiseCopyable' must occur in the same module as generic struct 'CheckedContinuation'}}
 
 //==============================================================================
 //========================_CONCURRENCY-DEPENDENCY TESTS=(END)=================}}

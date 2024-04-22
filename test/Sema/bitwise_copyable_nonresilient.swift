@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend                           \
 // RUN:     %t/Library.swift                             \
 // RUN:     -emit-module                                 \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -module-name Library                         \
 // RUN:     -emit-module-path %t/Library.swiftmodule
 
@@ -12,7 +11,6 @@
 // RUN:     %t/Downstream.swift                          \
 // RUN:     -typecheck -verify                           \
 // RUN:     -debug-diagnostic-names                      \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -I %t
 
 //--- Library.swift
