@@ -6416,8 +6416,7 @@ bool NotCopyableFailure::diagnoseAsError() {
       return false;
     };
 
-    // NOTE: a non-requirement constraint locator might now be impossible after
-    // having made Copyable a Requirement in Feature::NoncopyableGenerics
+    // NOTE: a non-requirement constraint locator might now be impossible.
     if (diagnoseGenericTypeParamType(loc->getGenericParameter()))
       return true;
 

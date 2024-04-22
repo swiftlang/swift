@@ -3,6 +3,7 @@
 // REQUIRES: swift_in_compiler
 
 import Builtin
+import Swift
 
 class Klass {}
 
