@@ -4685,6 +4685,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       return ABIDifference::NeedsThunk;
   }
 
+  // Non-throwing functions and functions with indirect error result need thunk
+  // because of the trailing error result storage parameter.
+  if (fnTy1->hasIndirectErrorResult() != fnTy2->hasIndirectErrorResult()) {
+    return ABIDifference::NeedsThunk;
+  }
+
   // Asynchronous functions require a thunk if they differ in whether they
   // have an error result.
   if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
