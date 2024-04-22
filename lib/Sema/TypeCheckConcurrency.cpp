@@ -789,8 +789,8 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 
 /// Determine whether the given nominal type has an explicit Sendable
 /// conformance (regardless of its availability).
-static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
-                                           bool applyModuleDefault = true) {
+bool swift::hasExplicitSendableConformance(NominalTypeDecl *nominal,
+                                           bool applyModuleDefault) {
   ASTContext &ctx = nominal->getASTContext();
   auto nominalModule = nominal->getParentModule();
 
