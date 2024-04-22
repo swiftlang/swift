@@ -70,7 +70,5 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     add_custom_command(TARGET swift-wasm-plugin-server POST_BUILD COMMAND
       codesign -fs - $<TARGET_FILE:swift-wasm-plugin-server> --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/allow-jit.plist
     )
-  else()
-    # TODO: Add dependency on WasmKit
   endif()
 endif()
