@@ -3679,7 +3679,8 @@ ERROR(inconsistent_implicit_access_level_on_import,none,
       "'%select{private|fileprivate|internal|package|public|%error}1' elsewhere",
       (Identifier, AccessLevel))
 NOTE(inconsistent_implicit_access_level_on_import_silence,none,
-      "silence these warnings by adopting 'InternalImportsByDefault'",
+      "silence these warnings by adopting the upcoming feature "
+      "'InternalImportsByDefault'",
       ())
 NOTE(inconsistent_implicit_access_level_on_import_here,none,
      "imported "
