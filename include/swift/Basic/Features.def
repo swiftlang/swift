@@ -374,7 +374,7 @@ EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true
 EXPERIMENTAL_FEATURE(IsolatedAny2, true)
 
 // Enable usability improvements for global-actor-isolated types.
-EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, false)
+EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
 
 // Enable @implementation on extensions of ObjC classes.
 EXPERIMENTAL_FEATURE(ObjCImplementation, true)
