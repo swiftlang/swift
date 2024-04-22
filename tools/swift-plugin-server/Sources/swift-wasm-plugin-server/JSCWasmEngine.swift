@@ -16,8 +16,6 @@ import JavaScriptCore
 import WASI
 import WasmTypes
 
-// typealias DefaultWasmEngine = JSCWasmEngine
-
 // (wasm: ArrayBuffer, imports: Object) => Promise<{ ... }>
 private let js = """
 async (wasmData, imports) => {
