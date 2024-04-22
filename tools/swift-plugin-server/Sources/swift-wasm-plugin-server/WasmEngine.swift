@@ -18,7 +18,7 @@ protocol WasmEngine {
   associatedtype GuestMemoryType: GuestMemory
   var memory: GuestMemoryType { get }
 
-  init(wasm: Data, imports: WASIBridgeToHost) async throws
+  init(wasm: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws
 
   func customSections(named name: String) throws -> [ArraySlice<UInt8>]
 
@@ -31,7 +31,7 @@ typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
 struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
   let engine: Engine
 
-  init(wasm: Data) async throws {
+  init(wasm: UnsafeByteBuffer) async throws {
     // TODO: we should air-gap this bridge. Wasm macros don't need IO.
     let bridge = try WASIBridgeToHost()
     engine = try await Engine(wasm: wasm, imports: bridge)

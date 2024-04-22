@@ -38,7 +38,7 @@ final class JSCWasmEngine: WasmEngine {
 
   var memory: some GuestMemory { _memory }
 
-  init(wasm data: Data, imports: WASIBridgeToHost) async throws {
+  init(wasm buffer: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws {
     let factory = try await JSCWasmFactory.shared
     let context = factory.context
 
@@ -52,7 +52,14 @@ final class JSCWasmEngine: WasmEngine {
       }
     }
 
-    let jsBuf = try JSValue(newArrayBufferWithData: data, in: context)
+    let jsBuf = try JSValue(
+      // JavaScript doesn't have readonly ArrayBuffers but all the JS we're running
+      // is contained within this file and we know that we aren't mutating this buffer.
+      // If we did attempt to mutate it, it would be UB.
+      newArrayBufferWithBytesNoCopy: UnsafeMutableRawBufferPointer(mutating: buffer.data),
+      deallocator: { _ = buffer },
+      in: context
+    )
     let promise = factory.value.call(withArguments: [jsBuf, imports])
     guard let promise, context.exception == nil else {
       throw JSCWasmError(message: "Failed to load plugin", value: context.exception)
