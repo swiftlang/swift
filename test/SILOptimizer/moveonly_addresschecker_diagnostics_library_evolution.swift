@@ -84,34 +84,41 @@ public func callerBorrowClassLetFieldForArgumentSpillingTestVarGlobal() {
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestLet() {
     let x = CopyableKlass()
-    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
+    consumeVal(x.letS.e) // expected-error{{field 'x.letS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestVar() {
     var x = CopyableKlass()
     x = CopyableKlass()
-    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
+    consumeVal(x.letS.e) // expected-error{{field 'x.letS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestArg(_ x: CopyableKlass) {
-    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
+    consumeVal(x.letS.e) // expected-error{{field 'x.letS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestInOutArg(_ x: inout CopyableKlass) {
-    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
+    consumeVal(x.letS.e) // expected-error{{field 'x.letS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 // TODO: more specific error message path than "unknown"
 public func callerConsumeClassLetFieldForArgumentSpillingTestConsumingArg(_ x: consuming CopyableKlass) {
-  consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
+  consumeVal(x.letS.e) // expected-error{{field 'x.letS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                       // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestLetGlobal() {
-    consumeVal(copyableKlassLetGlobal.letS.e) // expected-error{{cannot partially consume 'copyableKlassLetGlobal.letS'}}
+    consumeVal(copyableKlassLetGlobal.letS.e) // expected-error{{field 'copyableKlassLetGlobal.letS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                                              // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestVarGlobal() {
-    consumeVal(copyableKlassVarGlobal.letS.e) // expected-error{{cannot partially consume 'copyableKlassVarGlobal.letS'}}
+    consumeVal(copyableKlassVarGlobal.letS.e) // expected-error{{field 'copyableKlassVarGlobal.letS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                                              // expected-note@-1{{consumed here}}
 }
 
 ////////////////////
@@ -151,32 +158,39 @@ public func callerBorrowClassVarFieldForArgumentSpillingTestVarGlobal() {
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestLet() {
     let x = CopyableKlass()
-    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
+    consumeVal(x.varS.e) // expected-error{{field 'x.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestVar() {
     var x = CopyableKlass()
     x = CopyableKlass()
-    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
+    consumeVal(x.varS.e) // expected-error{{field 'x.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestArg(_ x: CopyableKlass) {
-    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
+    consumeVal(x.varS.e) // expected-error{{field 'x.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestInOutArg(_ x: inout CopyableKlass) {
-    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
+    consumeVal(x.varS.e) // expected-error{{field 'x.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                         // expected-note@-1{{consumed here}}
 }
 
 // TODO: more precise error path reporting than 'unknown'
 public func callerConsumeClassVarFieldForArgumentSpillingTestConsumingArg(_ x: consuming CopyableKlass) {
-  consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
+  consumeVal(x.varS.e) // expected-error{{field 'x.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                       // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestLetGlobal() {
-    consumeVal(copyableKlassLetGlobal.varS.e) // expected-error{{cannot partially consume 'copyableKlassLetGlobal.varS'}}
+    consumeVal(copyableKlassLetGlobal.varS.e) // expected-error{{field 'copyableKlassLetGlobal.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                                              // expected-note@-1{{consumed here}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestVarGlobal() {
-    consumeVal(copyableKlassVarGlobal.varS.e) // expected-error{{cannot partially consume 'copyableKlassVarGlobal.varS'}}
+    consumeVal(copyableKlassVarGlobal.varS.e) // expected-error{{field 'copyableKlassVarGlobal.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
+                                              // expected-note@-1{{consumed here}}
 }

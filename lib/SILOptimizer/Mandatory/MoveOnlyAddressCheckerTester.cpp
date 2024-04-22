@@ -109,7 +109,8 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
       borrowtodestructure::IntervalMapAllocator allocator;
       MoveOnlyAddressChecker checker{getFunction(), diagnosticEmitter,
                                      allocator, domTree, poa};
-      madeChange = checker.check(moveIntroducersToProcess);
+      madeChange = checker.completeLifetimes();
+      madeChange |= checker.check(moveIntroducersToProcess);
     }
 
     // If we did not emit any diagnostics, emit a diagnostic if we missed any
