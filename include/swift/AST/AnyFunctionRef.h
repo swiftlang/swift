@@ -75,13 +75,6 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
-  void setCaptureInfo(CaptureInfo captures) const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      AFD->setCaptureInfo(captures);
-      return;
-    }
-    TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
-  }
 
   bool hasType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
