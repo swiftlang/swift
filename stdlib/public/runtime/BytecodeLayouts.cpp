@@ -413,6 +413,10 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
 
       if (tagBytes) {
         xiType = nullptr;
+      } else if (!xiType) {
+        // If there are no inhabitants and the extra tag bits are not set,
+        // we have a payload.
+        return;
       }
     }
 
@@ -633,6 +637,10 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
 
       if (tagBytes) {
         xiType = nullptr;
+      } else if (!xiType) {
+        // If there are no inhabitants and the extra tag bits are not set,
+        // we have a payload.
+        return;
       }
     }
 

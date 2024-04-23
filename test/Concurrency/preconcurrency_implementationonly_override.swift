@@ -11,6 +11,7 @@
 // REQUIRES: asserts
 
 @_implementationOnly import ImplementationOnlyDefs
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 class D: C {
   @_implementationOnly

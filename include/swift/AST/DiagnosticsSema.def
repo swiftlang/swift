@@ -1167,6 +1167,9 @@ WARNING(implementation_only_requires_library_evolution,none,
         "using '@_implementationOnly' without enabling library evolution "
         "for %0 may lead to instability during execution",
         (Identifier))
+WARNING(implementation_only_deprecated,none,
+        "'@_implementationOnly' is deprecated, use 'internal import' instead",
+        ())
 
 ERROR(module_allowable_client_violation,none,
       "module %0 doesn't allow importation from module %1",
@@ -2507,6 +2510,11 @@ NOTE(decl_import_via_here,none,
      "%kind0 imported as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
      "from %2 here",
+     (const Decl *, AccessLevel, const ModuleDecl*))
+NOTE(decl_import_via_local,none,
+     "%kind0 is imported by this file as "
+     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
+     "from %2",
      (const Decl *, AccessLevel, const ModuleDecl*))
 
 // Opaque return types
@@ -7708,7 +7716,7 @@ NOTE(add_explicit_protocol_for_conformance,none,
      "consider making %kind0 explicitly conform to the '%1' protocol",
      (const ValueDecl *, StringRef))
 ERROR(escapable_requires_feature_flag,none,
-      "type '~Escapable' requires -enable-experimental-feature NonescapableTypes",
+      "type 'Escapable' requires -enable-experimental-feature NonescapableTypes",
       ())
 ERROR(non_bitwise_copyable_type_class,none,
       "class cannot conform to 'BitwiseCopyable'", ())

@@ -347,6 +347,11 @@ public struct ContainsSinglePayloadSimpleClassEnum {
     }
 }
 
+public enum TestOptional<T> {
+    case empty
+    case nonEmpty(T)
+}
+
 public enum SinglePayloadEnum<T> {
     case empty
     case nonEmpty(Int, T?)

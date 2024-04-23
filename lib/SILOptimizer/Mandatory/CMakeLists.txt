@@ -9,6 +9,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ConsumeOperatorCopyableValuesChecker.cpp
   PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
+  DiagnoseUnnecessaryPreconcurrencyImports.cpp
   DebugInfoCanonicalizer.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
