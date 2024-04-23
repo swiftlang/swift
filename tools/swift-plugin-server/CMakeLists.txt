@@ -64,7 +64,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftCompilerPluginMessageHandling
       swiftLLVMJSON
       SwiftPluginServerSupport
-      WASI WasmKit WasmKitWASI WasmTypes
+      WasmKitWASI
   )
   target_include_directories(swift-wasm-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include
