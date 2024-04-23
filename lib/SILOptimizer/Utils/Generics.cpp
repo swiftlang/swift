@@ -813,7 +813,7 @@ getReturnTypeCategory(const SILResultInfo &RI,
                   const SILFunctionConventions &substConv,
                   TypeExpansionContext typeExpansion) {
   auto ResultTy = substConv.getSILType(RI, typeExpansion);
-  ResultTy = Callee->mapTypeIntoContext(ResultTy);
+  ResultTy = mapTypeIntoContext(ResultTy);
   auto &TL = getModule().Types.getTypeLowering(ResultTy, typeExpansion);
 
   if (!TL.isLoadable())
