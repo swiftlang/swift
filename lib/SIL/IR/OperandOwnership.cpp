@@ -480,6 +480,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
                                                 bool hasScopeInCaller) {
 
   switch (argConv) {
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Direct_Owned:
   case SILArgumentConvention::Pack_Owned:

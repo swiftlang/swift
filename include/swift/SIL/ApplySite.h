@@ -412,6 +412,7 @@ public:
                               : SILArgumentConvention::Direct_Owned;
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
       return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
                               : SILArgumentConvention::Indirect_In;
     case SILArgumentConvention::Pack_Guaranteed:

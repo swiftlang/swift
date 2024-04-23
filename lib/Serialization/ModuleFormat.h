@@ -389,6 +389,7 @@ enum class ParameterConvention : uint8_t {
   Pack_Owned,
   Pack_Inout,
   Pack_Guaranteed,
+  Indirect_In_CXX,
 };
 using ParameterConventionField = BCFixed<4>;
 

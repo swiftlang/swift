@@ -4066,6 +4066,12 @@ enum class ParameterConvention : uint8_t {
   /// convention used by mutable captures in @noescape closures.
   Indirect_InoutAliasable,
 
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory. The callee may modify, but does not destroy the
+  /// object. This corresponds to the parameter-passing convention of the
+  /// Itanium C++ ABI, which is used ubiquitously on non-Windows targets.
+  Indirect_In_CXX,
+
   /// This argument is passed directly.  Its type is non-trivial, and the callee
   /// is responsible for destroying it.
   Direct_Owned,
@@ -4106,6 +4112,7 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In_Guaranteed:
     return true;
 
@@ -4122,6 +4129,7 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
 inline bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Pack_Owned:
     return true;
@@ -4150,6 +4158,7 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
@@ -4164,6 +4173,7 @@ inline bool isMutatingParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Pack_Inout:
     return true;
 
@@ -4190,6 +4200,7 @@ inline bool isPackParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
@@ -4268,6 +4279,10 @@ public:
 
   bool isIndirectIn() const {
     return getConvention() == ParameterConvention::Indirect_In;
+  }
+
+  bool isIndirectInCXX() const {
+    return getConvention() == ParameterConvention::Indirect_In_CXX;
   }
 
   bool isIndirectInOut() const {

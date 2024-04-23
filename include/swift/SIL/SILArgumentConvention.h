@@ -28,6 +28,7 @@ struct SILArgumentConvention {
     Indirect_In_Guaranteed,
     Indirect_Inout,
     Indirect_InoutAliasable,
+    Indirect_In_CXX,
     Indirect_Out,
     Direct_Owned,
     Direct_Unowned,
@@ -54,6 +55,9 @@ struct SILArgumentConvention {
       return;
     case ParameterConvention::Indirect_In_Guaranteed:
       Value = SILArgumentConvention::Indirect_In_Guaranteed;
+      return;
+    case ParameterConvention::Indirect_In_CXX:
+      Value = SILArgumentConvention::Indirect_In_CXX;
       return;
     case ParameterConvention::Direct_Unowned:
       Value = SILArgumentConvention::Direct_Unowned;
@@ -92,6 +96,7 @@ struct SILArgumentConvention {
       case SILArgumentConvention::Indirect_In_Guaranteed:
       case SILArgumentConvention::Indirect_In:
       case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Indirect_In_CXX:
       case SILArgumentConvention::Direct_Unowned:
       case SILArgumentConvention::Direct_Owned:
       case SILArgumentConvention::Direct_Guaranteed:
@@ -106,6 +111,7 @@ struct SILArgumentConvention {
   bool isOwnedConvention() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Pack_Owned:
       return true;
@@ -133,6 +139,7 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Pack_Inout:
@@ -150,6 +157,7 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_In_CXX:
       return true;
 
     case SILArgumentConvention::Indirect_InoutAliasable:
@@ -176,6 +184,7 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:

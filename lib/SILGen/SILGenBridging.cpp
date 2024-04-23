@@ -325,6 +325,10 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
       return ManagedValue::forBorrowedAddressRValue(value);
     }
 
+  case ParameterConvention::Indirect_In_CXX:
+    // Don't emit a cleanup if the parameter is @in_cxx.
+    return ManagedValue::forOwnedRValue(value, CleanupHandle::invalid());
+
   case ParameterConvention::Indirect_In:
     if (valueTL.isLoadable()) {
       return SGF.emitLoad(loc, value, valueTL, SGFContext(), IsTake);
@@ -439,6 +443,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Pack_Guaranteed:
       case ParameterConvention::Pack_Owned:
       case ParameterConvention::Pack_Inout:
@@ -1417,7 +1422,11 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       arg = emitObjCUnconsumedArgument(SGF, loc, arg);
     }
 
-    auto managedArg = SGF.emitManagedRValueWithCleanup(arg);
+    // Don't emit a cleanup if the argument is @in_cxx.
+    auto managedArg =
+        inputs[i].isIndirectInCXX()
+            ? ManagedValue::forOwnedRValue(arg, CleanupHandle::invalid())
+            : SGF.emitManagedRValueWithCleanup(arg);
 
     bridgedArgs.push_back(managedArg);
   }
@@ -2165,6 +2174,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         case ParameterConvention::Indirect_InoutAliasable:
           param = ManagedValue::forLValue(paramValue);
           break;
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Indirect_In:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
