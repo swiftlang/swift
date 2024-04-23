@@ -171,7 +171,13 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 
 /// A type whose values can be implicitly or explicitly copied.
 ///
-/// XXX this protocol has no symbol requirements, but it does have semantic requirements
+/// Although this protocol doesn’t have any required methods or properties,
+/// it does have semantic requirements that are enforced at compile time.
+/// These requirements are listed in the sections below.
+/// XXX what are the requirements -- just that copying is ok?
+/// Conformance to `Copyable` must be declared
+/// in the same file as the type's declaration.
+/// <!-- XXX TR: Confirm previous sentence; borrowed from Sendable docs -->
 ///
 /// Conformance to the `Copyable` protocol
 /// is implicitly included in the following places:
@@ -216,7 +222,12 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 ///
 /// Extensions on the `Copyable` protocol are not allowed.
 ///
-/// XXX xref to TSPL
+/// XXX link to the right chapter
+/// For information about the language-level concurrency model that `Task` is part of,
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
+///
+/// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
+/// [tspl]: https://docs.swift.org/swift-book/
 @_marker public protocol Copyable {}
 
 @_marker public protocol Escapable {}
