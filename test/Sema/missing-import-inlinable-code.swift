@@ -75,6 +75,7 @@ public import libA
 // BEGIN clientFileA-OldCheck.swift
 public import libA
 @_implementationOnly import empty
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 @inlinable public func bar() {
   let a = ImportedType()
@@ -102,6 +103,7 @@ public import libA
 
 // BEGIN clientFileB.swift
 @_implementationOnly import libB
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 public import libA
 extension ImportedType {
     public func localModuleMethod() {}

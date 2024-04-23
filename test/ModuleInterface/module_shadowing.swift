@@ -29,7 +29,7 @@
 import ShadowyHorror
 // OTHER-DAG: ShadowyHorror.module_shadowing:{{[0-9]+:[0-9]+}}: warning: public class 'ShadowyHorror.module_shadowing' shadows module 'module_shadowing', which may cause failures when importing 'module_shadowing' or its clients in some configurations; please rename either the class 'ShadowyHorror.module_shadowing' or the module 'module_shadowing', or see https://github.com/apple/swift/issues/56573 for workarounds{{$}}
 
-@_implementationOnly import TestModule
+internal import TestModule
 #endif
 
 public struct ShadowyHorror {
