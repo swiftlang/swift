@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !SWIFT_WASM_USE_JSC
+
 import WASI
 import WasmKit
 import WasmKitWASI
@@ -51,3 +53,5 @@ struct WasmKitPluginError: Error, CustomStringConvertible {
         self.description = message
     }
 }
+
+#endif
