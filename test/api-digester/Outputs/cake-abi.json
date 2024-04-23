@@ -54,26 +54,23 @@
             "children": [
               {
                 "kind": "TypeNominal",
-                "name": "P1",
-                "printedName": "any cake.P1",
-                "usr": "s:4cake2P1P"
+                "name": "GenericTypeParam",
+                "printedName": "τ_0_0"
               },
               {
                 "kind": "TypeNominal",
-                "name": "P1",
-                "printedName": "any cake.P1",
-                "usr": "s:4cake2P1P"
+                "name": "GenericTypeParam",
+                "printedName": "τ_0_0"
               },
               {
                 "kind": "TypeNominal",
-                "name": "P1",
-                "printedName": "any cake.P1",
-                "usr": "s:4cake2P1P"
+                "name": "GenericTypeParam",
+                "printedName": "τ_0_0"
               }
             ],
             "declKind": "Func",
-            "usr": "s:4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
-            "mangledName": "$s4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
+            "usr": "s:4cake2P1PAAE1poiyxx_xtFZ",
+            "mangledName": "$s4cake2P1PAAE1poiyxx_xtFZ",
             "moduleName": "cake",
             "genericSig": "<τ_0_0 where τ_0_0 : cake.P1>",
             "sugared_genericSig": "<Self where Self : cake.P1>",
