@@ -31,10 +31,19 @@ extension KeyPathInst : OnoneSimplifyable {
 fileprivate func allUsesRemovable(instruction: Instruction) -> Bool {
   for result in instruction.results {
     for use in result.uses {
-      if !(use.instruction is UpcastInst || use.instruction is DestroyValueInst || use.instruction is BeginBorrowInst || use.instruction is EndBorrowInst) {
-        return false
-      }
-      if !allUsesRemovable(instruction: use.instruction) {
+      switch use.instruction {
+      case is UpcastInst,
+           is DestroyValueInst,
+           is BeginBorrowInst,
+           is EndBorrowInst,
+           is MoveValueInst,
+           is CopyValueInst:
+        // This is a removable instruction type, continue descending into uses
+        if !allUsesRemovable(instruction: use.instruction) {
+          return false
+        }
+
+      default:
         return false
       }
     }
