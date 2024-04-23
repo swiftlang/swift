@@ -53,4 +53,7 @@ struct NonCopyableHolderDerivedDerived: NonCopyableHolderDerived {
     }
 };
 
+inline NonCopyable *getNonCopyablePtr() { return nullptr; }
+inline NonCopyableDerived *getNonCopyableDerivedPtr() { return nullptr; }
+
 #endif // TEST_INTEROP_CXX_CLASS_MOVE_ONLY_VT_H
