@@ -657,6 +657,21 @@ class BuildScriptInvocation(object):
         # Begin the post build-script-impl build phase.
         builder.begin_pipeline()
 
+        builder.add_product(products.WASILibc,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmLLVMRuntimeLibs,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmThreadsLLVMRuntimeLibs,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmKit,
+                            is_enabled=self.args.build_wasmkit)
+        builder.add_product(products.WasmStdlib,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmThreadsStdlib,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmSwiftSDK,
+                            is_enabled=self.args.build_wasmstdlib)
+
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
         builder.add_product(products.SwiftSyntax,
@@ -683,20 +698,6 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.install_swiftdocc)
         builder.add_product(products.MinimalStdlib,
                             is_enabled=self.args.build_minimalstdlib)
-        builder.add_product(products.WASILibc,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmLLVMRuntimeLibs,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmThreadsLLVMRuntimeLibs,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmKit,
-                            is_enabled=self.args.build_wasmkit)
-        builder.add_product(products.WasmStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmThreadsStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmSwiftSDK,
-                            is_enabled=self.args.build_wasmstdlib)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
