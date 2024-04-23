@@ -2034,7 +2034,12 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   return op.get();
 }
 
-bool swift::isMemberOperator(FuncDecl *decl, Type type) {
+/// This means two things:
+/// - If selfTy is null, 'decl' is assumed to be a member of a nominal type
+///   or extension. We check if its a valid member operator.
+/// - Otherwise, 'decl' is a member or top-level operator. We check if it
+///   is a suitable witness for the given conforming type.
+bool swift::isMemberOperator(FuncDecl *decl, Type selfTy) {
   // Check that member operators reference the type of 'Self'.
   if (decl->isInvalid())
     return true;
@@ -2042,40 +2047,46 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   auto *DC = decl->getDeclContext();
 
   auto selfNominal = DC->getSelfNominalTypeDecl();
+  assert(selfNominal || selfTy);
 
-  // Check the parameters for a reference to 'Self'.
+  // Is the operator a member of a protocol or protocol extension?
   bool isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
+
+  // Is the operator a member of a tuple extension?
   bool isTuple = isa_and_nonnull<BuiltinTupleDecl>(selfNominal);
 
+  // Check the parameters for a reference to 'Self'.
   for (auto param : *decl->getParameters()) {
     // Look through a metatype reference, if there is one.
     auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
 
+    if (isProtocol || isTuple) {
+      // For a member of a protocol or tuple extension, is it the 'Self'
+      // type parameter?
+      if (paramType->isEqual(DC->getSelfInterfaceType()))
+        return true;
+
+      continue;
+    }
+
+    // We have a member operator of a concrete nominal type, or a global operator.
     auto nominal = paramType->getAnyNominal();
-    if (type.isNull()) {
-      // Is it the same nominal type?
-      if (selfNominal && nominal == selfNominal)
+
+    if (selfTy.isNull()) {
+      // We're validating a member operator.
+
+      // Does the parameter have the right nominal type?
+      if (nominal == selfNominal)
         return true;
     } else {
-      // Is it the same nominal type? Or a generic (which may or may not match)?
-      if (paramType->is<GenericTypeParamType>() ||
-          nominal == type->getAnyNominal())
+      // We're checking a conformance and this operator is a candidate witness.
+
+      // Does the parameter have the right nominal type for the conformance?
+      if (nominal == selfTy->getAnyNominal())
         return true;
-    }
 
-    if (isProtocol) {
-      // FIXME: Source compatibility hack for Swift 5. The compiler
-      // accepts member operators on protocols with existential
-      // type arguments. We should consider banning this in Swift 6.
-      if (auto existential = paramType->getAs<ExistentialType>()) {
-        if (selfNominal == existential->getConstraintType()->getAnyNominal())
-          return true;
-      }
-    }
-
-    if (isProtocol || isTuple) {
-      // For a protocol or tuple extension, is it the 'Self' type parameter?
-      if (paramType->isEqual(DC->getSelfInterfaceType()))
+      // Otherwise, we might also have a match if the top-level operator is generic.
+      if (paramType->is<GenericTypeParamType>())
         return true;
     }
   }
