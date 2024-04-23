@@ -59,6 +59,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   SWIFT_MODULE_DEPENDS_OSX ${swift_stdlib_unittest_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_TVOS ${swift_stdlib_unittest_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_WATCHOS ${swift_stdlib_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_XROS ${swift_stdlib_unittest_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_stdlib_unittest_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_FREESTANDING "${SWIFT_FREESTANDING_TEST_DEPENDENCIES}"
   SWIFT_MODULE_DEPENDS_LINUX Glibc

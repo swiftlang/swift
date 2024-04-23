@@ -1690,6 +1690,12 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setSDKPath(SearchPathOpts.getSDKPath().str());
   }
 
+  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
+    GenericArgs.push_back("-platform-availability-inheritance-map-path");
+    GenericArgs.push_back(ArgSaver.save(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath));
+    genericSubInvocation.setPlatformAvailabilityInheritanceMapPath(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
+  }
+
   genericSubInvocation.getFrontendOptions().InputMode
       = FrontendOptions::ParseInputMode::SwiftModuleInterface;
   if (!SearchPathOpts.RuntimeResourcePath.empty()) {

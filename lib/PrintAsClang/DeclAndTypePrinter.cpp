@@ -1715,6 +1715,9 @@ public:
       case PlatformKind::watchOS:
         plat = "watchos";
         break;
+      case PlatformKind::visionOS:
+        plat = "visionos";
+        break;
       case PlatformKind::macOSApplicationExtension:
         plat = "macos_app_extension";
         break;
@@ -1729,6 +1732,9 @@ public:
         break;
       case PlatformKind::watchOSApplicationExtension:
         plat = "watchos_app_extension";
+        break;
+      case PlatformKind::visionOSApplicationExtension:
+        plat = "visionos_app_extension";
         break;
       case PlatformKind::OpenBSD:
         plat = "openbsd";

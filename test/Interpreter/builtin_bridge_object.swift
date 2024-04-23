@@ -3,6 +3,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// rdar://124700033
+// UNSUPPORTED: OS=xros
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 

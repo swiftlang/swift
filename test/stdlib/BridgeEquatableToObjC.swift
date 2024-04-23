@@ -32,7 +32,7 @@ BridgeEquatableToObjC.test("Bridge equatable struct") {
   let objcResult = objcA.isEqual(objcB)
 
   expectEqual(swiftResult, true)
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
   // Apple platforms use old semantics for now...
   expectEqual(objcResult, false)
 #else
