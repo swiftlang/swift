@@ -564,6 +564,7 @@ static ManagedValue createInputFunctionArgument(
   case SILArgumentConvention::Pack_Owned:
     return SGF.emitManagedPackWithCleanup(arg);
 
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In:
     if (SGF.silConv.useLoweredAddresses())
       return SGF.emitManagedBufferWithCleanup(arg);

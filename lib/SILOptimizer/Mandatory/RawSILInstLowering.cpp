@@ -144,6 +144,7 @@ static void getAssignByWrapperArgsRecursively(SmallVectorImpl<SILValue> &args,
       forCleanup.createDestroyValue(loc, src);
       break;
     case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Direct_Owned:
       break;

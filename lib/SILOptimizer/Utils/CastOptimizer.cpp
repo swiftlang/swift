@@ -693,6 +693,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   case ParameterConvention::Pack_Inout:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_CXX:
     // Currently this
     // cannot appear, because the _bridgeToObjectiveC protocol witness method
     // always receives the this pointer (= the source) as guaranteed.
