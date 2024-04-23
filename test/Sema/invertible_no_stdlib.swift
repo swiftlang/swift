@@ -14,7 +14,7 @@ func reqCopy2<T: Builtin.Copyable>(_ t: T) {} // expected-note {{generic paramet
 
 protocol P {}
 
-struct DataType: P, Builtin.Escapable {}
+struct DataType: P, Builtin.Escapable {} // expected-error {{type 'Escapable' requires -enable-experimental-feature NonescapableTypes}}
 struct DataTypeNC: ~Builtin.Copyable {}
 
 func main() {
