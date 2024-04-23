@@ -4770,6 +4770,21 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
+    // Gate the 'Escapable' type behind a specific flag for now.
+    //
+    // NOTE: we do not return an ErrorType, though! We're just artificially
+    // preventing people from referring to the type without the feature.
+    if (auto proto = result->getAs<ProtocolType>()) {
+      if (auto known = proto->getKnownProtocol()) {
+        if (*known == KnownProtocolKind::Escapable
+            && !isSILSourceFile()
+            && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escapable_requires_feature_flag);
+        }
+      }
+    }
+
     if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) &&
         options.isConstraintImplicitExistential()) {
       // Check whether this type is an implicit opaque result type.
@@ -5774,10 +5789,9 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
     if (auto kind = getInvertibleProtocolKind(*kp)) {
 
       // Gate the '~Escapable' type behind a specific flag for now.
+      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
       if (*kind == InvertibleProtocolKind::Escapable &&
           !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        diagnoseInvalid(repr, repr->getLoc(),
-                        diag::escapable_requires_feature_flag);
         return wrapInExistential(ErrorType::get(getASTContext()));
       }
 
