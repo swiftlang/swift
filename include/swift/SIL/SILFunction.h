@@ -269,6 +269,9 @@ private:
   /// @_dynamicReplacement(for:) function.
   SILFunction *ReplacedFunction = nullptr;
 
+  /// The SILDeclRef that this function was created for by SILGen if one exists.
+  SILDeclRef DeclRef = SILDeclRef();
+
   /// This SILFunction REFerences an ad-hoc protocol requirement witness in
   /// order to keep it alive, such that it main be obtained in IRGen. Without
   /// this explicit reference, the witness would seem not-used, and not be
@@ -1114,6 +1117,12 @@ public:
   /// Get the source location of the function.
   const SILDebugScope *getDebugScope() const { return DebugScope; }
 
+  /// Return the SILDeclRef for this SILFunction if one was assigned by SILGen.
+  SILDeclRef getDeclRef() const { return DeclRef; }
+
+  /// Set the SILDeclRef for this SILFunction. Used mainly by SILGen.
+  void setDeclRef(SILDeclRef declRef) { DeclRef = declRef; }
+
   /// Get this function's bare attribute.
   IsBare_t isBare() const { return IsBare_t(Bare); }
   void setBare(IsBare_t isB) { Bare = isB; }
@@ -1389,6 +1398,9 @@ public:
   }
 
   ActorIsolation getActorIsolation() const { return actorIsolation; }
+
+  /// Return the source file that this SILFunction belongs to if it exists.
+  SourceFile *getSourceFile() const;
 
   //===--------------------------------------------------------------------===//
   // Block List Access

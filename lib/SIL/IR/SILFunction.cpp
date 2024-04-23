@@ -1189,3 +1189,11 @@ bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
 
   return argumentMayReadFunction({this}, {argOp}, {addr});
 }
+
+SourceFile *SILFunction::getSourceFile() const {
+  auto declRef = getDeclRef();
+  if (!declRef)
+    return nullptr;
+
+  return declRef.getInnermostDeclContext()->getParentSourceFile();
+}
