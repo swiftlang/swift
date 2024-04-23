@@ -51,6 +51,22 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     Sources/CSwiftPluginServer/include
   )
 
+  set(swift_wasm_allow_jsc ON)
+
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    set(swift_wasm_use_jsc ${swift_wasm_allow_jsc})
+  else()
+    set(swift_wasm_use_jsc OFF)
+  endif()
+
+  if (swift_wasm_use_jsc)
+    set(wasi_dep WASI)
+    set(jsc_defines SWIFT_WASM_USE_JSC)
+  else()
+    set(wasi_dep WasmKitWASI)
+    set(jsc_defines)
+  endif()
+
   add_pure_swift_host_tool(swift-wasm-plugin-server
     Sources/swift-wasm-plugin-server/swift-wasm-plugin-server.swift
     Sources/swift-wasm-plugin-server/JSCWasmEngine.swift
@@ -64,12 +80,13 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftCompilerPluginMessageHandling
       swiftLLVMJSON
       SwiftPluginServerSupport
-      WasmKitWASI
+      ${wasi_dep}
   )
+  target_compile_definitions(swift-wasm-plugin-server PRIVATE ${jsc_defines})
   target_include_directories(swift-wasm-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include
   )
-  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  if (swift_wasm_use_jsc)
     add_custom_command(TARGET swift-wasm-plugin-server POST_BUILD COMMAND
       codesign -fs - $<TARGET_FILE:swift-wasm-plugin-server> --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/allow-jit.plist
     )

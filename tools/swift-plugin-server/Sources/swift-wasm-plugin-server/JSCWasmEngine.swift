@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS)
+#if SWIFT_WASM_USE_JSC
 
 import JavaScriptCore
 import WASI
 import WasmTypes
+
+typealias DefaultWasmEngine = JSCWasmEngine
 
 // (wasm: ArrayBuffer, imports: Object) => Promise<{ ... }>
 private let js = """
@@ -144,7 +146,7 @@ public struct JSCWasmError: Error, CustomStringConvertible {
 }
 
 extension WASIHostFunction {
-  func asJSFunction(in context: JSContext, memory: @escaping () throws -> GuestMemory) -> JSValue {
+  fileprivate func asJSFunction(in context: JSContext, memory: @escaping () throws -> GuestMemory) -> JSValue {
     JSValue(object: {
       let arguments = JSContext.currentArguments() as? [JSValue] ?? []
       let types: [Value] = zip(arguments, type.parameters).map { argument, type in
