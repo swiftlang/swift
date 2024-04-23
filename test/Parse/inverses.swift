@@ -92,8 +92,6 @@ func what(one: ~Copyable..., // expected-error {{noncopyable type '~Copyable' ca
 
 struct A { struct B { struct C {} } }
 
-typealias Z0 = (~Copyable).Type // expected-error{{constraint that suppresses conformance requires 'any'}}{{17-17=any }}
-typealias Z1 = ~Copyable.Type // expected-error{{constraint that suppresses conformance requires 'any'}}{{16-16=any }}
 typealias Z2 = ~A.B.C // expected-error {{type 'A.B.C' cannot be suppressed}}
 typealias Z3 = ~A? // expected-error {{type 'A?' cannot be suppressed}}
 typealias Z4 = ~Rope<Int> // expected-error {{type 'Rope<Int>' cannot be suppressed}}
@@ -120,13 +118,8 @@ func typeInExpression() {
   _ = X<(borrowing any ~Copyable) -> Void>()
 
   _ = ~Copyable.self // expected-error{{unary operator '~' cannot be applied to an operand of type '(any Copyable).Type'}}
-  _ = (~Copyable).self // expected-error{{constraint that suppresses conformance requires 'any'}}{{8-8=any }}
   _ = (any ~Copyable).self
 }
 
-func param1(_ t: borrowing ~Copyable) {} // expected-error{{constraint that suppresses conformance requires 'any'}}{{28-28=any }}
-func param2(_ t: ~Copyable.Type) {} // expected-error{{constraint that suppresses conformance requires 'any'}}{{18-18=any }}
 func param3(_ t: borrowing any ~Copyable) {}
 func param4(_ t: any ~Copyable.Type) {}
-
-func param3(_ t: borrowing ExtraNoncopyProto & ~Copyable) {} // expected-error{{constraint that suppresses conformance requires 'any'}}{{28-28=any }}
