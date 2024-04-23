@@ -140,8 +140,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addTransferNonSendable();
 
   // Now that we have completed running passes that use region analysis, clear
-  // region analysis.
+  // region analysis and emit diagnostics for unnecessary preconcurrency
+  // imports.
   P.addRegionAnalysisInvalidationTransform();
+  P.addDiagnoseUnnecessaryPreconcurrencyImports();
+
   // Lower tuple addr constructor. Eventually this can be merged into later
   // passes. This ensures we do not need to update later passes for something
   // that is only needed by TransferNonSendable().
