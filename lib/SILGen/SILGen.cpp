@@ -1236,6 +1236,9 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
 
+  // Initialize F with the constant we created for it.
+  F->setDeclRef(constant);
+
   LLVM_DEBUG(llvm::dbgs() << "lowering ";
              F->printName(llvm::dbgs());
              llvm::dbgs() << " : ";
