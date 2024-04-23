@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NoncopyableGenerics -enable-upcoming-feature MoveOnlyPartialConsumption -parse-stdlib -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift %s | %FileCheck %s
 
 @_marker protocol Copyable {}
 @_marker protocol Escapable {}

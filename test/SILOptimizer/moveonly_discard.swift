@@ -20,10 +20,9 @@ struct GoodFileDescriptor: ~Copyable {
     discard self
   }
 
-  deinit { // expected-error {{'self' consumed more than once}}
-    // FIXME: this is suppose to be valid. rdar://106044273
-    close() // expected-note {{consumed here}}
-  } // expected-note {{consumed again here}}
+  deinit {
+    close()
+  }
 }
 
 struct BadFileDescriptor: ~Copyable {

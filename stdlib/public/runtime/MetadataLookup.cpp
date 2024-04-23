@@ -133,11 +133,13 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       if (symInfo->getSymbolName())
         symbolName = symInfo->getSymbolName();
     }
+    uintptr_t ptrLocation = detail::applyRelativeOffset(base, offset);
     swift::fatalError(
         0,
         "Failed to look up symbolic reference at %p - offset %" PRId32
-        " - symbol %s in %s\n",
-        base, offset, symbolName, fileName);
+        " - symbol %s in %s - pointer at %#" PRIxPTR
+        " is likely a reference to a missing weak symbol\n",
+        base, offset, symbolName, fileName, ptrLocation);
   }
 
   // Figure out this symbolic reference's grammatical role.

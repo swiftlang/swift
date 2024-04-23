@@ -264,14 +264,11 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
                                 dd->getDeclContext()->getSelfNominalTypeDecl(),
                                 cleanupLoc);
 
-  if (getASTContext().LangOpts.hasFeature(
-          Feature::MoveOnlyPartialConsumption)) {
-    if (auto *ddi = dyn_cast<DropDeinitInst>(selfValue)) {
-      if (auto *mu =
-              dyn_cast<MarkUnresolvedNonCopyableValueInst>(ddi->getOperand())) {
-        if (auto *asi = dyn_cast<AllocStackInst>(mu->getOperand())) {
-          B.createDeallocStack(loc, asi);
-        }
+  if (auto *ddi = dyn_cast<DropDeinitInst>(selfValue)) {
+    if (auto *mu =
+            dyn_cast<MarkUnresolvedNonCopyableValueInst>(ddi->getOperand())) {
+      if (auto *asi = dyn_cast<AllocStackInst>(mu->getOperand())) {
+        B.createDeallocStack(loc, asi);
       }
     }
   }

@@ -2,7 +2,6 @@
 // RUN:     -sil-move-only-address-checker                             \
 // RUN:     %s                                                         \
 // RUN:     -module-name moveonly_addresschecker                       \
-// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption    \
 // RUN:     -enable-experimental-feature MoveOnlyClasses               \
 // RUN:     -enable-sil-verify-all                                     \
 // RUN:     -move-only-address-checker-disable-lifetime-extension=true \
@@ -202,4 +201,37 @@ bb0(%s_addr : $*S):
   destroy_value %om : $Builtin.NativeObject
   %retval = tuple ()
   return %retval : $()
+}
+
+sil @getter : $@convention(thin) (@guaranteed M) -> @owned String
+sil @die : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
+
+// CHECK-LABEL: sil [ossa] @partial_apply_of_borrow_of_deinitless_empty_struct : {{.*}} {
+// CHECK:       bb0([[M_IN:%[^,]+]] :
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $M
+// CHECK:         store [[M_IN]] to [init] [[STACK]]
+// CHECK:         [[ADDR:%[^,]+]] = drop_deinit [[STACK]]
+// CHECK:         [[MB:%[^,]+]] = load_borrow [[ADDR]]
+// CHECK:         [[GETTER:%[^,]+]] = function_ref @getter
+// CHECK:         [[PA:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[GETTER]]([[MB]])
+// CHECK:         [[DIE:%[^,]+]] = function_ref @die
+// CHECK:         apply [[DIE]]([[PA]])
+// CHECK:         destroy_value [[PA]]
+// CHECK:         end_borrow [[MB]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'partial_apply_of_borrow_of_deinitless_empty_struct'
+sil [ossa] @partial_apply_of_borrow_of_deinitless_empty_struct : $@convention(method) (@owned M) -> () {
+bb0(%m_in : @owned $M):
+  %stack = alloc_stack $M
+  %addr1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack : $*M
+  store %m_in to [init] %addr1 : $*M
+  %nodeinit = drop_deinit %addr1 : $*M
+  %addr = mark_unresolved_non_copyable_value [no_consume_or_assign] %nodeinit : $*M
+  %m = load [copy] %addr : $*M
+  %mb = begin_borrow %m : $M
+  %getter = function_ref @getter : $@convention(thin) (@guaranteed M) -> @owned String
+  %pa = partial_apply [callee_guaranteed] [on_stack] %getter(%mb) : $@convention(thin) (@guaranteed M) -> @owned String
+  %die = function_ref @die : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
+  apply %die(%pa) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
+  unreachable
 }

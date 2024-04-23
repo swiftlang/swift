@@ -44,6 +44,7 @@ struct MoveOnlyAddressChecker {
   /// \p diagnosticEmitter.getDiagnosticCount().
   bool check(llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
                  &moveIntroducersToProcess);
+  bool completeLifetimes();
 };
 
 } // namespace siloptimizer

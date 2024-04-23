@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 871; // ~ for suppression
+const uint16_t SWIFTMODULE_VERSION_MINOR = 872; // SerializePackageEnabled
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -941,6 +941,7 @@ namespace options_block {
     PLUGIN_SEARCH_OPTION,
     HAS_CXX_INTEROPERABILITY_ENABLED,
     ALLOW_NON_RESILIENT_ACCESS,
+    SERIALIZE_PACKAGE_ENABLED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1026,6 +1027,10 @@ namespace options_block {
 
   using AllowNonResilientAccess = BCRecordLayout<
     ALLOW_NON_RESILIENT_ACCESS
+  >;
+
+  using SerializePackageEnabled = BCRecordLayout<
+    SERIALIZE_PACKAGE_ENABLED
   >;
 }
 

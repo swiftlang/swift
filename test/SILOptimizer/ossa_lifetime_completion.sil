@@ -445,7 +445,7 @@ indirect enum IndirectEnumNontrivialPayload {
 // CHECK:         cond_br undef, {{bb[0-9]+}}, [[BASIC_BLOCK4:bb[0-9]+]]
 // CHECK:       [[BASIC_BLOCK4]]:
 // CHECK:         end_borrow [[C]]
-// CHECK:         destroy_value [[BOX]]
+// CHECK:         dealloc_box [[BOX]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'project_box_owned'
 sil [ossa] @project_box_owned : $@convention(thin) (@owned IndirectEnumNontrivialPayload) -> () {
@@ -497,4 +497,19 @@ bb0:
   %retval = load [trivial] %result_addr : $*()
   dealloc_stack %result_addr : $*()
   return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on alloc_box: ossa-lifetime-completion
+// CHECK-LABEL: sil [ossa] @alloc_box : {{.*}} {
+// CHECK:         [[BOX:%[^,]+]] = alloc_box
+// CHECK:         dealloc_box [[BOX]]
+// CHECK-LABEL: } // end sil function 'alloc_box'
+// CHECK-LABEL: end running test {{.*}} on alloc_box: ossa-lifetime-completion
+sil [ossa] @alloc_box : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %box = alloc_box ${ var C }
+  specify_test "ossa-lifetime-completion %box"
+  %addr = project_box %box : ${ var C }, 0
+  store %instance to [init] %addr : $*C
+  unreachable
 }

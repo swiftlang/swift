@@ -630,17 +630,6 @@ LookupConformanceInModuleRequest::evaluate(
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
-    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-        // Return an abstract conformance to maintain legacy compatability.
-        // We only need to do this until we are properly dealing with or
-        // omitting Copyable conformances in modules/interfaces.
-
-        if (nominal->canBeCopyable())
-          return ProtocolConformanceRef(protocol);
-      }
-
-      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     } else if (protocol->isSpecificProtocol(
                    KnownProtocolKind::BitwiseCopyable)) {
       // Try to infer BitwiseCopyable conformance.
