@@ -311,13 +311,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
 
   // Wrap in an InverseTypeRepr if needed.
   if (tildeLoc) {
-    TypeRepr *repr;
-    if (canSuppressConformancesWithTilde())
-      repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
-    else
-      repr =
-          ErrorTypeRepr::create(Context, tildeLoc, diag::cannot_suppress_here);
-
+    TypeRepr *repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
     ty = makeParserResult(ty, repr);
   }
 
