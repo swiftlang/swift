@@ -1181,27 +1181,48 @@ func testTupleAlignment() {
 
 testTupleAlignment()
 
+func testWeakRefOptionalNative() {
+    let ptr = allocateInternalGenericPtr(of: TestOptional<WeakNativeWrapper>.self)
+    let ptr2 = allocateInternalGenericPtr(of: TestOptional<WeakNativeWrapper>.self)
+
+    do {
+        let classInstance = SimpleClass(x: 23)
+
+        do {
+            let x = TestOptional.nonEmpty(WeakNativeWrapper(x: classInstance))
+            let y = TestOptional.nonEmpty(WeakNativeWrapper(x: classInstance))
+            testGenericInit(ptr, to: x)
+            testGenericInit(ptr2, to: y)
+        }
+
+        testGenericDestroy(ptr, of: TestOptional<WeakNativeWrapper>.self)
+        testGenericDestroy(ptr2, of: TestOptional<WeakNativeWrapper>.self)
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+    }
+
+    ptr.deallocate()
+}
+
+testWeakRefOptionalNative()
+
 #if os(macOS)
 
 import Foundation
-
-@objc
-final class ObjcClass: NSObject {
-    deinit {
-        print("ObjcClass deinitialized!")
-    }
-}
 
 func testGenericObjc() {
     let ptr = allocateInternalGenericPtr(of: ObjcClass.self)
 
     do {
-        let x = ObjcClass()
+        let x = ObjcClass(x: 23)
         testGenericInit(ptr, to: x)
     }
 
     do {
-        let y = ObjcClass()
+        let y = ObjcClass(x: 32)
         // CHECK-macosx: Before deinit
         print("Before deinit")
 
@@ -1219,5 +1240,35 @@ func testGenericObjc() {
 }
 
 testGenericObjc()
+
+import Darwin
+
+func testWeakRefOptionalObjc() {
+    let ptr = allocateInternalGenericPtr(of: TestOptional<WeakObjcWrapper>.self)
+    let ptr2 = allocateInternalGenericPtr(of: TestOptional<WeakObjcWrapper>.self)
+
+    do {
+        let classInstance = ObjcClass(x: 23)
+
+        do {
+            let x = TestOptional.nonEmpty(WeakObjcWrapper(x: classInstance))
+            let y = TestOptional.nonEmpty(WeakObjcWrapper(x: classInstance))
+            testGenericInit(ptr, to: x)
+            testGenericInit(ptr2, to: y)
+        }
+
+        testGenericDestroy(ptr, of: TestOptional<WeakObjcWrapper>.self)
+        testGenericDestroy(ptr2, of: TestOptional<WeakObjcWrapper>.self)
+
+        // CHECK-macosx: Before deinit
+        print("Before deinit")
+
+        // CHECK-macosx-NEXT: ObjcClass deinitialized!
+    }
+
+    ptr.deallocate()
+}
+
+testWeakRefOptionalObjc()
 
 #endif
