@@ -142,6 +142,12 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
     else()
       message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
     endif()
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
+    if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS")
+      set(swiftrt_obj
+        ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}/swiftrt${CMAKE_C_OUTPUT_EXTENSION})
+      target_link_libraries(${target} PRIVATE ${swiftrt_obj})
+    endif()
   endif()
 
   if(SWIFT_BUILD_SWIFT_SYNTAX)
