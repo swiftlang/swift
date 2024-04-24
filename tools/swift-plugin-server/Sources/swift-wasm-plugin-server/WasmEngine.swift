@@ -82,9 +82,13 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     _ = try engine.invoke("swift_wasm_macro_pump", [])
 
     let readHandle = pluginToHost.fileHandleForReading
-    let lengthData = try readHandle.read(upToCount: 8) ?? Data()
-    let lengthRaw = lengthData.withUnsafeBytes { $0.assumingMemoryBound(to: UInt64.self).baseAddress?.pointee }
-    guard let lengthRaw else { throw WasmEngineError(message: "Bad byte length") }
+    let lengthData = try readHandle.read(upToCount: 8)
+    guard let lengthData, lengthData.count == 8 else {
+      throw WasmEngineError(message: "Wasm plugin sent invalid response")
+    }
+    let lengthRaw = lengthData.withUnsafeBytes {
+      $0.assumingMemoryBound(to: UInt64.self).baseAddress!.pointee
+    }
     let length = Int(UInt64(littleEndian: lengthRaw))
     return try readHandle.read(upToCount: length) ?? Data()
   }
