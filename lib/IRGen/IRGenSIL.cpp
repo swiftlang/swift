@@ -34,6 +34,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -44,6 +45,7 @@
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "clang/AST/ASTContext.h"
@@ -411,6 +413,9 @@ public:
   /// metadata is emitted has some corresponding cleanup instructions.
   llvm::DenseMap<SILInstruction *, llvm::SmallVector<SILInstruction *, 2>>
       DynamicMetadataPackDeallocs;
+
+  // A cached dead-end blocks analysis.
+  std::unique_ptr<DeadEndBlocks> DeadEnds;
 #endif
   /// For each instruction which did allocate pack metadata on-stack, the stack
   /// locations at which they were allocated.
@@ -684,6 +689,15 @@ public:
     }
     return Name;
   }
+
+#ifndef NDEBUG
+  DeadEndBlocks *getDeadEndBlocks() {
+    if (!DeadEnds) {
+      DeadEnds.reset(new DeadEndBlocks(CurSILFn));
+    }
+    return DeadEnds.get();
+  }
+#endif
 
   /// To make it unambiguous whether a `var` binding has been initialized,
   /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
@@ -2744,8 +2758,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 #ifndef NDEBUG
     if (!OutstandingStackPackAllocs.empty()) {
       auto iter = DynamicMetadataPackDeallocs.find(&I);
-      if (iter == DynamicMetadataPackDeallocs.end() ||
-          iter->getSecond().size() == 0) {
+      if ((iter == DynamicMetadataPackDeallocs.end() ||
+           iter->getSecond().size() == 0) &&
+          !getDeadEndBlocks()->isDeadEnd(I.getParent())) {
         llvm::errs()
             << "Instruction missing on-stack pack metadata cleanups!\n";
         I.print(llvm::errs());
