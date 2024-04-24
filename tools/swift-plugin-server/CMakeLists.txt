@@ -8,6 +8,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
   # override the remote SwiftSystem dependency in WasmKit
   FetchContent_Declare(SwiftSystem SOURCE_DIR "${PROJECT_SOURCE_DIR}/../swift-system")
 
+  set(WASMKIT_BUILD_CLI OFF)
   FetchContent_Declare(WasmKit SOURCE_DIR "${PROJECT_SOURCE_DIR}/../wasmkit")
   FetchContent_MakeAvailable(WasmKit)
 
