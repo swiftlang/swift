@@ -18,13 +18,13 @@ import SwiftSyntaxBuilder
 /// Introduces:
 /// - `distributed actor $MyDistributedActor<ActorSystem>: $MyDistributedActor, _DistributedActorStub where ...`
 /// - `extension MyDistributedActor where Self: _DistributedActorStub {}`
-public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
+public struct DistributedResolvableMacro: ExtensionMacro, PeerMacro {
 }
 
 // ===== -----------------------------------------------------------------------
 // MARK: Default Stub implementations Extension
 
-extension DistributedProtocolMacro {
+extension DistributedResolvableMacro {
 
   /// Introduce the `extension MyDistributedActor` which contains default
   /// implementations of the protocol's requirements.
@@ -116,7 +116,7 @@ extension DistributedProtocolMacro {
 // ===== -----------------------------------------------------------------------
 // MARK: Distributed Actor Stub type
 
-extension DistributedProtocolMacro {
+extension DistributedResolvableMacro {
 
   /// Introduce the `distributed actor` stub type.
   public static func expansion(
@@ -263,9 +263,9 @@ extension DeclModifierSyntax {
 }
 
 // ===== -----------------------------------------------------------------------
-// MARK: DistributedProtocol macro errors
+// MARK: @Distributed.Resolvable macro errors
 
-extension DistributedProtocolMacro {
+extension DistributedResolvableMacro {
   static func throwIllegalTargetDecl(node: AttributeSyntax, _ declaration: some DeclSyntaxProtocol) throws -> Never {
     let kind: String
     if declaration.isClass {
@@ -282,11 +282,11 @@ extension DistributedProtocolMacro {
 
     throw DiagnosticsError(
       syntax: node,
-      message: "'@DistributedProtocol' can only be applied to 'protocol', but was attached to '\(kind)'", id: .invalidApplication)
+      message: "'@Resolvable' can only be applied to 'protocol', but was attached to '\(kind)'", id: .invalidApplication)
   }
 }
 
-struct DistributedProtocolMacroDiagnostic: DiagnosticMessage {
+struct DistributedResolvableMacroDiagnostic: DiagnosticMessage {
   enum ID: String {
     case invalidApplication = "invalid type"
     case missingInitializer = "missing initializer"
@@ -314,12 +314,12 @@ extension DiagnosticsError {
     syntax: S,
     message: String,
     domain: String = "Distributed",
-    id: DistributedProtocolMacroDiagnostic.ID,
+    id: DistributedResolvableMacroDiagnostic.ID,
     severity: SwiftDiagnostics.DiagnosticSeverity = .error) {
     self.init(diagnostics: [
       Diagnostic(
         node: Syntax(syntax),
-        message: DistributedProtocolMacroDiagnostic(
+        message: DistributedResolvableMacroDiagnostic(
           message: message,
           domain: domain,
           id: id,

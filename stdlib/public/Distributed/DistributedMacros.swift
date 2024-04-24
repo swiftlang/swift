@@ -28,7 +28,7 @@ import _Concurrency
 /// in such way that the system's `SerializationRequirement` is statically known.
 @attached(peer, names: prefixed(`$`)) // provides $Greeter concrete stub type
 @attached(extension, names: arbitrary) // provides extension for Greeter & _DistributedActorStub
-public macro _DistributedProtocol() =
-  #externalMacro(module: "SwiftMacros", type: "DistributedProtocolMacro")
+public macro Resolvable() =
+  #externalMacro(module: "SwiftMacros", type: "DistributedResolvableMacro")
 
 #endif
