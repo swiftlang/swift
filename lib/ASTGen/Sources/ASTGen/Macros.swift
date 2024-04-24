@@ -15,6 +15,7 @@ import BasicBridging
 @_spi(PluginMessage) @_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftOperators
+import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxBuilder
 @_spi(ExperimentalLanguageFeature) @_spi(Compiler) import SwiftSyntaxMacroExpansion
@@ -243,8 +244,8 @@ func checkDefaultArgumentMacroExpression(
 @_cdecl("swift_ASTGen_checkMacroDefinition")
 func checkMacroDefinition(
   diagEnginePtr: UnsafeMutableRawPointer,
-  sourceFilePtr: UnsafeRawPointer,
-  macroLocationPtr: UnsafePointer<UInt8>,
+  sourceFileBuffer: BridgedStringRef,
+  macroDeclText: BridgedStringRef,
   externalMacroOutPtr: UnsafeMutablePointer<BridgedStringRef>,
   replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
   numReplacementsPtr: UnsafeMutablePointer<Int>,
@@ -255,18 +256,23 @@ func checkMacroDefinition(
   assert(externalMacroOutPtr.pointee.isEmptyInitialized)
   assert(replacementsPtr.pointee == nil && numReplacementsPtr.pointee == 0)
 
-  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
-
-  // Find the macro declaration.
-  guard
-    let macroDecl = findSyntaxNodeInSourceFile(
-      sourceFilePtr: sourceFilePtr,
-      sourceLocationPtr: macroLocationPtr,
-      type: MacroDeclSyntax.self
-    )
-  else {
+  // Parse 'macro' decl.
+  // FIXME: Use 'ExportedSourceFile' when C++ parser is replaced.
+  let textBuffer = UnsafeBufferPointer<UInt8>(start: macroDeclText.data, count: macroDeclText.count)
+  var parser = Parser(textBuffer)
+  guard let macroDecl = DeclSyntax.parse(from: &parser).as(MacroDeclSyntax.self) else {
     // FIXME: Produce an error
     return -1
+  }
+
+  func diagnose(diagnostic: Diagnostic) {
+    emitDiagnostic(
+      diagnosticEngine: BridgedDiagnosticEngine(raw: diagEnginePtr),
+      sourceFileBuffer: UnsafeBufferPointer(start: sourceFileBuffer.data, count: sourceFileBuffer.count),
+      sourceFileBufferOffset: macroDeclText.data! - sourceFileBuffer.data!,
+      diagnostic: diagnostic,
+      diagnosticSeverity: diagnostic.diagMessage.severity
+    )
   }
 
   // Check the definition
@@ -299,9 +305,7 @@ func checkMacroDefinition(
 
         default:
           // Warn about the unknown builtin.
-          let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
-          srcMgr.insert(sourceFilePtr)
-          srcMgr.diagnose(
+          diagnose(
             diagnostic: .init(
               node: node,
               message: ASTGenMacroDiagnostic.unknownBuiltin(type)
@@ -321,9 +325,7 @@ func checkMacroDefinition(
         "#externalMacro(module: \(literal: module), type: \(literal: type))"
 
       // Warn about the use of old-style external macro syntax here.
-      let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
-      srcMgr.insert(sourceFilePtr)
-      srcMgr.diagnose(
+      diagnose(
         diagnostic: .init(
           node: node,
           message: ASTGenMacroDiagnostic.oldStyleExternalMacro,
@@ -350,9 +352,7 @@ func checkMacroDefinition(
         firstArgLabel == "module",
         let module = identifierFromStringLiteral(firstArg.expression)
       else {
-        let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
-        srcMgr.insert(sourceFilePtr)
-        srcMgr.diagnose(
+        diagnose(
           diagnostic: .init(
             node: Syntax(expansionSyntax),
             message: ASTGenMacroDiagnostic.notStringLiteralArgument("module")
@@ -367,9 +367,7 @@ func checkMacroDefinition(
         secondArgLabel == "type",
         let type = identifierFromStringLiteral(secondArg.expression)
       else {
-        let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
-        srcMgr.insert(sourceFilePtr)
-        srcMgr.diagnose(
+        diagnose(
           diagnostic: .init(
             node: Syntax(expansionSyntax),
             message: ASTGenMacroDiagnostic.notStringLiteralArgument("type")
@@ -431,16 +429,12 @@ func checkMacroDefinition(
 #endif
     }
   } catch let errDiags as DiagnosticsError {
-    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
-    srcMgr.insert(sourceFilePtr)
     for diag in errDiags.diagnostics {
-      srcMgr.diagnose(diagnostic: diag)
+      diagnose(diagnostic: diag)
     }
     return -1
   } catch let error {
-    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
-    srcMgr.insert(sourceFilePtr)
-    srcMgr.diagnose(
+    diagnose(
       diagnostic: .init(
         node: Syntax(macroDecl),
         message: ASTGenMacroDiagnostic.thrownError(error)
