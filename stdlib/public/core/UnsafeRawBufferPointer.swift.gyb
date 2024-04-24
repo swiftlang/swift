@@ -438,7 +438,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
-#if $BitwiseCopyable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T : BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
@@ -449,7 +448,6 @@ extension Unsafe${Mutable}RawBufferPointer {
       "${Self}.load out of bounds")
     return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
-#endif
 
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
