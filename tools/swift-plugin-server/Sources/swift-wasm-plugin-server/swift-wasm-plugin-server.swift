@@ -56,6 +56,7 @@ final class SwiftPluginServer {
         }
       }
     } catch {
+      try? FileHandle.standardError.write(contentsOf: Data("Error: \(error)\n".utf8))
       try sendMessage(.expandMacroResult(expandedSource: nil, diagnostics: []))
       return
     }
