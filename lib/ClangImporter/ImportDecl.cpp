@@ -2192,22 +2192,12 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-          if (decl->isInStdNamespace() && decl->getName() == "promise") {
-            // Do not import std::promise.
-            return nullptr;
-          }
-          result->getAttrs().add(new (Impl.SwiftContext)
-                                     MoveOnlyAttr(/*Implicit=*/true));
-        } else {
-          Impl.addImportDiagnostic(
-              decl,
-              Diagnostic(
-                  diag::move_only_requires_move_only,
-                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
-              decl->getLocation());
+        if (decl->isInStdNamespace() && decl->getName() == "promise") {
+          // Do not import std::promise.
           return nullptr;
         }
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   MoveOnlyAttr(/*Implicit=*/true));
       }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -2666,8 +2656,7 @@ namespace {
       // SemaLookup.cpp).
       if (!decl->isBeingDefined() && !decl->isDependentContext() &&
           areRecordFieldsComplete(decl)) {
-        if (decl->hasInheritedConstructor() &&
-            Impl.isCxxInteropCompatVersionAtLeast(6)) {
+        if (decl->hasInheritedConstructor()) {
           for (auto member : decl->decls()) {
             if (auto usingDecl = dyn_cast<clang::UsingDecl>(member)) {
               for (auto usingShadowDecl : usingDecl->shadows()) {
@@ -2838,14 +2827,12 @@ namespace {
     void
     addExplicitProtocolConformances(NominalTypeDecl *decl,
                                     const clang::CXXRecordDecl *clangDecl) {
-      if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-        // Propagate conforms_to attribute from public base classes.
-        for (auto base : clangDecl->bases()) {
-          if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
-            continue;
-          if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
-            addExplicitProtocolConformances(decl, baseClangDecl);
-        }
+      // Propagate conforms_to attribute from public base classes.
+      for (auto base : clangDecl->bases()) {
+        if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+          continue;
+        if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
+          addExplicitProtocolConformances(decl, baseClangDecl);
       }
 
       if (!clangDecl->hasAttrs())
@@ -3763,39 +3750,34 @@ namespace {
 
       if (decl->isVirtual()) {
         if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
-          if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-            if (auto structDecl =
-                    dyn_cast_or_null<StructDecl>(method->getDeclContext())) {
-              // If this is a method of a Swift struct, any possible override of
-              // this method would get sliced away, and an invocation would get
-              // dispatched statically. This is fine because it matches the C++
-              // behavior.
-              if (decl->isPure()) {
-                // If this is a pure virtual method, we won't have any
-                // implementation of it to invoke.
-                Impl.markUnavailable(
-                    funcDecl, "virtual function is not available in Swift "
-                              "because it is pure");
-              }
-            } else if (auto classDecl = dyn_cast_or_null<ClassDecl>(
-                           funcDecl->getDeclContext())) {
-              // This is a foreign reference type. Since `class T` on the Swift
-              // side is mapped from `T*` on the C++ side, an invocation of a
-              // virtual method `t->method()` should get dispatched dynamically.
-              // Create a thunk that will perform dynamic dispatch.
-              // TODO: we don't have to import the actual `method` in this case,
-              // we can just synthesize a thunk and import that instead.
-              auto result = synthesizer.makeVirtualMethod(decl);
-              if (result) {
-                return result;
-              } else {
-                Impl.markUnavailable(
-                    funcDecl, "virtual function is not available in Swift");
-              }
+          if (auto structDecl =
+                  dyn_cast_or_null<StructDecl>(method->getDeclContext())) {
+            // If this is a method of a Swift struct, any possible override of
+            // this method would get sliced away, and an invocation would get
+            // dispatched statically. This is fine because it matches the C++
+            // behavior.
+            if (decl->isPure()) {
+              // If this is a pure virtual method, we won't have any
+              // implementation of it to invoke.
+              Impl.markUnavailable(funcDecl,
+                                   "virtual function is not available in Swift "
+                                   "because it is pure");
             }
-          } else {
-            Impl.markUnavailable(
-                funcDecl, "virtual functions are not yet available in Swift");
+          } else if (auto classDecl = dyn_cast_or_null<ClassDecl>(
+                         funcDecl->getDeclContext())) {
+            // This is a foreign reference type. Since `class T` on the Swift
+            // side is mapped from `T*` on the C++ side, an invocation of a
+            // virtual method `t->method()` should get dispatched dynamically.
+            // Create a thunk that will perform dynamic dispatch.
+            // TODO: we don't have to import the actual `method` in this case,
+            // we can just synthesize a thunk and import that instead.
+            auto result = synthesizer.makeVirtualMethod(decl);
+            if (result) {
+              return result;
+            } else {
+              Impl.markUnavailable(
+                  funcDecl, "virtual function is not available in Swift");
+            }
           }
         }
       }
@@ -4053,8 +4035,7 @@ namespace {
       //   1. Types
       //   2. C++ methods from privately inherited base classes
       if (!isa<clang::TypeDecl>(decl->getTargetDecl()) &&
-          !(isa<clang::CXXMethodDecl>(decl->getTargetDecl()) &&
-            Impl.isCxxInteropCompatVersionAtLeast(6)))
+          !isa<clang::CXXMethodDecl>(decl->getTargetDecl()))
         return nullptr;
       // Constructors (e.g. `using BaseClass::BaseClass`) are handled in
       // VisitCXXRecordDecl, since we need them to determine whether a struct
