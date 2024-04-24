@@ -455,7 +455,6 @@ extension UnsafeRawPointer {
 
   // FIXME(NCG): Add a borrow analogue of `load`, like `withBorrow(fromByteOffset:as:_:)`
 
-#if $BitwiseCopyable
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
@@ -486,7 +485,6 @@ extension UnsafeRawPointer {
   ) -> T {
     return Builtin.loadRaw((self + offset)._rawValue)
   }
-#endif
 
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
@@ -1288,7 +1286,6 @@ extension UnsafeMutableRawPointer {
   // FIXME(NCG): Add a consuming analogue of `load`, like `move(fromByteOffset:as:_:)`
   // FIXME(NCG): Add a borrow analogue of `load`, like `withBorrow(fromByteOffset:as:_:)`
 
-#if $BitwiseCopyable
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
@@ -1319,7 +1316,6 @@ extension UnsafeMutableRawPointer {
   ) -> T {
     return Builtin.loadRaw((self + offset)._rawValue)
   }
-#endif
 
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
@@ -1362,7 +1358,6 @@ extension UnsafeMutableRawPointer {
     }
   }
 
-#if $BitwiseCopyable
   /// Stores the given value's bytes into raw memory at the specified offset.
   ///
   /// The type `T` to be stored must be a trivial type. The memory
@@ -1409,7 +1404,6 @@ extension UnsafeMutableRawPointer {
     fatalError("Unsupported swift compiler!")
 #endif
   }
-#endif
 
   /// Stores the given value's bytes into raw memory at the specified offset.
   ///
