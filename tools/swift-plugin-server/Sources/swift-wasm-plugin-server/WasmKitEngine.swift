@@ -22,7 +22,6 @@ struct WasmKitEngine: WasmEngine {
   private let module: Module
   private let instance: ModuleInstance
   private let runtime: Runtime
-  let memory: WasmKitGuestMemory
 
   init(wasm: UnsafeByteBuffer, imports: WASIBridgeToHost) throws {
     // we never call wasm.deallocator, effectively leaking the data,
@@ -30,12 +29,6 @@ struct WasmKitEngine: WasmEngine {
     module = try parseWasm(bytes: Array(wasm.data))
     runtime = Runtime(hostModules: imports.hostModules)
     instance = try runtime.instantiate(module: module)
-
-    let exports = instance.exports
-    guard case let .memory(memoryAddr) = exports["memory"] else {
-      throw WasmKitPluginError(message: "Wasm plugin does not export a valid memory.")
-    }
-    self.memory = WasmKitGuestMemory(store: runtime.store, address: memoryAddr)
   }
 
   func customSections(named name: String) throws -> [ArraySlice<UInt8>] {
