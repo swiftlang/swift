@@ -35,10 +35,7 @@ async (wasmData, imports) => {
 
 final class JSCWasmEngine: WasmEngine {
   private let runner: JSValue
-  private let _memory: JSCGuestMemory
   private let api: JSValue
-
-  var memory: some GuestMemory { _memory }
 
   init(wasm buffer: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws {
     let factory = try await JSCWasmFactory.shared
@@ -72,8 +69,7 @@ final class JSCWasmEngine: WasmEngine {
 
     let getMemory = runner.objectForKeyedSubscript("read")!
     let setMemory = runner.objectForKeyedSubscript("write")!
-    self._memory = JSCGuestMemory(getMemory: getMemory, setMemory: setMemory)
-    memory = self._memory
+    memory = JSCGuestMemory(getMemory: getMemory, setMemory: setMemory)
   }
 
   func customSections(named name: String) throws -> [ArraySlice<UInt8>] {
