@@ -18,7 +18,7 @@
 import Distributed
 import FakeDistributedActorSystems
 
-@_DistributedProtocol
+@Resolvable
 protocol GreeterProtocol: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func greet() -> String
 }
