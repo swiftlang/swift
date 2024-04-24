@@ -4,7 +4,7 @@
 
 // Execute an unaligned load of SIMD16<UInt8> which conforms to a protocol derived from BitwiseCopyable.
 
-public protocol MyBitwiseCopyable : _BitwiseCopyable {}
+public protocol MyBitwiseCopyable : BitwiseCopyable {}
 
 extension SIMD16 : MyBitwiseCopyable where Scalar.SIMD16Storage : MyBitwiseCopyable {}
 extension UInt8.SIMD16Storage : MyBitwiseCopyable {}

@@ -12,11 +12,11 @@
 import Foundation
 import Builtin
 
-struct Box<T : _BitwiseCopyable> : _BitwiseCopyable {
+struct Box<T : BitwiseCopyable> : BitwiseCopyable {
   var t: T
 }
 
-struct Boxx<each T : _BitwiseCopyable> {
+struct Boxx<each T : BitwiseCopyable> {
   var ts: (repeat each T)
 }
 

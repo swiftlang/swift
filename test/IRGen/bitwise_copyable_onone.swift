@@ -7,7 +7,7 @@
 // RUN: %FileCheck %s
 
 
-// CHECK-LABEL: define{{.*}} ptr @"$s22bitwise_copyable_onone1EOy1AQzGAA1PRzs16_BitwiseCopyableAERQlWOh"(
+// CHECK-LABEL: define{{.*}} ptr @"$s22bitwise_copyable_onone1EOy1AQzGAA1PRzs15BitwiseCopyableAERQlWOh"(
 // CHECK-SAME:      ptr %0, 
 // CHECK-SAME:      ptr %I.A, 
 // CHECK-SAME:      ptr %"E<I.A>"
@@ -21,7 +21,7 @@ protocol P {
   associatedtype A
 }
 
-class C<I: P> where I.A: _BitwiseCopyable {
+class C<I: P> where I.A: BitwiseCopyable {
   func takeE(_ event: E<I.A>) {}
   func run(_ e: I.A) {
     takeE(.next(e))

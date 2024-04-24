@@ -10,7 +10,7 @@
 
 import Builtin
 
-struct S : _BitwiseCopyable {
+struct S : BitwiseCopyable {
   unowned(unsafe) let c: Builtin.AnyObject
 }
 
@@ -25,7 +25,7 @@ func doit() -> B<Int> {
 struct Conditional<T> {
   var t: T
 }
-extension Conditional : _BitwiseCopyable where T : _BitwiseCopyable {}
+extension Conditional : BitwiseCopyable where T : BitwiseCopyable {}
 
 func doit() -> B<Conditional<Int>> { 
   .init(t: .init(t: 0)) 
@@ -39,15 +39,15 @@ enum Context<T> {
 
 func doit() -> Context<Int>.Here { .init(t: 0) }
 
-public enum E : _BitwiseCopyable {
+public enum E : BitwiseCopyable {
   case a
 }
 
-func take<T : _BitwiseCopyable>(_ t: T) {}
+func take<T : BitwiseCopyable>(_ t: T) {}
 
 func pass(_ e: E) { take(e) }
 
-func opacify() -> some _BitwiseCopyable {
+func opacify() -> some BitwiseCopyable {
     return Int()
 }
 
@@ -56,7 +56,7 @@ struct NeverGoingToBeBitwiseCopyable {
 }
 
 @available(*, unavailable)
-extension NeverGoingToBeBitwiseCopyable : _BitwiseCopyable {
+extension NeverGoingToBeBitwiseCopyable : BitwiseCopyable {
 }
 
-struct AlsoNotBitwiseCopyable : ~_BitwiseCopyable {}
+struct AlsoNotBitwiseCopyable : ~BitwiseCopyable {}

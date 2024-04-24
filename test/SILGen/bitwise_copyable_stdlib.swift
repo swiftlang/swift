@@ -19,11 +19,11 @@ import Builtin
 
 @_marker public protocol Copyable: ~Escapable {}
 @_marker public protocol Escapable: ~Copyable {}
-@_marker public protocol _BitwiseCopyable : ~Escapable {}
+@_marker public protocol BitwiseCopyable : ~Escapable {}
 
-struct Storage : ~Escapable, _BitwiseCopyable {}
+struct Storage : ~Escapable, BitwiseCopyable {}
 
 
-func take<T : _BitwiseCopyable & ~Escapable>(_ t: T) {}
+func take<T : BitwiseCopyable & ~Escapable>(_ t: T) {}
 
 func passStorage(_ s: Storage) { take(s) }

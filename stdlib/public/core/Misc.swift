@@ -175,7 +175,10 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 @_marker public protocol Escapable {}
 
 #if $NoncopyableGenerics && $NonescapableTypes
-@_marker public protocol _BitwiseCopyable: ~Escapable { }
+@_marker public protocol BitwiseCopyable: ~Escapable { }
 #else
-@_marker public protocol _BitwiseCopyable { }
+@_marker public protocol BitwiseCopyable { }
 #endif
+
+@available(*, unavailable)
+@_marker public protocol _BitwiseCopyable {}

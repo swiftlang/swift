@@ -673,7 +673,7 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
 /// A namespace for Unicode utilities.
 #if $BitwiseCopyable && $ConformanceSuppression
 @frozen
-public enum Unicode : ~_BitwiseCopyable {}
+public enum Unicode : ~BitwiseCopyable {}
 #else
 @frozen
 public enum Unicode {}

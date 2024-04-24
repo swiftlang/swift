@@ -136,7 +136,7 @@ extension Optional: Copyable /* where Wrapped: Copyable */ {}
 
 extension Optional: Sendable where Wrapped: ~Copyable & Sendable { }
 
-extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }
+extension Optional: BitwiseCopyable where Wrapped: BitwiseCopyable { }
 
 @_preInverseGenerics
 extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {

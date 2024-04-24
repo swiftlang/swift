@@ -41,12 +41,12 @@
 ///             alignment: MemoryLayout<Point>.alignment)
 #if $BitwiseCopyable && $ConformanceSuppression
 @frozen // namespace
-public enum MemoryLayout<T: ~Copyable>: ~_BitwiseCopyable, Copyable {}
+public enum MemoryLayout<T: ~Copyable>: ~BitwiseCopyable, Copyable {}
 #else
 @frozen // namespace
 public enum MemoryLayout<T: ~Copyable>: Copyable {}
 @available(*, unavailable)
-extension MemoryLayout: _BitwiseCopyable {}
+extension MemoryLayout: BitwiseCopyable {}
 #endif
 
 extension MemoryLayout where T: ~Copyable {

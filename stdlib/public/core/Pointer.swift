@@ -30,7 +30,7 @@ public protocol _Pointer:
   Strideable,
   _CustomDebugStringConvertibleOrNone,
   _CustomReflectableOrNone,
-  _BitwiseCopyable
+  BitwiseCopyable
 {
   /// A type that represents the distance between two pointers.
   typealias Distance = Int

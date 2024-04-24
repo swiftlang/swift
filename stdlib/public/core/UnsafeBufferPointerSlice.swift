@@ -381,7 +381,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
 #if $BitwiseCopyable
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T : _BitwiseCopyable>(
+  public func loadUnaligned<T : BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -620,7 +620,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
 #if $BitwiseCopyable
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T : _BitwiseCopyable>(
+  public func loadUnaligned<T : BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
