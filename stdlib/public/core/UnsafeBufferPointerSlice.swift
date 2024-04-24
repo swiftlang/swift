@@ -389,6 +389,9 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   }
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message:
+    "Use the BitwiseCopyable-constrained overload"
+  )
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -626,6 +629,9 @@ extension Slice where Base == UnsafeRawBufferPointer {
   }
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message:
+    "Use the BitwiseCopyable-constrained overload"
+  )
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type

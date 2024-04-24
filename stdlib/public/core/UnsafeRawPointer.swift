@@ -510,6 +510,9 @@ extension UnsafeRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message:
+    "Use the BitwiseCopyable-constrained overload"
+  )
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -1341,6 +1344,9 @@ extension UnsafeMutableRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message:
+    "Use the BitwiseCopyable-constrained overload"
+  )
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -1444,6 +1450,9 @@ extension UnsafeMutableRawPointer {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
+  @available(swift, deprecated: 6, message:
+    "Use the BitwiseCopyable-constrained overload"
+  )
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
