@@ -55,11 +55,15 @@ class SwiftClientSubclass: ImplClass {
     print("\(type).otherProperty =", otherProperty);
   }
 
+#if RESILIENCE
   override class func makeResilientImpl() -> ImplClassWithResilientStoredProperty {
     SwiftResilientStoredClientSubclass()
+    fatalError()
   }
+#endif
 }
 
+#if RESILIENCE
 extension SwiftClientSubclass {
   class SwiftResilientStoredClientSubclass: ImplClassWithResilientStoredProperty {
     final var mirror2: Mirror?
@@ -83,6 +87,7 @@ extension SwiftClientSubclass {
     }
   }
 }
+#endif
 
 ImplClass.runTests();
 
@@ -96,12 +101,12 @@ do {
 // CHECK: implFunc(1989)
 // CHECK-LABEL: *** ImplClass init ***
 // CHECK: ImplClass.init()
-// CHECK-LABEL: *** ImplClassWithResilientStoredProperty #1 ***
-// CHECK: ImplClassWithResilientStoredProperty.mirror = nil
-// CHECK: ImplClassWithResilientStoredProperty.afterMirrorProperty = 0
-// CHECK-LABEL: *** ImplClassWithResilientStoredProperty #2 ***
-// CHECK: ImplClassWithResilientStoredProperty.mirror = nil
-// CHECK: ImplClassWithResilientStoredProperty.afterMirrorProperty = 42
+// CHECK-RESILIENCE-LABEL: *** ImplClassWithResilientStoredProperty #1 ***
+// CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.mirror = nil
+// CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.afterMirrorProperty = 0
+// CHECK-RESILIENCE-LABEL: *** ImplClassWithResilientStoredProperty #2 ***
+// CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.mirror = nil
+// CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.afterMirrorProperty = 42
 // CHECK-LABEL: *** ImplClass #1 ***
 // CHECK: ImplClass.someMethod() = ImplClass
 // CHECK: ImplClass.implProperty = 0
@@ -117,16 +122,16 @@ do {
 // CHECK-LABEL: *** SwiftSubclass init ***
 // CHECK: SwiftSubclass.init()
 // CHECK: ImplClass.init()
-// CHECK-LABEL: *** SwiftResilientStoredSubclass #1 ***
-// CHECK: SwiftResilientStoredSubclass.mirror = nil
-// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty = 0
-// CHECK: SwiftResilientStoredSubclass.mirror2 = nil
-// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty2 = 1
-// CHECK-LABEL: *** SwiftResilientStoredSubclass #2 ***
-// CHECK: SwiftResilientStoredSubclass.mirror = nil
-// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty = 42
-// CHECK: SwiftResilientStoredSubclass.mirror2 = nil
-// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty2 = 43
+// CHECK-RESILIENCE-LABEL: *** SwiftResilientStoredSubclass #1 ***
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror = nil
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty = 0
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror2 = nil
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty2 = 1
+// CHECK-RESILIENCE-LABEL: *** SwiftResilientStoredSubclass #2 ***
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror = nil
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty = 42
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror2 = nil
+// CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty2 = 43
 // CHECK-LABEL: *** SwiftSubclass #1 ***
 // CHECK: SwiftSubclass.someMethod() = SwiftSubclass
 // CHECK: SwiftSubclass.implProperty = 0
@@ -150,16 +155,16 @@ do {
 // CHECK-LABEL: *** SwiftClientSubclass init ***
 // CHECK: SwiftClientSubclass.init()
 // CHECK: ImplClass.init()
-// CHECK-LABEL: *** SwiftResilientStoredClientSubclass #1 ***
-// CHECK: SwiftResilientStoredClientSubclass.mirror = nil
-// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty = 0
-// CHECK: SwiftResilientStoredClientSubclass.mirror2 = nil
-// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty2 = 1
-// CHECK-LABEL: *** SwiftResilientStoredClientSubclass #2 ***
-// CHECK: SwiftResilientStoredClientSubclass.mirror = nil
-// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty = 42
-// CHECK: SwiftResilientStoredClientSubclass.mirror2 = nil
-// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty2 = 43
+// CHECK-RESILIENCE-LABEL: *** SwiftResilientStoredClientSubclass #1 ***
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.mirror = nil
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.afterMirrorProperty = 0
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.mirror2 = nil
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.afterMirrorProperty2 = 1
+// CHECK-RESILIENCE-LABEL: *** SwiftResilientStoredClientSubclass #2 ***
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.mirror = nil
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.afterMirrorProperty = 42
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.mirror2 = nil
+// CHECK-RESILIENCE: SwiftResilientStoredClientSubclass.afterMirrorProperty2 = 43
 // CHECK-LABEL: *** SwiftClientSubclass #1 ***
 // CHECK: SwiftClientSubclass.someMethod() = SwiftClientSubclass
 // CHECK: SwiftClientSubclass.implProperty = 0

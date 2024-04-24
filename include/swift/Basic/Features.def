@@ -379,6 +379,11 @@ EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
 // Enable @implementation on extensions of ObjC classes.
 EXPERIMENTAL_FEATURE(ObjCImplementation, true)
 
+// Enable @implementation on extensions of ObjC classes with non-fixed layout
+// due to resilient stored properties. Requires OS support; this flag exists for
+// staging purposes.
+EXPERIMENTAL_FEATURE(ObjCImplementationWithResilientStorage, true)
+
 // Enable @implementation on @_cdecl functions.
 EXPERIMENTAL_FEATURE(CImplementation, true)
 
