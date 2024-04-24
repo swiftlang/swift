@@ -2746,9 +2746,15 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
         // We have some other parent stmt. Type check it completely.
         if (auto CS = dyn_cast<CaseStmt>(parentStmt))
           parentStmt = CS->getParentStmt();
+
+        bool LeaveBodyUnchecked = true;
+        // type-checking 'catch' patterns depends on the type checked body.
+        if (isa<DoCatchStmt>(parentStmt))
+          LeaveBodyUnchecked = false;
+
         ASTNode node(parentStmt);
         TypeChecker::typeCheckASTNode(node, VD->getDeclContext(),
-                                      /*LeaveBodyUnchecked=*/true);
+                                      LeaveBodyUnchecked);
       }
       namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
