@@ -3980,36 +3980,10 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
                                          ClassLayoutFlags flags,
                                          size_t numFields,
                                          const TypeLayout * const *fieldTypes) {
-  auto self = (ObjCClass *)cls;
-  bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
-
-  // Realize the superclass first.
-  (void)swift_getInitializedObjCClass((Class)self->Isa);
-
-  auto rodata = getROData(self);
-
-  // If we're running on a older Objective-C runtime, just realize
-  // the class.
-  if (!requiresUpdate) {
-    // If we don't have a backward deployment layout, we cannot proceed here.
-    if (rodata->InstanceSize == 0) {
-      fatalError(0, "class %s does not have a fragile layout; "
-                 "the deployment target was newer than this OS\n",
-                 rodata->Name);
-    }
-
-    // Realize the class. This causes the runtime to slide the field offsets
-    // stored in the field offset globals.
-    //
-    // Note that the field offset vector is *not* updated; however in
-    // Objective-C interop mode, we don't actually use the field offset vector
-    // of non-generic classes.
-    //
-    // In particular, class mirrors always use the Objective-C ivar descriptors,
-    // which point at field offset globals and not the field offset vector.
-    swift_getInitializedObjCClass((Class)self);
-    return cls;
-  }
+  bool hasRealizeClassFromSwift =
+    SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
+  assert(hasRealizeClassFromSwift);
+  (void)hasRealizeClassFromSwift;
 
   SWIFT_DEFER {
     // Realize the class. This causes the runtime to slide the field offsets
@@ -4019,7 +3993,10 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
 
   // Update the field offset globals using runtime type information; the layout
   // of resilient types might be different than the statically-emitted layout.
+  ObjCClass *self = (ObjCClass *)cls;
+  ClassROData *rodata = getROData(self);
   ClassIvarList *ivars = rodata->IvarList;
+
   if (!ivars) {
     assert(numFields == 0);
     return cls;

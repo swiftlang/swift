@@ -1607,6 +1607,17 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
 
       return;
     }
+
+    // While it's possible that @objc @implementation would function with
+    // pre-stable runtimes, this isn't a configuration that's been tested or
+    // supported.
+    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(Ctx);
+    if (!deploymentAvailability.isContainedIn(Ctx.getSwift50Availability())) {
+      diagnose(attr->getLocation(),
+               diag::attr_objc_implementation_raise_minimum_deployment_target,
+               prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+               Ctx.getSwift50Availability().getOSVersion().getLowerEndpoint());
+    }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
