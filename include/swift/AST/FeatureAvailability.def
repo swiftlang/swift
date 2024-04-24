@@ -75,6 +75,7 @@ FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(InitRawStructMetadata,                          FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)
+FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 
 #undef FEATURE
 #undef FUTURE

@@ -5057,12 +5057,80 @@ static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
       .to(alias, link.isForDefinition());
 }
 
+/// Check whether the metadata update strategy requires runtime support that is
+/// not guaranteed available by the minimum deployment target, and diagnose if
+/// so.
+static void
+diagnoseUnsupportedObjCImplLayout(IRGenModule &IGM, ClassDecl *classDecl,
+                                  const ClassLayout &fragileLayout) {
+  if (!fragileLayout.hasObjCImplementation())
+    return;
+
+  auto strategy = IGM.getClassMetadataStrategy(classDecl);
+
+  switch (strategy) {
+  case ClassMetadataStrategy::Fixed:
+    // Fixed is just fine; no special support needed.
+    break;
+
+  case ClassMetadataStrategy::FixedOrUpdate:
+  case ClassMetadataStrategy::Update: {
+    auto &ctx = IGM.Context;
+
+    // Update and FixedOrUpdate require support in both the Swift and ObjC
+    // runtimes.
+    auto requiredAvailability=ctx.getUpdatePureObjCClassMetadataAvailability();
+    // FIXME: Take the class's availability into account
+    auto currentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+    if (currentAvailability.isContainedIn(requiredAvailability))
+      break;
+
+    // We don't have the support we need. Find and diagnose the variable-size
+    // stored properties.
+    auto &diags = ctx.Diags;
+
+    bool diagnosed = false;
+    forEachField(IGM, classDecl, [&](Field field) {
+      auto elemLayout = fragileLayout.getFieldAccessAndElement(field).second;
+      if (field.getKind() != Field::Kind::Var ||
+            elemLayout.getType().isFixedSize())
+        return;
+
+      diags.diagnose(
+          field.getVarDecl(),
+          diag::attr_objc_implementation_resilient_property_unsupported,
+          prettyPlatformString(targetPlatform(ctx.LangOpts)),
+          currentAvailability.getOSVersion().getLowerEndpoint(),
+          requiredAvailability.getOSVersion().getLowerEndpoint());
+      diagnosed = true;
+    });
+
+    // We should have found at least one property to complain about.
+    if (diagnosed)
+      break;
+
+    LLVM_FALLTHROUGH;
+  }
+
+  case ClassMetadataStrategy::Singleton:
+  case ClassMetadataStrategy::Resilient:
+    // This isn't supposed to happen, but just in case, let's give some sort of
+    // vaguely legible output instead of using llvm_unreachable().
+    IGM.error(classDecl->getLoc(),
+              llvm::Twine("class '") + classDecl->getBaseIdentifier().str() +
+              "' needs a metadata strategy not supported by @implementation");
+    break;
+  }
+}
+
 /// Emit the type metadata or metadata template for a class.
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const ClassLayout &fragileLayout,
                               const ClassLayout &resilientLayout) {
   assert(!classDecl->isForeign());
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
+
+  diagnoseUnsupportedObjCImplLayout(IGM, classDecl, fragileLayout);
 
   emitFieldOffsetGlobals(IGM, classDecl, fragileLayout, resilientLayout);
 
