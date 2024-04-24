@@ -15,6 +15,8 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
@@ -35,6 +37,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
+#include "swift/Sema/Concurrency.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -54,6 +57,33 @@ using Region = PartitionPrimitives::Region;
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
+
+static std::optional<DiagnosticBehavior>
+getDiagnosticBehaviorLimitForValue(SILValue value) {
+  auto *nom = value->getType().getNominalOrBoundGenericNominal();
+  if (!nom)
+    return {};
+
+  auto declRef = value->getFunction()->getDeclRef();
+  if (!declRef)
+    return {};
+
+  auto *fromDC = declRef.getInnermostDeclContext();
+  auto attributedImport = nom->findImport(fromDC);
+  if (!attributedImport ||
+      !attributedImport->options.contains(ImportFlags::Preconcurrency))
+    return {};
+
+  if (auto *sourceFile = fromDC->getParentSourceFile())
+    sourceFile->setImportUsedPreconcurrency(*attributedImport);
+
+  if (hasExplicitSendableConformance(nom))
+    return DiagnosticBehavior::Warning;
+
+  return attributedImport->module.importedModule->isConcurrencyChecked()
+             ? DiagnosticBehavior::Warning
+             : DiagnosticBehavior::Ignore;
+}
 
 static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
                                             FullApplySite fai,
@@ -438,6 +468,10 @@ public:
       emitUnknownPatternError();
   }
 
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    return getDiagnosticBehaviorLimitForValue(transferOp->get());
+  }
+
   void
   emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
                                   SILIsolationInfo namedValuesIsolationInfo,
@@ -445,7 +479,8 @@ public:
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
     SmallString<64> descriptiveKindStr;
@@ -466,7 +501,8 @@ public:
         loc, diag::regionbasedisolation_transfer_yields_race_with_isolation,
         inferredType, isolationCrossing.getCallerIsolation(),
         isolationCrossing.getCalleeIsolation())
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
     emitRequireInstDiagnostics();
   }
 
@@ -475,7 +511,8 @@ public:
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
     diagnoseNote(
@@ -493,7 +530,8 @@ public:
         diag::
             regionbasedisolation_transfer_yields_race_stronglytransferred_binding,
         inferredType)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
     emitRequireInstDiagnostics();
   }
 
@@ -502,7 +540,8 @@ public:
     diagnoseError(loc,
                   diag::regionbasedisolation_transfer_yields_race_no_isolation,
                   inferredType)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
     emitRequireInstDiagnostics();
   }
 
@@ -513,7 +552,8 @@ public:
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
 
     SmallString<64> descriptiveKindStr;
     {
@@ -535,13 +575,15 @@ public:
     diagnoseError(loc, diag::regionbasedisolation_isolated_capture_yields_race,
                   inferredType, isolationCrossing.getCalleeIsolation(),
                   isolationCrossing.getCallerIsolation())
-        .highlight(loc.getSourceRange());
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
     emitRequireInstDiagnostics();
   }
 
   void emitUnknownPatternError() {
     diagnoseError(transferOp->getUser(),
-                  diag::regionbasedisolation_unknown_pattern);
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
 private:
@@ -941,6 +983,10 @@ public:
     return info.nonTransferrable.dyn_cast<SILInstruction *>();
   }
 
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    return getDiagnosticBehaviorLimitForValue(info.transferredOperand->get());
+  }
+
   /// Return the isolation region info for \p getNonTransferrableValue().
   SILIsolationInfo getIsolationRegionInfo() const {
     return info.isolationRegionInfo;
@@ -948,13 +994,15 @@ public:
 
   void emitUnknownPatternError() {
     diagnoseError(getOperand()->getUser(),
-                  diag::regionbasedisolation_unknown_pattern);
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
   void emitUnknownUse(SILLocation loc) {
     // TODO: This will eventually be an unknown pattern error.
-    diagnoseError(
-        loc, diag::regionbasedisolation_task_or_actor_isolated_transferred);
+    diagnoseError(loc,
+                  diag::regionbasedisolation_task_or_actor_isolated_transferred)
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
   void emitFunctionArgumentApply(SILLocation loc, Type type,
@@ -967,7 +1015,8 @@ public:
     diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
                   StringRef(descriptiveKindStr), type,
                   crossing.getCalleeIsolation())
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
   void emitNamedFunctionArgumentClosure(SILLocation loc, Identifier name,
@@ -995,13 +1044,15 @@ public:
     auto diag =
         diag::regionbasedisolation_arg_passed_to_strongly_transferred_param;
     diagnoseError(loc, diag, descriptiveKindStr, type)
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
   void emitNamedOnlyError(SILLocation loc, Identifier name) {
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange());
+        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
   void emitNamedIsolation(SILLocation loc, Identifier name,
@@ -1176,7 +1227,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
     if (!isolation) {
       // Otherwise, emit a "we don't know error" that tells the user to file a
       // bug.
-      diagnoseError(op->getUser(), diag::regionbasedisolation_unknown_pattern);
+      diagnosticEmitter.emitUnknownPatternError();
       return false;
     }
     assert(isolation && "Expected non-null");

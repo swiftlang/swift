@@ -23,11 +23,17 @@
 namespace swift {
 
 class SourceFile;
+class NominalTypeDecl;
 
 /// If any of the imports in this source file was @preconcurrency but there were
 /// no diagnostics downgraded or suppressed due to that @preconcurrency, suggest
 /// that the attribute be removed.
 void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
+
+/// Determine whether the given nominal type has an explicit Sendable
+/// conformance (regardless of its availability).
+bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
+                                    bool applyModuleDefault = true);
 
 } // namespace swift
 
