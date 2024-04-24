@@ -2,6 +2,7 @@
 // RUN:     %s                                                  \
 // RUN:     -emit-silgen                                        \
 // RUN:     -disable-availability-checking                      \
+// RUN:     -enable-experimental-feature Sensitive              \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts
@@ -60,3 +61,10 @@ extension NeverGoingToBeBitwiseCopyable : _BitwiseCopyable {
 }
 
 struct AlsoNotBitwiseCopyable : ~_BitwiseCopyable {}
+
+@sensitive
+struct S_Explicit_Sensitive {
+}
+
+func takeS_Explicit_Sensitive(_ s: S_Explicit_Sensitive) {
+}

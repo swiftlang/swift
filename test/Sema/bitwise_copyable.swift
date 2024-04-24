@@ -2,6 +2,7 @@
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
+// RUN:     -enable-experimental-feature Sensitive           \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
@@ -91,6 +92,19 @@ struct S_Explicit_With_Metatype_Optional_Generic<T> : _BitwiseCopyable {
 
 struct S_Explicit_With_Metatype_Optional_AnyObject : _BitwiseCopyable {
   var ty: Optional<AnyObject>.Type
+}
+
+@sensitive
+struct S_Explicit_Sensitive : _BitwiseCopyable { // expected-error {{a @sensitive type cannot conform to 'BitwiseCopyable'}}
+}
+
+@sensitive
+struct S_Implicit_Sensitive {
+}
+
+func passS_Implicit_Sensitive(_ s: S_Implicit_Sensitive) {
+  take1(s) // expected-error   {{type_does_not_conform_decl_owner}}
+           // expected-note@-94 {{where_requirement_failure_one_subst}}
 }
 
 //==============================================================================
