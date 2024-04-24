@@ -52,10 +52,10 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     Sources/CSwiftPluginServer/include
   )
 
-  set(swift_wasm_allow_jsc ON)
+  set(SWIFT_WASM_ALLOW_JSC ON CACHE BOOL "Use JavaScriptCore Wasm runtime if possible" FORCE)
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    set(swift_wasm_use_jsc ${swift_wasm_allow_jsc})
+    set(swift_wasm_use_jsc ${SWIFT_WASM_ALLOW_JSC})
   else()
     set(swift_wasm_use_jsc OFF)
   endif()

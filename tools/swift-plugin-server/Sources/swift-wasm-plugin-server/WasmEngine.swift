@@ -16,9 +16,6 @@ import SystemPackage
 import Foundation
 
 protocol WasmEngine {
-  associatedtype GuestMemoryType: GuestMemory
-  var memory: GuestMemoryType { get }
-
   init(wasm: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws
 
   func customSections(named name: String) throws -> [ArraySlice<UInt8>]
