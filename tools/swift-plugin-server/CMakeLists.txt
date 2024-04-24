@@ -5,10 +5,10 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
   include(DarwinSDKs)
   swift_get_host_triple(SWIFT_HOST_TRIPLE)
 
-  # override the remote SwiftSystem dependency in WasmKit
+  # override the remote SwiftSystem and ArgParser dependencies in WasmKit
   FetchContent_Declare(SwiftSystem SOURCE_DIR "${PROJECT_SOURCE_DIR}/../swift-system")
+  FetchContent_Declare(ArgumentParser SOURCE_DIR "${PROJECT_SOURCE_DIR}/../swift-argument-parser")
 
-  set(WASMKIT_BUILD_CLI OFF)
   FetchContent_Declare(WasmKit SOURCE_DIR "${PROJECT_SOURCE_DIR}/../wasmkit")
   FetchContent_MakeAvailable(WasmKit)
 
