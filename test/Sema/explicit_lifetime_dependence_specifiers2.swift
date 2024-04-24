@@ -2,7 +2,7 @@
 // REQUIRES: asserts
 // REQUIRES: nonescapable_types
 
-struct AnotherBufferView : ~Escapable, _BitwiseCopyable {
+struct AnotherBufferView : ~Escapable, BitwiseCopyable {
   let ptr: UnsafeRawBufferPointer
   @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer) {
@@ -20,6 +20,6 @@ struct BufferView : ~Escapable {
 
 struct NonescapableType: ~Escapable {}
 
-func f<T: ~Escapable & _BitwiseCopyable>(arg: T) -> NonescapableType {
+func f<T: ~Escapable & BitwiseCopyable>(arg: T) -> NonescapableType {
   NonescapableType()
 }

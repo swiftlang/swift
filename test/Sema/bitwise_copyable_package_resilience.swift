@@ -32,7 +32,7 @@ public struct PublicStruct {
 //--- Downstream.swift
 import Library
 
-func take<T : _BitwiseCopyable>(_ t: T) {}
+func take<T : BitwiseCopyable>(_ t: T) {}
 
 func passPackageStruct(_ s: PackageStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
                                                        // expected-note@-3{{where_requirement_failure_one_subst}}

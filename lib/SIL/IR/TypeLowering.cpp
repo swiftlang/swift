@@ -3199,7 +3199,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // conforming.
           if (!nominal) {
             llvm::errs()
-                << "Non-nominal type without conformance to _BitwiseCopyable:\n"
+                << "Non-nominal type without conformance to BitwiseCopyable:\n"
                 << ty << "\n"
                 << "within " << substType << "\n"
                 << "of " << origType << "\n";
@@ -3310,7 +3310,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           return true;
         });
     if (hasNoConformingArchetypeNode) {
-      llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
+      llvm::errs() << "Non-trivial type with BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
       llvm::errs() << "\n"

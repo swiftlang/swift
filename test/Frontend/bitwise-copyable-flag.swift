@@ -4,5 +4,5 @@
 
 // Verify that the BitwiseCopyable feature flag works both in asserts and noasserts builds.
 
-struct S : _BitwiseCopyable {
+struct S : BitwiseCopyable {
 }

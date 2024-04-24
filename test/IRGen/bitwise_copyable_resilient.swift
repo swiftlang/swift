@@ -32,9 +32,9 @@ public struct Integer {
 //--- Downstream.swift
 import Library
 
-func take<T: _BitwiseCopyable>(_ t: T) {}
+func take<T: BitwiseCopyable>(_ t: T) {}
 
-struct S_Explicit_With_Oopsional<T> : _BitwiseCopyable {
+struct S_Explicit_With_Oopsional<T> : BitwiseCopyable {
   var o: Oopsional<T> // expected-error{{non_bitwise_copyable_type_member}}
 }
 
@@ -42,12 +42,12 @@ func passOopsional<T>(_ t: Oopsional<T>) { take(t) } // expected-error   {{type_
                                                      // expected-note@-7 {{where_requirement_failure_one_subst}}
 
 
-struct S_Explicit_With_Woopsional<T> : _BitwiseCopyable {
+struct S_Explicit_With_Woopsional<T> : BitwiseCopyable {
   var o: Woopsional<T> // expected-error{{non_bitwise_copyable_type_member}}
 }
 
 func passWoopsional<T>(_ t: Woopsional<T>) { take(t) } // expected-error    {{type_does_not_conform_decl_owner}}
                                                        // expected-note@-15 {{where_requirement_failure_one_subst}}
 
-extension Integer : @retroactive _BitwiseCopyable {} // expected-error {{bitwise_copyable_outside_module}}
+extension Integer : @retroactive BitwiseCopyable {} // expected-error {{bitwise_copyable_outside_module}}
 

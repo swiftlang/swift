@@ -480,7 +480,7 @@ extension UnsafeRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: _BitwiseCopyable>(
+  public func loadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -1313,7 +1313,7 @@ extension UnsafeMutableRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: _BitwiseCopyable>(
+  public func loadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -1400,7 +1400,7 @@ extension UnsafeMutableRawPointer {
   ///   - type: The type of `value`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func storeBytes<T: _BitwiseCopyable>(
+  public func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
 #if $BuiltinStoreRaw

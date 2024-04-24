@@ -8,4 +8,4 @@
 @_moveOnly
 public struct S_Implicit_Noncopyable {}
 
-// CHECK-NOT: extension Test.S_Implicit_Noncopyable : Swift._BitwiseCopyable {}
+// CHECK-NOT: extension Test.S_Implicit_Noncopyable : Swift.BitwiseCopyable {}
