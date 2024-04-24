@@ -171,28 +171,30 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 
 /// A type whose values can be implicitly or explicitly copied.
 ///
-/// Although this protocol doesn’t have any required methods or properties,
-/// it does have semantic requirements that are enforced at compile time.
-/// These requirements are listed in the sections below.
-/// XXX what are the requirements -- just that copying is ok?
-/// Conformance to `Copyable` must be declared
-/// in the same file as the type's declaration.
-/// <!-- XXX TR: Confirm previous sentence; borrowed from Sendable docs -->
+/// Conforming to this protocol indicates that a type's value can be copied;
+/// this protocol doesn’t have any required methods or properties.
+/// You don't generally need to write an explicit conformance to `Copyable`.
+/// The following places implicitly include `Copyable` conformance:
 ///
-/// Conformance to the `Copyable` protocol
-/// is implicitly included in the following places:
-///
-/// * Structures declarations
-/// * Enumerations declarations
+/// * Structures declarations,
+///   unless it has a noncopyable stored property
+/// * Enumerations declarations,
+///   unless it has a case whose associated value isn't copyable
 /// * Class declarations
+/// * Actor declarations
 /// * Protocol declarations
 /// * Associated type declarations
 /// * The `Self` type in a protocol extension
 ///
+/// A class or actor can contain noncopyable stored properties,
+/// while still being copyable itself ---
+/// classes and actors are copied by retaining and releasing references.
+///
 /// In a declaration that includes generic type parameters,
 /// each generic type parameter implicitly includes `Copyable`
 /// in its list of requirements.
-/// Metatypes and tuples of copyable types are also implicitly copyable.
+/// Metatypes and tuples of copyable types are also implicitly copyable,
+/// as are boxed protocol types.
 /// For example,
 /// all of the following pairs of declarations are equivalent:
 ///
@@ -203,31 +205,29 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// protocol MyProtocol { }
 /// protocol MyProtocol: Copyable { }
 ///
-/// XXX example of assoc type or Self
+/// protocol AnotherProtocol {
+///     associatedtype MyType
+///     associatedtype MyType: Copyable
+/// }
 ///
 /// func genericFunction<T>(t: T) { }
 /// func genericFunction<T>(t: T) where T: Copyable { }
+///
+/// let x = any MyProtocol
+/// let x = any MyProtocol & Copyable
 /// ```
 ///
-/// To suppress an implicit conformance to `Copyable`
-/// you write `~Copyable`.
+/// To suppress an implicit conformance to `Copyable` you write `~Copyable`.
 /// For example,
 /// only copyable types can conform to `MyProtocol` in the example above,
 /// but both copyable and noncopyable types
-/// can conform to the following protocol:
+/// can conform `NoRequirements` in the example below:
 ///
 /// ```swift
 /// protocol NoRequirements: ~Copyable { }
 /// ```
 ///
-/// Extensions on the `Copyable` protocol are not allowed.
-///
-/// XXX link to the right chapter
-/// For information about the language-level concurrency model that `Task` is part of,
-/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
-///
-/// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
-/// [tspl]: https://docs.swift.org/swift-book/
+/// Extensions to the `Copyable` protocol are not allowed.
 @_marker public protocol Copyable {}
 
 @_marker public protocol Escapable {}
