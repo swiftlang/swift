@@ -2623,7 +2623,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // (https://github.com/apple/swift/issues/70124)
   if (param->hasDefaultArg() && !isInOut &&
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
-      impl->isCxxInteropCompatVersionAtLeast(6) &&
       impl->isDefaultArgSafeToImport(param)) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
