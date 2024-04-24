@@ -294,7 +294,7 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
     }
   }
 
-  Demangler dem;
+  StackAllocatedDemangler<4096> dem;
   auto mangleNode = _buildDemanglingForGenericType(description, arguments, dem);
   if (!mangleNode) {
     LOG("failed to build demangling with descriptor %p.", description);
