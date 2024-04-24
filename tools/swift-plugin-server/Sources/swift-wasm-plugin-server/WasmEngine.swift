@@ -12,6 +12,7 @@
 
 import WASI
 import WasmTypes
+import SystemPackage
 import Foundation
 
 protocol WasmEngine {
@@ -29,11 +30,16 @@ typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
 
 // a WasmPlugin implementation that delegates to a WasmEngine
 struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
+  private let hostToPlugin = Pipe()
+  private let pluginToHost = Pipe()
   let engine: Engine
 
   init(wasm: UnsafeByteBuffer) async throws {
-    // TODO: we should air-gap this bridge. Wasm macros don't need IO.
-    let bridge = try WASIBridgeToHost()
+    let bridge = try WASIBridgeToHost(
+      stdin: FileDescriptor(rawValue: hostToPlugin.fileHandleForReading.fileDescriptor),
+      stdout: FileDescriptor(rawValue: pluginToHost.fileHandleForWriting.fileDescriptor),
+      stderr: .standardError
+    )
     engine = try await Engine(wasm: wasm, imports: bridge)
     try checkABIVersion()
     _ = try engine.invoke("_start", [])
@@ -47,7 +53,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
   }
 
   private func abiVersion() throws -> UInt32 {
-    let sectionName = "wacro_abi"
+    let sectionName = "swift_wasm_macro_abi"
     let sections = try engine.customSections(named: sectionName)
     switch sections.count {
     case 0:
@@ -71,23 +77,18 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
   }
 
   func handleMessage(_ json: Data) async throws -> Data {
-    let memory = engine.memory
+    let writeHandle = hostToPlugin.fileHandleForWriting
+    let count = withUnsafeBytes(of: UInt64(json.count).littleEndian) { Data($0) }
+    try writeHandle.write(contentsOf: count)
+    try writeHandle.write(contentsOf: json)
 
-    let jsonLen = UInt32(json.count)
-    let inAddr = try engine.invoke("wacro_malloc", [jsonLen])[0]
-    let rawInAddr = UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: inAddr)
-    _ = UnsafeGuestBufferPointer(baseAddress: rawInAddr, count: jsonLen)
-      .withHostPointer { $0.initialize(from: json) }
+    _ = try engine.invoke("swift_wasm_macro_pump", [])
 
-    let outAddr = try engine.invoke("wacro_parse", [inAddr, jsonLen])[0]
-    let outLen = UnsafeGuestPointer<UInt32>(memorySpace: memory, offset: outAddr).pointee
-    let outBase = UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: outAddr + 4)
-    let out = UnsafeGuestBufferPointer(baseAddress: outBase, count: outLen)
-      .withHostPointer { Data($0) }
-
-    _ = try engine.invoke("wacro_free", [outAddr])
-
-    return out
+    let readHandle = pluginToHost.fileHandleForReading
+    let lengthRaw = try readHandle.read(upToCount: 8) ?? Data()
+    let length = lengthRaw.withUnsafeBytes { $0.assumingMemoryBound(to: UInt64.self).baseAddress?.pointee }
+    guard let length else { throw WasmEngineError(message: "Bad byte length") }
+    return try readHandle.read(upToCount: Int(length)) ?? Data()
   }
 }
 
