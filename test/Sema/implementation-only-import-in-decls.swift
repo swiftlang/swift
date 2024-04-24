@@ -9,6 +9,7 @@
 
 import NormalLibrary
 @_implementationOnly import BADLibrary
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 public struct TestConformance: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 

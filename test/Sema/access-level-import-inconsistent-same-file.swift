@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: split-file %s %t
+// RUN: split-file %s %t --leading-lines
 
 /// Build the library.
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -module-name Lib1 -o %t
@@ -57,6 +57,7 @@ public func dummyAPI(t1: Lib1.Type1, t2: Lib2.Type1, t3: Lib3.Type1) {}
 /// Simple public vs internal, imports defaults to public.
 import Lib1 // expected-note {{imported 'public' here}}
 // expected-error @-1 {{ambiguous implicit access level for import of 'Lib1'; it is imported as 'internal' elsewhere}}
+// expected-note @-2 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
 internal import Lib1 // expected-warning {{module 'Lib1' is imported as 'public' from the same file; this 'internal' access level will be ignored}}
 // expected-note @-1 {{imported 'internal' here}}
 
@@ -65,6 +66,7 @@ public import Lib2
 // expected-note @-1 {{imported 'public' here}}
 import Lib2
 // expected-error @-1 {{ambiguous implicit access level for import of 'Lib2'; it is imported as 'public' elsewhere}}
+// expected-note @-2 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
 
 public func dummyAPI(t: Lib1.Type1, t2: Lib2.Type1) {}
 

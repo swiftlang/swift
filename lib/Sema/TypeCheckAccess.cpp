@@ -382,7 +382,8 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
 
 /// Emit a note on \p limitImport when it restricted the access level
 /// of a type.
-static void noteLimitingImport(ASTContext &ctx,
+static void noteLimitingImport(const Decl *userDecl,
+                               ASTContext &ctx,
                                const ImportAccessLevel limitImport,
                                const TypeRepr *complainRepr) {
   if (!limitImport.has_value())
@@ -393,6 +394,16 @@ static void noteLimitingImport(ASTContext &ctx,
 
   if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(complainRepr)) {
     ValueDecl *VD = declRefTR->getBoundDecl();
+
+    // When using an IDE in a large file the decl_import_via_here note
+    // may be easy to miss on the import. Duplicate the information on the
+    // error line as well so it can't be missed.
+    if (userDecl)
+      userDecl->diagnose(diag::decl_import_via_local,
+                     VD,
+                     limitImport->accessLevel,
+                     limitImport->module.importedModule);
+
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here,
                        VD,
@@ -403,6 +414,16 @@ static void noteLimitingImport(ASTContext &ctx,
                        limitImport->module.importedModule,
                        limitImport->accessLevel);
   }
+}
+
+static void noteLimitingImport(const Decl *userDecl,
+                               const ImportAccessLevel limitImport,
+                               const TypeRepr *complainRepr) {
+  if (!limitImport.has_value())
+    return;
+
+  ASTContext &ctx = userDecl->getASTContext();
+  noteLimitingImport(userDecl, ctx, limitImport, complainRepr);
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
@@ -483,7 +504,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
         Context.Diags.diagnose(ownerDecl, diagID, ownerDecl->getDescriptiveKind(),
                                accessControlErrorKind == ACEK::Requirement);
     highlightOffendingType(diag, complainRepr);
-    noteLimitingImport(Context, minImportLimit, complainRepr);
+    noteLimitingImport(/*userDecl*/nullptr, Context, minImportLimit, complainRepr);
     return;
   }
 
@@ -500,7 +521,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
       contextAccess, minAccess, isa<FileUnit>(DC),
       accessControlErrorKind == ACEK::Requirement);
   highlightOffendingType(diag, complainRepr);
-  noteLimitingImport(Context, minImportLimit, complainRepr);
+  noteLimitingImport(/*userDecl*/nullptr, Context, minImportLimit, complainRepr);
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
@@ -532,7 +553,7 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
           auto diag = D->diagnose(diag::global_actor_not_usable_from_inline,
                                   VD);
           highlightOffendingType(diag, complainRepr);
-          noteLimitingImport(D->getASTContext(), importLimit, complainRepr);
+          noteLimitingImport(D, importLimit, complainRepr);
           return;
         }
 
@@ -544,7 +565,7 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
         auto diag = D->diagnose(diag::global_actor_access, declAccess, VD,
                                 typeAccess, globalActorDecl->getName());
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(D->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(D, importLimit, complainRepr);
       });
 }
 
@@ -630,7 +651,7 @@ public:
                   isTypeContext, isExplicit, theVarAccess,
                   isa<FileUnit>(theVar->getDeclContext()),
                   typeAccess, theVar->getInterfaceType());
-      noteLimitingImport(theVar->getASTContext(), importLimit, complainRepr);
+      noteLimitingImport(theVar, importLimit, complainRepr);
     });
   }
 
@@ -664,7 +685,7 @@ public:
           TP->getLoc(), diagID, anyVar->isLet(), isTypeContext, isExplicit,
           anyVarAccess, isa<FileUnit>(anyVar->getDeclContext()), typeAccess);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(anyVar->getASTContext(), importLimit, complainRepr);
+      noteLimitingImport(anyVar, importLimit, complainRepr);
     });
 
     // Check the property wrapper types.
@@ -691,7 +712,7 @@ public:
                                      isa<FileUnit>(anyVar->getDeclContext()),
                                      typeAccess);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(anyVar->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(anyVar, importLimit, complainRepr);
       });
     }
   }
@@ -740,7 +761,7 @@ public:
       auto diag = TAD->diagnose(diagID, isExplicit, aliasAccess, typeAccess,
                                 isa<FileUnit>(TAD->getDeclContext()));
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(TAD->getASTContext(), importLimit, complainRepr);
+      noteLimitingImport(TAD, importLimit, complainRepr);
     });
   }
 
@@ -826,8 +847,7 @@ public:
       auto diag = assocType->diagnose(diagID, assocType->getFormalAccess(),
                                       minAccess, accessControlErrorKind);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(assocType->getASTContext(), minImportLimit,
-                         complainRepr);
+      noteLimitingImport(assocType, minImportLimit, complainRepr);
     }
   }
 
@@ -863,7 +883,7 @@ public:
         auto diag = ED->diagnose(diagID, isExplicit, enumDeclAccess, typeAccess,
                                  isa<FileUnit>(ED->getDeclContext()));
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(ED->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(ED, importLimit, complainRepr);
       });
     }
   }
@@ -925,7 +945,7 @@ public:
                          isa<FileUnit>(CD->getDeclContext()),
                          superclassLocIter->getTypeRepr() != complainRepr);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(CD->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(CD, importLimit, complainRepr);
       });
     }
   }
@@ -1018,7 +1038,7 @@ public:
           diagID, isExplicit, protoAccess, protocolControlErrorKind, minAccess,
           isa<FileUnit>(proto->getDeclContext()), declKind);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(proto->getASTContext(), minImportLimit, complainRepr);
+      noteLimitingImport(proto, minImportLimit, complainRepr);
     }
   }
 
@@ -1078,7 +1098,7 @@ public:
       auto diag = SD->diagnose(diagID, isExplicit, subscriptDeclAccess,
                                minAccess, problemIsElement);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(SD->getASTContext(), minImportLimit, complainRepr);
+      noteLimitingImport(SD, minImportLimit, complainRepr);
     }
   }
 
@@ -1205,7 +1225,7 @@ public:
                                functionKind, entityKind,
                                hasInaccessibleParameterWrapper);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(fn->getASTContext(), minImportLimit, complainRepr);
+      noteLimitingImport(fn, minImportLimit, complainRepr);
     }
   }
 
@@ -1225,8 +1245,7 @@ public:
             auto diag =
                 EED->diagnose(diagID, EED->getFormalAccess(), typeAccess);
             highlightOffendingType(diag, complainRepr);
-            noteLimitingImport(EED->getASTContext(), importLimit, 
-                               complainRepr);
+            noteLimitingImport(EED, importLimit, complainRepr);
           });
     }
   }
@@ -1289,7 +1308,7 @@ public:
       auto diag = MD->diagnose(diagID, isExplicit, macroDeclAccess,
                                minAccess, problemIsResult);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(MD->getASTContext(), minImportLimit, complainRepr);
+      noteLimitingImport(MD, minImportLimit, complainRepr);
     }
   }
 
@@ -1412,8 +1431,7 @@ public:
           }
           Ctx.Diags.diagnose(NP->getLoc(), diagID, theVar->isLet(),
                              isTypeContext, theVar->getInterfaceType());
-          noteLimitingImport(theVar->getASTContext(), importLimit,
-                             complainRepr);
+          noteLimitingImport(theVar, importLimit, complainRepr);
         });
   }
 
@@ -1452,8 +1470,7 @@ public:
           auto diag = Ctx.Diags.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
                                          isTypeContext);
           highlightOffendingType(diag, complainRepr);
-          noteLimitingImport(anyVar->getASTContext(), importLimit,
-                             complainRepr);
+          noteLimitingImport(anyVar, importLimit, complainRepr);
         });
 
     for (auto attr : anyVar->getAttachedPropertyWrappers()) {
@@ -1469,7 +1486,7 @@ public:
             diag::property_wrapper_type_not_usable_from_inline,
             anyVar->isLet(), isTypeContext);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(anyVar->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(anyVar, importLimit, complainRepr);
       });
     }
   }
@@ -1508,7 +1525,7 @@ public:
         diagID = diag::type_alias_underlying_type_not_usable_from_inline_warn;
       auto diag = TAD->diagnose(diagID);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(TAD->getASTContext(), importLimit, complainRepr);
+      noteLimitingImport(TAD, importLimit, complainRepr);
     });
   }
 
@@ -1530,8 +1547,7 @@ public:
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(assocType->getASTContext(), importLimit,
-                           complainRepr);
+        noteLimitingImport(assocType, importLimit, complainRepr);
       });
     }
     checkTypeAccess(assocType->getDefaultDefinitionType(),
@@ -1546,8 +1562,7 @@ public:
         diagID = diag::associated_type_not_usable_from_inline_warn;
       auto diag = assocType->diagnose(diagID, ACEK_DefaultDefinition);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(assocType->getASTContext(), importLimit,
-                         complainRepr);
+      noteLimitingImport(assocType, importLimit, complainRepr);
     });
 
     if (assocType->getTrailingWhereClause()) {
@@ -1565,8 +1580,7 @@ public:
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(assocType->getASTContext(), importLimit,
-                           complainRepr);
+        noteLimitingImport(assocType, importLimit, complainRepr);
       });
     }
   }
@@ -1597,7 +1611,7 @@ public:
           diagID = diag::enum_raw_type_not_usable_from_inline_warn;
         auto diag = ED->diagnose(diagID);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(ED->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(ED, importLimit, complainRepr);
       });
     }
   }
@@ -1643,7 +1657,7 @@ public:
         auto diag = CD->diagnose(diagID, superclassLocIter->getTypeRepr() !=
                                              complainRepr);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(CD->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(CD, importLimit, complainRepr);
       });
     }
   }
@@ -1666,7 +1680,7 @@ public:
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Refine);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(proto->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(proto, importLimit, complainRepr);
       });
     }
 
@@ -1685,7 +1699,7 @@ public:
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Requirement);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(proto->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(proto, importLimit, complainRepr);
       });
     }
   }
@@ -1704,7 +1718,7 @@ public:
               diagID = diag::subscript_type_usable_from_inline_warn;
             auto diag = SD->diagnose(diagID, /*problemIsElement=*/false);
             highlightOffendingType(diag, complainRepr);
-            noteLimitingImport(SD->getASTContext(), importLimit, complainRepr);
+            noteLimitingImport(SD, importLimit, complainRepr);
           });
     }
 
@@ -1719,7 +1733,7 @@ public:
         diagID = diag::subscript_type_usable_from_inline_warn;
       auto diag = SD->diagnose(diagID, /*problemIsElement=*/true);
       highlightOffendingType(diag, complainRepr);
-      noteLimitingImport(SD->getASTContext(), importLimit, complainRepr);
+      noteLimitingImport(SD, importLimit, complainRepr);
     });
   }
 
@@ -1757,8 +1771,7 @@ public:
                                          /*problemIsResult=*/false,
                                          /*inaccessibleWrapper=*/true);
                 highlightOffendingType(diag, complainRepr);
-                noteLimitingImport(fn->getASTContext(), importLimit,
-                                   complainRepr);
+                noteLimitingImport(fn, importLimit, complainRepr);
               });
         }
       }
@@ -1775,7 +1788,7 @@ public:
                                      /*problemIsResult=*/false,
                                      /*inaccessibleWrapper=*/false);
             highlightOffendingType(diag, complainRepr);
-            noteLimitingImport(fn->getASTContext(), importLimit, complainRepr);
+            noteLimitingImport(fn, importLimit, complainRepr);
           });
     }
 
@@ -1793,7 +1806,7 @@ public:
                                  /*problemIsResult=*/true,
                                  /*inaccessibleWrapper=*/false);
         highlightOffendingType(diag, complainRepr);
-        noteLimitingImport(fn->getASTContext(), importLimit, complainRepr);
+        noteLimitingImport(fn, importLimit, complainRepr);
       });
     }
   }
@@ -1816,8 +1829,7 @@ public:
               diagID = diag::enum_case_usable_from_inline_warn;
             auto diag = EED->diagnose(diagID);
             highlightOffendingType(diag, complainRepr);
-            noteLimitingImport(EED->getASTContext(), importLimit,
-                               complainRepr);
+            noteLimitingImport(EED, importLimit, complainRepr);
           });
     }
   }
@@ -2538,6 +2550,49 @@ void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
   }
 }
 
+/// Register the type extended by \p ED as being used in a package decl if
+/// any member is a package decl. This patches a hole in the warnings on
+/// superfluously public imports which usually relies on exportability checking
+/// that is not currently executed for package decls.
+void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
+  auto extendedType = ED->getExtendedNominal();
+  if (!extendedType)
+    return;
+
+  bool hasPackageMembers = llvm::any_of(ED->getMembers(),
+                                        [](const Decl *member) -> bool {
+    auto *VD = dyn_cast<ValueDecl>(member);
+    if (!VD)
+      return false;
+
+    AccessScope accessScope =
+        VD->getFormalAccessScope(nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+    return accessScope.isPackage();
+  });
+  if (!hasPackageMembers)
+    return;
+
+  DeclContext *DC = ED->getDeclContext();
+  ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
+  if (import.has_value()) {
+    auto SF = DC->getParentSourceFile();
+    if (SF)
+      SF->registerAccessLevelUsingImport(import.value(),
+                                         AccessLevel::Package);
+
+    auto &ctx = DC->getASTContext();
+    if (ctx.LangOpts.EnableModuleApiImportRemarks) {
+      ModuleDecl *importedVia = import->module.importedModule,
+                 *sourceModule = ED->getModuleContext();
+      ED->diagnose(diag::module_api_import,
+                   ED, importedVia, sourceModule,
+                   importedVia == sourceModule,
+                   /*isImplicit*/false);
+    }
+  }
+}
+
 void swift::checkAccessControl(Decl *D) {
   if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
     bool allowInlineable =
@@ -2546,6 +2601,7 @@ void swift::checkAccessControl(Decl *D) {
     UsableFromInlineChecker().visit(D);
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     checkExtensionGenericParamAccess(ED);
+    registerPackageAccessForPackageExtendedType(ED);
   }
 
   if (isa<AccessorDecl>(D))

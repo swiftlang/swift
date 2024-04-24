@@ -26,6 +26,7 @@ public struct IOIStruct {
 //--- ClientSPIOnlyMode.swift
 
 @_implementationOnly import Lib
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 @_spi(X) public func spiClient(s: IOIStruct) -> IOIStruct { // expected-error 2 {{cannot use struct 'IOIStruct' here; 'Lib' has been imported as implementation-only}}
     return IOIStruct()
@@ -39,6 +40,7 @@ public struct IOIStruct {
 //--- ClientDefaultMode.swift
 
 @_implementationOnly import Lib
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 @_spi(X) public func spiClient(s: IOIStruct) -> IOIStruct { // expected-warning 2 {{cannot use struct 'IOIStruct' here; 'Lib' has been imported as implementation-only}}
     return IOIStruct()

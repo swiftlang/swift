@@ -1164,6 +1164,9 @@ WARNING(implementation_only_requires_library_evolution,none,
         "using '@_implementationOnly' without enabling library evolution "
         "for %0 may lead to instability during execution",
         (Identifier))
+WARNING(implementation_only_deprecated,none,
+        "'@_implementationOnly' is deprecated, use 'internal import' instead",
+        ())
 
 ERROR(module_allowable_client_violation,none,
       "module %0 doesn't allow importation from module %1",
@@ -2501,6 +2504,11 @@ NOTE(decl_import_via_here,none,
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
      "from %2 here",
      (const Decl *, AccessLevel, const ModuleDecl*))
+NOTE(decl_import_via_local,none,
+     "%kind0 is imported by this file as "
+     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
+     "from %2",
+     (const Decl *, AccessLevel, const ModuleDecl*))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -3678,6 +3686,10 @@ ERROR(inconsistent_implicit_access_level_on_import,none,
       "ambiguous implicit access level for import of %0; it is imported as "
       "'%select{private|fileprivate|internal|package|public|%error}1' elsewhere",
       (Identifier, AccessLevel))
+NOTE(inconsistent_implicit_access_level_on_import_silence,none,
+      "silence these warnings by adopting the upcoming feature "
+      "'InternalImportsByDefault'",
+      ())
 NOTE(inconsistent_implicit_access_level_on_import_here,none,
      "imported "
      "'%select{private|fileprivate|internal|package|public|%error}0' here",
