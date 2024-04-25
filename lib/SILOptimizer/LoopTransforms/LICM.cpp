@@ -1048,8 +1048,13 @@ computeInnerAccessPath(AccessPath::PathNode outerPath,
   if (outerPath == innerPath)
     return true;
 
-  if (!isa<StructElementAddrInst>(innerAddress)
-      && !isa<TupleElementAddrInst>(innerAddress)) {
+  auto *sea = dyn_cast<StructElementAddrInst>(innerAddress);
+
+  if (sea && sea->getStructDecl()->hasUnreferenceableStorage()) {
+    return false;
+  }
+
+  if (!sea && !isa<TupleElementAddrInst>(innerAddress)) {
     return false;
   }
   assert(ProjectionIndex(innerAddress).Index

@@ -20,17 +20,22 @@
 
 import PackageDescription
 
+let swiftSourceDirectory = #filePath
+  .split(separator: "/", omittingEmptySubsequences: false)
+  .dropLast(3) // Remove 'lib', 'ASTGen', 'Package.swift'
+  .joined(separator: "/")
+
 let swiftSetttings: [SwiftSetting] = [
   .interoperabilityMode(.Cxx),
   .unsafeFlags([
     "-Xcc", "-DCOMPILED_WITH_SWIFT",
     "-Xcc", "-UIBOutlet", "-Xcc", "-UIBAction", "-Xcc", "-UIBInspectable",
-    "-Xcc", "-I../../include",
-    "-Xcc", "-I../../../llvm-project/llvm/include",
-    "-Xcc", "-I../../../llvm-project/clang/include",
-    "-Xcc", "-I../../../build/Default/swift/include",
-    "-Xcc", "-I../../../build/Default/llvm/include",
-    "-Xcc", "-I../../../build/Default/llvm/tools/clang/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/llvm/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/clang/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/swift/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/tools/clang/include",
 
     // FIXME: Needed to work around an availability issue with CxxStdlib
     "-Xfrontend", "-disable-target-os-checking",

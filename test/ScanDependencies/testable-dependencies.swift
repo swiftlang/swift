@@ -42,18 +42,21 @@
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps3.json swiftPrebuiltExternal:A directDependencies | %FileCheck %s --check-prefix TEST3-A
 // TEST3-A:  "swift": "B"
 
-/// Testable import non-testable build without enable testing.
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/testable.swift \
-// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -o %t/deps4.json -I %t/regular -swift-version 5
-// RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps4.json Test directDependencies | %FileCheck %s --check-prefix TEST4
-// TEST4:  "swiftPrebuiltExternal": "A"
-// RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps4.json swiftPrebuiltExternal:A directDependencies | %FileCheck %s --check-prefix EMPTY --allow-empty
-
-/// Testable import non-testable build enable testing, still succeed since swift-frontend can provide a better diagnostics when the module is actually imported.
+/// Testable import sees non-testable module first, keep searching.
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/testable.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
-// RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading
+// RUN:   -o %t/deps4.json -I %t/regular -I %t/testable -I %t/internal -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix WARN
+// RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps4.json Test directDependencies | %FileCheck %s --check-prefix TEST4
+// TEST4:  "swiftPrebuiltExternal": "A"
+// RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps4.json swiftPrebuiltExternal:A directDependencies | %FileCheck %s --check-prefix TEST4-A
+// TEST4-A:  "swift": "B"
+
+/// Testable import non-testable build enable testing, warning about the finding then error out.
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-name Test %t/testable.swift \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
+// RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix WARN --check-prefix ERROR
+// WARN: warning: ignore swiftmodule built without '-enable-testing'
+// ERROR: error: Unable to find module dependency: 'A'
 
 /// Regular import a testable module with no interface, don't load optional dependencies.
 // RUN: rm %t/testable/A.swiftinterface

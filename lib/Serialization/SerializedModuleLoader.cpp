@@ -454,6 +454,12 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
                            modulePath.str());
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
+
+    if (isTestableImport && !loadedModuleFile->isTestable()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_not_testable,
+                         modulePath.str());
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    }
   }
 
   // Some transitive dependencies of binary modules are not required to be
