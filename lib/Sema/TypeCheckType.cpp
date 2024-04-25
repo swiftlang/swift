@@ -6074,26 +6074,39 @@ private:
   }
 
   void emitInsertAnyFixit(InFlightDiagnostic &diag, DeclRefTypeRepr *T) const {
-    TypeRepr *replaceRepr = T;
+    TypeRepr *replacementT = T;
 
     // Insert parens in expression context for '(any P).self'
     bool needsParens = (exprCount != 0);
+
+    // Compute the replacement node (the node to which to apply `any`).
     if (reprStack.size() > 1) {
-      auto parentIt = reprStack.end() - 2;
-      needsParens = anySyntaxNeedsParens(*parentIt);
+      auto it = reprStack.end() - 1;
+      auto replacementIt = it;
 
-      // Expand to include parenthesis before checking if the parent needs
-      // to be replaced.
-      while (parentIt != reprStack.begin() &&
-             (*parentIt)->getWithoutParens() != *parentIt)
-        parentIt -= 1;
+      // Backtrack the stack and expand the replacement range to any parent
+      // `.Type` metatypes, skipping only parentheses.
+      do {
+        --it;
+        if ((*it)->isParenType()) {
+          continue;
+        }
 
-      // For existential metatypes, 'any' is applied to the metatype.
-      if ((*parentIt)->getKind() == TypeReprKind::Metatype) {
-        replaceRepr = *parentIt;
-        if (parentIt != reprStack.begin())
-          needsParens = anySyntaxNeedsParens(*(parentIt - 1));
+        if (isa<MetatypeTypeRepr>(*it)) {
+          replacementIt = it;
+          continue;
+        }
+
+        break;
+      } while (it != reprStack.begin());
+
+      // Whether parentheses are necessary is determined by the immediate parent
+      // of the replacement node.
+      if (replacementIt != reprStack.begin()) {
+        needsParens = anySyntaxNeedsParens(*(replacementIt - 1));
       }
+
+      replacementT = *replacementIt;
     }
 
     llvm::SmallString<64> fix;
@@ -6101,13 +6114,13 @@ private:
       llvm::raw_svector_ostream OS(fix);
       if (needsParens)
         OS << "(";
-      ExistentialTypeRepr existential(SourceLoc(), replaceRepr);
+      ExistentialTypeRepr existential(SourceLoc(), replacementT);
       existential.print(OS);
       if (needsParens)
         OS << ")";
     }
 
-    diag.fixItReplace(replaceRepr->getSourceRange(), fix);
+    diag.fixItReplace(replacementT->getSourceRange(), fix);
   }
 
   /// Returns a Boolean value indicating whether the type representation being
