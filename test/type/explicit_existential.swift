@@ -345,7 +345,7 @@ func testAnyFixIt() {
   // expected-error@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{12-20=any HasAssoc}}
   // expected-error@+1 {{use of 'S.HasAssoc_Alias' (aka 'HasAssoc') as a type must be written 'any S.HasAssoc_Alias' (aka 'any HasAssoc')}}{{10-36=any G<HasAssoc>.HasAssoc_Alias}}
   let _: G<HasAssoc>.HasAssoc_Alias
-  // FIXME: Generic argument not diagnosed.
+  // expected-error@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{13-21=any HasAssoc}}
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{10-10=any }}
   let _: ~G<HasAssoc>.Copyable_Alias
   // FIXME: No fix-it + generic argument not diagnosed.
@@ -439,7 +439,7 @@ func testAnyFixIt() {
   let _: any HasAssocGeneric<~Copyable>
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{16-24=any HasAssoc}}
   let _: any G<HasAssoc>.HasAssoc_Alias
-  // FIXME: Generic argument not diagnosed.
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{17-25=any HasAssoc}}
   let _: any ~G<HasAssoc>.Copyable_Alias
   do {
     // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{22-30=any HasAssoc}}
