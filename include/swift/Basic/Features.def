@@ -376,7 +376,7 @@ EXPERIMENTAL_FEATURE(ObjCImplementation, true)
 EXPERIMENTAL_FEATURE(CImplementation, true)
 
 // Enable the stdlib @DebugDescription macro.
-EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
+EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(DebugDescriptionMacro, true)
 
 // Enable usability improvements for global-actor-isolated types.
 EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
