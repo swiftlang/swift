@@ -5982,26 +5982,6 @@ public:
 
     reprStack.push_back(T);
 
-    // Suppressed conformance needs to be within any/some.
-    if (auto inverse = dyn_cast<InverseTypeRepr>(T)) {
-      if (isAnyOrSomeMissing()) {
-        // Find an enclosing protocol composition, if there is one, so we
-        // can insert 'any' before that.
-        SourceLoc anyLoc = inverse->getTildeLoc();
-        if (reprStack.size() > 1) {
-          if (auto *repr =
-                  dyn_cast<CompositionTypeRepr>(*(reprStack.end() - 2))) {
-            anyLoc = repr->getStartLoc();
-          }
-        }
-
-        Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
-            .highlight(inverse->getConstraint()->getSourceRange())
-            .fixItInsert(anyLoc, "any ");
-      }
-      return Action::SkipChildren();
-    }
-
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
     if (!declRefTR) {
       return Action::Continue();
@@ -6134,6 +6114,8 @@ private:
   /// visited, assuming it is a constraint type demanding `any` or `some`, is
   /// missing either keyword.
   bool isAnyOrSomeMissing() const {
+    assert(isa<DeclRefTypeRepr>(reprStack.back()));
+
     if (reprStack.size() < 2) {
       return true;
     }
@@ -6169,6 +6151,36 @@ private:
 
     if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       return;
+    }
+
+    // Backtrack the stack, looking just through parentheses and metatypes. If
+    // we find an inverse (which always requires `any`), diagnose it specially.
+    if (reprStack.size() > 1) {
+      auto it = reprStack.end() - 2;
+      while (it != reprStack.begin() &&
+             ((*it)->isParenType() || isa<MetatypeTypeRepr>(*it))) {
+        --it;
+        continue;
+      }
+
+      if (auto inverse = dyn_cast<InverseTypeRepr>(*it)) {
+        if (isAnyOrSomeMissing()) {
+          // Find an enclosing protocol composition, if there is one, so we
+          // can insert 'any' before that.
+          SourceLoc anyLoc = inverse->getTildeLoc();
+          if (it != reprStack.begin()) {
+            if (auto *comp = dyn_cast<CompositionTypeRepr>(*(it - 1))) {
+              anyLoc = comp->getStartLoc();
+            }
+          }
+
+          Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
+              .highlight(inverse->getConstraint()->getSourceRange())
+              .fixItInsert(anyLoc, "any ");
+
+          return;
+        }
+      }
     }
 
     auto *decl = T->getBoundDecl();
