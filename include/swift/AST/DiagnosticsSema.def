@@ -1200,7 +1200,7 @@ REMARK(module_api_import_aliases,none,
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
 
 REMARK(skip_module_invalid,none,"skip invalid swiftmodule: %0", (StringRef))
-REMARK(skip_module_testable,none,"skip swiftmodule built with '-enable-testing': %0", (StringRef))
+WARNING(skip_module_not_testable,none,"ignore swiftmodule built without '-enable-testing': %0", (StringRef))
 
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
