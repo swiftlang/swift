@@ -176,9 +176,9 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// You don't generally need to write an explicit conformance to `Copyable`.
 /// The following places implicitly include `Copyable` conformance:
 ///
-/// * Structures declarations,
+/// * Structure declarations,
 ///   unless it has a noncopyable stored property
-/// * Enumerations declarations,
+/// * Enumeration declarations,
 ///   unless it has a case whose associated value isn't copyable
 /// * Class declarations
 /// * Actor declarations
