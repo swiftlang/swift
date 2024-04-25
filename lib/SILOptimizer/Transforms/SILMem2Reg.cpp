@@ -301,68 +301,6 @@ replaceDestroy(DestroyAddrInst *dai, SILValue newValue, SILBuilderContext &ctx,
   prepareForDeletion(dai, instructionsToDelete);
 }
 
-/// Whether the specified debug_value's operand names the address at the
-/// indicated alloc_stack.
-///
-/// If it's a guaranteed alloc_stack (i.e. a store_borrow location), that
-/// includes the values produced by any store_borrows whose destinations are the
-/// alloc_stack since those values amount to aliases for the alloc_stack's
-/// storage.
-static bool isDebugValueOfAllocStack(DebugValueInst *dvi, AllocStackInst *asi) {
-  auto value = dvi->getOperand();
-  if (value == asi)
-    return true;
-  auto *sbi = dyn_cast<StoreBorrowInst>(value);
-  if (!sbi)
-    return false;
-  return sbi->getDest() == asi;
-}
-
-/// Promote a DebugValue w/ address value to a DebugValue of non-address value.
-static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
-                                  SILBuilderContext &ctx,
-                                  InstructionDeleter &deleter) {
-  assert(dvai->getOperand()->getType().isLoadable(*dvai->getFunction()) &&
-         "Unexpected promotion of address-only type!");
-  assert(value && "Expected valid value");
-
-  // Avoid inserting the same debug_value twice.
-  //
-  // We remove the di expression when comparing since:
-  //
-  // 1. dvai is on will always have the deref diexpr since it is on addresses.
-  //
-  // 2. We are only trying to delete debug_var that are on values... values will
-  //    never have an op_deref meaning that the comparison will always fail and
-  //    not serve out purpose here.
-  auto dvaiWithoutDIExpr = dvai->getVarInfo()->withoutDIExpr();
-  for (auto *use : value->getUses()) {
-    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
-      if (!dvi->hasAddrVal() && *dvi->getVarInfo() == dvaiWithoutDIExpr) {
-        deleter.forceDelete(dvai);
-        return;
-      }
-    }
-  }
-
-  // Drop op_deref if dvai is actually a debug_value instruction
-  auto varInfo = *dvai->getVarInfo();
-  if (isa<DebugValueInst>(dvai)) {
-    auto &diExpr = varInfo.DIExpr;
-    // FIXME: There should always be a DIExpr starting with an op_deref here
-    // The debug_value is attached to a pointer type, and those don't exist
-    // in Swift, so they should always be dereferenced.
-    // However, this rule is broken in a lot of spaces, so we have to leave
-    // this check to recover from wrong info
-    if (diExpr && diExpr.startsWithDeref())
-      diExpr.eraseElement(diExpr.element_begin());
-  }
-
-  SILBuilderWithScope b(dvai, ctx);
-  b.createDebugValue(dvai->getLoc(), value, std::move(varInfo));
-  deleter.forceDelete(dvai);
-}
-
 /// Returns true if \p I is a load which loads from \p ASI.
 static bool isLoadFromStack(SILInstruction *i, AllocStackInst *asi) {
   if (!isa<LoadInst>(i) && !isa<LoadBorrowInst>(i))
@@ -1172,14 +1110,8 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       continue;
     }
 
-    // Replace debug_value w/ address value with debug_value of
-    // the promoted value.
-    // if we have a valid value to use at this point. Otherwise we'll
-    // promote this when we deal with hooking up phis.
+    // Debug values will automatically be salvaged, we can ignore them.
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
-      if (isDebugValueOfAllocStack(dvi, asi) && runningVals)
-        promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
-                              ctx, deleter);
       continue;
     }
 
@@ -1432,12 +1364,8 @@ void StackAllocationPromoter::fixBranchesAndUses(
     // on.
     SILBasicBlock *userBlock = user->getParent();
 
+    // Debug values will automatically be salvaged, we can ignore them.
     if (auto *dvi = DebugValueInst::hasAddrVal(user)) {
-      // Replace debug_value w/ address-type value with
-      // a new debug_value w/ promoted value.
-      auto def = getEffectiveLiveInValues(phiBlocks, userBlock);
-      promoteDebugValueAddr(dvi, def.replacement(asi, dvi), ctx, deleter);
-      ++NumInstRemoved;
       continue;
     }
 
@@ -2036,20 +1964,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       continue;
     }
 
-    // Replace debug_value w/ address value with debug_value of
-    // the promoted value.
+    // Debug values will automatically be salvaged, we can ignore them.
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
-      if (isDebugValueOfAllocStack(dvi, asi)) {
-        if (runningVals) {
-          promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
-                                ctx, deleter);
-        } else {
-          // Drop debug_value of uninitialized void values.
-          assert(asi->getElementType().isVoid() &&
-                 "Expected initialization of non-void type!");
-          deleter.forceDelete(dvi);
-        }
-      }
       continue;
     }
 
