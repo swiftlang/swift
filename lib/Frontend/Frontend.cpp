@@ -562,6 +562,23 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   return false;
 }
 
+bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
+                                      std::string &Error,
+                                      ArrayRef<const char *> Args) {
+  // This is the fast path for setup an instance for replay but cannot run
+  // regular compilation.
+  Invocation = Invoke;
+
+  if (setupCASIfNeeded(Args)) {
+    Error = "Setting up CAS failed";
+    return true;
+  }
+
+  setupOutputBackend();
+  setupCachingDiagnosticsProcessorIfNeeded();
+  return false;
+}
+
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   if (Invocation.getCASOptions().requireCASFS()) {
     const auto &Opts = getInvocation().getCASOptions();
