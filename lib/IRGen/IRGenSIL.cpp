@@ -3310,16 +3310,20 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
     bool canForwardLoadToIndirect = false;
     auto *load = dyn_cast<LoadInst>(arg);
     [&]() {
-      if (apply && load && apply->getParent() == load->getParent()) {
-        for (auto it = std::next(load->getIterator()), e = apply->getIterator();
-             it != e; ++it) {
-          if (isa<LoadInst>(&(*it))) {
-            continue;
-          }
-          return;
+      if (!apply || !load || apply->getParent() != load->getParent())
+        return;
+      // We cannot forward projections as the code that does the optimization
+      // does not know about them.
+      if (!isa<AllocStackInst>(load->getOperand()))
+        return;
+      for (auto it = std::next(load->getIterator()), e = apply->getIterator();
+           it != e; ++it) {
+        if (isa<LoadInst>(&(*it))) {
+          continue;
         }
-        canForwardLoadToIndirect = true;
+        return;
       }
+      canForwardLoadToIndirect = true;
     }();
     IGF.getLoweredExplosion(arg, out);
     if (canForwardLoadToIndirect) {
