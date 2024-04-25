@@ -2101,8 +2101,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return nullptr;
       }
 
-      return dyn_cast_or_null<const ClosureExpr>(
-          parentContext->getInnermostClosureForSelfCapture());
+      return parentContext->getInnermostClosureForSelfCapture();
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }

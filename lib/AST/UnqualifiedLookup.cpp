@@ -355,8 +355,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   // Perform an unqualified lookup for the base decl of this result. This
   // handles cases where self was rebound (e.g. `guard let self = self`)
   // earlier in this closure or some outer closure.
-  auto closureExpr =
-      dyn_cast_or_null<ClosureExpr>(DC->getInnermostClosureForSelfCapture());
+  auto closureExpr = DC->getInnermostClosureForSelfCapture();
   if (!closureExpr) {
     return nullptr;
   }

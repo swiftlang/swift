@@ -263,7 +263,7 @@ DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
   return nullptr;
 }
 
-DeclContext *DeclContext::getInnermostClosureForSelfCapture() {
+ClosureExpr *DeclContext::getInnermostClosureForSelfCapture() {
   auto dc = this;
   if (auto closure = dyn_cast<ClosureExpr>(dc)) {
     return closure;
