@@ -368,7 +368,7 @@ class TestGithubIssue70089 {
           x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
         }
 
-        doVoidStuff { [self = TestGithubIssue70089()] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+        doVoidStuff { [self = TestGithubIssue70089()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
           x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self.x += 1
 
@@ -477,7 +477,7 @@ class TestGithubIssue69911 {
           }
         }
 
-        doVoidStuffNonEscaping { [self = TestGithubIssue69911()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+        doVoidStuffNonEscaping { [self = TestGithubIssue69911()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
            self.x += 1
 
