@@ -1567,14 +1567,15 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive
   if (Recursive) {
     ImportCollector importCollector;
     this->getDisplayDeclsRecursivelyAndImports(Results, importCollector);
+  } else {
+    // FIXME: Should this do extra access control filtering?
+    FORWARD(getDisplayDecls, (Results));
   }
-  // FIXME: Should this do extra access control filtering?
-  FORWARD(getDisplayDecls, (Results));
 }
 
 void ModuleDecl::getDisplayDeclsRecursivelyAndImports(
     SmallVectorImpl<Decl *> &results, ImportCollector &importCollector) const {
-  this->getDisplayDecls(results);
+  this->getDisplayDecls(results, /*Recursive=*/false);
 
   // Look up imports recursively.
   collectExportedImports(this, importCollector);
