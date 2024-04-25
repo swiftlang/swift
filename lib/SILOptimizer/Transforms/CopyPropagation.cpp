@@ -635,7 +635,9 @@ void CopyPropagation::run() {
     accessBlockAnalysis->unlockInvalidation();
     if (f->getModule().getOptions().VerifySILOwnership) {
       auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-      f->verifyOwnership(deBlocksAnalysis->get(f));
+      f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
+                             ? nullptr
+                             : deBlocksAnalysis->get(f));
     }
   }
 }
