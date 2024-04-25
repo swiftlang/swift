@@ -627,16 +627,16 @@ public:
 
 CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
                                          AbstractFunctionDecl *AFD) const {
-  BraceStmt *body = AFD->getTypecheckedBody();
-
   auto type = AFD->getInterfaceType();
-  if (type->is<ErrorType>() || body == nullptr)
+  if (type->is<ErrorType>())
     return CaptureInfo::empty();
 
   bool isNoEscape = type->castTo<AnyFunctionType>()->isNoEscape();
   FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape,
                           AFD->isObjC(), AFD->isGeneric());
-  body->walk(finder);
+
+  if (auto *body = AFD->getTypecheckedBody())
+    body->walk(finder);
 
   if (!AFD->isObjC()) {
     finder.checkType(type, AFD->getLoc());

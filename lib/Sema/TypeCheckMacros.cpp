@@ -33,6 +33,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
@@ -150,11 +151,23 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   ptrdiff_t numReplacements = 0;
   ptrdiff_t *genericReplacements = nullptr;
   ptrdiff_t numGenericReplacements = 0;
+
+  // Parse 'macro' decl in swift_ASTGen_checkMacroDefinition.
+  // NOTE: We don't use source->getExportedSourceFile() because it parses the
+  // entire source buffer, which we don't want. Usually 'macro' decl is not in
+  // the same file as the expansion, so we only want to parse only the decl.
+  // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
+  auto &SM = ctx.SourceMgr;
+  StringRef sourceFileText =
+      SM.getEntireTextForBuffer(*sourceFile->getBufferID());
+  StringRef macroDeclText =
+      SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
+          SM, macro->getSourceRangeIncludingAttrs()));
+
   auto checkResult = swift_ASTGen_checkMacroDefinition(
-      &ctx.Diags, sourceFile->getExportedSourceFile(),
-      macro->getLoc().getOpaquePointerValue(), &externalMacroName,
-      &replacements, &numReplacements,
-      &genericReplacements, &numGenericReplacements);
+      &ctx.Diags, sourceFileText, macroDeclText, &externalMacroName,
+      &replacements, &numReplacements, &genericReplacements,
+      &numGenericReplacements);
 
   // Clean up after the call.
   SWIFT_DEFER {
