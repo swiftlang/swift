@@ -1,6 +1,7 @@
 // Tests that a C++ class can conform to a Swift protocol.
 
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -D VIRTUAL_METHODS -cxx-interoperability-mode=swift-5.9
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -D VIRTUAL_METHODS -cxx-interoperability-mode=swift-6
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -D VIRTUAL_METHODS -cxx-interoperability-mode=upcoming-swift
 
