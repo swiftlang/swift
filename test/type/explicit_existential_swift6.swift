@@ -390,6 +390,8 @@ func testAnyFixIt() {
   let _: HasAssoc.Type
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{10-10=any }}
   let _: ~Copyable.Type
+  // expected-error@+1 {{type 'any Copyable.Type' cannot be suppressed}}
+  let _: ~(Copyable.Type)
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-25=any (HasAssoc).Type}}
   let _: (HasAssoc).Type
   // FIXME: Fix-it produces singleton, not existential, metatype type?
@@ -400,13 +402,18 @@ func testAnyFixIt() {
   // FIXME: Fix-it produces singleton, not existential, metatype type?
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{12-12=any }}
   let _: ((~Copyable)).Type
-  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=any HasAssoc.Type}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-28=any HasAssoc.Type.Type}}
   let _: HasAssoc.Type.Type
   // expected-error@+1 {{type 'any Copyable.Type.Type' cannot be suppressed}}
   let _: ~Copyable.Type.Type
   // FIXME: Fix-it produces singleton, not existential, metatype type?
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-11=any }}
   let _: (~Copyable).Type.Type
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-30=any (HasAssoc.Type).Type}}
+  let _: (HasAssoc.Type).Type
+  // FIXME: Fix-it produces singleton, not existential, metatype type?
+  // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-11=any }}
+  let _: (~Copyable.Type).Type
   // expected-error@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{30-38=(any HasAssoc)}}
   let _: HasAssoc.Protocol = HasAssoc.self
@@ -437,8 +444,7 @@ func testAnyFixIt() {
   // FIXME: Incorrect fix-it.
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-11=any }}
   let _: (~Copyable).Type.Protocol
-  // FIXME: Incorrect fix-it.
-  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=any HasAssoc.Type}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-28=(any HasAssoc.Type.Type)}}
   let _: HasAssoc.Type.Type.Protocol
   // FIXME: Incorrect fix-it.
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-11=any }}
