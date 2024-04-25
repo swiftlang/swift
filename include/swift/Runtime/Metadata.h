@@ -954,6 +954,9 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
 
+/// Debugging entry point to dump the given type metadata.
+SWIFT_RUNTIME_EXPORT void printMetadataName(const Metadata *type);
+
 /// Register a block of protocol records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT
 void swift_registerProtocols(const ProtocolRecord *begin,

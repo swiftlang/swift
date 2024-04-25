@@ -114,6 +114,10 @@ static void _buildNameForMetadata(const Metadata *type,
   result = Demangle::nodeToString(demangling, options);
 }
 
+void swift::printMetadataName(const Metadata *type) {
+  printf("%s\n", nameForMetadata(type, true));
+}
+
 /// Return a user-comprehensible name for the given type.
 std::string swift::nameForMetadata(const Metadata *type,
                                    bool qualified) {
