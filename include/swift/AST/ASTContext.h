@@ -1181,6 +1181,11 @@ public:
 
   ModuleDecl *getModuleByIdentifier(Identifier ModuleID);
 
+  /// Looks up an already loaded module by its ABI name.
+  ///
+  /// \returns The module if found, nullptr otherwise.
+  ModuleDecl *getLoadedModuleByABIName(StringRef ModuleName);
+
   /// Returns the standard library module, or null if the library isn't present.
   ///
   /// If \p loadIfAbsent is true, the ASTContext will attempt to load the module
