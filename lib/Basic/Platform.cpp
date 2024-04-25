@@ -217,7 +217,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::ShaderModel:
   case llvm::Triple::Solaris:
   case llvm::Triple::Vulkan:
-  case llvm::Triple::XROS:
   case llvm::Triple::ZOS:
     return "";
   case llvm::Triple::Darwin:
