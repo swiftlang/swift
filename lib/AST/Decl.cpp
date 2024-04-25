@@ -3707,6 +3707,29 @@ void ValueDecl::setIsObjC(bool value) {
   LazySemanticInfo.isObjC = value;
 }
 
+Identifier ExtensionDecl::getObjCCategoryName() const {
+  // If there's an @objc attribute, it's authoritative. (ClangImporter
+  // attaches one automatically.)
+  if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid*/true)) {
+    if (objcAttr->hasName() && objcAttr->getName()->getNumArgs() == 0)
+      return objcAttr->getName()->getSimpleName();
+
+    return Identifier();
+  }
+
+  // Fall back to @_objcImplementation attribute.
+  if (auto attr =
+       getAttrs().getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true)) {
+    if (!attr->isCategoryNameInvalid())
+      return attr->CategoryName;
+
+    return Identifier();
+  }
+
+  // Not a category, evidently.
+  return Identifier();
+}
+
 bool ValueDecl::isSemanticallyFinal() const {
   // Actor types are semantically final.
   if (auto classDecl = dyn_cast<ClassDecl>(this)) {

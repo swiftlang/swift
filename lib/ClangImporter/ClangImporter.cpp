@@ -5969,32 +5969,6 @@ struct OrderDecls {
 };
 }
 
-Identifier ExtensionDecl::getObjCCategoryName() const {
-  // Could it be an imported category?
-  if (!hasClangNode()) {
-    // Nope, not imported. Is it an @implementation extension?
-    auto attr = getAttrs()
-                    .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-    if (attr && !attr->isCategoryNameInvalid())
-      return attr->CategoryName;
-
-    return Identifier();
-  }
-
-  auto category = dyn_cast<clang::ObjCCategoryDecl>(getClangDecl());
-  if (!category)
-    // Nope, not a category.
-    return Identifier();
-
-  // We'll look for an implementation with this category name.
-  auto clangCategoryName = category->getName();
-  if (clangCategoryName.empty())
-    // Class extension (has an empty name).
-    return Identifier();
-  
-  return getASTContext().getIdentifier(clangCategoryName);
-}
-
 static ObjCInterfaceAndImplementation
 constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
                 llvm::TinyPtrVector<Decl *> &impls,
