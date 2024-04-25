@@ -300,6 +300,11 @@ $IsCrossCompiling = $HostArchName -ne $BuildArchName
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 
+function Get-AndroidNDKPath {
+  $androidNDKPath = Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion"
+  return $androidNDKPath
+}
+
 function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
     $ProgramFilesName = "Program Files"
@@ -808,15 +813,23 @@ function Build-CMakeProject {
       TryAdd-KeyValue $Defines CMAKE_SYSTEM_PROCESSOR $Arch.CMakeName
     }
 
-    # TODO(compnerd) clean up these and formalise this selection
     if ($Platform -eq "Android") {
-      $env:Path = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
-      TryAdd-KeyValue $Defines CMAKE_C_COMPILER "S:\b\android-ndk-r26b\toolchains\llvm\prebuilt\windows-x86_64\bin\clang.exe"
-      TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER "S:\b\android-ndk-r26b\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe"
-      TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+      if (Test-Path "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
+        $env:Path = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
+        TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+      } elseif (Test-Path "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
+        $env:Path = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
+        TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+      } else {
+        throw "Missing CMake and Ninja in the visual studio installation that are needed to build Android"
+      }
+      $androidNDKPath = Get-AndroidNDKPath
+      TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Join-Path -Path $androidNDKPath -ChildPath "toolchains\llvm\prebuilt\windows-x86_64\bin\clang.exe")
+      TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Join-Path -Path $androidNDKPath -ChildPath "toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe")
       TryAdd-KeyValue $Defines CMAKE_ANDROID_API "$AndroidAPILevel"
       TryAdd-KeyValue $Defines CMAKE_ANDROID_ARCH_ABI $Arch.AndroidArchABI
-      TryAdd-KeyValue $Defines CMAKE_ANDROID_NDK "S:\b\android-ndk-r26b"
+      TryAdd-KeyValue $Defines CMAKE_ANDROID_NDK "$androidNDKPath"
+      TryAdd-KeyValue $Defines SWIFT_ANDROID_NDK_PATH "$androidNDKPath"
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_WORKS YES
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_WORKS YES
     }
@@ -830,7 +843,8 @@ function Build-CMakeProject {
         $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
       }
       Android {
-        $CFlags = @("--sysroot=S:\b\android-ndk-r26b\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
+        $androidNDKPath = Get-AndroidNDKPath
+        $CFlags = @("--sysroot=$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
       }
     }
 
@@ -945,14 +959,15 @@ function Build-CMakeProject {
               )
             }
             Android {
-              $SwiftArgs += @("-sdk", "S:\b\android-ndk-r26b\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
+              $androidNDKPath = Get-AndroidNDKPath
+              $SwiftArgs += @("-sdk", "$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
               $SwiftArgs += @(
                 "-Xclang-linker", "-target",
                 "-Xclang-linker", $Arch.LLVMTarget,
                 "-Xclang-linker", "--sysroot",
-                "-Xclang-linker", "S:\b\android-ndk-r26b\toolchains\llvm\prebuilt\windows-x86_64\sysroot",
+                "-Xclang-linker", "$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\sysroot",
                 "-Xclang-linker", "-resource-dir",
-                "-Xclang-linker", "S:\b\android-ndk-r26b\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\17"
+                "-Xclang-linker", "$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\17"
               )
             }
           }
