@@ -118,7 +118,7 @@
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
 @frozen
-public enum Optional<Wrapped: ~Copyable>: ~Copyable {
+public enum Optional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
 
@@ -132,14 +132,17 @@ public enum Optional<Wrapped: ~Copyable>: ~Copyable {
   case some(Wrapped)
 }
 
-extension Optional: Copyable where Wrapped: Copyable {}
+extension Optional: Copyable where Wrapped: Copyable /*& ~Escapable */ {}
+extension Optional: Escapable where Wrapped: Escapable /*& ~Copyable */ {}
 
-extension Optional: Sendable where Wrapped: ~Copyable & Sendable { }
+extension Optional: BitwiseCopyable where Wrapped: BitwiseCopyable {}
+// FIXME: Maybe BitwiseCopyable shouldn't require Escapability
 
-extension Optional: BitwiseCopyable where Wrapped: BitwiseCopyable { }
+extension Optional: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable {}
+
 
 @_preInverseGenerics
-extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
+extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance initialized with `nil`.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
@@ -151,12 +154,12 @@ extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
   /// initializer behind the scenes.
   @_transparent
   @_preInverseGenerics
-  public init(nilLiteral: ()) {
+  public init(nilLiteral: ()) -> dependsOn(immortal) Self {
     self = .none
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
   @_preInverseGenerics
