@@ -2209,21 +2209,21 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // unless this is something like a nonescaping closure that
         // didn't have this layer of validation in Swift 5 mode.
         // This doesn't apply to autoclosures.
-        if (auto invalidParentClosure =
-                parentClosureDisallowingImplicitSelf(selfDecl, ty, ACE)) {
-          auto invalidParentClosureExcludingOutermostCapture =
-              parentClosureDisallowingImplicitSelf(
-                  selfDecl, ty, ACE, /*validateOutermostCapture:*/ false);
+        if (!isa<AutoClosureExpr>(ACE)) {
+          if (auto invalidParentClosure =
+                  parentClosureDisallowingImplicitSelf(selfDecl, ty, ACE)) {
+            auto invalidParentClosureExcludingOutermostCapture =
+                parentClosureDisallowingImplicitSelf(
+                    selfDecl, ty, ACE, /*validateOutermostCapture:*/ false);
 
-          // In Swift 5 mode we didn't validate the outermost capture in
-          // nonescaping closures, so in that case we only warn.
-          if (!isClosureRequiringSelfQualification(ACE, Ctx) &&
-              (invalidParentClosureExcludingOutermostCapture !=
-               invalidParentClosure)) {
-            return true;
-          }
+            // In Swift 5 mode we didn't validate the outermost capture in
+            // nonescaping closures, so in that case we only warn.
+            if (!isClosureRequiringSelfQualification(ACE, Ctx) &&
+                (invalidParentClosureExcludingOutermostCapture !=
+                 invalidParentClosure)) {
+              return true;
+            }
 
-          if (!isa<AutoClosureExpr>(ACE)) {
             return false;
           }
         }
