@@ -298,7 +298,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     SILInstruction *User = Operand->getUser();
     auto *DVI = dyn_cast<DebugValueInst>(User);
     assert(DVI && "getDebugUses should only return DebugValueInst");
-    SILBuilderWithScope B(DVI);
+    SILBuilder B(DVI, DVI->getDebugScope());
     std::optional<SILDebugVariable> DVIVarInfo = DVI->getVarInfo();
     assert(DVIVarInfo && "debug_value without debug info");
 

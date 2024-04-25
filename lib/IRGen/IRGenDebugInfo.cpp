@@ -3175,7 +3175,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
-  uint16_t DVarCol = 0;
+  uint16_t DVarCol = DInstLoc.Column;
   if (VarInfo.Loc) {
     auto DVarLoc = getStartLocation(VarInfo.Loc);
     DVarLine = DVarLoc.Line;
