@@ -2787,7 +2787,6 @@ internal func _getTypeByMangledNameInEnvironmentOrContext(
   genericEnvironmentOrContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type? {
-
   let taggedPointer = UInt(bitPattern: genericEnvironmentOrContext)
   if taggedPointer & 1 == 0 {
     return _getTypeByMangledNameInEnvironment(name, nameLength,
