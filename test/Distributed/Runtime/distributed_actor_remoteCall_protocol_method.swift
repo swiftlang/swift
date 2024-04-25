@@ -20,7 +20,7 @@ import FakeDistributedActorSystems
 
 // ==== Known actor system -----------------------------------------------------
 
-@_DistributedProtocol
+@Resolvable
 protocol GreeterDefinedSystemProtocol: DistributedActor where ActorSystem == FakeRoundtripActorSystem {
   distributed func greet() -> String
 }
