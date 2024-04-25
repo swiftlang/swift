@@ -172,6 +172,10 @@ function(add_swift_compiler_modules_library name)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND swift_compile_options "-static")
     list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
+
+    # Workaround a crash in the LoadableByAddress pass
+    # https://github.com/apple/swift/issues/73254
+    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
   else()
     list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
   endif()
