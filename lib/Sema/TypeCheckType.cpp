@@ -6085,14 +6085,19 @@ private:
       auto replacementIt = it;
 
       // Backtrack the stack and expand the replacement range to any parent
-      // compositions or `.Type` metatypes, skipping only parentheses.
+      // inverses, compositions or `.Type` metatypes, skipping only parentheses.
+      //
+      // E.g. `(X & ~P).Type` → `any (X & ~P).Type`.
+      //             ↑
+      //             We're here
       do {
         --it;
         if ((*it)->isParenType()) {
           continue;
         }
 
-        if (isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
+        if (isa<InverseTypeRepr>(*it) || isa<CompositionTypeRepr>(*it) ||
+            isa<MetatypeTypeRepr>(*it)) {
           replacementIt = it;
           continue;
         }
@@ -6176,23 +6181,12 @@ private:
         continue;
       }
 
-      if (auto inverse = dyn_cast<InverseTypeRepr>(*it)) {
-        if (isAnyOrSomeMissing()) {
-          // Find an enclosing protocol composition, if there is one, so we
-          // can insert 'any' before that.
-          SourceLoc anyLoc = inverse->getTildeLoc();
-          if (it != reprStack.begin()) {
-            if (auto *comp = dyn_cast<CompositionTypeRepr>(*(it - 1))) {
-              anyLoc = comp->getStartLoc();
-            }
-          }
-
-          Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
-              .highlight(inverse->getConstraint()->getSourceRange())
-              .fixItInsert(anyLoc, "any ");
-
-          return;
-        }
+      if (auto *inverse = dyn_cast<InverseTypeRepr>(*it);
+          inverse && isAnyOrSomeMissing()) {
+        auto diag = Ctx.Diags.diagnose(inverse->getTildeLoc(),
+                                       diag::inverse_requires_any);
+        emitInsertAnyFixit(diag, T);
+        return;
       }
     }
 
