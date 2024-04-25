@@ -3163,6 +3163,7 @@ public:
 
 class EndApplyInst;
 class AbortApplyInst;
+class EndBorrowInst;
 
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
@@ -3216,10 +3217,13 @@ public:
 
   void getCoroutineEndPoints(
       SmallVectorImpl<EndApplyInst *> &endApplyInsts,
-      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const;
+      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
+      SmallVectorImpl<EndBorrowInst *> *endBorrowInsts = nullptr) const;
 
-  void getCoroutineEndPoints(SmallVectorImpl<Operand *> &endApplyInsts,
-                             SmallVectorImpl<Operand *> &abortApplyInsts) const;
+  void getCoroutineEndPoints(
+      SmallVectorImpl<Operand *> &endApplyInsts,
+      SmallVectorImpl<Operand *> &abortApplyInsts,
+      SmallVectorImpl<Operand *> *endBorrowInsts = nullptr) const;
 };
 
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
@@ -4538,8 +4542,6 @@ public:
     sharedUInt8().StoreInst.ownershipQualifier = uint8_t(qualifier);
   }
 };
-
-class EndBorrowInst;
 
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.

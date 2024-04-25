@@ -447,7 +447,8 @@ static bool visitScopeEndsRequiringInit(
   if (auto bai =
           dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
     for (auto *inst : bai->getTokenResult()->getUsers()) {
-      assert(isa<EndApplyInst>(inst) || isa<AbortApplyInst>(inst));
+      assert(isa<EndApplyInst>(inst) || isa<AbortApplyInst>(inst) ||
+             isa<EndBorrowInst>(inst));
       visit(inst, ScopeRequiringFinalInit::Coroutine);
     }
     return true;
