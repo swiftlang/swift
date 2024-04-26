@@ -103,6 +103,9 @@ swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isWatchOS())
     return llvm::VersionTuple(2, 0);
 
+  if (triple.isXROS())
+    return llvm::VersionTuple(1, 0);
+
   return std::nullopt;
 }
 
