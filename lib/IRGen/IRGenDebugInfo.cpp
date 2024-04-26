@@ -3186,10 +3186,14 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
   uint16_t DVarCol = DInstLoc.Column;
-  if (VarInfo.Loc) {
-    auto DVarLoc = getStartLocation(VarInfo.Loc);
-    DVarLine = DVarLoc.Line;
-    DVarCol = DVarLoc.Column;
+  auto VarInfoLoc = VarInfo.Loc ? VarInfo.Loc : DbgInstLoc;
+  if (VarInfoLoc) {
+    auto VarLoc = VarInfoLoc->strippedForDebugVariable();
+    if (VarLoc != DbgInstLoc) {
+      auto DVarLoc = getStartLocation(VarLoc);
+      DVarLine = DVarLoc.Line;
+      DVarCol = DVarLoc.Column;
+    }
   }
   llvm::DIScope *VarScope = Scope;
   if (ArgNo == 0 && VarInfo.Scope) {

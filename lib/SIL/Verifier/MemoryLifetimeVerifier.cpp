@@ -756,8 +756,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         // an alloc_stack), which don't have any `op_deref` in its
         // di-expression, because that memory doesn't need to be initialized
         // when `debug_value` is referencing it.
-        if (cast<DebugValueInst>(&I)->hasAddrVal() &&
-            cast<DebugValueInst>(&I)->exprStartsWithDeref())
+        if (!DebugValueInst::hasAddrVal(&I))
           requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
