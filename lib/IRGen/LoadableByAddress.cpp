@@ -3612,6 +3612,23 @@ protected:
     singleValueInstructionFallback(kp);
   }
 
+  void visitBeginApplyInst(BeginApplyInst *apply) {
+    auto builder = assignment.getBuilder(++apply->getIterator());
+    auto addr = assignment.createAllocStack(origValue->getType());
+    assignment.mapValueToAddress(origValue, addr);
+    for (auto &opd : apply->getAllOperands()) {
+      if (assignment.contains(opd.get())) {
+        auto builder = assignment.getBuilder(apply->getIterator());
+        auto loaded = builder.createLoad(
+            apply->getLoc(), assignment.getAddressForValue(opd.get()),
+            LoadOwnershipQualifier::Unqualified);
+        opd.set(loaded);
+      }
+    }
+    builder.createStore(apply->getLoc(), origValue, addr,
+                        StoreOwnershipQualifier::Unqualified);
+  }
+
   void visitApplyInst(ApplyInst *apply) {
     // The loadable by address transformation ignores large tuple return types.
     auto builder = assignment.getBuilder(++apply->getIterator());
@@ -3864,6 +3881,8 @@ protected:
   void visitKeyPathInst(KeyPathInst *kp) {
     userInstructionFallback(kp);
   }
+
+  void visitYieldInst(YieldInst *yield) { userInstructionFallback(yield); }
 
   void visitFixLifetimeInst(FixLifetimeInst *f) {
     auto addr = assignment.getAddressForValue(f->getOperand());
