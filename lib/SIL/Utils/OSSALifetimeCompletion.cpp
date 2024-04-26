@@ -149,7 +149,7 @@ public:
                             llvm::function_ref<void(SILInstruction *)> visit);
 
   struct State {
-    enum class Value : uint8_t {
+    enum Value : uint8_t {
       Unavailable = 0,
       Available,
       Unknown,
@@ -161,10 +161,6 @@ public:
     State meet(State const other) const {
       return *this < other ? *this : other;
     }
-
-    static State Unavailable() { return {Value::Unavailable}; }
-    static State Available() { return {Value::Available}; }
-    static State Unknown() { return {Value::Unknown}; }
   };
 
   struct Result {
@@ -244,9 +240,9 @@ void VisitUnreachableLifetimeEnds::propagateAvailablity(Result &result) {
   // - start blocks are ::Available
   for (auto *block : region) {
     if (starts.contains(block))
-      result.setState(block, State::Available());
+      result.setState(block, State::Available);
     else
-      result.setState(block, State::Unknown());
+      result.setState(block, State::Unknown);
   }
 
   BasicBlockWorklist worklist(value->getFunction());
@@ -280,14 +276,14 @@ void VisitUnreachableLifetimeEnds::propagateAvailablity(Result &result) {
 void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
     Result const &result, llvm::function_ref<void(SILInstruction *)> visit) {
   for (auto *block : region) {
-    auto available = result.getState(block) == State::Available();
+    auto available = result.getState(block) == State::Available;
     if (!available) {
       continue;
     }
     auto hasUnreachableSuccessor = [&]() {
       // Use a lambda to avoid checking if possible.
       return llvm::any_of(block->getSuccessorBlocks(), [&result](auto *block) {
-        return result.getState(block) == State::Unavailable();
+        return result.getState(block) == State::Unavailable;
       });
     };
     if (!block->succ_empty() && !hasUnreachableSuccessor()) {
