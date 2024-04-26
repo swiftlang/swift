@@ -3128,6 +3128,9 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
       return false;
     }
   }
+  if (Operands.size() && Operands.back() != llvm::dwarf::DW_OP_deref) {
+    Operands.push_back(llvm::dwarf::DW_OP_stack_value);
+  }
   return true;
 }
 
