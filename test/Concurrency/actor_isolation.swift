@@ -156,10 +156,11 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ anno: NoGlobalActorValueType) async {
   // these still do need an await in Swift 5
   _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
-  _ = formance.counter
   _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
-  _ = anno.counter // expected-warning {{non-sendable type 'NoGlobalActorValueType' passed in call to main actor-isolated property 'counter' cannot cross actor boundary}}
+
+  _ = formance.counter
+  _ = anno.counter
 
   // these will always need an await
   _ = await (formance as MainCounter).counter // expected-warning {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
@@ -171,7 +172,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 }
 
 // expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in the Swift 6 language mode}}
-// expected-note@+1 2 {{consider making struct 'NoGlobalActorValueType' conform to the 'Sendable' protocol}}
+// expected-note@+1 {{consider making struct 'NoGlobalActorValueType' conform to the 'Sendable' protocol}}
 struct NoGlobalActorValueType {
   @SomeGlobalActor var point: Point
   // expected-note@-1 {{initializer for property 'point' is global actor 'SomeGlobalActor'-isolated}}
@@ -1635,4 +1636,20 @@ class MainActorIsolated {
 nonisolated func accessAcrossActors() {
   // expected-warning@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
   let _ = MainActorIsolated.shared
+}
+
+@available(SwiftStdlib 5.1, *)
+actor Iterator: AsyncIteratorProtocol {
+  init() {}
+  func next() throws -> Int? { nil }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor SafeMutatingCall {
+  private let iterator: Iterator
+
+  public init() async throws {
+    self.iterator = Iterator()
+    _ = try await self.iterator.next()
+  }
 }

@@ -6465,12 +6465,19 @@ static ActorIsolation getActorIsolationForReference(ValueDecl *decl,
     // Fall through to treat initializers like any other declaration.
   }
 
-  // A 'nonisolated let' within an actor is treated as isolated from the
-  // perspective of the referencer.
+  // A 'nonisolated let' within an actor is treated as isolated if
+  // the access is outside the module or if the property type is not
+  // 'Sendable'.
   //
   // FIXME: getActorIsolation(decl) should treat these as isolated.
   // FIXME: Expand this out to local variables?
   if (auto var = dyn_cast<VarDecl>(decl)) {
+    auto *fromModule = fromDC->getParentModule();
+    ActorReferenceResult::Options options = std::nullopt;
+    if (varIsSafeAcrossActors(fromModule, var, declIsolation, options) &&
+        var->getTypeInContext()->isSendableType())
+      return ActorIsolation::forNonisolated(/*unsafe*/false);
+
     if (var->isLet() && isStoredProperty(var) &&
         declIsolation.isNonisolated()) {
       if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
