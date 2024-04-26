@@ -70,8 +70,8 @@ static SILInstruction *endOSSALifetime(SILValue value, SILBuilder &builder) {
   return builder.createEndBorrow(loc, value);
 }
 
-static bool endLifetimeAtBoundary(SILValue value,
-                                  const SSAPrunedLiveness &liveness) {
+static bool endLifetimeAtLivenessBoundary(SILValue value,
+                                          const SSAPrunedLiveness &liveness) {
   PrunedLivenessBoundary boundary;
   liveness.computeBoundary(boundary);
 
@@ -322,8 +322,9 @@ void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
   visitor.visitAvailabilityBoundary(result, visit);
 }
 
-static bool endLifetimeAtUnreachableBlocks(SILValue value,
-                                           const SSAPrunedLiveness &liveness) {
+static bool
+endLifetimeAtAvailabilityBoundary(SILValue value,
+                                  const SSAPrunedLiveness &liveness) {
   bool changed = false;
   OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
       value, liveness, [&](auto *unreachable) {
@@ -337,12 +338,8 @@ static bool endLifetimeAtUnreachableBlocks(SILValue value,
 /// End the lifetime of \p value at unreachable instructions.
 ///
 /// Returns true if any new instructions were created to complete the lifetime.
-///
-/// This is only meant to cleanup lifetimes that lead to dead-end blocks. After
-/// recursively completing all nested scopes, it then simply ends the lifetime
-/// at the Unreachable instruction.
 bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
-    SILValue value, bool forceBoundaryCompletion) {
+    SILValue value, std::optional<Boundary> maybeBoundary) {
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
   auto handleInnerScope = [this](SILValue innerBorrowedValue) {
@@ -351,11 +348,17 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
 
+  Boundary boundary = maybeBoundary.value_or(
+      value->isLexical() ? Boundary::Availability : Boundary::Liveness);
+
   bool changed = false;
-  if (value->isLexical() && !forceBoundaryCompletion) {
-    changed |= endLifetimeAtUnreachableBlocks(value, liveness.getLiveness());
-  } else {
-    changed |= endLifetimeAtBoundary(value, liveness.getLiveness());
+  switch (boundary) {
+  case Boundary::Availability:
+    changed |= endLifetimeAtAvailabilityBoundary(value, liveness.getLiveness());
+    break;
+  case Boundary::Liveness:
+    changed |= endLifetimeAtLivenessBoundary(value, liveness.getLiveness());
+    break;
   }
   // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently
   // produce guaranteed phis). See FindEnclosingDefs &
@@ -374,9 +377,15 @@ static FunctionTest OSSALifetimeCompletionTest(
     "ossa-lifetime-completion",
     [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
+      std::optional<OSSALifetimeCompletion::Boundary> kind = std::nullopt;
+      if (arguments.hasUntaken()) {
+        kind = arguments.takeBool()
+                   ? OSSALifetimeCompletion::Boundary::Liveness
+                   : OSSALifetimeCompletion::Boundary::Availability;
+      }
       llvm::outs() << "OSSA lifetime completion: " << value;
       OSSALifetimeCompletion completion(&function, /*domInfo*/ nullptr);
-      completion.completeOSSALifetime(value);
+      completion.completeOSSALifetime(value, kind);
       function.print(llvm::outs());
     });
 } // end namespace swift::test

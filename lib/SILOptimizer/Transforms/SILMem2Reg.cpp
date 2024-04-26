@@ -1754,7 +1754,8 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   for (auto it : valuesToComplete) {
     // Set forceBoundaryCompletion as true so that we complete at boundary for
     // lexical values as well.
-    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
+    completion.completeOSSALifetime(it,
+                                    OSSALifetimeCompletion::Boundary::Liveness);
   }
 }
 
