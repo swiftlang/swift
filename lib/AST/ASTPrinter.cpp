@@ -5957,7 +5957,7 @@ public:
 
   void visitErrorType(ErrorType *T) {
     if (auto originalType = T->getOriginalType()) {
-      if (Options.PrintInSILBody)
+      if (Options.PrintTypesForDebugging || Options.PrintInSILBody)
         Printer << "@error_type ";
       visit(originalType);
     }
