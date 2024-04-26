@@ -696,7 +696,7 @@ protected:
     if (!asSelf()->hasConditionalInvertedProtocols())
       return 0;
 
-    return countBitsUsed(getConditionalInvertedProtocols().rawBits());
+    return __builtin_popcount(getConditionalInvertedProtocols().rawBits());
   }
 
   size_t numTrailingObjects(
