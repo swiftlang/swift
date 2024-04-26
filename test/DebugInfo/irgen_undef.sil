@@ -1,0 +1,15 @@
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -O -g -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: define {{.*}} @just_undef
+sil @just_undef : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+// CHECK: call void @llvm.dbg.value(metadata i64 undef, metadata ![[JUST_UNDEF_VAR:[0-9]+]], metadata !DIExpression())
+debug_value undef : $Builtin.Int64, var, name "optimizedout"
+return %0 : $Builtin.Int64
+}
+
+// CHECK: ![[JUST_UNDEF_VAR]] = !DILocalVariable(name: "optimizedout"

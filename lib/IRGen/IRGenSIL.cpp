@@ -5479,11 +5479,10 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   auto VarInfo = i->getVarInfo();
   assert(VarInfo && "debug_value without debug info");
-  if (isa<SILUndef>(SILVal)) {
+  if (isa<SILUndef>(SILVal) && VarInfo->Name == "$error") {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!IsAddrVal &&
-        !i->getDebugScope()->InlinedCallSite && VarInfo->Name == "$error") {
+    if (!IsAddrVal && !i->getDebugScope()->InlinedCallSite) {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }

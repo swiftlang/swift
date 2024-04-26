@@ -77,8 +77,10 @@ static bool seemsUseful(SILInstruction *I) {
   }
 
   // Is useful if it's associating with a function argument
+  // If undef, it is useful and it doesn't cost anything.
   if (isa<DebugValueInst>(I))
-    return isa<SILFunctionArgument>(I->getOperand(0));
+    return isa<SILFunctionArgument>(I->getOperand(0))
+      || isa<SILUndef>(I->getOperand(0));
 
   return false;
 }
