@@ -219,7 +219,7 @@ debug_value undef : $Int, let, name "x", expr op_consts:1:op_fragment:#Int._valu
 ```
 
 > [!Caution]
-> This currently doesn't work, such debug values are dropped.
+> This currently doesn't work, an implicit op_deref is added.
 
 ### Undef variables
 
@@ -229,9 +229,6 @@ optimized away, an undef debug value should still be kept:
 ```
 debug_value undef : $Int, let, name "x"
 ```
-
-> [!Caution]
-> This currently doesn't work, such debug values are dropped.
 
 Additionally, if a previous `debug_value` exists for the variable, a debug value
 of undef invalidates the previous value, in case the value of the variable isn't
