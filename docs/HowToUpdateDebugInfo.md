@@ -206,7 +206,7 @@ debug_value %0 : $Builtin.Int64, var, name "next", type $Int, expr op_consts:1:o
 ```
 
 > [!Caution]
-> This currently doesn't work, an implicit op_deref is added.
+> This currently doesn't work if a fragment is present.
 
 #### Constants
 
@@ -219,7 +219,7 @@ debug_value undef : $Int, let, name "x", expr op_consts:1:op_fragment:#Int._valu
 ```
 
 > [!Caution]
-> This currently doesn't work, an implicit op_deref is added.
+> This currently doesn't work, these variables are dropped by IRGen.
 
 ### Undef variables
 
