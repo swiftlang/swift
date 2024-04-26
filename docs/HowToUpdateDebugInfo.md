@@ -218,9 +218,6 @@ value.
 debug_value undef : $Int, let, name "x", expr op_consts:1:op_fragment:#Int._value
 ```
 
-> [!Caution]
-> This currently doesn't work, these variables are dropped by IRGen.
-
 ### Undef variables
 
 If the value of the variable cannot be recovered as the value is entirely
