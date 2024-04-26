@@ -193,36 +193,47 @@ public:
 
 void VisitUnreachableLifetimeEnds::computeRegion(
     const SSAPrunedLiveness &liveness) {
-  // Find the non-lifetime-ending boundary of `value`.
+  // (1) Compute the complete liveness boundary.
   PrunedLivenessBoundary boundary;
   liveness.computeBoundary(boundary);
+
+  // Used in the forward walk below (3).
+  BasicBlockWorklist regionWorklist(value->getFunction());
+
+  // (2) Collect the non-lifetime-ending liveness boundary.  This is the
+  //     portion of `boundary` consisting of:
+  // - non-lifetime-ending instructions (their parent blocks)
+  // - boundary edges
+  // - dead defs (their parent blocks)
+  auto collect = [&](SILBasicBlock *block) {
+    // `region` consists of the non-lifetime-ending boundary and all its
+    // iterative successors.
+    region.insert(block);
+    // `starts` just consists of the blocks in the non-lifetime-ending
+    // boundary.
+    starts.insert(block);
+    // The forward walk begins from the non-lifetime-ending boundary.
+    regionWorklist.push(block);
+  };
 
   for (SILInstruction *lastUser : boundary.lastUsers) {
     if (liveness.isInterestingUser(lastUser)
         != PrunedLiveness::LifetimeEndingUse) {
-      region.insert(lastUser->getParent());
-      starts.insert(lastUser->getParent());
+      collect(lastUser->getParent());
     }
   }
   for (SILBasicBlock *edge : boundary.boundaryEdges) {
-    region.insert(edge);
-    starts.insert(edge);
+    collect(edge);
   }
   for (SILNode *deadDef : boundary.deadDefs) {
-    region.insert(deadDef->getParentBlock());
-    starts.insert(deadDef->getParentBlock());
+    collect(deadDef->getParentBlock());
   }
 
-  // Forward walk to find the region in which `value` might be available.
-  BasicBlockWorklist regionWorklist(value->getFunction());
-  // Start the forward walk from the non-lifetime-ending boundary.
-  for (auto *start : region) {
-    regionWorklist.push(start);
-  }
+  // (3) Forward walk to find the region in which `value` might be available.
   while (auto *block = regionWorklist.pop()) {
     if (block->succ_empty()) {
-      // This assert will fail unless there are already lifetime-ending
-      // instruction on all paths to normal function exits.
+      // This assert will fail unless there is already a lifetime-ending
+      // instruction on each path to normal function exits.
       assert(isa<UnreachableInst>(block->getTerminator()));
     }
     for (auto *successor : block->getSuccessorBlocks()) {
