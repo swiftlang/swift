@@ -12,4 +12,10 @@ void cfunc2(void (*fp)(NonTrivial)) {
   (*fp)(NonTrivial());
 }
 
+struct ARCStrong {
+  id a;
+};
+
+void cfuncARCStrong(void (*_Nonnull)(ARCStrong));
+
 #endif // __CLOSURE__
