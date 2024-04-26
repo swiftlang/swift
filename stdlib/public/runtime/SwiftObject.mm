@@ -22,6 +22,9 @@
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
+#if __has_include(<objc/objc-internal.h>)
+#include <objc/objc-internal.h>
+#endif
 #endif
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
@@ -1474,11 +1477,11 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
 }
 
 #if SWIFT_OBJC_INTEROP
-// It would be nice to weak link instead of doing this, but we can't do that
-// until the new API is in the versions of libobjc that we're linking against.
 static bool isUniquelyReferenced(id object) {
 #if OBJC_ISUNIQUELYREFERENCED_DEFINED
-  return objc_isUniquelyReferenced(object);
+  if (!SWIFT_RUNTIME_WEAK_CHECK(objc_isUniquelyReferenced))
+    return false;
+  return SWIFT_RUNTIME_WEAK_USE(objc_isUniquelyReferenced(object));
 #else
   auto objcIsUniquelyRefd = SWIFT_LAZY_CONSTANT(reinterpret_cast<bool (*)(id)>(
       dlsym(RTLD_NEXT, "objc_isUniquelyReferenced")));
