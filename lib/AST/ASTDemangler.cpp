@@ -1105,16 +1105,15 @@ ASTBuilder::createTypeDecl(NodePointer node,
   return dyn_cast<GenericTypeDecl>(DC);
 }
 
-ModuleDecl *
-ASTBuilder::findModule(NodePointer node) {
+ModuleDecl *ASTBuilder::findModule(NodePointer node) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
   const auto moduleName = node->getText();
-  // Respect the main module's ABI name when we're trying to resolve
+  // Respect the module's ABI name when we're trying to resolve
   // mangled names. But don't touch anything under the Swift stdlib's
-  // umbrella. 
-  if (Ctx.MainModule && Ctx.MainModule->getABIName().is(moduleName))
-    if (!Ctx.MainModule->getABIName().is(STDLIB_NAME))
-      return Ctx.MainModule;
+  // umbrella.
+  if (moduleName != STDLIB_NAME)
+    if (auto *Module = Ctx.getLoadedModuleByABIName(moduleName))
+      return Module;
 
   return Ctx.getModuleByName(moduleName);
 }
