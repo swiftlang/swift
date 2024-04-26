@@ -83,14 +83,12 @@ irgen::bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
   // The generic environment is marshaled into the end of the component
   // argument area inside the instance. Bind the generic information out of
   // the buffer.
-  if (hasSubscriptIndices) {
-    auto genericArgsSize = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-      requirements.size() * IGF.IGM.getPointerSize().getValue());
+  auto genericArgsSize = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+    requirements.size() * IGF.IGM.getPointerSize().getValue());
 
-    auto genericArgsOffset = IGF.Builder.CreateSub(size, genericArgsSize);
-    args =
-        IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, args, genericArgsOffset);
-  }
+  auto genericArgsOffset = IGF.Builder.CreateSub(size, genericArgsSize);
+  args =
+      IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, args, genericArgsOffset);
 
   bindFromGenericRequirementsBuffer(
       IGF, requirements,
