@@ -1816,6 +1816,7 @@ function Build-PackageManager($Arch) {
       SwiftCollections_DIR = (Get-HostProjectCMakeModules Collections);
       SwiftASN1_DIR = (Get-HostProjectCMakeModules ASN1);
       SwiftCertificates_DIR = (Get-HostProjectCMakeModules Certificates);
+      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
       SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
       SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
     }
