@@ -693,29 +693,41 @@ BeginApplyInst *BeginApplyInst::create(
 
 void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<EndApplyInst *> &endApplyInsts,
-    SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const {
+    SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
+    SmallVectorImpl<EndBorrowInst *> *endBorrowInsts) const {
   for (auto *tokenUse : getTokenResult()->getUses()) {
     auto *user = tokenUse->getUser();
     if (auto *end = dyn_cast<EndApplyInst>(user)) {
       endApplyInsts.push_back(end);
       continue;
     }
-
-    abortApplyInsts.push_back(cast<AbortApplyInst>(user));
+    if (auto *abort = dyn_cast<AbortApplyInst>(user)) {
+      abortApplyInsts.push_back(abort);
+      continue;
+    }
+    auto *end = cast<EndBorrowInst>(user);
+    if (endBorrowInsts) {
+      endBorrowInsts->push_back(end);
+    }
   }
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<Operand *> &endApplyInsts,
-    SmallVectorImpl<Operand *> &abortApplyInsts) const {
+    SmallVectorImpl<Operand *> &abortApplyInsts,
+    SmallVectorImpl<Operand *> *endBorrowInsts) const {
   for (auto *tokenUse : getTokenResult()->getUses()) {
     auto *user = tokenUse->getUser();
     if (isa<EndApplyInst>(user)) {
       endApplyInsts.push_back(tokenUse);
       continue;
     }
+    if (isa<AbortApplyInst>(user)) {
+      abortApplyInsts.push_back(tokenUse);
+      continue;
+    }
 
-    assert(isa<AbortApplyInst>(user));
+    assert(isa<EndBorrowInst>(user));
     abortApplyInsts.push_back(tokenUse);
   }
 }

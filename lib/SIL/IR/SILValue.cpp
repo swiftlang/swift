@@ -191,6 +191,13 @@ bool ValueBase::isGuaranteedForwarding() const {
   return phi->isGuaranteedForwarding();
 }
 
+bool ValueBase::isBeginApplyToken() const {
+  auto *result = isaResultOf<BeginApplyInst>(this);
+  if (!result)
+    return false;
+  return result->isBeginApplyToken();
+}
+
 bool ValueBase::hasDebugTrace() const {
   for (auto *op : getUses()) {
     if (auto *debugValue = dyn_cast<DebugValueInst>(op->getUser())) {
