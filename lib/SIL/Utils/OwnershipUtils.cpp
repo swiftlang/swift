@@ -913,6 +913,9 @@ void BorrowedValueKind::print(llvm::raw_ostream &os) const {
   case BorrowedValueKind::Phi:
     os << "Phi";
     return;
+  case BorrowedValueKind::BeginApplyToken:
+    os << "BeginApply";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -945,6 +948,7 @@ bool BorrowedValue::visitLocalScopeEndingUses(
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::BeginBorrow:
   case BorrowedValueKind::Phi:
+  case BorrowedValueKind::BeginApplyToken:
     for (auto *use : lookThroughBorrowedFromUser(value)->getUses()) {
       if (use->isLifetimeEnding()) {
         if (!visitor(use))
@@ -1819,6 +1823,7 @@ public:
 
       case BorrowedValueKind::LoadBorrow:
       case BorrowedValueKind::SILFunctionArgument:
+      case BorrowedValueKind::BeginApplyToken:
         // There is no enclosing def on this path.
         return true;
       }
@@ -2037,6 +2042,7 @@ protected:
     }
     case BorrowedValueKind::LoadBorrow:
     case BorrowedValueKind::SILFunctionArgument:
+    case BorrowedValueKind::BeginApplyToken:
       // There is no enclosing def on this path.
       break;
     }

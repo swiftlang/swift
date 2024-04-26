@@ -41,10 +41,11 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
     if (isa<EndApplyInst>(user)) {
       if (hasEndApply) return false;
       hasEndApply = true;
-    } else {
-      assert(isa<AbortApplyInst>(user));
+    } else if (isa<AbortApplyInst>(user)) {
       if (hasAbortApply) return false;
       hasAbortApply = true;
+    } else {
+      assert(isa<EndBorrowInst>(user));
     }
   }
 
@@ -95,6 +96,8 @@ class BeginApplySite {
   SILBasicBlock *AbortApplyBB = nullptr;
   SILBasicBlock *AbortApplyReturnBB = nullptr;
 
+  SmallVector<EndBorrowInst *, 2> EndBorrows;
+
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
                  SILBuilder *Builder)
@@ -112,7 +115,8 @@ public:
                   SmallVectorImpl<SILInstruction *> &endBorrowInsertPts) {
     SmallVector<EndApplyInst *, 1> endApplyInsts;
     SmallVector<AbortApplyInst *, 1> abortApplyInsts;
-    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts);
+    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts,
+                                      &EndBorrows);
     while (!endApplyInsts.empty()) {
       auto *endApply = endApplyInsts.pop_back_val();
       collectEndApply(endApply);
@@ -257,6 +261,8 @@ public:
       EndApply->eraseFromParent();
     if (AbortApply)
       AbortApply->eraseFromParent();
+    for (auto *EndBorrow : EndBorrows)
+      EndBorrow->eraseFromParent();
 
     assert(!BeginApply->hasUsesOfAnyResult());
   }
