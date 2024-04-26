@@ -704,6 +704,28 @@ struct FunctionTypeInfo {
   CanSILFunctionType ExpectedLoweredType;
 };
 
+/// Return type of getGenericSignatureWithCapturedEnvironments().
+struct GenericSignatureWithCapturedEnvironments {
+  GenericSignature baseGenericSig;
+  GenericSignature genericSig;
+  ArrayRef<GenericEnvironment *> capturedEnvs;
+
+  explicit GenericSignatureWithCapturedEnvironments() {}
+
+  explicit GenericSignatureWithCapturedEnvironments(
+      GenericSignature baseGenericSig)
+    : baseGenericSig(baseGenericSig),
+      genericSig(baseGenericSig) {}
+
+  GenericSignatureWithCapturedEnvironments(
+      GenericSignature baseGenericSig,
+      GenericSignature genericSig,
+      ArrayRef<GenericEnvironment *> capturedEnvs)
+    : baseGenericSig(baseGenericSig),
+      genericSig(genericSig),
+      capturedEnvs(capturedEnvs) {}
+};
+
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
   friend class TypeLowering;
@@ -1047,8 +1069,9 @@ public:
   const SILConstantInfo &getConstantInfo(TypeExpansionContext context,
                                          SILDeclRef constant);
 
-  /// Get the generic environment for a constant.
-  GenericSignature getConstantGenericSignature(SILDeclRef constant);
+  /// Get the generic signature for a constant.
+  GenericSignatureWithCapturedEnvironments
+  getGenericSignatureWithCapturedEnvironments(SILDeclRef constant);
 
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
