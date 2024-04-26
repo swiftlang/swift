@@ -1633,6 +1633,11 @@ bool AlignedGroupEntry::isSingleRetainablePointer() const { return false; }
 std::optional<Size> AlignedGroupEntry::fixedSize(IRGenModule &IGM) const {
   if (_fixedSize.has_value())
     return *_fixedSize;
+
+  if (fixedTypeInfo) {
+    return *(_fixedSize = (*fixedTypeInfo)->getFixedSize());
+  }
+
   Size currentSize(0);
   for (auto *entry : entries) {
     if (!entry->fixedSize(IGM) || !entry->fixedAlignment(IGM)) {
@@ -1740,6 +1745,11 @@ bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                                        GenericSignature genericSig) const {
   if (!isFixedSize(IGM) || ty.isMoveOnly()) {
     return false;
+  }
+
+  if (isTriviallyDestroyable()) {
+    B.addSkip(fixedSize(IGM)->getValue());
+    return true;
   }
 
   uint64_t offset = 0;
