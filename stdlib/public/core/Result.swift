@@ -64,8 +64,9 @@ extension Result {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO3mapyAByqd__q_Gqd__xXElF")
   @usableFromInline
-  internal func map<NewSuccess>(
+  internal func __abi_map<NewSuccess>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -205,8 +206,9 @@ extension Result {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO7flatMapyAByqd__q_GADxXElF")
   @usableFromInline
-  internal func flatMap<NewSuccess>(
+  internal func __abi_flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -272,7 +274,7 @@ extension Result {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$ss6ResultO12flatMapErroryAByxqd__GADq_XEs0D0Rd__lF")
   @usableFromInline
-  internal func flatMapError<NewFailure>(
+  internal func __abi_flatMapError<NewFailure>(
     _ transform: (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
     switch self {
