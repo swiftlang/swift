@@ -932,7 +932,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
       Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
 
   std::string InstanceSetupError;
-  if (Inst.setup(Instance.Invocation, InstanceSetupError, Instance.Args))
+  if (Inst.setupForReplay(Instance.Invocation, InstanceSetupError,
+                          Instance.Args))
     return createStringError(inconvertibleErrorCode(), InstanceSetupError);
 
   auto *CDP = Inst.getCachingDiagnosticsProcessor();
