@@ -5982,7 +5982,7 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
       auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
-      attr->setCategoryNameInvalid();
+      attr->setInvalid();
 
       // @objc @implementations for categories are diagnosed as category
       // conflicts, so we're only concerned with main class bodies and
@@ -5999,10 +5999,18 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
   return ObjCInterfaceAndImplementation(interfaces, impls.front());
 }
 
-static bool isCategoryNameValid(ExtensionDecl *ext) {
-  auto attr = ext->getAttrs()
-                .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-  return attr && !attr->isCategoryNameInvalid();
+static bool isImplValid(ExtensionDecl *ext) {
+  auto attr = ext->getAttrs().getAttribute<ObjCImplementationAttr>();
+
+  if (!attr)
+    return false;
+
+  // Clients using the stable syntax shouldn't have a category name on the attr.
+  // This is diagnosed in AttributeChecker::visitObjCImplementationAttr().
+  if (!attr->isEarlyAdopter() && !attr->CategoryName.empty())
+    return false;
+  
+  return !attr->isCategoryNameInvalid();
 }
 
 static ObjCInterfaceAndImplementation
@@ -6020,7 +6028,7 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
 
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     assert(ext);
-    if (!ext->hasClangNode() && !isCategoryNameValid(ext))
+    if (!ext->hasClangNode() && !isImplValid(ext))
       return {};
 
     categoryName = ext->getObjCCategoryName();
@@ -6038,7 +6046,7 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   for (ExtensionDecl *ext : classDecl->getExtensions()) {
     if (ext->isObjCImplementation()
           && ext->getObjCCategoryName() == categoryName
-          && isCategoryNameValid(ext))
+          && isImplValid(ext))
       implDecls.push_back(ext);
   }
 

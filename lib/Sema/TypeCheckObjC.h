@@ -71,7 +71,7 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
-    /// Is it a member of an \@\_objcImplementation extension.
+    /// Is it a member of an \@objc \@implementation extension.
     MemberOfObjCImplementationExtension,
     /// Has an explicit '@objc' attribute added by an access note, rather than
     /// written in source code.

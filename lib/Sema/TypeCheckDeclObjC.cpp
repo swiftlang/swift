@@ -1249,6 +1249,11 @@ static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
   return ext->getSelfClassDecl() && ext->getAttrs().hasAttribute<ObjCAttr>();
 }
 
+static bool isMemberOfObjCImplementationExtension(const ValueDecl *VD) {
+  return isMemberOfObjCClassExtension(VD) &&
+      cast<ExtensionDecl>(VD->getDeclContext())->isObjCImplementation();
+}
+
 /// Whether this declaration is a member of a class with the `@objcMembers`
 /// attribute.
 static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
@@ -1471,14 +1476,6 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
-  // A member implementation of an @objcImplementation extension is @objc.
-  if (VD->isObjCMemberImplementation()) {
-    auto ext = VD->getDeclContext()->getAsDecl();
-    auto attr = ext->getAttrs()
-                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-    return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
-  }
-
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -1487,10 +1484,23 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
         .hasAttribute<NonObjCAttr>()))
     return std::nullopt;
 
-  if (isMemberOfObjCClassExtension(VD) && 
+  if (isMemberOfObjCImplementationExtension(VD)) {
+    // A `final` member of an @objc @implementation extension is not @objc.
+    if (VD->isFinal())
+      return std::nullopt;
+    // Other members get a special reason.
+    if (canInferImplicitObjC(/*allowAnyAccess*/true)) {
+      auto ext = VD->getDeclContext()->getAsDecl();
+      auto attr = ext->getAttrs()
+                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+      return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
+    }
+  }
+  else if (isMemberOfObjCClassExtension(VD) &&
       canInferImplicitObjC(/*allowAnyAccess*/true))
     return ObjCReason(ObjCReason::MemberOfObjCExtension);
-  if (isMemberOfObjCMembersClass(VD) && 
+
+  if (isMemberOfObjCMembersClass(VD) &&
       canInferImplicitObjC(/*allowAnyAccess*/false))
     return ObjCReason(ObjCReason::MemberOfObjCMembersClass);
 
@@ -3849,9 +3859,13 @@ public:
     if (!isa<ExtensionDecl>(decl))
       return;
 
-    diagnose(getAttr()->getLocation(),
-             diag::objc_implementation_early_spelling_deprecated)
-        .fixItReplace(getAttr()->getLocation(), "implementation");
+    auto diag = diagnose(getAttr()->getLocation(),
+                         diag::objc_implementation_early_spelling_deprecated);
+    diag.fixItReplace(getAttr()->getRangeWithAt(), "@implementation");
+
+    ObjCSelector correctSelector(decl->getASTContext(), 0,
+                                 {getAttr()->CategoryName});
+    fixDeclarationObjCName(diag, decl, ObjCSelector(), correctSelector);
   }
 };
 }

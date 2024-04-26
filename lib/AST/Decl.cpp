@@ -3717,12 +3717,6 @@ Identifier ExtensionDecl::getObjCCategoryName() const {
     return Identifier();
   }
 
-  // Fall back to @_objcImplementation attribute.
-  if (auto implAttr =
-       getAttrs().getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true)) {
-    return implAttr->CategoryName;
-  }
-
   // Not a category, evidently.
   return Identifier();
 }

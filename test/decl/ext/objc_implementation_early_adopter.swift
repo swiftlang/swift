@@ -428,17 +428,17 @@ protocol EmptySwiftProto {}
   func nullableResult() -> Any { fatalError() } // expected-warning {{instance method 'nullableResult()' of type '() -> Any' does not match type '() -> Any?' declared by the header}}
   func nullableArgument(_: Any) {} // expected-warning {{instance method 'nullableArgument' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
 
-  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @_objcImplementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @_objcImplementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
 }
 
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
 @_objcImplementation(EmptyCategory) extension ObjCClass {
-  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{2-21=implementation}}
+  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-36=@implementation}} {{1-1=@objc(EmptyCategory) }}
 }
 
 @_objcImplementation extension ObjCImplSubclass {
-  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{2-21=implementation}}
+  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-21=@implementation}} {{1-1=@objc }}
   @objc(initFromProtocol1:)
     required public init?(fromProtocol1: CInt) {
       // OK
@@ -446,7 +446,7 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation extension ObjCBasicInitClass {
-  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{2-21=implementation}}
+  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-21=@implementation}} {{1-1=@objc }}
   init() {
     // OK
   }
@@ -463,10 +463,10 @@ protocol EmptySwiftProto {}
 // expected-note@-2 {{remove arguments to implement the main '@interface' for this class}} {{21-39=}}
 
 @_objcImplementation extension ObjCStruct {}
-// expected-error@-1 {{cannot mark extension of struct 'ObjCStruct' with '@_objcImplementation'; it is not an imported Objective-C class}} {{1-22=}}
+// expected-error@-1 {{'@objc' can only be applied to an extension of a class}}
 
 @_objcImplementation(CantWork) extension ObjCStruct {}
-// expected-error@-1 {{cannot mark extension of struct 'ObjCStruct' with '@_objcImplementation'; it is not an imported Objective-C class}} {{1-32=}}
+// expected-error@-1 {{'@objc' can only be applied to an extension of a class}}
 
 @objc class SwiftClass {}
 // expected-note@-1 2 {{'SwiftClass' declared here}}

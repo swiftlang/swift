@@ -3,7 +3,7 @@
 
 protocol EmptySwiftProto {}
 
-@implementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
+@objc @implementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
   // expected-note@-1 {{previously implemented here}}
   // expected-error@-2 {{extension for main class interface should provide implementation for instance method 'method(fromHeader4:)'}}
   // expected-error@-3 {{extension for main class interface should provide implementation for property 'propertyFromHeader9'}}
@@ -231,7 +231,7 @@ protocol EmptySwiftProto {}
   // expected-error@-1 {{property 'rdar122280735' of type '(() -> ()) -> Void' does not match type '(@escaping () -> Void) -> Void' declared by the header}}
 }
 
-@implementation(PresentAdditions) extension ObjCClass {
+@objc(PresentAdditions) @implementation extension ObjCClass {
   // expected-note@-1 {{'PresentAdditions' previously declared here}}
   // expected-error@-2 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader4:)'}}
   // FIXME: give better diagnostic expected-error@-3 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader3:)'}}
@@ -292,7 +292,7 @@ protocol EmptySwiftProto {}
   }
 }
 
-@implementation(SwiftNameTests) extension ObjCClass {
+@objc(SwiftNameTests) @implementation extension ObjCClass {
   // expected-error@-1 {{extension for category 'SwiftNameTests' should provide implementation for instance method 'methodSwiftName6B()'}}
 
   func methodSwiftName1() {
@@ -321,7 +321,7 @@ protocol EmptySwiftProto {}
   }
 }
 
-@implementation(AmbiguousMethods) extension ObjCClass {
+@objc(AmbiguousMethods) @implementation extension ObjCClass {
   // expected-error@-1 {{found multiple implementations that could match instance method 'ambiguousMethod4(with:)' with selector 'ambiguousMethod4WithCInt:'}}
 
   @objc func ambiguousMethod1(with: CInt) {
@@ -360,7 +360,7 @@ protocol EmptySwiftProto {}
   }
 }
 
-@implementation(Effects) extension ObjCClass {
+@objc(Effects) @implementation extension ObjCClass {
   @available(SwiftStdlib 5.1, *)
   public func doSomethingAsynchronous() async throws -> Any {
     return self
@@ -403,7 +403,7 @@ protocol EmptySwiftProto {}
   }
 }
 
-@implementation(Conformance) extension ObjCClass {
+@objc(Conformance) @implementation extension ObjCClass {
   // expected-error@-1 {{extension for category 'Conformance' should provide implementation for instance method 'requiredMethod2()'}}
   // no-error concerning 'optionalMethod2()'
 
@@ -412,7 +412,7 @@ protocol EmptySwiftProto {}
   func optionalMethod1() {}
 }
 
-@implementation(TypeMatchOptionality) extension ObjCClass {
+@objc(TypeMatchOptionality) @implementation extension ObjCClass {
   func nullableResultAndArg(_: Any?) -> Any? { fatalError() } // no-error
   func nonnullResultAndArg(_: Any) -> Any { fatalError() } // no-error
   func nullUnspecifiedResultAndArg(_: Any!) -> Any! { fatalError() } // no-error
@@ -428,59 +428,72 @@ protocol EmptySwiftProto {}
   func nullableResult() -> Any { fatalError() } // expected-error {{instance method 'nullableResult()' of type '() -> Any' does not match type '() -> Any?' declared by the header}}
   func nullableArgument(_: Any) {} // expected-error {{instance method 'nullableArgument' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
 
-  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @_objcImplementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @_objcImplementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
 }
 
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
 @_objcImplementation(EmptyCategory) extension ObjCClass {
-  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{2-21=implementation}}
+  // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-36=@implementation}} {{1-1=@objc(EmptyCategory) }}
 }
 
-@implementation extension ObjCImplSubclass {
+@objc @implementation extension ObjCImplSubclass {
   @objc(initFromProtocol1:)
     required public init?(fromProtocol1: CInt) {
       // OK
     }
 }
 
-@implementation extension ObjCBasicInitClass {
+@objc @implementation extension ObjCBasicInitClass {
   init() {
     // OK
   }
 }
 
-@implementation extension ObjCClass {}
+@objc @implementation extension ObjCClass {}
 // expected-error@-1 {{duplicate implementation of imported class 'ObjCClass'}}
 
-@implementation(PresentAdditions) extension ObjCClass {}
+@objc(PresentAdditions) @implementation extension ObjCClass {}
 // expected-warning@-1 {{extension with Objective-C category name 'PresentAdditions' conflicts with previous extension with the same category name; this is an error in the Swift 6 language mode}}
 
-@implementation(MissingAdditions) extension ObjCClass {}
+@objc(MissingAdditions) @implementation extension ObjCClass {}
 // expected-error@-1 {{could not find category 'MissingAdditions' on Objective-C class 'ObjCClass'; make sure your umbrella or bridging header imports the header that declares it}}
-// expected-note@-2 {{remove arguments to implement the main '@interface' for this class}} {{16-34=}}
+// expected-note@-2 {{remove arguments to implement the main '@interface' for this class}} {{6-24=}}
 
-@implementation extension ObjCStruct {}
-// expected-error@-1 {{cannot mark extension of struct 'ObjCStruct' with '@_objcImplementation'; it is not an imported Objective-C class}} {{1-17=}}
+@objc @implementation extension ObjCStruct {}
+// expected-error@-1 {{'@objc' can only be applied to an extension of a class}}
 
-@implementation(CantWork) extension ObjCStruct {}
-// expected-error@-1 {{cannot mark extension of struct 'ObjCStruct' with '@_objcImplementation'; it is not an imported Objective-C class}} {{1-27=}}
+@objc(CantWork) @implementation extension ObjCStruct {}
+// expected-error@-1 {{'@objc' can only be applied to an extension of a class}}
 
 @objc class SwiftClass {}
 // expected-note@-1 2 {{'SwiftClass' declared here}}
 
-@implementation extension SwiftClass {}
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-17=}}
+@objc @implementation extension SwiftClass {}
+// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{7-23=}}
 
-@implementation(WTF) extension SwiftClass {} // expected
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-22=}}
+@objc(WTF) @implementation extension SwiftClass {} // expected
+// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{12-28=}}
 
-@implementation extension ObjCImplRootClass {
+@objc @implementation extension ObjCImplRootClass {
   // expected-error@-1 {{'@_objcImplementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
 }
 
-@implementation extension ObjCImplGenericClass {
+@objc @implementation extension ObjCImplGenericClass {
   // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
+}
+
+@implementation extension ObjCBadClass {
+  // expected-error@-1 {{'@implementation' used without specifying the language being implemented}}
+  // expected-note@-2 {{add '@objc' to implement an Objective-C extension}} {{1-1=@objc }}
+}
+
+@objc @implementation(BadCategory1) extension ObjCBadClass {
+  // expected-error@-1 {{Objective-C category should be specified on '@objc', not '@implementation'}} {{22-36=}} {{6-6=(BadCategory1)}}
+}
+
+@objc(BadX) @implementation(BadCategory2) extension ObjCBadClass {
+  // expected-error@-1 {{Objective-C category should be specified on '@objc', not '@implementation'}} {{28-42=}} {{7-11=BadCategory2}}
 }
 
 //

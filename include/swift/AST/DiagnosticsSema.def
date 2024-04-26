@@ -763,6 +763,9 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
+NOTE(make_decl_objc_for_implementation,none,
+     "add '@objc' to implement an Objective-C %0",
+     (DescriptiveDeclKind))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -1760,10 +1763,6 @@ WARNING(objc_implementation_early_spelling_deprecated,none,
 ERROR(attr_objc_implementation_must_be_unconditional,none,
       "only unconditional extensions can implement an Objective-C '@interface'",
       ())
-ERROR(attr_objc_implementation_must_extend_class,none,
-      "cannot mark extension of %kind0 with '@_objcImplementation'; it is not "
-      "an imported Objective-C class",
-      (ValueDecl *))
 ERROR(attr_objc_implementation_must_be_imported,none,
       "'@_objcImplementation' cannot be used to extend %kind0 because it was "
       "defined by a Swift 'class' declaration, not an imported Objective-C "
@@ -1800,6 +1799,14 @@ ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
       (StringRef, llvm::VersionTuple))
+ERROR(attr_implementation_requires_language,none,
+      "'@implementation' used without specifying the language being "
+      "implemented",
+      ())
+ERROR(attr_implementation_category_goes_on_objc_attr,none,
+      "Objective-C category should be specified on '@objc', not "
+      "'@implementation'",
+      ())
 
 ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%kind0 does not match any %kindonly0 declared in the headers for %1; "
@@ -6295,7 +6302,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @_objcImplementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @objc @implementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
