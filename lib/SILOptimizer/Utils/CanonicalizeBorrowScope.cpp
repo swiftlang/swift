@@ -140,6 +140,7 @@ SILValue CanonicalizeBorrowScope::getCanonicalBorrowedDef(SILValue def) {
 
       case BorrowedValueKind::LoadBorrow:
       case BorrowedValueKind::Phi:
+      case BorrowedValueKind::BeginApplyToken:
         break;
       }
     }
@@ -170,6 +171,7 @@ bool CanonicalizeBorrowScope::computeBorrowLiveness() {
     // can handle persistentCopies.
     return false;
   case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::BeginApplyToken:
     break;
   }
   // Note that there is no need to look through any reborrows. The reborrowed
