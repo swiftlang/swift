@@ -232,7 +232,7 @@ extension Optional where Wrapped: ~Copyable {
   ) throws(E) -> U? {
     #if $NoncopyableGenerics
     switch self {
-    case .some(borrowing y):
+    case .some(_borrowing y):
       return .some(try transform(y))
     case .none:
       return .none
@@ -310,7 +310,7 @@ extension Optional where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
-    case .some(borrowing y):
+    case .some(_borrowing y):
       return try transform(y)
     case .none:
       return .none
