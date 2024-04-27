@@ -507,6 +507,9 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
   bool accessWithinModule =
       (fromModule == var->getDeclContext()->getParentModule());
 
+  if (varIsolation.getKind() == ActorIsolation::NonisolatedUnsafe)
+    return true;
+
   if (!var->isLet()) {
     ASTContext &ctx = var->getASTContext();
     if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
