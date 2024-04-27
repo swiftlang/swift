@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: asserts
-
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
 
@@ -813,5 +811,22 @@ func testActorWithInitAccessorInit() {
       self.a = value // Ok (nonisolated)
       print(a) // Ok (nonisolated)
     }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor TestNonisolatedUnsafe {
+  private nonisolated(unsafe) var child: OtherActor!
+  init() {
+    child = OtherActor(parent: self)
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor OtherActor {
+  unowned nonisolated let parent: any Actor
+
+  init(parent: any Actor) {
+    self.parent = parent
   }
 }
