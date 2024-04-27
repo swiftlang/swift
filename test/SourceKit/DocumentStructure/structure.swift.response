@@ -1687,7 +1687,7 @@
       key.filepath: main.swift,
       key.severity: source.diagnostic.severity.error,
       key.id: "c_style_for_stmt_removed",
-      key.description: "C-style for statement has been removed in Swift 3",
+      key.description: "C-style for statement was removed in Swift 3",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.ranges: [
         {
