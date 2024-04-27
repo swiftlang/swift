@@ -4199,6 +4199,12 @@ public:
   /// Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
 
+  /// Retrieve the extension most recently added to this type. Helpful to
+  /// determine if an extension has been added.
+  ExtensionDecl *getLastExtension() const {
+    return LastExtension;
+  }
+
   /// Special-behaviour flags passed to lookupDirect()
   enum class LookupDirectFlags {
     /// Whether to include @_implements members.
@@ -5063,6 +5069,11 @@ public:
   /// category by that name.
   llvm::TinyPtrVector<Decl *>
   getImportedObjCCategory(Identifier name) const;
+
+  /// Return a map of category names to extensions with that category name,
+  /// whether imported or otherwise. 
+  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ExtensionDecl *>>
+  getObjCCategoryNameMap();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -6450,6 +6450,12 @@ ERROR(objc_redecl_same,none,
       "previous declaration with the same Objective-C selector",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector))
 
+ERROR(objc_redecl_category_name,none,
+      "%select{|imported }0extension with Objective-C category name %2 "
+      "conflicts with previous %select{|imported }1extension with the same "
+      "category name",
+      (bool, bool, Identifier))
+
 ERROR(objc_override_other,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
       OBJC_DIAG_SELECT_2 " from superclass %5 with the same Objective-C "

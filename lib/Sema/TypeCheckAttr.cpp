@@ -1438,6 +1438,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                                     attr->getLParenLoc(), firstNameLoc,
                                     objcName->getSelectorPieces()[0],
                                     attr->getRParenLoc()));
+      } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+        assert(Ext->getSelfClassDecl());
+        // This is an extension with an explicit, and otherwise valid, category
+        // name. Schedule it to be checked for name conflicts later.
+        if (auto *SF = Ext->getParentSourceFile())
+          SF->ObjCCategories.push_back(Ext);
       }
     } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
       SourceLoc diagLoc = attr->getLParenLoc();

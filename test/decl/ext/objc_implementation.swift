@@ -4,7 +4,7 @@
 protocol EmptySwiftProto {}
 
 @_objcImplementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
-  // expected-note@-1 {{previously implemented by extension here}}
+  // expected-note@-1 {{previously implemented here}}
   // expected-warning@-2 {{extension for main class interface should provide implementation for instance method 'method(fromHeader4:)'}}
   // expected-warning@-3 {{extension for main class interface should provide implementation for property 'propertyFromHeader9'}}
   // FIXME: give better diagnostic expected-warning@-4 {{extension for main class interface should provide implementation for property 'propertyFromHeader8'}}
@@ -232,7 +232,7 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(PresentAdditions) extension ObjCClass {
-  // expected-note@-1 {{previously implemented by extension here}}
+  // expected-note@-1 {{'PresentAdditions' previously declared here}}
   // expected-warning@-2 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader4:)'; this will become an error after adopting '@implementation'}}
   // FIXME: give better diagnostic expected-warning@-3 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader3:)'; this will become an error after adopting '@implementation'}}
 
@@ -453,10 +453,10 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation extension ObjCClass {}
-// expected-error@-1 {{duplicate implementation of Objective-C class 'ObjCClass'}}
+// expected-error@-1 {{duplicate implementation of imported class 'ObjCClass'}}
 
 @_objcImplementation(PresentAdditions) extension ObjCClass {}
-// expected-error@-1 {{duplicate implementation of Objective-C category 'PresentAdditions' on class 'ObjCClass'}}
+// expected-warning@-1 {{extension with Objective-C category name 'PresentAdditions' conflicts with previous extension with the same category name; this is an error in the Swift 6 language mode}}
 
 @_objcImplementation(MissingAdditions) extension ObjCClass {}
 // expected-error@-1 {{could not find category 'MissingAdditions' on Objective-C class 'ObjCClass'; make sure your umbrella or bridging header imports the header that declares it}}
