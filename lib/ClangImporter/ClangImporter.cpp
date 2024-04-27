@@ -5971,9 +5971,15 @@ struct OrderDecls {
 
 Identifier ExtensionDecl::getObjCCategoryName() const {
   // Could it be an imported category?
-  if (!hasClangNode())
-    // Nope, not imported.
+  if (!hasClangNode()) {
+    // Nope, not imported. Is it an @implementation extension?
+    auto attr = getAttrs()
+                    .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+    if (attr && !attr->isCategoryNameInvalid())
+      return attr->CategoryName;
+
     return Identifier();
+  }
 
   auto category = dyn_cast<clang::ObjCCategoryDecl>(getClangDecl());
   if (!category)
@@ -6014,6 +6020,12 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
   return ObjCInterfaceAndImplementation(interfaces, impls.front());
 }
 
+static bool isCategoryNameValid(ExtensionDecl *ext) {
+  auto attr = ext->getAttrs()
+                .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+  return attr && !attr->isCategoryNameInvalid();
+}
+
 static ObjCInterfaceAndImplementation
 findContextInterfaceAndImplementation(DeclContext *dc) {
   if (!dc)
@@ -6028,16 +6040,11 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   Identifier categoryName;
 
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->hasClangNode()) {
-      // This is either an interface, or it's not objcImpl at all.
-      categoryName = ext->getObjCCategoryName();
-    } else {
-      // This is either the implementation, or it's not objcImpl at all.
-      if (auto name = ext->getCategoryNameForObjCImplementation())
-        categoryName = *name;
-      else
-        return {};
-    }
+    assert(ext);
+    if (!ext->hasClangNode() && !isCategoryNameValid(ext))
+      return {};
+
+    categoryName = ext->getObjCCategoryName();
   } else {
     // Must be an imported class. Look for its main implementation.
     assert(isa_and_nonnull<ClassDecl>(dc));
@@ -6051,7 +6058,8 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   llvm::TinyPtrVector<Decl *> implDecls;
   for (ExtensionDecl *ext : classDecl->getExtensions()) {
     if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == categoryName)
+          && ext->getObjCCategoryName() == categoryName
+          && isCategoryNameValid(ext))
       implDecls.push_back(ext);
   }
 

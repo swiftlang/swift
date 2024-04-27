@@ -1141,9 +1141,10 @@ namespace {
     std::optional<StringRef> getObjCImplCategoryName() const {
       if (!TheExtension || !TheExtension->isObjCImplementation())
         return std::nullopt;
-      if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
-        assert(!ident->empty());
-        return ident->str();
+      assert(!TheExtension->hasClangNode());
+      auto ident = TheExtension->getObjCCategoryName();
+      if (!ident.empty()) {
+        return ident.str();
       }
       return std::nullopt;
     }

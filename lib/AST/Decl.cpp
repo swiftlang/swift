@@ -1891,16 +1891,6 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
-std::optional<Identifier>
-ExtensionDecl::getCategoryNameForObjCImplementation() const {
-  auto attr = getAttrs()
-                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-  if (!attr || attr->isCategoryNameInvalid())
-    return std::nullopt;
-
-  return attr->CategoryName;
-}
-
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,

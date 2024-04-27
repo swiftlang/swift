@@ -1912,11 +1912,6 @@ public:
   /// \endcode
   bool isWrittenWithConstraints() const;
 
-  /// Returns the name of the category specified by the \c \@_objcImplementation
-  /// attribute, or \c None if the name is invalid or
-  /// \c isObjCImplementation() is false.
-  std::optional<Identifier> getCategoryNameForObjCImplementation() const;
-
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
   Identifier getObjCCategoryName() const;
