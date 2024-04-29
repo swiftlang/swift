@@ -832,6 +832,9 @@ function Build-CMakeProject {
       TryAdd-KeyValue $Defines SWIFT_ANDROID_NDK_PATH "$androidNDKPath"
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_WORKS YES
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_WORKS YES
+      # The current Android NDK ships with Clang 17,
+      # which doesn't provide the _Builtin_float module.
+      TryAdd-KeyValue $Defines SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT YES
     }
 
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
