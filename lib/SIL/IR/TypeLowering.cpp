@@ -3818,12 +3818,16 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 }
 
 static CanAnyFunctionType
-getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
-                                     CanAnyFunctionType funcType,
-                                     SILDeclRef constant) {
+getAnyFunctionRefInterfaceType(TypeConverter &TC,
+                               CanAnyFunctionType funcType,
+                               SILDeclRef constant) {
   // Get transitive closure of value captured by this function, and any
   // captured functions.
   auto captureInfo = TC.getLoweredLocalCaptures(constant);
+
+  LLVM_DEBUG(llvm::dbgs() << "-- capture info: ";
+             captureInfo.print(llvm::dbgs());
+             llvm::dbgs() << "\n");
 
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
@@ -3934,7 +3938,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       funcTy = cast<AnyFunctionType>(
         vd->getInterfaceType()->getCanonicalType());
     }
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::EnumElement: {
@@ -3951,14 +3955,14 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     auto *cd = cast<ConstructorDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                                    cd->getInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::Initializer: {
     auto *cd = cast<ConstructorDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                          cd->getInitializerInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::Destroyer:
