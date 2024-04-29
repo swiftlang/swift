@@ -14,7 +14,6 @@ import ASTBridging
 import BasicBridging
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 import SwiftSyntax
-import swiftLLVMJSON
 
 enum PluginError: String, Error, CustomStringConvertible {
   case stalePlugin = "plugin is stale"
@@ -117,7 +116,7 @@ struct CompilerPlugin {
   }
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
-    let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
+    let hadError = try JSON.encode(message).withUnsafeBufferPointer { (data) -> Bool in
       return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, count: data.count))
     }
     if hadError {
@@ -133,7 +132,9 @@ struct CompilerPlugin {
       throw PluginError.failedToReceiveMessage
     }
     let data = UnsafeBufferPointer(start: result.baseAddress, count: result.count)
-    return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
+    return try data.withMemoryRebound(to: UInt8.self) { buffer in
+      try JSON.decode(PluginToHostMessage.self, from: buffer)
+    }
   }
 
   func sendMessageAndWaitWithoutLock(_ message: HostToPluginMessage) throws -> PluginToHostMessage {

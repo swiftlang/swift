@@ -9,7 +9,6 @@ let package = Package(
   ],
   dependencies: [
     .package(path: "../../../swift-syntax"),
-    .package(path: "../../lib/ASTGen"),
   ],
   targets: [
     .target(
@@ -24,7 +23,6 @@ let package = Package(
     .executableTarget(
       name: "swift-plugin-server",
       dependencies: [
-        .product(name: "swiftLLVMJSON", package: "ASTGen"),
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
         .product(name: "SwiftSyntax", package: "swift-syntax"),

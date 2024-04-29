@@ -1,10 +1,3 @@
-add_pure_swift_host_library(swiftLLVMJSON STATIC EMIT_MODULE
-  Sources/LLVMJSON/LLVMJSON.swift
-
-  DEPENDENCIES
-    swiftBasic
-)
-
 set(ASTGen_Swift_dependencies)
 
 # If requested, build the regular expression parser into the compiler itself.
@@ -61,7 +54,6 @@ add_pure_swift_host_library(swiftASTGen STATIC
     SwiftSyntaxBuilder
     SwiftSyntaxMacros
     SwiftSyntaxMacroExpansion
-    swiftLLVMJSON
     ${ASTGen_Swift_dependencies}
 )
 
@@ -116,7 +108,7 @@ else()
 endif()
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
-  foreach(target swiftASTGen swiftLLVMJSON swiftIDEUtilsBridging)
+  foreach(target swiftASTGen swiftIDEUtilsBridging)
     target_compile_options(${target} PRIVATE ${compile_options})
   endforeach()
 endif()
