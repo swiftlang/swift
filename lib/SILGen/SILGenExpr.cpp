@@ -4382,27 +4382,21 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
 
       unsigned numOperands = operands.size();
-      loweredComponents.push_back(
-        SGF.SGM.emitKeyPathComponentForDecl(SILLocation(E),
-                            SGF.F.getGenericEnvironment(),
-                            SGF.F.getResilienceExpansion(),
-                            numOperands,
-                            needsGenericContext,
-                            component.getDeclRef().getSubstitutions(),
-                            decl,
-                            component.getSubscriptIndexHashableConformances(),
-                            baseTy,
-                            SGF.FunctionDC,
-                            /*for descriptor*/ false));
+      loweredComponents.push_back(SGF.SGM.emitKeyPathComponentForDecl(
+          SILLocation(E), SGF.F.getGenericEnvironment(),
+          SGF.F.getResilienceExpansion(), numOperands, needsGenericContext,
+          component.getDeclRef().getSubstitutions(), decl,
+          component.getComponentIndexHashableConformances(), baseTy,
+          SGF.FunctionDC,
+          /*for descriptor*/ false));
       baseTy = loweredComponents.back().getComponentType();
       if (kind == KeyPathExpr::Component::Kind::Property)
         break;
 
       auto subscript = cast<SubscriptDecl>(decl);
       auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
-          E, subscript,
-          component.getDeclRef().getSubstitutions(),
-          component.getSubscriptArgs());
+          E, subscript, component.getDeclRef().getSubstitutions(),
+          component.getComponentArgs());
 
       for (auto &arg : loweredArgs) {
         operands.push_back(arg.forward(SGF));

@@ -2403,7 +2403,7 @@ namespace {
                                         components);
         } else if (comp.getKind() == Component::Kind::UnresolvedSubscript) {
           buildKeyPathSubscriptComponent(overload, comp.getLoc(),
-                                         comp.getSubscriptArgs(), componentLoc,
+                                         comp.getComponentArgs(), componentLoc,
                                          components);
         } else {
           return nullptr;
@@ -5063,7 +5063,7 @@ namespace {
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
           buildKeyPathSubscriptComponent(solution.getOverloadChoice(calleeLoc),
                                          origComponent.getLoc(),
-                                         origComponent.getSubscriptArgs(),
+                                         origComponent.getComponentArgs(),
                                          componentLocator, resolvedComponents);
           break;
         }

@@ -5737,15 +5737,15 @@ public:
       DeclNameOrRef(ConcreteDeclRef rd) : ResolvedDecl(rd) {}
     } Decl;
 
-    ArgumentList *SubscriptArgList;
-    const ProtocolConformanceRef *SubscriptHashableConformancesData;
+    ArgumentList *ComponentArgList;
+    const ProtocolConformanceRef *ComponentHashableConformancesData;
 
     unsigned TupleIndex;
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
 
-    // Private constructor for subscript component.
+    // Private constructor for subscript/method components.
     explicit Component(DeclNameOrRef decl, ArgumentList *argList,
                        ArrayRef<ProtocolConformanceRef> indexHashables,
                        Kind kind, Type type, SourceLoc loc);
@@ -5848,7 +5848,7 @@ public:
     }
     
     SourceRange getSourceRange() const {
-      if (auto *args = getSubscriptArgs()) {
+      if (auto *args = getComponentArgs()) {
         return args->getSourceRange();
       }
       return Loc;
@@ -5886,11 +5886,11 @@ public:
       llvm_unreachable("unhandled kind");
     }
 
-    ArgumentList *getSubscriptArgs() const {
+    ArgumentList *getComponentArgs() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptArgList;
+        return ComponentArgList;
 
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -5907,18 +5907,18 @@ public:
       llvm_unreachable("unhandled kind");
     }
 
-    void setSubscriptArgs(ArgumentList *newArgs) {
-      assert(getSubscriptArgs() && "Should be replacing existing args");
-      SubscriptArgList = newArgs;
+    void setComponentArgs(ArgumentList *newArgs) {
+      assert(getComponentArgs() && "Should be replacing existing args");
+      ComponentArgList = newArgs;
     }
 
     ArrayRef<ProtocolConformanceRef>
-    getSubscriptIndexHashableConformances() const {
+    getComponentIndexHashableConformances() const {
       switch (getKind()) {
       case Kind::Subscript:
-        if (!SubscriptHashableConformancesData)
+        if (!ComponentHashableConformancesData)
           return {};
-        return {SubscriptHashableConformancesData, SubscriptArgList->size()};
+        return {ComponentHashableConformancesData, ComponentArgList->size()};
 
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
