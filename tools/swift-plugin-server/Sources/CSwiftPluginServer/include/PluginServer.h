@@ -20,24 +20,6 @@ extern "C" {
 #endif
 
 //===----------------------------------------------------------------------===//
-// Inter-process communication.
-//===----------------------------------------------------------------------===//
-
-/// Create an IPC communication handle.
-const void *PluginServer_createConnection(const char **errorMessage);
-
-/// Destroy an IPC communication handle created by
-/// 'PluginServer_createConnection'.
-void PluginServer_destroyConnection(const void *connHandle);
-
-/// Read bytes from the IPC communication handle.
-ptrdiff_t PluginServer_read(const void *connHandle, void *data, size_t nbyte);
-
-/// Write bytes to the IPC communication handle.
-ptrdiff_t PluginServer_write(const void *connHandle, const void *data,
-                             size_t nbyte);
-
-//===----------------------------------------------------------------------===//
 // Dynamic link
 //===----------------------------------------------------------------------===//
 
