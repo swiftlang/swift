@@ -15,26 +15,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/SIL/SILRemarkStreamer.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/Parse/ParseVersion.h"
+#include "swift/SIL/SILRemarkStreamer.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Serialization/SerializationOptions.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -363,6 +364,12 @@ struct SILOptOptions {
              llvm::cl::desc("verify diagnostics against expected-"
                             "{error|warning|note} annotations"));
 
+  llvm::cl::list<std::string> VerifyAdditionalPrefixes =
+      llvm::cl::list<std::string>(
+          "verify-additional-prefix",
+          llvm::cl::desc("Check for diagnostics with the prefix "
+                         "expected-<PREFIX> as well as expected-"));
+
   llvm::cl::opt<unsigned>
   AssertConfId = llvm::cl::opt<unsigned>("assert-conf-id", llvm::cl::Hidden,
                llvm::cl::init(0));
@@ -542,6 +549,11 @@ struct SILOptOptions {
       llvm::cl::opt<bool>(
           "disable-region-based-isolation-with-strict-concurrency",
           llvm::cl::init(false));
+
+  llvm::cl::opt<std::string> SwiftVersionString = llvm::cl::opt<std::string>(
+      "swift-version",
+      llvm::cl::desc(
+          "The swift version to assume AST declarations correspond to"));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -641,6 +653,23 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
   Invocation.setParseStdlib();
+  if (options.SwiftVersionString.size()) {
+    auto vers = VersionParser::parseVersionString(options.SwiftVersionString,
+                                                  SourceLoc(), nullptr);
+    bool isValid = false;
+    if (vers.has_value()) {
+      if (auto effectiveVers = vers.value().getEffectiveLanguageVersion()) {
+        Invocation.getLangOptions().EffectiveLanguageVersion =
+            effectiveVers.value();
+        isValid = true;
+      }
+    }
+    if (!isValid) {
+      llvm::errs() << "error: invalid swift version "
+                   << options.SwiftVersionString << '\n';
+      exit(-1);
+    }
+  }
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
@@ -716,7 +745,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   Invocation.getDiagnosticOptions().VerifyMode =
-    options.VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+      options.VerifyMode ? DiagnosticOptions::Verify
+                         : DiagnosticOptions::NoVerify;
+  for (auto &additionalPrefixes : options.VerifyAdditionalPrefixes) {
+    Invocation.getDiagnosticOptions()
+        .AdditionalDiagnosticVerifierPrefixes.push_back(additionalPrefixes);
+  }
 
   ClangImporterOptions &clangImporterOptions =
       Invocation.getClangImporterOptions();
