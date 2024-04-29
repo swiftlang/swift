@@ -2550,6 +2550,14 @@ ModuleDecl *ASTContext::getModuleByIdentifier(Identifier ModuleID) {
   return getModule(builder.get());
 }
 
+ModuleDecl *ASTContext::getLoadedModuleByABIName(StringRef ModuleName) {
+  for (auto &[_, module] : getLoadedModules()) {
+    if (ModuleName == module->getABIName().str())
+      return module;
+  }
+  return nullptr;
+}
+
 ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (TheStdlibModule)
     return TheStdlibModule;
