@@ -4110,8 +4110,8 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
   }
 
   // The type of the native-to-foreign thunk for a swift closure.
-  if (shouldStoreClangType(TC.getDeclRefRepresentation(constant)) &&
-      constant.isForeign && constant.hasClosureExpr()) {
+  if (constant.isForeign && constant.hasClosureExpr() &&
+      shouldStoreClangType(TC.getDeclRefRepresentation(constant))) {
     auto clangType = TC.Context.getClangFunctionType(
         origLoweredInterfaceType->getParams(),
         origLoweredInterfaceType->getResult(),
