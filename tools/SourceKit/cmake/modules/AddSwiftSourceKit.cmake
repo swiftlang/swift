@@ -173,6 +173,12 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
         target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
       endif()
     endif()
+
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFT_ALLOW_LINKING_SWIFT_CONTENT_IN_DARWIN_TOOLCHAIN)
+      get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+      target_link_directories(${target} BEFORE PUBLIC ${TOOLCHAIN_LIB_DIR})
+    endif()
   endif()
 
   set(RPATH_LIST ${RPATH_LIST} PARENT_SCOPE)
