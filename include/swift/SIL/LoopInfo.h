@@ -24,9 +24,13 @@ namespace swift {
   class SILPassManager;
 }
 
-// Implementation in llvm/Support/GenericLoopInfoImpl.h
-extern template class llvm::LoopBase<swift::SILBasicBlock, swift::SILLoop>;
-extern template class llvm::LoopInfoBase<swift::SILBasicBlock, swift::SILLoop>;
+// Implementation in LoopInfoImpl.h
+#ifdef __GNUC__
+__extension__ extern template
+class llvm::LoopBase<swift::SILBasicBlock, swift::SILLoop>;
+__extension__ extern template
+class llvm::LoopInfoBase<swift::SILBasicBlock, swift::SILLoop>;
+#endif
 
 namespace swift {
 
