@@ -1349,6 +1349,17 @@ static bool needSpaceBeforeType(NodePointer Type) {
   }
 }
 
+static bool shouldShowEntityType(Node::Kind EntityKind,
+                                 const DemangleOptions &Options) {
+  switch (EntityKind) {
+  case Node::Kind::ExplicitClosure:
+  case Node::Kind::ImplicitClosure:
+    return Options.ShowClosureSignature;
+  default:
+    return true;
+  }
+}
+
 NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                                bool asPrefixContext) {
   if (depth > NodePrinter::MaxDepth) {
@@ -3492,7 +3503,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
         Printer << " : ";
         printEntityType(Entity, type, genericFunctionTypeList, depth);
       }
-    } else {
+    } else if (shouldShowEntityType(Entity->getKind(), Options)) {
       assert(TypePr == TypePrinting::FunctionStyle);
       if (MultiWordName || needSpaceBeforeType(type))
         Printer << ' ';
