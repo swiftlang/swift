@@ -35,6 +35,7 @@ public:
   ~BitMask() {
     free(mask);
   }
+private:
   // Construct a bitmask of the appropriate number of bytes
   // initialized to all bits set
   BitMask(unsigned sizeInBytes = 0): size(sizeInBytes) {
@@ -58,6 +59,24 @@ public:
 
     memset(mask, 0xff, size);
   }
+
+public:  
+  static BitMask zeroMask(unsigned sizeInBytes) {
+    auto mask = BitMask(sizeInBytes);
+    mask.makeZero();
+    return mask;
+  }
+
+  static BitMask oneMask(unsigned sizeInBytes) {
+    auto mask = BitMask(sizeInBytes);
+    return mask;
+  }
+
+  BitMask(unsigned sizeInBytes, uint64_t sourceMask): size(sizeInBytes) {
+    mask = (uint8_t *)calloc(1, sizeInBytes);
+    memcpy(mask, &sourceMask, sizeInBytes);
+  }
+
   // Construct a bitmask of the appropriate number of bytes
   // initialized with bits from the specified buffer
   BitMask(unsigned sizeInBytes, const uint8_t *initialValue,
@@ -184,13 +203,7 @@ public:
   }
 
   int countZeroBits() const {
-    static const int counter[] =
-      {4, 3, 3, 2, 3, 2, 2, 1, 3, 2, 2, 1, 2, 1, 1, 0};
-    int bits = 0;
-    for (unsigned i = 0; i < size; ++i) {
-      bits += counter[mask[i] >> 4] + counter[mask[i] & 15];
-    }
-    return bits;
+    return (size * 8) - countSetBits();
   }
 
   // Treat the provided value as a mask, `and` it with
@@ -242,6 +255,12 @@ public:
 #endif
   }
 
+  void keepOnlyLeastSignificantBytes(unsigned n) {
+    if (size > n) {
+      size = n;
+    }
+  }
+  
   unsigned numBits() const {
     return size * 8;
   }
