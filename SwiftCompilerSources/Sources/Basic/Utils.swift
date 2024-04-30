@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import BasicBridging
-import CxxStdlib
 
 /// The assert function to be used in the compiler.
 ///
@@ -52,6 +51,9 @@ public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
 
+#if !os(Windows)
+// TODO: https://github.com/apple/swift/issues/73252
+
 public var standardError = CFileStream(fp: stderr)
 
 #if os(Android) || canImport(Musl)
@@ -71,6 +73,8 @@ public struct CFileStream: TextOutputStream {
     fflush(fp)
   }
 }
+
+#endif
 
 //===----------------------------------------------------------------------===//
 //                              StringRef
