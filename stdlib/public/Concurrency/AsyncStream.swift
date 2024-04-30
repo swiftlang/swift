@@ -330,7 +330,8 @@ public struct AsyncStream<Element> {
   ///     }
   ///
   ///
-  @preconcurrency
+  @_silgen_name("$sScS9unfolding8onCancelScSyxGxSgyYac_yyYbcSgtcfC")
+  @preconcurrency // Original API had `@Sendable` only on `onCancel`
   public init(
     unfolding produce: @escaping @Sendable () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
