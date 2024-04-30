@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
-@_spi(PluginMessage) import SwiftPluginServerSupport
 import SwiftSyntaxMacros
 import CSwiftPluginServer
 
@@ -39,12 +38,12 @@ final class SwiftPluginServer {
 
   /// @main entry point.
   static func main() throws {
-    let connection = try PluginHostConnection()
-    let messageHandler = CompilerPluginMessageHandler(
+    let connection = try StandardIOMessageConnection()
+    let listener = CompilerPluginMessageListener(
       connection: connection,
       provider: self.init()
     )
-    try messageHandler.main()
+    try listener.main()
   }
 }
 
@@ -96,5 +95,12 @@ extension SwiftPluginServer: PluginProvider {
   /// This 'PluginProvider' implements 'loadLibraryMacro()'.
   var features: [SwiftCompilerPluginMessageHandling.PluginFeature] {
     [.loadPluginLibrary]
+  }
+}
+
+struct PluginServerError: Error, CustomStringConvertible {
+  var description: String
+  init(message: String) {
+    self.description = message
   }
 }

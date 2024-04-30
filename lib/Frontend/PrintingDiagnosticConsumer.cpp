@@ -576,7 +576,9 @@ PrintingDiagnosticConsumer::PrintingDiagnosticConsumer(
     : Stream(stream) {}
 
 PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
+#if SWIFT_BUILD_SWIFT_SYNTAX
   for (const auto &sourceFileSyntax : sourceFileSyntax) {
     swift_ASTGen_destroySourceFile(sourceFileSyntax.second);
   }
+#endif
 }

@@ -68,6 +68,8 @@ void GenericCloner::populateCloned() {
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
+  RemappedScopeCache.insert({Original.getDebugScope(), Cloned->getDebugScope()});
+
   // Create the entry basic block with the function arguments.
   auto origConv = Original.getConventions();
   unsigned ArgIdx = 0;
@@ -137,26 +139,6 @@ void GenericCloner::populateCloned() {
           auto *NewArg = ClonedEntryBB->createFunctionArgument(
               mappedType, OrigArg->getDecl());
           NewArg->copyFlags(cast<SILFunctionArgument>(OrigArg));
-
-          // Try to create a new debug_value from an existing debug_value w/
-          // address value for the argument. We do this before storing to
-          // ensure that when we are cloning code in ossa the argument has
-          // not been consumed by the store below.
-          for (Operand *ArgUse : OrigArg->getUses()) {
-            if (auto *DVI = DebugValueInst::hasAddrVal(ArgUse->getUser())) {
-              auto *oldScope = getBuilder().getCurrentDebugScope();
-              getBuilder().setCurrentDebugScope(
-                  remapScope(DVI->getDebugScope()));
-              auto VarInfo = DVI->getVarInfo();
-              assert(VarInfo && VarInfo->DIExpr &&
-                     "No DebugVarInfo or no DIExpr operand?");
-              // Drop the op_deref
-              VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
-              getBuilder().createDebugValue(DVI->getLoc(), NewArg, *VarInfo);
-              getBuilder().setCurrentDebugScope(oldScope);
-              break;
-            }
-          }
 
           // Store the new direct parameter to an alloc_stack.
           createAllocStack();

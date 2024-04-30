@@ -507,6 +507,9 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
   bool accessWithinModule =
       (fromModule == var->getDeclContext()->getParentModule());
 
+  if (varIsolation.getKind() == ActorIsolation::NonisolatedUnsafe)
+    return true;
+
   if (!var->isLet()) {
     ASTContext &ctx = var->getASTContext();
     if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
@@ -789,8 +792,8 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 
 /// Determine whether the given nominal type has an explicit Sendable
 /// conformance (regardless of its availability).
-static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
-                                           bool applyModuleDefault = true) {
+bool swift::hasExplicitSendableConformance(NominalTypeDecl *nominal,
+                                           bool applyModuleDefault) {
   ASTContext &ctx = nominal->getASTContext();
   auto nominalModule = nominal->getParentModule();
 
@@ -6465,12 +6468,19 @@ static ActorIsolation getActorIsolationForReference(ValueDecl *decl,
     // Fall through to treat initializers like any other declaration.
   }
 
-  // A 'nonisolated let' within an actor is treated as isolated from the
-  // perspective of the referencer.
+  // A 'nonisolated let' within an actor is treated as isolated if
+  // the access is outside the module or if the property type is not
+  // 'Sendable'.
   //
   // FIXME: getActorIsolation(decl) should treat these as isolated.
   // FIXME: Expand this out to local variables?
   if (auto var = dyn_cast<VarDecl>(decl)) {
+    auto *fromModule = fromDC->getParentModule();
+    ActorReferenceResult::Options options = std::nullopt;
+    if (varIsSafeAcrossActors(fromModule, var, declIsolation, options) &&
+        var->getTypeInContext()->isSendableType())
+      return ActorIsolation::forNonisolated(/*unsafe*/false);
+
     if (var->isLet() && isStoredProperty(var) &&
         declIsolation.isNonisolated()) {
       if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {

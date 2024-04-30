@@ -691,6 +691,10 @@ public:
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});
 
+  /// The fast setup function for cache replay.
+  bool setupForReplay(const CompilerInvocation &Invocation, std::string &Error,
+                      ArrayRef<const char *> Args = {});
+
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
   /// If a IDE inspection buffer has been set, returns the corresponding source

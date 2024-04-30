@@ -34,6 +34,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -44,6 +45,7 @@
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "clang/AST/ASTContext.h"
@@ -411,6 +413,9 @@ public:
   /// metadata is emitted has some corresponding cleanup instructions.
   llvm::DenseMap<SILInstruction *, llvm::SmallVector<SILInstruction *, 2>>
       DynamicMetadataPackDeallocs;
+
+  // A cached dead-end blocks analysis.
+  std::unique_ptr<DeadEndBlocks> DeadEnds;
 #endif
   /// For each instruction which did allocate pack metadata on-stack, the stack
   /// locations at which they were allocated.
@@ -684,6 +689,15 @@ public:
     }
     return Name;
   }
+
+#ifndef NDEBUG
+  DeadEndBlocks *getDeadEndBlocks() {
+    if (!DeadEnds) {
+      DeadEnds.reset(new DeadEndBlocks(CurSILFn));
+    }
+    return DeadEnds.get();
+  }
+#endif
 
   /// To make it unambiguous whether a `var` binding has been initialized,
   /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
@@ -2744,8 +2758,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 #ifndef NDEBUG
     if (!OutstandingStackPackAllocs.empty()) {
       auto iter = DynamicMetadataPackDeallocs.find(&I);
-      if (iter == DynamicMetadataPackDeallocs.end() ||
-          iter->getSecond().size() == 0) {
+      if ((iter == DynamicMetadataPackDeallocs.end() ||
+           iter->getSecond().size() == 0) &&
+          !getDeadEndBlocks()->isDeadEnd(I.getParent())) {
         llvm::errs()
             << "Instruction missing on-stack pack metadata cleanups!\n";
         I.print(llvm::errs());
@@ -3295,16 +3310,20 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
     bool canForwardLoadToIndirect = false;
     auto *load = dyn_cast<LoadInst>(arg);
     [&]() {
-      if (apply && load && apply->getParent() == load->getParent()) {
-        for (auto it = std::next(load->getIterator()), e = apply->getIterator();
-             it != e; ++it) {
-          if (isa<LoadInst>(&(*it))) {
-            continue;
-          }
-          return;
+      if (!apply || !load || apply->getParent() != load->getParent())
+        return;
+      // We cannot forward projections as the code that does the optimization
+      // does not know about them.
+      if (!isa<AllocStackInst>(load->getOperand()))
+        return;
+      for (auto it = std::next(load->getIterator()), e = apply->getIterator();
+           it != e; ++it) {
+        if (isa<LoadInst>(&(*it))) {
+          continue;
         }
-        canForwardLoadToIndirect = true;
+        return;
       }
+      canForwardLoadToIndirect = true;
     }();
     IGF.getLoweredExplosion(arg, out);
     if (canForwardLoadToIndirect) {
@@ -5598,11 +5617,10 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   auto VarInfo = i->getVarInfo();
   assert(VarInfo && "debug_value without debug info");
-  if (isa<SILUndef>(SILVal)) {
+  if (isa<SILUndef>(SILVal) && VarInfo->Name == "$error") {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!IsAddrVal &&
-        !i->getDebugScope()->InlinedCallSite && VarInfo->Name == "$error") {
+    if (!IsAddrVal && !i->getDebugScope()->InlinedCallSite) {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }

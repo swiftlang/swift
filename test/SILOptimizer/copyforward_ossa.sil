@@ -284,7 +284,7 @@ public struct S<T> {
 // CHECK-LABEL: sil [ossa] @deadtemp :
 // CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
 // CHECK-NOT: copy_addr
-// CHECK-NOT: debug_value {{.*}} expr op_deref
+// CHECK: debug_value %[[G:.*]] : $*T, expr op_deref
 // CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
 // CHECK: copy_addr %[[G]] to %[[F]] : $*T
 // CHECK-LABEL: } // end sil function 'deadtemp'

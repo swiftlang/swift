@@ -29,8 +29,9 @@ public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
 }
 
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF")
 @usableFromInline
-internal func withExtendedLifetime<T, Result>(
+internal func __abi_withExtendedLifetime<T, Result>(
   _ x: T,
   _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
 ) rethrows -> Result {
@@ -56,8 +57,9 @@ public func withExtendedLifetime<T, Result: ~Copyable>(
 }
 
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss20withExtendedLifetimeyq_x_q_xKXEtKr0_lF")
 @usableFromInline
-internal func withExtendedLifetime<T, Result>(
+internal func __abi_withExtendedLifetime<T, Result>(
   _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
 ) rethrows -> Result {
   defer { _fixLifetime(x) }

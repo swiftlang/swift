@@ -11,17 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
-@_spi(PluginMessage) import SwiftPluginServerSupport
 import Foundation
-import swiftLLVMJSON
 
 @main
 final class SwiftPluginServer {
-  let connection: PluginHostConnection
+  let connection: StandardIOMessageConnection
   var loadedWasmPlugins: [String: WasmPlugin] = [:]
   var hostCapability: PluginMessage.HostCapability?
 
-  init(connection: PluginHostConnection) {
+  init(connection: StandardIOMessageConnection) {
     self.connection = connection
   }
 
@@ -48,11 +46,11 @@ final class SwiftPluginServer {
     let response: PluginToHostMessage
     do {
       guard let plugin = loadedWasmPlugins[module] else { throw PluginServerError(message: "Could not find module \(module)") }
-      let request = try LLVMJSON.encoding(message) { Data(UnsafeRawBufferPointer($0)) }
+      let request = try JSON.encode(message).withUnsafeBufferPointer { Data($0) }
       let responseRaw = try await plugin.handleMessage(request)
       response = try responseRaw.withUnsafeBytes {
-        try $0.withMemoryRebound(to: Int8.self) {
-          try LLVMJSON.decode(PluginToHostMessage.self, from: $0)
+        try $0.withMemoryRebound(to: UInt8.self) {
+          try JSON.decode(PluginToHostMessage.self, from: $0)
         }
       }
     } catch {
@@ -100,7 +98,7 @@ final class SwiftPluginServer {
 
   /// @main entry point.
   static func main() async throws {
-    let connection = try PluginHostConnection()
+    let connection = try StandardIOMessageConnection()
     try await Self(connection: connection).run()
   }
 }
@@ -126,4 +124,11 @@ final class UnsafeByteBuffer: @unchecked Sendable {
   }
 
   deinit { deallocator() }
+}
+
+struct PluginServerError: Error, CustomStringConvertible {
+  var description: String
+  init(message: String) {
+    self.description = message
+  }
 }

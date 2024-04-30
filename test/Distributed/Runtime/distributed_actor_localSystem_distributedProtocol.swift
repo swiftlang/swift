@@ -19,7 +19,7 @@
  
 import Distributed
 
-@_DistributedProtocol
+@Resolvable
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
   distributed func distributedMethod() -> String

@@ -421,14 +421,19 @@ extractPropertyWrapperAttrValues(VarDecl *propertyDecl) {
 
 static ConstValueTypePropertyInfo
 extractTypePropertyInfo(VarDecl *propertyDecl) {
+  std::optional<AttrValueVector> propertyWrapperValues;
+  if (propertyDecl->hasAttachedPropertyWrapper())
+    propertyWrapperValues = extractPropertyWrapperAttrValues(propertyDecl);
+
   if (const auto binding = propertyDecl->getParentPatternBinding()) {
     if (const auto originalInit = binding->getInit(0)) {
       if (propertyDecl->hasAttachedPropertyWrapper()) {
         return {propertyDecl, extractCompileTimeValue(originalInit),
-                extractPropertyWrapperAttrValues(propertyDecl)};
+                propertyWrapperValues};
       }
 
-      return {propertyDecl, extractCompileTimeValue(originalInit)};
+      return {propertyDecl, extractCompileTimeValue(originalInit),
+              propertyWrapperValues};
     }
   }
 
@@ -438,7 +443,8 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
       if (auto *stmt = node.dyn_cast<Stmt *>()) {
         if (stmt->getKind() == StmtKind::Return) {
           return {propertyDecl,
-                  extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
+                  extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult()),
+                  propertyWrapperValues};
         }
       }
     }

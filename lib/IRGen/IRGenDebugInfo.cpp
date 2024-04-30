@@ -3138,6 +3138,9 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
       return false;
     }
   }
+  if (Operands.size() && Operands.back() != llvm::dwarf::DW_OP_deref) {
+    Operands.push_back(llvm::dwarf::DW_OP_stack_value);
+  }
   return true;
 }
 
@@ -3186,10 +3189,14 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
   uint16_t DVarCol = DInstLoc.Column;
-  if (VarInfo.Loc) {
-    auto DVarLoc = getStartLocation(VarInfo.Loc);
-    DVarLine = DVarLoc.Line;
-    DVarCol = DVarLoc.Column;
+  auto VarInfoLoc = VarInfo.Loc ? VarInfo.Loc : DbgInstLoc;
+  if (VarInfoLoc) {
+    auto VarLoc = VarInfoLoc->strippedForDebugVariable();
+    if (VarLoc != DbgInstLoc) {
+      auto DVarLoc = getStartLocation(VarLoc);
+      DVarLine = DVarLoc.Line;
+      DVarCol = DVarLoc.Column;
+    }
   }
   llvm::DIScope *VarScope = Scope;
   if (ArgNo == 0 && VarInfo.Scope) {
@@ -3425,6 +3432,16 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   // /always/ emit an llvm.dbg.value of undef.
   // If we have undef, always emit a llvm.dbg.value in the current position.
   if (isa<llvm::UndefValue>(Storage)) {
+    if (Expr->getNumElements() &&
+        (Expr->getElement(0) == llvm::dwarf::DW_OP_consts
+         || Expr->getElement(0) == llvm::dwarf::DW_OP_constu)) {
+      /// Convert `undef, expr op_consts:N:...` to `N, expr ...`
+      Storage = llvm::ConstantInt::get(
+          llvm::IntegerType::getInt64Ty(Builder.getContext()),
+          Expr->getElement(1));
+      Expr = llvm::DIExpression::get(Builder.getContext(),
+                                     Expr->getElements().drop_front(2));
+    }
     DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
     return;
   }

@@ -490,6 +490,7 @@ public:
     BeginBorrow,
     SILFunctionArgument,
     Phi,
+    BeginApplyToken,
   };
 
 private:
@@ -520,6 +521,13 @@ public:
       }
       return Kind::Phi;
     }
+    case ValueKind::MultipleValueInstructionResult:
+      if (!isaResultOf<BeginApplyInst>(value))
+        return Kind::Invalid;
+      if (value->isBeginApplyToken()) {
+        return Kind::BeginApplyToken;
+      }
+      return Kind::Invalid;
     }
   }
 
@@ -540,6 +548,7 @@ public:
     case BorrowedValueKind::BeginBorrow:
     case BorrowedValueKind::LoadBorrow:
     case BorrowedValueKind::Phi:
+    case BorrowedValueKind::BeginApplyToken:
       return true;
     case BorrowedValueKind::SILFunctionArgument:
       return false;

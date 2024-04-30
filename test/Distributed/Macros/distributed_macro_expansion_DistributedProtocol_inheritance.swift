@@ -13,7 +13,7 @@ import Distributed
 
 typealias System = LocalTestingDistributedActorSystem
 
-@_DistributedProtocol
+@Resolvable
 protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func base() -> Int
 }
@@ -35,7 +35,7 @@ protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Co
 
 // ==== ------------------------------------------------------------------------
 
-@_DistributedProtocol
+@Resolvable
 protocol G3<ActorSystem>: DistributedActor, Base where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func get() -> String
   distributed func greet(name: String) -> String

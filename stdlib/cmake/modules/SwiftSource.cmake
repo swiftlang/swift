@@ -856,7 +856,10 @@ function(_compile_swift_files
   if(SWIFT_INCLUDE_TOOLS AND NOT BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
     # Depend on the binary itself, in addition to the symlink, unless
     # cross-compiling the compiler.
-    set(swift_compiler_tool_dep "swift-frontend${target_suffix}")
+    list(APPEND swift_compiler_tool_dep "swift-frontend${target_suffix}")
+
+    # If we aren't cross compiling, also depend on SwiftMacros.
+    list(APPEND swift_compiler_tool_dep SwiftMacros)
   endif()
 
   # If there are more than one output files, we assume that they are specified

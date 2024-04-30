@@ -5728,6 +5728,8 @@ DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
 
 static ValueDecl *
 cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
+  ASTContext &context = decl->getASTContext();
+
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
     // TODO: function templates are specialized during type checking so to
     // support these we need to tell Swift to type check the synthesized bodies.
@@ -5745,7 +5747,6 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
         return nullptr;
     }
 
-    ASTContext &context = decl->getASTContext();
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(),
         fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
@@ -5781,6 +5782,20 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   }
 
   if (auto var = dyn_cast<VarDecl>(decl)) {
+    auto oldContext = var->getDeclContext();
+    auto oldTypeDecl = oldContext->getSelfNominalTypeDecl();
+    // If the base type is non-copyable, and non-copyable generics are disabled,
+    // we cannot synthesize the accessor, because its implementation would use
+    // `UnsafePointer<BaseTy>`.
+    // We cannot use `ty->isNoncopyable()` here because that would create a
+    // cyclic dependency between ModuleQualifiedLookupRequest and
+    // LookupConformanceInModuleRequest, so we check for the presence of
+    // move-only attribute that is implicitly added to non-copyable C++ types by
+    // ClangImporter.
+    if (oldTypeDecl->getAttrs().hasAttribute<MoveOnlyAttr>() &&
+        !context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+      return nullptr;
+
     auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
                                                     sizeof(VarDecl), false);
     auto out =

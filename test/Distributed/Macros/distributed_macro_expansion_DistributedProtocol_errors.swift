@@ -12,26 +12,26 @@
 
 import Distributed
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'struct' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'struct' (from macro 'Resolvable')}}
 struct Struct {}
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'class' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'class' (from macro 'Resolvable')}}
 class Clazz {}
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'actor' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'actor' (from macro 'Resolvable')}}
 actor Act {}
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'actor' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'actor' (from macro 'Resolvable')}}
 distributed actor Caplin {
   typealias ActorSystem = FakeActorSystem
 }
 
-@_DistributedProtocol // expected-error{{Distributed protocol must declare actor system with SerializationRequirement}}
+@Resolvable // expected-error{{Distributed protocol must declare actor system with SerializationRequirement}}
 protocol Fail: DistributedActor {
   distributed func method() -> String
 }
 
-@_DistributedProtocol // expected-note{{in expansion of macro '_DistributedProtocol' on protocol 'SomeRoot' here}}
+@Resolvable // expected-note{{in expansion of macro 'Resolvable' on protocol 'SomeRoot' here}}
 public protocol SomeRoot: DistributedActor, Sendable
   where ActorSystem: DistributedActorSystem<any Codable> {
 

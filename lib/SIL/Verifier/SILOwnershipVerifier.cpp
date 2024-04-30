@@ -914,6 +914,8 @@ void SILModule::verifyOwnership() const {
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   if (DisableOwnershipVerification)
     return;
+  if (!getModule().getOptions().VerifySILOwnership)
+    return;
 
 #ifdef NDEBUG
   // When compiling without asserts enabled, only verify ownership if
