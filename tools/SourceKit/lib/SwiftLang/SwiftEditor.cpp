@@ -2447,25 +2447,24 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 // EditorClose
 //===----------------------------------------------------------------------===//
 
-void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
+void SwiftLangSupport::editorClose(StringRef Name, bool CancelBuilds,
+                                   bool RemoveCache) {
   auto Removed = EditorDocuments->remove(Name);
-  if (Removed) {
-    --Stats->numOpenDocs;
-  } else {
+  if (!Removed) {
+    // FIXME: Report error if Name did not apply to anything ?
     IFaceGenContexts.remove(Name);
+    return;
   }
+  --Stats->numOpenDocs;
 
-  if (Removed) {
-    // Cancel any in-flight builds for the given AST.
+  // Cancel any in-flight builds for the given AST if needed.
+  if (CancelBuilds)
     Removed->cancelBuildsForCachedAST();
 
-    // Then remove the cached AST if we've been asked to do so.
-    if (RemoveCache)
-      Removed->removeCachedAST();
-  }
-  // FIXME: Report error if Name did not apply to anything ?
+  // Then remove the cached AST if we've been asked to do so.
+  if (RemoveCache)
+    Removed->removeCachedAST();
 }
-
 
 //===----------------------------------------------------------------------===//
 // EditorReplaceText

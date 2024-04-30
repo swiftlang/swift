@@ -166,7 +166,8 @@ public:
   }
 
   void close(const char *DocName) {
-    getLang().editorClose(DocName, /*removeCache=*/false);
+    getLang().editorClose(DocName, /*CancelBuilds*/ true,
+                          /*RemoveCache*/ false);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
