@@ -1349,6 +1349,23 @@ static bool needSpaceBeforeType(NodePointer Type) {
   }
 }
 
+/// Determine whether to print an entity's type.
+static bool shouldShowEntityType(Node::Kind EntityKind,
+                                 const DemangleOptions &Options) {
+  switch (EntityKind) {
+  case Node::Kind::ExplicitClosure:
+  case Node::Kind::ImplicitClosure:
+    /// The signature of a closure (its `Type` node) can optionally be omitted.
+    /// Unlike functions which can have overloads, the signature of a closure is
+    /// not needed to be uniquely identified. A closure is uniquely identified
+    /// by its index and parent. Omitting the signature improves the readability
+    /// when long type names are in use.
+    return Options.ShowClosureSignature;
+  default:
+    return true;
+  }
+}
+
 NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                                bool asPrefixContext) {
   if (depth > NodePrinter::MaxDepth) {
@@ -3492,7 +3509,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
         Printer << " : ";
         printEntityType(Entity, type, genericFunctionTypeList, depth);
       }
-    } else {
+    } else if (shouldShowEntityType(Entity->getKind(), Options)) {
       assert(TypePr == TypePrinting::FunctionStyle);
       if (MultiWordName || needSpaceBeforeType(type))
         Printer << ' ';
