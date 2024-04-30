@@ -107,6 +107,7 @@ public:
   void updateSemaInfo(SourceKitCancellationToken CancellationToken);
 
   void removeCachedAST();
+  void cancelBuildsForCachedAST();
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 

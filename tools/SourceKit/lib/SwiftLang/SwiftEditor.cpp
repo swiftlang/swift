@@ -707,6 +707,13 @@ public:
     }
   }
 
+  void cancelBuildsForCachedAST() {
+    if (!InvokRef)
+      return;
+    if (auto ASTMgr = this->ASTMgr.lock())
+      ASTMgr->cancelBuildsForCachedAST(InvokRef);
+  }
+
 private:
   std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
@@ -2174,6 +2181,10 @@ void SwiftEditorDocument::removeCachedAST() {
   Impl.SemanticInfo->removeCachedAST();
 }
 
+void SwiftEditorDocument::cancelBuildsForCachedAST() {
+  Impl.SemanticInfo->cancelBuildsForCachedAST();
+}
+
 void SwiftEditorDocument::applyFormatOptions(OptionsDictionary &FmtOptions) {
   static UIdent KeyUseTabs("key.editor.format.usetabs");
   static UIdent KeyIndentWidth("key.editor.format.indentwidth");
@@ -2444,8 +2455,14 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
     IFaceGenContexts.remove(Name);
   }
 
-  if (Removed && RemoveCache)
-    Removed->removeCachedAST();
+  if (Removed) {
+    // Cancel any in-flight builds for the given AST.
+    Removed->cancelBuildsForCachedAST();
+
+    // Then remove the cached AST if we've been asked to do so.
+    if (RemoveCache)
+      Removed->removeCachedAST();
+  }
   // FIXME: Report error if Name did not apply to anything ?
 }
 
