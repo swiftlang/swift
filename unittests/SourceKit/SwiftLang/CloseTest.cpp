@@ -105,8 +105,8 @@ public:
     getLang().editorOpen(DocName, Buf.get(), Consumer, Args, std::nullopt);
   }
 
-  void close(const char *DocName, bool removeCache) {
-    getLang().editorClose(DocName, removeCache);
+  void close(const char *DocName, bool CancelBuilds, bool RemoveCache) {
+    getLang().editorClose(DocName, CancelBuilds, RemoveCache);
   }
 
   void getDiagnosticsAsync(
@@ -171,7 +171,7 @@ TEST_F(CloseTest, Cancel) {
 
     getCompileTracker().waitForBuildToStart();
 
-    close(DocName, RemoveCache);
+    close(DocName, /*CancelBuilds*/ true, RemoveCache);
 
     bool Expired = BuildResultSema.wait(30 * 1000);
     if (Expired)
