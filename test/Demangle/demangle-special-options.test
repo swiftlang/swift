@@ -16,3 +16,6 @@ LOCAL: ByteBuffer #1 in closure #6
 
 RUN: swift-demangle -display-local-name-contexts=false s1a4mainyyFySRys5UInt8VGXEfU4_10ByteBufferL_aD | %FileCheck %s --check-prefix=NOLOCAL
 NOLOCAL: {{ ByteBuffer$}}
+
+RUN: swift-demangle -show-closure-signature=false s4mainySiXEfU_ySiXEfU_ | %FileCheck %s --check-prefix=CLOSURE
+CLOSURE: closure #1 in closure #1 in main
