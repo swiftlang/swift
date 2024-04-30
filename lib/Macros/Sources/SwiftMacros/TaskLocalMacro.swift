@@ -17,7 +17,7 @@ import SwiftDiagnostics
 /// Macro implementing the TaskLocal functionality.
 ///
 /// It introduces a peer `static let $name: TaskLocal<Type>` as well as a getter
-/// that assesses accesses the task local storage.
+/// that accesses the task local storage.
 public enum TaskLocalMacro {}
 
 extension TaskLocalMacro: PeerMacro {
