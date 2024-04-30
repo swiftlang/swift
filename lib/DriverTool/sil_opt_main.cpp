@@ -15,26 +15,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/SIL/SILRemarkStreamer.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/Parse/ParseVersion.h"
+#include "swift/SIL/SILRemarkStreamer.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Serialization/SerializationOptions.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -77,7 +78,29 @@ enum class EnforceExclusivityMode {
   DynamicOnly,
   None,
 };
+
+enum class SILOptStrictConcurrency {
+  None = 0,
+  Complete,
+  Targeted,
+  Minimal,
+};
+
 } // end anonymous namespace
+
+std::optional<StrictConcurrency>
+convertSILOptToRawStrictConcurrencyLevel(SILOptStrictConcurrency level) {
+  switch (level) {
+  case SILOptStrictConcurrency::None:
+    return {};
+  case SILOptStrictConcurrency::Complete:
+    return StrictConcurrency::Complete;
+  case SILOptStrictConcurrency::Targeted:
+    return StrictConcurrency::Targeted;
+  case SILOptStrictConcurrency::Minimal:
+    return StrictConcurrency::Minimal;
+  }
+}
 
 namespace llvm {
 
@@ -363,6 +386,12 @@ struct SILOptOptions {
              llvm::cl::desc("verify diagnostics against expected-"
                             "{error|warning|note} annotations"));
 
+  llvm::cl::list<std::string> VerifyAdditionalPrefixes =
+      llvm::cl::list<std::string>(
+          "verify-additional-prefix",
+          llvm::cl::desc("Check for diagnostics with the prefix "
+                         "expected-<PREFIX> as well as expected-"));
+
   llvm::cl::opt<unsigned>
   AssertConfId = llvm::cl::opt<unsigned>("assert-conf-id", llvm::cl::Hidden,
                llvm::cl::init(0));
@@ -482,15 +511,19 @@ struct SILOptOptions {
       cl::value_desc("format"), cl::init("yaml"));
 
   // Strict Concurrency
-  llvm::cl::opt<StrictConcurrency> StrictConcurrencyLevel =
-      llvm::cl::opt<StrictConcurrency>(
+  llvm::cl::opt<SILOptStrictConcurrency> StrictConcurrencyLevel =
+      llvm::cl::opt<SILOptStrictConcurrency>(
           "strict-concurrency", cl::desc("strict concurrency level"),
-          llvm::cl::values(clEnumValN(StrictConcurrency::Complete, "complete",
-                                      "Enable complete strict concurrency"),
-                           clEnumValN(StrictConcurrency::Targeted, "targeted",
-                                      "Enable targeted strict concurrency"),
-                           clEnumValN(StrictConcurrency::Minimal, "minimal",
-                                      "Enable minimal strict concurrency")));
+          llvm::cl::init(SILOptStrictConcurrency::None),
+          llvm::cl::values(
+              clEnumValN(SILOptStrictConcurrency::Complete, "complete",
+                         "Enable complete strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::Targeted, "targeted",
+                         "Enable targeted strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::Minimal, "minimal",
+                         "Enable minimal strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::None, "disabled",
+                         "Strict concurrency disabled")));
 
   llvm::cl::opt<bool>
       EnableCxxInterop = llvm::cl::opt<bool>("enable-experimental-cxx-interop",
@@ -542,6 +575,11 @@ struct SILOptOptions {
       llvm::cl::opt<bool>(
           "disable-region-based-isolation-with-strict-concurrency",
           llvm::cl::init(false));
+
+  llvm::cl::opt<std::string> SwiftVersionString = llvm::cl::opt<std::string>(
+      "swift-version",
+      llvm::cl::desc(
+          "The swift version to assume AST declarations correspond to"));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -641,6 +679,23 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
   Invocation.setParseStdlib();
+  if (options.SwiftVersionString.size()) {
+    auto vers = VersionParser::parseVersionString(options.SwiftVersionString,
+                                                  SourceLoc(), nullptr);
+    bool isValid = false;
+    if (vers.has_value()) {
+      if (auto effectiveVers = vers.value().getEffectiveLanguageVersion()) {
+        Invocation.getLangOptions().EffectiveLanguageVersion =
+            effectiveVers.value();
+        isValid = true;
+      }
+    }
+    if (!isValid) {
+      llvm::errs() << "error: invalid swift version "
+                   << options.SwiftVersionString << '\n';
+      exit(-1);
+    }
+  }
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
@@ -664,15 +719,26 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.BypassResilienceChecks;
   Invocation.getDiagnosticOptions().PrintDiagnosticNames =
       options.DebugDiagnosticNames;
+
   for (auto &featureName : options.UpcomingFeatures) {
-    if (auto feature = getUpcomingFeature(featureName)) {
-      Invocation.getLangOptions().enableFeature(*feature);
-    } else {
+    auto feature = getUpcomingFeature(featureName);
+    if (!feature) {
       llvm::errs() << "error: unknown upcoming feature "
                    << QuotedString(featureName) << "\n";
       exit(-1);
     }
+
+    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
+      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+        llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
+                     << " is already enabled as of Swift version "
+                     << *firstVersion << '\n';
+        exit(-1);
+      }
+    }
+    Invocation.getLangOptions().enableFeature(*feature);
   }
+
   for (auto &featureName : options.ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().enableFeature(*feature);
@@ -706,17 +772,35 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
-  if (options.StrictConcurrencyLevel.hasArgStr()) {
+
+  // Enable strict concurrency if we have the feature specified or if it was
+  // specified via a command line option to sil-opt.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
     Invocation.getLangOptions().StrictConcurrencyLevel =
-        options.StrictConcurrencyLevel;
-    if (options.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        !options.DisableRegionBasedIsolationWithStrictConcurrency) {
-      Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
-    }
+        StrictConcurrency::Complete;
+  } else if (auto level = convertSILOptToRawStrictConcurrencyLevel(
+                 options.StrictConcurrencyLevel)) {
+    // If strict concurrency was enabled from the cmdline so the feature flag as
+    // well.
+    if (*level == StrictConcurrency::Complete)
+      Invocation.getLangOptions().enableFeature(Feature::StrictConcurrency);
+    Invocation.getLangOptions().StrictConcurrencyLevel = *level;
+  }
+
+  // If we have strict concurrency set as a feature and were told to turn off
+  // region based isolation... do so now.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency) &&
+      !options.DisableRegionBasedIsolationWithStrictConcurrency) {
+    Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }
 
   Invocation.getDiagnosticOptions().VerifyMode =
-    options.VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+      options.VerifyMode ? DiagnosticOptions::Verify
+                         : DiagnosticOptions::NoVerify;
+  for (auto &additionalPrefixes : options.VerifyAdditionalPrefixes) {
+    Invocation.getDiagnosticOptions()
+        .AdditionalDiagnosticVerifierPrefixes.push_back(additionalPrefixes);
+  }
 
   ClangImporterOptions &clangImporterOptions =
       Invocation.getClangImporterOptions();
