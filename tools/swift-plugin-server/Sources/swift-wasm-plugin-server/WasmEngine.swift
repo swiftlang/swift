@@ -13,7 +13,6 @@
 import WASI
 import WasmTypes
 import SystemPackage
-import Foundation
 
 protocol WasmEngine {
   init(wasm: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws
@@ -27,14 +26,19 @@ typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
 
 // a WasmPlugin implementation that delegates to a WasmEngine
 struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
-  private let hostToPlugin = Pipe()
-  private let pluginToHost = Pipe()
+  private let hostToPlugin: FileDescriptor
+  private let pluginToHost: FileDescriptor
   let engine: Engine
 
   init(wasm: UnsafeByteBuffer) async throws {
+    let hostToPluginPipes = try FileDescriptor.pipe()
+    let pluginToHostPipes = try FileDescriptor.pipe()
+    self.hostToPlugin = hostToPluginPipes.writeEnd
+    self.pluginToHost = pluginToHostPipes.readEnd
+
     let bridge = try WASIBridgeToHost(
-      stdin: FileDescriptor(rawValue: hostToPlugin.fileHandleForReading.fileDescriptor),
-      stdout: FileDescriptor(rawValue: pluginToHost.fileHandleForWriting.fileDescriptor),
+      stdin: hostToPluginPipes.readEnd,
+      stdout: pluginToHostPipes.writeEnd,
       stderr: .standardError
     )
     engine = try await Engine(wasm: wasm, imports: bridge)
@@ -73,24 +77,29 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     }
   }
 
-  func handleMessage(_ json: Data) async throws -> Data {
-    let writeHandle = hostToPlugin.fileHandleForWriting
-    let count = withUnsafeBytes(of: UInt64(json.count).littleEndian) { Data($0) }
-    try writeHandle.write(contentsOf: count)
-    try writeHandle.write(contentsOf: json)
+  func handleMessage(_ json: [UInt8]) async throws -> [UInt8] {
+    try withUnsafeBytes(of: UInt64(json.count).littleEndian) {
+      _ = try hostToPlugin.writeAll($0)
+    }
+    try hostToPlugin.writeAll(json)
 
     _ = try engine.invoke("swift_wasm_macro_pump", [])
 
-    let readHandle = pluginToHost.fileHandleForReading
-    let lengthData = try readHandle.read(upToCount: 8)
-    guard let lengthData, lengthData.count == 8 else {
-      throw WasmEngineError(message: "Wasm plugin sent invalid response")
-    }
-    let lengthRaw = lengthData.withUnsafeBytes {
-      $0.assumingMemoryBound(to: UInt64.self).baseAddress!.pointee
+    let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
+      let lengthCount = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
+      guard lengthCount == 8 else {
+        throw WasmEngineError(message: "Wasm plugin sent invalid response")
+      }
+      return buffer.withMemoryRebound(to: UInt64.self, \.baseAddress!.pointee)
     }
     let length = Int(UInt64(littleEndian: lengthRaw))
-    return try readHandle.read(upToCount: length) ?? Data()
+    return try [UInt8](unsafeUninitializedCapacity: length) { buffer, size in
+      let received = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
+      guard received == length else {
+        throw WasmEngineError(message: "Wasm plugin sent truncated response")
+      }
+      size = received
+    }
   }
 }
 
