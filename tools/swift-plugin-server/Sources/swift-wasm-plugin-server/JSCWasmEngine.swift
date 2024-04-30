@@ -15,6 +15,7 @@
 import JavaScriptCore
 import WASI
 import WasmTypes
+import SystemPackage
 
 typealias DefaultWasmEngine = JSCWasmEngine
 
@@ -37,7 +38,7 @@ final class JSCWasmEngine: WasmEngine {
   private let runner: JSValue
   private let api: JSValue
 
-  init(wasm buffer: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws {
+  init(path: FilePath, imports: WASIBridgeToHost) async throws {
     guard #available(macOS 10.15, *) else { fatalError("JSCWasmEngine requires macOS 10.15+") }
 
     let factory = try await JSCWasmFactory.shared
@@ -53,12 +54,16 @@ final class JSCWasmEngine: WasmEngine {
       }
     }
 
+    let buffer = try NSData(contentsOfFile: path.string, options: .mappedIfSafe)
     let jsBuf = try JSValue(
       // JavaScript doesn't have readonly ArrayBuffers but all the JS we're running
       // is contained within this file and we know that we aren't mutating this buffer.
       // If we did attempt to mutate it, it would be UB.
-      newArrayBufferWithBytesNoCopy: UnsafeMutableRawBufferPointer(mutating: buffer.data),
-      deallocator: { _ = buffer },
+      newArrayBufferWithBytesNoCopy: UnsafeMutableRawBufferPointer(
+        start: UnsafeMutableRawPointer(mutating: buffer.bytes),
+        count: buffer.count
+      ),
+      deallocator: { [box = buffer as AnyObject] in _ = box },
       in: context
     )
     let promise = factory.value.call(withArguments: [jsBuf, imports])
