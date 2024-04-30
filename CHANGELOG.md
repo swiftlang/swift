@@ -21,7 +21,7 @@
   typealias MyValue = Optional<Int> 
   
   @TaskLocal
-  static var number: MyValue // Swift 6: error, please specify default value explicitl
+  static var number: MyValue // Swift 6: error, please specify default value explicitly
   
   // Solution 1: Specify the default value
   @TaskLocal
