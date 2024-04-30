@@ -61,8 +61,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     Sources/swift-wasm-plugin-server/JSCWasmEngine.swift
     Sources/swift-wasm-plugin-server/WasmEngine.swift
     Sources/swift-wasm-plugin-server/WasmKitEngine.swift
-    DEPENDENCIES
-      _swiftCSwiftPluginServer
     SWIFT_COMPONENT
       compiler
     SWIFT_DEPENDENCIES

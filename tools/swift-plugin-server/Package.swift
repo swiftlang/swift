@@ -43,13 +43,10 @@ let package = Package(
       name: "swift-wasm-plugin-server",
       dependencies: [
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        "CSwiftPluginServer",
         .product(name: "WASI", package: "WasmKit"),
         .product(name: "WasmKitWASI", package: "WasmKit", condition: .when(platforms: [.linux, .windows])),
       ],
-      swiftSettings: [.interoperabilityMode(.Cxx)] + (
-        allowJSC ? [.define("SWIFT_WASM_USE_JSC", .when(platforms: [.macOS]))] : []
-      )
+      swiftSettings: allowJSC ? [.define("SWIFT_WASM_USE_JSC", .when(platforms: [.macOS]))] : []
     ),
   ],
   cxxLanguageStandard: .cxx17
