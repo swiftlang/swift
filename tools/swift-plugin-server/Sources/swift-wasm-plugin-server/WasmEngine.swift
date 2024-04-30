@@ -15,7 +15,7 @@ import WasmTypes
 import SystemPackage
 
 protocol WasmEngine {
-  init(wasm: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws
+  init(path: FilePath, imports: WASIBridgeToHost) async throws
 
   func customSections(named name: String) throws -> [ArraySlice<UInt8>]
 
@@ -30,7 +30,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
   private let pluginToHost: FileDescriptor
   let engine: Engine
 
-  init(wasm: UnsafeByteBuffer) async throws {
+  init(path: FilePath) async throws {
     let hostToPluginPipes = try FileDescriptor.pipe()
     let pluginToHostPipes = try FileDescriptor.pipe()
     self.hostToPlugin = hostToPluginPipes.writeEnd
@@ -41,7 +41,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
       stdout: pluginToHostPipes.writeEnd,
       stderr: .standardError
     )
-    engine = try await Engine(wasm: wasm, imports: bridge)
+    engine = try await Engine(path: path, imports: bridge)
     try checkABIVersion()
     _ = try engine.invoke("_start", [])
   }
