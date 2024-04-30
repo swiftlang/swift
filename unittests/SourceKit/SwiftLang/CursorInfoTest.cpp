@@ -16,6 +16,7 @@
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/SwiftLang/Factory.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
@@ -63,10 +64,6 @@ public:
   LangSupport &getLang() { return getContext().getSwiftLangSupport(); }
 
   void SetUp() override {
-    llvm::InitializeAllTargets();
-    llvm::InitializeAllTargetMCs();
-    llvm::InitializeAllAsmPrinters();
-    llvm::InitializeAllAsmParsers();
     NumTasks = 0;
   }
 
@@ -76,6 +73,7 @@ public:
                                     /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
                                     /*dispatchOnMain=*/false)) {
+    INITIALIZE_LLVM();
     // This is avoiding destroying \p SourceKit::Context because another
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
