@@ -78,7 +78,29 @@ enum class EnforceExclusivityMode {
   DynamicOnly,
   None,
 };
+
+enum class SILOptStrictConcurrency {
+  None = 0,
+  Complete,
+  Targeted,
+  Minimal,
+};
+
 } // end anonymous namespace
+
+std::optional<StrictConcurrency>
+convertSILOptToRawStrictConcurrencyLevel(SILOptStrictConcurrency level) {
+  switch (level) {
+  case SILOptStrictConcurrency::None:
+    return {};
+  case SILOptStrictConcurrency::Complete:
+    return StrictConcurrency::Complete;
+  case SILOptStrictConcurrency::Targeted:
+    return StrictConcurrency::Targeted;
+  case SILOptStrictConcurrency::Minimal:
+    return StrictConcurrency::Minimal;
+  }
+}
 
 namespace llvm {
 
@@ -489,15 +511,19 @@ struct SILOptOptions {
       cl::value_desc("format"), cl::init("yaml"));
 
   // Strict Concurrency
-  llvm::cl::opt<StrictConcurrency> StrictConcurrencyLevel =
-      llvm::cl::opt<StrictConcurrency>(
+  llvm::cl::opt<SILOptStrictConcurrency> StrictConcurrencyLevel =
+      llvm::cl::opt<SILOptStrictConcurrency>(
           "strict-concurrency", cl::desc("strict concurrency level"),
-          llvm::cl::values(clEnumValN(StrictConcurrency::Complete, "complete",
-                                      "Enable complete strict concurrency"),
-                           clEnumValN(StrictConcurrency::Targeted, "targeted",
-                                      "Enable targeted strict concurrency"),
-                           clEnumValN(StrictConcurrency::Minimal, "minimal",
-                                      "Enable minimal strict concurrency")));
+          llvm::cl::init(SILOptStrictConcurrency::None),
+          llvm::cl::values(
+              clEnumValN(SILOptStrictConcurrency::Complete, "complete",
+                         "Enable complete strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::Targeted, "targeted",
+                         "Enable targeted strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::Minimal, "minimal",
+                         "Enable minimal strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::None, "disabled",
+                         "Strict concurrency disabled")));
 
   llvm::cl::opt<bool>
       EnableCxxInterop = llvm::cl::opt<bool>("enable-experimental-cxx-interop",
@@ -693,15 +719,26 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.BypassResilienceChecks;
   Invocation.getDiagnosticOptions().PrintDiagnosticNames =
       options.DebugDiagnosticNames;
+
   for (auto &featureName : options.UpcomingFeatures) {
-    if (auto feature = getUpcomingFeature(featureName)) {
-      Invocation.getLangOptions().enableFeature(*feature);
-    } else {
+    auto feature = getUpcomingFeature(featureName);
+    if (!feature) {
       llvm::errs() << "error: unknown upcoming feature "
                    << QuotedString(featureName) << "\n";
       exit(-1);
     }
+
+    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
+      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+        llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
+                     << " is already enabled as of Swift version "
+                     << *firstVersion << '\n';
+        exit(-1);
+      }
+    }
+    Invocation.getLangOptions().enableFeature(*feature);
   }
+
   for (auto &featureName : options.ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().enableFeature(*feature);
@@ -735,13 +772,26 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
-  if (options.StrictConcurrencyLevel.hasArgStr()) {
+
+  // Enable strict concurrency if we have the feature specified or if it was
+  // specified via a command line option to sil-opt.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
     Invocation.getLangOptions().StrictConcurrencyLevel =
-        options.StrictConcurrencyLevel;
-    if (options.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        !options.DisableRegionBasedIsolationWithStrictConcurrency) {
-      Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
-    }
+        StrictConcurrency::Complete;
+  } else if (auto level = convertSILOptToRawStrictConcurrencyLevel(
+                 options.StrictConcurrencyLevel)) {
+    // If strict concurrency was enabled from the cmdline so the feature flag as
+    // well.
+    if (*level == StrictConcurrency::Complete)
+      Invocation.getLangOptions().enableFeature(Feature::StrictConcurrency);
+    Invocation.getLangOptions().StrictConcurrencyLevel = *level;
+  }
+
+  // If we have strict concurrency set as a feature and were told to turn off
+  // region based isolation... do so now.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency) &&
+      !options.DisableRegionBasedIsolationWithStrictConcurrency) {
+    Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }
 
   Invocation.getDiagnosticOptions().VerifyMode =

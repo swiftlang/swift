@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -transfer-non-sendable -strict-concurrency=complete -swift-version 5 %s -verify -verify-additional-prefix complete-
-// RUN: %target-sil-opt -transfer-non-sendable -strict-concurrency=complete -swift-version 6 %s -verify -verify-additional-prefix tns-
+// RUN: %target-sil-opt -transfer-non-sendable -swift-version 6 %s -verify -verify-additional-prefix tns-
 
 // READ THIS: This test takes advantage of the semantics of concurrency to
 // validate that sil-opt can properly set the swift-version flag in a way that
