@@ -4109,6 +4109,19 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     }
   }
 
+  // The type of the native-to-foreign thunk for a swift closure.
+  if (constant.isForeign && constant.hasClosureExpr() &&
+      shouldStoreClangType(TC.getDeclRefRepresentation(constant))) {
+    auto clangType = TC.Context.getClangFunctionType(
+        origLoweredInterfaceType->getParams(),
+        origLoweredInterfaceType->getResult(),
+        FunctionTypeRepresentation::CFunctionPointer);
+    AbstractionPattern pattern =
+        AbstractionPattern(origLoweredInterfaceType, clangType);
+    return getSILFunctionTypeForAbstractCFunction(
+        TC, pattern, origLoweredInterfaceType, extInfoBuilder, constant);
+  }
+
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
   return getSILFunctionTypeForObjCSelectorFamily(
