@@ -3195,6 +3195,13 @@ namespace {
     const uint8_t *WeakIvarLayout;
     const void *PropertyList;
   };
+
+  struct ObjCClass {
+    ObjCClass *Isa;
+    ObjCClass *Superclass;
+    void *CacheData[2];
+    uintptr_t RODataAndFlags;
+  };
 } // end anonymous namespace
 
 #if SWIFT_OBJC_INTEROP
@@ -3212,6 +3219,9 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
+static inline ClassROData *getROData(ObjCClass *theClass) {
+  return (ClassROData*)(theClass->RODataAndFlags & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
+}
 // This gets called if we fail during copyGenericClassObjcName().  Its job is
 // to generate a unique name, even though the name won't be very helpful if
 // we end up looking at it in a debugger.
@@ -3964,6 +3974,150 @@ swift::swift_updateClassMetadata2(ClassMetadata *self,
                                         /*allowDependency*/ true);
 }
 
+static void initClassFieldOffsetVector(ObjCClass *self,
+                                       size_t numFields,
+                                       const TypeLayout * const *fieldTypes,
+                                       size_t *fieldOffsets) {
+  size_t size, alignMask;
+
+  ClassROData *rodata = getROData(self);
+
+  // Start layout from our static notion of where the superclass starts.
+  // Objective-C expects us to have generated a correct ivar layout, which it
+  // will simply slide if it needs to.
+  assert(self->Superclass && "Swift cannot implement a root class");
+  size = rodata->InstanceStart;
+  alignMask = 0xF; // malloc alignment guarantee
+
+  // Okay, now do layout.
+  for (unsigned i = 0; i != numFields; ++i) {
+    auto *eltLayout = fieldTypes[i];
+
+    // Skip empty fields.
+    if (fieldOffsets[i] == 0 && eltLayout->size == 0)
+      continue;
+    auto offset = roundUpToAlignMask(size,
+                                     eltLayout->flags.getAlignmentMask());
+    fieldOffsets[i] = offset;
+    size = offset + eltLayout->size;
+    alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
+  }
+
+  // Save the size into the Objective-C metadata.
+  if (rodata->InstanceSize != size)
+    rodata->InstanceSize = size;
+}
+
+/// Non-generic classes only. Initialize the Objective-C ivar descriptors and
+/// field offset globals. Does *not* register the class with the Objective-C
+/// runtime; that must be done by the caller.
+///
+/// This function copies the ivar descriptors and updates each ivar global with
+/// the corresponding offset in \p fieldOffsets, before asking the Objective-C
+/// runtime to realize the class. The Objective-C runtime will then slide the
+/// offsets stored in those globals.
+///
+/// Note that \p fieldOffsets remains unchanged in this case.
+static void initObjCClass(ObjCClass *self,
+                          size_t numFields,
+                          const TypeLayout * const *fieldTypes,
+                          size_t *fieldOffsets) {
+  ClassROData *rodata = getROData(self);
+
+  ClassIvarList *ivars = rodata->IvarList;
+  if (!ivars) {
+    assert(numFields == 0);
+    return;
+  }
+
+  assert(ivars->Count == numFields);
+  assert(ivars->EntrySize == sizeof(ClassIvarEntry));
+
+  bool copiedIvarList = false;
+
+  for (unsigned i = 0; i != numFields; ++i) {
+    auto *eltLayout = fieldTypes[i];
+
+    ClassIvarEntry *ivar = &ivars->getIvars()[i];
+
+    // Fill in the field offset global, if this ivar has one.
+    if (ivar->Offset) {
+      if (*ivar->Offset != fieldOffsets[i])
+        *ivar->Offset = fieldOffsets[i];
+    }
+
+    // If the ivar's size doesn't match the field layout we
+    // computed, overwrite it and give it better type information.
+    if (ivar->Size != eltLayout->size) {
+      // If we're going to modify the ivar list, we need to copy it first.
+      if (!copiedIvarList) {
+        auto ivarListSize = sizeof(ClassIvarList) +
+                            numFields * sizeof(ClassIvarEntry);
+        ivars = (ClassIvarList*) getResilientMetadataAllocator()
+          .Allocate(ivarListSize, alignof(ClassIvarList));
+        memcpy(ivars, rodata->IvarList, ivarListSize);
+        rodata->IvarList = ivars;
+        copiedIvarList = true;
+
+        // Update ivar to point to the newly copied list.
+        ivar = &ivars->getIvars()[i];
+      }
+      ivar->Size = eltLayout->size;
+      ivar->Type = nullptr;
+      ivar->Log2Alignment =
+        getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
+    }
+  }
+}
+
+Class
+swift::swift_updatePureObjCClassMetadata(Class cls,
+                                         ClassLayoutFlags flags,
+                                         size_t numFields,
+                                         const TypeLayout * const *fieldTypes,
+                                         size_t *fieldOffsets) {
+  auto self = (ObjCClass *)cls;
+  bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
+
+  // Realize the superclass first.
+  (void)swift_getInitializedObjCClass((Class)self->Isa);
+
+  auto ROData = getROData(self);
+
+  // If we're running on a older Objective-C runtime, just realize
+  // the class.
+  if (!requiresUpdate) {
+    // If we don't have a backward deployment layout, we cannot proceed here.
+    if (ROData->InstanceSize == 0) {
+      fatalError(0, "class %s does not have a fragile layout; "
+                 "the deployment target was newer than this OS\n",
+                 ROData->Name);
+    }
+
+    // Realize the class. This causes the runtime to slide the field offsets
+    // stored in the field offset globals.
+    //
+    // Note that the field offset vector is *not* updated; however in
+    // Objective-C interop mode, we don't actually use the field offset vector
+    // of non-generic classes.
+    //
+    // In particular, class mirrors always use the Objective-C ivar descriptors,
+    // which point at field offset globals and not the field offset vector.
+    swift_getInitializedObjCClass((Class)self);
+  } else {
+    // Update the field offset vector using runtime type information; the layout
+    // of resilient types might be different than the statically-emitted layout.
+    initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
+
+    // Copy field offset vector entries to the field offset globals.
+    initObjCClass(self, numFields, fieldTypes, fieldOffsets);
+
+    // See remark above about how this slides field offset globals.
+    SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift(cls, cls));
+  }
+
+  return cls;
+}
 #endif
 
 #ifndef NDEBUG

@@ -37,34 +37,146 @@
 import Foundation
 import objc_implementation
 
-ImplClass.runTests()
-// CHECK: someMethod = ImplClass.someMethod()
-// CHECK: implProperty = 0
-// CHECK: implProperty = 42
-// CHECK: someMethod = SwiftSubclass.someMethod()
-// CHECK: implProperty = 0
-// CHECK: implProperty = 42
-// CHECK: otherProperty = 1
-// CHECK: otherProperty = 13
-// CHECK: implProperty = 42
-
-let impl = ImplClass()
-print(impl.someMethod(), impl.implProperty)
-// CHECK: ImplClass.someMethod() 0
-
 class SwiftClientSubclass: ImplClass {
-  override init() {}
+  override init() { print("SwiftClientSubclass.init() ") }
   var otherProperty = 2
-  override func someMethod() -> String { "SwiftClientSubclass.someMethod()" }
+  override func someMethod() -> String { "SwiftClientSubclass" }
+
+  override func testSelf() {
+    super.testSelf()
+    self.implProperty = 3
+    self.otherProperty = 9
+    self.printSelf(withLabel: 3)
+  }
+
+  override func printSelf(withLabel label: CInt) {
+    super.printSelf(withLabel: label)
+    let type = type(of: self)
+    print("\(type).otherProperty =", otherProperty);
+  }
+
+  override class func makeResilientImpl() -> ImplClassWithResilientStoredProperty {
+    SwiftResilientStoredClientSubclass()
+  }
 }
 
-let swiftClientSub = SwiftClientSubclass()
-print(swiftClientSub.someMethod())
-// CHECK: SwiftClientSubclass.someMethod()
-print(swiftClientSub.implProperty, swiftClientSub.otherProperty)
-// CHECK: 0 2
-swiftClientSub.implProperty = 3
-swiftClientSub.otherProperty = 9
-print(swiftClientSub.implProperty, swiftClientSub.otherProperty)
-// CHECK: 3 9
+extension SwiftClientSubclass {
+  class SwiftResilientStoredClientSubclass: ImplClassWithResilientStoredProperty {
+    final var mirror2: Mirror?
+    final var afterMirrorProperty2: Int
 
+    public override init() {
+      self.mirror2 = nil
+      self.afterMirrorProperty2 = 1
+    }
+
+    override func printSelf(withLabel label: CInt) {
+      super.printSelf(withLabel: label)
+      let type = type(of: self)
+      print("\(type).mirror2 =", self.mirror2 as Any)
+      print("\(type).afterMirrorProperty2 =", self.afterMirrorProperty2)
+    }
+
+    override func mutate() {
+      super.mutate()
+      self.afterMirrorProperty2 = 43
+    }
+  }
+}
+
+ImplClass.runTests();
+
+do {
+  print("*** SwiftClientSubclass init ***")
+  let swiftClientSub = SwiftClientSubclass()
+  swiftClientSub.testSelf()
+  print("*** SwiftClientSubclass end ***")
+}
+
+// CHECK: implFunc(1989)
+// CHECK-LABEL: *** ImplClass init ***
+// CHECK: ImplClass.init()
+// CHECK-LABEL: *** ImplClassWithResilientStoredProperty #1 ***
+// CHECK: ImplClassWithResilientStoredProperty.mirror = nil
+// CHECK: ImplClassWithResilientStoredProperty.afterMirrorProperty = 0
+// CHECK-LABEL: *** ImplClassWithResilientStoredProperty #2 ***
+// CHECK: ImplClassWithResilientStoredProperty.mirror = nil
+// CHECK: ImplClassWithResilientStoredProperty.afterMirrorProperty = 42
+// CHECK-LABEL: *** ImplClass #1 ***
+// CHECK: ImplClass.someMethod() = ImplClass
+// CHECK: ImplClass.implProperty = 0
+// CHECK: ImplClass.defaultIntProperty = 17
+// CHECK: ImplClass.description = ImplClass(implProperty: 0, object: objc_implementation.LastWords)
+// CHECK-LABEL: *** ImplClass #2 ***
+// CHECK: ImplClass.someMethod() = ImplClass
+// CHECK: ImplClass.implProperty = 42
+// CHECK: ImplClass.defaultIntProperty = 17
+// CHECK: ImplClass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+// CHECK-LABEL: *** ImplClass end ***
+// CHECK: ImplClass It's better to burn out than to fade away.
+// CHECK-LABEL: *** SwiftSubclass init ***
+// CHECK: SwiftSubclass.init()
+// CHECK: ImplClass.init()
+// CHECK-LABEL: *** SwiftResilientStoredSubclass #1 ***
+// CHECK: SwiftResilientStoredSubclass.mirror = nil
+// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty = 0
+// CHECK: SwiftResilientStoredSubclass.mirror2 = nil
+// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty2 = 1
+// CHECK-LABEL: *** SwiftResilientStoredSubclass #2 ***
+// CHECK: SwiftResilientStoredSubclass.mirror = nil
+// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty = 42
+// CHECK: SwiftResilientStoredSubclass.mirror2 = nil
+// CHECK: SwiftResilientStoredSubclass.afterMirrorProperty2 = 43
+// CHECK-LABEL: *** SwiftSubclass #1 ***
+// CHECK: SwiftSubclass.someMethod() = SwiftSubclass
+// CHECK: SwiftSubclass.implProperty = 0
+// CHECK: SwiftSubclass.defaultIntProperty = 17
+// CHECK: SwiftSubclass.description = ImplClass(implProperty: 0, object: objc_implementation.LastWords)
+// CHECK: SwiftSubclass.otherProperty = 1
+// CHECK-LABEL: *** SwiftSubclass #2 ***
+// CHECK: SwiftSubclass.someMethod() = SwiftSubclass
+// CHECK: SwiftSubclass.implProperty = 42
+// CHECK: SwiftSubclass.defaultIntProperty = 17
+// CHECK: SwiftSubclass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+// CHECK: SwiftSubclass.otherProperty = 1
+// CHECK-LABEL: *** SwiftSubclass #3 ***
+// CHECK: SwiftSubclass.someMethod() = SwiftSubclass
+// CHECK: SwiftSubclass.implProperty = 42
+// CHECK: SwiftSubclass.defaultIntProperty = 17
+// CHECK: SwiftSubclass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+// CHECK: SwiftSubclass.otherProperty = 13
+// CHECK-LABEL: *** SwiftSubclass end ***
+// CHECK: SwiftSubclass It's better to burn out than to fade away.
+// CHECK-LABEL: *** SwiftClientSubclass init ***
+// CHECK: SwiftClientSubclass.init()
+// CHECK: ImplClass.init()
+// CHECK-LABEL: *** SwiftResilientStoredClientSubclass #1 ***
+// CHECK: SwiftResilientStoredClientSubclass.mirror = nil
+// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty = 0
+// CHECK: SwiftResilientStoredClientSubclass.mirror2 = nil
+// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty2 = 1
+// CHECK-LABEL: *** SwiftResilientStoredClientSubclass #2 ***
+// CHECK: SwiftResilientStoredClientSubclass.mirror = nil
+// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty = 42
+// CHECK: SwiftResilientStoredClientSubclass.mirror2 = nil
+// CHECK: SwiftResilientStoredClientSubclass.afterMirrorProperty2 = 43
+// CHECK-LABEL: *** SwiftClientSubclass #1 ***
+// CHECK: SwiftClientSubclass.someMethod() = SwiftClientSubclass
+// CHECK: SwiftClientSubclass.implProperty = 0
+// CHECK: SwiftClientSubclass.defaultIntProperty = 17
+// CHECK: SwiftClientSubclass.description = ImplClass(implProperty: 0, object: objc_implementation.LastWords)
+// CHECK: SwiftClientSubclass.otherProperty = 2
+// CHECK-LABEL: *** SwiftClientSubclass #2 ***
+// CHECK: SwiftClientSubclass.someMethod() = SwiftClientSubclass
+// CHECK: SwiftClientSubclass.implProperty = 42
+// CHECK: SwiftClientSubclass.defaultIntProperty = 17
+// CHECK: SwiftClientSubclass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+// CHECK: SwiftClientSubclass.otherProperty = 2
+// CHECK-LABEL: *** SwiftClientSubclass #3 ***
+// CHECK: SwiftClientSubclass.someMethod() = SwiftClientSubclass
+// CHECK: SwiftClientSubclass.implProperty = 3
+// CHECK: SwiftClientSubclass.defaultIntProperty = 17
+// CHECK: SwiftClientSubclass.description = ImplClass(implProperty: 3, object: objc_implementation.LastWords)
+// CHECK: SwiftClientSubclass.otherProperty = 9
+// CHECK-LABEL: *** SwiftClientSubclass end ***
+// CHECK: SwiftClientSubclass It's better to burn out than to fade away.
