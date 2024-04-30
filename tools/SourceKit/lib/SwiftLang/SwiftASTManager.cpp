@@ -451,6 +451,9 @@ public:
   /// consumer, removes it from the \c Consumers severed by this build operation
   /// and, if no consumers are left, cancels the AST build of this operation.
   void requestConsumerCancellation(SwiftASTConsumerRef Consumer);
+
+  /// Cancels all consumers for the given operation.
+  void cancelAllConsumers();
 };
 
 using ASTBuildOperationRef = std::shared_ptr<ASTBuildOperation>;
@@ -516,6 +519,9 @@ public:
   void enqueueConsumer(SwiftASTConsumerRef Consumer,
                        IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
                        SwiftASTManagerRef Mgr);
+
+  /// Cancel all currently running build operations.
+  void cancelAllBuilds();
 
   size_t getMemoryCost() const {
     size_t Cost = sizeof(*this);
@@ -848,6 +854,14 @@ void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
   Impl.ASTCache.remove(Invok->Impl.Key);
 }
 
+void SwiftASTManager::cancelBuildsForCachedAST(SwiftInvocationRef Invok) {
+  auto Result = Impl.getASTProducer(Invok);
+  if (!Result)
+    return;
+
+  (*Result)->cancelAllBuilds();
+}
+
 ASTProducerRef SwiftASTManager::Implementation::getOrCreateASTProducer(
     SwiftInvocationRef InvokRef) {
   llvm::sys::ScopedLock L(CacheMtx);
@@ -1004,6 +1018,24 @@ void ASTBuildOperation::requestConsumerCancellation(
   ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer] {
     Consumer->cancelled();
   });
+}
+
+void ASTBuildOperation::cancelAllConsumers() {
+  if (isFinished())
+    return;
+
+  llvm::sys::ScopedLock L(ConsumersAndResultMtx);
+  CancellationFlag->store(true, std::memory_order_relaxed);
+
+  // Take the consumers, and notify them of the cancellation.
+  decltype(this->Consumers) Consumers;
+  std::swap(Consumers, this->Consumers);
+
+  ASTManager->Impl.ConsumerNotificationQueue.dispatch(
+      [Consumers = std::move(Consumers)] {
+        for (auto &Consumer : Consumers)
+          Consumer->cancelled();
+      });
 }
 
 static void collectModuleDependencies(ModuleDecl *TopMod,
@@ -1328,6 +1360,15 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
     ++(*StatCount);
   }
   return LatestUsableOp;
+}
+
+void ASTProducer::cancelAllBuilds() {
+  // Cancel all build operations, cleanup will happen when each operation
+  // terminates.
+  BuildOperationsQueue.dispatch([This = shared_from_this()] {
+    for (auto &BuildOp : This->BuildOperations)
+      BuildOp->cancelAllConsumers();
+  });
 }
 
 void ASTProducer::enqueueConsumer(
