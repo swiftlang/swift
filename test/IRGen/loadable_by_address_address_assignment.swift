@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend %s  -O -Xllvm -sil-print-after=loadable-address -c -o %t/t.o 2>&1 | %FileCheck %s
 
-// XFAIL: OS=windows-msvc
-
 public struct LargeThing {
     var  s0 : String = ""
     var  s1 : String = ""

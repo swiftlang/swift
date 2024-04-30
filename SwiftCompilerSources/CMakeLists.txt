@@ -106,6 +106,7 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
   # Prior to 5.9, we have to use the experimental flag for C++ interop.
   if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
     list(APPEND swift_compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
@@ -167,7 +168,17 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-  list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND swift_compile_options "-static")
+    list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
+
+    # Workaround a crash in the LoadableByAddress pass
+    # https://github.com/apple/swift/issues/73254
+    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
+  else()
+    list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+  endif()
 
   set(all_obj_files)
   set(all_module_targets)
