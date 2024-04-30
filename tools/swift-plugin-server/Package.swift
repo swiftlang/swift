@@ -7,7 +7,7 @@ let allowJSC = true
 let package = Package(
   name: "swift-plugin-server",
   platforms: [
-    .macOS(.v11),
+    .macOS(.v10_15),
   ],
   products: [
     .library(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
