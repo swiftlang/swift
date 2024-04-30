@@ -1,10 +1,4 @@
 if (SWIFT_BUILD_SWIFT_SYNTAX)
-  # hack: override macOS deployment target to 10.15.4
-  # since that's the minimum required by WasmKit
-  set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.15.4")
-  include(DarwinSDKs)
-  swift_get_host_triple(SWIFT_HOST_TRIPLE)
-
   # override the remote SwiftSystem and ArgParser dependencies in WasmKit
   FetchContent_Declare(SwiftSystem SOURCE_DIR "${PROJECT_SOURCE_DIR}/../swift-system")
   FetchContent_Declare(ArgumentParser SOURCE_DIR "${PROJECT_SOURCE_DIR}/../swift-argument-parser")

@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
-import Foundation
+import SystemPackage
+import Foundation.NSData
 
 @main
 final class SwiftPluginServer {
@@ -31,7 +32,7 @@ final class SwiftPluginServer {
     // it's worth the effort jumping through these hoops because
     // wasm modules can be really large (30M+) so we want to avoid making
     // copies if possible.
-    let data = try NSData(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+    let data = try NSData(contentsOfFile: path, options: .mappedIfSafe)
     let wasm = UnsafeByteBuffer(
       data: UnsafeRawBufferPointer(start: data.bytes, count: data.count),
       deallocator: { [box = data as AnyObject] in _ = box }
@@ -46,7 +47,7 @@ final class SwiftPluginServer {
     let response: PluginToHostMessage
     do {
       guard let plugin = loadedWasmPlugins[module] else { throw PluginServerError(message: "Could not find module \(module)") }
-      let request = try JSON.encode(message).withUnsafeBufferPointer { Data($0) }
+      let request = try JSON.encode(message)
       let responseRaw = try await plugin.handleMessage(request)
       response = try responseRaw.withUnsafeBytes {
         try $0.withMemoryRebound(to: UInt8.self) {
@@ -54,7 +55,7 @@ final class SwiftPluginServer {
         }
       }
     } catch {
-      try? FileHandle.standardError.write(contentsOf: Data("Error: \(error)\n".utf8))
+      printError("Error: \(error)")
       try sendMessage(.expandMacroResult(expandedSource: nil, diagnostics: []))
       return
     }
@@ -80,7 +81,7 @@ final class SwiftPluginServer {
         do {
           loadedWasmPlugins[moduleName] = try await loadPluginLibrary(path: libraryPath, moduleName: moduleName)
         } catch {
-          try? FileHandle.standardError.write(contentsOf: Data("Error: \(error)\n".utf8))
+          printError("Error: \(error)")
           try sendMessage(.loadPluginLibraryResult(loaded: false, diagnostics: []))
           continue
         }
@@ -103,10 +104,14 @@ final class SwiftPluginServer {
   }
 }
 
+private func printError(_ error: String) {
+  _ = try? FileDescriptor.standardError.writeAll("\(error)\n".utf8)
+}
+
 protocol WasmPlugin {
   init(wasm: UnsafeByteBuffer) async throws
 
-  func handleMessage(_ json: Data) async throws -> Data
+  func handleMessage(_ json: [UInt8]) async throws -> [UInt8]
 }
 
 private var defaultWasmPlugin: (some WasmPlugin).Type { DefaultWasmPlugin.self }
