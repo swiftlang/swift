@@ -7,7 +7,7 @@ let allowJSC = true
 let package = Package(
   name: "swift-plugin-server",
   platforms: [
-    .macOS(.v10_15),
+    .macOS(.v10_15)
   ],
   products: [
     .library(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
@@ -35,7 +35,7 @@ let package = Package(
       dependencies: [
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
-        "CSwiftPluginServer",
+        "CSwiftPluginServer"
       ]
     ),
     .target(
