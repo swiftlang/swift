@@ -21,7 +21,7 @@ class NullEditorConsumer : public EditorConsumer {
     llvm_unreachable("unexpected error");
   }
 
-  bool syntaxMapEnabled() override { return true; }
+  bool syntaxMapEnabled() override { return false; }
 
   void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
   }
