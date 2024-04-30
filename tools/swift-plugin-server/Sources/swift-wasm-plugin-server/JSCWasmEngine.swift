@@ -38,6 +38,8 @@ final class JSCWasmEngine: WasmEngine {
   private let api: JSValue
 
   init(wasm buffer: UnsafeByteBuffer, imports: WASIBridgeToHost) async throws {
+    guard #available(macOS 10.15, *) else { fatalError("JSCWasmEngine requires macOS 10.15+") }
+
     let factory = try await JSCWasmFactory.shared
     let context = factory.context
 
@@ -107,6 +109,7 @@ private struct JSCGuestMemory: GuestMemory {
   }
 }
 
+@available(macOS 10.15, *)
 private struct JSCWasmFactory {
   let context: JSContext
   let value: JSValue
@@ -214,6 +217,7 @@ extension JSValue {
     withUnsafeArrayBuffer { Data($0) }
   }
 
+  @available(macOS 10.15, *)
   fileprivate var promiseValue: JSValue {
     get async throws {
       try await withCheckedThrowingContinuation { continuation in
