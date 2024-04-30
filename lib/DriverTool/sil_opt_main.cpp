@@ -864,7 +864,11 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {
     llvm::errs() << InstanceSetupError << '\n';
-    return finishDiagProcessing(1);
+    // Rather than finish Diag processing, exit -1 here to show we failed to
+    // setup here. The reason we do this is if the setup fails, we want to fail
+    // hard. We shouldn't be testing that we setup correctly with
+    // -verify/etc. We should be testing that later.
+    exit(-1);
   }
 
   CI.performSema();
