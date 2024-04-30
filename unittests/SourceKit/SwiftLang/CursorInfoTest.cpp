@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "NullEditorConsumer.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
@@ -40,61 +41,6 @@ static void *createCancellationToken() {
 }
 
 namespace {
-
-class NullEditorConsumer : public EditorConsumer {
-  bool needsSemanticInfo() override { return needsSema; }
-
-  void handleRequestError(const char *Description) override {
-    llvm_unreachable("unexpected error");
-  }
-
-  bool syntaxMapEnabled() override { return true; }
-
-  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
-  }
-
-  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
-                                bool isSystem) override {}
-
-  bool documentStructureEnabled() override { return false; }
-
-  void beginDocumentSubStructure(unsigned Offset, unsigned Length,
-                                 UIdent Kind, UIdent AccessLevel,
-                                 UIdent SetterAccessLevel,
-                                 unsigned NameOffset,
-                                 unsigned NameLength,
-                                 unsigned BodyOffset,
-                                 unsigned BodyLength,
-                                 unsigned DocOffset,
-                                 unsigned DocLength,
-                                 StringRef DisplayName,
-                                 StringRef TypeName,
-                                 StringRef RuntimeName,
-                                 StringRef SelectorName,
-                                 ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
-  }
-
-  void endDocumentSubStructure() override {}
-
-  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
-                                         unsigned Length) override {}
-
-  void recordAffectedRange(unsigned Offset, unsigned Length) override {}
-
-  void recordAffectedLineRange(unsigned Line, unsigned Length) override {}
-
-  bool diagnosticsEnabled() override { return false; }
-
-  void handleDiagnostics(ArrayRef<DiagnosticEntryInfo> DiagInfos,
-                         UIdent DiagStage) override {}
-  void recordFormattedText(StringRef Text) override {}
-
-  void handleSourceText(StringRef Text) override {}
-
-public:
-  bool needsSema = false;
-};
 
 struct TestCursorInfo {
   // Empty if no error.
