@@ -36,8 +36,7 @@ let package = Package(
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         "CSwiftPluginServer",
-      ],
-      swiftSettings: [.interoperabilityMode(.Cxx)]
+      ]
     ),
     .target(
       name: "swift-wasm-plugin-server",
