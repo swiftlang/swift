@@ -443,6 +443,17 @@ namespace {
       return Type();
     }
 
+    ImportResult VisitCountAttributedType(
+        const clang::CountAttributedType *type) {
+      // CountAttributedType is a clang type representing a pointer with
+      // a "counted_by" type attribute. For now, we don't import these
+      // into Swift.
+      // In the future we could do something more clever (such as trying to
+      // import as an Array where possible) or less clever (such as importing
+      // as the desugared, underlying pointer type).
+      return Type();
+    }
+
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
       return Type();
     }
@@ -1286,10 +1297,6 @@ namespace {
     }
 
     ImportResult VisitPackIndexingType(const clang::PackIndexingType *type) {
-      return Type();
-    }
-
-    ImportResult VisitCountAttributedType(const clang::CountAttributedType *type) {
       return Type();
     }
   };

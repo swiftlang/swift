@@ -317,6 +317,18 @@ namespace {
     }
 
     void writeAttr(const clang::Attr *attr) {}
+
+    // CountAttributedType is a clang type representing a pointer with
+    // a "counted_by" type attribute and DynamicRangePointerType
+    // is representing a "__ended_by" type attribute.
+    // TypeCoupledDeclRefInfo is used to hold information of a declaration
+    // referenced from an expression argument of "__counted_by(expr)" or
+    // "__ended_by(expr)".
+    // Leave it non-serializable for now as we currently don't import
+    // these types into Swift.
+    void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
+      llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
+    }
   };
 }
 

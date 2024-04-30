@@ -99,11 +99,6 @@ public:
   T *readDeclAs() {
     return asImpl().template readDeclAs<T>();
   }
-
-  clang::TypeCoupledDeclRefInfo readTypeCoupledDeclRefInfo() {
-    return clang::TypeCoupledDeclRefInfo(
-        asImpl().template readDeclAs<clang::ValueDecl>(), asImpl().readBool());
-  }
 };
 
 }
