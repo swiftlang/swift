@@ -15,6 +15,7 @@
 import WASI
 import WasmKit
 import WasmKitWASI
+import SystemPackage
 
 typealias DefaultWasmEngine = WasmKitEngine
 
@@ -23,10 +24,10 @@ struct WasmKitEngine: WasmEngine {
   private let instance: ModuleInstance
   private let runtime: Runtime
 
-  init(wasm: UnsafeByteBuffer, imports: WASIBridgeToHost) throws {
+  init(path: FilePath, imports: WASIBridgeToHost) throws {
     // we never call wasm.deallocator, effectively leaking the data,
     // but that's intentional because plugins can't be "unloaded"
-    module = try parseWasm(bytes: Array(wasm.data))
+    module = try parseWasm(filePath: path)
     runtime = Runtime(hostModules: imports.hostModules)
     instance = try runtime.instantiate(module: module)
   }

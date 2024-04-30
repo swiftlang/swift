@@ -44,7 +44,9 @@ let package = Package(
       dependencies: [
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "WASI", package: "WasmKit"),
-        .product(name: "WasmKitWASI", package: "WasmKit", condition: .when(platforms: [.linux, .windows])),
+        .product(name: "WasmKitWASI", package: "WasmKit", condition: .when(
+            platforms: [.linux, .windows] + (allowJSC ? [] : [.macOS])
+        )),
       ],
       swiftSettings: allowJSC ? [.define("SWIFT_WASM_USE_JSC", .when(platforms: [.macOS]))] : []
     ),
