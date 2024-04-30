@@ -41,11 +41,4 @@ struct WasmKitEngine: WasmEngine {
   }
 }
 
-struct WasmKitPluginError: Error, CustomStringConvertible {
-    let description: String
-    init(message: String) {
-        self.description = message
-    }
-}
-
 #endif
