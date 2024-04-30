@@ -2953,10 +2953,16 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
                                 bool isVWTMutable,
                                 MetadataDependencyCollector *collector) {
   auto *target = T.getNominalOrBoundGenericNominal();
-  llvm::Value *fieldVector
-    = emitAddressOfFieldOffsetVector(*this, metadata, target)
+
+  llvm::Value *fieldVector = nullptr;
+  // @objc @implementation classes don't actually have a field vector; for them,
+  // we're just trying to update the direct field offsets.
+  if (!isa<ClassDecl>(target)
+        || !cast<ClassDecl>(target)->getObjCImplementationDecl()) {
+    fieldVector = emitAddressOfFieldOffsetVector(*this, metadata, target)
       .getAddress();
-  
+  }
+
   // Collect the stored properties of the type.
   unsigned numFields = getNumFields(target);
 
@@ -3019,7 +3025,7 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
     case ClassMetadataStrategy::FixedOrUpdate:
       assert(IGM.Context.LangOpts.EnableObjCInterop);
 
-      if (!classDecl->getObjCImplementationDecl()) {
+      if (fieldVector) {
         // Call swift_updateClassMetadata(). Note that the static metadata
         // already references the superclass in this case, but we still want
         // to ensure the superclass metadata is initialized first.
@@ -3028,10 +3034,13 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
               {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
                fields.getAddress(), fieldVector});
       } else {
+        // If we don't have a field vector, we must be updating an
+        // @objc @implementation class layout. Call
+        // swift_updatePureObjCClassMetadata() instead.
         Builder.CreateCall(
               IGM.getUpdatePureObjCClassMetadataFunctionPointer(),
               {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
-               fields.getAddress(), fieldVector});
+               fields.getAddress()});
       }
       break;
 
@@ -4438,12 +4447,14 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout, vtable) {}
 
     void addFieldOffset(VarDecl *var) {
+      assert(!isPureObjC());
       addFixedFieldOffset(IGM, B, var, [](DeclContext *dc) {
         return dc->getDeclaredTypeInContext();
       });
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      assert(!isPureObjC());
       llvm_unreachable("Fixed class metadata cannot have missing members");
     }
 
@@ -4469,12 +4480,14 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout) {}
 
     void addFieldOffset(VarDecl *var) {
+      assert(!isPureObjC());
       // Field offsets are either copied from the superclass or calculated
       // at runtime.
       B.addInt(IGM.SizeTy, 0);
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      assert(!isPureObjC());
       for (unsigned i = 0,
                     e = placeholder->getNumberOfFieldOffsetVectorEntries();
            i < e; ++i) {
@@ -4970,11 +4983,13 @@ namespace {
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      assert(!isPureObjC());
       llvm_unreachable(
           "Prespecialized generic class metadata cannot have missing members");
     }
 
     void addFieldOffset(VarDecl *var) {
+      assert(!isPureObjC());
       addFixedFieldOffset(IGM, B, var, [&](DeclContext *dc) {
         return dc->mapTypeIntoContext(type);
       });

@@ -1437,17 +1437,15 @@ FUNCTION(UpdateClassMetadata2,
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)
 
-// objc_class *swift_updatePureObjCClassMetadata(objc_class *self,
-//                                               ClassLayoutFlags flags,
-//                                               size_t numFields,
-//                                               TypeLayout * const *fieldTypes,
-//                                               size_t *fieldOffsets);
+// objc_class *swift_updatePureObjCClassMetadata(
+//             objc_class *self,
+//             ClassLayoutFlags flags,
+//             size_t numFields,
+//             TypeLayout * const *fieldTypes);
 FUNCTION(UpdatePureObjCClassMetadata,
          swift_updatePureObjCClassMetadata, SwiftCC, AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
-         ARGS(ObjCClassPtrTy, SizeTy, SizeTy,
-              Int8PtrPtrTy->getPointerTo(),
-              SizeTy->getPointerTo()),
+         ARGS(ObjCClassPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo()),
          ATTRS(NoUnwind),
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)

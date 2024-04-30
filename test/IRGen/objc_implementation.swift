@@ -28,7 +28,7 @@
 // CHECK: [[_PROPERTIES_ImplClass:@[^, ]+]] = internal constant { i32, i32, [1 x { ptr, ptr }] } { i32 16, i32 1, [1 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.12.implProperty, ptr @".str.18.Ti,N,VimplProperty" }] }, section "__DATA, __objc_const", align 8
 // FIXME: Should just be @_PROTOCOLS_ImplClass, but an IRGen bug causes the protocol list to be emitted twice.
 // CHECK: [[_DATA_ImplClass:@[^, ]+]] = internal constant { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { i32 388, i32 8, i32 24, i32 0, ptr null, ptr @.str.9.ImplClass, ptr [[_INSTANCE_METHODS_ImplClass]], ptr @_PROTOCOLS_ImplClass.{{[0-9]+}}, ptr [[_IVARS_ImplClass]], ptr null, ptr [[_PROPERTIES_ImplClass]] }, section "__DATA, __objc_data", align 8
-// CHECK: @"OBJC_CLASS_$_ImplClass" = global <{ i64, ptr, ptr, ptr, i64, i64, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_ImplClass" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr [[_DATA_ImplClass]] to i64), i64 8, i64 16 }>, section "__DATA,__objc_data, regular", align 8
+// CHECK: @"OBJC_CLASS_$_ImplClass" = global <{ i64, ptr, ptr, ptr, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_ImplClass" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr [[_DATA_ImplClass]] to i64) }>, section "__DATA,__objc_data, regular", align 8
 
 // Swift metadata
 // NEGATIVE-NOT: OBJC_CLASS_$_ImplClass.{{[0-9]}}
@@ -92,7 +92,7 @@
 // CHECK: @_IVARS_NoInitImplClass = internal constant { i32, i32, [4 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 4, [4 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s1SSvpWvd", ptr @.str.2.s1, ptr @.str.0., i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s2SSvpWvd", ptr @.str.2.s2, ptr @.str.0., i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s3SSvpWvd", ptr @.str.2.s3, ptr @.str.0., i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s4SSvpWvd", ptr @.str.2.s4, ptr @.str.0., i32 3, i32 16 }] }, section "__DATA, __objc_const", align 8
 // CHECK: @_PROPERTIES_NoInitImplClass = internal constant { i32, i32, [4 x { ptr, ptr }] } { i32 16, i32 4, [4 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.2.s1, ptr @".str.16.T@\22NSString\22,N,R" }, { ptr, ptr } { ptr @.str.2.s2, ptr @".str.16.T@\22NSString\22,N,C" }, { ptr, ptr } { ptr @.str.2.s3, ptr @".str.16.T@\22NSString\22,N,R" }, { ptr, ptr } { ptr @.str.2.s4, ptr @".str.16.T@\22NSString\22,N,C" }] }, section "__DATA, __objc_const", align 8
 // CHECK: @_DATA_NoInitImplClass = internal constant { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { i32 388, i32 8, i32 72, i32 0, ptr null, ptr @.str.15.NoInitImplClass, ptr @_INSTANCE_METHODS_NoInitImplClass, ptr null, ptr @_IVARS_NoInitImplClass, ptr null, ptr @_PROPERTIES_NoInitImplClass }, section "__DATA, __objc_data", align 8
-// CHECK: @"OBJC_CLASS_$_NoInitImplClass" = global <{ i64, ptr, ptr, ptr, i64, i64, i64, i64, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_NoInitImplClass" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr @_DATA_NoInitImplClass to i64), i64 8, i64 24, i64 40, i64 56 }>, section "__DATA,__objc_data, regular", align 8
+// CHECK: @"OBJC_CLASS_$_NoInitImplClass" = global <{ i64, ptr, ptr, ptr, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_NoInitImplClass" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr @_DATA_NoInitImplClass to i64) }>, section "__DATA,__objc_data, regular", align 8
 @_objcImplementation extension NoInitImplClass {
   @objc let s1 = "s1v"
   @objc var s2 = "s2v"
@@ -142,7 +142,7 @@ open class SwiftSubclass: ImplClass {
 // Class
 // CHECK: @_IVARS_ImplClassWithResilientStoredProperty = internal constant { i32, i32, [4 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 4, [4 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE9beforeInts5Int32VvpWvd", ptr @.str.9.beforeInt, ptr @.str.0., i32 2, i32 4 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE6mirrors6MirrorVSgvpWvd", ptr @.str.6.mirror, ptr @.str.0., i32 0, i32 0 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE13afterIntFinals5Int32VvpWvd", ptr @.str.13.afterIntFinal, ptr @.str.0., i32 2, i32 4 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE8afterInts5Int32VvpWvd", ptr @.str.8.afterInt, ptr @.str.0., i32 2, i32 4 }] }, section "__DATA, __objc_const", align 8
 // CHECK: @_DATA_ImplClassWithResilientStoredProperty = internal constant { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { i32 452, i32 8, i32 20, i32 0, ptr null, ptr @.str.36.ImplClassWithResilientStoredProperty, ptr @_INSTANCE_METHODS_ImplClassWithResilientStoredProperty, ptr null, ptr @_IVARS_ImplClassWithResilientStoredProperty, ptr null, ptr @_PROPERTIES_ImplClassWithResilientStoredProperty, ptr @"$sSo36ImplClassWithResilientStoredPropertyCMU" }, section "__DATA, __objc_data", align 8
-// CHECK: @"OBJC_CLASS_$_ImplClassWithResilientStoredProperty" = global <{ i64, ptr, ptr, ptr, i64, i64, i64, i64, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_ImplClassWithResilientStoredProperty" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr @_DATA_ImplClassWithResilientStoredProperty to i64), i64 0, i64 0, i64 0, i64 0 }>, section "__DATA,__objc_data, regular", align 8
+// CHECK: @"OBJC_CLASS_$_ImplClassWithResilientStoredProperty" = global <{ i64, ptr, ptr, ptr, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_ImplClassWithResilientStoredProperty" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr @_DATA_ImplClassWithResilientStoredProperty to i64) }>, section "__DATA,__objc_data, regular", align 8
 
 @_objcImplementation extension ImplClassWithResilientStoredProperty {
   @objc var beforeInt: Int32 = 0
@@ -323,7 +323,7 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // CHECK:         store ptr {{%[0-9]+}}, ptr {{%[0-9]+}}
 // CHECK:         store ptr getelementptr inbounds (ptr, ptr @"$sBi32_WV", i32 8), ptr {{%[0-9]+}}
 // CHECK:         store ptr getelementptr inbounds (ptr, ptr @"$sBi32_WV", i32 8), ptr {{%[0-9]+}}
-// CHECK:         {{%[0-9]+}} = call swiftcc ptr @swift_updatePureObjCClassMetadata(ptr @"OBJC_CLASS_$_ImplClassWithResilientStoredProperty", i64 256, i64 4, ptr [[FIELDS_ARRAY]], ptr getelementptr inbounds (i64, ptr @"OBJC_CLASS_$_ImplClassWithResilientStoredProperty", i64 5))
+// CHECK:         {{%[0-9]+}} = call swiftcc ptr @swift_updatePureObjCClassMetadata(ptr @"OBJC_CLASS_$_ImplClassWithResilientStoredProperty", i64 256, i64 4, ptr [[FIELDS_ARRAY]])
 //
 // This function should not invoke the metadata accessor.
 // CHECK-NOT:     sSo36ImplClassWithResilientStoredPropertyCMa

@@ -104,7 +104,6 @@ public:
       asImpl().addSuperclass();
       asImpl().addClassCacheData();
       asImpl().addClassDataPointer();
-      addClassMembers(Target, Target);
       return;
     }
 
@@ -221,10 +220,8 @@ private:
                                  rootClass))
       return;
 
-    if (!isPureObjC()) {
-      // Add vtable entries.
-      asImpl().addVTableEntries(theClass);
-    }
+    // Add vtable entries.
+    asImpl().addVTableEntries(theClass);
   }
 
   /// Add fields associated with the given class and its bases.

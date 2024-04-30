@@ -4070,12 +4070,36 @@ static void initObjCClass(ObjCClass *self,
   }
 }
 
+static void populateInitialFieldOffsets(ObjCClass *self,
+                                        size_t numFields,
+                                        size_t *fieldOffsets) {
+  ClassROData *rodata = getROData(self);
+
+  ClassIvarList *ivars = rodata->IvarList;
+  if (!ivars) {
+    assert(numFields == 0);
+    return;
+  }
+
+  assert(ivars->Count == numFields);
+  assert(ivars->EntrySize == sizeof(ClassIvarEntry));
+
+  for (unsigned i = 0; i != numFields; ++i) {
+    ClassIvarEntry *ivar = &ivars->getIvars()[i];
+
+    if (ivar->Offset) {
+      fieldOffsets[i] = *ivar->Offset;
+    } else {
+      fieldOffsets[i] = 0;
+    }
+  }
+}
+
 Class
 swift::swift_updatePureObjCClassMetadata(Class cls,
                                          ClassLayoutFlags flags,
                                          size_t numFields,
-                                         const TypeLayout * const *fieldTypes,
-                                         size_t *fieldOffsets) {
+                                         const TypeLayout * const *fieldTypes) {
   auto self = (ObjCClass *)cls;
   bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
 
@@ -4105,6 +4129,11 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
     // which point at field offset globals and not the field offset vector.
     swift_getInitializedObjCClass((Class)self);
   } else {
+    // Fake up a field offsets vector based on the ivars.
+    // FIXME: Temporary; we should just combine the other two functions' logic.
+    size_t *fieldOffsets = (size_t *)alloca(numFields * sizeof(size_t));
+    populateInitialFieldOffsets(self, numFields, fieldOffsets);
+
     // Update the field offset vector using runtime type information; the layout
     // of resilient types might be different than the statically-emitted layout.
     initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
