@@ -3374,19 +3374,21 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         if (auto ret = dyn_cast_or_null<ReturnStmt>(
               caseLabel->getBody()->getSingleActiveElement()
                        .dyn_cast<Stmt*>())) {
-          Expr *result = ret->getResult()->getSemanticsProvidingExpr();
-          if (result->getType()->isNoncopyable()) {
-            while (auto conv = dyn_cast<ImplicitConversionExpr>(result)) {
-              result = conv->getSubExpr()->getSemanticsProvidingExpr();
-            }
-            if (auto dr = dyn_cast<DeclRefExpr>(result)) {
-              if (std::find(caseLabel->getCaseBodyVariables().begin(),
-                            caseLabel->getCaseBodyVariables().end(),
-                            dr->getDecl())
-                    != caseLabel->getCaseBodyVariables().end()) {
-                SGM.diagnose(result->getLoc(),
-                             diag::return_borrowing_switch_binding);
-                ownership = ValueOwnership::Owned;
+          if (ret->hasResult()) {
+            Expr *result = ret->getResult()->getSemanticsProvidingExpr();
+            if (result->getType()->isNoncopyable()) {
+              while (auto conv = dyn_cast<ImplicitConversionExpr>(result)) {
+                result = conv->getSubExpr()->getSemanticsProvidingExpr();
+              }
+              if (auto dr = dyn_cast<DeclRefExpr>(result)) {
+                if (std::find(caseLabel->getCaseBodyVariables().begin(),
+                              caseLabel->getCaseBodyVariables().end(),
+                              dr->getDecl())
+                      != caseLabel->getCaseBodyVariables().end()) {
+                  SGM.diagnose(result->getLoc(),
+                               diag::return_borrowing_switch_binding);
+                  ownership = ValueOwnership::Owned;
+                }
               }
             }
           }
