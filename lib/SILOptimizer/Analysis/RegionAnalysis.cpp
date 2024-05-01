@@ -156,59 +156,38 @@ struct UseDefChainVisitor
         isMerge = true;
         break;
       case ProjectionKind::Enum: {
-        // Enum is never a merge since it always has a single tuple field... but
-        // it can be actor isolated.
-        if (!bool(actorIsolation)) {
-          auto *uedi = cast<UncheckedTakeEnumDataAddrInst>(inst);
-          auto i = getActorIsolation(uedi->getEnumDecl());
-          // If our operand decl is actor isolated, then we want to stop looking
-          // through since it is Sendable.
-          if (i.isActorIsolated()) {
-            actorIsolation = i;
-            return SILValue();
-          }
-        }
+        auto op = cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand();
+
+        // See if our operand type is a sendable type. In such a case, we do not
+        // want to look through our operand.
+        if (!isNonSendableType(op->getType(), op->getFunction()))
+          return SILValue();
+
         break;
       }
       case ProjectionKind::Tuple: {
         // These are merges if we have multiple fields.
-        auto *tti = cast<TupleElementAddrInst>(inst);
+        auto op = cast<TupleElementAddrInst>(inst)->getOperand();
 
-        // See if our result type is a sendable type. In such a case, we do not
-        // want to look through the tuple_element_addr since we do not want to
-        // identify the sendable type with the non-sendable operand. These we
-        // are always going to ignore anyways since a sendable let/var field of
-        // a struct can always be used.
-        if (!isNonSendableType(tti->getType(), tti->getFunction()))
+        if (!isNonSendableType(op->getType(), op->getFunction()))
           return SILValue();
 
-        isMerge |= tti->getOperand()->getType().getNumTupleElements() > 1;
+        isMerge |= op->getType().getNumTupleElements() > 1;
         break;
       }
       case ProjectionKind::Struct:
-        auto *sea = cast<StructElementAddrInst>(inst);
-
-        // See if our type is actor isolated.
-        if (!bool(actorIsolation)) {
-          auto i = getActorIsolation(sea->getStructDecl());
-          // If our parent type is actor isolated then we do not want to keep on
-          // walking up from use->def since the value is considered Sendable.
-          if (i.isActorIsolated()) {
-            actorIsolation = i;
-            return SILValue();
-          }
-        }
+        auto op = cast<StructElementAddrInst>(inst)->getOperand();
 
         // See if our result type is a sendable type. In such a case, we do not
         // want to look through the struct_element_addr since we do not want to
         // identify the sendable type with the non-sendable operand. These we
         // are always going to ignore anyways since a sendable let/var field of
         // a struct can always be used.
-        if (!isNonSendableType(sea->getType(), sea->getFunction()))
+        if (!isNonSendableType(op->getType(), op->getFunction()))
           return SILValue();
 
         // These are merges if we have multiple fields.
-        isMerge |= sea->getOperand()->getType().getNumNominalFields() > 1;
+        isMerge |= op->getType().getNumNominalFields() > 1;
         break;
       }
     }
@@ -1457,6 +1436,8 @@ public:
         LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ";
                    state->print(llvm::dbgs()); llvm::dbgs() << *arg);
         nonSendableJoinedIndices.push_back(state->getID());
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "    Sendable: " << *arg);
       }
     }
 
