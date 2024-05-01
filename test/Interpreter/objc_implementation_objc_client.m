@@ -8,7 +8,7 @@
 // RUN: %empty-directory(%t-frameworks/objc_implementation.framework/Headers)
 // RUN: cp %S/Inputs/objc_implementation.modulemap %t-frameworks/objc_implementation.framework/Modules/module.modulemap
 // RUN: cp %S/Inputs/objc_implementation.h %t-frameworks/objc_implementation.framework/Headers
-// RUN: %target-build-swift-dylib(%t-frameworks/objc_implementation.framework/objc_implementation) -emit-module-path %t-frameworks/objc_implementation.framework/Modules/objc_implementation.swiftmodule/%module-target-triple.swiftmodule -module-name objc_implementation -F %t-frameworks -import-underlying-module -Xlinker -install_name -Xlinker %t-frameworks/objc_implementation.framework/objc_implementation %S/objc_implementation.swift
+// RUN: %target-build-swift-dylib(%t-frameworks/objc_implementation.framework/objc_implementation) -emit-module-path %t-frameworks/objc_implementation.framework/Modules/objc_implementation.swiftmodule/%module-target-triple.swiftmodule -module-name objc_implementation -F %t-frameworks -import-underlying-module -Xlinker -install_name -Xlinker %t-frameworks/objc_implementation.framework/objc_implementation %S/objc_implementation.swift -enable-experimental-feature CImplementation -target %target-stable-abi-triple
 
 //
 // Execute this file
@@ -38,6 +38,9 @@
 @end
 
 static void print(NSString *str) {
+  // Flush any buffered Swift output.
+  fflush(stdout);
+
   NSData *strData = [str dataUsingEncoding:NSUTF8StringEncoding];
   NSData *nlData = [@"\n" dataUsingEncoding:NSUTF8StringEncoding];
 
@@ -57,64 +60,200 @@ static void print(NSString *str) {
   }
 }
 
-static void printInt(NSString *str, NSUInteger num) {
+static void printInt(Class class, NSString *property, NSUInteger num) {
   NSString *fullStr =
-    [NSString stringWithFormat:@"%@ %lld", str, (long long)num];
+    [NSString stringWithFormat:@"%@.%@ = %lld", class, property, (long long)num];
+  print(fullStr);
+}
+
+static void printString(Class class, NSString *property, NSString *str) {
+  NSString *fullStr =
+    [NSString stringWithFormat:@"%@.%@ = %@", class, property, str];
   print(fullStr);
 }
 
 int main() {
   [ImplClass runTests];
-  // CHECK: someMethod = ImplClass.someMethod()
-  // CHECK: implProperty = 0
-  // CHECK: implProperty = 42
-  // CHECK: someMethod = SwiftSubclass.someMethod()
-  // CHECK: implProperty = 0
-  // CHECK: implProperty = 42
-  // CHECK: otherProperty = 1
-  // CHECK: otherProperty = 13
-  // CHECK: implProperty = 42
+  // CHECK: implFunc(1989)
+  // CHECK-LABEL: *** ImplClass init ***
+  // CHECK: ImplClass.init()
+  // CHECK-RESILIENCE-LABEL: *** ImplClassWithResilientStoredProperty #1 ***
+  // CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.mirror = nil
+  // CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.afterMirrorProperty = 0
+  // CHECK-RESILIENCE-LABEL: *** ImplClassWithResilientStoredProperty #2 ***
+  // CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.mirror = nil
+  // CHECK-RESILIENCE: ImplClassWithResilientStoredProperty.afterMirrorProperty = 42
+  // CHECK-LABEL: *** ImplClass #1 ***
+  // CHECK: ImplClass.someMethod() = ImplClass
+  // CHECK: ImplClass.implProperty = 0
+  // CHECK: ImplClass.defaultIntProperty = 17
+  // CHECK: ImplClass.description = ImplClass(implProperty: 0, object: objc_implementation.LastWords)
+  // CHECK-LABEL: *** ImplClass #2 ***
+  // CHECK: ImplClass.someMethod() = ImplClass
+  // CHECK: ImplClass.implProperty = 42
+  // CHECK: ImplClass.defaultIntProperty = 17
+  // CHECK: ImplClass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+  // CHECK-LABEL: *** ImplClass end ***
+  // CHECK: ImplClass It's better to burn out than to fade away.
+  // CHECK-LABEL: *** SwiftSubclass init ***
+  // CHECK: SwiftSubclass.init()
+  // CHECK: ImplClass.init()
+  // CHECK-RESILIENCE-LABEL: *** SwiftResilientStoredSubclass #1 ***
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror = nil
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty = 0
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror2 = nil
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty2 = 1
+  // CHECK-RESILIENCE-LABEL: *** SwiftResilientStoredSubclass #2 ***
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror = nil
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty = 42
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.mirror2 = nil
+  // CHECK-RESILIENCE: SwiftResilientStoredSubclass.afterMirrorProperty2 = 43
+  // CHECK-LABEL: *** SwiftSubclass #1 ***
+  // CHECK: SwiftSubclass.someMethod() = SwiftSubclass
+  // CHECK: SwiftSubclass.implProperty = 0
+  // CHECK: SwiftSubclass.defaultIntProperty = 17
+  // CHECK: SwiftSubclass.description = ImplClass(implProperty: 0, object: objc_implementation.LastWords)
+  // CHECK: SwiftSubclass.otherProperty = 1
+  // CHECK-LABEL: *** SwiftSubclass #2 ***
+  // CHECK: SwiftSubclass.someMethod() = SwiftSubclass
+  // CHECK: SwiftSubclass.implProperty = 42
+  // CHECK: SwiftSubclass.defaultIntProperty = 17
+  // CHECK: SwiftSubclass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+  // CHECK: SwiftSubclass.otherProperty = 1
+  // CHECK-LABEL: *** SwiftSubclass #3 ***
+  // CHECK: SwiftSubclass.someMethod() = SwiftSubclass
+  // CHECK: SwiftSubclass.implProperty = 42
+  // CHECK: SwiftSubclass.defaultIntProperty = 17
+  // CHECK: SwiftSubclass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+  // CHECK: SwiftSubclass.otherProperty = 13
+  // CHECK-LABEL: *** SwiftSubclass end ***
+  // CHECK: SwiftSubclass It's better to burn out than to fade away.
+
+  {
+    print(@"*** ObjCClientSubclass init ***");
+    ObjCClientSubclass *objcSub = [[ObjCClientSubclass alloc] init];
+    [objcSub testSelf];
+    print(@"*** ObjCClientSubclass end ***");
+  }
+  // CHECK-LABEL: *** ObjCClientSubclass init ***
+  // CHECK: -[ObjCClientSubclass init]
+  // CHECK: ImplClass.init()
+  // CHECK-RESILIENCE-LABEL: *** ObjCClientResilientSubclass #1 ***
+  // CHECK-RESILIENCE: ObjCClientResilientSubclass.mirror = nil
+  // CHECK-RESILIENCE: ObjCClientResilientSubclass.afterMirrorProperty = 0
+  // CHECK-RESILIENCE: ObjCClientResilientSubclass.subclassProperty = 100
+  // CHECK-RESILIENCE-LABEL: *** ObjCClientResilientSubclass #2 ***
+  // CHECK-RESILIENCE: ObjCClientResilientSubclass.mirror = nil
+  // CHECK-RESILIENCE: ObjCClientResilientSubclass.afterMirrorProperty = 42
+  // CHECK-RESILIENCE: ObjCClientResilientSubclass.subclassProperty = 101
+  // CHECK-LABEL: *** ObjCClientSubclass #1 ***
+  // CHECK: ObjCClientSubclass.someMethod() = ObjCClientSubclass
+  // CHECK: ObjCClientSubclass.implProperty = 0
+  // CHECK: ObjCClientSubclass.defaultIntProperty = 17
+  // CHECK: ObjCClientSubclass.description = ImplClass(implProperty: 0, object: objc_implementation.LastWords)
+  // CHECK: ObjCClientSubclass.otherProperty = 4
+  // CHECK-LABEL: *** ObjCClientSubclass #2 ***
+  // CHECK: ObjCClientSubclass.someMethod() = ObjCClientSubclass
+  // CHECK: ObjCClientSubclass.implProperty = 42
+  // CHECK: ObjCClientSubclass.defaultIntProperty = 17
+  // CHECK: ObjCClientSubclass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+  // CHECK: ObjCClientSubclass.otherProperty = 4
+  // CHECK-LABEL: *** ObjCClientSubclass #3 ***
+  // CHECK: ObjCClientSubclass.someMethod() = ObjCClientSubclass
+  // CHECK: ObjCClientSubclass.implProperty = 42
+  // CHECK: ObjCClientSubclass.defaultIntProperty = 17
+  // CHECK: ObjCClientSubclass.description = ImplClass(implProperty: 42, object: objc_implementation.LastWords)
+  // CHECK: ObjCClientSubclass.otherProperty = 6
+  // CHECK-LABEL: *** ObjCClientSubclass end ***
+  // CHECK: ObjCClientSubclass It's better to burn out than to fade away.
 
   fflush(stdout);
 
   ImplClass *impl = [[ImplClass alloc] init];
-  print([impl someMethod]);
-  // CHECK: ImplClass.someMethod()
-  printInt(@"implProperty", impl.implProperty);
-  // CHECK: implProperty 0
+  printInt([impl class], @"implProperty", impl.implProperty);
   impl.implProperty = -2;
-  printInt(@"implProperty", impl.implProperty);
-  // CHECK: implProperty -2
+  printInt([impl class], @"implProperty", impl.implProperty);
+  // CHECK: ImplClass.implProperty = 0
+  // CHECK: ImplClass.implProperty = -2
 
   ObjCClientSubclass *objcSub = [[ObjCClientSubclass alloc] init];
   print([objcSub someMethod]);
-  // CHECK: -[ObjCClientSubclass someMethod]
+  // CHECK: ObjCClientSubclass
 
-  printInt(@"implProperty", objcSub.implProperty);
-  // CHECK: implProperty 0
-  printInt(@"otherProperty", objcSub.otherProperty);
-  // CHECK: otherProperty 4
+  printInt([objcSub class], @"implProperty", objcSub.implProperty);
+  printInt([objcSub class], @"otherProperty", objcSub.otherProperty);
   objcSub.implProperty = 7;
   objcSub.otherProperty = 9;
-  printInt(@"implProperty", objcSub.implProperty);
-  // CHECK: implProperty 7
-  printInt(@"otherProperty", objcSub.otherProperty);
-  // CHECK: otherProperty 9
+  printInt([objcSub class], @"implProperty", objcSub.implProperty);
+  printInt([objcSub class], @"otherProperty", objcSub.otherProperty);
+  // CHECK: ObjCClientSubclass.implProperty = 0
+  // CHECK: ObjCClientSubclass.otherProperty = 4
+  // CHECK: ObjCClientSubclass.implProperty = 7
+  // CHECK: ObjCClientSubclass.otherProperty = 9
 
   return 0;
 }
 
+#if RESILIENCE
+@interface ObjCClientResilientSubclass : ImplClassWithResilientStoredProperty
+
+@property (assign) NSInteger subclassProperty;
+
+@end
+#endif
+
 @implementation ObjCClientSubclass
 
 - (id)init {
+  print(@"-[ObjCClientSubclass init]");
   if (self = [super init]) {
     _otherProperty = 4;
   }
   return self;
 }
 
+- (void)testSelf {
+  [super testSelf];
+  self.otherProperty = 6;
+  [self printSelfWithLabel:3];
+}
+
+- (void)printSelfWithLabel:(int)label {
+  [super printSelfWithLabel:label];
+  printInt([self class], @"otherProperty", self.otherProperty);
+}
+
 - (NSString *)someMethod {
-  return @"-[ObjCClientSubclass someMethod]";
+  return @"ObjCClientSubclass";
+}
+
+#if RESILIENCE
++ (ImplClassWithResilientStoredProperty *)makeResilientImpl {
+  return [ObjCClientResilientSubclass new];
+}
+#endif
+
+@end
+
+#if RESILIENCE
+@implementation ObjCClientResilientSubclass
+
+- (id)init {
+  if (self = [super init]) {
+    _subclassProperty = 100;
+  }
+  return self;
+}
+
+- (void)printSelfWithLabel:(int)label {
+  [super printSelfWithLabel:label];
+  printInt([self class], @"subclassProperty", self.subclassProperty);
+}
+
+- (void)mutate {
+  [super mutate];
+  self.subclassProperty = 101;
 }
 
 @end
+#endif

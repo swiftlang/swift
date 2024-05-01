@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name test -primary-file %s -import-objc-header %S/Inputs/let_properties_opts.h -O -wmo -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -module-name test -primary-file %s -import-objc-header %S/Inputs/let_properties_opts.h -O -wmo -emit-sil -target %target-stable-abi-triple | %FileCheck %s
 
 // REQUIRES: objc_interop
 
