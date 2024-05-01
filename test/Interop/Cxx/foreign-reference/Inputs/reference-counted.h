@@ -46,6 +46,21 @@ __attribute__((swift_attr("release:GCRelease"))) GlobalCount {
 inline void GCRetain(GlobalCount *x) { globalCount++; }
 inline void GCRelease(GlobalCount *x) { globalCount--; }
 
+struct __attribute__((swift_attr("import_as_ref")))
+__attribute__((swift_attr("retain:GCRetainNullableInit")))
+__attribute__((swift_attr("release:GCReleaseNullableInit")))
+GlobalCountNullableInit {
+  static GlobalCountNullableInit *_Nullable create(bool wantNullptr) {
+    if (wantNullptr)
+      return nullptr;
+    return new (malloc(sizeof(GlobalCountNullableInit)))
+        GlobalCountNullableInit();
+  }
+};
+
+inline void GCRetainNullableInit(GlobalCountNullableInit *x) { globalCount++; }
+inline void GCReleaseNullableInit(GlobalCountNullableInit *x) { globalCount--; }
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // TEST_INTEROP_CXX_FOREIGN_REFERENCE_INPUTS_REFERENCE_COUNTED_H
