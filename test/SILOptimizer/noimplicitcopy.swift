@@ -1977,11 +1977,11 @@ public func closureClassUseAfterConsumeArg(_ argX: Klass) {
 }
 
 public func closureCaptureClassUseAfterConsume(_ x: Klass) {
-    @_noImplicitCopy let x2 = x
+    @_noImplicitCopy let x2 = x // expected-error{{}}
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(x2) // expected-note{{consumed here}}
+        print(x2) // expected-note{{consumed here}}
     }
     f()
 }
@@ -1989,9 +1989,9 @@ public func closureCaptureClassUseAfterConsume(_ x: Klass) {
 public func closureCaptureClassUseAfterConsumeError(_ x: Klass) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
     let f = { // expected-note {{consumed here}}
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classUseMoveOnlyWithoutEscaping(copy x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     f()
     let x3 = x2 // expected-note {{consumed again here}}
@@ -2002,8 +2002,8 @@ public func closureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) 
     // expected-error @-1 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
     let f = { // expected-note {{closure capturing 'x2' here}}
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     f()
 }
@@ -2011,8 +2011,8 @@ public func closureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) 
 public func closureCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy _ x2: __owned Klass) {
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     f()
 }
@@ -2020,8 +2020,8 @@ public func closureCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy _ x2: __
 public func closureCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
     let f = { // expected-note {{consumed here}}
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     f()
     let x3 = x2 // expected-note {{consumed again here}}
@@ -2032,8 +2032,8 @@ public func deferCaptureClassUseAfterConsume(_ x: Klass) {
     @_noImplicitCopy let x2 = x
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     print(x)
 }
@@ -2042,8 +2042,8 @@ public func deferCaptureClassUseAfterConsume2(_ x: Klass) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
     defer { // expected-note {{used here}}
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     let x3 = x2 // expected-note {{consumed here}}
     let _ = x3
@@ -2053,8 +2053,8 @@ public func deferCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) {
     classUseMoveOnlyWithoutEscaping(x2)
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     print("foo")
 }
@@ -2062,8 +2062,8 @@ public func deferCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) {
 public func deferCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy _ x2: __owned Klass) {
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     print("foo")
 }
@@ -2071,8 +2071,8 @@ public func deferCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy _ x2: __ow
 public func deferCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' used after consume}}
     defer { // expected-note {{used here}}
         classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
-        print(x2)
+        classConsume(copy x2)
+        print(copy x2)
     }
     print(x2) // expected-note {{consumed here}}
 }
@@ -2082,8 +2082,8 @@ public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) {
     let f = {
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         print("foo")
     }
@@ -2093,11 +2093,11 @@ public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) {
 public func closureAndDeferCaptureClassUseAfterConsume2(_ x: Klass) {
     @_noImplicitCopy let x2 = x
     let f = {
-        classConsume(x2)
+        classConsume(copy x2)
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         print("foo")
     }
@@ -2107,11 +2107,11 @@ public func closureAndDeferCaptureClassUseAfterConsume2(_ x: Klass) {
 public func closureAndDeferCaptureClassUseAfterConsume3(_ x: Klass) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
     let f = { // expected-note {{consumed here}}
-        classConsume(x2)
+        classConsume(copy x2)
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         print("foo")
     }
@@ -2124,8 +2124,8 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2:
     let f = { // expected-note {{closure capturing 'x2' here}}
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         print("foo")
     }
@@ -2136,8 +2136,8 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy 
     let f = {
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         print("foo")
     }
@@ -2148,8 +2148,8 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy
     let f = { // expected-note {{consumed here}}
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         print("foo")
     }
@@ -2158,12 +2158,13 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy
 }
 
 public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) {
-    @_noImplicitCopy let x2 = x
+    // TODO: why is `g` considered escaping?
+    @_noImplicitCopy let x2 = x // expected-error{{cannot be captured}}
     let f = {
-        let g = {
+        let g = { // expected-note{{capturing 'x2' here}}
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         g()
     }
@@ -2171,12 +2172,12 @@ public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) {
 }
 
 public func closureAndClosureCaptureClassUseAfterConsume2(_ x: Klass) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}} expected-error {{cannot be captured}}
     let f = { // expected-note {{consumed here}}
-        let g = {
+        let g = { // expected-note{{capturing 'x2' here}}
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         g()
     }
@@ -2185,37 +2186,37 @@ public func closureAndClosureCaptureClassUseAfterConsume2(_ x: Klass) {
 }
 
 
-public func closureAndClosureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) {
+public func closureAndClosureCaptureClassArgUseAfterConsume(@_noImplicitCopy _ x2: Klass) { // expected-error{{cannot be captured by an escaping closure}}
     // expected-error @-1 {{'x2' cannot be captured by an escaping closure since it is a borrowed parameter}}
     let f = { // expected-note {{closure capturing 'x2' here}}
-        let g = {
+        let g = { // expected-note{{capturing 'x2' here}}
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         g()
     }
     f()
 }
 
-public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy _ x2: __owned Klass) {
+public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy _ x2: __owned Klass) { // expected-error{{cannot be captured by an escaping closure}}
     let f = {
-        let g = {
+        let g = { // expected-note{{closure capturing 'x2' here}}
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         g()
     }
     f()
 }
 
-public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
+public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}} expected-error{{cannot be captured}}
     let f = { // expected-note {{consumed here}}
-        let g = {
+        let g = { // expected-note{{capturing 'x2' here}}
             classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
-            print(x2)
+            classConsume(copy x2)
+            print(copy x2)
         }
         g()
     }
