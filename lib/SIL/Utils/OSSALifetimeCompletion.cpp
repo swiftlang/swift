@@ -338,8 +338,8 @@ endLifetimeAtAvailabilityBoundary(SILValue value,
 /// End the lifetime of \p value at unreachable instructions.
 ///
 /// Returns true if any new instructions were created to complete the lifetime.
-bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
-    SILValue value, std::optional<Boundary> maybeBoundary) {
+bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
+                                                      Boundary boundary) {
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
   auto handleInnerScope = [this](SILValue innerBorrowedValue) {
@@ -347,9 +347,6 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
   };
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
-
-  Boundary boundary = maybeBoundary.value_or(
-      value->isLexical() ? Boundary::Availability : Boundary::Liveness);
 
   bool changed = false;
   switch (boundary) {

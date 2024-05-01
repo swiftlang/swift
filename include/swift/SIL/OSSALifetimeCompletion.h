@@ -97,7 +97,7 @@ public:
   /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
   LifetimeCompletion
   completeOSSALifetime(SILValue value,
-                       std::optional<Boundary> boundary = std::nullopt) {
+                       std::optional<Boundary> maybeBoundary = std::nullopt) {
     if (value->getOwnershipKind() == OwnershipKind::None)
       return LifetimeCompletion::NoLifetime;
 
@@ -112,6 +112,9 @@ public:
     if (!completedValues.insert(value))
       return LifetimeCompletion::AlreadyComplete;
 
+    Boundary boundary = maybeBoundary.value_or(
+        value->isLexical() ? Boundary::Availability : Boundary::Liveness);
+
     return analyzeAndUpdateLifetime(value, boundary)
                ? LifetimeCompletion::WasCompleted
                : LifetimeCompletion::AlreadyComplete;
@@ -122,8 +125,7 @@ public:
       llvm::function_ref<void(SILInstruction *)> visit);
 
 protected:
-  bool analyzeAndUpdateLifetime(SILValue value,
-                                std::optional<Boundary> boundary);
+  bool analyzeAndUpdateLifetime(SILValue value, Boundary boundary);
 };
 
 //===----------------------------------------------------------------------===//
