@@ -17,7 +17,8 @@ public func testGlobalFunctions() {
 
 // --- asyncFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper9asyncFuncyyYaFTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper9asyncFuncyyYaF", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper9asyncFuncyyYaFTu", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper9asyncFuncyyYaF", ptr null), icmp ne (ptr @"$s17has_symbol_helper9asyncFuncyyYaFTu", ptr null)
+// CHECK:   ret i1 %0
 
 // --- isolatedFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper12isolatedFuncyyFTwS"()
@@ -35,8 +36,11 @@ public func testActor(_ a: A) {
 
 // --- A.init() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1ACACycfcTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1ACACycfc", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1ACACycfC", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper1ACACycfc", ptr null), icmp ne (ptr @"$s17has_symbol_helper1ACACycfC", ptr null)
+// CHECK:   ret i1 %0
 
 // --- A.asyncMethod() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1AC11asyncMethodyyYaFTwS"()
-// CHECK:   ret i1 and (i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTj", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTjTu", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTq", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTj", ptr null), icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTjTu", ptr null)
+// CHECK:   %1 = and i1 %0, icmp ne (ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTq", ptr null)
+// CHECK:   ret i1 %1

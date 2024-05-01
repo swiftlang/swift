@@ -64,8 +64,8 @@ func create<T>(_ t: T) -> C<T> {
 // Make sure we don't loose the stores for the optional UInt32? in optimize mode.
 // OPT-LABEL: define hidden swiftcc void @"$s16non_fixed_return1CVACyxGycfC"(ptr noalias sret(%swift.opaque) %0
 // OPT:  store i32 0, ptr [[BASE:%[0-9]+]]
-// OPT:  [[ADDR2:%.*]] = getelementptr inbounds %Ts6UInt32VSg, ptr [[BASE]], i64 0, i32 1
+// OPT:  [[ADDR2:%.*]] = getelementptr inbounds i8, ptr [[BASE]], i64 4
 // OPT:  store i1 true, ptr [[ADDR2]]
-// OPT:  [[ADDR4:%.*]] = getelementptr inbounds %T16non_fixed_return1BV, ptr [[BASE]], i64 0, i32 2
+// OPT:  [[ADDR4:%.*]] = getelementptr inbounds i8, ptr [[BASE]], i64 8
 // OPT: call void @llvm.memset.p0.i64(ptr {{.*}}[[ADDR4]], i8 0, i64 16, i1 false)
 // OPT: ret void

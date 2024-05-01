@@ -55,11 +55,13 @@ public func testGlobalFunctions() {
 
 // --- funcWithOpaqueResult() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper20funcWithOpaqueResultQryFTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper20funcWithOpaqueResultQryFQOMQ", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper20funcWithOpaqueResultQryF", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper20funcWithOpaqueResultQryFQOMQ", ptr null), icmp ne (ptr @"$s17has_symbol_helper20funcWithOpaqueResultQryF", ptr null)
+// CHECK:   ret i1 %0
 
 // --- cdeclFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper9cdeclFuncyyFTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper9cdeclFuncyyF", ptr null), i1 icmp ne (ptr @cdecl_func, ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper9cdeclFuncyyF", ptr null), icmp ne (ptr @cdecl_func, ptr null)
+// CHECK:   ret i1 %0
 
 // --- forwardDeclaredFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper19forwardDeclaredFuncyyFTwS"()
@@ -67,19 +69,33 @@ public func testGlobalFunctions() {
 
 // --- dynamicFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper11dynamicFuncyyFTwS"()
-// CHECK:   ret i1 and (i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper11dynamicFuncyyF", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper11dynamicFuncyyFTX", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper11dynamicFuncyyFTx", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper11dynamicFuncyyF", ptr null), icmp ne (ptr @"$s17has_symbol_helper11dynamicFuncyyFTX", ptr null)
+// CHECK:   %1 = and i1 %0, icmp ne (ptr @"$s17has_symbol_helper11dynamicFuncyyFTx", ptr null)
+// CHECK:   ret i1 %1
 
 // --- replacementFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper15replacementFuncyyFTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper15replacementFuncyyF", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper15replacementFuncyyFTX", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper15replacementFuncyyF", ptr null), icmp ne (ptr @"$s17has_symbol_helper15replacementFuncyyFTX", ptr null)
+// CHECK:   ret i1 %0
 
 // --- dynamicFuncOpaqueResult() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTwS"()
-// CHECK:   ret i1 and (i1 and (i1 and (i1 and (i1 and (i1 and (i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMQ", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMh", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryF", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTX", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTx", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMQ", ptr null), icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", ptr null)
+// CHECK:   %1 = and i1 %0, icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMh", ptr null)
+// CHECK:   %2 = and i1 %1, icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", ptr null)
+// CHECK:   %3 = and i1 %2, icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", ptr null)
+// CHECK:   %4 = and i1 %3, icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryF", ptr null)
+// CHECK:   %5 = and i1 %4, icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTX", ptr null)
+// CHECK:   %6 = and i1 %5, icmp ne (ptr @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTx", ptr null)
+// CHECK:   ret i1 %6
 
 // --- replacementFuncOpaqueResult() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFTwS"()
-// CHECK:   ret i1 and (i1 and (i1 and (i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMQ", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMg", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMg", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryF", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFTX", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMQ", ptr null), icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMg", ptr null)
+// CHECK:   %1 = and i1 %0, icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMg", ptr null)
+// CHECK:   %2 = and i1 %1, icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryF", ptr null)
+// CHECK:   %3 = and i1 %2, icmp ne (ptr @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFTX", ptr null)
+// CHECK:   ret i1 %3
 
 public func testVars() {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper6globalSivpTwS"()
@@ -100,11 +116,13 @@ public func testClass(_ c: C) {
 
 // --- C.init() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1CCACycfcTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1CCACycfc", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1CCACycfC", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper1CCACycfc", ptr null), icmp ne (ptr @"$s17has_symbol_helper1CCACycfC", ptr null)
+// CHECK:   ret i1 %0
 
 // --- C.method(with:) ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1CC6method4withySi_tFTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1CC6method4withySi_tFTj", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1CC6method4withySi_tFTq", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper1CC6method4withySi_tFTj", ptr null), icmp ne (ptr @"$s17has_symbol_helper1CC6method4withySi_tFTq", ptr null)
+// CHECK:   ret i1 %0
 
 public func testStruct(_ s: S) {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1SV6memberSivpTwS"()
@@ -116,7 +134,10 @@ public func testStruct(_ s: S) {
 
 // --- S.member ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1SV6memberSivpTwS"()
-// CHECK:   ret i1 and (i1 and (i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivpMV", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivg", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivs", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivM", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivpMV", ptr null), icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivg", ptr null)
+// CHECK:   %1 = and i1 %0, icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivs", ptr null)
+// CHECK:   %2 = and i1 %1, icmp ne (ptr @"$s17has_symbol_helper1SV6memberSivM", ptr null)
+// CHECK:   ret i1 %2
 
 // --- S.method(with:) ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1SV6method4withySi_tFTwS"()
@@ -169,4 +190,6 @@ public func testMetatypes() {
 
 // --- S.self ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1SVTwS"()
-// CHECK:   ret i1 and (i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper1SVMn", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper1SVN", ptr null)), i1 icmp ne (ptr @"$s17has_symbol_helper1SVMa", ptr null))
+// CHECK:   %0 = and i1 icmp ne (ptr @"$s17has_symbol_helper1SVMn", ptr null), icmp ne (ptr @"$s17has_symbol_helper1SVN", ptr null)
+// CHECK:   %1 = and i1 %0, icmp ne (ptr @"$s17has_symbol_helper1SVMa", ptr null)
+// CHECK:   ret i1 %1
