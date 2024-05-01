@@ -36,6 +36,9 @@ func testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> ((sending NonS
 func testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
 
 struct MethodTest {
+  // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.init(__owned sending_mangling.NonSendableKlass) -> sending_mangling.MethodTest : $@convention(method) (@sil_sending @owned NonSendableKlass, @thin MethodTest.Type) -> MethodTest {
+  init(_ x: sending NonSendableKlass) {}
+
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testMethodRemoveFunctionArg(__owned sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @owned NonSendableKlass, MethodTest) -> () {
   func testMethodRemoveFunctionArg(_ x: sending NonSendableKlass) {}
   
