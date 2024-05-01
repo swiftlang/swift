@@ -410,7 +410,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   unsigned baseDepth = 0;
   SubstitutionMap baseSubMap;
   if (auto baseClassSig = baseClassDecl->getGenericSignatureOfContext()) {
-    baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
+    baseDepth = baseClassSig.getNextDepth();
 
     // Compute the type of the base class, starting from the
     // derived class type and the type of the method's self
@@ -435,9 +435,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
 
   // Add generic parameters from the method itself, ignoring any generic
   // parameters from the derived class.
-  unsigned origDepth = 0;
-  if (auto calleeClassSig = calleeClassDecl->getGenericSignatureOfContext())
-    origDepth = calleeClassSig.getGenericParams().back()->getDepth() + 1;
+  unsigned origDepth = calleeClassDecl->getGenericSignature().getNextDepth();
 
   auto baseCalleeSig = baseCalleeType->getInvocationGenericSignature();
 
@@ -927,10 +925,8 @@ getWitnessMethodSubstitutions(
   // substitutions for the concrete type's generic parameters.
   auto baseSubMap = conformance->getSubstitutionMap();
 
-  unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootConformance();
-  if (auto conformingTypeSig = rootConformance->getGenericSignature())
-    baseDepth = conformingTypeSig.getGenericParams().back()->getDepth() + 1;
+  unsigned baseDepth = rootConformance->getGenericSignature().getNextDepth();
 
   // witnessThunkSig begins with the optional class 'Self', followed by the
   // generic parameters of the concrete conforming type, followed by the

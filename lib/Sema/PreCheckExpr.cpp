@@ -713,8 +713,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         if (!xGeneric)
           return false;
 
-        unsigned xDepth = xGeneric->getGenericParams().back()->getDepth();
-        unsigned yDepth = yGeneric->getGenericParams().back()->getDepth();
+        unsigned xDepth = xGeneric->getGenericSignature()->getMaxDepth();
+        unsigned yDepth = yGeneric->getGenericSignature()->getMaxDepth();
         return xDepth < yDepth;
       });
     }
