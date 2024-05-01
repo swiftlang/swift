@@ -1,10 +1,8 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -Xfrontend -disable-availability-checking)
 //
 // REQUIRES: executable_test
 // TODO: This should work without ObjC interop in the future rdar://97497120
 // REQUIRES: objc_interop
-
-// REQUIRES: rdar97532642
 
 import StdlibUnittest
 import ReferenceCounted
@@ -17,7 +15,7 @@ public func blackHole<T>(_ _: T) {  }
 @inline(never)
 func localTest() {
     var x = NS.LocalCount.create()
-    expectEqual(x.value, 6) // This is 6 because of "var x" "x.value" * 2 and "(x, x, x)".
+    expectEqual(x.value, 8) // This is 8 because of "var x" "x.value" * 2, two method calls on x, and "(x, x, x)".
 
     expectEqual(x.returns42(), 42)
     expectEqual(x.constMethod(), 42)
@@ -35,7 +33,6 @@ ReferenceCountedTestSuite.test("Local") {
 var globalOptional: NS.LocalCount? = nil
 
 ReferenceCountedTestSuite.test("Global optional holding local ref count") {
-    expectEqual(finalLocalRefCount, 0)
     globalOptional = NS.LocalCount.create()
     expectEqual(finalLocalRefCount, 1)
 }

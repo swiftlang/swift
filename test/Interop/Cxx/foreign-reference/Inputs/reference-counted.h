@@ -27,7 +27,10 @@ __attribute__((swift_attr("release:LCRelease"))) LocalCount {
 
 }
 
-inline void LCRetain(NS::LocalCount *x) { x->value++; }
+inline void LCRetain(NS::LocalCount *x) {
+  x->value++;
+  finalLocalRefCount = x->value;
+}
 inline void LCRelease(NS::LocalCount *x) {
   x->value--;
   finalLocalRefCount = x->value;
