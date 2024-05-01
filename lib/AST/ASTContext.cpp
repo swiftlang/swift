@@ -5884,11 +5884,8 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
 
 Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(GenericSignature parentSig,
                                                           ASTContext &ctx) {
-  unsigned depth = 0;
-  if (!parentSig.getGenericParams().empty())
-    depth = parentSig.getGenericParams().back()->getDepth() + 1;
   return GenericTypeParamType::get(/*isParameterPack=*/ false,
-                                   /*depth=*/ depth, /*index=*/ 0,
+                                   parentSig.getNextDepth(), /*index=*/ 0,
                                    ctx);
 }
 

@@ -1807,10 +1807,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
       M = DC->getParentModule();
       subMap = CurrentType->getContextSubstitutionMap(M, DC);
-      if (!subMap.empty()) {
-        typeContextDepth = subMap.getGenericSignature()
-            .getGenericParams().back()->getDepth() + 1;
-      }
+      typeContextDepth = subMap.getGenericSignature().getNextDepth();
     }
   }
 
@@ -7075,7 +7072,7 @@ public:
 
     // The element archetypes are at a depth one past the max depth
     // of the base signature.
-    unsigned elementDepth = params.back()->getDepth() + 1;
+    unsigned elementDepth = sig.getNextDepth();
 
     // Transform the archetype's interface type to be based on the
     // corresponding non-canonical type parameter.

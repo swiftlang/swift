@@ -77,13 +77,9 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Calculate the depth at which the requirement's generic parameters
   // appear in the witness thunk signature.
-  unsigned depth = 0;
-  if (covariantSelf) {
+  unsigned depth = conformanceSig.getNextDepth();
+  if (covariantSelf)
     ++depth;
-  }
-  if (conformanceSig) {
-    depth += conformanceSig.getGenericParams().back()->getDepth() + 1;
-  }
 
   // Build a substitution map to replace the protocol's \c Self and the type
   // parameters of the requirement into a combined context that provides the
