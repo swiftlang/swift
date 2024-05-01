@@ -36,6 +36,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
@@ -5897,8 +5898,6 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
     type = existential->getConstraintType();
 
   const CanType constraint = type->getCanonicalType();
-  assert(parentSig || !constraint->hasTypeParameter() &&
-         "Interface type here requires a parent signature");
 
   auto canParentSig = parentSig.getCanonicalSignature();
   auto key = std::make_pair(constraint, canParentSig.getPointer());
@@ -5906,24 +5905,18 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      canParentSig, *this)
-    ->castTo<GenericTypeParamType>();
-  Requirement requirement(RequirementKind::Conformance, genericParam,
-                          constraint);
+  LocalArchetypeRequirementCollector collector(*this, canParentSig);
+  collector.addOpenedExistential(type);
   auto genericSig = buildGenericSignature(
-      *this, canParentSig,
-      {genericParam}, {requirement},
-      /*allowInverses=*/true);
-
-  CanGenericSignature canGenericSig(genericSig);
+      *this, collector.OuterSig, collector.Params, collector.Requirements,
+      /*allowInverses=*/true).getCanonicalSignature();
 
   auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(key, canGenericSig));
+      std::make_pair(key, genericSig));
   assert(result.second);
   (void) result;
 
-  return canGenericSig;
+  return genericSig;
 }
 
 CanGenericSignature
