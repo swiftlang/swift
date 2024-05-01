@@ -1354,11 +1354,11 @@ static bool shouldShowEntityType(Node::Kind EntityKind,
   switch (EntityKind) {
   case Node::Kind::ExplicitClosure:
   case Node::Kind::ImplicitClosure:
-    /// The signature of a closure (its `Type` node) can optionally be omitted.
-    /// Unlike functions which can have overloads, the signature of a closure is
-    /// not needed to be uniquely identified. A closure is uniquely identified
-    /// by its index and parent. Omitting the signature improves the readability
-    /// when long type names are in use.
+    // The signature of a closure (its `Type` node) can optionally be omitted.
+    // Unlike functions which can have overloads, the signature of a closure is
+    // not needed to be uniquely identified. A closure is uniquely identified by
+    // its index and parent. Omitting the signature improves the readability
+    // when long type names are in use.
     return Options.ShowClosureSignature;
   default:
     return true;
