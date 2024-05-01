@@ -2229,6 +2229,10 @@ private:
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
+  /// Maps closures and local functions to the pack expansion expressions they
+  /// capture.
+  llvm::MapVector<AnyFunctionRef, SmallVector<PackExpansionExpr *, 1>> CapturedExpansions;
+
   /// Maps expressions for implied results (e.g implicit 'then' statements,
   /// implicit 'return' statements in single expression body closures) to their
   /// result kind.
@@ -3162,6 +3166,19 @@ public:
     if (result != ClosureTypes.end())
       return result->second;
     return nullptr;
+  }
+
+  SmallVector<PackExpansionExpr *, 1> getCapturedExpansions(AnyFunctionRef func) const {
+    auto result = CapturedExpansions.find(func);
+    if (result == CapturedExpansions.end())
+      return {};
+
+    return result->second;
+  }
+
+  void setCapturedExpansions(AnyFunctionRef func, SmallVector<PackExpansionExpr *, 1> exprs) {
+    assert(CapturedExpansions.count(func) == 0 && "Cannot reset captured expansions");
+    CapturedExpansions.insert({func, exprs});
   }
 
   TypeVariableType *getKeyPathValueType(const KeyPathExpr *keyPath) const {

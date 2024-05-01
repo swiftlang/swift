@@ -3021,15 +3021,12 @@ struct LocalArchetypeRequirementCollector {
 ///
 /// \param localArchetypes - the list of local archetypes to promote
 ///   into the signature, if any
-/// \param inheritGenericSig - whether to inherit the generic signature from the
-/// parent function.
 /// \param genericEnv - the new generic environment
 /// \param contextSubs - map non-local archetypes from the original function
 ///    to archetypes in the thunk
 /// \param interfaceSubs - map interface types to old archetypes
 static CanGenericSignature
 buildThunkSignature(SILFunction *fn,
-                    bool inheritGenericSig,
                     ArrayRef<CanLocalArchetypeType> localArchetypes,
                     GenericEnvironment *&genericEnv,
                     SubstitutionMap &contextSubs,
@@ -3037,6 +3034,7 @@ buildThunkSignature(SILFunction *fn,
                     llvm::DenseMap<ArchetypeType*, Type> &contextLocalArchetypes) {
   auto *mod = fn->getModule().getSwiftModule();
   auto &ctx = mod->getASTContext();
+  auto forwardingSubs = fn->getForwardingSubstitutionMap();
 
   // If there are no local archetypes, we just inherit the generic
   // environment from the parent function.
@@ -3044,7 +3042,7 @@ buildThunkSignature(SILFunction *fn,
     auto genericSig =
       fn->getLoweredFunctionType()->getInvocationGenericSignature();
     genericEnv = fn->getGenericEnvironment();
-    interfaceSubs = fn->getForwardingSubstitutionMap();
+    interfaceSubs = forwardingSubs;
     contextSubs = interfaceSubs;
     return genericSig;
   }
@@ -3052,12 +3050,10 @@ buildThunkSignature(SILFunction *fn,
   // Add the existing generic signature.
   unsigned depth = 0;
   GenericSignature baseGenericSig;
-  if (inheritGenericSig) {
-    if (auto genericSig =
-          fn->getLoweredFunctionType()->getInvocationGenericSignature()) {
-      baseGenericSig = genericSig;
-      depth = genericSig.getGenericParams().back()->getDepth() + 1;
-    }
+  if (auto genericSig =
+        fn->getLoweredFunctionType()->getInvocationGenericSignature()) {
+    baseGenericSig = genericSig;
+    depth = genericSig.getGenericParams().back()->getDepth() + 1;
   }
 
   // Add new generic parameters to replace the local archetypes.
@@ -3088,13 +3084,11 @@ buildThunkSignature(SILFunction *fn,
           ->getInvocationGenericSignature()) {
     contextSubs = SubstitutionMap::get(
       calleeGenericSig,
-      [&](SubstitutableType *type) -> Type {
-        return genericEnv->mapTypeIntoContext(type);
-      },
-      MakeAbstractConformanceForGenericType());
+      genericEnv->getForwardingSubstitutionMap());
   }
 
   // Calculate substitutions to map interface types to the caller's archetypes.
+
   interfaceSubs = SubstitutionMap::get(
     genericSig,
     [&](SubstitutableType *type) -> Type {
@@ -3103,7 +3097,7 @@ buildThunkSignature(SILFunction *fn,
           return collector.ParamSubs[param->getIndex()];
         }
       }
-      return fn->mapTypeIntoContext(type);
+      return Type(type).subst(forwardingSubs);
     },
     MakeAbstractConformanceForGenericType());
 
@@ -3142,18 +3136,14 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
-  // Does the thunk type involve archetypes other than local archetypes?
-  bool hasArchetypes = false;
   // Does the thunk type involve a local archetype type?
   SmallVector<CanLocalArchetypeType, 8> localArchetypes;
   auto archetypeVisitor = [&](CanType t) {
     if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
-      if (auto opened = dyn_cast<LocalArchetypeType>(archetypeTy)) {
-        auto root = opened.getRoot();
+      if (auto local = dyn_cast<LocalArchetypeType>(archetypeTy)) {
+        auto root = local.getRoot();
         if (llvm::find(localArchetypes, root) == localArchetypes.end())
           localArchetypes.push_back(root);
-      } else {
-        hasArchetypes = true;
       }
     }
   };
@@ -3169,7 +3159,6 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
     sourceType.visit(archetypeVisitor);
 
     genericSig = buildThunkSignature(fn,
-                                     hasArchetypes,
                                      localArchetypes,
                                      genericEnv,
                                      contextSubs,

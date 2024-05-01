@@ -1823,9 +1823,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
-      if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
-               .isKnownNoEscape())
-        return false;
+      if (auto funcTy = CE->getType()->getAs<FunctionType>()) {
+        if (funcTy->isNoEscape())
+          return false;
+      }
 
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
         if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
@@ -2094,9 +2095,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
+      // FIXME: This is happening too early, because closure->getType() isn't set.
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
-        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
-          ACE = const_cast<AbstractClosureExpr *>(closure);
+        if (closure->getType())
+          if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
+            ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
