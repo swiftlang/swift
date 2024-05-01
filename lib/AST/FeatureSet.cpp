@@ -710,6 +710,7 @@ static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(ObjCImplementation)
+UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
 UNINTERESTING_FEATURE(CImplementation)
 
 static bool usesFeatureSensitive(Decl *decl) {
