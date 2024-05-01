@@ -237,12 +237,10 @@ extension AnyKeyPath: Hashable {
     if a === b {
       return true
     }
-    /*
     // Short-circuit differently-typed key paths
     if type(of: a) != type(of: b) {
       return false
     }
-    */
     return a.withBuffer {
       var aBuffer = $0
       return b.withBuffer {
