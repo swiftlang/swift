@@ -12,17 +12,17 @@
 
 import TestsUtils
 
-class DummyObject {}
+fileprivate class DummyObject {}
 
-func makePOD(count: Int) -> [Int] {
+fileprivate func makePOD(count: Int) -> [Int] {
   Array(repeating: 42, count: count)
 }
 
-func makeRefcounted(count: Int) -> [DummyObject] {
+fileprivate func makeRefcounted(count: Int) -> [DummyObject] {
   (0 ..< count).map { _ in DummyObject() }
 }
 
-func ranges(count: Int) -> [(Range<Int>, String)] {
+fileprivate func ranges(count: Int) -> [(Range<Int>, String)] {
   var results:[(Range<Int>, String)] = []
   results.append((0 ..< (count / 3), "front"))
   results.append(((count / 3) ..< ((count / 3) * 2), "middle"))
@@ -30,14 +30,14 @@ func ranges(count: Int) -> [(Range<Int>, String)] {
   return results
 }
 
-let sizes = [(100_000, "large"), (100, "small"), (3, "tiny")]
+fileprivate let sizes = [(100_000, "large"), (100, "small"), (3, "tiny")]
 
-private func configs() -> [BenchmarkInfo] {
+fileprivate func configs() -> [BenchmarkInfo] {
   var configs: [BenchmarkInfo] = []
   for (refcounted, refcountedName) in [(true, "refcounted"), (false, "pod")] {
     for (sourceCount, sourceName) in sizes {
       for (destCount, destName) in sizes {
-        for (range, rangeName) in ranges(count: destCount) {
+        for (subrange, rangeName) in ranges(count: destCount) {
           for (sourceUnique, sourceUniqueName) in [(true, "sourceUnique"), (false, "sourceNonUnique")] {
             for (destUnique, destUniqueName) in [(true, "destUnique"), (false, "destNonUnique")] {
               let runFunction = switch (refcounted, destUnique) {
@@ -50,6 +50,7 @@ private func configs() -> [BenchmarkInfo] {
                 BenchmarkInfo(
                   name:"arrayRRC_\(refcountedName)_\(destName)_\(sourceName)_\(rangeName)_\(destUniqueName)_\(sourceUniqueName)",
                   runFunction: runFunction,
+                  tags: [.api, .Array, .algorithm],
                   setUpFunction: {
                     useUniqueDest = destUnique
                     useUniqueSource = sourceUnique
@@ -66,7 +67,7 @@ private func configs() -> [BenchmarkInfo] {
                         podOriginalRangeContents = Array(podDest[range])
                       }
                     }
-                    range = range
+                    range = subrange
                   },
                   tearDownFunction: {
                     refcountedDest = []
@@ -87,15 +88,15 @@ private func configs() -> [BenchmarkInfo] {
   return configs
 }
 
-var range:Range<Int> = 0 ..< 0
-var refcountedDest:[DummyObject] = []
-var podDest:[Int] = []
-var refcountedSource:[DummyObject] = []
-var podSource:[Int] = []
-var refcountedOriginalRangeContents:[DummyObject] = []
-var podOriginalRangeContents:[Int] = []
-var useUniqueDest = false
-var useUniqueSource = false
+fileprivate var range:Range<Int> = 0 ..< 0
+fileprivate var refcountedDest:[DummyObject] = []
+fileprivate var podDest:[Int] = []
+fileprivate var refcountedSource:[DummyObject] = []
+fileprivate var podSource:[Int] = []
+fileprivate var refcountedOriginalRangeContents:[DummyObject] = []
+fileprivate var podOriginalRangeContents:[Int] = []
+fileprivate var useUniqueDest = false
+fileprivate var useUniqueSource = false
 
 public let benchmarks: [BenchmarkInfo] = configs()
 
@@ -103,11 +104,11 @@ public let benchmarks: [BenchmarkInfo] = configs()
  Note: the work done by the unique and non-unique variants is different.
  Only compare like to like.
  */
-func runArrayRRCImplNonUniqueDest<A>(
+fileprivate func runArrayRRCImplNonUniqueDest<A>(
   n: Int,
   dest: consuming A,
   source: consuming A
-) {
+) where A:RangeReplaceableCollection, A.Index == Int  {
   let subrange = range
   for _ in 0 ..< n {
     let destCopy = dest
@@ -127,7 +128,7 @@ func runArrayRRCImplNonUniqueDest<A>(
  being tested. Unfortunately this makes this variant less precise than the
  other, but it's still useful to be able to see the non-CoW case
  */
-func runArrayRRCImplUniqueDest<A>(
+fileprivate func runArrayRRCImplUniqueDest<A>(
   n: Int,
   dest: consuming A,
   source: consuming A,
