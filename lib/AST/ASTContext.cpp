@@ -5928,100 +5928,12 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   if (found != sigs.end())
     return found->second;
 
-  // This operation doesn't make sense if the input signature does not contain`
-  // any pack generic parameters.
-#ifndef NDEBUG
-  {
-    auto found = std::find_if(baseGenericSig.getGenericParams().begin(),
-                              baseGenericSig.getGenericParams().end(),
-                              [](GenericTypeParamType *paramType) {
-                                return paramType->isParameterPack();
-                              });
-    assert(found != baseGenericSig.getGenericParams().end());
-  }
-#endif
-
-  // The pack element signature includes all type parameters and requirements
-  // from the outer context, plus a new set of type parameters representing
-  // open pack elements and their corresponding element requirements.
-
-  llvm::SmallMapVector<GenericTypeParamType *,
-                       GenericTypeParamType *, 2> packElementParams;
-  SmallVector<GenericTypeParamType *, 2> genericParams(
-      baseGenericSig.getGenericParams().begin(), baseGenericSig.getGenericParams().end());
-  SmallVector<Requirement, 2> requirements;
-
-  auto packElementDepth =
-      baseGenericSig.getInnermostGenericParams().front()->getDepth() + 1;
-
-  for (auto paramType : baseGenericSig.getGenericParams()) {
-    if (!paramType->isParameterPack())
-      continue;
-
-    // Only include opened element parameters for packs in the given
-    // shape equivalence class.
-    if (!baseGenericSig->haveSameShape(paramType, shapeClass))
-      continue;
-
-    auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,
-                                                   packElementDepth,
-                                                   packElementParams.size(),
-                                                   *this);
-    genericParams.push_back(elementParam);
-    packElementParams[paramType] = elementParam;
-  }
-
-  auto eraseParameterPackRec = [&](Type type) -> Type {
-    return type.transformTypeParameterPacks(
-        [&](SubstitutableType *t) -> std::optional<Type> {
-          if (auto *paramType = dyn_cast<GenericTypeParamType>(t)) {
-            if (packElementParams.find(paramType) != packElementParams.end()) {
-              return Type(packElementParams[paramType]);
-            }
-
-            return Type(t);
-          }
-          return std::nullopt;
-        });
-  };
-
-  for (auto requirement : baseGenericSig.getRequirements()) {
-    requirements.push_back(requirement);
-
-    // If this requirement contains parameter packs, create a new requirement
-    // for the corresponding pack element.
-    switch (requirement.getKind()) {
-    case RequirementKind::SameShape:
-      // Drop same-shape requirements from the element signature.
-      break;
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType: {
-      auto firstType = eraseParameterPackRec(requirement.getFirstType());
-      auto secondType = eraseParameterPackRec(requirement.getSecondType());
-      if (firstType->isEqual(requirement.getFirstType()) &&
-          secondType->isEqual(requirement.getSecondType()))
-        break;
-
-      requirements.emplace_back(requirement.getKind(),
-                                firstType, secondType);
-      break;
-    }
-    case RequirementKind::Layout: {
-      auto firstType = eraseParameterPackRec(requirement.getFirstType());
-      if (firstType->isEqual(requirement.getFirstType()))
-        break;
-
-      requirements.emplace_back(requirement.getKind(), firstType,
-                                requirement.getLayoutConstraint());
-      break;
-    }
-    }
-  }
-
+  LocalArchetypeRequirementCollector collector(*this, baseGenericSig);
+  collector.addOpenedElement(shapeClass);
   auto elementSig = buildGenericSignature(
-      *this, GenericSignature(), genericParams, requirements,
+      *this, collector.OuterSig, collector.Params, collector.Requirements,
       /*allowInverses=*/false).getCanonicalSignature();
+
   sigs[key] = elementSig;
   return elementSig;
 }
