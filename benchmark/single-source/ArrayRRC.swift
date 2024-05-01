@@ -22,7 +22,7 @@ func makeRefcounted(count: Int) -> [DummyObject] {
   (0 ..< count).map { _ in DummyObject() }
 }
 
-func ranges<C: RangeReplaceableCollection>(count: Int) -> [(Range<Int>, String)] where C.Index == Int {
+func ranges(count: Int) -> [(Range<Int>, String)] {
   var results:[(Range<Int>, String)] = []
   results.append((0 ..< (count / 3), "front"))
   results.append(((count / 3) ..< ((count / 3) * 2), "middle"))
@@ -40,13 +40,13 @@ private func configs() -> [BenchmarkInfo] {
         for (range, rangeName) in ranges(count: destCount) {
           for (sourceUnique, sourceUniqueName) in [(true, "sourceUnique"), (false, "sourceNonUnique")] {
             for (destUnique, destUniqueName) in [(true, "destUnique"), (false, "destNonUnique")] {
+              let runFunction = switch (refcounted, destUnique) {
+              case (true, true): runArrayRRCRefcountedUniqueDest
+              case (true, false): runArrayRRCRefcountedSharedDest
+              case (false, true): runArrayRRCPODUniqueDest
+              case (false, false): runArrayRRCPODSharedDest
+              }
               configs.append(
-                let runFunction = switch (refcounted, destUnique) {
-                case (true, true): runArrayRRCRefcountedUniqueDest
-                case (true, false): runArrayRRCRefcountedSharedDest
-                case (false, true): runArrayRRCPODUniqueDest
-                case (false, false): runArrayRRCPODSharedDest
-                }
                 BenchmarkInfo(
                   name:"arrayRRC_\(refcountedName)_\(destName)_\(sourceName)_\(rangeName)_\(destUniqueName)_\(sourceUniqueName)",
                   runFunction: runFunction,
@@ -87,7 +87,7 @@ private func configs() -> [BenchmarkInfo] {
   return configs
 }
 
-var range:Range<Int> = 0 ... 0
+var range:Range<Int> = 0 ..< 0
 var refcountedDest:[DummyObject] = []
 var podDest:[Int] = []
 var refcountedSource:[DummyObject] = []
@@ -108,6 +108,7 @@ func runArrayRRCImplNonUniqueDest<A>(
   dest: consuming A,
   source: consuming A
 ) {
+  let subrange = range
   for _ in 0 ..< n {
     let destCopy = dest
     let sourceCopy = useUniqueSource ? nil : source
@@ -131,7 +132,8 @@ func runArrayRRCImplUniqueDest<A>(
   dest: consuming A,
   source: consuming A,
   originalRangeContents: consuming A
-) {
+) where A:RangeReplaceableCollection, A.Index == Int {
+  let subrange = range
   for _ in 0 ..< n {
     let sourceCopy = useUniqueSource ? nil : source
     let originalRangeContentsCopy = useUniqueSource ? nil : originalRangeContents
