@@ -60,6 +60,9 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckStmt"
 
 namespace {
+  /// After forming autoclosures, we must re-parent any closure expressions
+  /// nested inside the autoclosure, because the autoclosure introduces a new
+  /// DeclContext.
   class ContextualizeClosuresAndMacros : public ASTWalker {
     DeclContext *ParentDC;
   public:
@@ -70,16 +73,10 @@ namespace {
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      // Autoclosures need to be numbered and potentially reparented.
-      // Reparenting is required with:
-      //   - nested autoclosures, because the inner autoclosure will be
-      //     parented to the outer context, not the outer autoclosure
-      //   - non-local initializers
       if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
         CE->setParent(ParentDC);
 
-        // Recurse into the autoclosure body using the same sequence,
-        // but parenting to the autoclosure instead of the outer closure.
+        // Recurse into the autoclosure body with the new ParentDC.
         auto oldParentDC = ParentDC;
         ParentDC = CE;
         CE->getBody()->walk(*this);
@@ -103,13 +100,12 @@ namespace {
         }
       }
 
-      // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         CE->setParent(ParentDC);
 
         // If the closure was type checked within its enclosing context,
-        // we need to walk into it with a new sequence.
-        // Otherwise, it'll have been separately type-checked.
+        // we need to walk into it. Otherwise, it'll have been separately
+        // type-checked.
         if (!CE->isSeparatelyTypeChecked())
           CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
 

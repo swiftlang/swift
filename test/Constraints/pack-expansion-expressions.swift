@@ -608,9 +608,8 @@ func test_that_expansions_are_bound_early() {
 do {
   func test<T>(x: T) {}
 
-  // rdar://110711746 to make this valid
   func caller1<each T>(x: repeat each T) {
-    _ = (repeat { test(x: each x) }()) // expected-error {{pack reference 'each T' can only appear in pack expansion}}
+    _ = (repeat { test(x: each x) }())
   }
 
   func caller2<each T>(x: repeat each T) {

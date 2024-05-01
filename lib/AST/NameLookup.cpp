@@ -2833,10 +2833,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
         // Type version: an empty class-bound existential.
-        if (typealias->hasInterfaceType()) {
-          if (auto type = typealias->getUnderlyingType())
-            if (type->isAnyObject())
-              anyObject = true;
+        if (auto type = typealias->getUnderlyingType()) {
+          if (type->isAnyObject())
+            anyObject = true;
         }
         // TypeRepr version: Builtin.AnyObject
         else if (auto *qualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
