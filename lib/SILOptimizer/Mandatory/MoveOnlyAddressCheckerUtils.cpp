@@ -3997,6 +3997,10 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
+        if (llvm::any_of(result->getUsers(),
+                         [](auto *user) { return isa<BranchInst>(user); })) {
+          continue;
+        }
         if (completion.completeOSSALifetime(result) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
@@ -4004,7 +4008,9 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
       }
     }
     for (SILArgument *arg : block->getArguments()) {
-      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
+      if (arg->isReborrow()) {
+        continue;
+      }
       if (completion.completeOSSALifetime(arg) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
