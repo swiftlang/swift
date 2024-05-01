@@ -95,6 +95,16 @@ GenericSignatureImpl::getInnermostGenericParams() const {
   return params.slice(sliceCount);
 }
 
+unsigned GenericSignatureImpl::getMaxDepth() const {
+  return getGenericParams().back()->getDepth();
+}
+
+unsigned GenericSignature::getNextDepth() const {
+  if (!getPointer())
+    return 0;
+  return getPointer()->getMaxDepth() + 1;
+}
+
 void GenericSignatureImpl::forEachParam(
     llvm::function_ref<void(GenericTypeParamType *, bool)> callback) const {
   // Figure out which generic parameters are concrete or same-typed to another
