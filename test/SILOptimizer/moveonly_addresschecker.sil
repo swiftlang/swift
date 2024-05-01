@@ -871,3 +871,36 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// Test that we don't crash while attempting to complete reborrow lifetimes.
+sil [ossa] @closure_lifetime_fixup_output : $@convention(thin) (@owned NonTrivialStructPair) -> () {
+bb0(%pair : @owned $NonTrivialStructPair):
+  %none = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  %none_borrow = begin_borrow %none : $Optional<@callee_guaranteed () -> ()>
+  %stack = alloc_stack $NonTrivialStructPair, let, name "job", argno 1
+  %addr = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack : $*NonTrivialStructPair
+  store %pair to [init] %addr : $*NonTrivialStructPair
+  cond_br undef, bb1, bb3
+
+bb1:
+  end_borrow %none_borrow : $Optional<@callee_guaranteed () -> ()>
+  %closure = partial_apply [callee_guaranteed] undef() : $@convention(thin) () -> ()
+  %some = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %closure : $@callee_guaranteed () -> ()
+  %some_borrow = begin_borrow %some : $Optional<@callee_guaranteed () -> ()>
+  br bb2
+
+bb2:
+  br bb4(%some_borrow : $Optional<@callee_guaranteed () -> ()>, %some : $Optional<@callee_guaranteed () -> ()>)
+
+bb3:
+  br bb4(%none_borrow : $Optional<@callee_guaranteed () -> ()>, %none : $Optional<@callee_guaranteed () -> ()>)
+
+bb4(%reborrow : @reborrow @guaranteed $Optional<@callee_guaranteed () -> ()>, %maybe : @owned $Optional<@callee_guaranteed () -> ()>):
+  %borrow = borrowed %reborrow : $Optional<@callee_guaranteed () -> ()> from (%maybe : $Optional<@callee_guaranteed () -> ()>)
+  destroy_addr %addr : $*NonTrivialStructPair
+  dealloc_stack %stack : $*NonTrivialStructPair
+  end_borrow %borrow : $Optional<@callee_guaranteed () -> ()>
+  destroy_value %maybe : $Optional<@callee_guaranteed () -> ()>
+  %retval = tuple ()
+  return %retval : $()
+}
