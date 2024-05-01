@@ -4162,6 +4162,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // that IRGen can pass dynamic 'Self' metadata.
   std::optional<CapturedValue> selfCapture;
 
+  // Captured pack element environments.
+  llvm::SetVector<GenericEnvironment *> genericEnv;
+
   bool capturesGenericParams = false;
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
@@ -4179,6 +4182,13 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       capturesDynamicSelf = captureInfo.getDynamicSelfType();
     if (captureInfo.hasOpaqueValueCapture())
       capturesOpaqueValue = captureInfo.getOpaqueValue();
+
+    // Any set of mutually-recursive local functions will capture the same
+    // element environments, because we can't "cross" a pack expansion
+    // expression.
+    for (auto *env : captureInfo.getGenericEnvironments()) {
+      genericEnv.insert(env);
+    }
 
     SmallVector<CapturedValue, 4> localCaptures;
     captureInfo.getLocalCaptures(localCaptures);
@@ -4397,8 +4407,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the uniqued set of transitive captures.
-  CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
-                   capturesOpaqueValue, capturesGenericParams};
+  CaptureInfo info(Context, resultingCaptures,
+                   capturesDynamicSelf, capturesOpaqueValue,
+                   capturesGenericParams, genericEnv.getArrayRef());
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
   (void)inserted;
