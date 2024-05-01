@@ -94,6 +94,11 @@ static llvm::cl::opt<std::string> HidingModule(
     "hiding-module",
     llvm::cl::desc("Don't qualify types originating from this module"),
     llvm::cl::Hidden);
+
+static llvm::cl::opt<bool>
+    ShowClosureSignature("show-closure-signature", llvm::cl::init(true),
+                         llvm::cl::desc("Show type signature of closures"),
+                         llvm::cl::Hidden);
 /// \}
 
 
@@ -390,6 +395,7 @@ int main(int argc, char **argv) {
   options.DisplayObjCModule = DisplayObjCModule;
   options.HidingCurrentModule = HidingModule;
   options.DisplayLocalNameContexts = DisplayLocalNameContexts;
+  options.ShowClosureSignature = ShowClosureSignature;
 
   if (InputNames.empty()) {
     CompactMode = true;
