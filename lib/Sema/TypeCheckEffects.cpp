@@ -1183,6 +1183,13 @@ public:
     return Classification();
   }
 
+  bool isContextPreconcurrency() const {
+    if (!DC)
+      return false;
+
+    return getActorIsolationOfContext(DC).preconcurrency();
+  }
+
   /// Whether a missing 'await' error on accessing an async var should be
   /// downgraded to a warning.
   ///
@@ -1190,7 +1197,7 @@ public:
   /// global or static 'let' variables, which was previously accepted in
   /// compiler versions before 5.10, or for declarations marked preconcurrency.
   bool downgradeAsyncAccessToWarning(Decl *decl) {
-    if (decl->preconcurrency()) {
+    if (decl->preconcurrency() || isContextPreconcurrency()) {
       return true;
     }
 
@@ -1339,7 +1346,8 @@ public:
 
     // Downgrade missing 'await' errors for preconcurrency references.
     result.setDowngradeToWarning(
-        result.hasAsync() && fnRef.isPreconcurrency());
+        result.hasAsync() &&
+        (fnRef.isPreconcurrency() || isContextPreconcurrency()));
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
