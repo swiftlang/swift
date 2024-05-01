@@ -316,6 +316,7 @@ module WinSDK [system] {
 
   module Security {
     header "../shared/sddl.h"
+    header "../shared/security.h"
 
     module AuthZ {
       header "AuthZ.h"
@@ -337,6 +338,8 @@ module WinSDK [system] {
 
       link "Crypt32.Lib"
     }
+
+    link "Secur32.Lib"
   }
 
   module Shell {
