@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
+// REQUIRES: PTRSIZE=64
+
 public struct B<T> {
   var x: T
   var y: T
@@ -80,20 +82,20 @@ public enum ForwardEnum<T> {
 
 
 // OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr nocapture readonly %"A<T>")
-// OPT:   [[T_PARAM:%.*]] = getelementptr inbounds ptr, ptr %"A<T>", {{(i64|i32)}} 2
+// OPT:   [[T_PARAM:%.*]] = getelementptr inbounds i8, ptr %"A<T>", i64 16
 // OPT:   [[T:%.*]] = load ptr, ptr [[T_PARAM]]
-// OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[T]], {{(i64|i32)}} -1
+// OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8, ptr [[T]], {{(i64|i32)}} -8
 // OPT:   [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
-// OPT:   [[DESTROY_VW:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], {{(i64|i32)}} 1
+// OPT:   [[DESTROY_VW:%.*]] = getelementptr inbounds i8, ptr [[VWT]], {{(i64|i32)}} 8
 // OPT:   [[DESTROY:%.*]] = load ptr, ptr [[DESTROY_VW]]
 // OPT:   tail call void [[DESTROY]](ptr noalias %object, ptr [[T]])
-// OPT:   [[SIZE_VW:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], {{i64|i32}} 0, {{(i64|i32)}} 8
+// OPT:   [[SIZE_VW:%.*]] = getelementptr inbounds i8, ptr [[VWT]], {{(i64|i32)}} 64
 // OPT:   [[SIZE_T:%.*]] = load {{(i64|i32)}}, ptr [[SIZE_VW]]
 // OPT:   [[OBJECT:%.*]] = ptrtoint ptr %object to {{(i64|i32)}}
-// OPT:   [[FLAGS_VW:%.*]] = getelementptr inbounds {{.*}}, ptr [[VWT]], {{i64|i32}} 0, {{(i64|i32)}} 10
+// OPT:   [[FLAGS_VW:%.*]] = getelementptr inbounds i8, ptr [[VWT]], {{(i64|i32)}} 80
 // OPT:   [[FLAGS3:%.*]] = load i32, ptr [[FLAGS_VW]]
 // OPT:   [[FLAGS:%.*]] = and i32 [[FLAGS3]], 255
-// OPT-64:   %flags.alignmentMask = zext i32 [[FLAGS]] to i64
+// OPT-64:   %flags.alignmentMask = zext nneg i32 [[FLAGS]] to i64
 // OPT-64:   [[TMP:%.*]] = add {{(i64|i32)}} [[SIZE_T]], %flags.alignmentMask
 // OPT-32:   [[TMP:%.*]] = add {{(i64|i32)}} %flags.alignmentMask, [[SIZE_T]]
 // OPT:   [[TMP2:%.*]] = add {{(i64|i32)}} [[TMP]], [[OBJECT]]
