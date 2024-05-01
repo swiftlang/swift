@@ -61,6 +61,7 @@ add_swift_host_library(swiftAST STATIC
   IndexSubset.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
+  LocalArchetypeRequirementCollector.cpp
   Module.cpp
   ModuleDependencies.cpp
   ModuleLoader.cpp
