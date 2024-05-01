@@ -38,6 +38,16 @@ class FindCapturedVars : public ASTWalker {
   ASTContext &Context;
   SmallVector<CapturedValue, 4> Captures;
   llvm::SmallDenseMap<ValueDecl*, unsigned, 4> captureEntryNumber;
+
+  /// A stack of pack element environments we're currently walking into.
+  /// A reference to an element archetype defined by one of these is not
+  /// a capture.
+  llvm::SetVector<GenericEnvironment *> VisitingEnvironments;
+
+  /// A set of pack element environments we've encountered that were not
+  /// in the above stack; those are the captures.
+  llvm::SetVector<GenericEnvironment *> CapturedEnvironments;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
@@ -65,8 +75,9 @@ public:
         dynamicSelfToRecord = DynamicSelf;
     }
 
-    return CaptureInfo(Context, Captures, dynamicSelfToRecord, OpaqueValue,
-                       HasGenericParamCaptures);
+    return CaptureInfo(Context, Captures, dynamicSelfToRecord,
+                       OpaqueValue, HasGenericParamCaptures,
+                       CapturedEnvironments.getArrayRef());
   }
 
   bool hasGenericParamCaptures() const {
@@ -148,9 +159,17 @@ public:
     // perform it accurately.
     if (type->hasArchetype() || type->hasTypeParameter()) {
       type.walk(TypeCaptureWalker(ObjC, [&](Type t) {
-        if ((t->is<ArchetypeType>() ||
+        // Record references to element archetypes that were bound
+        // outside the body of the current closure.
+        if (auto *element = t->getAs<ElementArchetypeType>()) {
+          auto *env = element->getGenericEnvironment();
+          if (VisitingEnvironments.count(env) == 0)
+            CapturedEnvironments.insert(env);
+        }
+
+        if ((t->is<PrimaryArchetypeType>() ||
+             t->is<PackArchetypeType>() ||
              t->is<GenericTypeParamType>()) &&
-            !t->isOpenedExistential() &&
             !HasGenericParamCaptures) {
           GenericParamCaptureLoc = loc;
           HasGenericParamCaptures = true;
@@ -616,6 +635,25 @@ public:
         assert(!OpaqueValue || OpaqueValue == opaqueValue);
         OpaqueValue = opaqueValue;
         return Action::Continue(E);
+      }
+    }
+
+    if (auto expansion = dyn_cast<PackExpansionExpr>(E)) {
+      if (auto *env = expansion->getGenericEnvironment()) {
+        assert(VisitingEnvironments.count(env) == 0);
+        VisitingEnvironments.insert(env);
+      }
+    }
+
+    return Action::Continue(E);
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (auto expansion = dyn_cast<PackExpansionExpr>(E)) {
+      if (auto *env = expansion->getGenericEnvironment()) {
+        assert(env == VisitingEnvironments.back());
+        VisitingEnvironments.pop_back();
+        (void) env;
       }
     }
 
