@@ -1025,7 +1025,7 @@ function Build-CURL($Arch) {
       ENABLE_THREADED_RESOLVER = "NO";
       ENABLE_UNICODE = "YES";
       ENABLE_UNIX_SOCKETS = "NO";
-      ENABLE_WEBSOCKETS = "NO";
+      ENABLE_WEBSOCKETS = "YES";
       HAVE_POLL_FINE = "NO";
       USE_IDN2 = "NO";
       USE_MSH3 = "NO";
