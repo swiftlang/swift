@@ -244,7 +244,6 @@ void SILFunction::init(
          "function type has open type parameters");
 
   this->LoweredType = LoweredType;
-  this->GenericEnv = genericEnv;
   this->SpecializationInfo = nullptr;
   this->EntryCount = entryCount;
   this->Availability = AvailabilityContext::alwaysAvailable();
@@ -280,6 +279,7 @@ void SILFunction::init(
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
   setDebugScope(DebugScope);
+  setGenericEnvironment(genericEnv);
 }
 
 SILFunction::~SILFunction() {
@@ -993,14 +993,10 @@ void SILFunction::eraseAllBlocks() {
   BlockList.clear();
 }
 
-SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
-  if (ForwardingSubMap)
-    return ForwardingSubMap;
-
-  if (auto *env = getGenericEnvironment())
-    ForwardingSubMap = env->getForwardingSubstitutionMap();
-
-  return ForwardingSubMap;
+void SILFunction::setGenericEnvironment(GenericEnvironment *env) {
+  setGenericEnvironment(env, ArrayRef<GenericEnvironment *>(),
+                        env ? env->getForwardingSubstitutionMap()
+                            : SubstitutionMap());
 }
 
 bool SILFunction::shouldVerifyOwnership() const {

@@ -1076,6 +1076,13 @@ public:
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
 
+  /// Get the generic environment for SILGen to use. The substitution map
+  /// sends the generic parameters of the function's interface type into
+  /// archetypes, which will either be primary archetypes from this
+  /// environment, or local archetypes captured by this function.
+  std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
+  getForwardingSubstitutionsForLowering(SILDeclRef constant);
+
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(TypeExpansionContext context, SILDeclRef constant) {
     return getConstantInfo(context, constant).getSILType();

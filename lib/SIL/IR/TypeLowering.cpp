@@ -4094,6 +4094,26 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
       .genericSig.getGenericEnvironment();
 }
 
+std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
+TypeConverter::getForwardingSubstitutionsForLowering(SILDeclRef constant) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+
+  auto *genericEnv = sig.baseGenericSig.getGenericEnvironment();
+  SubstitutionMap forwardingSubs;
+
+  if (sig.baseGenericSig)
+    forwardingSubs = genericEnv->getForwardingSubstitutionMap();
+
+  if (!sig.capturedEnvs.empty()) {
+    assert(sig.genericSig && !sig.genericSig->isEqual(sig.baseGenericSig));
+
+    forwardingSubs = buildSubstitutionMapWithCapturedEnvironments(
+        forwardingSubs, sig.genericSig, sig.capturedEnvs);
+  }
+
+  return std::make_tuple(genericEnv, sig.capturedEnvs, forwardingSubs);
+}
+
 SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,
                                                  AbstractStorageDecl *value,
                                                  Type lvalueType) {
