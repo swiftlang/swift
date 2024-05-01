@@ -111,8 +111,7 @@ public:
 
   void getDiagnosticsAsync(
       const char *DocName, ArrayRef<const char *> CArgs,
-      llvm::function_ref<void(const RequestResult<DiagnosticsResult> &)>
-          callback) {
+      std::function<void(const RequestResult<DiagnosticsResult> &)> callback) {
     auto Args = makeArgs(DocName, CArgs);
     getLang().getDiagnostics(DocName, Args, /*VFSOpts*/ std::nullopt,
                              /*CancelToken*/ {}, callback);
