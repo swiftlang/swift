@@ -5,10 +5,10 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
 
-// RUN: %target-swift-emit-module-interface(%t/objc_implementation.swiftinterface) %s -import-underlying-module %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/objc_implementation
+// RUN: %target-swift-emit-module-interface(%t/objc_implementation.swiftinterface) %s -import-underlying-module %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/objc_implementation -target %target-stable-abi-triple
 // RUN: %FileCheck --input-file %t/objc_implementation.swiftinterface %s
 // RUN: %FileCheck --input-file %t/objc_implementation.swiftinterface --check-prefix NEGATIVE %s
-// RUN: %target-swift-typecheck-module-from-interface(%t/objc_implementation.swiftinterface) %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/objc_implementation
+// RUN: %target-swift-typecheck-module-from-interface(%t/objc_implementation.swiftinterface) %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/objc_implementation -target %target-stable-abi-triple
 
 // REQUIRES: objc_interop
 

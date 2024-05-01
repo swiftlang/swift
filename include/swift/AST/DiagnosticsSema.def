@@ -1796,6 +1796,10 @@ ERROR(attr_objc_implementation_no_conformance,none,
       "add this conformance %select{with an ordinary extension|"
       "in the Objective-C header}1",
       (Type, bool))
+ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
+      "'@implementation' of an Objective-C class requires a minimum deployment "
+      "target of at least %0 %1",
+      (StringRef, llvm::VersionTuple))
 
 ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%kind0 does not match any %kindonly0 declared in the headers for %1; "
