@@ -2981,7 +2981,7 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
-  appendFunctionSignature(fn, sig, forDecl, NoFunctionMangling);
+  appendFunctionSignature(fn, sig, forDecl, NoFunctionMangling, isRecursedInto);
 
   bool mangleClangType = fn->getASTContext().LangOpts.UseClangFunctionTypes &&
                          fn->hasNonDerivableClangType();
