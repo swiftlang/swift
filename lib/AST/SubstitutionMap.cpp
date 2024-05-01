@@ -578,7 +578,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
     DerivedParams(derivedParams) {
 
   if (auto baseNominalSig = baseNominal->getGenericSignature()) {
-    BaseDepth = baseNominalSig.getGenericParams().back()->getDepth() + 1;
+    BaseDepth = baseNominalSig.getNextDepth();
 
     auto *genericEnv = derivedNominal->getGenericEnvironment();
     auto derivedNominalTy = derivedNominal->getDeclaredInterfaceType();
@@ -602,7 +602,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
   }
 
   if (auto derivedNominalSig = derivedNominal->getGenericSignature())
-    OrigDepth = derivedNominalSig.getGenericParams().back()->getDepth() + 1;
+    OrigDepth = derivedNominalSig.getNextDepth();
 }
 
 Type QueryOverrideSubs::operator()(SubstitutableType *type) const {

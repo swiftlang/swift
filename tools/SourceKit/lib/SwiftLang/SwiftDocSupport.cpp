@@ -286,10 +286,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
       M = DC->getParentModule();
       SubMap = BaseType->getContextSubstitutionMap(M, DC);
-      if (!SubMap.empty()) {
-        TypeContextDepth = SubMap.getGenericSignature()
-            .getGenericParams().back()->getDepth() + 1;
-      }
+      TypeContextDepth = SubMap.getGenericSignature().getNextDepth();
     }
   }
 

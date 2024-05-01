@@ -1572,8 +1572,7 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
 
   auto genericSig = callee->getInnermostDeclContext()
       ->getGenericSignatureOfContext().getCanonicalSignature();
-  if (genericParam->getDepth() <
-          genericSig.getGenericParams().back()->getDepth())
+  if (genericParam->getDepth() < genericSig->getMaxDepth())
     return std::nullopt;
 
   // If the existential argument conforms to all of protocol requirements on
