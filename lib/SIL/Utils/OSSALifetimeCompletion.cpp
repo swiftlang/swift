@@ -70,8 +70,8 @@ static SILInstruction *endOSSALifetime(SILValue value, SILBuilder &builder) {
   return builder.createEndBorrow(loc, value);
 }
 
-static bool endLifetimeAtBoundary(SILValue value,
-                                  const SSAPrunedLiveness &liveness) {
+static bool endLifetimeAtLivenessBoundary(SILValue value,
+                                          const SSAPrunedLiveness &liveness) {
   PrunedLivenessBoundary boundary;
   liveness.computeBoundary(boundary);
 
@@ -149,7 +149,7 @@ public:
                             llvm::function_ref<void(SILInstruction *)> visit);
 
   struct State {
-    enum class Value : uint8_t {
+    enum Value : uint8_t {
       Unavailable = 0,
       Available,
       Unknown,
@@ -161,10 +161,6 @@ public:
     State meet(State const other) const {
       return *this < other ? *this : other;
     }
-
-    static State Unavailable() { return {Value::Unavailable}; }
-    static State Available() { return {Value::Available}; }
-    static State Unknown() { return {Value::Unknown}; }
   };
 
   struct Result {
@@ -197,36 +193,47 @@ public:
 
 void VisitUnreachableLifetimeEnds::computeRegion(
     const SSAPrunedLiveness &liveness) {
-  // Find the non-lifetime-ending boundary of `value`.
+  // (1) Compute the complete liveness boundary.
   PrunedLivenessBoundary boundary;
   liveness.computeBoundary(boundary);
+
+  // Used in the forward walk below (3).
+  BasicBlockWorklist regionWorklist(value->getFunction());
+
+  // (2) Collect the non-lifetime-ending liveness boundary.  This is the
+  //     portion of `boundary` consisting of:
+  // - non-lifetime-ending instructions (their parent blocks)
+  // - boundary edges
+  // - dead defs (their parent blocks)
+  auto collect = [&](SILBasicBlock *block) {
+    // `region` consists of the non-lifetime-ending boundary and all its
+    // iterative successors.
+    region.insert(block);
+    // `starts` just consists of the blocks in the non-lifetime-ending
+    // boundary.
+    starts.insert(block);
+    // The forward walk begins from the non-lifetime-ending boundary.
+    regionWorklist.push(block);
+  };
 
   for (SILInstruction *lastUser : boundary.lastUsers) {
     if (liveness.isInterestingUser(lastUser)
         != PrunedLiveness::LifetimeEndingUse) {
-      region.insert(lastUser->getParent());
-      starts.insert(lastUser->getParent());
+      collect(lastUser->getParent());
     }
   }
   for (SILBasicBlock *edge : boundary.boundaryEdges) {
-    region.insert(edge);
-    starts.insert(edge);
+    collect(edge);
   }
   for (SILNode *deadDef : boundary.deadDefs) {
-    region.insert(deadDef->getParentBlock());
-    starts.insert(deadDef->getParentBlock());
+    collect(deadDef->getParentBlock());
   }
 
-  // Forward walk to find the region in which `value` might be available.
-  BasicBlockWorklist regionWorklist(value->getFunction());
-  // Start the forward walk from the non-lifetime-ending boundary.
-  for (auto *start : region) {
-    regionWorklist.push(start);
-  }
+  // (3) Forward walk to find the region in which `value` might be available.
   while (auto *block = regionWorklist.pop()) {
     if (block->succ_empty()) {
-      // This assert will fail unless there are already lifetime-ending
-      // instruction on all paths to normal function exits.
+      // This assert will fail unless there is already a lifetime-ending
+      // instruction on each path to normal function exits.
       assert(isa<UnreachableInst>(block->getTerminator()));
     }
     for (auto *successor : block->getSuccessorBlocks()) {
@@ -244,9 +251,9 @@ void VisitUnreachableLifetimeEnds::propagateAvailablity(Result &result) {
   // - start blocks are ::Available
   for (auto *block : region) {
     if (starts.contains(block))
-      result.setState(block, State::Available());
+      result.setState(block, State::Available);
     else
-      result.setState(block, State::Unknown());
+      result.setState(block, State::Unknown);
   }
 
   BasicBlockWorklist worklist(value->getFunction());
@@ -280,14 +287,14 @@ void VisitUnreachableLifetimeEnds::propagateAvailablity(Result &result) {
 void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
     Result const &result, llvm::function_ref<void(SILInstruction *)> visit) {
   for (auto *block : region) {
-    auto available = result.getState(block) == State::Available();
+    auto available = result.getState(block) == State::Available;
     if (!available) {
       continue;
     }
     auto hasUnreachableSuccessor = [&]() {
       // Use a lambda to avoid checking if possible.
       return llvm::any_of(block->getSuccessorBlocks(), [&result](auto *block) {
-        return result.getState(block) == State::Unavailable();
+        return result.getState(block) == State::Unavailable;
       });
     };
     if (!block->succ_empty() && !hasUnreachableSuccessor()) {
@@ -315,8 +322,9 @@ void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
   visitor.visitAvailabilityBoundary(result, visit);
 }
 
-static bool endLifetimeAtUnreachableBlocks(SILValue value,
-                                           const SSAPrunedLiveness &liveness) {
+static bool
+endLifetimeAtAvailabilityBoundary(SILValue value,
+                                  const SSAPrunedLiveness &liveness) {
   bool changed = false;
   OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
       value, liveness, [&](auto *unreachable) {
@@ -330,12 +338,8 @@ static bool endLifetimeAtUnreachableBlocks(SILValue value,
 /// End the lifetime of \p value at unreachable instructions.
 ///
 /// Returns true if any new instructions were created to complete the lifetime.
-///
-/// This is only meant to cleanup lifetimes that lead to dead-end blocks. After
-/// recursively completing all nested scopes, it then simply ends the lifetime
-/// at the Unreachable instruction.
-bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
-    SILValue value, bool forceBoundaryCompletion) {
+bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
+                                                      Boundary boundary) {
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
   auto handleInnerScope = [this](SILValue innerBorrowedValue) {
@@ -345,10 +349,13 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
   liveness.compute(domInfo, handleInnerScope);
 
   bool changed = false;
-  if (value->isLexical() && !forceBoundaryCompletion) {
-    changed |= endLifetimeAtUnreachableBlocks(value, liveness.getLiveness());
-  } else {
-    changed |= endLifetimeAtBoundary(value, liveness.getLiveness());
+  switch (boundary) {
+  case Boundary::Availability:
+    changed |= endLifetimeAtAvailabilityBoundary(value, liveness.getLiveness());
+    break;
+  case Boundary::Liveness:
+    changed |= endLifetimeAtLivenessBoundary(value, liveness.getLiveness());
+    break;
   }
   // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently
   // produce guaranteed phis). See FindEnclosingDefs &
@@ -367,9 +374,15 @@ static FunctionTest OSSALifetimeCompletionTest(
     "ossa-lifetime-completion",
     [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
+      std::optional<OSSALifetimeCompletion::Boundary> kind = std::nullopt;
+      if (arguments.hasUntaken()) {
+        kind = arguments.takeBool()
+                   ? OSSALifetimeCompletion::Boundary::Liveness
+                   : OSSALifetimeCompletion::Boundary::Availability;
+      }
       llvm::outs() << "OSSA lifetime completion: " << value;
       OSSALifetimeCompletion completion(&function, /*domInfo*/ nullptr);
-      completion.completeOSSALifetime(value);
+      completion.completeOSSALifetime(value, kind);
       function.print(llvm::outs());
     });
 } // end namespace swift::test

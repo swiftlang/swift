@@ -302,6 +302,13 @@ with the proper attributes to ensure they'll be available in the debugger. In
 particular, if you see `SWIFT_DEBUG_DUMP` in a class declaration, that class
 has a `dump()` method you can call.
 
+### Pass statistics
+
+There are options to output a lot of different statistics, including about
+SIL passes. More information is available in
+[Compiler Performance](CompilerPerformance.md) for the unified statistics, and
+[Optimizer Counter Analysis](OptimizerCountersAnalysis.md) for pass counters.
+
 ## Debugging and Profiling on SIL level
 
 ### SIL source level profiling
