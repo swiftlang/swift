@@ -523,13 +523,13 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--musl-path=%s" % (args.musl_path, )
             ]
-        if args.linux_static_arch:
+        if args.linux_static_archs:
             impl_args += [
-                "--linux-static-arch=%s" % ';'.join(args.linux_static_arch)
+                "--linux-static-archs=%s" % ';'.join(args.linux_static_archs)
             ]
-        if args.linux_arch:
+        if args.linux_archs:
             impl_args += [
-                "--linux-arch=%s" % ';'.join(args.linux_arch)
+                "--linux-archs=%s" % ';'.join(args.linux_archs)
             ]
 
         # Compute the set of host-specific variables, which we pass through to

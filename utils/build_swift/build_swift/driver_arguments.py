@@ -1394,7 +1394,7 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Build settings for Linux')
 
-    option('--linux-arch', store,
+    option('--linux-archs', store,
            type=argparse.ShellSplitType(),
            default=None,
            help='Semicolon-separated list of architectures to use when '
@@ -1407,7 +1407,7 @@ def create_argument_parser():
            default='/usr/local/musl',
            help='The path to the Musl headers and libraries.')
 
-    option('--linux-static-arch', store,
+    option('--linux-static-archs', store,
            type=argparse.ShellSplitType(),
            default=None,
            help='Semicolon-separated list of architectures to use when '

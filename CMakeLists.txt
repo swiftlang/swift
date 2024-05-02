@@ -1107,7 +1107,6 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
 
-  # Should we build the standard library for the host?
   is_sdk_requested(LINUX swift_build_linux)
   if(swift_build_linux)
     if("${SWIFT_SDK_LINUX_ARCHITECTURES}" STREQUAL "")
@@ -1117,7 +1116,6 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
     configure_sdk_unix("Linux" "${SWIFT_SDK_LINUX_ARCHITECTURES}")
   endif()
 
-  # Should we build it for LINUX_STATIC?
   is_sdk_requested(LINUX_STATIC swift_build_linux_static)
   if(swift_build_linux_static)
     if("${SWIFT_MUSL_PATH}" STREQUAL "")

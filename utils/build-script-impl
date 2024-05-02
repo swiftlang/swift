@@ -95,8 +95,8 @@ KNOWN_SETTINGS=(
 
     ## Linux Options
     musl-path                                     "/usr/local/musl" "The path to the Musl headers and libraries"
-    linux-arch                                    ""                "The Linux target architecture(s)"
-    linux-static-arch                             ""                "The fully static Linux target architecture(s)"
+    linux-archs                                   ""                "The Linux target architecture(s)"
+    linux-static-archs                            ""                "The fully static Linux target architecture(s)"
 
     ## Darwin Options
     darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration, default is 1 on Darwin platforms, 0 otherwise"
@@ -1729,7 +1729,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ ! "${SKIP_BUILD_LINUX}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_SDK_LINUX_ARCHITECTURES:STRING="${LINUX_ARCH}"
+                        -DSWIFT_SDK_LINUX_ARCHITECTURES:STRING="${LINUX_ARCHS}"
                     )
                 fi
 
@@ -1737,7 +1737,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_MUSL_PATH:STRING="${MUSL_PATH}"
-                        -DSWIFT_SDK_LINUX_STATIC_ARCHITECTURES:STRING="${LINUX_STATIC_ARCH}"
+                        -DSWIFT_SDK_LINUX_STATIC_ARCHITECTURES:STRING="${LINUX_STATIC_ARCHS}"
                     )
                 fi
 

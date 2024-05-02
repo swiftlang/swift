@@ -2089,10 +2089,10 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
-    elseif(${sdk} STREQUAL "LINUX_STATIC")
+    elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftlib_module_depends_flattened
           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
-    elseif(${sdk} STREQUAL "CYGWIN")
+    elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
     elseif(sdk STREQUAL "HAIKU")
@@ -2349,19 +2349,19 @@ function(add_swift_target_library name)
 
       # If the SDK is static only, always build static instead of dynamic
       if(SWIFT_SDK_${sdk}_STATIC_ONLY AND SWIFTLIB_SHARED)
-        set(shared)
-        set(static STATIC)
+        set(shared_keyword)
+        set(static_keyword STATIC)
       else()
-        set(shared ${SWIFTLIB_SHARED_keyword})
-        set(static ${SWIFTLIB_STATIC_keyword})
+        set(shared_keyword ${SWIFTLIB_SHARED_keyword})
+        set(static_keyword ${SWIFTLIB_STATIC_keyword})
       endif()
 
       # Add this library variant.
       add_swift_target_library_single(
         ${variant_name}
         ${name}
-        ${shared}
-        ${static}
+        ${shared_keyword}
+        ${static_keyword}
         ${SWIFTLIB_NO_LINK_NAME_keyword}
         ${SWIFTLIB_OBJECT_LIBRARY_keyword}
         ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
@@ -2420,19 +2420,23 @@ function(add_swift_target_library name)
 
       if(NOT SWIFTLIB_OBJECT_LIBRARY)
         # Add dependencies on the (not-yet-created) custom lipo target.
-        foreach(dep ${SWIFTLIB_LINK_LIBRARIES})
-          if (NOT "${dep}" MATCHES "^(icucore|dispatch|BlocksRuntime)($|-.*)$")
+        foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
+          if (NOT "${DEP}" MATCHES "^icucore($|-.*)$" AND
+              NOT "${DEP}" MATCHES "^dispatch($|-.*)$" AND
+              NOT "${DEP}" MATCHES "^BlocksRuntime($|-.*)$")
             add_dependencies(${VARIANT_NAME}
-              "${dep}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+              "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
           endif()
         endforeach()
 
         if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
           # Add dependencies on the (not-yet-created) custom lipo target.
-          foreach(dep ${SWIFTLIB_LINK_LIBRARIES})
-            if (NOT "${dep}" MATCHES "^(icucore|dispatch|BlocksRuntime)($|-.*)$")
+          foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
+          if (NOT "${DEP}" MATCHES "^icucore($|-.*)$" AND
+              NOT "${DEP}" MATCHES "^dispatch($|-.*)$" AND
+              NOT "${DEP}" MATCHES "^BlocksRuntime($|-.*)$")
               add_dependencies("${VARIANT_NAME}-static"
-                "${dep}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
+                "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
             endif()
           endforeach()
         endif()
