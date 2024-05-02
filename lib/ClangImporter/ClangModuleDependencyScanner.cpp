@@ -493,11 +493,8 @@ bool ClangImporter::addHeaderDependencies(
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
         commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
         lookupModuleOutput);
-    if (!dependencies) {
-      // FIXME: Route this to a normal diagnostic.
-      llvm::logAllUnhandledErrors(dependencies.takeError(), llvm::errs());
+    if (!dependencies)
       return dependencies.takeError();
-    }
 
     // Record module dependencies for each new module we found.
     auto bridgedDeps = bridgeClangModuleDependencies(
@@ -527,8 +524,15 @@ bool ClangImporter::addHeaderDependencies(
       !targetModule.getBridgingHeader()->empty()) {
     auto clangModuleDependencies =
         scanHeaderDependencies(*targetModule.getBridgingHeader());
-    if (!clangModuleDependencies)
+    if (!clangModuleDependencies) {
+      // FIXME: Route this to a normal diagnostic.
+      llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
+                                  llvm::errs());
+      Impl.SwiftContext.Diags.diagnose(
+          SourceLoc(), diag::clang_dependency_scan_error,
+          "failed to scan bridging header dependencies");
       return true;
+    }
     if (auto TreeID = clangModuleDependencies->IncludeTreeID)
       targetModule.addBridgingHeaderIncludeTree(*TreeID);
     recordBridgingHeaderOptions(targetModule, *clangModuleDependencies);
