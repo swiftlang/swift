@@ -105,6 +105,16 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
+  // Don't change the order of the getDisallowedOriginKind call;
+  // it can reset downgradeToWarning to NO so needs to be called here.
+  auto originKind = getDisallowedOriginKind(D, where, downgradeToWarning);
+  // For a default argument or property initializer, package type is
+  // allowed at the use site with package access scope.
+  auto allowedForPkgCtx = false;
+  if (originKind == DisallowedOriginKind::None ||
+      originKind == DisallowedOriginKind::PackageImport) {
+    allowedForPkgCtx = where.isPackage() && declAccessScope.isPackage();
+  }
 
   // Swift 4.2 did not perform any checks for type aliases.
   if (isa<TypeAliasDecl>(D)) {
@@ -124,22 +134,12 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (isa<TypeAliasDecl>(DC) && !Context.isSwiftVersionAtLeast(6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
-  AccessLevel diagAccessLevel = declAccessScope.accessLevelForDiagnostics();
-
-  auto allowedForPkgCtx = false;
-  auto originKind = getDisallowedOriginKind(D, where, downgradeToWarning);
-  // For a default argument or property initializer, package type is
-  // allowed at the use site with package access scope.
-  if (originKind == DisallowedOriginKind::None ||
-      originKind == DisallowedOriginKind::PackageImport) {
-    allowedForPkgCtx = where.isPackage() && diagAccessLevel >= AccessLevel::Package;
-  }
-
   if (!allowedForPkgCtx) {
     auto diagID = diag::resilience_decl_unavailable;
     if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::resilience_decl_unavailable_warn;
 
+    AccessLevel diagAccessLevel = declAccessScope.accessLevelForDiagnostics();
     Context.Diags.diagnose(loc, diagID, D, diagAccessLevel,
                            fragileKind.getSelector());
 
