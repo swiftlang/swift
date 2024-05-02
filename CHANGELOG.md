@@ -5,6 +5,35 @@
 
 ## Swift 6.0
 
+* Since its introduction in Swift 5.1 the @TaskLocal property wrapper was used to   
+  create and access task-local value bindings. Property wrappers introduce mutable storage,
+  which was now properly flagged as potential source of concurrency unsafety.
+ 
+  In order for Swift 6 language mode to not flag task-locals as potentially thread-unsafe,
+  task locals are now implemented using a macro. The macro has the same general semantics 
+  and usage patterns, however there are two source-break situations which the Swift 6 
+  task locals cannot handle:
+
+  Using an implicit default `nil` value for task local initialization, when combined with a type alias:
+  ```swift
+  // allowed in Swift 5.x, not allowed in Swift 6.x
+  
+  typealias MyValue = Optional<Int> 
+  
+  @TaskLocal
+  static var number: MyValue // Swift 6: error, please specify default value explicitly
+  
+  // Solution 1: Specify the default value
+  @TaskLocal
+  static var number: MyValue = nil
+  
+  // Solution 2: Avoid the type-alias
+  @TaskLocal
+  static var number: Optional<Int>
+  ```
+
+  At the same time, task locals can now be declared as global properties, which wasn't possible before.
+
 * Swift 5.10 missed a semantic check from [SE-0309][]. In type context, a reference to a
   protocol `P` that has associated types or `Self` requirements should use
   the `any` keyword, but this was not enforced in nested generic argument positions.
