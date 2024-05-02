@@ -255,7 +255,8 @@ debug_value %1 : $Int, var, name "pair", type $Pair, expr op_fragment:#Pair.a //
 
 ## Rules of thumb
 - Optimization passes may never drop a variable entirely. If a variable is
-  entirely optimized away, an `undef` debug value should still be kept.
+  entirely optimized away, an `undef` debug value should still be kept. The only
+  exception is an unreachable function or scope, which is entirely removed.
 - A `debug_value` must always describe a correct value for that source variable
   at that source location. If a value is only correct on some paths through that
   instruction, it must be replaced with `undef`. Debug info never speculates.
@@ -263,3 +264,9 @@ debug_value %1 : $Int, var, name "pair", type $Pair, expr op_fragment:#Pair.a //
   capture the effect of the deleted instruction in a debug expression, so the
   location can be preserved. You can also use an `InstructionDeleter` which will
   automatically call `salvageDebugInfo`.
+
+> [!Tip]
+> To detect when a pass drops a variable, you can use the
+> `-Xllvm -sil-stats-lost-variables` to print when a variable is lost by a pass.
+> More information about this option is available in
+> [Optimizer Counter Analysis](OptimizerCountersAnalysis.md)
