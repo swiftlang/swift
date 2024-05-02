@@ -170,6 +170,19 @@ public:
   bool completeLifetimes();
 };
 
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &OS, OSSALifetimeCompletion::Boundary boundary) {
+  switch (boundary) {
+  case OSSALifetimeCompletion::Boundary::Liveness:
+    OS << "liveness";
+    break;
+  case OSSALifetimeCompletion::Boundary::Availability:
+    OS << "availability";
+    break;
+  }
+  return OS;
+}
+
 } // namespace swift
 
 #endif
