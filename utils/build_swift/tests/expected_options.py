@@ -780,6 +780,9 @@ EXPECTED_OPTIONS = [
     StrOption('--swift-darwin-supported-archs'),
     SetTrueOption('--swift-freestanding-is-darwin'),
 
+    StrOption('--linux-archs'),
+    StrOption('--linux-static-archs'),
+
     PathOption('--android-deploy-device-path'),
     PathOption('--android-ndk'),
     PathOption('--build-subdir'),
@@ -804,6 +807,7 @@ EXPECTED_OPTIONS = [
     PathOption('--cmake-cxx-launcher'),
     PathOption('--swift-profile-instr-use'),
     PathOption('--swift-runtime-fixed-backtracer-path'),
+    PathOption('--musl-path'),
 
     IntOption('--benchmark-num-o-iterations'),
     IntOption('--benchmark-num-onone-iterations'),
