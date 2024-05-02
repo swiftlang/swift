@@ -13,21 +13,41 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// Property wrapper that defines a task-local value key.
+
+// Macros are disabled when Swift is built without swift-syntax.
+#if $Macros && hasAttribute(attached)
+
+/// Macro that introduces a ``TaskLocal-class`` binding.
+///
+/// For information about task-local bindings, see ``TaskLocal-class``.
+///
+/// - SeeAlso: ``TaskLocal-class``
+@available(SwiftStdlib 5.1, *)
+@attached(accessor)
+@attached(peer, names: prefixed(`$`))
+public macro TaskLocal() =
+  #externalMacro(module: "SwiftMacros", type: "TaskLocalMacro")
+
+#endif
+
+/// Wrapper type that defines a task-local value key.
 ///
 /// A task-local value is a value that can be bound and read in the context of a
-/// `Task`. It is implicitly carried with the task, and is accessible by any
-/// child tasks the task creates (such as TaskGroup or `async let` created tasks).
+/// ``Task``. It is implicitly carried with the task, and is accessible by any
+/// child tasks it creates (such as TaskGroup or `async let` created tasks).
 ///
 /// ### Task-local declarations
 ///
-/// Task locals must be declared as static properties (or global properties,
-/// once property wrappers support these), like this:
+/// Task locals must be declared as static properties or global properties, like this:
 ///
 ///     enum Example {
 ///         @TaskLocal
 ///         static var traceID: TraceID?
 ///     }
+///
+///     // Global task local properties are supported since Swift 6.0:
+///     @TaskLocal
+///     var contextualNumber: Int = 12
 ///
 /// ### Default values
 /// Reading a task local value when no value was bound to it results in returning
@@ -137,7 +157,8 @@ import Swift
 ///         read() // traceID: nil
 ///       }
 ///     }
-@propertyWrapper
+///
+/// - SeeAlso: ``TaskLocal-macro``
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value

@@ -4980,15 +4980,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
       if (var->isGlobalStorage() && !isActorType) {
         auto *diagVar = var;
         if (auto *originalVar = var->getOriginalWrappedProperty()) {
-          // temporary 5.10 checking bypass for @TaskLocal <rdar://120907014>
-          // TODO: @TaskLocal should be a macro <rdar://120914014>
-          if (auto *classDecl =
-                  var->getInterfaceType()->getClassOrBoundGenericClass()) {
-            auto &ctx = var->getASTContext();
-            if (classDecl == ctx.getTaskLocalDecl()) {
-              return isolation;
-            }
-          }
           diagVar = originalVar;
         }
         if (var->isLet()) {

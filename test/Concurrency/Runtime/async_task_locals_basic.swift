@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,9 +8,12 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-final class StringLike: Sendable, CustomStringConvertible {
+final class StringLike: Sendable, ExpressibleByStringLiteral, CustomStringConvertible {
   let value: String
   init(_ value: String) {
+    self.value = value
+  }
+  init(stringLiteral value: StringLiteralType) {
     self.value = value
   }
 
@@ -32,6 +35,9 @@ enum TL {
   @TaskLocal
   static var clazz: ClassTaskLocal?
 }
+
+@TaskLocal
+var globalTaskLocal: StringLike = StringLike("<not-set>")
 
 @available(SwiftStdlib 5.1, *)
 final class ClassTaskLocal: Sendable {
@@ -218,6 +224,13 @@ func inside_actor() async {
 }
 
 @available(SwiftStdlib 5.1, *)
+func global_task_local() async {
+  await $globalTaskLocal.withValue("value-1") {
+    await printTaskLocalAsync($globalTaskLocal) // CHECK-NEXT: TaskLocal<StringLike>(defaultValue: <not-set>) (value-1)
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await simple()
@@ -229,5 +242,6 @@ func inside_actor() async {
     await nested_3_onlyTopContributesAsync()
     await nested_3_onlyTopContributesMixed()
     await inside_actor()
+    await global_task_local()
   }
 }
