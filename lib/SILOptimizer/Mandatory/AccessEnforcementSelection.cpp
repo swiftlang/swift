@@ -707,9 +707,11 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
   if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(address))
     return getSourceAccess(mmci->getOperand());
 
-  // Recurse through moveonlywrapper_to_copyable_addr.
+  // Recur through moveonlywrapper_to_copyable_addr or vice versa.
   if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(address))
     return getSourceAccess(m->getOperand());
+  if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address))
+    return getSourceAccess(c->getOperand());
 
   // Recurse through drop_deinit.
   if (auto *ddi = dyn_cast<DropDeinitInst>(address))
