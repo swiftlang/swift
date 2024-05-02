@@ -1073,14 +1073,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     isPack = true;
   }
 
-  // Local function to get the captured variable type within the capturing
-  // context.
-  auto getVarTypeInCaptureContext = [&]() -> Type {
-    return SGF.F.mapTypeIntoContext(interfaceType);
-  };
-
-  auto type = getVarTypeInCaptureContext();
-  auto &lowering = SGF.getTypeLowering(getVarTypeInCaptureContext());
+  auto type = SGF.F.mapTypeIntoContext(interfaceType);
+  auto &lowering = SGF.getTypeLowering(type);
   SILType ty = lowering.getLoweredType();
 
   bool isNoImplicitCopy;

@@ -419,6 +419,9 @@ Type RequirementMachine::getReducedType(
 
     // Get a type (concrete or dependent) for U.
     auto prefixType = [&]() -> Type {
+      if (prefix.empty())
+        return Type();
+
       verify(prefix);
 
       auto *props = Map.lookUpProperties(prefix);
@@ -461,13 +464,25 @@ Type RequirementMachine::getReducedType(
 
     // If U is not concrete, we have an invalid member type of a dependent
     // type, which is not valid in this generic signature. Give up.
-    if (prefixType->isTypeParameter()) {
-      llvm::errs() << "Invalid type parameter in getReducedType()\n";
-      llvm::errs() << "Original type: " << type << "\n";
-      llvm::errs() << "Simplified term: " << term << "\n";
-      llvm::errs() << "Longest valid prefix: " << prefix << "\n";
-      llvm::errs() << "Prefix type: " << prefixType << "\n";
+    if (prefix.empty() || prefixType->isTypeParameter()) {
       llvm::errs() << "\n";
+      llvm::errs() << "getReducedType() was called\n";
+      llvm::errs() << "       with " << Sig << ",\n";
+      llvm::errs() << "       and " << type << ".\n\n";
+      llvm::errs() << "This type contains the type parameter " << t << ".\n\n";
+      if (prefix.empty()) {
+        llvm::errs() << "This type parameter contains the generic parameter "
+                     << Type(t->getRootGenericParam()) << ".\n\n";
+        llvm::errs() << "This generic parameter is not part of the given "
+                     << "generic signature.\n\n";
+      } else {
+        llvm::errs() << "This type parameter's reduced term is " << term << ".\n\n";
+        llvm::errs() << "This is not a valid term, because " << prefix << " does not "
+                     << "have a member type named " << term[prefix.size()] << ".\n\n";
+      }
+      llvm::errs() << "This usually indicates the caller passed the wrong type or "
+                   << "generic signature to getReducedType().\n\n";
+
       dump(llvm::errs());
       abort();
     }
