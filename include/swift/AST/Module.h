@@ -18,6 +18,7 @@
 #define SWIFT_MODULE_H
 
 #include "swift/AST/AccessNotes.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -551,7 +552,7 @@ public:
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
 
   /// Returns true if this module is the Clang overlay of \p other.
-  bool isClangOverlayOf(ModuleDecl *other);
+  bool isClangOverlayOf(ModuleDecl *other) const;
 
   /// Returns true if this module is the same module or either module is a clang
   /// overlay of the other.
@@ -1094,6 +1095,24 @@ public:
   /// for that.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
+  struct ImportCollector {
+    SmallPtrSet<const ModuleDecl *, 4> imports;
+    llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+        qualifiedImports;
+    AccessLevel minimumDocVisibility = AccessLevel::Private;
+    llvm::function_ref<bool(const ModuleDecl *)> importFilter = nullptr;
+
+    void collect(const ImportedModule &importedModule);
+
+    ImportCollector() = default;
+    ImportCollector(AccessLevel minimumDocVisibility)
+        : minimumDocVisibility(minimumDocVisibility) {}
+  };
+
+  void
+  getDisplayDeclsRecursivelyAndImports(SmallVectorImpl<Decl *> &results,
+                                       ImportCollector &importCollector) const;
+
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
   /// Generate the list of libraries needed to link this module, based on its
@@ -1272,12 +1291,6 @@ inline bool DeclContext::isPackageContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
-
-/// Collects modules that this module imports via `@_exported import`.
-void collectParsedExportedImports(const ModuleDecl *M,
-                                  SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
-                                  llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
 
 /// If the import that would make the given declaration visibile is absent,
 /// emit a diagnostic and a fix-it suggesting adding the missing import.
