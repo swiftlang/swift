@@ -835,8 +835,13 @@ handleRequestEditorClose(const RequestDict &Req,
     int64_t CancelBuilds = true;
     Req.getInt64(KeyCancelBuilds, CancelBuilds, /*isOptional=*/true);
 
-    // Whether we remove the cached AST from libcache, by default, false.
-    int64_t RemoveCache = false;
+    // Whether to remove the cached AST from libcache. This is currently true by
+    // default since future requests will never match matchesSourceState or
+    // cursor info's canUseASTWithSnapshots since the newly opened document
+    // will always have a mismatching stamp. Once we fix that
+    // (rdar://127353608), we ought to be able to switch this back to false by
+    // default.
+    int64_t RemoveCache = true;
     Req.getInt64(KeyRemoveCache, RemoveCache, /*isOptional=*/true);
     return Rec(editorClose(*Name, CancelBuilds, RemoveCache));
   }
