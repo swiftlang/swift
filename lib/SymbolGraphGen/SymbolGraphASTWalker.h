@@ -48,9 +48,10 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   const ModuleDecl &M;
 
   // FIXME: these should be tracked per-graph, rather than at the top level
-  const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
+  const SmallPtrSet<const ModuleDecl *, 4> ExportedImportedModules;
 
-  const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports;
+  const llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+      QualifiedExportedImports;
 
   /// The symbol graph for the main module of interest.
   SymbolGraph MainGraph;
@@ -59,11 +60,15 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   llvm::StringMap<SymbolGraph *> ExtendedModuleGraphs;
 
   // MARK: - Initialization
-  
-  SymbolGraphASTWalker(ModuleDecl &M,
-                       const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
-                       const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports,
-                       const SymbolGraphOptions &Options);
+
+  SymbolGraphASTWalker(
+      ModuleDecl &M,
+      const SmallPtrSet<const ModuleDecl *, 4> ExportedImportedModules,
+      const llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+          QualifiedExportedImports,
+      const SymbolGraphOptions &Options);
+
+  SymbolGraphASTWalker(ModuleDecl &M, const SymbolGraphOptions &Options);
   virtual ~SymbolGraphASTWalker() {}
 
   // MARK: - Utilities
