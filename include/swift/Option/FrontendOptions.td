@@ -1292,7 +1292,7 @@ def enable_emit_generic_class_ro_t_list :
 
 def enable_deterministic_check :
   Flag<["-"], "enable-deterministic-check">,
-  HelpText<"Check compiler output determinisim by running it twice">;
+  HelpText<"Check compiler output determinism by running it twice">;
 def always_compile_output_files :
   Flag<["-"], "always-compile-output-files">,
   HelpText<"Always compile output files even it might not change the results">;
