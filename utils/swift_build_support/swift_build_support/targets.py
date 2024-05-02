@@ -8,11 +8,9 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import atexit
-import contextlib
 import os
-import platform
 import importlib.resources
+import platform
 
 from . import cmake
 from . import shell

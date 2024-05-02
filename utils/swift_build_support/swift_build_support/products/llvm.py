@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import errno
 import shutil
 from platform import system
 
