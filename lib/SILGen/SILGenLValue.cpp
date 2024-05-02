@@ -1150,8 +1150,12 @@ namespace {
       // See if we have a noncopyable address from a project_box or global.
       if (Value.getType().isAddress() && Value.getType().isMoveOnly()) {
         SILValue addr = Value.getValue();
-        auto box = dyn_cast<ProjectBoxInst>(addr);
-        if (box || isa<GlobalAddrInst>(addr) || IsLazyInitializedGlobal) {
+        auto boxProject = addr;
+        if (auto m = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(boxProject)) {
+          boxProject = m->getOperand();
+        }
+        auto box = dyn_cast<ProjectBoxInst>(boxProject);
+        if (box || isa<GlobalAddrInst>(boxProject) || IsLazyInitializedGlobal) {
           if (Enforcement)
             addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
                                     getAccessKind(), *Enforcement,
