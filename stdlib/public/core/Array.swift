@@ -1090,25 +1090,6 @@ extension Array: RangeReplaceableCollection {
     _internalInvariant(_buffer.mutableCapacity == 0 ||
                        _buffer.isUniquelyReferenced())
   }
-  
-  @_alwaysEmitIntoClient
-  internal mutating func _reserveCapacityImplForReplaceSubrange(
-    minimumCapacity: Int,
-    growForAppend: Bool,
-    rangeToNotCopy: Range<Int>
-  ) -> Bool {
-    let isUnique = _buffer.beginCOWMutation()
-    if _slowPath(!isUnique || _buffer.mutableCapacity < minimumCapacity) {
-      _createNewBufferForReplaceSubrange(
-        bufferIsUnique: isUnique,
-        minimumCapacity: Swift.max(minimumCapacity, _buffer.count),
-        growForAppend: growForAppend,
-        rangeToNotCopy: rangeToNotCopy)
-    }
-    _internalInvariant(_buffer.mutableCapacity >= minimumCapacity)
-    _internalInvariant(_buffer.mutableCapacity == 0 || _buffer.isUniquelyReferenced())
-    return !isUnique
-  }
 
   /// Creates a new buffer, replacing the current buffer.
   ///
@@ -1128,21 +1109,6 @@ extension Array: RangeReplaceableCollection {
                                            growForAppend: growForAppend)
   }
 
-  @_alwaysEmitIntoClient
-  @inline(never)
-  internal mutating func _createNewBufferForReplaceSubrange(
-    bufferIsUnique: Bool,
-    minimumCapacity: Int,
-    growForAppend: Bool,
-    rangeToNotCopy: Range<Int>
-  ) {
-    _internalInvariant(!bufferIsUnique || _buffer.isUniquelyReferenced())
-    _buffer = _buffer._consumeAndCreateNew(bufferIsUnique: bufferIsUnique,
-                                           minimumCapacity: minimumCapacity,
-                                           growForAppend: growForAppend,
-                                           rangeToNotCopy: rangeToNotCopy)
-  }
-  
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
@@ -1787,15 +1753,9 @@ extension Array {
     let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
-    let punchedHole = _reserveCapacityImplForReplaceSubrange(
-      minimumCapacity: self.count + growth,
-      growForAppend: growth > 0,
-      rangeToNotCopy: subrange)
-    _buffer.replaceSubrange(
-      subrange,
-      with: insertCount,
-      elementsOf: newElements,
-      holeAlreadyPunched: punchedHole)
+    _reserveCapacityImpl(minimumCapacity: self.count + growth,
+                         growForAppend: true)
+    _buffer.replaceSubrange(subrange, with: insertCount, elementsOf: newElements)
     _endMutation()
   }
 }
