@@ -624,6 +624,9 @@ class BuildScriptInvocation(object):
         builder.add_product(products.curl.LibCurl,
                             is_enabled=self.args.build_curl)
 
+        builder.add_product(products.foundation.SwiftFoundationICU,
+                            is_enabled=self.args.build_foundation)
+
         # Begin a build-script-impl pipeline for handling the compiler toolchain
         # and a subset of the tools that we build. We build these in this manner
         # to preserve current build-script-impl run behavior as we transition
