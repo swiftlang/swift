@@ -372,21 +372,29 @@ struct FunctionPassContext : MutatingContext {
     return gv.globalVar
   }
 
-  /// Utility function that should be used by optimizations that generate new functions or specialized versions of
-  /// existing functions.
-  func createAndBuildSpecializedFunction(createFn: (FunctionPassContext) -> Function,
-                                         buildFn: (Function, FunctionPassContext) -> ()) -> Function 
+  func createFunctionForClosureSpecialization(from applySiteCallee: Function, withName specializedFunctionName: String, 
+                                              withParams specializedParameters: [ParameterInfo], 
+                                              withSerialization isSerialized: Bool) -> Function 
   {
-    let specializedFunction = createFn(self)
-    
+    return specializedFunctionName._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = specializedParameters.map { $0._bridged }
+
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+        _bridged.ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(nameRef, paramBuf.baseAddress, 
+                                                                                paramBuf.count, 
+                                                                                applySiteCallee.bridged, 
+                                                                                isSerialized).function
+      }
+    }
+  }
+
+  func buildSpecializedFunction(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> ()) {
     let nestedFunctionPassContext = 
         FunctionPassContext(_bridged: _bridged.initializeNestedPassContext(specializedFunction.bridged))
 
-    defer { _bridged.deinitializedNestedPassContext() }
+      defer { _bridged.deinitializedNestedPassContext() }
 
-    buildFn(specializedFunction, nestedFunctionPassContext)
-
-    return specializedFunction
+      buildFn(specializedFunction, nestedFunctionPassContext)
   }
 }
 
@@ -477,8 +485,8 @@ extension Builder {
   /// Creates a builder which inserts instructions into an empty function, using the location of the function itself.
   init(atStartOf function: Function, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: function)
-    self.init(insertAt: .atStartOf(function), context.notifyInstructionChanged, 
-              context._bridged.asNotificationHandler())
+    self.init(insertAt: .atStartOf(function), location: function.location,
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   init(staticInitializerOf global: GlobalVariable, _ context: some MutatingContext) {

@@ -21,6 +21,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return StringRef(bridged: bridged.getName())
   }
 
+  public var location: Location {
+    return Location(bridged: bridged.getLocation())
+  }
+
   final public var description: String {
     return String(taking: bridged.getDebugDescription())
   }

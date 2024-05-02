@@ -24,7 +24,7 @@ public struct Builder {
   }
 
   let insertAt: InsertionPoint
-  let location: Location?
+  let location: Location
   private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
@@ -32,15 +32,16 @@ public struct Builder {
     switch insertAt {
     case .before(let inst):
       return BridgedBuilder(insertAt: .beforeInst, insertionObj: inst.bridged.obj,
-                            loc: location!.bridged)
+                            loc: location.bridged)
     case .atEndOf(let block):
       return BridgedBuilder(insertAt: .endOfBlock, insertionObj: block.bridged.obj,
-                            loc: location!.bridged)
+                            loc: location.bridged)
     case .atStartOf(let function):
-      return BridgedBuilder(insertAt: .startOfFunction, function: function.bridged)
+      return BridgedBuilder(insertAt: .startOfFunction, insertionObj: function.bridged.obj,
+                            loc: location.bridged)
     case .staticInitializer(let global):
       return BridgedBuilder(insertAt: .intoGlobal, insertionObj: global.bridged.obj,
-                            loc: location!.bridged)
+                            loc: location.bridged)
     }
   }
 
@@ -56,26 +57,9 @@ public struct Builder {
     return instruction
   }
 
-  public init(insertAt: InsertionPoint, 
-              _ notifyNewInstruction: @escaping (Instruction) -> (),
-              _ notificationHandler: BridgedChangeNotificationHandler) {
-    guard case let .atStartOf(_) = insertAt else {
-      fatalError("Initializer must only be used to initialize builders that insert at the start of functions.")
-    }
-    
-    self.insertAt = insertAt
-    self.location = nil;
-    self.notifyNewInstruction = notifyNewInstruction
-    self.notificationHandler = notificationHandler
-  }
-
   public init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
               _ notificationHandler: BridgedChangeNotificationHandler) {
-    if case let .atStartOf(_) = insertAt {
-      fatalError("Initializer must not be used to initialize builders that insert at the start of functions.")
-    }
-
     self.insertAt = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction
@@ -165,18 +149,6 @@ public struct Builder {
   public func createEndInitLetRef(operand: Value) -> EndInitLetRefInst {
     let endInit = bridged.createEndInitLetRef(operand.bridged)
     return notifyNew(endInit.getAs(EndInitLetRefInst.self))
-  }
-
-  @discardableResult
-  public func createRetainValue(operand: Value) -> RetainValueInst {
-    let retain = bridged.createRetainValue(operand.bridged)
-    return notifyNew(retain.getAs(RetainValueInst.self))
-  }
-
-  @discardableResult
-  public func createReleaseValue(operand: Value) -> ReleaseValueInst {
-    let release = bridged.createReleaseValue(operand.bridged)
-    return notifyNew(release.getAs(ReleaseValueInst.self))
   }
 
   @discardableResult
@@ -323,14 +295,14 @@ public struct Builder {
   }
 
   public func createPartialApply(
-    forFunction function: Value,
+    function: Value,
     substitutionMap: SubstitutionMap, 
-    capturedArgs: [Value], 
+    capturedArguments: [Value], 
     calleeConvention: ArgumentConvention, 
     hasUnknownResultIsolation: Bool, 
     isOnStack: Bool
   ) -> PartialApplyInst {
-    return capturedArgs.withBridgedValues { capturedArgsRef in
+    return capturedArguments.withBridgedValues { capturedArgsRef in
       let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged, substitutionMap.bridged, hasUnknownResultIsolation, isOnStack)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }

@@ -192,6 +192,7 @@ public:
 
   void deinitializeNestedSwiftPassInvocation() {
     assert(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
+    nestedSwiftPassInvocation->endTransformFunction();
     delete nestedSwiftPassInvocation;
     nestedSwiftPassInvocation = nullptr;
   }

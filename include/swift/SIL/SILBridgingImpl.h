@@ -593,6 +593,10 @@ BridgedStringRef BridgedFunction::getName() const {
   return getFunction()->getName();
 }
 
+BridgedLocation BridgedFunction::getLocation() const {
+  return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())}; 
+}
+
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
@@ -1507,10 +1511,6 @@ BridgedWitnessTableEntryArray BridgedDefaultWitnessTable::getEntries() const {
 //                                BridgedBuilder
 //===----------------------------------------------------------------------===//
 
-BridgedBuilder::BridgedBuilder(InsertAt insertAt, BridgedFunction function): 
-  insertAt(insertAt), insertionObj(function.obj), 
-  loc(BridgedLocation({function.getFunction()->getLocation(), function.getFunction()->getDebugScope()})) {}
-
 BridgedInstruction BridgedBuilder::createBuiltinBinaryFunction(BridgedStringRef name,
                                                BridgedType operandType, BridgedType resultType,
                                                BridgedValueArray arguments) const {
@@ -1587,16 +1587,6 @@ BridgedInstruction BridgedBuilder::createBeginDeallocRef(BridgedValue reference,
 
 BridgedInstruction BridgedBuilder::createEndInitLetRef(BridgedValue op) const {
   return {unbridged().createEndInitLetRef(regularLoc(), op.getSILValue())};
-}
-
-BridgedInstruction BridgedBuilder::createRetainValue(BridgedValue op) const {
-  auto b = unbridged();
-  return {b.createRetainValue(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
-}
-
-BridgedInstruction BridgedBuilder::createReleaseValue(BridgedValue op) const {
-  auto b = unbridged();
-  return {b.createReleaseValue(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createStrongRetain(BridgedValue op) const {
