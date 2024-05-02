@@ -342,8 +342,8 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
                                                       Boundary boundary) {
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
-  auto handleInnerScope = [this](SILValue innerBorrowedValue) {
-    completeOSSALifetime(innerBorrowedValue);
+  auto handleInnerScope = [this, boundary](SILValue innerBorrowedValue) {
+    completeOSSALifetime(innerBorrowedValue, boundary);
   };
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
@@ -374,13 +374,14 @@ static FunctionTest OSSALifetimeCompletionTest(
     "ossa_lifetime_completion",
     [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
-      std::optional<OSSALifetimeCompletion::Boundary> kind = std::nullopt;
-      if (arguments.hasUntaken()) {
-        kind = arguments.takeBool()
-                   ? OSSALifetimeCompletion::Boundary::Liveness
-                   : OSSALifetimeCompletion::Boundary::Availability;
-      }
-      llvm::outs() << "OSSA lifetime completion: " << value;
+      OSSALifetimeCompletion::Boundary kind =
+          llvm::StringSwitch<OSSALifetimeCompletion::Boundary>(
+              arguments.takeString())
+              .Case("liveness", OSSALifetimeCompletion::Boundary::Liveness)
+              .Case("availability",
+                    OSSALifetimeCompletion::Boundary::Availability);
+      llvm::outs() << "OSSA lifetime completion on " << kind
+                   << " boundary: " << value;
       OSSALifetimeCompletion completion(&function, /*domInfo*/ nullptr);
       completion.completeOSSALifetime(value, kind);
       function.print(llvm::outs());
@@ -462,8 +463,9 @@ bool UnreachableLifetimeCompletion::completeLifetimes() {
 
   bool changed = false;
   for (auto value : incompleteValues) {
-    if (completion.completeOSSALifetime(value)
-        == LifetimeCompletion::WasCompleted) {
+    if (completion.completeOSSALifetime(
+            value, OSSALifetimeCompletion::Boundary::Availability) ==
+        LifetimeCompletion::WasCompleted) {
       changed = true;
     }
   }

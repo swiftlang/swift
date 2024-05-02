@@ -66,15 +66,6 @@ public:
 
     Boundary(Value value) : value(value){};
     operator Value() const { return value; }
-
-    static std::optional<Boundary> getForcingLiveness(bool force) {
-      if (!force)
-        return {};
-      return {Liveness};
-    }
-
-    bool isLiveness() { return value == Liveness; }
-    bool isAvailable() { return !isLiveness(); }
   };
 
   /// Insert a lifetime-ending instruction on every path to complete the OSSA
@@ -95,9 +86,7 @@ public:
   /// lifetime.
   ///
   /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
-  LifetimeCompletion
-  completeOSSALifetime(SILValue value,
-                       std::optional<Boundary> maybeBoundary = std::nullopt) {
+  LifetimeCompletion completeOSSALifetime(SILValue value, Boundary boundary) {
     if (value->getOwnershipKind() == OwnershipKind::None)
       return LifetimeCompletion::NoLifetime;
 
@@ -111,9 +100,6 @@ public:
     }
     if (!completedValues.insert(value))
       return LifetimeCompletion::AlreadyComplete;
-
-    Boundary boundary = maybeBoundary.value_or(
-        value->isLexical() ? Boundary::Availability : Boundary::Liveness);
 
     return analyzeAndUpdateLifetime(value, boundary)
                ? LifetimeCompletion::WasCompleted
