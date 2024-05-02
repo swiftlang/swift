@@ -1695,7 +1695,7 @@ private:
   std::pair<ArgumentList *, bool> enclosingCallExprArg(SourceFile &SF,
                                                        SourceLoc SL) {
 
-    class CallExprFinder : public SourceEntityWalker {
+    class CallExprFinder : public ASTWalker {
     public:
       const SourceManager &SM;
       SourceLoc TargetLoc;
@@ -1719,7 +1719,11 @@ private:
         return true;
       }
 
-      bool walkToExprPre(Expr *E) override {
+      MacroWalking getMacroWalkingBehavior() const override {
+        return MacroWalking::Arguments;
+      }
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
             !checkCallExpr(E) && !EnclosingCallAndArg.first) {
@@ -1732,13 +1736,13 @@ private:
             OuterExpr = E;
           }
         }
-        return true;
+        return Action::Continue(E);
       }
 
-      bool walkToExprPost(Expr *E) override {
+      PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
         if (E->getStartLoc() == TargetLoc)
-          return false; // found what we needed to find, stop walking.
-        return true;
+          return Action::Stop(); // found what we needed to find, stop walking.
+        return Action::Continue(E);
       }
 
       /// Whether this statement body consists of only an implicit "return",
@@ -1756,7 +1760,7 @@ private:
 
           // Before pre-checking, the implicit return will not have been
           // inserted. Look for a single expression body in a closure.
-          if (auto *ParentE = getWalker().Parent.getAsExpr()) {
+          if (auto *ParentE = Parent.getAsExpr()) {
             if (isa<ClosureExpr>(ParentE)) {
               if (auto *innerE = BS->getSingleActiveExpression())
                 return innerE->getStartLoc() == TargetLoc;
@@ -1767,7 +1771,7 @@ private:
         return false;
       }
 
-      bool walkToStmtPre(Stmt *S) override {
+      PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
             !isImplicitReturnBody(S)) {
@@ -1791,17 +1795,29 @@ private:
             break;
           }
         }
-        return true;
+        return Action::Continue(S);
       }
 
-      bool shouldWalkInactiveConfigRegion() override { return true; }
+      PreWalkAction walkToDeclPre(Decl *D) override {
+        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+          for (auto Clause : ICD->getClauses()) {
+            // Active clase elements are visited normally.
+            if (Clause.isActive)
+              continue;
+            for (auto Member : Clause.Elements)
+              Member.walk(*this);
+          }
+          return Action::SkipNode();
+        }
+        return Action::Continue();
+      }
 
       ArgumentList *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
         EnclosingCallAndArg = {nullptr, nullptr};
         OuterExpr = nullptr;
         OuterStmt = nullptr;
         TargetLoc = SL;
-        walk(SF);
+        SF.walk(*this);
         return EnclosingCallAndArg.second;
       }
     };
