@@ -377,3 +377,32 @@ final class UseNonisolatedUnsafe: Sendable {
     }
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+@preconcurrency
+func preconcurrencyContext(_: @escaping @Sendable () -> Void) {}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+struct DowngradeForPreconcurrency {
+  func capture(completion: @escaping @MainActor () -> Void) {
+    preconcurrencyContext {
+      Task {
+        completion()
+        // expected-warning@-1 2 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in a `@Sendable` closure; this is an error in the Swift 6 language mode}}
+        // expected-note@-2 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+        // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
+        // expected-note@-4 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
+      }
+    }
+  }
+
+  var x: Int
+  func createStream() -> AsyncStream<Int> {
+    AsyncStream<Int> {
+      self.x
+      // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
+      // expected-note@-2 {{property access is 'async'}}
+    }
+  }
+}

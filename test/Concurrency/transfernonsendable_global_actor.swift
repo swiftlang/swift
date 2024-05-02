@@ -30,6 +30,31 @@ var booleanFlag: Bool { false }
 @MainActor var mainActorIsolatedGlobal = NonSendableKlass()
 @CustomActor var customActorIsolatedGlobal = NonSendableKlass()
 
+@MainActor
+class NonSendableGlobalActorIsolatedKlass {}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedKlass: Sendable {}
+
+@MainActor
+struct NonSendableGlobalActorIsolatedStruct {
+  var k = NonSendableKlass()
+}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedStruct: Sendable {}
+
+@MainActor
+enum NonSendableGlobalActorIsolatedEnum {
+  case first
+  case second(NonSendableKlass)
+  case third(SendableKlass)
+}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedEnum: Sendable {}
+
+
 /////////////////
 // MARK: Tests //
 /////////////////

@@ -1807,10 +1807,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
       M = DC->getParentModule();
       subMap = CurrentType->getContextSubstitutionMap(M, DC);
-      if (!subMap.empty()) {
-        typeContextDepth = subMap.getGenericSignature()
-            .getGenericParams().back()->getDepth() + 1;
-      }
+      typeContextDepth = subMap.getGenericSignature().getNextDepth();
     }
   }
 
@@ -3120,6 +3117,13 @@ static void suppressingFeatureOptionalIsolatedParameters(
   action();
 }
 
+static void suppressingFeatureTransferringArgsAndResults(
+    PrintOptions &options, llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressTransferringArgsAndResults,
+                                   true);
+  action();
+}
+
 static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
@@ -3691,7 +3695,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
-  if (flags.isTransferring())
+  if (!options.SuppressTransferringArgsAndResults && flags.isTransferring())
     printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
@@ -4151,19 +4155,16 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           }
         }
       }
-      {
-        auto fnTy = decl->getInterfaceType();
-        bool hasTransferring = false;
-        if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
-          if (ft->hasExtInfo())
-            hasTransferring = ft->hasTransferringResult();
-        } else if (auto *ft =
-                       llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
-          if (ft->hasExtInfo())
-            hasTransferring = ft->hasTransferringResult();
-        }
-        if (hasTransferring)
+
+      if (!Options.SuppressTransferringArgsAndResults) {
+        if (decl->hasTransferringResult()) {
           Printer << "transferring ";
+        } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
+                       decl->getInterfaceType())) {
+          if (ft->hasExtInfo() && ft->hasTransferringResult()) {
+            Printer << "transferring ";
+          }
+        }
       }
 
       // HACK: When printing result types for funcs with opaque result types,
@@ -6624,7 +6625,8 @@ public:
 
     Printer << " -> ";
 
-    if (T->hasExtInfo() && T->hasTransferringResult()) {
+    if (!Options.SuppressTransferringArgsAndResults && T->hasExtInfo() &&
+        T->hasTransferringResult()) {
       Printer.printKeyword("transferring ", Options);
     }
 
@@ -7075,7 +7077,7 @@ public:
 
     // The element archetypes are at a depth one past the max depth
     // of the base signature.
-    unsigned elementDepth = params.back()->getDepth() + 1;
+    unsigned elementDepth = sig.getNextDepth();
 
     // Transform the archetype's interface type to be based on the
     // corresponding non-canonical type parameter.

@@ -96,10 +96,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   // types and their interface constraints.
   auto originatingDC = originatingDecl->getInnermostDeclContext();
   auto outerGenericSignature = originatingDC->getGenericSignatureOfContext();
-  unsigned opaqueSignatureDepth =
-      outerGenericSignature
-          ? outerGenericSignature.getGenericParams().back()->getDepth() + 1
-          : 0;
+  unsigned opaqueSignatureDepth = outerGenericSignature.getNextDepth();
 
   // Determine the context of the opaque type declaration we'll be creating.
   auto parentDC = originatingDecl->getDeclContext();

@@ -312,7 +312,7 @@ func test11<each T>() -> Use<repeat each T> {
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Bool for <each T>} as $*@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Bool for <@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    [[ESCAPING_ELT:%.*]] = convert_function [[ELT]]
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sxSbIegnr_xSbIegnd_lTR : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @out Bool) -> Bool
+// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sqd__SbIegnr_qd__SbIegnd_Rvzr__lTR : $@convention(thin) <each τ_0_0><τ_1_0> (@in_guaranteed τ_1_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_1_0) -> @out Bool) -> Bool
 // CHECK-NEXT:    [[CONVERTED_ELT:%.*]] = partial_apply
 // CHECK-NEXT:    [[CONVERTED_ELT_2:%.*]] = convert_function [[CONVERTED_ELT]]
 // CHECK-NEXT:    store [[CONVERTED_ELT_2]] to [init] [[DEST_ELT_ADDR]] :

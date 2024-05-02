@@ -25,6 +25,7 @@
 #include "MetadataCache.h"
 #include "BytecodeLayouts.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
@@ -3195,6 +3196,13 @@ namespace {
     const uint8_t *WeakIvarLayout;
     const void *PropertyList;
   };
+
+  struct ObjCClass {
+    ObjCClass *Isa;
+    ObjCClass *Superclass;
+    void *CacheData[2];
+    uintptr_t RODataAndFlags;
+  };
 } // end anonymous namespace
 
 #if SWIFT_OBJC_INTEROP
@@ -3212,6 +3220,9 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
+static inline ClassROData *getROData(ObjCClass *theClass) {
+  return (ClassROData*)(theClass->RODataAndFlags & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
+}
 // This gets called if we fail during copyGenericClassObjcName().  Its job is
 // to generate a unique name, even though the name won't be very helpful if
 // we end up looking at it in a debugger.
@@ -3964,6 +3975,98 @@ swift::swift_updateClassMetadata2(ClassMetadata *self,
                                         /*allowDependency*/ true);
 }
 
+Class
+swift::swift_updatePureObjCClassMetadata(Class cls,
+                                         ClassLayoutFlags flags,
+                                         size_t numFields,
+                                         const TypeLayout * const *fieldTypes) {
+  bool hasRealizeClassFromSwift =
+    SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
+  assert(hasRealizeClassFromSwift);
+  (void)hasRealizeClassFromSwift;
+
+  SWIFT_DEFER {
+    // Realize the class. This causes the runtime to slide the field offsets
+    // stored in the field offset globals.
+    SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift(cls, cls));
+  };
+
+  // Update the field offset globals using runtime type information; the layout
+  // of resilient types might be different than the statically-emitted layout.
+  ObjCClass *self = (ObjCClass *)cls;
+  ClassROData *rodata = getROData(self);
+  ClassIvarList *ivars = rodata->IvarList;
+
+  if (!ivars) {
+    assert(numFields == 0);
+    return cls;
+  }
+
+  assert(ivars->Count == numFields);
+  assert(ivars->EntrySize == sizeof(ClassIvarEntry));
+
+  bool copiedIvarList = false;
+
+  // Start layout from our static notion of where the superclass starts.
+  // Objective-C expects us to have generated a correct ivar layout, which it
+  // will simply slide if it needs to.
+  assert(self->Superclass && "Swift cannot implement a root class");
+  size_t size = rodata->InstanceStart;
+  size_t alignMask = 0xF; // malloc alignment guarantee
+
+  // Okay, now do layout.
+  for (unsigned i = 0; i != numFields; ++i) {
+    ClassIvarEntry *ivar = &ivars->getIvars()[i];
+
+    size_t offset = 0;
+    if (ivar->Offset) {
+      offset = *ivar->Offset;
+    }
+
+    auto *eltLayout = fieldTypes[i];
+
+    // Skip empty fields.
+    if (offset != 0 || eltLayout->size != 0) {
+      offset = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
+      size = offset + eltLayout->size;
+      alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
+
+      // Fill in the field offset global, if this ivar has one.
+      if (ivar->Offset) {
+        if (*ivar->Offset != offset)
+          *ivar->Offset = offset;
+      }
+    }
+
+    // If the ivar's size doesn't match the field layout we
+    // computed, overwrite it and give it better type information.
+    if (ivar->Size != eltLayout->size) {
+      // If we're going to modify the ivar list, we need to copy it first.
+      if (!copiedIvarList) {
+        auto ivarListSize = sizeof(ClassIvarList) +
+                            numFields * sizeof(ClassIvarEntry);
+        ivars = (ClassIvarList*) getResilientMetadataAllocator()
+          .Allocate(ivarListSize, alignof(ClassIvarList));
+        memcpy(ivars, rodata->IvarList, ivarListSize);
+        rodata->IvarList = ivars;
+        copiedIvarList = true;
+
+        // Update ivar to point to the newly copied list.
+        ivar = &ivars->getIvars()[i];
+      }
+      ivar->Size = eltLayout->size;
+      ivar->Type = nullptr;
+      ivar->Log2Alignment =
+        getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
+    }
+  }
+
+  // Save the size into the Objective-C metadata.
+  if (rodata->InstanceSize != size)
+    rodata->InstanceSize = size;
+
+  return cls;
+}
 #endif
 
 #ifndef NDEBUG

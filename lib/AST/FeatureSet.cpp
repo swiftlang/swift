@@ -613,22 +613,38 @@ UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
 static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
-  if (auto *pd = dyn_cast<ParamDecl>(decl))
-    if (pd->isTransferring())
+  auto functionTypeUsesTransferring = [](Decl *decl) {
+    return usesTypeMatching(decl, [](Type type) {
+      auto fnType = type->getAs<AnyFunctionType>();
+      if (!fnType)
+        return false;
+
+      if (fnType->hasExtInfo() && fnType->hasTransferringResult())
+        return true;
+
+      return llvm::any_of(fnType->getParams(),
+                          [](AnyFunctionType::Param param) {
+                            return param.getParameterFlags().isTransferring();
+                          });
+    });
+  };
+
+  if (auto *pd = dyn_cast<ParamDecl>(decl)) {
+    if (pd->isTransferring()) {
       return true;
+    }
+
+    if (functionTypeUsesTransferring(pd))
+      return true;
+  }
 
   if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
-    auto fnTy = fDecl->getInterfaceType();
-    bool hasTransferring = false;
-    if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    } else if (auto *ft =
-                   llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    }
-    if (hasTransferring)
+    // First check for param decl results.
+    if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
+          return usesFeatureTransferringArgsAndResults(pd);
+        }))
+      return true;
+    if (functionTypeUsesTransferring(decl))
       return true;
   }
 
@@ -694,6 +710,7 @@ static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(ObjCImplementation)
+UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
 UNINTERESTING_FEATURE(CImplementation)
 
 static bool usesFeatureSensitive(Decl *decl) {

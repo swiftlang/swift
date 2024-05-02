@@ -2748,7 +2748,7 @@ void ASTMangler::appendContextualInverses(const GenericTypeDecl *contextDecl,
   parts.params = std::nullopt;
 
   // The depth of parameters for this extension is +1 of the extended signature.
-  parts.initialParamDepth = sig.getGenericParams().back()->getDepth() + 1;
+  parts.initialParamDepth = sig.getNextDepth();
 
   appendModule(module, alternateModuleName);
   appendGenericSignatureParts(sig, parts);
@@ -3391,7 +3391,7 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
   } else {
     inverseReqs.clear();
   }
-  base.setDepth(canSig.getGenericParams().back()->getDepth());
+  base.setDepth(canSig->getMaxDepth());
 
   unsigned &initialParamDepth = parts.initialParamDepth;
   auto &genericParams = parts.params;
@@ -3412,7 +3412,7 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
 
   // The signature depth starts above the depth of the context signature.
   if (!contextSig.getGenericParams().empty()) {
-    initialParamDepth = contextSig.getGenericParams().back()->getDepth() + 1;
+    initialParamDepth = contextSig.getNextDepth();
   }
 
   // If both signatures have exactly the same requirements, ignoring
@@ -4760,11 +4760,10 @@ static std::optional<unsigned> getEnclosingTypeGenericDepth(const Decl *decl) {
   if (!typeDecl)
     return std::nullopt;
 
-  auto genericParams = typeDecl->getGenericParams();
-  if (!genericParams)
+  if (!typeDecl->isGeneric())
     return std::nullopt;
 
-  return genericParams->getParams().back()->getDepth();
+  return typeDecl->getGenericSignature()->getMaxDepth();
 }
 
 ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)

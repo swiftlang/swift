@@ -356,7 +356,7 @@ EXPERIMENTAL_FEATURE(FixedArrays, true)
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
 // Allow for the 'transferring' keyword to be applied to arguments and results.
-EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
 
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
@@ -378,6 +378,11 @@ EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
 
 // Enable @implementation on extensions of ObjC classes.
 EXPERIMENTAL_FEATURE(ObjCImplementation, true)
+
+// Enable @implementation on extensions of ObjC classes with non-fixed layout
+// due to resilient stored properties. Requires OS support; this flag exists for
+// staging purposes.
+EXPERIMENTAL_FEATURE(ObjCImplementationWithResilientStorage, true)
 
 // Enable @implementation on @_cdecl functions.
 EXPERIMENTAL_FEATURE(CImplementation, true)

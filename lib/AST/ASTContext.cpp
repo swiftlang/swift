@@ -36,6 +36,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
@@ -5884,11 +5885,8 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
 
 Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(GenericSignature parentSig,
                                                           ASTContext &ctx) {
-  unsigned depth = 0;
-  if (!parentSig.getGenericParams().empty())
-    depth = parentSig.getGenericParams().back()->getDepth() + 1;
   return GenericTypeParamType::get(/*isParameterPack=*/ false,
-                                   /*depth=*/ depth, /*index=*/ 0,
+                                   parentSig.getNextDepth(), /*index=*/ 0,
                                    ctx);
 }
 
@@ -5900,8 +5898,6 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
     type = existential->getConstraintType();
 
   const CanType constraint = type->getCanonicalType();
-  assert(parentSig || !constraint->hasTypeParameter() &&
-         "Interface type here requires a parent signature");
 
   auto canParentSig = parentSig.getCanonicalSignature();
   auto key = std::make_pair(constraint, canParentSig.getPointer());
@@ -5909,24 +5905,18 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      canParentSig, *this)
-    ->castTo<GenericTypeParamType>();
-  Requirement requirement(RequirementKind::Conformance, genericParam,
-                          constraint);
+  LocalArchetypeRequirementCollector collector(*this, canParentSig);
+  collector.addOpenedExistential(type);
   auto genericSig = buildGenericSignature(
-      *this, canParentSig,
-      {genericParam}, {requirement},
-      /*allowInverses=*/true);
-
-  CanGenericSignature canGenericSig(genericSig);
+      *this, collector.OuterSig, collector.Params, collector.Requirements,
+      /*allowInverses=*/true).getCanonicalSignature();
 
   auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(key, canGenericSig));
+      std::make_pair(key, genericSig));
   assert(result.second);
   (void) result;
 
-  return canGenericSig;
+  return genericSig;
 }
 
 CanGenericSignature
@@ -5938,100 +5928,12 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   if (found != sigs.end())
     return found->second;
 
-  // This operation doesn't make sense if the input signature does not contain`
-  // any pack generic parameters.
-#ifndef NDEBUG
-  {
-    auto found = std::find_if(baseGenericSig.getGenericParams().begin(),
-                              baseGenericSig.getGenericParams().end(),
-                              [](GenericTypeParamType *paramType) {
-                                return paramType->isParameterPack();
-                              });
-    assert(found != baseGenericSig.getGenericParams().end());
-  }
-#endif
-
-  // The pack element signature includes all type parameters and requirements
-  // from the outer context, plus a new set of type parameters representing
-  // open pack elements and their corresponding element requirements.
-
-  llvm::SmallMapVector<GenericTypeParamType *,
-                       GenericTypeParamType *, 2> packElementParams;
-  SmallVector<GenericTypeParamType *, 2> genericParams(
-      baseGenericSig.getGenericParams().begin(), baseGenericSig.getGenericParams().end());
-  SmallVector<Requirement, 2> requirements;
-
-  auto packElementDepth =
-      baseGenericSig.getInnermostGenericParams().front()->getDepth() + 1;
-
-  for (auto paramType : baseGenericSig.getGenericParams()) {
-    if (!paramType->isParameterPack())
-      continue;
-
-    // Only include opened element parameters for packs in the given
-    // shape equivalence class.
-    if (!baseGenericSig->haveSameShape(paramType, shapeClass))
-      continue;
-
-    auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,
-                                                   packElementDepth,
-                                                   packElementParams.size(),
-                                                   *this);
-    genericParams.push_back(elementParam);
-    packElementParams[paramType] = elementParam;
-  }
-
-  auto eraseParameterPackRec = [&](Type type) -> Type {
-    return type.transformTypeParameterPacks(
-        [&](SubstitutableType *t) -> std::optional<Type> {
-          if (auto *paramType = dyn_cast<GenericTypeParamType>(t)) {
-            if (packElementParams.find(paramType) != packElementParams.end()) {
-              return Type(packElementParams[paramType]);
-            }
-
-            return Type(t);
-          }
-          return std::nullopt;
-        });
-  };
-
-  for (auto requirement : baseGenericSig.getRequirements()) {
-    requirements.push_back(requirement);
-
-    // If this requirement contains parameter packs, create a new requirement
-    // for the corresponding pack element.
-    switch (requirement.getKind()) {
-    case RequirementKind::SameShape:
-      // Drop same-shape requirements from the element signature.
-      break;
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType: {
-      auto firstType = eraseParameterPackRec(requirement.getFirstType());
-      auto secondType = eraseParameterPackRec(requirement.getSecondType());
-      if (firstType->isEqual(requirement.getFirstType()) &&
-          secondType->isEqual(requirement.getSecondType()))
-        break;
-
-      requirements.emplace_back(requirement.getKind(),
-                                firstType, secondType);
-      break;
-    }
-    case RequirementKind::Layout: {
-      auto firstType = eraseParameterPackRec(requirement.getFirstType());
-      if (firstType->isEqual(requirement.getFirstType()))
-        break;
-
-      requirements.emplace_back(requirement.getKind(), firstType,
-                                requirement.getLayoutConstraint());
-      break;
-    }
-    }
-  }
-
+  LocalArchetypeRequirementCollector collector(*this, baseGenericSig);
+  collector.addOpenedElement(shapeClass);
   auto elementSig = buildGenericSignature(
-      *this, GenericSignature(), genericParams, requirements,
+      *this, collector.OuterSig, collector.Params, collector.Requirements,
       /*allowInverses=*/false).getCanonicalSignature();
+
   sigs[key] = elementSig;
   return elementSig;
 }
