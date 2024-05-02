@@ -11,36 +11,45 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
+import Darwin
 
 fileprivate class DummyObject {}
 
 fileprivate func makePOD(count: Int) -> [Int] {
-  Array(repeating: 42, count: count)
+  var result = Array(repeating: 42, count: count - 1)
+  blackHole(result)
+  result.append(42) //force a resize if result was perfectly fitted
+  return result
 }
 
 fileprivate func makeRefcounted(count: Int) -> [DummyObject] {
-  (0 ..< count).map { _ in DummyObject() }
+  var result = (0 ..< count - 1).map { _ in DummyObject() }
+  blackHole(result)
+  result.append(DummyObject())
+  return result
 }
 
 fileprivate func ranges(count: Int) -> [(Range<Int>, String)] {
   var results:[(Range<Int>, String)] = []
-  results.append((0 ..< (count / 3), "front"))
-  results.append(((count / 3) ..< ((count / 3) * 2), "middle"))
+  results.append((0 ..< (count / 3), "pre"))
+  results.append(((count / 3) ..< ((count / 3) * 2), "mid"))
   results.append((((count / 3) * 2) ..< count, "end"))
   return results
 }
 
-fileprivate let sizes = [(100_000, "large"), (100, "small"), (3, "tiny")]
+fileprivate let sourceSizes = [(10_000, "lg"), (99, "sm")/*, (1, "xs")*/]
+fileprivate let destSizes = [(10_000, "lg"), (99, "sm")]
+
 
 fileprivate func configs() -> [BenchmarkInfo] {
   var configs: [BenchmarkInfo] = []
-  for (refcounted, refcountedName) in [(true, "refcounted"), (false, "pod")] {
-    for (sourceCount, sourceName) in sizes {
-      for (destCount, destName) in sizes {
+  for (refcounted, refcountedName) in [(true, "ref"), (false, "pod")] {
+    for (sourceCount, sourceName) in sourceSizes {
+      for (destCount, destName) in destSizes {
         for (subrange, rangeName) in ranges(count: destCount) {
-          for (sourceUnique, sourceUniqueName) in [(true, "sourceUnique"), (false, "sourceNonUnique")] {
-            for (destUnique, destUniqueName) in [(true, "destUnique"), (false, "destNonUnique")] {
-              let runFunction = switch (refcounted, destUnique) {
+          for (unique, uniqueName) in [(true, "unq"), (false, "non")] {
+      //      for (destUnique, destUniqueName) in [(true, "du"), (false, "dn")] {
+              let runFunction = switch (refcounted, unique) {
               case (true, true): runArrayRRCRefcountedUniqueDest
               case (true, false): runArrayRRCRefcountedSharedDest
               case (false, true): runArrayRRCPODUniqueDest
@@ -48,12 +57,29 @@ fileprivate func configs() -> [BenchmarkInfo] {
               }
               configs.append(
                 BenchmarkInfo(
-                  name:"arrayRRC_\(refcountedName)_\(destName)_\(sourceName)_\(rangeName)_\(destUniqueName)_\(sourceUniqueName)",
+                  name:"ArrayRRC.\(refcountedName).\(destName).\(sourceName).\(rangeName).\(uniqueName)",
                   runFunction: runFunction,
                   tags: [.api, .Array, .algorithm],
                   setUpFunction: {
-                    useUniqueDest = destUnique
-                    useUniqueSource = sourceUnique
+                    if sourceCount < 1000 && destCount < 1000 {
+                      extraIters = 100
+                    }
+                    if sourceCount > 1000 && destCount > 1000 {
+                      extraIters = 2
+                    }
+                    if !refcounted {
+                      extraIters *= 10
+                    }
+                    //It looks like the first iteration is having to do a single
+                    //CoW copy, so we amortize that a bit by letting it get more
+                    //non-copying iterations. Ideally we wouldn't need this.
+                    if unique && extraIters < 20 {
+                      extraIters *= 2
+                    }
+                    //These are different code paths, but I'm trying to have a less overwhelming number of total tests
+                    useUniqueDest = unique
+                    useUniqueSource = unique
+                    range = subrange
                     if refcounted {
                       refcountedDest = makeRefcounted(count: destCount)
                       refcountedSource = makeRefcounted(count: sourceCount)
@@ -67,7 +93,6 @@ fileprivate func configs() -> [BenchmarkInfo] {
                         podOriginalRangeContents = Array(podDest[range])
                       }
                     }
-                    range = subrange
                   },
                   tearDownFunction: {
                     refcountedDest = []
@@ -76,10 +101,11 @@ fileprivate func configs() -> [BenchmarkInfo] {
                     podDest = []
                     podSource = []
                     podOriginalRangeContents = []
+                    extraIters = 10
                   }
                 )
               )
-            }
+          //  }
           }
         }
       }
@@ -97,6 +123,7 @@ fileprivate var refcountedOriginalRangeContents:[DummyObject] = []
 fileprivate var podOriginalRangeContents:[Int] = []
 fileprivate var useUniqueDest = false
 fileprivate var useUniqueSource = false
+fileprivate var extraIters = 10
 
 public let benchmarks: [BenchmarkInfo] = configs()
 
@@ -104,22 +131,28 @@ public let benchmarks: [BenchmarkInfo] = configs()
  Note: the work done by the unique and non-unique variants is different.
  Only compare like to like.
  */
+@inline(__always)
 fileprivate func runArrayRRCImplNonUniqueDest<A>(
   n: Int,
-  dest: consuming A,
-  source: consuming A
+  dest destination: A,
+  source: A,
+  sourceLocation: inout A
 ) where A:RangeReplaceableCollection, A.Index == Int  {
   let subrange = range
+  var dest = destination
   for _ in 0 ..< n {
-    let destCopy = dest
-    let sourceCopy = useUniqueSource ? nil : source
-    dest.replaceSubrange(subrange, with: source)
-    blackHole(dest)
-    if useUniqueSource {
-      blackHole(sourceCopy)
+    for _ in 0 ..< extraIters {
+      let destCopy = dest
+      let sourceCopy = useUniqueSource ? nil : source
+      dest.replaceSubrange(subrange, with: source)
+      blackHole(dest)
+      if !useUniqueSource {
+        blackHole(sourceCopy)
+      }
+      dest = destCopy
     }
-    dest = destCopy
   }
+  sourceLocation = source
 }
 
 /*
@@ -128,24 +161,37 @@ fileprivate func runArrayRRCImplNonUniqueDest<A>(
  being tested. Unfortunately this makes this variant less precise than the
  other, but it's still useful to be able to see the non-CoW case
  */
+@inline(__always)
 fileprivate func runArrayRRCImplUniqueDest<A>(
   n: Int,
-  dest: consuming A,
-  source: consuming A,
-  originalRangeContents: consuming A
+  dest destination: A,
+  source: A,
+  originalRangeContents: A,
+  destLocation: inout A,
+  sourceLocation: inout A,
+  originalRangeContentsLocation: inout A
 ) where A:RangeReplaceableCollection, A.Index == Int {
   let subrange = range
+  var dest = destination
   for _ in 0 ..< n {
-    let sourceCopy = useUniqueSource ? nil : source
-    let originalRangeContentsCopy = useUniqueSource ? nil : originalRangeContents
-    dest.replaceSubrange(subrange, with: source)
-    blackHole(dest)
-    dest.replaceSubrange(subrange, with: originalRangeContents)
-    if useUniqueSource {
-      blackHole(originalRangeContentsCopy)
-      blackHole(sourceCopy)
+    for _ in 0 ..< extraIters {
+      let sourceCopy = useUniqueSource ? nil : source
+      let originalRangeContentsCopy = useUniqueSource ? nil : originalRangeContents
+      dest.replaceSubrange(subrange, with: source)
+      blackHole(dest)
+      dest.replaceSubrange(
+        subrange.lowerBound ..< subrange.lowerBound + source.count,
+        with: originalRangeContents
+      )
+      if !useUniqueSource {
+        blackHole(originalRangeContentsCopy)
+        blackHole(sourceCopy)
+      }
     }
   }
+  destLocation = dest
+  sourceLocation = source
+  originalRangeContentsLocation = originalRangeContents
 }
 
 public func runArrayRRCRefcountedUniqueDest(n: Int) {
@@ -159,7 +205,10 @@ public func runArrayRRCRefcountedUniqueDest(n: Int) {
     n: n,
     dest: dest,
     source: source,
-    originalRangeContents: originalRangeContents
+    originalRangeContents: originalRangeContents,
+    destLocation: &refcountedDest,
+    sourceLocation: &refcountedSource,
+    originalRangeContentsLocation: &refcountedOriginalRangeContents
   )
 }
 
@@ -169,7 +218,8 @@ public func runArrayRRCRefcountedSharedDest(n: Int) {
   runArrayRRCImplNonUniqueDest(
     n: n,
     dest: refcountedDest,
-    source: source
+    source: source,
+    sourceLocation: &refcountedSource
   )
 }
 
@@ -180,11 +230,15 @@ public func runArrayRRCPODUniqueDest(n: Int) {
   podDest = []
   let originalRangeContents = podOriginalRangeContents
   podOriginalRangeContents = []
+  assert(dest.count > 0)
   runArrayRRCImplUniqueDest(
     n: n,
     dest: dest,
     source: source,
-    originalRangeContents: originalRangeContents
+    originalRangeContents: originalRangeContents,
+    destLocation: &podDest,
+    sourceLocation: &podSource,
+    originalRangeContentsLocation: &podOriginalRangeContents
   )
 }
 
@@ -194,6 +248,7 @@ public func runArrayRRCPODSharedDest(n: Int) {
   runArrayRRCImplNonUniqueDest(
     n: n,
     dest: podDest,
-    source: source
+    source: source,
+    sourceLocation: &podSource
   )
 }
