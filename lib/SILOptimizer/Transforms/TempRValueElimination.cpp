@@ -964,7 +964,8 @@ void TempRValueOptPass::run() {
   // Call the utlity to complete ossa lifetime.
   OSSALifetimeCompletion completion(function, da->get(function));
   for (auto it : valuesToComplete) {
-    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
+    completion.completeOSSALifetime(it,
+                                    OSSALifetimeCompletion::Boundary::Liveness);
   }
 }
 
