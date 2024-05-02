@@ -10,6 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Note that this module map requires some changes to the Musl headers in order
+// for it to work.  Specifically:
+//
+// - The types need to be broken out of <bits/alltypes.h> into individual files
+//   in <bits/types>.
+//
+// - The definitions included in <bits/alltypes.h> need to be broken out into
+//   <bits/musldefs.h>.
+//
+// - A _modules directory needs to be created; for each of the files mentioned
+//   in _modules below there should be a header that looks like
+//
+//      #if !__building_module(stdc_foo)
+//      #error "Do not include this header directly, include <foo.h> instead"
+//      #endif
+//      #include <foo.h>
+//
+//   This is so that the replacement headers from Clang and Libc++ work as
+//   expected.
+
 module _musl [system] {
   config_macros _GNU_SOURCE, _BSD_SOURCE, _XOPEN_SOURCE, _POSIX_SOURCE, _POSIX_C_SOURCE, _LARGEFILE64_SOURCE, _ALL_SOURCE, _DEFAULT_SOURCE, __STRICT_ANSI__
 
@@ -28,111 +48,252 @@ module _musl [system] {
   }
 }
 
-module stdc_assert [system] {
-  config_macros NDEBUG
+// Headers that can be overridden by Clang or libc++; in this case what we do is
+// we create an underscored module to wrap the actual header, then have the
+// module with the nicer name include a forwarding header from _modules.  This
+// ensures that e.g. `import stdc_float` will result in pulling in the Clang
+// or libc++ versions as expected.
+
+module _stdc_assert [system] {
   textual header "assert.h"
+}
+module stdc_assert [system] {
+  header "_modules/stdc_assert.h"
   export *
 }
 
-module stdc_float [system] {
-  header "float.h"
-  export *
-}
-
-module stdc_iso646 [system] {
-  header "iso646.h"
-  export *
-}
-
-module stdc_limits [system] {
-  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
-  header "limits.h"
-  export *
-}
-
-module stdc_stdalign [system] {
-  header "stdalign.h"
-  export *
-}
-
-module stdc_stdarg [system] {
-  header "stdarg.h"
-  export *
-}
-
-module stdc_stdatomic [system] {
-  header "stdatomic.h"
-  export *
-}
-
-module stdc_stdbool [system] {
-  header "stdbool.h"
-  export *
-}
-
-module stdc_stddef [system] {
-  header "stddef.h"
-  export *
-}
-
-module stdc_stdint [system] {
-  header "stdint.h"
-  export *
-}
-
-module stdc_time [system] {
-  config_macros _POSIX_SOURCE, _POSIX_C_SOURCE, _XOPEN_SOURCE, _GNU_SOURCE, _BSD_SOURCE
-  header "time.h"
-  export *
-}
-
-module stdc_tgmath [system] {
-  header "tgmath.h"
-  export *
-}
-
-module stdc_complex [system] {
+module _stdc_complex [system] {
   header "complex.h"
   export *
 }
+module stdc_complex [system] {
+  header "_modules/stdc_complex.h"
+  export *
+}
 
-module stdc_ctype [system] {
+module _stdc_ctype [system] {
   config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
   header "ctype.h"
   export *
 }
+module stdc_ctype [system] {
+  header "_modules/stdc_ctype.h"
+  export *
+}
 
-module stdc_errno [system] {
+module _stdc_errno [system] {
   config_macros _GNU_SOURCE
   header "errno.h"
   export *
 }
+module stdc_errno [system] {
+  header "_modules/stdc_errno.h"
+  export *
+}
 
-module stdc_fenv [system] {
+module _stdc_fenv [system] {
   header "fenv.h"
   export *
 }
-
-module stdc_inttypes [system] {
-  header "inttypes.h"
+module stdc_fenv [system] {
+  header "_modules/stdc_fenv.h"
   export *
 }
 
-module stdc_locale [system] {
+module _stdc_float [system] {
+  header "float.h"
+  export *
+}
+module stdc_float [system] {
+  header "_modules/stdc_float.h"
+  export *
+}
+
+module _stdc_inttypes [system] {
+  header "inttypes.h"
+  export *
+}
+module stdc_inttypes [system] {
+  header "_modules/stdc_inttypes.h"
+  use stdc_stdint
+  export *
+}
+
+module _stdc_iso646 [system] {
+  header "iso646.h"
+  export *
+}
+module stdc_iso646 [system] {
+  header "_modules/stdc_iso646.h"
+  export *
+}
+
+module _stdc_limits [system] {
+  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
+  header "limits.h"
+  export *
+}
+module stdc_limits [system] {
+  header "_modules/stdc_limits.h"
+  export *
+}
+
+module _stdc_locale [system] {
   config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
   header "locale.h"
   export *
 }
+module stdc_locale [system] {
+  header "_modules/stdc_locale.h"
+  export *
+}
 
-module stdc_math [system] {
+module _stdc_math [system] {
   config_macros _BSD_SOURCE, _GNU_SOURCE, _XOPEN_SOURCE
   header "math.h"
   export *
 }
+module stdc_math [system] {
+  header "_modules/stdc_math.h"
+  export *
+}
 
-module stdc_setjmp [system] {
+module _stdc_setjmp [system] {
   config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
   header "setjmp.h"
+  export *
+}
+module stdc_setjmp [system] {
+  header "_modules/stdc_setjmp.h"
+  export *
+}
+
+module _stdc_stdalign [system] {
+  header "stdalign.h"
+  export *
+}
+module stdc_stdalign [system] {
+  header "_modules/stdc_stdalign.h"
+  export *
+}
+
+module _stdc_stdarg [system] {
+  header "stdarg.h"
+  export *
+}
+module stdc_stdarg [system] {
+  header "_modules/stdc_stdarg.h"
+  export *
+}
+
+module _stdc_stdatomic [system] {
+  header "stdatomic.h"
+  export *
+}
+module stdc_stdatomic [system] {
+  header "_modules/stdc_stdatomic.h"
+  export *
+}
+
+module _stdc_stdbool [system] {
+  header "stdbool.h"
+  export *
+}
+module stdc_stdbool [system] {
+  header "_modules/stdc_stdbool.h"
+  export *
+}
+
+module _stdc_stddef [system] {
+  header "stddef.h"
+  export *
+}
+module stdc_stddef [system] {
+  header "_modules/stdc_stddef.h"
+  export *
+}
+
+module _stdc_stdint [system] {
+  header "stdint.h"
+  export *
+}
+module stdc_stdint [system] {
+  header "_modules/stdc_stdint.h"
+  export *
+}
+
+module _stdc_stdio [system] {
+  config_macros _BSD_SOURCE, _GNU_SOURCE, _LARGEFILE64_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
+  header "stdio.h"
+  export *
+}
+module stdc_stdio [system] {
+  header "_modules/stdc_stdio.h"
+  export *
+}
+
+module _stdc_stdlib [system] {
+  config_macros _BSD_SOURCE, _GNU_SOURCE, _LARGEFILE64_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
+  header "stdlib.h"
+  export *
+}
+module stdc_stdlib [system] {
+  header "_modules/stdc_stdlib.h"
+  export *
+}
+
+module _stdc_string [system] {
+  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
+  header "string.h"
+  export *
+}
+module stdc_string [system] {
+  header "_modules/stdc_string.h"
+  export *
+}
+
+module _stdc_tgmath [system] {
+  header "tgmath.h"
+  export *
+}
+module stdc_tgmath [system] {
+  header "_modules/stdc_tgmath.h"
+  export *
+}
+
+module _stdc_uchar [system] {
+  header "uchar.h"
+  export *
+}
+module stdc_uchar [system] {
+  header "_modules/stdc_uchar.h"
+  export *
+}
+
+module _stdc_wchar [system] {
+  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
+  header "wchar.h"
+  export *
+}
+module stdc_wchar [system] {
+  header "_modules/stdc_wchar.h"
+  export *
+}
+
+module _stdc_wctype [system] {
+  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
+  header "wctype.h"
+  export *
+}
+module stdc_wctype [system] {
+  header "_modules/stdc_wctype.h"
+  export *
+}
+
+// C library headers
+module stdc_time [system] {
+  config_macros _POSIX_SOURCE, _POSIX_C_SOURCE, _XOPEN_SOURCE, _GNU_SOURCE, _BSD_SOURCE
+  header "time.h"
   export *
 }
 
@@ -142,48 +303,13 @@ module stdc_signal [system] {
   export *
 }
 
-module stdc_stdio [system] {
-  config_macros _BSD_SOURCE, _GNU_SOURCE, _LARGEFILE64_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
-  header "stdio.h"
-  export *
-}
-
-module stdc_stdlib [system] {
-  config_macros _BSD_SOURCE, _GNU_SOURCE, _LARGEFILE64_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
-  header "stdlib.h"
-  export *
-}
-
 module stdc_stdnoreturn [system] {
   header "stdnoreturn.h"
   export *
 }
 
-module stdc_string [system] {
-  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
-  header "string.h"
-  export *
-}
-
 module stdc_threads [system] {
   header "threads.h"
-  export *
-}
-
-module stdc_uchar [system] {
-  header "uchar.h"
-  export *
-}
-
-module stdc_wchar [system] {
-  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
-  header "wchar.h"
-  export *
-}
-
-module stdc_wctype [system] {
-  config_macros _BSD_SOURCE, _GNU_SOURCE, _POSIX_C_SOURCE, _POSIX_SOURCE, _XOPEN_SOURCE
-  header "wctype.h"
   export *
 }
 
