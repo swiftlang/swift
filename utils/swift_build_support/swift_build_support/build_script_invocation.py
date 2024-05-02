@@ -518,6 +518,7 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--extra-dsymutil-args=%s" % ' '.join(
                     shlex.quote(opt) for opt in args.extra_dsymutil_args)
+            ]
 
         if args.musl_path:
             impl_args += [
