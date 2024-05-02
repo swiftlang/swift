@@ -98,13 +98,14 @@ bb4:
   return %9999 : $()
 }
 
-// This case we are not moving anything so we are leaving in the default
-// behavior which is not breaking blocks and not inserting debug_info.
+// This case we are not moving anything, so we don't add the
+// [moveable_value_debuginfo] flag, but we still want debug info for the
+// second alloc_stack!
 //
 // CHECK-LABEL: sil @hoist_generic_3 :
 // CHECK: bb0([[ARG:%.*]] : $*T,
 // CHECK-NEXT:   [[STACK:%.*]] = alloc_stack $T{{[ ]*}}, let, name "x"
-// CHECK-NOT:    debug_value
+// CHECK:        debug_value %{{.+}}, let, name "y"
 // CHECK: } // end sil function 'hoist_generic_3'
 sil @hoist_generic_3 : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
 bb0(%0 : $*T, %1: $Builtin.Int1):

@@ -260,7 +260,7 @@ If one builds swift using ninja and wants to dump the SIL of the
 stdlib using some of the SIL dumping options from the previous
 section, one can use the following one-liner:
 
-    ninja -t commands | grep swiftc | grep Swift.o | grep " -c "
+    ninja -t commands | grep swiftc | grep 'Swift\.o'
 
 This should give one a single command line that one can use for
 Swift.o, perfect for applying the previous sections options to.
