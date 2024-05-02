@@ -371,7 +371,7 @@ namespace swift::test {
 // Dumps:
 // - function
 static FunctionTest OSSALifetimeCompletionTest(
-    "ossa-lifetime-completion",
+    "ossa_lifetime_completion",
     [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
       std::optional<OSSALifetimeCompletion::Boundary> kind = std::nullopt;
