@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O -primary-file %s
+// RUN: %target-swift-frontend -emit-sil -O -experimental-swift-based-closure-specialization -primary-file %s
 
 // Just make sure we skip the optimization and not crash here.
 //

@@ -43,16 +43,20 @@
 ///   return sin(x)
 /// }
 ///
-/// //============== Before optimization ==============// 
+/// //============== Before closure specialization ==============// 
 /// // VJP of `foo`. Returns the original result and the Pullback of `foo`.
 /// sil @vjp_foo: $(Float) -> (originalResult: Float, pullback: (Float) -> Float) { 
 /// bb0(%0: $Float): 
-///   // vjp_sin returns the original result `sin(x)`, and the pullback of sin, `pb_sin`.
-///   // `pb_sin` is a closure.
-///   %(originalResult, pb_sin) = apply @vjp_sin(%0): $(Float) -> (Float, (Float) -> Float)
-///  
+///   // __Inlined__ `vjp_sin`: It is important for all intermediate VJPs to have 
+///   // been inlined in `vjp_foo`, otherwise `vjp_foo` will not be able to determine
+///   // that `pb_foo` is closing over other closures and no specialization will happen.
+///                                                                               \        
+///   %originalResult = apply @sin(%0): $(Float) -> Float                          \__ Inlined `vjp_sin`
+///   %partially_applied_pb_sin = partial_apply pb_sin(%0): $(Float) -> Float      /
+///                                                                               /  
+///
 ///   %pb_foo = function_ref @pb_foo: $@convention(thin) (Float, (Float) -> Float) -> Float
-///   %partially_applied_pb_foo = partial_apply %pb_foo(%pb_sin): $(Float, (Float) -> Float) -> Float
+///   %partially_applied_pb_foo = partial_apply %pb_foo(%partially_applied_pb_sin): $(Float, (Float) -> Float) -> Float
 ///  
 ///   return (%originalResult, %partially_applied_pb_foo)
 /// }
@@ -72,10 +76,10 @@
 ///   return %derivative_of_sin: Float
 /// }
 ///
-/// //============== After optimization ==============// 
+/// //============== After closure specialization ==============// 
 /// sil @vjp_foo: $(Float) -> (originalResult: Float, pullback: (Float) -> Float) { 
 /// bb0(%0: $Float): 
-///   %1 = apply @sin(%0): $(Float) -> Float 
+///   %originalResult = apply @sin(%0): $(Float) -> Float 
 /// 
 ///   // Before the optimization, pullback of `foo` used to take a closure for computing
 ///   // pullback of `sin`. Now, the specialized pullback of `foo` takes the arguments that
@@ -84,7 +88,7 @@
 ///   %specialized_pb_foo = function_ref @specialized_pb_foo: $@convention(thin) (Float, Float) -> Float
 ///   %partially_applied_pb_foo = partial_apply %specialized_pb_foo(%0): $(Float, Float) -> Float 
 /// 
-///   return (%1, %partially_applied_pb_foo)
+///   return (%originalResult, %partially_applied_pb_foo)
 /// }
 /// 
 /// sil @specialized_pb_foo: $(Float, Float) -> Float { 
@@ -384,8 +388,8 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
       continue
     }
 
-    // If the callee uses a dynamic Self, we cannot specialize it, since the resulting specialization might longer have
-    // 'self' as the last parameter.
+    // If the callee uses a dynamic Self, we cannot specialize it, since the resulting specialization might no longer
+    // have 'self' as the last parameter.
     //
     // TODO: We could fix this by inserting new arguments more carefully, or changing how we model dynamic Self
     // altogether.

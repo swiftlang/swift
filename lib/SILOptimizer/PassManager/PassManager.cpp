@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <cassert>
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"

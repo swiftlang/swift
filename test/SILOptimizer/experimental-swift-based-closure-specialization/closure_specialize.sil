@@ -132,6 +132,8 @@ bb0(%0 : $Int):
 // address and non-address only types) taken as @in or @in_guaranteed.
 
 // This is a temporary limitation.
+// TODO: figure out what to do with non-inout indirect arguments
+// https://forums.swift.org/t/non-inout-indirect-types-not-supported-in-closure-specialization-optimization/70826
 // CHECK-LABEL: sil @address_closure : $@convention(thin) (@in Int) -> () {
 sil @address_closure : $@convention(thin) (@in Int) -> () {
 bb0(%0 : $*Int):
