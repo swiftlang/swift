@@ -3230,36 +3230,18 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     sawLoad = true;
   }
 
-  // If we have a subscript, strip it off and make sure that our base is
-  // something that we can process. If we do and we succeed below, we return the
-  // subscript instead.
-  SubscriptExpr *subscriptExpr = nullptr;
-  if ((subscriptExpr = dyn_cast<SubscriptExpr>(argExpr))) {
-    auto *decl = cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl());
-    if (decl->getReadImpl() != ReadImplKind::Read) {
-      subscriptExpr = nullptr;
-    } else {
-      argExpr = subscriptExpr->getBase();
-    }
-
-    // If there's a load on the base of the subscript expr, look past it.
-    if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
-      argExpr = li->getSubExpr();
-    }
-  }
-
   // If we're consuming instead, then the load _must_ have been there.
   if (kind == StorageReferenceOperationKind::Consume && !sawLoad)
     return nullptr;
 
-  // If we did not see a load or a subscript expr and our argExpr is a
+  // If we did not see a load and our argExpr is a
   // declref_expr, return nullptr. We have an object not something that will be
   // in memory. This can happen with classes or with values captured by a
   // closure.
   //
   // NOTE: If we see a member_ref_expr from a decl_ref_expr, we still process it
   // since the declref_expr could be from a class.
-  if (!sawLoad && !subscriptExpr) {
+  if (!sawLoad) {
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
@@ -3288,18 +3270,27 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   // We want to perform a borrow/consume if the first piece of storage being
   // referenced is a move-only type.
 
-  VarDecl *storage = nullptr;
+  AbstractStorageDecl *storage = nullptr;
   Type type;
   if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
-    storage = dyn_cast<VarDecl>(dre->getDecl());
+    storage = dyn_cast<AbstractStorageDecl>(dre->getDecl());
     type = dre->getType();
   } else if (auto mre = dyn_cast<MemberRefExpr>(result.getStorageRef())) {
-    storage = dyn_cast<VarDecl>(mre->getDecl().getDecl());
+    storage = dyn_cast<AbstractStorageDecl>(mre->getDecl().getDecl());
     type = mre->getType();
+  } else if (auto se = dyn_cast<SubscriptExpr>(result.getStorageRef())) {
+    storage = dyn_cast<AbstractStorageDecl>(se->getDecl().getDecl());
+    type = se->getType();
   }
 
   if (!storage)
     return nullptr;
+  if (!storage->hasStorage()
+      && storage->getReadImpl() != ReadImplKind::Read
+      && storage->getReadImpl() != ReadImplKind::Address) {
+    return nullptr;
+  }
+
   assert(type);
 
   SILType ty =
@@ -3311,12 +3302,6 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   }
   if (!isMoveOnly)
     return nullptr;
-
-  // If we saw a subscript expr and the base of the subscript expr passed our
-  // tests above, we can emit the call to the subscript directly as a borrowed
-  // lvalue. Return the subscript expr here so that we emit it appropriately.
-  if (subscriptExpr)
-    return subscriptExpr;
 
   return result.getTransitiveRoot();
 }
