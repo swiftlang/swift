@@ -44,8 +44,7 @@ extension Duration {
     // get bogus data.
     let (low, carry) = secLo.addingReportingOverflow(UInt64(n) * 1_000_000_000)
     let high = secHi &+ (carry ? 1 : 0)
-    _low = low
-    _high = high
+    self.init(_high: high, low: low)
   }
 }
 
