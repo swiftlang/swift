@@ -2290,32 +2290,32 @@ ERROR(pattern_type_not_usable_from_inline,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
-      (bool, bool))
+      (bool, bool, /*ignored*/bool))
 WARNING(pattern_type_not_usable_from_inline_warn,none,
         "type referenced from a '@usableFromInline' "
         "%select{%select{variable|constant}0|property}1 "
         "should be '@usableFromInline' or public",
-        (bool, bool))
+        (bool, bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_frozen,none,
-      "type referenced from a stored property in a '@frozen' struct must "
-      "be '@usableFromInline' or public",
-      (/*ignored*/bool, /*ignored*/bool))
+      "type referenced from a stored property in a '@frozen%select{| package}2' struct must "
+      "be '@usableFromInline'%select{ or public|, public, or package}2",
+      (/*ignored*/bool, /*ignored*/bool, bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
       "with inferred type %2 "
       "must be '@usableFromInline' or public",
-      (bool, bool, Type))
+      (bool, bool, Type, /*ignored*/bool))
 WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         "type referenced from a '@usableFromInline' "
         "%select{%select{variable|constant}0|property}1 "
         "with inferred type %2 "
         "should be '@usableFromInline' or public",
-        (bool, bool, Type))
+        (bool, bool, Type, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred_frozen,none,
       "type referenced from a stored property with inferred type %2 in a "
-      "'@frozen' struct must be '@usableFromInline' or public",
-      (/*ignored*/bool, /*ignored*/bool, Type))
+      "'@frozen%select{| package}3' struct must be '@usableFromInline'%select{ or public|, public, or package}3",
+      (/*ignored*/bool, /*ignored*/bool, Type, bool))
 
 ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
@@ -3630,6 +3630,8 @@ ERROR(decl_from_hidden_module,none,
       "cannot use %kind0 %select{here|as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances|"
+      "in an extension with public, package, or '@usableFromInline' members|"
       "in an extension with conditional conformances}1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
@@ -3637,7 +3639,9 @@ ERROR(decl_from_hidden_module,none,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
-      "%2 was not imported publicly}3",
+      "%2 was not imported publicly|"
+      "%2 was imported as package}3"
+      "%select{||||| or as package| or as package}1",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 aliases '%1.%2' and cannot be used %select{here|"
@@ -3651,7 +3655,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
-      "%4 was not imported publicly}5",
+      "%4 was not imported publicly|"
+      "%4 was imported as package}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -3664,7 +3669,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "%3 was imported for SPI only|"
       "%3 was not imported by this file|"
       "C++ types from imported module %3 do not support library evolution|"
-      "%3 was not imported publicly}4",
+      "%3 was not imported publicly|"
+      "%3 was imported as package}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
@@ -6888,7 +6894,8 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
-      "%2 was not imported publicly}3",
+      "%2 was not imported publicly|"
+      "%2 was imported as package}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
@@ -6906,7 +6913,8 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
-      "%4 was not imported publicly}5",
+      "%4 was not imported publicly|"
+      "%4 was imported as package}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 
 NOTE(missing_import_inserted,
@@ -6920,8 +6928,8 @@ ERROR(availability_macro_in_inlinable, none,
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here,
-     none, "%kind0 is not '@usableFromInline' or public",
-     (const ValueDecl *))
+     none, "%kind0 is not '@usableFromInline'%select{ or public|, public, or package}1",
+     (const ValueDecl *, bool))
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
