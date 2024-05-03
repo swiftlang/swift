@@ -5710,9 +5710,10 @@ public:
   /// - a subscript index expression, which may or may not be resolved
   /// - an optional chaining, forcing, or wrapping component
   /// - a code completion token
+  /// - a global, type, or instance method
   class Component {
   public:
-    enum class Kind: unsigned {
+    enum class Kind : unsigned {
       Invalid,
       UnresolvedProperty,
       UnresolvedSubscript,
@@ -5725,8 +5726,9 @@ public:
       TupleElement,
       DictionaryKey,
       CodeCompletion,
+      Method,
     };
-  
+
   private:
     union DeclNameOrRef {
       DeclNameRef UnresolvedName;
@@ -5737,6 +5739,7 @@ public:
       DeclNameOrRef(ConcreteDeclRef rd) : ResolvedDecl(rd) {}
     } Decl;
 
+    Expr *FuncExpression;
     ArgumentList *ComponentArgList;
     const ProtocolConformanceRef *ComponentHashableConformancesData;
 
@@ -5745,10 +5748,12 @@ public:
     Type ComponentType;
     SourceLoc Loc;
 
-    // Private constructor for subscript/method components.
+    // Private constructor for subscript or global/type/instance method
+    // components.
     explicit Component(DeclNameOrRef decl, ArgumentList *argList,
                        ArrayRef<ProtocolConformanceRef> indexHashables,
-                       Kind kind, Type type, SourceLoc loc);
+                       Kind kind, Type type, SourceLoc loc,
+                       Expr *funcExpression);
 
     // Private constructor for property or #keyPath dictionary key.
     explicit Component(DeclNameOrRef decl, Kind kind, Type type, SourceLoc loc)
@@ -5790,7 +5795,11 @@ public:
     static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
       return Component(Kind::OptionalChain, Type(), QuestionLoc);
     }
-    
+
+    /// Create an unresolved component for a global, type, or instance method.
+    static Component forUnresolvedMethod(Expr *funcExpression, ASTContext &ctx,
+                                         ArgumentList *argList);
+
     /// Create a component for a property.
     static Component forProperty(ConcreteDeclRef property,
                                  Type propertyType,
@@ -5875,6 +5884,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::Method:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -5890,6 +5900,7 @@ public:
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
+      case Kind::Method:
         return ComponentArgList;
 
       case Kind::Invalid:
@@ -5915,6 +5926,7 @@ public:
     ArrayRef<ProtocolConformanceRef>
     getComponentIndexHashableConformances() const {
       switch (getKind()) {
+      case Kind::Method:
       case Kind::Subscript:
         if (!ComponentHashableConformancesData)
           return {};
@@ -5940,6 +5952,7 @@ public:
       switch (getKind()) {
       case Kind::UnresolvedProperty:
       case Kind::DictionaryKey:
+      case Kind::Method:
         return Decl.UnresolvedName;
 
       case Kind::Invalid:
@@ -5961,6 +5974,7 @@ public:
       switch (getKind()) {
       case Kind::Property:
       case Kind::Subscript:
+      case Kind::Method:
         return true;
 
       case Kind::Invalid:
@@ -5982,6 +5996,7 @@ public:
       switch (getKind()) {
       case Kind::Property:
       case Kind::Subscript:
+      case Kind::Method:
         return Decl.ResolvedDecl;
 
       case Kind::Invalid:
@@ -6015,6 +6030,7 @@ public:
         case Kind::Subscript:
         case Kind::DictionaryKey:
         case Kind::CodeCompletion:
+        case Kind::Method:
           llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -6027,6 +6043,8 @@ public:
     void setComponentType(Type t) {
       ComponentType = t;
     }
+
+    Expr *getExpression() const { return FuncExpression; }
   };
 
 private:

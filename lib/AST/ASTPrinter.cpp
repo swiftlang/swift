@@ -4945,6 +4945,10 @@ void PrintAST::printKeyPathComponents(KeyPathExpr *expr, ArrayRef<KeyPathExpr::C
         case ComponentKind::CodeCompletion: {
           break;
         }
+        case ComponentKind::Method: {
+          auto args = component.getComponentArgs();
+          printArgumentList(args, /*forSubscript*/ false);
+        }
       }
     }
   } else {

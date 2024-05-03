@@ -487,6 +487,19 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         break;
       }
 
+      // ToDo: handle keypath method references to inits as DeclConstructorRef?
+      case KeyPathExpr::Component::Kind::Method: {
+        auto *decl = component.getDeclRef().getDecl();
+        auto loc = component.getLoc();
+        SourceRange range(loc, loc);
+        auto Continue = passReference(
+            decl, component.getComponentType(), loc, range,
+            ReferenceMetaData((SemaReferenceKind::DeclMemberRef), OpAccess));
+        if (!Continue)
+          return Action::Stop();
+        break;
+      }
+
       case KeyPathExpr::Component::Kind::TupleElement:
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::UnresolvedProperty:

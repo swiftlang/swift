@@ -3152,6 +3152,9 @@ public:
           case KeyPathExpr::Component::Kind::CodeCompletion:
             printHead("completion", ASTNodeColor);
             break;
+          case swift::KeyPathExpr::Component::Kind::Method:
+            printHead("method", ASTNodeColor);
+            break;
           }
           printFieldQuoted(GetTypeOfKeyPathComponent(E, i), "type");
           if (auto *args = component.getComponentArgs()) {
