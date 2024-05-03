@@ -19,10 +19,10 @@ actor Bar {
   }
   func bar() async {
     let ns = NonSendable()
-    _ = Bar(ns) // expected-warning {{transferring 'ns' may cause a data race}}
+    _ = Bar(ns) // expected-warning {{sending 'ns' may cause a data race}}
     // TODO: This needs to be:
     // disconnected 'ns' is transferred to actor-isolated callee. Later local uses could race with uses in callee.
-    // expected-note @-3 {{transferring disconnected 'ns' to actor-isolated callee could cause races in between callee actor-isolated and local actor-isolated uses}}
+    // expected-note @-3 {{sending disconnected 'ns' to actor-isolated callee could cause races in between callee actor-isolated and local actor-isolated uses}}
     ns.foo() // expected-note {{use here could race}}
   }
 }
