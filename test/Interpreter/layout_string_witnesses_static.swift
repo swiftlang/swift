@@ -1223,6 +1223,49 @@ func testCTypeAligned() {
 
 testCTypeAligned()
 
+func testCTypeUnderAligned() {
+    let ptr = UnsafeMutablePointer<CTypeUnderAligned>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = CTypeUnderAligned(SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = CTypeUnderAligned(SimpleClass(x: 1))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = CTypeUnderAligned(SimpleClass(x: 5))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testCTypeUnderAligned()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)
