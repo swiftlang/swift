@@ -2156,6 +2156,10 @@ ERROR(init_accessor_is_not_on_property,none,
       "init accessors could only be associated with properties",
       ())
 
+ERROR(init_accessor_is_not_in_the_primary_declaration,none,
+      "init accessors could only be declared in the primary declaration",
+      ())
+
 ERROR(missing_storage_restrictions_attr_label,none,
       "missing label in @storageRestrictions attribute", ())
 
