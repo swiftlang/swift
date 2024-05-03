@@ -36,11 +36,11 @@ sil @callee : $@convention(thin) <each T> () -> () {
 // CHECK:       [[HEADER]]:
 // CHECK:         [[PREVIOUS:%[^,]+]] = phi i64 [ 10000000, %[[ENTRY]] ], [ [[REMAINING:%[^,]+]], %{{[^,]+}} ]
 // CHECK:         [[COMBINED_PACK_SIZE:%[^,]+]] = add [[INT]] %0, %1
-// CHECK:         [[STACK_BEFORE_FIRST_ALLOCA:%[^,]+]] = call ptr @llvm.stacksave()
+// CHECK:         [[STACK_BEFORE_FIRST_ALLOCA:%[^,]+]] = call ptr @llvm.stacksave.p0()
 // CHECK:         [[FIRST_ALLOCA_METADATA_PACK:%[^,]+]] = alloca ptr, [[INT]] [[COMBINED_PACK_SIZE]]
 // CHECK:         call swiftcc void @callee([[INT]] [[COMBINED_PACK_SIZE]], ptr [[FIRST_ALLOCA_METADATA_PACK]])
 // CHECK:         [[COMBINED_PACK_SIZE_2:%[^,]+]] = add [[INT]] %1, %0
-// CHECK:         [[STACK_BEFORE_SECOND_ALLOCA:%[^,]+]] = call ptr @llvm.stacksave()
+// CHECK:         [[STACK_BEFORE_SECOND_ALLOCA:%[^,]+]] = call ptr @llvm.stacksave.p0()
 // CHECK:         [[SECOND_ALLOCA_METADATA_PACK:%[^,]+]] = alloca ptr, [[INT]] [[COMBINED_PACK_SIZE_2]]
 // CHECK:         call swiftcc void @callee([[INT]] [[COMBINED_PACK_SIZE_2]], ptr [[SECOND_ALLOCA_METADATA_PACK]])
 // CHECK:         [[REMAINING_AND_OVERFLOW:%[^,]+]] = call { i64, i1 } @llvm.ssub.with.overflow.i64(i64 [[PREVIOUS]], i64 1)
@@ -48,12 +48,14 @@ sil @callee : $@convention(thin) <each T> () -> () {
 // CHECK:         [[IS_ZERO:%[^,]+]] = icmp eq i64 [[REMAINING]], 0
 // CHECK:         br i1 [[IS_ZERO]], label %[[EXIT:[^,]+]], label %[[BACKEDGE:[^,]+]]
 // CHECK:       [[BACKEDGE]]:
-// CHECK:         call void @llvm.stackrestore(ptr [[STACK_BEFORE_SECOND_ALLOCA]])
-// CHECK:         call void @llvm.stackrestore(ptr [[STACK_BEFORE_FIRST_ALLOCA]])
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_SECOND_ALLOCA]])
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_FIRST_ALLOCA]])
 // CHECK:         br label %[[HEADER]]
 // CHECK:       [[EXIT]]:
-// CHECK:         call void @llvm.stackrestore(ptr [[STACK_BEFORE_SECOND_ALLOCA]])
-// CHECK:         call void @llvm.stackrestore(ptr [[STACK_BEFORE_FIRST_ALLOCA]])
+// CHECK:         [[STACK_BEFORE_SECOND_ALLOCAlcssa:%.*]] = phi ptr [ [[STACK_BEFORE_SECOND_ALLOCA]], %{{.*}} ]
+// CHECK:         [[STACK_BEFORE_FIRST_ALLOCAlcssa:%.*]] = phi ptr [ [[STACK_BEFORE_FIRST_ALLOCA]], %{{.*}} ]
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_SECOND_ALLOCAlcssa]])
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_FIRST_ALLOCAlcssa]])
 // CHECK:         ret void
 // CHECK:       }
 sil @looper : $@convention(thin) <each T_1, each T_2> () -> () {
