@@ -624,9 +624,6 @@ class BuildScriptInvocation(object):
         builder.add_product(products.curl.LibCurl,
                             is_enabled=self.args.build_curl)
 
-        builder.add_product(products.foundation.SwiftFoundationICU,
-                            is_enabled=self.args.build_foundation)
-
         # Begin a build-script-impl pipeline for handling the compiler toolchain
         # and a subset of the tools that we build. We build these in this manner
         # to preserve current build-script-impl run behavior as we transition
@@ -645,6 +642,13 @@ class BuildScriptInvocation(object):
                                  is_enabled=self.args.build_lldb)
         builder.add_impl_product(products.LibDispatch,
                                  is_enabled=self.args.build_libdispatch)
+
+        # Begin a pipeline to build Foundation's dependencies now that Swift
+        # has built. This needs to be done before Foundation can build
+        builder.begin_pipeline()
+
+        builder.add_product(products.foundation.SwiftFoundationICU,
+                            is_enabled=self.args.build_foundation)
 
         # Begin a new build-script-impl pipeline that builds libraries that we
         # build as part of build-script-impl but that we should eventually move
