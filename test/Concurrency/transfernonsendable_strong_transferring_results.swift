@@ -86,7 +86,7 @@ func simpleTest2() async {
   let x = NonSendableKlass()
   let y = transferResultWithArg(x)
   await transferToMainDirect(x) // expected-warning {{sending 'x' may cause a data race}}
-  // expected-note @-1 {{sending disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending disconnected 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(y)
   useValue(x) // expected-note {{use here could race}}
 }
@@ -97,14 +97,14 @@ func simpleTest3() async {
   let y = transferResultWithArg(x)
   await transferToMainDirect(x)
   await transferToMainDirect(y) // expected-warning {{sending 'y' may cause a data race}}
-  // expected-note @-1 {{sending disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending disconnected 'y' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(y) // expected-note {{use here could race}}
 }
 
 func transferResult() async -> transferring NonSendableKlass {
   let x = NonSendableKlass()
   await transferToMainDirect(x) // expected-warning {{sending 'x' may cause a data race}}
-  // expected-note @-1 {{sending disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending disconnected 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local nonisolated uses}}
   return x // expected-note {{use here could race}}
 }
 

@@ -99,7 +99,7 @@ func normalFunc_testLocal_2() {
 func transferBeforeCaptureErrors() async {
   let x = NonSendableKlass()
   await transferToCustom(x) // expected-warning {{sending 'x' may cause a data race}}
-  // expected-note @-1 {{sending disconnected 'x' to global actor 'CustomActor'-isolated callee could cause races in between callee global actor 'CustomActor'-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending disconnected 'x' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and local nonisolated uses}}
   let _ = { @MainActor in // expected-note {{use here could race}}
     useValue(x)
   }

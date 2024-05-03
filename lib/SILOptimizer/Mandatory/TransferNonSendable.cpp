@@ -41,6 +41,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
+#pragma clang optimize off
+
 using namespace swift;
 using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
@@ -83,6 +85,50 @@ getDiagnosticBehaviorLimitForValue(SILValue value) {
   return attributedImport->module.importedModule->isConcurrencyChecked()
              ? DiagnosticBehavior::Warning
              : DiagnosticBehavior::Ignore;
+}
+
+static std::optional<SILDeclRef> getDeclRefForCallee(SILInstruction *inst) {
+  auto fas = FullApplySite::isa(inst);
+  if (!fas)
+    return {};
+
+  SILValue calleeOrigin = fas.getCalleeOrigin();
+
+  while (true) {
+    // Intentionally don't lookup through dynamic_function_ref and
+    // previous_dynamic_function_ref as the target of those functions is not
+    // statically known.
+    if (auto *fri = dyn_cast<FunctionRefInst>(calleeOrigin)) {
+      if (auto *callee = fri->getReferencedFunctionOrNull()) {
+        if (auto declRef = callee->getDeclRef())
+          return declRef;
+      }
+    }
+
+    if (auto *mi = dyn_cast<MethodInst>(calleeOrigin)) {
+      return mi->getMember();
+    }
+
+    if (auto *pai = dyn_cast<PartialApplyInst>(calleeOrigin)) {
+      calleeOrigin = pai->getCalleeOrigin();
+      continue;
+    }
+
+    return {};
+  }
+}
+
+static std::optional<std::pair<DescriptiveDeclKind, DeclName>>
+getTransferringApplyCalleeInfo(SILInstruction *inst) {
+  auto declRef = getDeclRefForCallee(inst);
+  if (!declRef)
+    return {};
+
+  auto *decl = declRef->getDecl();
+  if (!decl->hasName())
+    return {};
+
+  return {{decl->getDescriptiveKind(), decl->getName()}};
 }
 
 static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
@@ -472,6 +518,12 @@ public:
     return getDiagnosticBehaviorLimitForValue(transferOp->get());
   }
 
+  /// If we can find a callee decl name, return that. None otherwise.
+  std::optional<std::pair<DescriptiveDeclKind, DeclName>>
+  getTransferringCalleeInfo() const {
+    return getTransferringApplyCalleeInfo(transferOp->getUser());
+  }
+
   void
   emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
                                   SILIsolationInfo namedValuesIsolationInfo,
@@ -488,10 +540,20 @@ public:
       llvm::raw_svector_ostream os(descriptiveKindStr);
       namedValuesIsolationInfo.printForDiagnostics(os);
     }
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_info_transfer_yields_race, name,
-        descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-        isolationCrossing.getCallerIsolation());
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc,
+          diag::regionbasedisolation_named_info_transfer_yields_race_callee,
+          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
+          calleeInfo->first, calleeInfo->second,
+          isolationCrossing.getCallerIsolation());
+    } else {
+      diagnoseNote(
+          loc, diag::regionbasedisolation_named_info_transfer_yields_race, name,
+          descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
+          isolationCrossing.getCallerIsolation());
+    }
     emitRequireInstDiagnostics();
   }
 
@@ -987,6 +1049,12 @@ public:
     return getDiagnosticBehaviorLimitForValue(info.transferredOperand->get());
   }
 
+  /// If we can find a callee decl name, return that. None otherwise.
+  std::optional<std::pair<DescriptiveDeclKind, DeclName>>
+  getTransferringCalleeInfo() const {
+    return getTransferringApplyCalleeInfo(info.transferredOperand->getUser());
+  }
+
   /// Return the isolation region info for \p getNonTransferrableValue().
   SILIsolationInfo getIsolationRegionInfo() const {
     return info.isolationRegionInfo;
@@ -1063,9 +1131,17 @@ public:
       llvm::raw_svector_ostream os(descriptiveKindStr);
       getIsolationRegionInfo().printForDiagnostics(os);
     }
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_transfer_non_transferrable, name,
-        descriptiveKindStr, isolationCrossing.getCalleeIsolation());
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc,
+          diag::regionbasedisolation_named_transfer_non_transferrable_callee,
+          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
+          calleeInfo->first, calleeInfo->second);
+    } else {
+      diagnoseNote(
+          loc, diag::regionbasedisolation_named_transfer_non_transferrable,
+          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation());
+    }
   }
 
   void emitNamedFunctionArgumentApplyStronglyTransferred(SILLocation loc,

@@ -16,5 +16,5 @@ func useValueAsync<T>(_ t: T) async {}
   let erased: () -> Void = mainActorFunction
 
   await useValueAsync(erased) // expected-error {{sending 'erased' may cause a data race}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }

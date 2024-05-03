@@ -49,12 +49,12 @@ distributed actor MyDistributedActor {
 
   distributed func transferActorField() async {
     await transferToMain(x) // expected-error {{sending 'self.x' may cause a data race}}
-    // expected-note @-1 {{sending 'self'-isolated 'self.x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
+    // expected-note @-1 {{sending 'self'-isolated 'self.x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 
   distributed func transferActorIsolatedArg(_ x: NonSendableKlass) async {
     await transferToMain(x) // expected-error {{sending 'x' may cause a data race}}
-    // expected-note @-1 {{sending actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    // expected-note @-1 {{sending actor-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and actor-isolated uses}}
   }
 
   distributed func transferActorIsolatedArgIntoClosure(_ x: NonSendableKlass) async {
