@@ -9,7 +9,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
-import importlib.resources
 import platform
 
 from . import cmake

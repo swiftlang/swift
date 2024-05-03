@@ -205,6 +205,7 @@ def _apply_default_arguments(args):
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
+        args.test_linux_static = False
         args.test_freebsd = False
         args.test_cygwin = False
         args.test_osx = False
