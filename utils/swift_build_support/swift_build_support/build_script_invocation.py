@@ -643,13 +643,6 @@ class BuildScriptInvocation(object):
         builder.add_impl_product(products.LibDispatch,
                                  is_enabled=self.args.build_libdispatch)
 
-        # Begin a pipeline to build Foundation's dependencies now that Swift
-        # has built. This needs to be done before Foundation can build
-        builder.begin_pipeline()
-
-        builder.add_product(products.foundation.SwiftFoundationICU,
-                            is_enabled=self.args.build_foundation)
-
         # Begin a new build-script-impl pipeline that builds libraries that we
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
