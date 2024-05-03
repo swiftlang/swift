@@ -2027,6 +2027,23 @@ static ManagedValue emitBuiltinAddressOfRawLayout(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
 }
 
+/// TODO: Remove.  Only exists to avoid a reverse condfail.
+///       rdar://127516085 (Complete removal of Builtin.copy)
+static ManagedValue emitBuiltinCopy(SILGenFunction &SGF, SILLocation loc,
+                                    SubstitutionMap subs,
+                                    ArrayRef<ManagedValue> args, SGFContext C) {
+  // Builtin.copy has no uses in current/future swiftinterfaces.  It has a
+  // single use in old swiftinterfaces:
+  // func _copy<T>(_ t: T) -> T {
+  //   Builtin.copy(t)
+  // }
+  // It is sufficient to have the builtin pass the value through.  When the
+  // return is emitted, a copy will be made.
+  assert(args.size() == 1 && "not two arguments!?");
+  return ManagedValue::forOwnedAddressRValue(args[0].getValue(),
+                                             CleanupHandle::invalid());
+}
+
 std::optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
