@@ -34,6 +34,7 @@ public struct ContinuousClock: Sendable {
   public init() { }
 }
 
+@available(SwiftStdlib 5.7, *)
 extension Duration {
   internal init(_seconds s: Int64, nanoseconds n: Int64) {
     let (secHi, secLo) = s.multipliedFullWidth(by: 1_000_000_000_000_000_000)
