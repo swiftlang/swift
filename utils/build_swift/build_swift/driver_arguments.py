@@ -1397,7 +1397,7 @@ def create_argument_parser():
     option('--linux-archs', store,
            type=argparse.ShellSplitType(),
            default=None,
-           help='Semicolon-separated list of architectures to use when '
+           help='Comma-separated list of architectures to use when '
            'building for Linux.')
 
     # -------------------------------------------------------------------------
@@ -1409,8 +1409,8 @@ def create_argument_parser():
 
     option('--linux-static-archs', store,
            type=argparse.ShellSplitType(),
-           default=None,
-           help='Semicolon-separated list of architectures to use when '
+           default=['x86_64', 'aarch64'],
+           help='Comma-separated list of architectures to use when '
            'building for fully static Linux.')
 
     # -------------------------------------------------------------------------

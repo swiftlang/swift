@@ -97,6 +97,7 @@ KNOWN_SETTINGS=(
     musl-path                                     "/usr/local/musl" "The path to the Musl headers and libraries"
     linux-archs                                   ""                "The Linux target architecture(s)"
     linux-static-archs                            ""                "The fully static Linux target architecture(s)"
+    build-linux-static                            ""                "set to build Swift stdlibs for statically linked Linux"
 
     ## Darwin Options
     darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration, default is 1 on Darwin platforms, 0 otherwise"
@@ -136,7 +137,6 @@ KNOWN_SETTINGS=(
     skip-build                                    ""                "set to configure as usual while skipping the build step"
     skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
     skip-build-linux                              ""                "set to skip building Swift stdlibs for Linux"
-    skip-build-linux-static                       ""                "set to skip building Swift stdlibs for statically linked Linux"
     skip-build-wasm                               ""                "set to skip building Swift stdlibs for WebAssembly"
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
@@ -1733,7 +1733,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ ! "${SKIP_BUILD_LINUX_STATIC}" ]]; then
+                if [[ "${BUILD_LINUX_STATIC}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_MUSL_PATH:STRING="${MUSL_PATH}"

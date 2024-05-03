@@ -533,6 +533,11 @@ class BuildScriptInvocation(object):
                 "--linux-archs=%s" % ';'.join(args.linux_archs)
             ]
 
+        if not args.build_linux:
+            impl_args += ["--skip-build-linux"]
+        if args.build_linux_static:
+            impl_args += ["--build-linux-static"]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
