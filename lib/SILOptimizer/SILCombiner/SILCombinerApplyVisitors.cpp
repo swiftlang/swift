@@ -157,6 +157,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto context = AI.getFunction()->getTypeExpansionContext();
   auto oldOpRetTypes = substConventions.getIndirectSILResultTypes(context);
   auto newOpRetTypes = convertConventions.getIndirectSILResultTypes(context);
+  auto oldIndirectErrorResultType =
+      substConventions.getIndirectErrorResultType(context);
+  auto newIndirectErrorResultType =
+      convertConventions.getIndirectErrorResultType(context);
   auto oldOpParamTypes = substConventions.getParameterSILTypes(context);
   auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
@@ -186,7 +190,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
        ++OpI, ++newRetI, ++oldRetI) {
     convertOp(Ops[OpI], *oldRetI, *newRetI);
   }
-  
+
+  if (oldIndirectErrorResultType) {
+    assert(newIndirectErrorResultType);
+    convertOp(Ops[OpI], oldIndirectErrorResultType, newIndirectErrorResultType);
+    ++OpI;
+  }
+
   auto newParamI = newOpParamTypes.begin();
   auto oldParamI = oldOpParamTypes.begin();
   for (auto e = newOpParamTypes.end(); newParamI != e;
