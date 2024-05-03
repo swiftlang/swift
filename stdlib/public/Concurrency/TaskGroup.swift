@@ -575,6 +575,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   }
 
   @available(SwiftStdlib 5.1, *)
+  @_disfavoredOverload
   public mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
@@ -1034,6 +1035,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   @available(SwiftStdlib 5.1, *)
+  @_disfavoredOverload
   public mutating func next() async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
