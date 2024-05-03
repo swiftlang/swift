@@ -64,9 +64,9 @@ func testPreconcurrencyExplicitlyNonSendable() async {
   await transferToMain(x)
   // expected-swift-5-no-tns-warning @-1 {{passing argument of non-sendable type 'PreCUncheckedExplicitlyNonSendableKlass' (aka 'ExplicitlyNonSendableKlass') into main actor-isolated context may introduce data races}}
   // expected-swift-5-warning @-2 {{sending 'x' may cause a data race}}
-  // expected-swift-5-note @-3 {{sending disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-swift-5-note @-3 {{sending disconnected 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-swift-6-warning @-4 {{sending 'x' may cause a data race}}
-  // expected-swift-6-note @-5 {{sending disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-swift-6-note @-5 {{sending disconnected 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(x)
   // expected-swift-5-note @-1 {{use here could race}}
   // expected-swift-6-note @-2 {{use here could race}}
@@ -78,8 +78,8 @@ func testNormal() async {
   await transferToMain(x) // expected-swift-5-no-tns-warning {{passing argument of non-sendable type 'PostCUncheckedNonSendableKlass' (aka 'NonSendableKlass') into main actor-isolated context may introduce data races}}
   // expected-swift-5-warning @-1 {{sending 'x' may cause a data race}}
   // expected-swift-6-error @-2 {{sending 'x' may cause a data race}}
-  // expected-swift-5-note @-3 {{sending disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  // expected-swift-6-note @-4 {{sending disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-swift-5-note @-3 {{sending disconnected 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-swift-6-note @-4 {{sending disconnected 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(x) // expected-swift-5-note {{use here could race}}
   // expected-swift-6-note @-1 {{use here could race}}
 }
@@ -92,9 +92,9 @@ func testOnlyErrorOnExactValue() async {
   await transferToMain(y)
   // expected-swift-5-no-tns-warning @-1 2{{passing argument of non-sendable type '(PreCUncheckedNonSendableKlass, PreCUncheckedNonSendableKlass)' (aka '(NonSendableKlass, NonSendableKlass)') into main actor-isolated context may introduce data races}}
   // expected-swift-5-warning @-2 {{sending 'y' may cause a data race}}
-  // expected-swift-5-note @-3 {{sending disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-swift-5-note @-3 {{sending disconnected 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-swift-6-error @-4 {{sending 'y' may cause a data race}}
-  // expected-swift-6-note @-5 {{sending disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-swift-6-note @-5 {{sending disconnected 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(x)
   // expected-swift-5-note @-1 {{use here could race}}
   // expected-swift-6-note @-2 {{use here could race}}
@@ -119,35 +119,35 @@ func testNeverTransfer(_ x: PreCUncheckedNonSendableKlass) async {
 func testNeverTransferExplicit(_ x: PreCUncheckedExplicitlyNonSendableKlass) async {
   await transferToMain(x) // expected-swift-5-no-tns-warning {{passing argument of non-sendable type 'PreCUncheckedExplicitlyNonSendableKlass' (aka 'ExplicitlyNonSendableKlass') into main actor-isolated context may introduce data races}}
   // expected-swift-5-warning @-1 {{sending 'x' may cause a data race}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-swift-6-warning @-3 {{sending 'x' may cause a data race}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
 func testNeverTransferNormal(_ x: PostCUncheckedNonSendableKlass) async {
   await transferToMain(x) // expected-swift-5-no-tns-warning {{passing argument of non-sendable type 'PostCUncheckedNonSendableKlass' (aka 'NonSendableKlass') into main actor-isolated context may introduce data races}}
   // expected-swift-5-warning @-1 {{sending 'x' may cause a data race}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-swift-6-error @-3 {{sending 'x' may cause a data race}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
 // Inexact match => normal behavior.
 func testNeverTransferInexactMatch(_ x: (PreCUncheckedNonSendableKlass, PreCUncheckedNonSendableKlass)) async {
   await transferToMain(x) // expected-swift-5-no-tns-warning 2{{passing argument of non-sendable type '(PreCUncheckedNonSendableKlass, PreCUncheckedNonSendableKlass)' (aka '(NonSendableKlass, NonSendableKlass)') into main actor-isolated context may introduce data races}}
   // expected-swift-5-warning @-1 {{sending 'x' may cause a data race}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-swift-6-error @-3 {{sending 'x' may cause a data race}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
 // Inexact match => normal behavior.
 func testNeverTransferInexactMatchExplicit(_ x: (PreCUncheckedExplicitlyNonSendableKlass, PreCUncheckedExplicitlyNonSendableKlass)) async {
   await transferToMain(x) // expected-swift-5-no-tns-warning {{passing argument of non-sendable type '(PreCUncheckedExplicitlyNonSendableKlass, PreCUncheckedExplicitlyNonSendableKlass)' (aka '(ExplicitlyNonSendableKlass, ExplicitlyNonSendableKlass)') into main actor-isolated context may introduce data races}}
   // expected-swift-5-warning @-1 {{sending 'x' may cause a data race}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-swift-6-error @-3 {{sending 'x' may cause a data race}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
 
