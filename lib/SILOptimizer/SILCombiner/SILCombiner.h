@@ -72,9 +72,11 @@ class SILCombiner :
   /// lifetimes in OSSA.
   NonLocalAccessBlockAnalysis *NLABA;
 
+public:
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
+private:
   /// Utility for dead code removal.
   InstructionDeleter deleter;
 
@@ -102,10 +104,12 @@ class SILCombiner :
   // The tracking list is used by `Builder` for newly added
   // instructions, which we will periodically move to our worklist.
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
-  
+
+public:
   /// Builder used to insert instructions.
   SILBuilder Builder;
 
+private:
   SILOptFunctionBuilder FuncBuilder;
 
   /// Cast optimizer

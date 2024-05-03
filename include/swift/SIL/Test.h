@@ -173,6 +173,8 @@ public:
   template <typename Analysis, typename Transform = SILFunctionTransform>
   Analysis *getAnalysis();
 
+  SILFunctionTransform *getPass();
+
   SwiftPassInvocation *getSwiftPassInvocation();
 
 //===----------------------------------------------------------------------===//
@@ -302,6 +304,8 @@ template <typename Analysis, typename Transform>
 Analysis *FunctionTest::getAnalysis() {
   return impl::getAnalysisFromTransform<Analysis, Transform>(pass);
 }
+
+inline SILFunctionTransform *FunctionTest::getPass() { return pass; }
 } // namespace test
 } // namespace swift
 
