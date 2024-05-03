@@ -467,16 +467,20 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
 
     set(sdk_dir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift")
 
-    # HostCompatibilityLibs is defined as an interface library that
-    # does not generate any concrete build target
-    # (https://cmake.org/cmake/help/latest/command/add_library.html#interface-libraries)
-    # In order to specify a dependency to it using `add_dependencies`
-    # we need to manually "expand" its underlying targets
-    get_property(compatibility_libs
-      TARGET HostCompatibilityLibs
-      PROPERTY INTERFACE_LINK_LIBRARIES)
-    set(compatibility_libs_path
-      "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
+    # Note we only check this for bootstrapping, since you ought to
+    # be able to build using hosttools with the stdlib disabled.
+    if(ASRLF_BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+      # HostCompatibilityLibs is defined as an interface library that
+      # does not generate any concrete build target
+      # (https://cmake.org/cmake/help/latest/command/add_library.html#interface-libraries)
+      # In order to specify a dependency to it using `add_dependencies`
+      # we need to manually "expand" its underlying targets
+      get_property(compatibility_libs
+        TARGET HostCompatibilityLibs
+        PROPERTY INTERFACE_LINK_LIBRARIES)
+      set(compatibility_libs_path
+        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
+    endif()
 
     # If we found a swift compiler and are going to use swift code in swift
     # host side tools but link with clang, add the appropriate -L paths so we
