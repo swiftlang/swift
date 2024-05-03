@@ -1180,6 +1180,30 @@ func testMultiPayloadError() {
 
 testMultiPayloadError()
 
+// Regression test for rdar://127379960
+func testMultiPayloadErrorKeepsTagIntact() {
+    let ptr = UnsafeMutablePointer<MultiPayloadError>.allocate(capacity: 1)
+
+    // initWithTake
+    do {
+        let x = MultiPayloadError.error2(0, MyError(x: SimpleClass(x: 23)))
+        testInit(ptr, to: x)
+    }
+
+    // CHECK: Got error2!
+    switch ptr.pointee {
+        case .error1: print("Get error1!")
+        case .error2: print("Got error2!")
+        case .empty: print("Got empty!")
+    }
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+    ptr.deallocate()
+}
+
+testMultiPayloadErrorKeepsTagIntact()
+
 func testCTypeAligned() {
     let ptr = UnsafeMutablePointer<CTypeAligned>.allocate(capacity: 1)
 
