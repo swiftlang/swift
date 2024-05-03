@@ -1655,6 +1655,10 @@ AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
   if (_fixedAlignment.has_value())
     return *_fixedAlignment;
 
+  if (fixedTypeInfo) {
+    return *(_fixedAlignment = (*fixedTypeInfo)->getFixedAlignment());
+  }
+
   Alignment currentAlignment = Alignment(
     std::max((Alignment::int_type)1, minimumAlignment));
   for (auto *entry : entries) {
