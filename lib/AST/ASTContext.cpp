@@ -5848,8 +5848,8 @@ ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
 }
 
 const clang::Type *
-ASTContext::getClangTypeForIRGen(Type ty) {
-  return getClangTypeConverter().convert(ty).getTypePtrOrNull();
+ASTContext::getClangTypeForIRGen(Type ty, bool allowBridging) {
+  return getClangTypeConverter().convert(ty, allowBridging).getTypePtrOrNull();
 }
 
 GenericParamList *ASTContext::getSelfGenericParamList(DeclContext *dc) const {

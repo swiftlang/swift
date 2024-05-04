@@ -2088,8 +2088,15 @@ namespace {
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
       fields.add(IGM.getAddrOfGlobalString(name));
 
+      // Swift classes don't include type encodings in their ivars; they're
+      // redundant with Swift metadata. @objc @implementation classes, though,
+      // don't have Swift metadata, so their ivars need them.
+      std::string typeEnc;
+      if (FieldLayout->hasObjCImplementation())
+        irgen::getObjCEncodingForIvarType(IGM, field, getSelfType(getClass()),
+                                          typeEnc);
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(""));
+      fields.add(IGM.getAddrOfGlobalString(typeEnc));
 
       Size size;
       Alignment alignment;
@@ -2209,6 +2216,7 @@ namespace {
       
       // If the property is an instance property and has storage, and meanwhile
       // its type is trivially representable in ObjC, emit the ivar name last.
+      // FIXME: Should also support objcImpl
       bool isTriviallyRepresentable =
           propTy->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
                                              propDC);

@@ -811,7 +811,10 @@ public:
   /// IRGen. For converting function types, strongly prefer using one of the
   /// other methods instead, instead of manually iterating over parameters
   /// and results.
-  const clang::Type *getClangTypeForIRGen(Type ty);
+  ///
+  /// \param allowBridging Get clang types that require non-trivial bridging
+  ///     through e.g. the \c ObjectiveCBridgeable protocol.
+  const clang::Type *getClangTypeForIRGen(Type ty, bool allowBridging = true);
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.

@@ -37,6 +37,7 @@
 #include "clang/AST/DeclObjC.h"
 
 #include "CallEmission.h"
+#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenCall.h"
@@ -49,6 +50,7 @@
 #include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
+#include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
@@ -1255,6 +1257,135 @@ void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
   // exposed from Clang.
   IGM.getClangASTContext()
     .getObjCEncodingForPropertyType(getObjCPropertyType(IGM, property), s);
+}
+
+static void appendObjCEncodingSwiftTypeName(SILType type,
+                                            llvm::raw_ostream &encoding) {
+  // Add a Swift type name to the encoding. This consists of a `$s` prefix
+  // followed by a mangled type name. It can encode an arbitrarily complicated
+  // Swift type.
+  //
+  // Tips for parsing these out of ObjC type encoding strings:
+  //
+  // * `$` is not otherwise used in ObjC type encoding strings, so `$s` reliably
+  //   indicates a Swift type.
+  // * Swift mangled names only include `_`, `$`, and ASCII letters and numbers.
+  //   In particular, they never include any of these characters, which are used
+  //   as structural markers in ObjC type encoding strings: `=)]}"`. You can
+  //   treat these as delimiters when parsing the Swift name out.
+  // * swift-demangle will understand the mangled string with or without the
+  //   `$s` prefix.
+  // * The standard library's `Swift._typeByName(_:)` SPI will only understand
+  //   the string with the `$s` prefix removed.
+  IRGenMangler mangler;
+  encoding << "$s" << mangler.mangleTypeForTypeName(type.getASTType());
+}
+
+static void appendSizeAndAlignmentMembers(IRGenModule &IGM, SILType type,
+                                          llvm::raw_ostream &encoding) {
+  // Get size and alignment type to use. We start with ambiguous values we'll
+  // use for non-fixed-size types; `swift_updatePureObjCClassMetadata()` can
+  // construct something more specific while it's updating the ivars.
+  uint64_t size = 0;        // zero elements = variable-length array
+  char alignType = '?';     // type encoding for an unknown type
+
+  if (auto fixedTI = dyn_cast<FixedTypeInfo>(&IGM.getTypeInfo(type))) {
+    size = fixedTI->getFixedSize().getValue();
+    auto alignment = fixedTI->getFixedAlignment();
+
+    // Type encoding to use for a given `alignment.log2()`:
+    // `char`, `short`, `int`, `long long`, `int128_t`
+    static const char alignmentEncodings[6] = "csiqt";
+
+    // Bounds check
+    if (alignment.log2() >= sizeof(alignmentEncodings))
+      IGM.error(SourceLoc(),
+                llvm::Twine("don't know how to @encode Swift type with ")
+                  + llvm::Twine(alignment.getValue()) + "-byte alignment");
+
+    alignType = alignmentEncodings[alignment.log2()];
+  }
+
+  // The first member of the union is an `unsigned char bytes[size]` with the
+  // same size as the Swift type.
+  encoding << "\"bytes\"[" << size << "C]";
+
+  // The second member of the union is `some_type align`, where `some_type` is
+  // a signed integer type with the appropriate alignment.
+  encoding << "\"align\"" << alignType;
+}
+
+static bool
+maybeAppendObjCEncodingForSwiftOnlyClass(SILType type,
+                                         llvm::raw_ostream &encoding) {
+  // Is this something that ObjC can treat as an object?
+  if (!type.hasRetainablePointerRepresentation())
+    return false;
+
+  // Is this a weak ref? A Swift weak ref points to a side allocation, so it
+  // can't be treated like an object pointer.
+  if (type.getReferenceStorageOwnership().value_or(ReferenceOwnership::Strong)
+        == ReferenceOwnership::Weak)
+    return false;
+
+  // Represent this as an `id` with a mangled Swift type name in double-quotes.
+  encoding << "@\"";
+  appendObjCEncodingSwiftTypeName(type, encoding);
+  encoding << "\"";
+  return true;
+}
+
+static void getObjCEncodingForSwiftOnlyType(IRGenModule &IGM, SILType type,
+                                            std::string &s) {
+  llvm::raw_string_ostream encoding(s);
+
+  // Special case: We represent object references like ObjC object references,
+  // but with Swift class names.
+  if (maybeAppendObjCEncodingForSwiftOnlyClass(type, encoding))
+    return;
+
+  // We represent other Swift types using a union. Swift-aware clients can
+  // figure out the exact Swift type by looking at the name of this union;
+  // clients which are not Swift-aware will still get the right size and
+  // alignment and can examine the bytes.
+  encoding << "(";
+
+  // Add the type name. Swift-aware clients can use it to detect that this is a
+  // Swift type and access its metadata; naïve clients will just see it as a
+  // meaningless type name.
+  appendObjCEncodingSwiftTypeName(type, encoding);
+
+  // Delimit the name and start the member list.
+  encoding << "=";
+  
+  // Add the members. For clients that are not aware of Swift, these
+  // members will at least give the type the right size and alignment.
+  appendSizeAndAlignmentMembers(IGM, type, encoding);
+
+  // TODO: Could provide another, slightly more detailed view of the type that
+  //       captures some of its structural details (e.g. pointers,
+  //       enum tag representations) to aid debugging.
+
+  // End the union.
+  encoding << ")";
+}
+
+void irgen::getObjCEncodingForIvarType(IRGenModule &IGM, Field field,
+                                       SILType baseType, std::string &s) {
+  // We care about the actual value stored in the instance variable, so we do
+  // no bridging here--we look at the field's type directly.
+  auto fieldSILTy = field.getType(IGM, baseType);
+
+  if (auto fieldClangTy = IGM.getClangType(fieldSILTy,
+                                           /*allowBridging=*/false)) {
+    // Type is representable in clang, so ask clang to encode it for us.
+    IGM.getClangASTContext().getObjCEncodingForType(fieldClangTy, s);
+    return;
+  }
+
+  // This is a Swift-only type. We'll have to generate an ObjC-compatible type
+  // encoding that uses its mangling.
+  getObjCEncodingForSwiftOnlyType(IGM, fieldSILTy, s);
 }
 
 static void

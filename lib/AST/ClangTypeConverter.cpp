@@ -281,7 +281,7 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
   if (!ret.isNull())
     return ret;
 
-  if (type->isPotentiallyBridgedValueType()) {
+  if (AllowBridging && type->isPotentiallyBridgedValueType()) {
     if (auto t = Context.getBridgedToObjC(type->getDecl(), type))
       return convert(t);
   }
@@ -340,6 +340,11 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
   assert(stdlib && "translating stdlib type to C without stdlib module?");
   auto &ctx = ClangASTContext;
 
+  auto insertCache = [&](Type swiftType, clang::QualType clangType) {
+    Cache.insert({{swiftType, true }, clangType});
+    Cache.insert({{swiftType, false}, clangType});
+  };
+
   if (!StdlibTypesAreCached) {
     auto cacheStdlibType = [&](StringRef swiftName,
                                clang::BuiltinType::Kind builtinKind) {
@@ -355,13 +360,13 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
         if (swiftType->isInt()) {
           auto NSIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSInteger");
           if (!NSIntegerTy.isNull()) {
-            Cache.insert({swiftType->getCanonicalType(), NSIntegerTy});
+            insertCache(swiftType->getCanonicalType(), NSIntegerTy);
             return;
           }
         } else if (swiftType->isUInt()) {
           auto NSUIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSUInteger");
           if (!NSUIntegerTy.isNull()) {
-            Cache.insert({swiftType->getCanonicalType(), NSUIntegerTy});
+            insertCache(swiftType->getCanonicalType(), NSUIntegerTy);
             return;
           }
         }
@@ -369,8 +374,8 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
 
       // For something like `typealias CInt = Int32`, reverseBuiltinTypeMapping
       // will get Int32 as the input, so we need to record the desugared type.
-      Cache.insert({swiftType->getCanonicalType(),
-                    getClangBuiltinTypeFromKind(ctx, builtinKind)});
+      insertCache(swiftType->getCanonicalType(),
+                  getClangBuiltinTypeFromKind(ctx, builtinKind));
     };
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
@@ -386,23 +391,23 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
       // Map UInt to uintptr_t
       auto swiftUIntType = getNamedSwiftType(stdlib, "UInt");
       auto clangUIntPtrType = ctx.getCanonicalType(ctx.getUIntPtrType());
-      Cache.insert({swiftUIntType, clangUIntPtrType});
+      insertCache(swiftUIntType, clangUIntPtrType);
 
       // Map Int to intptr_t
       auto swiftIntType = getNamedSwiftType(stdlib, "Int");
       auto clangIntPtrType = ctx.getCanonicalType(ctx.getIntPtrType());
-      Cache.insert({swiftIntType, clangIntPtrType});
+      insertCache(swiftIntType, clangIntPtrType);
     }
     StdlibTypesAreCached = true;
   }
 
-  auto it = Cache.find(Type(type));
+  auto it = Cache.find({Type(type), AllowBridging});
   if (it != Cache.end())
     return it->second;
 
-  it = Cache.find(type->getCanonicalType());
+  it = Cache.find({type->getCanonicalType(), AllowBridging});
   if (it != Cache.end()) {
-    Cache.insert({Type(type), it->second});
+    Cache.insert({{Type(type), AllowBridging}, it->second});
     return it->second;
   }
 
@@ -825,7 +830,9 @@ clang::QualType ClangTypeConverter::visit(Type type) {
 }
 
 clang::QualType ClangTypeConverter::convert(Type type) {
-  auto it = Cache.find(type);
+  TypeAndAllowBridging typeKey{type, AllowBridging};
+
+  auto it = Cache.find(typeKey);
   if (it != Cache.end())
     return it->second;
 
@@ -854,8 +861,13 @@ clang::QualType ClangTypeConverter::convert(Type type) {
 
   // If that failed, convert the type, cache, and return.
   clang::QualType result = visit(type);
-  Cache.insert({type, result});
+  Cache.insert({typeKey, result});
   return result;
+}
+
+clang::QualType ClangTypeConverter::convert(Type type, bool allowBridging) {
+  llvm::SaveAndRestore<bool> save(AllowBridging, allowBridging);
+  return convert(type);
 }
 
 void ClangTypeConverter::registerExportedClangDecl(Decl *swiftDecl,

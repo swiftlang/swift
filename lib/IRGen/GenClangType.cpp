@@ -26,24 +26,26 @@
 using namespace swift;
 using namespace irgen;
 
-clang::CanQualType IRGenModule::getClangType(CanType type) {
-  auto *ty = type->getASTContext().getClangTypeForIRGen(type);
+clang::CanQualType IRGenModule::getClangType(CanType type, bool allowBridging) {
+  auto *ty = type->getASTContext().getClangTypeForIRGen(type, allowBridging);
   return ty ? ty->getCanonicalTypeUnqualified() : clang::CanQualType();
 }
 
-clang::CanQualType IRGenModule::getClangType(SILType type) {
+clang::CanQualType IRGenModule::getClangType(SILType type, bool allowBridging) {
   if (type.isForeignReferenceType())
     return getClangType(type.getASTType()
                             ->wrapInPointer(PTK_UnsafePointer)
-                            ->getCanonicalType());
-  return getClangType(type.getASTType());
+                            ->getCanonicalType(),
+                        allowBridging);
+  return getClangType(type.getASTType(), allowBridging);
 }
 
 clang::CanQualType IRGenModule::getClangType(SILParameterInfo params,
-                                             CanSILFunctionType funcTy) {
+                                             CanSILFunctionType funcTy,
+                                             bool allowBridging) {
   auto paramTy = params.getSILStorageType(getSILModule(), funcTy,
                                           getMaximalTypeExpansionContext());
-  auto clangType = getClangType(paramTy);
+  auto clangType = getClangType(paramTy, allowBridging);
   // @block_storage types must be @inout_aliasable and have
   // special lowering
   if (!paramTy.is<SILBlockStorageType>()) {
