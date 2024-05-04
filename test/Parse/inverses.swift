@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature SuppressedAssociatedTypes
 
 protocol U {}
 
@@ -15,7 +15,7 @@ func more() {
   let _: ~AnyObject // expected-error {{type 'AnyObject' cannot be suppressed}}
 }
 
-struct S4: ~(Copyable & Equatable) {} // expected-error {{type 'Equatable' cannot be suppressed}}
+struct S4: ~(Copyable & Equatable) {} // expected-error {{conformance to 'Equatable' cannot be suppressed}}
 
 func blah<T>(_ t: borrowing T) where T: ~Copyable,
                                      T: ~Hashable {}  // expected-error@:41 {{type 'Hashable' cannot be suppressed}}
@@ -58,6 +58,7 @@ struct S: ~U, // expected-error {{type 'U' cannot be suppressed}}
           ~Copyable {}
 
 func greenBay<each T: ~Copyable>(_ r: repeat each T) {} // expected-error{{cannot suppress '~Copyable' on type 'each T'}}
+// expected-error@-1 {{'each T' required to be 'Copyable' but is marked with '~Copyable'}}
 
 typealias Clone = Copyable
 func dup<D: ~Clone>(_ d: D) {}
@@ -81,15 +82,18 @@ func ownership2(_ t: ~ borrowing Int) {} // expected-error {{cannot find type 'b
 
 func ownership3(_ t: consuming some ~Clone) {}
 
-func what(one: ~Copyable..., // expected-error {{type 'any Copyable' cannot be suppressed}}
+func what(one: ~Copyable..., // expected-error {{noncopyable type '~Copyable' cannot be used within a variadic type yet}}
           two: ~(Copyable...) // expected-error {{variadic parameter cannot appear outside of a function parameter list}}
-                              // expected-error@-1 {{type 'any Copyable' cannot be suppressed}}
+                              // expected-error@-1 {{parameter of noncopyable type '~Copyable' must specify ownership}}
+              // expected-note@-2{{add 'borrowing' for an immutable reference}}
+              // expected-note@-3{{add 'inout' for a mutable reference}}
+              // expected-note@-4{{add 'consuming' to take the value from the caller}}
           ) {}
 
 struct A { struct B { struct C {} } }
 
-typealias Z1 = (~Copyable).Type // FIXME: should be an error
-typealias Z1 = ~Copyable.Type // expected-error {{type 'any Copyable.Type' cannot be suppressed}}
+typealias Z0 = (~Copyable).Type // expected-error{{constraint that suppresses conformance requires 'any'}}{{17-17=any }}
+typealias Z1 = ~Copyable.Type // expected-error{{constraint that suppresses conformance requires 'any'}}{{16-16=any }}
 typealias Z2 = ~A.B.C // expected-error {{type 'A.B.C' cannot be suppressed}}
 typealias Z3 = ~A? // expected-error {{type 'A?' cannot be suppressed}}
 typealias Z4 = ~Rope<Int> // expected-error {{type 'Rope<Int>' cannot be suppressed}}
@@ -102,3 +106,27 @@ typealias Z8 = ~Copyable & Hashable // expected-error {{composition cannot conta
 struct NotAProtocol {}
 
 struct Bad: ~NotAProtocol {} // expected-error {{type 'NotAProtocol' cannot be suppressed}}
+
+
+struct X<T: ~Copyable>: ~Copyable { }
+
+func typeInExpression() {
+  _ = [~Copyable]()  // expected-error{{type '~Copyable' does not conform to protocol 'Copyable'}}
+  _ = X<any ~Copyable>()
+
+  _ = X<any ~Copyable & Foo>()
+  _ = X<any Foo & ~Copyable>()
+
+  _ = X<(borrowing any ~Copyable) -> Void>()
+
+  _ = ~Copyable.self // expected-error{{unary operator '~' cannot be applied to an operand of type '(any Copyable).Type'}}
+  _ = (~Copyable).self // expected-error{{constraint that suppresses conformance requires 'any'}}{{8-8=any }}
+  _ = (any ~Copyable).self
+}
+
+func param1(_ t: borrowing ~Copyable) {} // expected-error{{constraint that suppresses conformance requires 'any'}}{{28-28=any }}
+func param2(_ t: ~Copyable.Type) {} // expected-error{{constraint that suppresses conformance requires 'any'}}{{18-18=any }}
+func param3(_ t: borrowing any ~Copyable) {}
+func param4(_ t: any ~Copyable.Type) {}
+
+func param3(_ t: borrowing ExtraNoncopyProto & ~Copyable) {} // expected-error{{constraint that suppresses conformance requires 'any'}}{{28-28=any }}

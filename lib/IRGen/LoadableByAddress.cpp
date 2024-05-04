@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "loadable-address"
+#include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -997,7 +998,8 @@ void LargeValueVisitor::visitAllocStackInst(AllocStackInst *instr) {
 
 void LargeValueVisitor::visitPointerToAddressInst(PointerToAddressInst *instr) {
   SILType currSILType = instr->getType().getObjectType();
-  if (getInnerFunctionType(currSILType)) {
+  if (pass.containsDifferentFunctionSignature(pass.F->getLoweredFunctionType(),
+                                              currSILType)) {
     pass.pointerToAddrkInstsToMod.push_back(instr);
   }
 }
@@ -3431,6 +3433,29 @@ public:
     toDeleteBlockArg.push_back(std::make_pair(b, argIdx));
   }
 
+  bool isPotentiallyCArray(SILType ty) {
+    if (ty.isAddress() || ty.isClassOrClassMetatype()) {
+      return false;
+    }
+
+    auto canType = ty.getASTType();
+    if (canType->hasTypeParameter()) {
+      assert(genEnv && "Expected a GenericEnv");
+      canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    }
+
+    if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
+      assert(ty.isObject() &&
+             "Expected only two categories: address and object");
+      assert(!canType->hasTypeParameter());
+      const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
+      auto explosionSchema = TI.getSchema();
+      if (explosionSchema.size() > 15)
+        return true;
+    }
+    return false;
+  }
+
   bool isLargeLoadableType(SILType ty) {
     if (ty.isAddress() || ty.isClassOrClassMetatype()) {
       return false;
@@ -3448,7 +3473,11 @@ public:
       assert(!canType->hasTypeParameter());
       const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
       auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(*irgenModule);
-      return nativeSchemaOrigParam.size() > 15;
+      if (nativeSchemaOrigParam.size() > 15)
+        return true;
+      auto explosionSchema = TI.getSchema();
+      if (explosionSchema.size() > 15)
+        return true;
     }
     return false;
   }
@@ -3581,6 +3610,23 @@ protected:
 
   void visitKeyPathInst(KeyPathInst *kp) {
     singleValueInstructionFallback(kp);
+  }
+
+  void visitBeginApplyInst(BeginApplyInst *apply) {
+    auto builder = assignment.getBuilder(++apply->getIterator());
+    auto addr = assignment.createAllocStack(origValue->getType());
+    assignment.mapValueToAddress(origValue, addr);
+    for (auto &opd : apply->getAllOperands()) {
+      if (assignment.contains(opd.get())) {
+        auto builder = assignment.getBuilder(apply->getIterator());
+        auto loaded = builder.createLoad(
+            apply->getLoc(), assignment.getAddressForValue(opd.get()),
+            LoadOwnershipQualifier::Unqualified);
+        opd.set(loaded);
+      }
+    }
+    builder.createStore(apply->getLoc(), origValue, addr,
+                        StoreOwnershipQualifier::Unqualified);
   }
 
   void visitApplyInst(ApplyInst *apply) {
@@ -3764,9 +3810,18 @@ protected:
       builder.createStore(bc->getLoc(), bc->getOperand(), opdAddr,
                           StoreOwnershipQualifier::Unqualified);
       assignment.mapValueToAddress(origValue, addr);
-
+      assignment.markForDeletion(bc);
       return;
     }
+    auto opdAddr = assignment.getAddressForValue(bc->getOperand());
+    auto newAddr = builder.createUncheckedAddrCast(
+        bc->getLoc(), opdAddr, bc->getType().getAddressType());
+    assignment.mapValueToAddress(origValue, newAddr);
+    assignment.markForDeletion(bc);
+  }
+
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *bc) {
+    auto builder = assignment.getBuilder(bc->getIterator());
     auto opdAddr = assignment.getAddressForValue(bc->getOperand());
     auto newAddr = builder.createUncheckedAddrCast(
         bc->getLoc(), opdAddr, bc->getType().getAddressType());
@@ -3826,6 +3881,8 @@ protected:
   void visitKeyPathInst(KeyPathInst *kp) {
     userInstructionFallback(kp);
   }
+
+  void visitYieldInst(YieldInst *yield) { userInstructionFallback(yield); }
 
   void visitFixLifetimeInst(FixLifetimeInst *f) {
     auto addr = assignment.getAddressForValue(f->getOperand());
@@ -3926,7 +3983,9 @@ protected:
   }
 
   void visitDebugValueInst(DebugValueInst *dbg) {
-    if (!dbg->hasAddrVal() && overlapsWithOnStackDebugLoc(dbg->getOperand())) {
+    if (!dbg->hasAddrVal() &&
+        (assignment.isPotentiallyCArray(dbg->getOperand()->getType()) ||
+         overlapsWithOnStackDebugLoc(dbg->getOperand()))) {
       assignment.markForDeletion(dbg);
       return;
     }

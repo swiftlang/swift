@@ -4,7 +4,7 @@
 // RUN: mkdir -p %t/clang-module-cache
 // RUN: mkdir -p %t/cas
 
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
@@ -15,12 +15,12 @@
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
-// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job -cas-path %t/cas
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
 
 // Ensure that scanning with `-clang-target` makes sure that Swift modules' respective PCM-dependency-build-argument sets do not contain target triples.
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps_clang_target.json &>/dev/null
 // RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
@@ -127,7 +127,6 @@ import SubE
 // CHECK: ],
 // CHECK-NEXT: "details": {
 
-// CHECK: "contextHash": "{{.*}}",
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
@@ -138,6 +137,7 @@ import SubE
 // CHECK: "-swift-version"
 // CHECK: "5"
 // CHECK: ],
+// CHECK: "contextHash": "{{.*}}",
 // CHECK_NO_CLANG_TARGET: "extraPcmArgs": [
 // CHECK_NO_CLANG_TARGET-NEXT:   "-Xcc",
 // CHECK_NO_CLANG_TARGET-NEXT:   "-target",
@@ -173,11 +173,18 @@ import SubE
 // CHECK: "contextHash"
 // CHECK-SAME: "{{.*}}"
 
+// CHECK: "commandLine": [
+// CHECK:   "-fmodule-format=obj"
+// CHECK:   "-dwarf-ext-refs"
+
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}B-{{.*}}.pcm",
 // CHECK: "contextHash": "[[B_CONTEXT:.*]]",
-// CHECK: "-o"
+// CHECK: "commandLine": [
+// CHECK:      "-o"
 // CHECK-NEXT: B-{{.*}}[[B_CONTEXT]].pcm
+// CHECK:      "-fmodule-format=obj"
+// CHECK:      "-dwarf-ext-refs"
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps_include_tree.swift

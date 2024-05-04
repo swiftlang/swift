@@ -32,6 +32,9 @@ struct ConstructorWithParam {
 struct CopyAndMoveConstructor {
   CopyAndMoveConstructor(const CopyAndMoveConstructor &) = default;
   CopyAndMoveConstructor(CopyAndMoveConstructor &&) = default;
+
+  int value = 123;
+  int *ptr = nullptr;
 };
 
 struct Base {};
@@ -79,5 +82,11 @@ HasUserProvidedCopyConstructor {
 struct DeletedCopyConstructor {
   DeletedCopyConstructor(const DeletedCopyConstructor &) = delete;
 };
+
+#ifdef ENABLE_PTRAUTH
+struct HasPtrAuthMember {
+  void (*__ptrauth(1, 1, 3) handler)();
+};
+#endif
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H

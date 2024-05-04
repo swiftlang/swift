@@ -3041,6 +3041,13 @@ matchFunctionThrowing(ConstraintSystem &cs,
   }
 }
 
+static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  (void) locator.getLocatorParts(path);
+  return (path.size() == 1 &&
+          path[0].is<LocatorPathElt::Witness>());
+}
+
 bool
 ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
                                           FunctionType *func2,
@@ -3054,8 +3061,11 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
   // function-conversion score to make sure this solution is worse than
   // an exact match.
   // FIXME: there may be a better way. see https://github.com/apple/swift/pull/62514
-  auto matchIfConversion = [&]() -> bool {
-    if (kind < ConstraintKind::Subtype)
+  auto matchIfConversion = [&](bool isErasure = false) -> bool {
+    // We generally require a conversion here, but allow some lassitude
+    // if we're doing witness-matching.
+    if (kind < ConstraintKind::Subtype &&
+        !(isErasure && isWitnessMatching(locator)))
       return false;
     increaseScore(SK_FunctionConversion, locator);
     return true;
@@ -3154,7 +3164,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // isolation as a conversion.
     case FunctionTypeIsolation::Kind::NonIsolated:
     case FunctionTypeIsolation::Kind::GlobalActor:
-      return matchIfConversion();
+      return matchIfConversion(/*erasure*/ true);
 
     // Parameter isolation is value-dependent and can't be erased in the
     // abstract, though.  We need to be able to recover the isolation from
@@ -4118,14 +4128,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   for (auto *protoDecl : layout.getProtocols()) {
-    if (auto superclass = protoDecl->getSuperclass()) {
-      auto subKind = std::min(ConstraintKind::Subtype, kind);
-      auto result = matchTypes(type1, superclass, subKind,
-                               subflags, locator);
-      if (result.isFailure())
-        return result;
-    }
-
     switch (simplifyConformsToConstraint(type1, protoDecl, kind, locator,
                                          subflags)) {
       case SolutionKind::Solved:
@@ -5584,6 +5586,55 @@ bool ConstraintSystem::repairFailures(
     }
 
     return false;
+  }
+
+  if (auto *VD = getAsDecl<ValueDecl>(anchor)) {
+    // Matching a witness to an ObjC protocol requirement.
+    if (VD->isObjC() &&
+        isa<ProtocolDecl>(VD->getDeclContext()) &&
+        VD->isProtocolRequirement() &&
+        path[0].is<LocatorPathElt::Witness>() &&
+        // Note that the condition below is very important,
+        // we need to wait until the very last moment to strip
+        // the concurrency annotations from the inner most type.
+        conversionsOrFixes.empty()) {
+      // Allow requirements to introduce `swift_attr` annotations
+      // (note that `swift_attr` in type contexts weren't supported
+      // before) and for witnesses to adopt them gradually by matching
+      // with a warning in non-strict concurrency mode.
+      if (!(Context.isSwiftVersionAtLeast(6) ||
+            Context.LangOpts.StrictConcurrencyLevel ==
+                StrictConcurrency::Complete)) {
+        auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
+                                                 /*dropGlobalActor=*/true);
+        auto strippedRHS = rhs->stripConcurrency(/*recursive=*/true,
+                                                 /*dropGlobalActor=*/true);
+
+        auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
+                                 flags | TMF_ApplyingFix, locator);
+        if (!result.isFailure()) {
+          increaseScore(SK_MissingSynthesizableConformance, locator);
+          return true;
+        }
+      }
+    }
+  }
+
+  // If there is a conversion associated with an existential member access
+  // along the path, the problem is that the constraint system does not support
+  // the (formally sane) upcast required to access the member.
+  if (llvm::find_if(path, [](const LocatorPathElt &elt) -> bool {
+        return elt.is<LocatorPathElt::ExistentialMemberAccessConversion>();
+      }) != path.end()) {
+    if (auto overload = findSelectedOverloadFor(castToExpr(anchor))) {
+      auto &choice = overload->choice;
+      conversionsOrFixes.push_back(AllowMemberRefOnExistential::create(
+          *this, choice.getBaseType(), choice.getDecl(),
+          DeclNameRef(choice.getDecl()->getName()),
+          getConstraintLocator(locator)));
+
+      return true;
+    }
   }
 
   auto elt = path.back();
@@ -8560,7 +8611,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto synthesizeConformance = [&]() {
           ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
-              /*anchor=*/{}, LocatorPathElt::Witness(witness));
+              locator.getAnchor(), LocatorPathElt::Witness(witness));
           SynthesizedConformances.insert({witnessLoc, synthesized});
           return recordConformance(synthesized);
         };
@@ -9729,9 +9780,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Dynamically isolated function types have a magic '.isolation'
   // member that extracts the isolation value.
-  if (auto *fn = dyn_cast<FunctionType>(instanceTy)) {
+  if (auto *fn = instanceTy->getAs<FunctionType>()) {
     if (fn->getIsolation().isErased() &&
-        memberName.getBaseIdentifier().str() == "isolation") {
+        memberName.isSimpleName(Context.Id_isolation)) {
       result.ViableCandidates.push_back(
         OverloadChoice(baseTy, OverloadChoiceKind::ExtractFunctionIsolation));
     }
@@ -10222,13 +10273,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                 if (req.getKind() != RequirementKind::Conformance)
                   return false;
 
-                if (auto protocolTy =
-                        req.getSecondType()->template getAs<ProtocolType>()) {
-                  return req.getFirstType()->hasTypeVariable() &&
-                         protocolTy->getDecl()->isSpecificProtocol(
-                             KnownProtocolKind::Sendable);
-                }
-                return false;
+                return (req.getFirstType()->hasTypeVariable() &&
+                        req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::Sendable));
               })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
@@ -15123,7 +15170,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowConcreteTypeSpecialization:
   case FixKind::IgnoreGenericSpecializationArityMismatch:
-  case FixKind::IgnoreKeyPathSubscriptIndexMismatch: {
+  case FixKind::IgnoreKeyPathSubscriptIndexMismatch:
+  case FixKind::AllowMemberRefOnExistential: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreThrownErrorMismatch: {
@@ -15346,7 +15394,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveCall:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
-  case FixKind::AllowMemberRefOnExistential:
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:

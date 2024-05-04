@@ -3229,7 +3229,8 @@ namespace {
       case AccessorKind::Set: {
         LLVM_FALLTHROUGH;
       }
-      case AccessorKind::Get: {
+      case AccessorKind::Get:
+      case AccessorKind::DistributedGet: {
         auto typeData = getLogicalStorageTypeData(
             SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
         return asImpl().emitUsingGetterSetter(accessor, isDirect, typeData);
@@ -4088,7 +4089,10 @@ void LValue::addMemberVarComponent(
       auto typeData = getLogicalStorageTypeData(
           SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
 
-      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/true, typeData);
+      // If we're in a protocol, we must use a witness call for the getter,
+      // otherwise (in a class) we must use a direct call.
+      auto isDirect = isa<ClassDecl>(var->getDeclContext());
+      asImpl().emitUsingGetterSetter(accessor, /*isDirect=*/isDirect, typeData);
     }
 
   } emitter(SGF, loc, var, subs, isSuper, accessKind,
@@ -4594,7 +4598,8 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                 origFormalType.getType(),
                                 substFormalType, rvalueTL.getLoweredType())
       : Conversion::getOrigToSubst(origFormalType, substFormalType,
-                                   rvalueTL.getLoweredType());
+                                   /*input*/addrRValueType,
+                                   /*output*/rvalueTL.getLoweredType());
 
   return emitConvertedRValue(loc, conversion, C,
       [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {

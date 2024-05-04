@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -118,4 +118,16 @@ public struct ReaderSeq: AsyncSequence, Sendable {
 @available(SwiftStdlib 5.1, *)
 func test1() -> Error {
   return ReaderSeq.Failure.x
+}
+
+@available(SwiftStdlib 5.1, *)
+public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
+  public mutating func next() async -> Element? { nil }
+  public func makeAsyncIterator() -> Self { self }
+
+  @_implements(AsyncIteratorProtocol, Failure)
+  public typealias __AsyncIteratorProtocol_Failure = Never
+
+  @_implements(AsyncSequence, Failure)
+  public typealias __AsyncSequence_Failure = Never
 }

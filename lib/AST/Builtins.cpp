@@ -862,14 +862,16 @@ static ValueDecl *getRefCountingOperation(ASTContext &ctx, Identifier id) {
 static ValueDecl *getLoadOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable)),
+                                      _conformsTo(_typeparam(0), _copyable),
+                                      _conformsTo(_typeparam(0), _escapable)),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }
 
 static ValueDecl *getTakeOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted),
+                            _generics(_unrestricted,
+                                      _conformsTo(_typeparam(0), _escapable)),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }
@@ -902,7 +904,8 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
 static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable)),
+                                      _conformsTo(_typeparam(0), _copyable),
+                                      _conformsTo(_typeparam(0), _escapable)),
                             _parameters(_typeparam(0)), _typeparam(0));
 }
 
@@ -976,12 +979,16 @@ static ValueDecl *getAllocWithTailElemsOperation(ASTContext &Context,
       1 + NumTailTypes > (int)std::size(GenericParamNames))
     return nullptr;
   BuiltinFunctionBuilder builder(Context, 1 + NumTailTypes);
-  builder.addParameter(makeMetatype(makeGenericParam(0)));
+
+  auto resultTy = makeGenericParam(0);
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+
+  builder.addParameter(makeMetatype(resultTy));
   for (int Idx = 0; Idx < NumTailTypes; ++Idx) {
     builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(Context)));
     builder.addParameter(makeMetatype(makeGenericParam(Idx + 1)));
   }
-  builder.setResult(makeGenericParam(0));
+  builder.setResult(resultTy);
   return builder.build(Id);
 }
 
@@ -1262,6 +1269,7 @@ static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   //
   BuiltinFunctionBuilder builder(C, 1, true);
   auto T = makeGenericParam();
+  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
   builder.addParameter(T);
   builder.setResult(T);
   return builder.build(Id);
@@ -1286,7 +1294,11 @@ static ValueDecl *getCastReferenceOperation(ASTContext &ctx,
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinFunctionBuilder builder(ctx, 2);
   builder.addParameter(makeGenericParam(0), ParamSpecifier::LegacyOwned);
-  builder.setResult(makeGenericParam(1));
+
+  auto resultTy = makeGenericParam(1);
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.setResult(resultTy);
+
   return builder.build(name);
 }
 
@@ -1296,7 +1308,11 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &ctx,
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinFunctionBuilder builder(ctx, 2);
   builder.addParameter(makeGenericParam(0), ParamSpecifier::LegacyOwned);
-  builder.setResult(makeGenericParam(1));
+
+  auto resultTy = makeGenericParam(1);
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.setResult(resultTy);
+
   return builder.build(name);
 }
 
@@ -1485,7 +1501,11 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
   BuiltinFunctionBuilder builder(ctx, 3);
   builder.addParameter(makeGenericParam(0));                        // Base
   builder.addParameter(makeGenericParam(1), ParamSpecifier::InOut); // Unmanaged
-  builder.setResult(makeGenericParam(2)); // Guaranteed Result
+
+  auto resultTy = makeGenericParam(2);
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.setResult(resultTy); // Guaranteed Result
+
   return builder.build(id);
 }
 
@@ -2053,7 +2073,10 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   auto *fnTy = FunctionType::get(params, voidTy, extInfo);
 
   builder.addParameter(makeConcrete(fnTy));
-  builder.setResult(makeGenericParam());
+
+  auto resultTy = makeGenericParam();
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.setResult(resultTy);
 
   builder.setAsync();
   if (throws)
@@ -2114,6 +2137,15 @@ static ValueDecl *getInjectEnumTag(ASTContext &ctx, Identifier id) {
   builder.addParameter(makeGenericParam(), ParamSpecifier::InOut);
   builder.addParameter(makeConcrete(BuiltinIntegerType::get(32, ctx)));
   builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
+
+  return builder.build(id);
+}
+
+static ValueDecl *getAddressOfRawLayout(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  builder.addParameter(makeGenericParam(), ParamSpecifier::Borrowing);
+  builder.setResult(makeConcrete(ctx.TheRawPointerType));
 
   return builder.build(id);
 }
@@ -3191,6 +3223,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DistributedActorAsAnyActor:
     return getDistributedActorAsAnyActor(Context, Id);
+
+  case BuiltinValueKind::AddressOfRawLayout:
+    return getAddressOfRawLayout(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

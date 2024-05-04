@@ -24,8 +24,14 @@
 namespace swift {
 namespace Lowering {
 
+class OptionalInjectionConversion;
+
 /// An abstraction representing certain kinds of conversion that SILGen can
-/// do automatically in various situations.
+/// do automatically in various situations.  These are used primarily with
+/// ConvertingInitialization in order to guide the emission of an expression.
+/// Some of these conversions are semantically required, such as propagating
+/// @isolated(any) down to the emission of the function reference, or some of
+/// the bridging conversions.
 class Conversion {
 public:
   enum KindTy {
@@ -36,6 +42,9 @@ public:
     /// Although it's not reflected in the name, this is always an
     /// implicit force cast.
     ForceAndBridgeToObjC,
+
+    /// Force an optional value.
+    ForceOptional,
 
     /// A bridging conversion from a foreign type.
     BridgeFromObjC,
@@ -49,28 +58,34 @@ public:
     /// and that's easier.
     AnyErasure,
 
+    /// A subtype conversion, except it's allowed to do optional injections
+    /// and existential erasures.  This comes up with bridging peepholes
+    /// and is annoying to not have a way to represent.  The conversion
+    /// should always involve class references and so will be harmless
+    /// in terms of representations.
+    BridgingSubtype,
+
     /// A subtype conversion.
     Subtype,
 
-    /// An orig-to-subst conversion.
-    OrigToSubst,
-
-    /// A subst-to-orig conversion.  These can always be annihilated.
-    SubstToOrig,
+    /// A reabstraction conversion.  There can also be a subtype difference
+    /// between the substituted types.
+    Reabstract,
   };
 
   static bool isBridgingKind(KindTy kind) {
     switch (kind) {
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
+    case ForceOptional:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
+    case BridgingSubtype:
     case Subtype:
       return true;
 
-    case OrigToSubst:
-    case SubstToOrig:
+    case Reabstract:
       return false;
     }
     llvm_unreachable("bad kind");
@@ -78,15 +93,16 @@ public:
   
   static bool isReabstractionKind(KindTy kind) {
     switch (kind) {
-    case OrigToSubst:
-    case SubstToOrig:
+    case Reabstract:
       return true;
 
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
+    case ForceOptional:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
+    case BridgingSubtype:
     case Subtype:
       return false;
     }
@@ -96,37 +112,46 @@ public:
 private:
   KindTy Kind;
 
-  struct BridgingTypes {
-    CanType OrigType;
-    CanType ResultType;
-    SILType LoweredResultType;
+  struct BridgingStorage {
     bool IsExplicit;
   };
 
-  struct ReabstractionTypes {
-    // Whether this abstraction pattern applies to the input or output
-    // substituted type is determined by the kind.
-    AbstractionPattern OrigType;
-    CanType SubstSourceType;
-    CanType SubstResultType;
-    SILType LoweredResultType;
+  /// The types we store for reabstracting contexts.  In general, when
+  /// we're just emitting an expression, it's expected that the input
+  /// abstraction type and lowered type will match the input formal type,
+  /// which will be the type of the expression we're emitting.  They can
+  /// therefore simply be replaced if we're e.g. prepending a subtype
+  /// conversion to the reabstraction.  But it's very useful to be able to
+  /// represent both sides of the conversion uniformly so that e.g. we can
+  /// elegantly perform a single (perhaps identity) reabstraction when
+  /// receiving a function result or loading a value from abstracted
+  /// storage.
+  struct ReabstractionStorage {
+    AbstractionPattern InputOrigType;
+    AbstractionPattern OutputOrigType;
+    SILType InputLoweredTy;
   };
 
-  using Members = ExternalUnionMembers<BridgingTypes, ReabstractionTypes>;
+  CanType SourceType;
+  CanType ResultType;
+  SILType LoweredResultType;
+
+  using Members = ExternalUnionMembers<BridgingStorage, ReabstractionStorage>;
 
   static Members::Index getStorageIndexForKind(KindTy kind) {
     switch (kind) {
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
+    case ForceOptional:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
+    case BridgingSubtype:
     case Subtype:
-      return Members::indexOf<BridgingTypes>();
+      return Members::indexOf<BridgingStorage>();
 
-    case OrigToSubst:
-    case SubstToOrig:
-      return Members::indexOf<ReabstractionTypes>();
+    case Reabstract:
+      return Members::indexOf<ReabstractionStorage>();
     }
     llvm_unreachable("bad kind");
   }
@@ -135,45 +160,87 @@ private:
   static_assert(decltype(Types)::union_is_trivially_copyable,
                 "define the special members if this changes");
 
-  Conversion(KindTy kind, CanType origType, CanType resultType,
+  Conversion(KindTy kind, CanType sourceType, CanType resultType,
              SILType loweredResultTy, bool isExplicit)
-      : Kind(kind) {
-    Types.emplaceAggregate<BridgingTypes>(kind, origType, resultType,
-                                          loweredResultTy, isExplicit);
+      : Kind(kind), SourceType(sourceType), ResultType(resultType),
+        LoweredResultType(loweredResultTy) {
+    Types.emplaceAggregate<BridgingStorage>(kind, isExplicit);
   }
 
-  Conversion(KindTy kind, AbstractionPattern origType, CanType substSourceType,
-             CanType substResultType, SILType loweredResultTy)
-      : Kind(kind) {
-    Types.emplaceAggregate<ReabstractionTypes>(kind, origType, substSourceType,
-                                               substResultType, loweredResultTy);
+  Conversion(AbstractionPattern inputOrigType, CanType inputSubstType,
+             SILType inputLoweredTy,
+             AbstractionPattern outputOrigType, CanType outputSubstType,
+             SILType outputLoweredTy)
+      : Kind(Reabstract), SourceType(inputSubstType),
+        ResultType(outputSubstType),
+        LoweredResultType(outputLoweredTy) {
+    Types.emplaceAggregate<ReabstractionStorage>(Kind, inputOrigType,
+                                                 outputOrigType,
+                                                 inputLoweredTy);
+  }
+
+  static bool isAllowedConversion(CanType inputType, CanType outputType) {
+    // Allow all identity conversions.  (This should only happen with
+    // reabstraction.)
+    if (inputType == outputType) return true;
+
+    // Allow optional-to-optional conversions, but not injections
+    // into optional.  Emitters can be expected to just strip optionality
+    // from the result type when peepholing through an optional injection,
+    // and doing so avoids the need to handle injections specially in
+    // emitters, like those for function references and closures.
+    while (auto outputObjectType = outputType.getOptionalObjectType()) {
+      auto inputObjectType = inputType.getOptionalObjectType();
+      if (!inputObjectType) return false;
+      outputType = outputObjectType;
+      inputType = inputObjectType;
+    }
+
+    // Disallow existential erasures from being directly represented here
+    // because it may involve a representation change for the value.  Emitters
+    // shouldn't have to specially recognize those.
+    if (outputType.isExistentialType())
+      return inputType.isExistentialType();
+
+    assert(!inputType.getOptionalObjectType());
+    return true;
   }
 
 public:
   static Conversion getOrigToSubst(AbstractionPattern origType,
                                    CanType substType,
-                                   SILType loweredResultTy) {
-    return Conversion(OrigToSubst, origType, substType, substType, loweredResultTy);
+                                   SILType inputLoweredTy,
+                                   SILType outputLoweredTy) {
+    return getReabstract(origType, substType, inputLoweredTy,
+                         AbstractionPattern(substType), substType, outputLoweredTy);
   }
 
   static Conversion getSubstToOrig(AbstractionPattern origType,
                                    CanType substType,
-                                   SILType loweredResultTy) {
-    return Conversion(SubstToOrig, origType, substType, substType, loweredResultTy);
+                                   SILType inputLoweredTy,
+                                   SILType outputLoweredTy) {
+    return getReabstract(AbstractionPattern(substType), substType, inputLoweredTy,
+                         origType, substType, outputLoweredTy);
   }
 
-  static Conversion getSubstToOrig(CanType inputSubstType,
-                                   AbstractionPattern outputOrigType,
-                                   CanType outputSubstType,
-                                   SILType loweredResultTy) {
-    return Conversion(SubstToOrig, outputOrigType, inputSubstType,
-                      outputSubstType, loweredResultTy);
+  static Conversion getReabstract(AbstractionPattern inputOrigType,
+                                  CanType inputSubstType,
+                                  SILType inputLoweredTy,
+                                  AbstractionPattern outputOrigType,
+                                  CanType outputSubstType,
+                                  SILType outputLoweredTy) {
+    assert(isAllowedConversion(inputSubstType, outputSubstType) &&
+           "don't build subtype conversions that do existential erasures");
+    return Conversion(inputOrigType, inputSubstType, inputLoweredTy,
+                      outputOrigType, outputSubstType, outputLoweredTy);
   }
 
   static Conversion getBridging(KindTy kind, CanType origType,
                                 CanType resultType, SILType loweredResultTy,
                                 bool isExplicit = false) {
     assert(isBridgingKind(kind));
+    assert((kind != Subtype || isAllowedConversion(origType, resultType)) &&
+           "disallowed conversion for subtype relationship");
     return Conversion(kind, origType, resultType, loweredResultTy, isExplicit);
   }
 
@@ -194,37 +261,60 @@ public:
     return isReabstractionKind(getKind());
   }
 
-  AbstractionPattern getReabstractionOrigType() const {
-    return Types.get<ReabstractionTypes>(Kind).OrigType;
+  AbstractionPattern getReabstractionInputOrigType() const {
+    return Types.get<ReabstractionStorage>(Kind).InputOrigType;
   }
 
-  CanType getReabstractionSubstSourceType() const {
-    return Types.get<ReabstractionTypes>(Kind).SubstSourceType;
+  CanType getReabstractionInputSubstType() const {
+    return getSourceType();
   }
 
-  CanType getReabstractionSubstResultType() const {
-    return Types.get<ReabstractionTypes>(Kind).SubstResultType;
+  SILType getReabstractionInputLoweredType() const {
+    return Types.get<ReabstractionStorage>(Kind).InputLoweredTy;
   }
 
-  SILType getReabstractionLoweredResultType() const {
-    return Types.get<ReabstractionTypes>(Kind).LoweredResultType;
+  AbstractionPattern getReabstractionOutputOrigType() const {
+    return Types.get<ReabstractionStorage>(Kind).OutputOrigType;
+  }
+
+  CanType getReabstractionOutputSubstType() const {
+    return getResultType();
+  }
+
+  SILType getReabstractionOutputLoweredType() const {
+    return getLoweredResultType();
   }
 
   bool isBridgingExplicit() const {
-    return Types.get<BridgingTypes>(Kind).IsExplicit;
+    return Types.get<BridgingStorage>(Kind).IsExplicit;
   }
 
-  CanType getBridgingSourceType() const {
-    return Types.get<BridgingTypes>(Kind).OrigType;
+  CanType getSourceType() const {
+    return SourceType;
   }
 
-  CanType getBridgingResultType() const {
-    return Types.get<BridgingTypes>(Kind).ResultType;
+  CanType getResultType() const {
+    return ResultType;
   }
 
-  SILType getBridgingLoweredResultType() const {
-    return Types.get<BridgingTypes>(Kind).LoweredResultType;
+  SILType getLoweredResultType() const {
+    return LoweredResultType;
   }
+
+  /// Given that this conversion is not one of the specialized bridging
+  /// conversion (i.e. it is either a reabstraction or a subtype conversion),
+  /// rebuild it with the given source type.
+  Conversion withSourceType(AbstractionPattern origSourceType,
+                            CanType sourceType,
+                            SILType loweredSourceTy) const;
+  Conversion withSourceType(SILGenFunction &SGF, CanType sourceType) const;
+
+  /// Given that this conversion is not one of the specialized bridging
+  /// conversion (i.e. it is either a reabstraction or a subtype conversion),
+  /// rebuild it with the given result type.
+  Conversion withResultType(AbstractionPattern origResultType,
+                            CanType sourceType,
+                            SILType loweredSourceTy) const;
 
   ManagedValue emit(SILGenFunction &SGF, SILLocation loc,
                     ManagedValue source, SGFContext ctxt) const;
@@ -237,6 +327,8 @@ public:
   /// Try to form a conversion that does a force-value followed by
   /// this conversion.
   std::optional<Conversion> adjustForInitialForceValue() const;
+
+  OptionalInjectionConversion adjustForInitialOptionalInjection() const;
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &out) const;
@@ -259,7 +351,10 @@ public:
 
     /// The inner conversion is a subtype conversion and can be done implicitly
     /// as part of the outer conversion.
-    SubtypeIntoSubstToOrig,
+    SubtypeIntoReabstract,
+
+    /// Both conversions are reabstractions and can be combined.
+    Reabstract,
   };
 
 private:
@@ -279,9 +374,66 @@ public:
   bool isForced() const { return Forced; }
 };
 
-std::optional<ConversionPeepholeHint>
-canPeepholeConversions(SILGenFunction &SGF, const Conversion &outerConversion,
-                       const Conversion &innerConversion);
+struct CombinedConversions {
+  std::optional<Conversion> first;
+  std::optional<Conversion> second;
+
+  explicit CombinedConversions() {}
+  explicit CombinedConversions(const Conversion &first)
+    : first(first) {}
+  explicit CombinedConversions(const Conversion &first,
+                               const Conversion &second)
+    : first(first), second(second) {}
+};
+
+bool canPeepholeConversions(SILGenFunction &SGF,
+                            const Conversion &outer,
+                            const Conversion &inner);
+
+/// The result of trying to combine an optional injection with an existing
+/// conversion.
+class OptionalInjectionConversion {
+  enum Kind {
+    None,
+    Injection,
+    Value
+  };
+
+  std::optional<Conversion> conversion;
+  Kind kind;
+
+  OptionalInjectionConversion(Kind kind, const Conversion &conv)
+    : conversion(conv), kind(kind) {}
+
+public:
+  OptionalInjectionConversion() : kind(None) {}
+  static OptionalInjectionConversion forInjection(const Conversion &conv) {
+    return { Injection, conv };
+  }
+  static OptionalInjectionConversion forValue(const Conversion &conv) {
+    return { Value, conv };
+  }
+
+  /// Is the result of this combination a conversion that produces a
+  /// value of the original optional type?
+  bool isInjection() const {
+    return kind == Injection;
+  }
+  const Conversion &getInjectionConversion() const {
+    assert(isInjection());
+    return *conversion;
+  }
+
+  /// Is the result of this combination a conversion that produces a
+  /// value of the element of the original optional type?
+  bool isValue() const {
+    return kind == Value;
+  }
+  const Conversion &getValueConversion() const {
+    assert(isValue());
+    return *conversion;
+  }
+};
 
 /// An initialization where we ultimately want to apply a conversion to
 /// the value before completing the initialization.

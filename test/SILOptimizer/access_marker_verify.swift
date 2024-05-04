@@ -939,7 +939,7 @@ func testOpenExistential(p: PBar) {
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr [[Q0]] : $*Optional<any Q>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
-// CHECK: apply %{{.*}}<any Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
+// CHECK: apply %{{.*}}<any Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
 // CHECK: [[Q:%.*]] = alloc_stack [lexical] [var_decl] $any Q, let, name "q"
 // CHECK: [[OPT_Q:%.*]] = alloc_stack $Optional<any Q>
 // CHECK-NOT: begin_access
@@ -1030,7 +1030,7 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify15testPointerInit1x1yySi_SpySiGtF : $@convention(thin) (Int, UnsafeMutablePointer<Int>) -> () {
 // CHECK: bb0(%0 : $Int, %1 : $UnsafeMutablePointer<Int>):
 // call addressor
-// CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADR]] : $*Int

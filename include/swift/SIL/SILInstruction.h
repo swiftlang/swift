@@ -1849,12 +1849,10 @@ class TailAllocatedDebugVariable {
       int_type HasValue : 1;
       /// True if this is a let-binding.
       int_type Constant : 1;
-      /// True if this variable is created by compiler
-      int_type Implicit : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
-      int_type NameLength : 13;
+      int_type NameLength : 14;
       /// The source function argument position from left to right
       /// starting with 1 or 0 if this is a local variable.
       int_type ArgNo : 16;
@@ -1876,9 +1874,6 @@ public:
   StringRef getName(const char *buf) const;
   bool isLet() const { return Bits.Data.Constant; }
 
-  bool isImplicit() const { return Bits.Data.Implicit; }
-  void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
-
   std::optional<SILDebugVariable>
   get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType = {},
       std::optional<SILLocation> DeclLoc = {},
@@ -1890,8 +1885,8 @@ public:
     StringRef name = getName(buf);
     if (VD && name.empty())
       name = VD->getName().str();
-    return SILDebugVariable(name, isLet(), getArgNo(), isImplicit(), AuxVarType,
-                            DeclLoc, DeclScope, DIExprElements);
+    return SILDebugVariable(name, isLet(), getArgNo(), AuxVarType, DeclLoc,
+                            DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
@@ -3168,6 +3163,7 @@ public:
 
 class EndApplyInst;
 class AbortApplyInst;
+class EndBorrowInst;
 
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
@@ -3221,10 +3217,13 @@ public:
 
   void getCoroutineEndPoints(
       SmallVectorImpl<EndApplyInst *> &endApplyInsts,
-      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const;
+      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
+      SmallVectorImpl<EndBorrowInst *> *endBorrowInsts = nullptr) const;
 
-  void getCoroutineEndPoints(SmallVectorImpl<Operand *> &endApplyInsts,
-                             SmallVectorImpl<Operand *> &abortApplyInsts) const;
+  void getCoroutineEndPoints(
+      SmallVectorImpl<Operand *> &endApplyInsts,
+      SmallVectorImpl<Operand *> &abortApplyInsts,
+      SmallVectorImpl<Operand *> *endBorrowInsts = nullptr) const;
 };
 
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
@@ -3253,11 +3252,12 @@ public:
 /// normally.
 class EndApplyInst
     : public UnaryInstructionBase<SILInstructionKind::EndApplyInst,
-                                  NonValueInstruction> {
+                                  SingleValueInstruction> {
   friend SILBuilder;
 
-  EndApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
-      : UnaryInstructionBase(debugLoc, beginApplyToken) {
+  EndApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken,
+               SILType Ty)
+    : UnaryInstructionBase(debugLoc, beginApplyToken, Ty) {
     assert(isaResultOf<BeginApplyInst>(beginApplyToken) &&
            isaResultOf<BeginApplyInst>(beginApplyToken)->isBeginApplyToken());
   }
@@ -4543,8 +4543,6 @@ public:
   }
 };
 
-class EndBorrowInst;
-
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
 class LoadBorrowInst :
@@ -4645,6 +4643,37 @@ public:
   /// Useful for matching common SILGen patterns that emit one borrow per use,
   /// and simplifying pass logic.
   Operand *getSingleNonEndingUse() const;
+};
+
+/// BorrowedFromInst - Establishes borrow relations.
+class BorrowedFromInst final : public InstructionBaseWithTrailingOperands<
+                             SILInstructionKind::BorrowedFromInst, BorrowedFromInst,
+                             OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  /// Because of the storage requirements of BorrowedFromInst, object
+  /// creation goes through 'create()'.
+  BorrowedFromInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> operands);
+
+  /// Construct a BorrowedFromInst.
+  static BorrowedFromInst *create(SILDebugLocation DebugLoc, SILValue borrowedValue,
+                                  ArrayRef<SILValue> enclosingValues, SILModule &M);
+
+public:
+
+  SILValue getBorrowedValue() {
+    return getAllOperands()[0].get();
+  }
+
+  /// The elements referenced by this StructInst.
+  ArrayRef<Operand> getEnclosingValueOperands() const {
+    return getAllOperands().drop_front();
+  }
+
+  /// The elements referenced by this StructInst.
+  OperandValueArrayRef getEnclosingValues() const {
+    return OperandValueArrayRef(getEnclosingValueOperands());
+  }
 };
 
 inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
@@ -8546,8 +8575,9 @@ public:
   }
 
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
-  bool visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand*)> func)
-    const;
+  bool visitNonEscapingLifetimeEnds(
+    llvm::function_ref<bool (Operand*)> visitScopeEnd,
+    llvm::function_ref<bool (Operand*)> visitUnknownUse) const;
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply
@@ -8677,6 +8707,11 @@ class DestroyValueInst
   }
 
 public:
+  /// True if this destroy fully deinitializes the type by invoking the
+  /// user-defined deinitializer if present. This returns false if a prior
+  /// drop_deinit is present.
+  bool isFullDeinitialization();
+
   /// If true, then all references within the destroyed value will be
   /// overwritten with a sentinel. This is used in debug builds when shortening
   /// non-trivial value lifetimes to ensure the debugger cannot inspect invalid
@@ -8747,11 +8782,12 @@ public:
 /// for details. See SILVerifier.cpp for constraints on valid uses.
 class DropDeinitInst
     : public UnaryInstructionBase<SILInstructionKind::DropDeinitInst,
-                                  SingleValueInstruction> {
+                                  OwnershipForwardingSingleValueInstruction> {
   friend class SILBuilder;
 
   DropDeinitInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+    : UnaryInstructionBase(DebugLoc, operand, operand->getType(),
+                           OwnershipKind::Owned) {}
 };
 
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics
@@ -10222,7 +10258,7 @@ public:
   std::optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
     for (unsigned i = 0; i < getNumCases(); ++i) {
       if (getCase(i).second == bb) {
-        return i + 1;
+        return i;
       }
     }
     return std::nullopt;
@@ -11132,6 +11168,8 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::FunctionExtractIsolationInst:
+  case SILInstructionKind::DropDeinitInst:
+  case SILInstructionKind::BorrowedFromInst:
     return true;
   default:
     return false;

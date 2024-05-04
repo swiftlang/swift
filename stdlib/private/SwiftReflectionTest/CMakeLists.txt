@@ -13,6 +13,7 @@ if (SWIFT_INCLUDE_TESTS AND SWIFT_BUILD_DYNAMIC_STDLIB)
     SWIFT_MODULE_DEPENDS_IOS ${swift_reflection_test_darwin_depencencies}
     SWIFT_MODULE_DEPENDS_TVOS ${swift_reflection_test_darwin_depencencies}
     SWIFT_MODULE_DEPENDS_WATCHOS ${swift_reflection_test_darwin_depencencies}
+    SWIFT_MODULE_DEPENDS_XROS ${swift_reflection_test_darwin_depencencies}
     SWIFT_MODULE_DEPENDS_LINUX Glibc
     SWIFT_MODULE_DEPENDS_FREEBSD Glibc
     SWIFT_MODULE_DEPENDS_OPENBSD Glibc

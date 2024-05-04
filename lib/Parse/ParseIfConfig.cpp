@@ -299,10 +299,13 @@ public:
       if (E->getArgs()->empty()) {
         D.diagnose(E->getLoc(), diag::platform_condition_expected_argument);
       } else {
-        D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+        SourceLoc DiagLoc = E->getArgs()->front().getStartLoc();
+        assert(DiagLoc.isValid() && "parsed Argument should have a location");
+        D.diagnose(DiagLoc, diag::platform_condition_expected_one_argument);
       }
       return nullptr;
     }
+    SourceLoc ArgLoc = Arg->getStartLoc();
     // '_compiler_version' '(' string-literal ')'
     if (*KindName == "_compiler_version") {
       if (auto SLE = dyn_cast<StringLiteralExpr>(Arg)) {
@@ -331,7 +334,7 @@ public:
               : std::nullopt;
       if (!isValidPrefixUnaryOperator(PrefixName)) {
         D.diagnose(
-            Arg->getLoc(), diag::unsupported_platform_condition_argument,
+            ArgLoc, diag::unsupported_platform_condition_argument,
             "a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'");
         return nullptr;
       }
@@ -352,7 +355,7 @@ public:
       }
 
       if (!isModulePath(Arg)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "module name");
         return nullptr;
       }
@@ -361,7 +364,7 @@ public:
 
     if (*KindName == "hasFeature") {
       if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "feature name");
         return nullptr;
       }
@@ -371,7 +374,7 @@ public:
 
     if (*KindName == "hasAttribute") {
       if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "attribute name");
         return nullptr;
       }
@@ -388,7 +391,7 @@ public:
 
     auto ArgStr = getDeclRefStr(Arg, DeclRefKind::Ordinary);
     if (!ArgStr.has_value()) {
-      D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+      D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                  "identifier");
       return nullptr;
     }
@@ -399,7 +402,7 @@ public:
                                                       suggestedKind, suggestedValues)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
-        D.diagnose(Arg->getLoc(),
+        D.diagnose(ArgLoc,
                    diag::unsupported_platform_runtime_condition_argument);
         return nullptr;
       }
@@ -426,27 +429,25 @@ public:
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
-      auto Loc = Arg->getLoc();
-      D.diagnose(Loc, diag::unknown_platform_condition_argument,
-                 DiagName, *KindName);
+      D.diagnose(ArgLoc, diag::unknown_platform_condition_argument, DiagName,
+                 *KindName);
       if (suggestedKind != *Kind) {
         auto suggestedKindName = getPlatformConditionName(suggestedKind);
-        D.diagnose(Loc, diag::note_typo_candidate, suggestedKindName)
-          .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
+        D.diagnose(ArgLoc, diag::note_typo_candidate, suggestedKindName)
+            .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
       }
       for (auto suggestion : suggestedValues)
-        D.diagnose(Loc, diag::note_typo_candidate, suggestion)
-          .fixItReplace(Arg->getSourceRange(), suggestion);
+        D.diagnose(ArgLoc, diag::note_typo_candidate, suggestion)
+            .fixItReplace(Arg->getSourceRange(), suggestion);
     }
     else if (!suggestedValues.empty()) {
       // The value the user gave has been replaced by something newer.
       assert(suggestedValues.size() == 1 && "only support one replacement");
       auto replacement = suggestedValues.front();
 
-      auto Loc = Arg->getLoc();
-      D.diagnose(Loc, diag::renamed_platform_condition_argument,
-                 *ArgStr, replacement)
-        .fixItReplace(Arg->getSourceRange(), replacement);
+      D.diagnose(ArgLoc, diag::renamed_platform_condition_argument, *ArgStr,
+                 replacement)
+          .fixItReplace(Arg->getSourceRange(), replacement);
     }
 
     return E;
@@ -772,7 +773,6 @@ Result Parser::parseIfConfigRaw(
                             bool isActive, IfConfigElementsRole role)>
       parseElements,
     llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
-  auto startLoc = Tok.getLoc();
   assert(Tok.is(tok::pound_if));
 
   Parser::StructureMarkerRAII ParsingDecl(

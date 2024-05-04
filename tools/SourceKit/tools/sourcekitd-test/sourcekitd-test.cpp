@@ -341,7 +341,7 @@ static std::optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
 
 static std::optional<sourcekitd_object_t>
 getReqOptValueAsArray(StringRef Value) {
-  if (!Value.starts_with("[") || !Value.endswith("]"))
+  if (!Value.starts_with("[") || !Value.ends_with("]"))
     return std::nullopt;
   SmallVector<StringRef, 4> Elements;
   Value.drop_front().drop_back().split(Elements, ';');

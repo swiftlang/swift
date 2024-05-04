@@ -1680,6 +1680,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       bool isMutator = [&] {
         switch (accessor->getAccessorKind()) {
         case AccessorKind::Get:
+        case AccessorKind::DistributedGet:
         case AccessorKind::Read:
         case AccessorKind::Address:
           return false;
@@ -2606,7 +2607,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   // If we see an alloc_box as the pointer, then we're deallocating a 'box' for
   // self. Make sure that the box gets deallocated (not released) since the
   // pointer it contains will be manually cleaned up.
-  auto *MUI = dyn_cast<MarkUninitializedInst>(Release->getOperand(0));
+  auto *MUI = dyn_cast<MarkUninitializedInst>(Pointer);
 
   if (MUI && isa<AllocBoxInst>(MUI->getOperand())) {
     Pointer = MUI->getSingleUserOfType<ProjectBoxInst>();
@@ -2639,6 +2640,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       if (classDecl && classDecl->isRootDefaultActor()) {
           emitDefaultActorDestroy(B, Loc, Pointer);
       }
+    }
+
+    // Cast back down from an upcast.
+    if (auto *UI = dyn_cast<UpcastInst>(Pointer)) {
+      Pointer =
+          B.createUncheckedRefCast(Loc, Pointer, UI->getOperand()->getType());
     }
 
     // We've already destroyed any instance variables initialized by this

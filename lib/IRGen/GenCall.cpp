@@ -31,6 +31,7 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
@@ -661,9 +662,6 @@ namespace {
 }
 
 void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
-  assert(FnType->getNumResults() == 0 &&
-         "having both normal and yield results is currently unsupported");
-
   // The return type may be different for the ramp function vs. the
   // continuations.
   if (forContinuation) {
@@ -671,14 +669,27 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
     case SILCoroutineKind::None:
       llvm_unreachable("should have been filtered out before here");
 
-    // Yield-once coroutines just return void from the continuation.
-    case SILCoroutineKind::YieldOnce:
-      ResultIRType = IGM.VoidTy;
+    // Yield-once coroutines may optionaly return a value from the continuation.
+    case SILCoroutineKind::YieldOnce: {
+      auto fnConv = getSILFuncConventions();
+
+      assert(fnConv.getNumIndirectSILResults() == 0);
+      // Ensure that no parameters were added before to correctly record their ABI
+      // details.
+      assert(ParamIRTypes.empty());
+
+      // Expand the direct result.
+      const TypeInfo *directResultTypeInfo;
+      std::tie(ResultIRType, directResultTypeInfo) = expandDirectResult();
+
       return;
+    }
 
     // Yield-many coroutines yield the same types from the continuation
     // as they do from the ramp function.
     case SILCoroutineKind::YieldMany:
+      assert(FnType->getNumResults() == 0 &&
+             "having both normal and yield results is currently unsupported");
       break;
     }
   }
@@ -1463,7 +1474,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   bool formalIndirectResult = FnType->getNumResults() > 0 &&
                               FnType->getSingleResult().isFormalIndirect();
   assert(
-      (cxxCtorDecl || !formalIndirectResult || returnInfo.isIndirect()) &&
+      (cxxCtorDecl || !formalIndirectResult || returnInfo.isIndirect() || SILResultTy.isSensitive()) &&
       "swift and clang disagree on whether the result is returned indirectly");
 #endif
 
@@ -2381,10 +2392,6 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
   return {fn, size};
 }
 
-static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
-                                 Explosion &in, Explosion &out,
-                                 TemporarySet &temporaries, bool isOutlined);
-
 namespace {
 
 class SyncCallEmission final : public CallEmission {
@@ -2623,11 +2630,19 @@ public:
       return;
     }
 
-    // Get the natural IR type in the body of the function that makes
-    // the call. This may be different than the IR type returned by the
-    // call itself due to ABI type coercion.
-    auto resultType =
-        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+    SILType resultType;
+    if (convertDirectToIndirectReturn) {
+      resultType = SILType::getPrimitiveObjectType(
+              origFnType->getSingleResult().getReturnValueType(
+              IGF.IGM.getSILModule(), origFnType, TypeExpansionContext::minimal()));
+    } else {
+      // Get the natural IR type in the body of the function that makes
+      // the call. This may be different than the IR type returned by the
+      // call itself due to ABI type coercion.
+      resultType =
+          fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+    }
+
     auto &nativeSchema = IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
 
     // For ABI reasons the result type of the call might not actually match the
@@ -2642,6 +2657,10 @@ public:
     if (result->getType() != expectedNativeResultType) {
       result =
           IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
+    }
+    if (convertDirectToIndirectReturn) {
+      IGF.Builder.CreateStore(result, indirectReturnAddress);
+      return;
     }
 
     // Gather the values.
@@ -3952,7 +3971,27 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
   swiftTI.deallocateStack(IGF, tempAlloc, swiftType);
 }
 
-static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
+Address getForwardableAlloca(const TypeInfo &TI, bool isForwardableArgument,
+                             Explosion &in) {
+  if (!isForwardableArgument)
+    return Address();
+
+  auto *load = dyn_cast<llvm::LoadInst>(*in.begin());
+  if (!load)
+    return Address();
+
+  auto *gep = dyn_cast<llvm::GetElementPtrInst>(load->getPointerOperand());
+  if (!gep)
+    return Address();
+
+  auto *alloca = dyn_cast<llvm::AllocaInst>(getUnderlyingObject(gep));
+  if (!alloca)
+    return Address();
+
+  return TI.getAddressForPointer(alloca);
+}
+
+void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                                  TemporarySet &temporaries,
                                  bool isOutlined) {
@@ -3989,11 +4028,26 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
   bool formalIndirectResult = fnType->getNumResults() > 0 &&
                               fnType->getSingleResult().isFormalIndirect();
+  if (!FI.getReturnInfo().isIndirect() && formalIndirectResult) {
+    // clang returns directly and swift returns indirectly
 
-  // If clang returns directly and swift returns indirectly, this must be a c++
-  // constructor call. In that case, skip the "self" param.
-  if (!FI.getReturnInfo().isIndirect() && formalIndirectResult)
-    firstParam += 1;
+    SILType returnTy = SILType::getPrimitiveObjectType(
+        fnType->getSingleResult().getReturnValueType(
+            IGF.IGM.getSILModule(), fnType, TypeExpansionContext::minimal()));
+
+    if (returnTy.isSensitive()) {
+      // Sensitive return types are represented as indirect return value in SIL,
+      // but are returned as values (if small) in LLVM IR.
+      assert(out.size() == 1 && "expect a single address for the return value");
+      llvm::Value *returnAddr = out.claimNext();
+      out.reset();
+      assert(returnAddr == indirectReturnAddress.getAddress());
+      convertDirectToIndirectReturn = true;
+    } else {
+      // This must be a constructor call. In that case, skip the "self" param.
+      firstParam += 1;
+    }
+  }
 
   for (unsigned i = firstParam; i != paramEnd; ++i) {
     auto clangParamTy = FI.arg_begin()[i].type;
@@ -4008,8 +4062,11 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     if (auto *padType = AI.getPaddingType())
       out.add(llvm::UndefValue::get(padType));
 
+    const SILParameterInfo &paramInfo = params[i - firstParam];
     SILType paramType = silConv.getSILType(
-        params[i - firstParam], IGF.IGM.getMaximalTypeExpansionContext());
+        paramInfo, IGF.IGM.getMaximalTypeExpansionContext());
+
+    bool isForwardableArgument = IGF.isForwardableArgument(i - firstParam);
 
     // In Swift, values that are foreign references types will always be
     // pointers. Additionally, we only import functions which use foreign
@@ -4027,6 +4084,35 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       continue;
     }
 
+    bool passIndirectToDirect = paramInfo.isIndirectInGuaranteed() && paramType.isSensitive();
+    if (passIndirectToDirect) {
+      llvm::Value *ptr = in.claimNext();
+
+      if (AI.getKind() == clang::CodeGen::ABIArgInfo::Indirect) {
+        // It's a large struct which is also passed indirectl in LLVM IR.
+        // The C function (= the callee) is allowed to modify the memory used
+        // for passing arguments, therefore we need to copy the argument value
+        // to a temporary.
+        // TODO: avoid the temporary if the SIL parameter value in memory is
+        //       not used anymore after the call.
+        auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
+        auto temp = ti.allocateStack(IGF, paramType, "indirect-temporary");
+        Address tempAddr = temp.getAddress();
+        temporaries.add({temp, paramType});
+        Address paramAddr = ti.getAddressForPointer(ptr);
+        ti.initializeWithCopy(IGF, tempAddr, paramAddr, paramType, isOutlined);
+
+        out.add(tempAddr.getAddress());
+        continue;
+      }
+
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
+      Explosion loadedValue;
+      ti.loadAsCopy(IGF, ti.getAddressForPointer(ptr), loadedValue);
+      in.transferInto(loadedValue, in.size());
+      in = std::move(loadedValue);
+    }
+
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend: {
       bool signExt = clangParamTy->hasSignedIntegerRepresentation();
@@ -4039,7 +4125,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       auto toTy = AI.getCoerceToType();
 
       // Indirect parameters are bridged as Clang pointer types.
-      if (silConv.isSILIndirect(params[i - firstParam])) {
+      if (silConv.isSILIndirect(params[i - firstParam]) && !passIndirectToDirect) {
         assert(paramType.isAddress() && "SIL type is not an address?");
 
         auto addr = in.claimNext();
@@ -4072,8 +4158,18 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                          Alignment(ABIAlign.getQuantity()));
         }
       }
-
-      ti.initialize(IGF, in, addr, isOutlined);
+      Address forwardFromAddr = getForwardableAlloca(ti, isForwardableArgument,
+                                                     in);
+      // Try to forward the address from a `load` instruction "immediately"
+      // preceeding the apply.
+      if (isForwardableArgument && forwardFromAddr.isValid()) {
+        ti.initializeWithTake(IGF, addr, forwardFromAddr,
+                              paramType.getAddressType(), isOutlined,
+                              /*zeroizeIfSensitive=*/ true);
+        (void)in.claim(ti.getSchema().size());
+      } else {
+        ti.initialize(IGF, in, addr, isOutlined);
+      }
 
       out.add(addr.getAddress());
       break;
@@ -5701,6 +5797,117 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
     nativeResults = nativeResultsStorage;
   }
   emitAsyncReturn(IGF, asyncLayout, fnType, nativeResults);
+}
+
+void irgen::emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
+                                         SILType funcResultType, SILType returnResultType) {
+  auto &Builder = IGF.Builder;
+  auto &IGM = IGF.IGM;
+
+  // Prepare coroutine result values
+  auto &coroResults = IGF.coroutineResults;
+  assert(coroResults.empty() && "must only be single return");
+  if (result.empty()) {
+    assert(IGM.getTypeInfo(returnResultType)
+           .nativeReturnValueSchema(IGM)
+           .empty() &&
+           "Empty explosion must match the native calling convention");
+  } else {
+    result = IGF.coerceValueTo(returnResultType, result, funcResultType);
+    auto &nativeSchema =
+      IGM.getTypeInfo(funcResultType).nativeReturnValueSchema(IGM);
+    assert(!nativeSchema.requiresIndirect());
+
+    Explosion native = nativeSchema.mapIntoNative(IGM, IGF, result,
+                                                  funcResultType,
+                                                  false /* isOutlined */);
+    for (unsigned i = 0, e = native.size(); i != e; ++i)
+      coroResults.push_back(native.claimNext());
+  }
+
+  auto coroEndBB = IGF.getCoroutineExitBlock();
+  auto handle = IGF.getCoroutineHandle();
+  bool newEndBlock = false;
+  if (!coroEndBB) {
+    coroEndBB = IGF.createBasicBlock("coro.end");
+    IGF.setCoroutineExitBlock(coroEndBB);
+    newEndBlock = true;
+  }
+
+  // If there are coroutine results, then we need to capture them via
+  // @llvm.coro_end_results intrinsics. However, since unwind blocks would
+  // jump to the same block, we wrap values into phi nodes.
+  Builder.CreateBr(coroEndBB);
+
+  // Emit the end block.
+  llvm::BasicBlock *returnBB = Builder.GetInsertBlock();
+
+  if (newEndBlock) {
+    Builder.emitBlock(coroEndBB);
+
+    llvm::Value *resultToken = nullptr;
+    if (coroResults.empty()) {
+      // No results: just use none token
+      resultToken = llvm::ConstantTokenNone::get(Builder.getContext());
+    } else {
+      // Otherwise, wrap result values into singleton phi nodes
+      for (auto &val : coroResults) {
+        auto *phi = Builder.CreatePHI(val->getType(), 0);
+        phi->addIncoming(val, returnBB);
+        val = phi;
+      }
+
+      // Capture results via result token
+      resultToken =
+        Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_results, coroResults);
+
+        Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                              {handle,
+                               /*is unwind*/ Builder.getFalse(),
+                               resultToken});
+        Builder.CreateUnreachable();
+    }
+  } else {
+    if (coroResults.empty()) {
+      // No results, we do not need to change anything around existing coro.end
+      return;
+    }
+
+    // Otherwise, we'd need to insert new coro.end.results intrinsics capturing
+    // result values.  However, we'd need to wrap results into phi nodes adding
+    // undef for all values coming from incoming unwind blocks.
+
+    // Find coro.end intrinsic
+    llvm::CallInst *coroEndCall = nullptr;
+    for (llvm::Instruction &inst : coroEndBB->instructionsWithoutDebug()) {
+      if (auto *CI = dyn_cast<llvm::CallInst>(&inst)) {
+        if (CI->getIntrinsicID() == llvm::Intrinsic::coro_end) {
+          coroEndCall = CI;
+          break;
+        }
+      }
+    }
+
+    assert(coroEndCall && isa<llvm::ConstantTokenNone>(coroEndCall->getArgOperand(2)) &&
+           "invalid unwind coro.end call");
+
+    Builder.SetInsertPoint(&*coroEndBB->getFirstInsertionPt());
+
+    for (auto &val : coroResults) {
+      auto *phi = Builder.CreatePHI(val->getType(), llvm::pred_size(coroEndBB));
+      for (auto *predBB : llvm::predecessors(coroEndBB))
+        phi->addIncoming(predBB == returnBB ? val : llvm::UndefValue::get(val->getType()),
+                         predBB);
+
+      val = phi;
+    }
+
+    // Capture results via result token and replace coro.end token operand
+    auto *resultToken =
+      Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_results, coroResults);
+    coroEndCall->setArgOperand(2, resultToken);
+    Builder.SetInsertPoint(returnBB);
+  }
 }
 
 FunctionPointer

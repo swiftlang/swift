@@ -3,54 +3,81 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+// Some container-ish thing.
+struct CN: ~Copyable {
   let p: UnsafeRawPointer
-  let c: Int
+  let i: Int
+}
 
-  public var isEmpty: Bool { c == 0 }
+// Some Bufferview-ish thing.
+struct BV : ~Escapable {
+  let p: UnsafeRawPointer
+  let i: Int
+
+  public var isEmpty: Bool { i == 0 }
 
   @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ c: Int) {
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
-    self.c = c
+    self.i = i
+  }
+
+  init(_ cn: borrowing CN) {
+    self.p = cn.p
+    self.i = cn.i
   }
 }
 
-@_nonescapable
-struct NCNE : ~Copyable {
+// Some MutableBufferview-ish thing.
+struct MBV : ~Escapable, ~Copyable {
   let p: UnsafeRawPointer
-  let c: Int
+  let i: Int
   
   @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ c: Int) {
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
-    self.c = c
+    self.i = i
   }
 
   // Requires a borrow.
-  borrowing func getBV() -> _borrow(self) BV {
-    BV(p, c)
+  borrowing func getBV() -> dependsOn(self) BV {
+    BV(p, i)
+  }
+}
+
+// Nonescapable wrapper.
+struct NEBV : ~Escapable {
+  var bv: BV
+
+  init(_ bv: consuming BV) {
+    self.bv = bv
   }
 }
 
 // Propagate a borrow.
-func bv_get_borrow(container: borrowing NCNE) -> _borrow(container) BV {
+func bv_get_borrow(container: borrowing MBV) -> dependsOn(container) BV {
   container.getBV()
 }
 
 // Copy a borrow.
-func bv_get_copy(container: borrowing NCNE) -> _copy(container) BV {
+func bv_get_copy(container: borrowing MBV) -> dependsOn(container) BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-func bv_get_mutate(container: inout NCNE) -> _mutate(container) BV {
+func bv_get_mutate(container: inout MBV) -> dependsOn(container) BV {
   container.getBV()
+}
+
+// Create and decompose a nonescapable aggregate.
+func ne_wrap_and_extract_member(cn: borrowing CN) -> dependsOn(scoped cn) BV {
+  let bv = BV(cn)
+  let ne = NEBV(bv)
+  return ne.bv
 }

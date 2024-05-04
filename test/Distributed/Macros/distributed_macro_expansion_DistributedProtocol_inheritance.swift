@@ -13,7 +13,7 @@ import Distributed
 
 typealias System = LocalTestingDistributedActorSystem
 
-@_DistributedProtocol
+@Resolvable
 protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func base() -> Int
 }
@@ -25,7 +25,7 @@ protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Co
 
 // CHECK: extension Base where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func base() -> Int {
-// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -35,7 +35,7 @@ protocol Base: DistributedActor where ActorSystem: DistributedActorSystem<any Co
 
 // ==== ------------------------------------------------------------------------
 
-@_DistributedProtocol
+@Resolvable
 protocol G3<ActorSystem>: DistributedActor, Base where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func get() -> String
   distributed func greet(name: String) -> String
@@ -49,14 +49,14 @@ protocol G3<ActorSystem>: DistributedActor, Base where ActorSystem: DistributedA
 
 // CHECK: extension G3 where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func get() -> String {
-// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
 // CHECK:     }
 // CHECK:   }
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()

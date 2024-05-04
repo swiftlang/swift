@@ -1,6 +1,6 @@
 // REQUIRES: VENDOR=apple
 
-// XFAIL: noncopyable_generics
+
 
 // RUN: %empty-directory(%t.mod)
 // RUN: %empty-directory(%t.sdk)

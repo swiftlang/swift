@@ -30,7 +30,7 @@ public func unavailableFunc() {}
 public func unavailableOnMacOSFunc() {}
 
 // CHECK-LABEL:     sil{{.*}}@$s4Test31unavailableOnMacOSExtensionFuncyyF
-// CHECK-NOT:         function_ref @$ss36_diagnoseUnavailableCodeReached{{.*}} : $@convention(thin) () -> Never
+// CHECK-NOT:         _diagnoseUnavailableCodeReached
 // CHECK:           } // end sil function '$s4Test31unavailableOnMacOSExtensionFuncyyF'
 @available(macOSApplicationExtension, unavailable)
 public func unavailableOnMacOSExtensionFunc() {}

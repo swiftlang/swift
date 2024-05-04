@@ -43,6 +43,7 @@ class ValueDecl;
 class FuncDecl;
 class OpaqueValueExpr;
 class VarDecl;
+class GenericEnvironment;
 
 /// CapturedValue includes both the declaration being captured, along with flags
 /// that indicate how it is captured.
@@ -140,19 +141,27 @@ class DynamicSelfType;
 /// Stores information about captured variables.
 class CaptureInfo {
   class CaptureInfoStorage final
-      : public llvm::TrailingObjects<CaptureInfoStorage, CapturedValue> {
+      : public llvm::TrailingObjects<CaptureInfoStorage,
+                                     CapturedValue,
+                                     GenericEnvironment *> {
 
     DynamicSelfType *DynamicSelf;
     OpaqueValueExpr *OpaqueValue;
-    unsigned Count;
-  public:
-    explicit CaptureInfoStorage(unsigned count, DynamicSelfType *dynamicSelf,
-                                OpaqueValueExpr *opaqueValue)
-      : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue), Count(count) { }
+    unsigned NumCapturedValues;
+    unsigned NumGenericEnvironments;
 
-    ArrayRef<CapturedValue> getCaptures() const {
-      return llvm::ArrayRef(this->getTrailingObjects<CapturedValue>(), Count);
-    }
+  public:
+    explicit CaptureInfoStorage(DynamicSelfType *dynamicSelf,
+                                OpaqueValueExpr *opaqueValue,
+                                unsigned numCapturedValues,
+                                unsigned numGenericEnvironments)
+      : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue),
+        NumCapturedValues(numCapturedValues),
+        NumGenericEnvironments(numGenericEnvironments) { }
+
+    ArrayRef<CapturedValue> getCaptures() const;
+
+    ArrayRef<GenericEnvironment *> getGenericEnvironments() const;
 
     DynamicSelfType *getDynamicSelfType() const {
       return DynamicSelf;
@@ -160,6 +169,10 @@ class CaptureInfo {
 
     OpaqueValueExpr *getOpaqueValue() const {
       return OpaqueValue;
+    }
+
+    unsigned numTrailingObjects(OverloadToken<CapturedValue>) const {
+      return NumCapturedValues;
     }
   };
 
@@ -173,9 +186,11 @@ class CaptureInfo {
 public:
   /// The default-constructed CaptureInfo is "not yet computed".
   CaptureInfo() = default;
-  CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
+  CaptureInfo(ASTContext &ctx,
+              ArrayRef<CapturedValue> captures,
               DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
-              bool genericParamCaptures);
+              bool genericParamCaptures,
+              ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>());
 
   /// A CaptureInfo representing no captures at all.
   static CaptureInfo empty();
@@ -185,33 +200,27 @@ public:
   }
 
   bool isTrivial() const {
+    assert(hasBeenComputed());
     return getCaptures().empty() && !hasGenericParamCaptures() &&
            !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
   }
 
+  /// Returns all captured values and opaque expressions.
   ArrayRef<CapturedValue> getCaptures() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return std::nullopt;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getCaptures();
   }
 
-  /// Return a filtered list of the captures for this function,
-  /// filtering out global variables.  This function returns the list that
-  /// actually needs to be closed over.
-  ///
-  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const;
+  /// Returns all captured pack element environments.
+  ArrayRef<GenericEnvironment *> getGenericEnvironments() const {
+    assert(hasBeenComputed());
+    return StorageAndFlags.getPointer()->getGenericEnvironments();
+  }
 
-  /// \returns true if getLocalCaptures() will return a non-empty list.
-  bool hasLocalCaptures() const;
-
-  /// \returns true if the function captures any generic type parameters.
+  /// \returns true if the function captures the primary generic environment
+  /// from its innermost declaration context.
   bool hasGenericParamCaptures() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return false;
+    assert(hasBeenComputed());
     return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
   }
 
@@ -222,22 +231,17 @@ public:
 
   /// \returns the captured dynamic Self type, if any.
   DynamicSelfType *getDynamicSelfType() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return nullptr;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getDynamicSelfType();
   }
 
   bool hasOpaqueValueCapture() const {
+    assert(hasBeenComputed());
     return getOpaqueValue() != nullptr;
   }
 
   OpaqueValueExpr *getOpaqueValue() const {
-    // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
-    if (!hasBeenComputed())
-      return nullptr;
+    assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getOpaqueValue();
   }
 

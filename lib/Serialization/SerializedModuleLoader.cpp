@@ -25,6 +25,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Option/Options.h"
+#include "swift/Serialization/Validation.h"
 
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/ArgList.h"
@@ -391,26 +392,14 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
+SerializedModuleLoaderBase::BinaryModuleImports
 SerializedModuleLoaderBase::getImportsOfModule(
-    Twine modulePath, ModuleLoadingBehavior transitiveBehavior,
-    bool isFramework, bool isRequiredOSSAModules, StringRef SDKName,
-    StringRef packageName, llvm::vfs::FileSystem *fileSystem,
-    PathObfuscator &recoverer) {
-  auto moduleBuf = fileSystem->getBufferForFile(modulePath);
-  if (!moduleBuf)
-    return moduleBuf.getError();
-
+    const ModuleFileSharedCore &loadedModuleFile,
+    ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
+    bool isTestableImport) {
   llvm::StringSet<> importedModuleNames;
   std::string importedHeader = "";
-  // Load the module file without validation.
-  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
-  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
-      "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules,
-      SDKName, recoverer, loadedModuleFile);
-
-  for (const auto &dependency : loadedModuleFile->getDependencies()) {
+  for (const auto &dependency : loadedModuleFile.getDependencies()) {
     if (dependency.isHeader()) {
       assert(importedHeader.empty() &&
              "Unexpected more than one header dependency");
@@ -419,11 +408,10 @@ SerializedModuleLoaderBase::getImportsOfModule(
     }
 
     ModuleLoadingBehavior dependencyTransitiveBehavior =
-        loadedModuleFile->getTransitiveLoadingBehavior(
+        loadedModuleFile.getTransitiveLoadingBehavior(
             dependency,
             /*debuggerMode*/ false,
-            /*isPartialModule*/ false, packageName,
-            loadedModuleFile->isTestable());
+            /*isPartialModule*/ false, packageName, isTestableImport);
     if (dependencyTransitiveBehavior > transitiveBehavior)
       continue;
 
@@ -437,41 +425,59 @@ SerializedModuleLoaderBase::getImportsOfModule(
     importedModuleNames.insert(moduleName);
   }
 
-  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames, importedHeader};
+  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames,
+                                                         importedHeader};
 }
 
 llvm::ErrorOr<ModuleDependencyInfo>
-SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
+SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
+                                           bool isTestableImport) {
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
+
+  // Read and valid module.
+  auto moduleBuf = Ctx.SourceMgr.getFileSystem()->getBufferForFile(modulePath);
+  if (!moduleBuf)
+    return moduleBuf.getError();
+
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
+
+  if (!Ctx.SearchPathOpts.NoScannerModuleValidation) {
+    // If failed to load, just ignore and return do not found.
+    if (loadInfo.status != serialization::Status::Valid) {
+      if (Ctx.LangOpts.EnableModuleLoadingRemarks)
+        Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_invalid,
+                           modulePath.str());
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    }
+
+    if (isTestableImport && !loadedModuleFile->isTestable()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_not_testable,
+                         modulePath.str());
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    }
+  }
+
   // Some transitive dependencies of binary modules are not required to be
   // imported during normal builds.
   // TODO: This is worth revisiting for debugger purposes where
   //       loading the module is optional, and implementation-only imports
   //       from modules with testing enabled where the dependency is
   //       optional.
-  ModuleLoadingBehavior transitiveLoadingBehavior =
-      ModuleLoadingBehavior::Required;
-  auto binaryModuleImports = getImportsOfModule(
-      modulePath, transitiveLoadingBehavior, isFramework,
-      isRequiredOSSAModules(),
-      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
-      Ctx.SourceMgr.getFileSystem().get(),
-      Ctx.SearchPathOpts.DeserializedPathRecoverer);
-  if (!binaryModuleImports)
-    return binaryModuleImports.getError();
+  auto binaryModuleImports =
+      getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Required,
+                         Ctx.LangOpts.PackageName, isTestableImport);
 
   // Lookup optional imports of this module also
-  auto binaryModuleOptionalImports = getImportsOfModule(
-      modulePath, ModuleLoadingBehavior::Optional, isFramework,
-      isRequiredOSSAModules(),
-      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
-      Ctx.SourceMgr.getFileSystem().get(),
-      Ctx.SearchPathOpts.DeserializedPathRecoverer);
-  if (!binaryModuleOptionalImports)
-    return binaryModuleImports.getError();
+  auto binaryModuleOptionalImports =
+      getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
+                         Ctx.LangOpts.PackageName, isTestableImport);
 
-  auto importedModuleSet = binaryModuleImports.get().moduleImports;
+  auto importedModuleSet = binaryModuleImports.moduleImports;
   std::vector<std::string> importedModuleNames;
   importedModuleNames.reserve(importedModuleSet.size());
   llvm::transform(importedModuleSet.keys(),
@@ -480,8 +486,8 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
                      return N.str();
                   });
 
-  auto importedHeader = binaryModuleImports.get().headerImport;
-  auto &importedOptionalModuleSet = binaryModuleOptionalImports.get().moduleImports;
+  auto importedHeader = binaryModuleImports.headerImport;
+  auto &importedOptionalModuleSet = binaryModuleOptionalImports.moduleImports;
   std::vector<std::string> importedOptionalModuleNames;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))
@@ -790,7 +796,8 @@ bool SerializedModuleLoaderBase::findModule(
       auto result = findModuleFilesInDirectory(
           moduleID, absoluteBaseName, moduleInterfacePath,
           moduleInterfaceSourcePath, moduleBuffer, moduleDocBuffer,
-          moduleSourceInfoBuffer, skipBuildingInterface, isFramework);
+          moduleSourceInfoBuffer, skipBuildingInterface, isFramework,
+          isTestableDependencyLookup);
       if (!result)
         return true;
       if (result == std::errc::not_supported)
@@ -844,6 +851,8 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
       osName = swift::prettyPlatformString(PlatformKind::tvOS);
     } else if (triple.isiOS()) {
       osName = swift::prettyPlatformString(PlatformKind::iOS);
+    }  else if (triple.isXROS()) {
+      osName = swift::prettyPlatformString(PlatformKind::visionOS);
     } else {
       assert(!triple.isOSDarwin() && "unknown Apple OS");
       // Fallback to the LLVM triple name. This isn't great (it won't be
@@ -915,6 +924,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setIsBuiltFromInterface();
     if (loadedModuleFile->allowNonResilientAccess())
       M.setAllowNonResilientAccess();
+    if (loadedModuleFile->serializePackageEnabled())
+      M.setSerializePackageEnabled();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
@@ -1320,7 +1331,7 @@ bool swift::extractCompilerFlagsFromInterface(
       continue;
     auto spelling = ArgSaver.save(parse->getSpelling());
     auto &values = parse->getValues();
-    if (spelling.endswith("=")) {
+    if (spelling.ends_with("=")) {
       // Handle the case like -tbd-install_name=Foo. This should be rare because
       // most equal-separated arguments are alias to the separate form.
       assert(values.size() == 1);

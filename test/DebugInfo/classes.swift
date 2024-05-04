@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -gdwarf-types -o - | %FileCheck %s
 
 // rdar://124465351
-// UNSUPPORTED: CPU=armv7k
+// UNSUPPORTED: OS=watchos
 
 class SomeClass {
   let first = 4

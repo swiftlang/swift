@@ -274,6 +274,34 @@ void InitializeDistActorIdentity::dump(SILGenFunction &) const {
 #endif
 }
 
+bool SILGenFunction::shouldReplaceConstantForApplyWithDistributedThunk(
+    FuncDecl *func) const {
+  auto isDistributedFuncOrAccessor =
+      func->isDistributed();
+  if (auto acc = dyn_cast<AccessorDecl>(func)) {
+    isDistributedFuncOrAccessor =
+        acc->getStorage()->isDistributed();
+  }
+
+  if (!isDistributedFuncOrAccessor)
+    return false;
+
+  // If we are inside a distributed thunk, we want to call the "real" method,
+  // in order to avoid infinitely recursively calling the thunk from itself.
+  if (F.isDistributed() && F.isThunk())
+    return false;
+
+  // If caller and called func are isolated to the same (distributed) actor,
+  // (i.e. we are "inside the distributed actor"), there is no need to call
+  // the thunk.
+  if (isSameActorIsolated(func, FunctionDC))
+    return false;
+
+  // In all other situations, we may have to replace the called function,
+  // depending on isolation (to be checked in SILGenApply).
+  return true;
+}
+
 void SILGenFunction::emitDistributedActorImplicitPropertyInits(
     ConstructorDecl *ctor, ManagedValue selfArg) {
   // Only designated initializers should perform this initialization.

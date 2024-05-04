@@ -874,3 +874,14 @@ struct Twople<T> {
     self.storage = (t1, t2)
   }
 }
+
+// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValue : {{.*}} {
+// CHECK:       bb0([[E:%[^,]+]] :
+// CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped
+// CHECK:         apply [[SWIFT_WILL_THROW_TYPED]]<Err>([[E]])
+// CHECK:         throw [[E]]
+// CHECK-LABEL: } // end sil function 'throwTypedValue'
+@_silgen_name("throwTypedValue")
+func throwTypedValue(_ e: Err) throws(Err) { throw e }
+
+struct Err : Error {}

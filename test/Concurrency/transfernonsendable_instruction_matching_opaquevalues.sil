@@ -104,7 +104,7 @@ bb0:
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{transferring value of non-Sendable type 'τ_1_0' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
-  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1 // expected-note {{access here could race}}
+  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1 // expected-note {{use here could race}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
   end_borrow %1 : $(repeat each T)
@@ -124,7 +124,7 @@ bb0:
   %b = begin_borrow %p : $P
   %v = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   %w = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.doSomething, %v : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{access here could race}}
+  apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
   end_borrow %b : $P
   destroy_value %p : $P
 
@@ -144,7 +144,7 @@ bb0:
 
   %w = weak_copy_value %pBorrowed : $Optional<PAnyObject>
   %weakFunc = function_ref @usePAnyObjectWeak : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> ()
-  apply %weakFunc(%w) : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> () // expected-note {{access here could race}}
+  apply %weakFunc(%w) : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> () // expected-note {{use here could race}}
   destroy_value %w : $@sil_weak Optional<PAnyObject>
 
   end_borrow %pBorrowed : $Optional<PAnyObject>
@@ -167,7 +167,7 @@ bb0:
   %w = weak_copy_value %pBorrowed : $Optional<PAnyObject>
   %s = strong_copy_weak_value %w : $@sil_weak Optional<PAnyObject>
   %weakFunc = function_ref @usePAnyObject : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> ()
-  apply %weakFunc(%s) : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> () // expected-note {{access here could race}}
+  apply %weakFunc(%s) : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> () // expected-note {{use here could race}}
   destroy_value %s : $Optional<PAnyObject>
   destroy_value %w : $@sil_weak Optional<PAnyObject>
 
@@ -189,7 +189,7 @@ bb0:
 
   %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P
   %f2 = function_ref @useP : $@convention(thin) (@in_guaranteed P) -> ()
-  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{access here could race}}
+  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{use here could race}}
   destroy_value %i : $P
 
   %9999 = tuple ()

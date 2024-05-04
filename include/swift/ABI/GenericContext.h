@@ -21,6 +21,7 @@
 #include "swift/ABI/TargetLayout.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/MetadataRef.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/ABI/TrailingObjects.h"
 #include "swift/Demangling/Demangle.h"
 
@@ -103,6 +104,10 @@ struct TargetGenericContextDescriptorHeader {
   bool hasArguments() const {
     return getNumArguments() > 0;
   }
+
+  bool hasConditionalInvertedProtocols() const {
+    return Flags.hasConditionalInvertedProtocols();
+  }
 };
 using GenericContextDescriptorHeader =
   TargetGenericContextDescriptorHeader<InProcess>;
@@ -137,6 +142,20 @@ public:
     ///
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
+
+    /// The set of invertible protocols whose check is disabled, along
+    /// with the index of the generic parameter to which this applies.
+    ///
+    /// The index is technically redundant with the subject type, but its
+    /// storage is effectively free because this union is 32 bits anyway. The
+    /// index 0xFFFF is reserved for "not a generic parameter", in which case
+    /// the constraints are on the subject type.
+    ///
+    /// Only valid if the requirement has InvertedProtocols kind.
+    struct {
+      uint16_t GenericParamIndex;
+      InvertibleProtocolSet Protocols;
+    } InvertedProtocols;
   };
 
   constexpr GenericRequirementFlags getFlags() const {
@@ -204,6 +223,18 @@ public:
     return Layout;
   }
 
+  /// Retrieve the set of inverted protocols.
+  InvertibleProtocolSet getInvertedProtocols() const {
+    assert(getKind() == GenericRequirementKind::InvertedProtocols);
+    return InvertedProtocols.Protocols;
+  }
+
+  /// Retrieve the invertible protocol kind.
+  uint16_t getInvertedProtocolsGenericParamIndex() const {
+    assert(getKind() == GenericRequirementKind::InvertedProtocols);
+    return InvertedProtocols.GenericParamIndex;
+  }
+
   /// Determine whether this generic requirement has a known kind.
   ///
   /// \returns \c false for any future generic requirement kinds.
@@ -215,6 +246,7 @@ public:
     case GenericRequirementKind::SameConformance:
     case GenericRequirementKind::SameType:
     case GenericRequirementKind::SameShape:
+    case GenericRequirementKind::InvertedProtocols:
       return true;
     }
 
@@ -266,6 +298,26 @@ struct GenericPackShapeDescriptor {
   uint16_t Unused;
 };
 
+/// A count for the number of requirements for the number of requirements
+/// for a given conditional conformance to a invertible protocols.
+struct ConditionalInvertibleProtocolsRequirementCount {
+  uint16_t count;
+};
+
+/// A invertible protocol set used for the conditional conformances in a
+/// generic context.
+struct ConditionalInvertibleProtocolSet: InvertibleProtocolSet {
+  using InvertibleProtocolSet::InvertibleProtocolSet;
+};
+
+/// A generic requirement for describing a conditional conformance to a
+/// invertible protocol.
+///
+/// This type is equivalent to a `TargetGenericRequirementDescriptor`, and
+/// differs only because it needs to occur alongside
+template<typename Runtime>
+struct TargetConditionalInvertibleProtocolRequirement: TargetGenericRequirementDescriptor<Runtime> { };
+
 /// An array of generic parameter descriptors, all
 /// GenericParamDescriptor::implicit(), which is by far
 /// the most common case.  Some generic context storage can
@@ -306,7 +358,8 @@ class RuntimeGenericSignature {
 
 public:
   RuntimeGenericSignature()
-    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr),
+    : Header{0, 0, 0, GenericContextDescriptorFlags(false, false)},
+      Params(nullptr), Requirements(nullptr),
       PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr) {}
 
   RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
@@ -425,6 +478,9 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       TargetGenericRequirementDescriptor<Runtime>,
       GenericPackShapeHeader,
       GenericPackShapeDescriptor,
+      ConditionalInvertibleProtocolSet,
+      ConditionalInvertibleProtocolsRequirementCount,
+      TargetConditionalInvertibleProtocolRequirement<Runtime>,
       FollowingTrailingObjects...>
 {
 protected:
@@ -432,13 +488,17 @@ protected:
   using GenericContextHeaderType = TargetGenericContextHeaderType<Runtime>;
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
-
+  using GenericConditionalInvertibleProtocolRequirement =
+    TargetConditionalInvertibleProtocolRequirement<Runtime>;
   using TrailingObjects = swift::ABI::TrailingObjects<Self,
     GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
     GenericPackShapeHeader,
     GenericPackShapeDescriptor,
+    ConditionalInvertibleProtocolSet,
+    ConditionalInvertibleProtocolsRequirementCount,
+    GenericConditionalInvertibleProtocolRequirement,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -467,7 +527,84 @@ public:
     /// HeaderType ought to be convertible to GenericContextDescriptorHeader.
     return getFullGenericContextHeader();
   }
-  
+
+  bool hasConditionalInvertedProtocols() const {
+    if (!asSelf()->isGeneric())
+      return false;
+
+    return getGenericContextHeader().hasConditionalInvertedProtocols();
+  }
+
+  const InvertibleProtocolSet &
+  getConditionalInvertedProtocols() const {
+    assert(hasConditionalInvertedProtocols());
+    return *this->template
+        getTrailingObjects<ConditionalInvertibleProtocolSet>();
+  }
+
+  /// Retrieve the counts for # of conditional invertible protocols for each
+  /// conditional conformance to a invertible protocol.
+  ///
+  /// The counts are cumulative, so the first entry in the array is the
+  /// number of requirements for the first conditional conformance. The
+  /// second entry in the array is the number of requirements in the first
+  /// and second conditional conformances. The last entry is, therefore, the
+  /// total count of requirements in the structure.
+  llvm::ArrayRef<ConditionalInvertibleProtocolsRequirementCount>
+  getConditionalInvertibleProtocolRequirementCounts() const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
+      return {};
+
+    return {
+      this->template
+        getTrailingObjects<ConditionalInvertibleProtocolsRequirementCount>(),
+      getNumConditionalInvertibleProtocolsRequirementCounts()
+    };
+  }
+
+  /// Retrieve the array of requirements for conditional conformances to
+  /// the ith conditional conformance to a invertible protocol.
+  llvm::ArrayRef<GenericConditionalInvertibleProtocolRequirement>
+  getConditionalInvertibleProtocolRequirementsAt(unsigned i) const {
+    auto counts = getConditionalInvertibleProtocolRequirementCounts();
+    assert(i < counts.size());
+
+    unsigned startIndex = (i == 0) ? 0 : counts[i-1].count;
+    unsigned endIndex = counts[i].count;
+
+    auto basePtr =
+      this->template
+        getTrailingObjects<GenericConditionalInvertibleProtocolRequirement>();
+    return { basePtr + startIndex, basePtr + endIndex };
+  }
+
+  /// Retrieve the array of requirements for conditional conformances to
+  /// the ith conditional conformance to a invertible protocol.
+  llvm::ArrayRef<GenericConditionalInvertibleProtocolRequirement>
+  getConditionalInvertibleProtocolRequirementsFor(
+      InvertibleProtocolKind kind
+  ) const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
+      return { };
+
+    auto conditionallyInverted = getConditionalInvertedProtocols();
+    if (!conditionallyInverted.contains(kind))
+      return { };
+
+    // Count the number of "set" bits up to (but not including) the
+    // bit we're looking at.
+    unsigned targetBit = static_cast<uint8_t>(kind);
+    auto invertedBits = conditionallyInverted.rawBits();
+    unsigned priorBits = 0;
+    for (unsigned i = 0; i != targetBit; ++i) {
+      if (invertedBits & 0x01)
+        ++priorBits;
+      invertedBits = invertedBits >> 1;
+    }
+
+    return getConditionalInvertibleProtocolRequirementsAt(priorBits);
+  }
+
   const TargetGenericContext<Runtime> *getGenericContext() const {
     if (!asSelf()->isGeneric())
       return nullptr;
@@ -547,6 +684,32 @@ protected:
       return 0;
 
     return getGenericPackShapeHeader().NumPacks;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<ConditionalInvertibleProtocolSet>
+  ) const {
+    return asSelf()->hasConditionalInvertedProtocols() ? 1 : 0;
+  }
+
+  unsigned getNumConditionalInvertibleProtocolsRequirementCounts() const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
+      return 0;
+
+    return countBitsUsed(getConditionalInvertedProtocols().rawBits());
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<ConditionalInvertibleProtocolsRequirementCount>
+  ) const {
+    return getNumConditionalInvertibleProtocolsRequirementCounts();
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<GenericConditionalInvertibleProtocolRequirement>
+  ) const {
+    auto counts = getConditionalInvertibleProtocolRequirementCounts();
+    return counts.empty() ? 0 : counts.back().count;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920

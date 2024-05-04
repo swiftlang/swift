@@ -387,8 +387,7 @@ private:
 
   /// Writes lifetime dependence info
   void
-  writeLifetimeDependenceInfo(LifetimeDependenceInfo lifetimeDependenceInfo,
-                              bool skipImplicit = false);
+  writeLifetimeDependenceInfo(LifetimeDependenceInfo lifetimeDependenceInfo);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>

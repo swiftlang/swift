@@ -636,6 +636,11 @@ bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
         }
+        if (PhiOperand(end)) {
+          assert(end->getOperandOwnership() ==
+                 OperandOwnership::ForwardingConsume);
+          return false;
+        }
         recordUse(end);
         return true;
       })) {

@@ -2705,7 +2705,10 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
                                                           mv.forward(SGF),
                                                           enumCase);
         if (payload->getType().isLoadable(SGF.F)) {
-          payload = SGF.B.createLoad(loc, payload, LoadOwnershipQualifier::Take);
+          payload = SGF.B.createLoad(loc, payload,
+                                     payload->getType().isTrivial(SGF.F)
+                                         ? LoadOwnershipQualifier::Trivial
+                                         : LoadOwnershipQualifier::Take);
         }
         visit(subPattern,
               SGF.emitManagedRValueWithCleanup(payload));
@@ -2867,7 +2870,12 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
       if (!ty.isAddressOnly(SGF.F))
         continue;
       assert(!Temporaries[vd]);
-      Temporaries[vd] = SGF.emitTemporaryAllocation(vd, ty);
+      // Don't generate debug info for the temporary, as another debug_value
+      // will be created in the body, with the same scope and a different type
+      // Not sure if this is the best way to avoid that?
+      Temporaries[vd] = SGF.emitTemporaryAllocation(
+        vd, ty, DoesNotHaveDynamicLifetime, IsNotLexical, IsNotFromVarDecl,
+        /* generateDebugInfo = */ false);
     }
   }
 
@@ -3210,12 +3218,123 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
 }
 
+// TODO: Integrate this with findStorageExprForMoveOnly, which does almost the
+// same check.
+static bool isBorrowableSubject(SILGenFunction &SGF,
+                                Expr *subjectExpr) {
+  // Look through forwarding expressions.
+  for (;;) {
+    subjectExpr = subjectExpr->getValueProvidingExpr();
+    
+    // Look through loads.
+    if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
+      subjectExpr = load->getSubExpr();
+      continue;
+    }
+    
+    // Look through optional force-projections.
+    // We can't look through optional evaluations here because wrapping the
+    // value up in an Optional at the end needs a copy/move to create the
+    // temporary optional.
+    if (auto force = dyn_cast<ForceValueExpr>(subjectExpr)) {
+      subjectExpr = force->getSubExpr();
+      continue;
+    }
+
+    // Look through parens.
+    if (auto paren = dyn_cast<ParenExpr>(subjectExpr)) {
+      subjectExpr = paren->getSubExpr();
+      continue;
+    }
+
+    // Look through `try` and `await`.
+    if (auto tryExpr = dyn_cast<TryExpr>(subjectExpr)) {
+      subjectExpr = tryExpr->getSubExpr();
+      continue;
+    }
+    if (auto awaitExpr = dyn_cast<AwaitExpr>(subjectExpr)) {
+      subjectExpr = awaitExpr->getSubExpr();
+      continue;
+    }
+    
+    break;
+  }
+  
+  // An explicit `borrow` expression requires us to do a borrowing access.
+  if (isa<BorrowExpr>(subjectExpr)) {
+    return true;
+  }
+  
+  AbstractStorageDecl *storage;
+  AccessSemantics access;
+  
+  // A subject is potentially borrowable if it's some kind of storage reference.
+  if (auto declRef = dyn_cast<DeclRefExpr>(subjectExpr)) {
+    storage = dyn_cast<AbstractStorageDecl>(declRef->getDecl());
+    access = declRef->getAccessSemantics();
+  } else if (auto memberRef = dyn_cast<MemberRefExpr>(subjectExpr)) {
+    storage = dyn_cast<AbstractStorageDecl>(memberRef->getMember().getDecl());
+    access = memberRef->getAccessSemantics();
+  } else if (auto subscript = dyn_cast<SubscriptExpr>(subjectExpr)) {
+    storage = dyn_cast<AbstractStorageDecl>(subscript->getMember().getDecl());
+    access = subscript->getAccessSemantics();
+  } else {
+    return false;
+  }
+  
+  // If the member being referenced isn't storage, there's no benefit to
+  // borrowing it.
+  if (!storage) {
+    return false;
+  }
+  
+  // Check the access strategy used to read the storage.
+  auto strategy = storage->getAccessStrategy(access,
+                                             AccessKind::Read,
+                                             SGF.SGM.SwiftModule,
+                                             SGF.F.getResilienceExpansion());
+                                             
+  switch (strategy.getKind()) {
+  case AccessStrategy::Kind::Storage:
+    // Accessing storage directly benefits from borrowing.
+    return true;
+  case AccessStrategy::Kind::DirectToAccessor:
+  case AccessStrategy::Kind::DispatchToAccessor:
+    // If we use an accessor, the kind of accessor affects whether we get
+    // a reference we can borrow or a temporary that will be consumed.
+    switch (strategy.getAccessor()) {
+    case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
+      // Get returns an owned value.
+      return false;
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      // Read, modify, and addressors yield a borrowable reference.
+      return true;
+    case AccessorKind::Init:
+    case AccessorKind::Set:
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+      llvm_unreachable("should not be involved in a read");
+    }
+    llvm_unreachable("switch not covered?");
+    
+  case AccessStrategy::Kind::MaterializeToTemporary:
+  case AccessStrategy::Kind::DispatchToDistributedThunk:
+    return false;
+  }
+  llvm_unreachable("switch not covered?");
+}
+
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   LLVM_DEBUG(llvm::dbgs() << "emitting switch stmt\n";
              S->dump(llvm::dbgs());
              llvm::dbgs() << '\n');
 
-  auto subjectTy = S->getSubjectExpr()->getType();
+  auto subjectExpr = S->getSubjectExpr();
+  auto subjectTy = subjectExpr->getType();
   auto subjectLoweredTy = getLoweredType(subjectTy);
   auto subjectLoweredAddress =
     silConv.useLoweredAddresses() && subjectLoweredTy.isAddressOnly(F);
@@ -3233,13 +3352,46 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // the match, we'll have to perform the initial match as a borrow and then
   // reproject the value to consume it.
   auto ownership = ValueOwnership::Default;
-  if (getASTContext().LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-    if (subjectTy->isNoncopyable()) {
-      // Determine the overall ownership behavior of the switch, based on the
-      // patterns' ownership behavior.
-      for (auto caseLabel : S->getCases()) {
-        for (auto item : caseLabel->getCaseLabelItems()) {
-          ownership = std::max(ownership, item.getPattern()->getOwnership());
+  if (subjectTy->isNoncopyable()) {
+    // Determine the overall ownership behavior of the switch, based on the
+    // subject expression and the patterns' ownership behavior.
+    
+    // If the subject expression is borrowable, then perform the switch as
+    // a borrow. (A `consume` expression would render the expression
+    // non-borrowable.) Otherwise, perform it as a consume.
+    ownership = isBorrowableSubject(*this, subjectExpr)
+      ? ValueOwnership::Shared
+      : ValueOwnership::Owned;
+    for (auto caseLabel : S->getCases()) {
+      for (auto item : caseLabel->getCaseLabelItems()) {
+        ownership = std::max(ownership, item.getPattern()->getOwnership());
+      }
+      // To help migrate early adopters of the feature, if the case body is
+      // obviously trying to return out one of the pattern bindings, which
+      // would necessitate a consuming switch, perform the switch as a consume,
+      // and warn that this will need to be made explicit in the future.
+      if (ownership == ValueOwnership::Shared) {
+        if (auto ret = dyn_cast_or_null<ReturnStmt>(
+              caseLabel->getBody()->getSingleActiveElement()
+                       .dyn_cast<Stmt*>())) {
+          if (ret->hasResult()) {
+            Expr *result = ret->getResult()->getSemanticsProvidingExpr();
+            if (result->getType()->isNoncopyable()) {
+              while (auto conv = dyn_cast<ImplicitConversionExpr>(result)) {
+                result = conv->getSubExpr()->getSemanticsProvidingExpr();
+              }
+              if (auto dr = dyn_cast<DeclRefExpr>(result)) {
+                if (std::find(caseLabel->getCaseBodyVariables().begin(),
+                              caseLabel->getCaseBodyVariables().end(),
+                              dr->getDecl())
+                      != caseLabel->getCaseBodyVariables().end()) {
+                  SGM.diagnose(result->getLoc(),
+                               diag::return_borrowing_switch_binding);
+                  ownership = ValueOwnership::Owned;
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -3379,103 +3531,101 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   
   // Inline constructor for subject.
   auto subject = ([&]() -> ConsumableManagedValue {
-    if (subjectMV.getType().isMoveOnly()) {
-      if (ownership > ValueOwnership::Default) { // should become an assert when BorrowingSwitch is enabled
-        // Based on the ownership behavior, prepare the subject.
-        // The pattern match itself will always be performed on a borrow, to
-        // ensure that the order of pattern evaluation doesn't prematurely
-        // consume or modify the value until we commit to a match. But if the
-        // match consumes the value, then we need a +1 value to go back to in
-        // order to consume the parts we match to, so we force a +1 value then
-        // borrow that for the pattern match.
-        switch (ownership) {
-        case ValueOwnership::Default:
-          llvm_unreachable("invalid");
-        
-        case ValueOwnership::Shared:
-          emission.setNoncopyableBorrowingOwnership();
-          if (subjectMV.getType().isAddress()) {
-            // Initiate a read access on the memory, to ensure that even
-            // if the underlying memory is mutable or consumable, the pattern
-            // match is not allowed to modify it.
-            subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
-            if (subjectMV.getType().isLoadable(F)) {
-              // Load a borrow if the type is loadable.
-              subjectMV = subjectUndergoesFormalAccess
-                ? B.createFormalAccessLoadBorrow(S, subjectMV)
-                : B.createLoadBorrow(S, subjectMV);
-            }
-          } else {
-            // Initiate a fixed borrow on the subject, so that it's treated as
-            // opaque by the move checker.
-            subjectMV =
-                subjectUndergoesFormalAccess
-                    ? B.createFormalAccessBeginBorrow(
-                          S, subjectMV, IsNotLexical, BeginBorrowInst::IsFixed)
-                    : B.createBeginBorrow(S, subjectMV, IsNotLexical,
-                                          BeginBorrowInst::IsFixed);
+    // TODO: Move-only-wrapped subjects should also undergo a noncopying switch.
+    if (subjectMV.getType().isMoveOnly(/*or wrapped*/ false)) {
+      assert(ownership > ValueOwnership::Default);
+      // Based on the ownership behavior, prepare the subject.
+      // The pattern match itself will always be performed on a borrow, to
+      // ensure that the order of pattern evaluation doesn't prematurely
+      // consume or modify the value until we commit to a match. But if the
+      // match consumes the value, then we need a +1 value to go back to in
+      // order to consume the parts we match to, so we force a +1 value then
+      // borrow that for the pattern match.
+      switch (ownership) {
+      case ValueOwnership::Default:
+        llvm_unreachable("invalid");
+      
+      case ValueOwnership::Shared:
+        emission.setNoncopyableBorrowingOwnership();
+        if (subjectMV.getType().isAddress()) {
+          // Initiate a read access on the memory, to ensure that even
+          // if the underlying memory is mutable or consumable, the pattern
+          // match is not allowed to modify it.
+          subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
+          if (subjectMV.getType().isLoadable(F)) {
+            // Load a borrow if the type is loadable.
+            subjectMV = subjectUndergoesFormalAccess
+              ? B.createFormalAccessLoadBorrow(S, subjectMV)
+              : B.createLoadBorrow(S, subjectMV);
           }
-          return {subjectMV, CastConsumptionKind::BorrowAlways};
-          
-        case ValueOwnership::InOut:
-          // TODO: mutating switches
-          llvm_unreachable("not implemented");
-          
-        case ValueOwnership::Owned:
-          // Make sure we own the subject value.
-          subjectMV = subjectMV.ensurePlusOne(*this, S);
-          if (subjectMV.getType().isAddress() &&
-              subjectMV.getType().isLoadable(F)) {
-            // Move the value into memory if it's loadable.
-            subjectMV = B.createLoadTake(S, subjectMV);
-          }
-          
-          // Unwind cleanups to this point when we're ready to reproject
-          // the value for consumption or mutation.
-          emission.setNoncopyableConsumingOwnership(
-            Cleanups.getCleanupsDepth(),
-            subjectMV);
-
-          // Perform the pattern match on an opaque borrow or read access of the
-          // subject.
-          if (subjectMV.getType().isAddress()) {
-            subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
-          } else {
-            subjectMV = B.createBeginBorrow(S, subjectMV, IsNotLexical,
-                                            BeginBorrowInst::IsFixed);
-          }
-          return {subjectMV, CastConsumptionKind::BorrowAlways};
+        } else {
+          // Initiate a fixed borrow on the subject, so that it's treated as
+          // opaque by the move checker.
+          subjectMV =
+              subjectUndergoesFormalAccess
+                  ? B.createFormalAccessBeginBorrow(
+                        S, subjectMV, IsNotLexical, BeginBorrowInst::IsFixed)
+                  : B.createBeginBorrow(S, subjectMV, IsNotLexical,
+                                        BeginBorrowInst::IsFixed);
         }
-        llvm_unreachable("unhandled value ownership");
+        return {subjectMV, CastConsumptionKind::BorrowAlways};
+        
+      case ValueOwnership::InOut:
+        // TODO: mutating switches
+        llvm_unreachable("not implemented");
+        
+      case ValueOwnership::Owned:
+        // Make sure we own the subject value.
+        subjectMV = subjectMV.ensurePlusOne(*this, S);
+        if (subjectMV.getType().isAddress() &&
+            subjectMV.getType().isLoadable(F)) {
+          // Move the value into memory if it's loadable.
+          subjectMV = B.createLoadTake(S, subjectMV);
+        }
+        
+        // Unwind cleanups to this point when we're ready to reproject
+        // the value for consumption or mutation.
+        emission.setNoncopyableConsumingOwnership(
+          Cleanups.getCleanupsDepth(),
+          subjectMV);
+
+        // Perform the pattern match on an opaque borrow or read access of the
+        // subject.
+        if (subjectMV.getType().isAddress()) {
+          subjectMV = B.createOpaqueBorrowBeginAccess(S, subjectMV);
+        } else {
+          subjectMV = B.createBeginBorrow(S, subjectMV, IsNotLexical,
+                                          BeginBorrowInst::IsFixed);
+        }
+        return {subjectMV, CastConsumptionKind::BorrowAlways};
+      }
+      llvm_unreachable("unhandled value ownership");
+    }
+    
+    // TODO: Move-only-wrapped subjects should also undergo a noncopying switch.
+    // For now, unwrap them and perform a normal switch over them.
+    if (subjectMV.getType().isMoveOnlyWrapped()) {
+      if (subjectMV.getType().isAddress()) {
+        auto isPlusOne = subjectMV.isPlusOne(*this);
+        auto subjectAddr
+          = B.createMoveOnlyWrapperToCopyableAddr(S, subjectMV.forward(*this));
+
+        if (isPlusOne) {
+          subjectMV = emitManagedRValueWithCleanup(subjectAddr);
+        } else {
+          subjectMV = ManagedValue::forBorrowedAddressRValue(subjectAddr);
+        }
       } else {
-        // TODO: Remove.
-        // If we have a noImplicitCopy value, ensure plus one and convert
-        // it. Switches always consume move only values.
-        //
-        // NOTE: We purposely do not do this for pure move only types since for them
-        // we emit everything at +0 and then run the BorrowToDestructure transform
-        // upon them. The reason that we do this is that internally to
-        // SILGenPattern, we always attempt to move from +1 -> +0 meaning that even
-        // if we start at +1, we will go back to +0 given enough patterns to go
-        // through. It is simpler to just let SILGenPattern do what it already wants
-        // to do, rather than fight it or try to resusitate the "fake owned borrow"
-        // path that we still use for address only types (and that we want to delete
-        // once we have opaque values).
-        if (subjectMV.getType().isObject()) {
-          if (subjectMV.getType().isMoveOnlyWrapped()) {
-            subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
-                S, subjectMV.ensurePlusOne(*this, S));
-          } else {
-            // If we have a pure move only type and it is owned, borrow it so that
-            // BorrowToDestructure can handle it.
-            if (subjectMV.getOwnershipKind() == OwnershipKind::Owned) {
-              subjectMV = subjectMV.borrow(*this, S);
-            }
-          }
+        if (subjectMV.isPlusOne(*this)) {
+          subjectMV
+            = B.createOwnedMoveOnlyWrapperToCopyableValue(S, subjectMV);
+        } else {
+          subjectMV
+            = B.createGuaranteedMoveOnlyWrapperToCopyableValue(S, subjectMV);
         }
       }
     }
-  
+
     // If we have a plus one value...
     if (subjectMV.isPlusOne(*this)) {
       // And we have an address that is loadable, perform a load [take].

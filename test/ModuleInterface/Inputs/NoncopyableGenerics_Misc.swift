@@ -98,7 +98,7 @@ extension Outer: Copyable {}
 extension Outer.InnerStruct: Copyable {}
 
 extension Outer.InnerVariation1: Copyable {}
-extension Outer.InnerVariation2: Escapable {}
+extension Outer.InnerVariation2: Escapable where A: ~Copyable {}
 
 extension Outer.InnerStruct {
     public func hello<T: ~Escapable>(_ t: T) {}
@@ -106,3 +106,9 @@ extension Outer.InnerStruct {
 
 @_preInverseGenerics
 public func old_swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {}
+
+@_preInverseGenerics
+public func borrowsNoncopyable<T: ~Copyable>(_ t: borrowing T) {}
+
+@_disallowFeatureSuppression(NoncopyableGenerics)
+public func suppressesNoncopyableGenerics<T: ~Copyable>(_ t: borrowing T) {}

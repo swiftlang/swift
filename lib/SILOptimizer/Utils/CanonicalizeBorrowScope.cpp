@@ -140,6 +140,7 @@ SILValue CanonicalizeBorrowScope::getCanonicalBorrowedDef(SILValue def) {
 
       case BorrowedValueKind::LoadBorrow:
       case BorrowedValueKind::Phi:
+      case BorrowedValueKind::BeginApplyToken:
         break;
       }
     }
@@ -170,6 +171,7 @@ bool CanonicalizeBorrowScope::computeBorrowLiveness() {
     // can handle persistentCopies.
     return false;
   case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::BeginApplyToken:
     break;
   }
   // Note that there is no need to look through any reborrows. The reborrowed
@@ -352,9 +354,6 @@ public:
       // For borrows, record the scope-ending instructions to outer use
       // points. Note: The logic in filterOuterBorrowUseInsts that checks
       // whether a borrow scope is an outer use must visit the same set of uses.
-      //
-      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
-      // borrows are disallowed.
       if (!borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
         auto *endInst = endBorrow->getUser();
         if (!isUserInLiveOutBlock(endInst)) {
@@ -362,7 +361,8 @@ public:
         }
         return true;
       })) {
-        useInsts.insert(user);
+        // Bail out on dead borrow scopes and scopes with unknown uses.
+        return false;
       }
     }
     return true;

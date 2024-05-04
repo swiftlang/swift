@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_CLASSMETADATAVISITOR_H
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
@@ -67,6 +68,9 @@ protected:
     : super(IGM), Target(target), VTable(vtable) {}
 
 public:
+  bool isPureObjC() const {
+    return Target->getObjCImplementationDecl();
+  }
 
   // Layout in embedded mode while considering the class type.
   // This is important for adding the right superclass pointer.
@@ -76,6 +80,7 @@ public:
     asImpl().noteAddressPoint();
     asImpl().addEmbeddedSuperclass(classTy);
     asImpl().addDestructorFunction();
+    asImpl().addIVarDestroyer();
     addEmbeddedClassMembers(Target);
   }
 
@@ -87,7 +92,18 @@ public:
       asImpl().noteAddressPoint();
       asImpl().addSuperclass();
       asImpl().addDestructorFunction();
+      asImpl().addIVarDestroyer();
       addEmbeddedClassMembers(Target);
+      return;
+    }
+
+    if (isPureObjC()) {
+      assert(IGM.ObjCInterop);
+      asImpl().noteAddressPoint();
+      asImpl().addMetadataFlags();
+      asImpl().addSuperclass();
+      asImpl().addClassCacheData();
+      asImpl().addClassDataPointer();
       return;
     }
 

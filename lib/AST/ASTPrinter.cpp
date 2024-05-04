@@ -705,6 +705,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     StringRef RawText =
         RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
     trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
+    indent();
     bool FirstLine = true;
     for (auto Line : Lines) {
       if (FirstLine)
@@ -1134,27 +1135,19 @@ public:
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
     }
 
-    // We want to print a newline before doc comments.  Swift code already
-    // handles this, but we need to insert it for clang doc comments when not
-    // printing other clang comments. Do it now so the printDeclPre callback
-    // happens after the newline.
-    if (Options.PrintDocumentationComments &&
-        !Options.PrintRegularClangComments &&
-        D->hasClangNode()) {
-      auto clangNode = D->getClangNode();
-      auto clangDecl = clangNode.getAsDecl();
-      if (clangDecl &&
-          clangDecl->getASTContext().getRawCommentForAnyRedecl(clangDecl)) {
-        Printer.printNewline();
-        indent();
-      }
-    }
-
-
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
     if (Options.PrintCompatibilityFeatureChecks) {
-      printWithCompatibilityFeatureChecks(Printer, Options, D, [&]{
+      printWithCompatibilityFeatureChecks(Printer, Options, D, [&] {
+        // If we are in a scope where non-copyable generics are being suppressed
+        // and we are also printing a decl that has @_preInverseGenerics, make
+        // sure we also suppress printing ownership modifiers that were added
+        // to satisfy the requirements of non-copyability.
+        llvm::SaveAndRestore<bool> scope(
+            Options.SuppressNoncopyableOwnershipModifiers,
+            Options.SuppressNoncopyableGenerics &&
+                D->getAttrs().hasAttribute<PreInverseGenericsAttr>());
+
         ASTVisitor::visit(D);
       });
     } else {
@@ -1690,14 +1683,11 @@ void PrintAST::printGenericSignature(GenericSignature genericSig,
 static void eraseInvertibleProtocolConformances(
     SmallVectorImpl<Requirement> &requirements) {
   llvm::erase_if(requirements, [&](Requirement req) {
-      if (req.getKind() == RequirementKind::Conformance) {
-        if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
-          auto proto = protoType->getDecl();
-          return proto->getInvertibleProtocolKind().has_value();
-        }
-      }
+      if (req.getKind() != RequirementKind::Conformance)
+        return false;
 
-      return false;
+      return req.getProtocolDecl()
+          ->getInvertibleProtocolKind().has_value();
     });
 }
 
@@ -2727,7 +2717,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
       if (!member->shouldPrintInContext(Options))
         continue;
 
-      if (Options.EmptyLineBetweenMembers)
+      if (Options.EmptyLineBetweenDecls)
         Printer.printNewline();
       indent();
       visit(member);
@@ -2803,6 +2793,8 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
+      if (inherited.isSuppressed())
+        Printer << "~";
     });
   }, [&]() {
     Printer << ", ";
@@ -3128,6 +3120,13 @@ static void suppressingFeatureOptionalIsolatedParameters(
   action();
 }
 
+static void suppressingFeatureTransferringArgsAndResults(
+    PrintOptions &options, llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressTransferringArgsAndResults,
+                                   true);
+  action();
+}
+
 static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
@@ -3139,9 +3138,23 @@ static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
 static void suppressingFeatureNoncopyableGenerics(
     PrintOptions &options,
     llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::PreInverseGenerics);
   llvm::SaveAndRestore<bool> scope(
       options.SuppressNoncopyableGenerics, true);
   action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void
+suppressingFeatureConformanceSuppression(PrintOptions &options,
+                                         llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::PreInverseGenerics);
+  llvm::SaveAndRestore<bool> scope(options.SuppressConformanceSuppression,
+                                   true);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 /// Suppress the printing of a particular feature.
@@ -3685,7 +3698,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
-  if (flags.isTransferring())
+  if (!options.SuppressTransferringArgsAndResults && flags.isTransferring())
     printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
@@ -3696,10 +3709,14 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("inout", options, " ");
     break;
   case ParamSpecifier::Borrowing:
-    printer.printKeyword("borrowing", options, " ");
+    if (!options.SuppressNoncopyableOwnershipModifiers) {
+      printer.printKeyword("borrowing", options, " ");
+    }
     break;
   case ParamSpecifier::Consuming:
-    printer.printKeyword("consuming", options, " ");
+    if (!options.SuppressNoncopyableOwnershipModifiers) {
+      printer.printKeyword("consuming", options, " ");
+    }
     break;
   case ParamSpecifier::LegacyShared:
     printer.printKeyword("__shared", options, " ");
@@ -4011,6 +4028,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
 
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
   case AccessorKind::Modify:
@@ -4136,24 +4154,20 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(
                 decl->getResultTypeRepr())) {
           for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << " " << dep.getLifetimeDependenceKindString() << "(";
-            Printer << dep.getParamString() << ") ";
+            Printer << " " << dep.getLifetimeDependenceSpecifierString() << " ";
           }
         }
       }
-      {
-        auto fnTy = decl->getInterfaceType();
-        bool hasTransferring = false;
-        if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
-          if (ft->hasExtInfo())
-            hasTransferring = ft->hasTransferringResult();
-        } else if (auto *ft =
-                       llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
-          if (ft->hasExtInfo())
-            hasTransferring = ft->hasTransferringResult();
-        }
-        if (hasTransferring)
+
+      if (!Options.SuppressTransferringArgsAndResults) {
+        if (decl->hasTransferringResult()) {
           Printer << "transferring ";
+        } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
+                       decl->getInterfaceType())) {
+          if (ft->hasExtInfo() && ft->hasTransferringResult()) {
+            Printer << "transferring ";
+          }
+        }
       }
 
       // HACK: When printing result types for funcs with opaque result types,
@@ -4377,8 +4391,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
         auto *typeRepr =
             cast<LifetimeDependentReturnTypeRepr>(decl->getResultTypeRepr());
         for (auto &dep : typeRepr->getLifetimeDependencies()) {
-          Printer << dep.getLifetimeDependenceKindString() << "(";
-          Printer << dep.getParamString() << ") ";
+          Printer << dep.getLifetimeDependenceSpecifierString() << " ";
         }
         // TODO: Handle failable initializers with lifetime dependent returns
         Printer << "Self";
@@ -5948,7 +5961,7 @@ public:
 
   void visitErrorType(ErrorType *T) {
     if (auto originalType = T->getOriginalType()) {
-      if (Options.PrintInSILBody)
+      if (Options.PrintTypesForDebugging || Options.PrintInSILBody)
         Printer << "@error_type ";
       visit(originalType);
     }
@@ -6615,7 +6628,8 @@ public:
 
     Printer << " -> ";
 
-    if (T->hasExtInfo() && T->hasTransferringResult()) {
+    if (!Options.SuppressTransferringArgsAndResults && T->hasExtInfo() &&
+        T->hasTransferringResult()) {
       Printer.printKeyword("transferring ", Options);
     }
 
@@ -7485,7 +7499,7 @@ std::string GenericSignature::getAsString() const {
   return out.str();
 }
 
-static StringRef getStringForParameterConvention(ParameterConvention conv) {
+StringRef swift::getStringForParameterConvention(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In: return "@in ";
   case ParameterConvention::Indirect_In_Guaranteed:  return "@in_guaranteed ";
@@ -7766,14 +7780,16 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
                                           llvm::SmallVectorImpl<InheritedEntry> &Results) {
   auto &ctx = proto->getASTContext();
 
-  if (auto superclassTy = proto->getSuperclass()) {
+  auto genericSig = proto->getGenericSignature();
+  if (auto superclassTy = genericSig->getSuperclassBound(
+        proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
                          /*isUnchecked=*/false,
                          /*isRetroactive=*/false,
                          /*isPreconcurrency=*/false);
   }
 
-  InvertibleProtocolSet inverses = InvertibleProtocolSet::full();
+  InvertibleProtocolSet inverses = InvertibleProtocolSet::allKnown();
 
   for (auto *inherited : proto->getInheritedProtocols()) {
     if (auto ip = inherited->getInvertibleProtocolKind()) {
@@ -7781,7 +7797,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
       continue;
     }
 
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
       if (inherited->inheritsFrom(proto))
         inverses.remove(ip);
@@ -7852,6 +7868,10 @@ swift::getInheritedForPrinting(
           if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Copyable))
             continue;
       }
+    }
+    if (options.SuppressConformanceSuppression &&
+        inherited.getEntry(i).isSuppressed()) {
+      continue;
     }
 
     Results.push_back(inherited.getEntry(i));

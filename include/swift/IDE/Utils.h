@@ -171,7 +171,7 @@ private:
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
   bool IsRef = true;
-  Type Ty;
+  Type SolutionSpecificInterfaceType;
   Type ContainerType;
   std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
       std::nullopt;
@@ -196,13 +196,15 @@ public:
   ResolvedValueRefCursorInfo() = default;
   explicit ResolvedValueRefCursorInfo(
       SourceFile *SF, SourceLoc Loc, ValueDecl *ValueD, TypeDecl *CtorTyRef,
-      ExtensionDecl *ExtTyRef, bool IsRef, Type Ty, Type ContainerType,
+      ExtensionDecl *ExtTyRef, bool IsRef, Type SolutionSpecificInterfaceType,
+      Type ContainerType,
       std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
       bool IsKeywordArgument, bool IsDynamic,
       SmallVector<NominalTypeDecl *> ReceiverTypes,
       SmallVector<ValueDecl *> ShorthandShadowedDecls)
       : ResolvedCursorInfo(CursorInfoKind::ValueRef, SF, Loc), ValueD(ValueD),
-        CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef), Ty(Ty),
+        CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef),
+        SolutionSpecificInterfaceType(SolutionSpecificInterfaceType),
         ContainerType(ContainerType), CustomAttrRef(CustomAttrRef),
         IsKeywordArgument(IsKeywordArgument), IsDynamic(IsDynamic),
         ReceiverTypes(ReceiverTypes),
@@ -216,7 +218,9 @@ public:
 
   bool isRef() const { return IsRef; }
 
-  Type getType() const { return Ty; }
+  Type getSolutionSpecificInterfaceType() const {
+    return SolutionSpecificInterfaceType;
+  }
 
   Type getContainerType() const { return ContainerType; }
 

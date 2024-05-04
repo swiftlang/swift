@@ -28,6 +28,10 @@ private extension ConvertEscapeToNoEscapeInst {
   ///   %3 = thin_to_thick_function %1 to $@noescape () -> ()
 
   func tryCombineWithThinToThickOperand(_ context: SimplifyContext) {
+    // compiling bridged.getFunctionTypeWithNoEscape crashes the 5.10 Windows compiler
+#if !os(Windows)
+    // TODO: https://github.com/apple/swift/issues/73253
+
     if let thinToThick = fromFunction as? ThinToThickFunctionInst {
       let builder = Builder(before: self, context)
       let noEscapeFnType = thinToThick.type.getFunctionType(withNoEscape: true)
@@ -36,5 +40,6 @@ private extension ConvertEscapeToNoEscapeInst {
       uses.replaceAll(with: newThinToThick, context)
       context.erase(instruction: self)
     }
+#endif
   }
 }

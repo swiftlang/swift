@@ -521,9 +521,14 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
-      Context.Diags.diagnose(
-          Loc, diag::candidate_inaccessible, first,
-          first->getFormalAccessScope().accessLevelForDiagnostics());
+      auto accessLevel =
+          first->getFormalAccessScope().accessLevelForDiagnostics();
+      if (accessLevel == AccessLevel::Public &&
+          diagnoseMissingImportForMember(first, DC, Loc))
+        return errorResult();
+
+      Context.Diags.diagnose(Loc, diag::candidate_inaccessible, first,
+                             accessLevel);
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
@@ -1101,6 +1106,8 @@ namespace {
     VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc) ;
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      auto &diags = Ctx.Diags;
+
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
@@ -1143,11 +1150,39 @@ namespace {
       // Resolve 'super' references.
       if (auto *superRef = dyn_cast<SuperRefExpr>(expr)) {
         auto loc = superRef->getLoc();
+
         auto *selfDecl = getImplicitSelfDeclForSuperContext(loc);
         if (selfDecl == nullptr)
-          return finish(true, new (Ctx) ErrorExpr(loc));
+          return finish(false, new (Ctx) ErrorExpr(loc));
 
         superRef->setSelf(selfDecl);
+
+        const bool isValidSuper = [&]() -> bool {
+          auto *parentExpr = Parent.getAsExpr();
+          if (!parentExpr) {
+            return false;
+          }
+
+          if (isa<UnresolvedDotExpr>(parentExpr) ||
+              isa<MemberRefExpr>(parentExpr)) {
+            return true;
+          } else if (auto *SE = dyn_cast<SubscriptExpr>(parentExpr)) {
+            // 'super[]' is valid, but 'x[super]' is not.
+            return superRef == SE->getBase();
+          }
+
+          return false;
+        }();
+
+        // NB: This is done along the happy path because presenting this error
+        // in a context where 'super' is not legal to begin with is not helpful.
+        if (!isValidSuper) {
+          // Diagnose and keep going. It is important for source tooling such
+          // as code completion that Sema is able to provide type information
+          // for 'super' in arbitrary positions inside expressions.
+          diags.diagnose(loc, diag::super_invalid_parent_expr);
+        }
+
         return finish(true, superRef);
       }
 
@@ -1188,8 +1223,8 @@ namespace {
             auto *DRE = cast<DeclRefExpr>(refExpr);
             if (accessor->getImplicitSelfDecl() == DRE->getDecl() &&
                 !isa_and_nonnull<UnresolvedDotExpr>(Parent.getAsExpr())) {
-              Ctx.Diags.diagnose(unresolved->getLoc(),
-                                 diag::invalid_use_of_self_in_init_accessor);
+              diags.diagnose(unresolved->getLoc(),
+                             diag::invalid_use_of_self_in_init_accessor);
               refExpr = new (Ctx) ErrorExpr(unresolved->getSourceRange());
             }
           }
@@ -1235,24 +1270,21 @@ namespace {
             // a member reference, it might be valid to have `&`
             // before all of the parens.
             if (lastInnerParenLoc.isValid()) {
-              auto &DE = getASTContext().Diags;
-              auto diag = DE.diagnose(expr->getStartLoc(),
-                                      diag::extraneous_address_of);
+              auto diag = diags.diagnose(expr->getStartLoc(),
+                                         diag::extraneous_address_of);
               diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
             }
             return finish(true, expr);
           }
 
           if (isa<SubscriptExpr>(parent)) {
-            getASTContext().Diags.diagnose(
-                expr->getStartLoc(),
-                diag::cannot_pass_inout_arg_to_subscript);
+            diags.diagnose(expr->getStartLoc(),
+                           diag::cannot_pass_inout_arg_to_subscript);
             return finish(false, nullptr);
           }
         }
 
-        getASTContext().Diags.diagnose(expr->getStartLoc(),
-                                       diag::extraneous_address_of);
+        diags.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
         return finish(false, nullptr);
       }
 
@@ -1805,8 +1837,26 @@ void PreCheckExpression::markAcceptableDiscardExprs(Expr *E) {
 
 VarDecl *PreCheckExpression::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
   auto *methodContext = DC->getInnermostMethodContext();
-  if (!methodContext) {
-    Ctx.Diags.diagnose(Loc, diag::super_not_in_class_method);
+
+  if (auto *typeContext = DC->getInnermostTypeContext()) {
+    auto *nominal = typeContext->getSelfNominalTypeDecl();
+    auto *classDecl = dyn_cast<ClassDecl>(nominal);
+
+    if (!classDecl) {
+      Ctx.Diags.diagnose(Loc, diag::super_in_nonclass_type, nominal);
+      return nullptr;
+    } else if (!methodContext) {
+      Ctx.Diags.diagnose(Loc, diag::super_invalid_context);
+      return nullptr;
+    } else if (!classDecl->hasSuperclass()) {
+      Ctx.Diags.diagnose(
+          Loc, diag::super_no_superclass,
+          /*isExtension*/ isa<ExtensionDecl>(typeContext->getAsDecl()),
+          classDecl);
+      return nullptr;
+    }
+  } else {
+    Ctx.Diags.diagnose(Loc, diag::super_invalid_context);
     return nullptr;
   }
 
@@ -1826,10 +1876,37 @@ VarDecl *PreCheckExpression::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
   return methodSelf;
 }
 
+/// Check whether this expression refers to the ~ operator.
+static bool isTildeOperator(Expr *expr) {
+  auto nameMatches = [&](DeclName name) {
+    return name.isOperator() && name.getBaseName().getIdentifier().is("~");
+  };
+
+  if (auto overload = dyn_cast<OverloadedDeclRefExpr>(expr)) {
+    return llvm::any_of(overload->getDecls(), [=](auto *decl) -> bool {
+      return nameMatches(decl->getName());
+    });
+  }
+
+  if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+    return nameMatches(unresolved->getName().getFullName());
+  }
+
+  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+    return nameMatches(declRef->getDecl()->getName());
+  }
+
+  return false;
+}
+
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
+  // If it's already a type expression, return it.
+  if (auto typeExpr = dyn_cast<TypeExpr>(E))
+    return typeExpr;
+
   // Fold member types.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
@@ -2081,6 +2158,17 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
   
+  // Fold '~P' into a composition type.
+  if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(E)) {
+    if (isTildeOperator(unaryExpr->getFn())) {
+      if (auto operand = simplifyTypeExpr(unaryExpr->getOperand())) {
+        auto inverseTypeRepr = new (Ctx) InverseTypeRepr(
+            unaryExpr->getLoc(), operand->getTypeRepr());
+        return new (Ctx) TypeExpr(inverseTypeRepr);
+      }
+    }
+  }
+
   // Fold 'P & Q' into a composition type
   if (auto *binaryExpr = getCompositionExpr(E)) {
     // The protocols we are composing

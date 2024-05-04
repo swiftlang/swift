@@ -6,7 +6,7 @@
 // REQUIRES: optimized_stdlib
 
 // rdar://124539686
-// UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=arm64e, CPU=arm64
 
 import StdlibUnittest
 import StdlibUnicodeUnittest
@@ -115,9 +115,7 @@ if #available(SwiftStdlib 5.9, *) {
       check(string, test.pieces)
     }
   }
-}
 
-if #available(SwiftStdlib 5.8, *) {
   StringGraphemeBreaking.test("GB11") {
     // MAN, ZERO WIDTH JOINER, ZERO WIDTH JOINER, GIRL
     let string = "\u{1f468}\u{200d}\u{200d}\u{1f467}"

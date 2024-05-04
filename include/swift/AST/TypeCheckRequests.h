@@ -16,23 +16,25 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
-#include "swift/AST/ActorIsolation.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/ActorIsolation.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/Type.h"
-#include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TaggedUnion.h"
+#include "swift/Basic/TypeID.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -51,6 +53,7 @@ class DoCatchStmt;
 struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
+class InverseTypeRepr;
 class LabeledStmt;
 class MacroDefinition;
 class PrecedenceGroupDecl;
@@ -78,13 +81,75 @@ void simple_display(
 
 void simple_display(llvm::raw_ostream &out, ASTContext *ctx);
 
+/// Emulates the following enum with associated values:
+/// enum InheritedTypeResult {
+///     case inherited(Type)
+///     case suppressed(Type, InverseTypeRepr *)
+///     case `default`
+/// }
+class InheritedTypeResult {
+  struct Inherited_ {
+    Type ty;
+  };
+  struct Suppressed_ {
+    // The type which is suppressed.  Not the result of inverting a protocol.
+    Type ty;
+    InverseTypeRepr *repr;
+  };
+  struct Default_ {};
+  using Payload = TaggedUnion<Inherited_, Suppressed_, Default_>;
+  Payload payload;
+  InheritedTypeResult(Payload payload) : payload(payload) {}
+
+public:
+  enum Kind { Inherited, Suppressed, Default };
+  static InheritedTypeResult forInherited(Type ty) { return {Inherited_{ty}}; }
+  static InheritedTypeResult forSuppressed(Type ty, InverseTypeRepr *repr) {
+    return {Suppressed_{ty, repr}};
+  }
+  static InheritedTypeResult forDefault() { return {Default_{}}; }
+  operator Kind() {
+    if (payload.isa<Inherited_>()) {
+      return Kind::Inherited;
+    } else if (payload.isa<Suppressed_>()) {
+      return Kind::Suppressed;
+    }
+    return Kind::Default;
+  }
+  explicit operator bool() { return !payload.isa<Default_>(); }
+  Type getInheritedTypeOrNull(ASTContext &ctx) {
+    switch (*this) {
+    case Inherited:
+      return getInheritedType();
+    case Suppressed: {
+      auto suppressed = getSuppressed();
+      auto kp = suppressed.first->getKnownProtocol();
+      if (!kp)
+        return Type();
+      auto ipk = getInvertibleProtocolKind(*kp);
+      if (!ipk)
+        return Type();
+      return ProtocolCompositionType::getInverseOf(ctx, *ipk);
+    }
+    case Default:
+      return Type();
+    }
+  }
+  Type getInheritedType() { return payload.get<Inherited_>().ty; }
+  std::pair<Type, InverseTypeRepr *> getSuppressed() {
+    auto &suppressed = payload.get<Suppressed_>();
+    return {suppressed.ty, suppressed.repr};
+  }
+};
+
 /// Request the type from the ith entry in the inheritance clause for the
 /// given declaration.
 class InheritedTypeRequest
     : public SimpleRequest<
           InheritedTypeRequest,
-          Type(llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
-               unsigned, TypeResolutionStage),
+          InheritedTypeResult(
+              llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
+              unsigned, TypeResolutionStage),
           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -93,12 +158,13 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type
+  InheritedTypeResult
   evaluate(Evaluator &evaluator,
            llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
            unsigned index, TypeResolutionStage stage) const;
 
-  const TypeLoc &getTypeLoc() const;
+  const InheritedEntry &getInheritedEntry() const;
+  ASTContext &getASTContext() const;
 
 public:
   // Source location
@@ -106,14 +172,14 @@ public:
 
   // Caching
   bool isCached() const;
-  std::optional<Type> getCachedResult() const;
-  void cacheResult(Type value) const;
+  std::optional<InheritedTypeResult> getCachedResult() const;
+  void cacheResult(InheritedTypeResult value) const;
 };
 
 /// Request the superclass type for the given class.
 class SuperclassTypeRequest
     : public SimpleRequest<
-          SuperclassTypeRequest, Type(NominalTypeDecl *, TypeResolutionStage),
+          SuperclassTypeRequest, Type(ClassDecl *, TypeResolutionStage),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -123,7 +189,7 @@ private:
 
   // Evaluation.
   Type
-  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl,
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl,
            TypeResolutionStage stage) const;
 
 public:
@@ -3025,7 +3091,7 @@ public:
 
 /// Checks if the Distributed module is available.
 class DistributedModuleIsAvailableRequest
-    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
+    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(const ValueDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3034,7 +3100,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  bool evaluate(Evaluator &evaluator, const ValueDecl *decl) const;
 
 public:
   // Cached.
@@ -4840,6 +4906,104 @@ private:
 
   ObjCRequirementMap evaluate(Evaluator &evaluator,
                               const ProtocolDecl *proto) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Finds the import declaration that effectively imports a given module in a
+/// source file.
+class ImportDeclRequest
+    : public SimpleRequest<ImportDeclRequest,
+                           std::optional<AttributedImport<ImportedModule>>(
+                               const SourceFile *sf, const ModuleDecl *mod),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<AttributedImport<ImportedModule>>
+  evaluate(Evaluator &evaluator, const SourceFile *sf,
+           const ModuleDecl *mod) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class LifetimeDependenceInfoRequest
+    : public SimpleRequest<LifetimeDependenceInfoRequest,
+                           std::optional<LifetimeDependenceInfo>(
+                               AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<LifetimeDependenceInfo>
+  evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+
+};
+
+class CaptureInfoRequest :
+    public SimpleRequest<CaptureInfoRequest,
+                         CaptureInfo(AbstractFunctionDecl *),
+                         RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CaptureInfo evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<CaptureInfo> getCachedResult() const;
+  void cacheResult(CaptureInfo value) const;
+};
+
+class ParamCaptureInfoRequest :
+    public SimpleRequest<ParamCaptureInfoRequest,
+                         CaptureInfo(ParamDecl *),
+                         RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CaptureInfo evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<CaptureInfo> getCachedResult() const;
+  void cacheResult(CaptureInfo value) const;
+};
+
+class SuppressesConformanceRequest
+    : public SimpleRequest<SuppressesConformanceRequest,
+                           bool(NominalTypeDecl *decl, KnownProtocolKind kp),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                KnownProtocolKind kp) const;
 
 public:
   bool isCached() const { return true; }

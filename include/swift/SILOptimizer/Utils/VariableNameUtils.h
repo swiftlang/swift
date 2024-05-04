@@ -192,6 +192,15 @@ public:
 
   StringRef getName() const { return resultingString; }
 
+  /// Given a specific SILValue, construct a VariableNameInferrer and use it to
+  /// attempt to infer an identifier for the value.
+  static std::optional<Identifier> inferName(SILValue value);
+
+  /// Given a specific SILValue, construct a VariableNameInferrer and use it to
+  /// attempt to infer an identifier for the value and a named value.
+  static std::optional<std::pair<Identifier, SILValue>>
+  inferNameAndRoot(SILValue value);
+
 private:
   void drainVariableNamePath();
   void popSingleVariableName();

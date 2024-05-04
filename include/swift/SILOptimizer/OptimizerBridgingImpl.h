@@ -130,6 +130,26 @@ BridgedFunction BridgedNodeSet::getFunction() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                            BridgedOperandSet
+//===----------------------------------------------------------------------===//
+
+bool BridgedOperandSet::contains(BridgedOperand operand) const {
+  return set->contains(operand.op);
+}
+
+bool BridgedOperandSet::insert(BridgedOperand operand) const {
+  return set->insert(operand.op);
+}
+
+void BridgedOperandSet::erase(BridgedOperand operand) const {
+  set->erase(operand.op);
+}
+
+BridgedFunction BridgedOperandSet::getFunction() const {
+  return {set->getFunction()};
+}
+
+//===----------------------------------------------------------------------===//
 //                            BridgedPassContext
 //===----------------------------------------------------------------------===//
 
@@ -254,6 +274,14 @@ BridgedNodeSet BridgedPassContext::allocNodeSet() const {
 
 void BridgedPassContext::freeNodeSet(BridgedNodeSet set) const {
   invocation->freeNodeSet(set.set);
+}
+
+BridgedOperandSet BridgedPassContext::allocOperandSet() const {
+  return {invocation->allocOperandSet()};
+}
+
+void BridgedPassContext::freeOperandSet(BridgedOperandSet set) const {
+  invocation->freeOperandSet(set.set);
 }
 
 void BridgedPassContext::notifyInvalidatedStackNesting() const {

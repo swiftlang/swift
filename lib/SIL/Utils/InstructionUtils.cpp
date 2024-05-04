@@ -506,6 +506,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::ProjectExistentialBoxInst:
@@ -746,6 +747,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
   case SILInstructionKind::CopyAddrInst: {
     auto *ca = cast<CopyAddrInst>(inst);
+    if (ca->getSrc()->getType().isTrivial(ca->getFunction()))
+      return RuntimeEffect::NoEffect;
     impactType = ca->getSrc()->getType();
     if (!ca->isInitializationOfDest())
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;

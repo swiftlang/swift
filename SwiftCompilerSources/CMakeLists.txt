@@ -98,13 +98,6 @@ function(add_swift_compiler_modules_library name)
                         "DEPENDS"
                         ${ARGN})
 
-  # Prior to 5.9, we have to use the experimental flag for C++ interop.
-  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-    set(cxx_interop_flag "-enable-experimental-cxx-interop")
-  else()
-    set(cxx_interop_flag "-cxx-interoperability-mode=default")
-  endif()
-
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
@@ -113,6 +106,13 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    list(APPEND swift_compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
+  else()
+    list(APPEND swift_compile_options "-cxx-interoperability-mode=default")
+  endif()
 
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
@@ -129,7 +129,9 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-O" "-cross-module-optimization")
   endif()
 
-  if(NOT LLVM_ENABLE_ASSERTIONS)
+  if(LLVM_ENABLE_ASSERTIONS)
+    list(APPEND swift_compile_options "-Xcc" "-UNDEBUG")
+  else()
     list(APPEND swift_compile_options "-Xcc" "-DNDEBUG")
   endif()
 
@@ -166,7 +168,17 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-  list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND swift_compile_options "-static")
+    list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
+
+    # Workaround a crash in the LoadableByAddress pass
+    # https://github.com/apple/swift/issues/73254
+    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
+  else()
+    list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+  endif()
 
   set(all_obj_files)
   set(all_module_targets)
@@ -304,7 +316,7 @@ else()
 
   elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
 
-    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
+    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0 copy-legacy-layouts)
     set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
     if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       list(APPEND b0_deps swiftCore-bootstrapping0)

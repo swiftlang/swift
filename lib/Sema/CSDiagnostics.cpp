@@ -455,8 +455,28 @@ bool RequirementFailure::diagnoseAsError() {
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
-    emitDiagnostic(diag::type_does_not_conform_in_opaque_return,
-                   namingDecl, lhs, rhs, rhs->isAnyObject());
+
+    auto &req = getRequirement();
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+      emitDiagnostic(diag::type_does_not_conform_in_opaque_return, namingDecl,
+                     lhs, rhs, rhs->isAnyObject());
+      break;
+
+    case RequirementKind::Superclass:
+      emitDiagnostic(diag::types_not_inherited_in_opaque_return, namingDecl,
+                    lhs, rhs);
+      break;
+
+    case RequirementKind::SameType:
+      emitDiagnostic(diag::type_is_not_equal_in_opaque_return, namingDecl, lhs,
+                     rhs);
+      break;
+
+    case RequirementKind::SameShape:
+      return false;
+    }
 
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
       emitDiagnosticAt(repr->getLoc(), diag::opaque_return_type_declared_here)
@@ -4658,6 +4678,7 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
       break;
 
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Read:
     case AccessorKind::Modify:
     case AccessorKind::Address:
@@ -6166,6 +6187,10 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
   auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
+  if (accessLevel == AccessLevel::Public &&
+      diagnoseMissingImportForMember(Member, getDC(), loc))
+    return true;
+
   if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
     emitDiagnosticAt(loc, diag::init_candidate_inaccessible,
                      CD->getResultInterfaceType(), accessLevel)
@@ -6391,8 +6416,7 @@ bool NotCopyableFailure::diagnoseAsError() {
       return false;
     };
 
-    // NOTE: a non-requirement constraint locator might now be impossible after
-    // having made Copyable a Requirement in Feature::NoncopyableGenerics
+    // NOTE: a non-requirement constraint locator might now be impossible.
     if (diagnoseGenericTypeParamType(loc->getGenericParameter()))
       return true;
 

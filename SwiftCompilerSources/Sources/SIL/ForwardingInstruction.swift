@@ -66,11 +66,8 @@ extension Value {
   // If this value is produced by a ForwardingInstruction, return that instruction. This is convenient for following the forwarded value chain.
   // Unlike definingInstruction, a value's forwardingInstruction is not necessarily a valid insertion point. 
   public var forwardingInstruction: ForwardingInstruction? {
-    if let inst = definingInstruction {
+    if let inst = definingInstructionOrTerminator {
       return inst as? ForwardingInstruction
-    }
-    if let termResult = TerminatorResult(self) {
-      return termResult.terminator as? ForwardingInstruction
     }
     return nil
   }
@@ -319,6 +316,12 @@ extension UncheckedValueCastInst : ConversionInstruction {
   public var canForwardOwnedValues: Bool { true }
 }
 
+extension DropDeinitInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { false }
+  public var canForwardOwnedValues: Bool { true }
+}
+
 // -----------------------------------------------------------------------------
 // other forwarding instructions
 
@@ -436,6 +439,14 @@ extension LinearFunctionExtractInst: ForwardingInstruction {
   public var preservesRepresentation: Bool { true }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
+}
+
+extension BorrowedFromInst: ForwardingInstruction {
+  public var singleForwardedOperand: Operand? { operands[0] }
+  public var preservesIdentity: Bool { true }
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
 }
 
 // -----------------------------------------------------------------------------

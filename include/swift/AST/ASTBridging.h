@@ -483,12 +483,13 @@ BridgedAlignmentAttr_createParsed(BridgedASTContext cContext,
                                   BridgedSourceLoc cAtLoc,
                                   BridgedSourceRange cRange, size_t cValue);
 
-SWIFT_NAME("BridgedAllowFeatureSuppressionAttr.createParsed(_:atLoc:range:features:)")
+SWIFT_NAME("BridgedAllowFeatureSuppressionAttr.createParsed(_:atLoc:range:inverted:features:)")
 BridgedAllowFeatureSuppressionAttr
 BridgedAllowFeatureSuppressionAttr_createParsed(
                                   BridgedASTContext cContext,
                                   BridgedSourceLoc cAtLoc,
                                   BridgedSourceRange cRange,
+                                  bool inverted,
                                   BridgedArrayRef cFeatures);
 
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:)")
@@ -624,10 +625,10 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
     BridgedArrayRef cNameLocs, BridgedArrayRef cNames,
     BridgedSourceLoc cRParenLoc);
 
-SWIFT_NAME("BridgedObjCImplementationAttr.createParsed(_:atLoc:range:name:)")
+SWIFT_NAME("BridgedObjCImplementationAttr.createParsed(_:atLoc:range:name:isEarlyAdopter:)")
 BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cName);
+    BridgedSourceRange cRange, BridgedIdentifier cName, bool isEarlyAdopter);
 
 SWIFT_NAME("BridgedObjCRuntimeNameAttr.createParsed(_:atLoc:range:name:)")
 BridgedObjCRuntimeNameAttr BridgedObjCRuntimeNameAttr_createParsed(

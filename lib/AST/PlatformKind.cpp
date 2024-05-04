@@ -107,11 +107,14 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
     return PlatformKind::tvOS;
   case PlatformKind::watchOSApplicationExtension:
     return PlatformKind::watchOS;
+  case PlatformKind::visionOSApplicationExtension:
+    return PlatformKind::visionOS;
   case PlatformKind::macOS:
   case PlatformKind::iOS:
   case PlatformKind::macCatalyst:
   case PlatformKind::tvOS:
   case PlatformKind::watchOS:
+  case PlatformKind::visionOS:
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
@@ -122,7 +125,8 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
 
 static bool isPlatformActiveForTarget(PlatformKind Platform,
                                       const llvm::Triple &Target,
-                                      bool EnableAppExtensionRestrictions) {
+                                      bool EnableAppExtensionRestrictions,
+                                      bool ForRuntimeQuery) {
   if (Platform == PlatformKind::none)
     return true;
 
@@ -137,6 +141,9 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
       return Target.isMacOSX();
     case PlatformKind::iOS:
     case PlatformKind::iOSApplicationExtension:
+      if (!ForRuntimeQuery && Target.isXROS()) {
+        return true;
+      }
       return Target.isiOS() && !Target.isTvOS();
     case PlatformKind::macCatalyst:
     case PlatformKind::macCatalystApplicationExtension:
@@ -147,6 +154,9 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
     case PlatformKind::watchOS:
     case PlatformKind::watchOSApplicationExtension:
       return Target.isWatchOS();
+    case PlatformKind::visionOS:
+    case PlatformKind::visionOSApplicationExtension:
+      return Target.isXROS();
     case PlatformKind::OpenBSD:
       return Target.isOSOpenBSD();
     case PlatformKind::Windows:
@@ -158,15 +168,16 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
 }
 
 bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
-                             bool ForTargetVariant) {
+                             bool ForTargetVariant, bool ForRuntimeQuery) {
   if (ForTargetVariant) {
     assert(LangOpts.TargetVariant && "Must have target variant triple");
     return isPlatformActiveForTarget(Platform, *LangOpts.TargetVariant,
-                                     LangOpts.EnableAppExtensionRestrictions);
+                                     LangOpts.EnableAppExtensionRestrictions,
+                                     ForRuntimeQuery);
   }
 
   return isPlatformActiveForTarget(Platform, LangOpts.Target,
-                                   LangOpts.EnableAppExtensionRestrictions);
+                                   LangOpts.EnableAppExtensionRestrictions, ForRuntimeQuery);
 }
 
 PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
@@ -198,6 +209,12 @@ PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
                 : PlatformKind::iOS);
   }
 
+  if (LangOpts.Target.isXROS()) {
+    return (LangOpts.EnableAppExtensionRestrictions
+            ? PlatformKind::visionOSApplicationExtension
+            : PlatformKind::visionOS);
+  }
+
   return PlatformKind::none;
 }
 
@@ -212,6 +229,16 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
     return true;
 
   if (Child == PlatformKind::macCatalystApplicationExtension) {
+    if (Parent == PlatformKind::iOS ||
+        Parent == PlatformKind::iOSApplicationExtension) {
+      return true;
+    }
+  }
+
+  if (Child == PlatformKind::visionOS && Parent == PlatformKind::iOS)
+    return true;
+
+  if (Child == PlatformKind::visionOSApplicationExtension) {
     if (Parent == PlatformKind::iOS ||
         Parent == PlatformKind::iOSApplicationExtension) {
       return true;

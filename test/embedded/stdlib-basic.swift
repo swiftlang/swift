@@ -4,6 +4,9 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: CODEGENERATOR=ARM
 
+// https://github.com/apple/swift/issues/73249
+// UNSUPPORTED: OS=windows-msvc
+
 public func bool() -> Bool {
   return true
 }

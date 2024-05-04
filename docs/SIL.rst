@@ -4297,7 +4297,6 @@ less verbose.
    debug-var-attr ::= 'let'
    debug-var-attr ::= 'name' string-literal
    debug-var-attr ::= 'argno' integer-literal
-   debug-var-attr ::= 'implicit'
 
 There are a number of attributes that provide details about the source
 variable that is being described, including the name of the
@@ -4613,6 +4612,38 @@ the original SILValue can not be modified. This means that:
 2. If ``%0`` is a non-trivial value, ``%0`` can not be destroyed.
 
 We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
+
+This instruction is only valid in functions in Ownership SSA form.
+
+borrowed from
+`````````````
+
+::
+
+   sil-instruction ::= 'borrowed' sil-operand 'from' '(' (sil-operand (',' sil-operand)*)? ')'
+
+   bb1(%1 : @owned $T, %2 : @guaranteed $T):
+     %3 = borrowed %2 : $T from (%1 : $T, %0 : $S)
+     // %3 has type $T and guaranteed ownership
+
+Declares from which enclosing values a guaranteed phi argument is borrowed
+from.
+An enclosing value is either a dominating borrow introducer (``%0``) of the
+borrowed operand (``%2``) or an adjacent phi-argument in the same block
+(``%1``).
+In case of an adjacent phi, all incoming values of the adjacent phi must be
+borrow introducers for the corresponding incoming value of the borrowed
+operand in all predecessor blocks.
+
+The borrowed operand (``%2``) must be a guaranteed phi argument and is
+forwarded to the instruction result.
+
+The list of enclosing values (operands after ``from``) can be empty if the
+borrowed operand stems from a borrow introducer with no enclosing value, e.g.
+a ``load_borrow``.
+
+Guaranteed phi arguments must not have other users than borrowed-from
+instructions.
 
 This instruction is only valid in functions in Ownership SSA form.
 
@@ -6100,6 +6131,14 @@ executing the ``begin_apply``) were being "called" by the ``yield``:
   or move the value from that position before ending or aborting the
   coroutine.
 
+A coroutine optionally may produce normal results. These do not have
+``@yields`` annotation in the result type tuple.
+::
+  (%float, %token) = begin_apply %0() : $@yield_once () -> (@yields Float, Int)
+
+Normal results of a coroutine are produced by the corresponding ``end_apply``
+instruction.
+
 A ``begin_apply`` must be uniquely either ended or aborted before
 exiting the function or looping to an earlier portion of the function.
 
@@ -6129,9 +6168,9 @@ end_apply
 `````````
 ::
 
-  sil-instruction ::= 'end_apply' sil-value
+  sil-instruction ::= 'end_apply' sil-value 'as' sil-type
 
-  end_apply %token
+  end_apply %token as $()
 
 Ends the given coroutine activation, which is currently suspended at
 a ``yield`` instruction.  Transfers control to the coroutine and takes
@@ -6141,8 +6180,8 @@ when the coroutine reaches a ``return`` instruction.
 The operand must always be the token result of a ``begin_apply``
 instruction, which is why it need not specify a type.
 
-``end_apply`` currently has no instruction results.  If coroutines were
-allowed to have normal results, they would be producted by ``end_apply``.
+The result of ``end_apply`` is the normal result of the coroutine function (the
+operand of the ``return`` instruction)."
 
 When throwing coroutines are supported, there will need to be a
 ``try_end_apply`` instruction.
@@ -8393,7 +8432,7 @@ switch_value
   // FIXME: All destination labels currently must take no arguments
 
 Conditionally branches to one of several destination basic blocks based on a
-value of builtin integer or function type. If the operand value matches one of the ``case``
+value of builtin integer. If the operand value matches one of the ``case``
 values of the instruction, control is transferred to the corresponding basic
 block. If there is a ``default`` basic block, control is transferred to it if
 the value does not match any of the ``case`` values. It is undefined behavior

@@ -200,7 +200,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          SourceLoc, bool, bool),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
-              bool(ModuleDecl *), Cached, NoLocationInfo)
+              bool(const ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               Type(llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
                    unsigned, TypeResolutionStage),
@@ -562,4 +562,19 @@ SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
 SWIFT_REQUEST(TypeChecker, ObjCRequirementMapRequest,
               ObjCRequirementMap(const ProtocolDecl *proto),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ImportDeclRequest,
+              std::optional<AttributedImport<ImportedModule>>(
+                  const SourceFile *sf, const ModuleDecl *mod),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LifetimeDependenceInfoRequest,
+              LifetimeDependenceInfo(AbstractFunctionDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SuppressesConformanceRequest,
+              bool(NominalTypeDecl *decl, KnownProtocolKind kp),
+              SeparatelyCached, NoLocationInfo)
 
+SWIFT_REQUEST(TypeChecker, CaptureInfoRequest,
+              CaptureInfo(AbstractFunctionDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ParamCaptureInfoRequest,
+              CaptureInfo(ParamDecl *),
+              SeparatelyCached, NoLocationInfo)

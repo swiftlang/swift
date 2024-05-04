@@ -443,8 +443,7 @@ protected:
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type, GenericSignature sig);
   void appendRetroactiveConformances(SubstitutionMap subMap,
-                                     GenericSignature sig,
-                                     ModuleDecl *fromModule);
+                                     GenericSignature sig);
   void appendImplFunctionType(SILFunctionType *fn, GenericSignature sig,
                               const ValueDecl *forDecl = nullptr);
   void appendOpaqueTypeArchetype(ArchetypeType *archetype,
@@ -596,6 +595,24 @@ protected:
                               GenericSignature contextSig,
                               BaseEntitySignature &base);
 
+  /// Describes how the subject of a requirement was mangled.
+  struct RequirementSubject {
+    enum Kind {
+      GenericParameter,
+      AssociatedType,
+      AssociatedTypeAtDepth,
+      Substitution
+    } kind;
+
+    /// Generic parameter at the base, if there is one. Valid for everything
+    /// except Substitution subjects.
+    GenericTypeParamType *gpBase = nullptr;
+  };
+
+  /// Append the subject of a generic requirement and state what kind it is.
+  RequirementSubject appendRequirementSubject(
+      CanType subjectType, GenericSignature sig);
+
   /// Append a requirement to the mangling.
   ///
   /// \param reqt The requirement to mangle
@@ -685,6 +702,9 @@ protected:
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance,
                                         GenericSignature sig);
+  void appendPackProtocolConformance(
+                                     const PackConformance *conformance,
+                                     GenericSignature sig);
   void appendDependentProtocolConformance(const ConformancePath &path,
                                           GenericSignature sig);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);

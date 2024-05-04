@@ -22,7 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/InvertibleProtocolKind.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementKind.h"
 #include "swift/Basic/OptionSet.h"
@@ -46,6 +46,12 @@ enum class ImplMetatypeRepresentation {
   Thin,
   Thick,
   ObjC,
+};
+
+enum class ImplCoroutineKind {
+  None,
+  YieldOnce,
+  YieldMany,
 };
 
 /// Describe a function parameter, parameterized on the type
@@ -187,6 +193,9 @@ public:
 
   BuiltType getType() const { return Type; }
 };
+
+template<typename Type>
+using ImplFunctionYield = ImplFunctionParam<Type>;
 
 enum class ImplResultConvention {
   Indirect,
@@ -456,38 +465,15 @@ void decodeRequirement(
     } else if (child->getKind() ==
           Demangle::Node::Kind::DependentGenericInverseConformanceRequirement) {
       // Type child
-      auto constraintNode = child->getChild(1);
+      auto constraintNode = child->getChild(0);
       if (constraintNode->getKind() != Demangle::Node::Kind::Type ||
           constraintNode->getNumChildren() != 1)
         return;
 
-      // Protocol child
-      auto protocolNode = constraintNode->getChild(0);
-      if (protocolNode->getKind() != Demangle::Node::Kind::Protocol ||
-          protocolNode->getNumChildren() != 2)
-        return;
-
-      auto moduleNode = protocolNode->getChild(0);
-      if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
-          moduleNode->getText() != "Swift")
-        return;
-
-      auto protocolNameNode = protocolNode->getChild(1);
-      if (protocolNameNode->getKind() != Demangle::Node::Kind::Identifier)
-        return;
-
-      auto protocolName = protocolNameNode->getText();
-      using OptInvertibleKind = std::optional<InvertibleProtocolKind>;
-      auto protocolKind = llvm::StringSwitch<OptInvertibleKind>(protocolName)
-#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
-          .Case(Name, InvertibleProtocolKind::Id)
-#include "swift/AST/KnownProtocols.def"
-          .Default(std::nullopt);
-      if (!protocolKind)
-        return;
-
+      auto protocolKind =
+          static_cast<InvertibleProtocolKind>(child->getChild(1)->getIndex());
       inverseRequirements.push_back(
-          Builder.createInverseRequirement(subjectType, *protocolKind));
+          Builder.createInverseRequirement(subjectType, protocolKind));
       continue;
     }
 
@@ -1046,9 +1032,11 @@ protected:
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;
       llvm::SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
+      llvm::SmallVector<ImplFunctionYield<BuiltType>, 8> yields;
       llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> results;
       llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
       ImplFunctionTypeFlags flags;
+      ImplCoroutineKind coroutineKind = ImplCoroutineKind::None;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
         auto child = Node->getChild(i);
@@ -1089,6 +1077,15 @@ protected:
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
           }
+        } else if (child->getKind() == NodeKind::ImplCoroutineKind) {
+          if (!child->hasText())
+            return MAKE_NODE_TYPE_ERROR0(child, "expected text");
+          if (child->getText() == "yield_once") {
+            coroutineKind = ImplCoroutineKind::YieldOnce;
+          } else if (child->getText() == "yield_many") {
+            coroutineKind = ImplCoroutineKind::YieldMany;
+          } else
+            return MAKE_NODE_TYPE_ERROR0(child, "failed to decode coroutine kind");
         } else if (child->getKind() == NodeKind::ImplDifferentiabilityKind) {
           ImplFunctionDifferentiabilityKind implDiffKind;
           switch ((MangledDifferentiabilityKind)child->getIndex()) {
@@ -1111,10 +1108,14 @@ protected:
           if (decodeImplFunctionParam(child, depth + 1, parameters))
             return MAKE_NODE_TYPE_ERROR0(child,
                                          "failed to decode function parameter");
+        } else if (child->getKind() == NodeKind::ImplYield) {
+          if (decodeImplFunctionParam(child, depth + 1, yields))
+            return MAKE_NODE_TYPE_ERROR0(child,
+                                         "failed to decode function yields");
         } else if (child->getKind() == NodeKind::ImplResult) {
           if (decodeImplFunctionParam(child, depth + 1, results))
             return MAKE_NODE_TYPE_ERROR0(child,
-                                         "failed to decode function parameter");
+                                         "failed to decode function results");
         } else if (child->getKind() == NodeKind::ImplErrorResult) {
           if (decodeImplFunctionPart(child, depth + 1, errorResults))
             return MAKE_NODE_TYPE_ERROR0(child,
@@ -1138,11 +1139,10 @@ protected:
 
       // TODO: Some cases not handled above, but *probably* they cannot
       // appear as the types of values in SIL (yet?):
-      // - functions with yield returns
       // - functions with generic signatures
       // - foreign error conventions
-      return Builder.createImplFunctionType(calleeConvention,
-                                            parameters, results,
+      return Builder.createImplFunctionType(calleeConvention, coroutineKind,
+                                            parameters, yields, results,
                                             errorResult, flags);
     }
 

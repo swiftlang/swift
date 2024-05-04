@@ -124,6 +124,16 @@ TypeAttribute::getAttrKindFromString(StringRef Str) {
       .Default(std::nullopt);
 }
 
+bool TypeAttribute::isSilOnly(TypeAttrKind TK) {
+  switch (TK) {
+#define SIL_TYPE_ATTR(X, C) case TypeAttrKind::C:
+#include "swift/AST/TypeAttr.def"
+    return true;
+  default:
+    return false;
+  }
+}
+
 /// Return the name (like "autoclosure") for an attribute ID.
 const char *TypeAttribute::getAttrName(TypeAttrKind kind) {
   switch (kind) {
@@ -487,6 +497,13 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
         return AvAttr;
 
       std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+
+      StringRef DeprecatedPlatform = AvAttr->prettyPlatformString();
+      llvm::VersionTuple RemappedDeprecatedVersion;
+      if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+          AvAttr, ctx, DeprecatedPlatform, RemappedDeprecatedVersion))
+        DeprecatedVersion = RemappedDeprecatedVersion;
+
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -1265,14 +1282,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(" << cast<AlignmentAttr>(this)->getValue() << ")";
     break;
 
-  case DeclAttrKind::AllowFeatureSuppression:
-    Printer.printAttrName("@_allowFeatureSuppression");
+  case DeclAttrKind::AllowFeatureSuppression: {
+    auto Attr = cast<AllowFeatureSuppressionAttr>(this);
+    Printer.printAttrName(Attr->getInverted() ? "@_disallowFeatureSuppression"
+                                              : "@_allowFeatureSuppression");
     Printer << "(";
-    interleave(cast<AllowFeatureSuppressionAttr>(this)->getSuppressedFeatures(),
-               [&](Identifier ident) { Printer << ident; },
-               [&] { Printer << ", "; });
+    interleave(
+        Attr->getSuppressedFeatures(),
+        [&](Identifier ident) { Printer << ident; }, [&] { Printer << ", "; });
     Printer << ")";
     break;
+  }
 
   case DeclAttrKind::SILGenName:
     Printer.printAttrName("@_silgen_name");
@@ -1807,7 +1827,9 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::ObjCRuntimeName:
     return "objc";
   case DeclAttrKind::ObjCImplementation:
-    return "_objcImplementation";
+    if (cast<ObjCImplementationAttr>(this)->isEarlyAdopter())
+      return "_objcImplementation";
+    return "implementation";
   case DeclAttrKind::MainType:
     return "main";
   case DeclAttrKind::DynamicReplacement:
@@ -1937,7 +1959,11 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Extern:
     return "_extern";
   case DeclAttrKind::AllowFeatureSuppression:
-    return "_allowFeatureSuppression";
+    if (cast<AllowFeatureSuppressionAttr>(this)->getInverted()) {
+      return "_disallowFeatureSuppression";
+    } else {
+      return "_allowFeatureSuppression";
+    }
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2316,18 +2342,32 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
     return AvailableVersionComparison::Unavailable;
 
   llvm::VersionTuple queryVersion = getActiveVersion(ctx);
+  std::optional<llvm::VersionTuple> ObsoletedVersion = Obsoleted;
+
+  StringRef ObsoletedPlatform = prettyPlatformString();
+  llvm::VersionTuple RemappedObsoletedVersion;
+  if (AvailabilityInference::updateObsoletedPlatformForFallback(
+      this, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
+    ObsoletedVersion = RemappedObsoletedVersion;
 
   // If this entity was obsoleted before or at the query platform version,
   // consider it obsolete.
-  if (Obsoleted && *Obsoleted <= queryVersion)
+  if (ObsoletedVersion && *ObsoletedVersion <= queryVersion)
     return AvailableVersionComparison::Obsoleted;
+
+  std::optional<llvm::VersionTuple> IntroducedVersion = Introduced;
+  StringRef IntroducedPlatform = prettyPlatformString();
+  llvm::VersionTuple RemappedIntroducedVersion;
+  if (AvailabilityInference::updateIntroducedPlatformForFallback(
+      this, ctx, IntroducedPlatform, RemappedIntroducedVersion))
+    IntroducedVersion = RemappedIntroducedVersion;
 
   // If this entity was introduced after the query version and we're doing a
   // platform comparison, true availability can only be determined dynamically;
   // if we're doing a _language_ version check, the query version is a
   // static requirement, so we treat "introduced later" as just plain
   // unavailable.
-  if (Introduced && *Introduced > queryVersion) {
+  if (IntroducedVersion && *IntroducedVersion > queryVersion) {
     if (isLanguageVersionSpecific() || isPackageDescriptionVersionSpecific())
       return AvailableVersionComparison::Unavailable;
     else
@@ -2922,24 +2962,24 @@ StorageRestrictionsAttr::getAccessesProperties(AccessorDecl *attachedTo) const {
                            {});
 }
 
-AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(SourceLoc atLoc,
-                                                         SourceRange range,
-                                                         bool implicit,
-                                              ArrayRef<Identifier> features)
-    : DeclAttribute(DeclAttrKind::AllowFeatureSuppression,
-                    atLoc, range, implicit) {
+AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(
+    SourceLoc atLoc, SourceRange range, bool implicit, bool inverted,
+    ArrayRef<Identifier> features)
+    : DeclAttribute(DeclAttrKind::AllowFeatureSuppression, atLoc, range,
+                    implicit) {
+  Bits.AllowFeatureSuppressionAttr.Inverted = inverted;
   Bits.AllowFeatureSuppressionAttr.NumFeatures = features.size();
   std::uninitialized_copy(features.begin(), features.end(),
                           getTrailingObjects<Identifier>());
 }
 
-AllowFeatureSuppressionAttr *
-AllowFeatureSuppressionAttr::create(ASTContext &ctx, SourceLoc atLoc,
-                                    SourceRange range, bool implicit,
-                                    ArrayRef<Identifier> features) {
+AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
+    ASTContext &ctx, SourceLoc atLoc, SourceRange range, bool implicit,
+    bool inverted, ArrayRef<Identifier> features) {
   unsigned size = totalSizeToAlloc<Identifier>(features.size());
   auto *mem = ctx.Allocate(size, alignof(AllowFeatureSuppressionAttr));
-  return new (mem) AllowFeatureSuppressionAttr(atLoc, range, implicit, features);
+  return new (mem)
+      AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
@@ -2947,8 +2987,8 @@ void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
     attr->print(out);
 }
 
-bool swift::hasAttribute(
-    const LangOptions &langOpts, llvm::StringRef attributeName) {
+static bool hasDeclAttribute(const LangOptions &langOpts,
+                             llvm::StringRef attributeName) {
   std::optional<DeclAttrKind> kind =
       DeclAttribute::getAttrKindFromString(attributeName);
   if (!kind)
@@ -2966,4 +3006,28 @@ bool swift::hasAttribute(
     return false;
 
   return true;
+}
+
+static bool hasTypeAttribute(const LangOptions &langOpts,
+                             llvm::StringRef attributeName) {
+  std::optional<TypeAttrKind> kind =
+      TypeAttribute::getAttrKindFromString(attributeName);
+  if (!kind)
+    return false;
+
+  if (TypeAttribute::isSilOnly(*kind))
+    return false;
+
+  return true;
+}
+
+bool swift::hasAttribute(const LangOptions &langOpts,
+                         llvm::StringRef attributeName) {
+  if (hasDeclAttribute(langOpts, attributeName))
+    return true;
+
+  if (hasTypeAttribute(langOpts, attributeName))
+    return true;
+
+  return false;
 }

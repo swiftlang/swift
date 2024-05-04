@@ -257,7 +257,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Void to _ then warn, because that is redundant.
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(destExpr)) {
           if (auto CE = dyn_cast<CallExpr>(AE->getSrc())) {
-            if (isa_and_nonnull<FuncDecl>(CE->getCalledValue()) &&
+            if (getAsDecl<FuncDecl>(
+                    CE->getCalledValue(/*skipFunctionConversions=*/true)) &&
                 CE->getType()->isVoid()) {
               Ctx.Diags
                   .diagnose(DAE->getLoc(),
@@ -311,7 +312,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // FIXME: Duplicate labels on enum payloads should be diagnosed
       // when declared, not when called.
       if (auto *CE = dyn_cast_or_null<CallExpr>(E)) {
-        auto calledValue = CE->getCalledValue();
+        auto calledValue = CE->getCalledValue(/*skipFunctionConversions=*/true);
         if (calledValue && isa<EnumElementDecl>(calledValue)) {
           auto *args = CE->getArgs();
           SmallVector<Identifier, 4> scratch;
@@ -421,8 +422,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
-      auto partialConsumptionEnabled =
-          Ctx.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
       auto *subExpr = consumeExpr->getSubExpr();
       bool noncopyable =
           subExpr->getType()->getCanonicalType()->isNoncopyable();
@@ -446,7 +445,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           continue;
         }
         auto *mre = dyn_cast<MemberRefExpr>(current);
-        if (mre && partialConsumptionEnabled) {
+        if (mre) {
           auto *vd = dyn_cast<VarDecl>(mre->getMember().getDecl());
           if (!vd) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
@@ -474,7 +473,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           continue;
         }
         auto *ce = dyn_cast<CallExpr>(current);
-        if (ce && partialConsumptionEnabled) {
+        if (ce) {
           if (noncopyable) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
                                diag::consume_expression_non_storage);
@@ -487,7 +486,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
         }
         auto *se = dyn_cast<SubscriptExpr>(current);
-        if (se && partialConsumptionEnabled) {
+        if (se) {
           if (noncopyable) {
             Ctx.Diags.diagnose(consumeExpr->getLoc(),
                                diag::consume_expression_non_storage);
@@ -1464,6 +1463,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(fnExpr))
         fnExpr = dotSyntax->getSemanticFn();
 
+      if (auto *FCE = dyn_cast<FunctionConversionExpr>(fnExpr))
+        fnExpr = FCE->getSubExpr();
+
       auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
       if (!DRE || !DRE->getDecl()->isOperator())
         return;
@@ -2074,9 +2076,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
-      if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
-              .isKnownNoEscape())
-        return false;
+      if (auto funcTy = CE->getType()->getAs<FunctionType>()) {
+        if (funcTy->isNoEscape())
+          return false;
+      }
 
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
         if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
@@ -2493,9 +2496,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
+      // FIXME: This is happening too early, because closure->getType() isn't set.
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
-        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
-          ACE = const_cast<AbstractClosureExpr *>(closure);
+        if (closure->getType())
+          if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
+            ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
@@ -5073,6 +5078,10 @@ public:
             out << "getter: ";
             name = bestAccessor->getStorage()->getName();
             break;
+          case AccessorKind::DistributedGet:
+            out << "_distributed_getter: ";
+            name = bestAccessor->getStorage()->getName();
+            break;
 
           case AccessorKind::Set:
           case AccessorKind::WillSet:
@@ -5490,7 +5499,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
         return declRef->getDecl();
 
       if (auto *apply = dyn_cast<ApplyExpr>(E)) {
-        auto *decl = apply->getCalledValue();
+        auto *decl = apply->getCalledValue(/*skipFunctionConversions=*/true);
         if (isa_and_nonnull<AbstractFunctionDecl>(decl))
           return decl;
       }
@@ -5629,9 +5638,10 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     void diagnoseIfUnintendedInterpolation(CallExpr *segment,
                                            UnintendedInterpolationKind kind) {
-      if (interpolationWouldBeUnintended(segment->getCalledValue(), kind))
+      if (interpolationWouldBeUnintended(
+              segment->getCalledValue(/*skipFunctionConversions=*/true), kind))
         if (auto firstArg =
-              getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
+                getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
           diagnoseUnintendedInterpolation(firstArg, kind);
     }
 
@@ -5842,7 +5852,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
     KVOObserveCallWalker(ASTContext &ctx) : C(ctx) {}
 
     void maybeDiagnoseCallExpr(CallExpr *expr) {
-      auto fn = expr->getCalledValue();
+      auto fn = expr->getCalledValue(/*skipFunctionConversions=*/true);
       if (!fn)
         return;
       SmallVector<KeyPathExpr *, 1> keyPathArgs;
@@ -5980,9 +5990,10 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       // Dig out the function declaration.
       if (auto Fn = BE->getFn()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
-          comparisonDecl = DSCE->getCalledValue();
+          comparisonDecl =
+              DSCE->getCalledValue(/*skipFunctionConversions=*/true);
         } else {
-          comparisonDecl = BE->getCalledValue();
+          comparisonDecl = BE->getCalledValue(/*skipFunctionConversions=*/true);
         }
       }
 

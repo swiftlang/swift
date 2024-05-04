@@ -1,0 +1,14 @@
+# REQUIRES: standalone_build,OS=macosx
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: mkdir -p %t/destdir
+# RUN: mkdir -p %t/symroot/macosx-%target-cpu
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --enable-extract-symbol-dry-run-test=1 --host-target=macosx-%target-cpu --darwin-install-extract-symbols --extra-dsymutil-args="--verify-dwarf=none --verbose"  --cmake %cmake --install-symroot=%t/symroot --install-destdir=%t/destdir --toolchain-prefix= 2>&1 | %FileCheck %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --enable-extract-symbol-dry-run-test=1 --host-target=macosx-%target-cpu --darwin-install-extract-symbols --extra-dsymutil-args=--verify-dwarf=none,--verbose  --cmake %cmake --install-symroot=%t/symroot --install-destdir=%t/destdir --toolchain-prefix= 2>&1 | %FileCheck %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --enable-extract-symbol-dry-run-test=1 --host-target=macosx-%target-cpu --darwin-install-extract-symbols --extra-dsymutil-args="--verify-dwarf=none" --extra-dsymutil-args=--verbose  --cmake %cmake --install-symroot=%t/symroot --install-destdir=%t/destdir --toolchain-prefix= 2>&1 | %FileCheck %s
+
+# CHECK: --- Extracting symbols ---
+# CHECK: { "command": "dsymutil", "start": "
+# CHECK: xargs -t -n 1 -P 1 {{.*}}dsymutil --verify-dwarf=none --verbose
+# CHECK: { "command": "dsymutil", "end": "

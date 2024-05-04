@@ -2461,8 +2461,10 @@ Parser::parseDocumentationAttribute(SourceLoc atLoc, SourceLoc loc) {
 }
 
 ParserResult<AllowFeatureSuppressionAttr>
-Parser::parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc) {
-  StringRef attrName = "_allowFeatureSuppression";
+Parser::parseAllowFeatureSuppressionAttribute(bool inverted, SourceLoc atLoc,
+                                              SourceLoc loc) {
+  StringRef attrName =
+      inverted ? "_disallowFeatureSuppression" : "_allowFeatureSuppression";
 
   SmallVector<Identifier, 4> features;
   SourceRange parensRange;
@@ -2479,9 +2481,9 @@ Parser::parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc) {
     return status;
 
   auto range = SourceRange(loc, parensRange.End);
-  return makeParserResult(
-    AllowFeatureSuppressionAttr::create(Context, loc, range, /*implicit*/ false,
-                                        features));
+  return makeParserResult(AllowFeatureSuppressionAttr::create(
+      Context, loc, range, /*implicit*/ false, /*inverted*/ inverted,
+      features));
 }
 
 static std::optional<MacroIntroducedDeclNameKind>
@@ -3638,7 +3640,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!name)
       return makeParserSuccess();
 
-    Attributes.add(new (Context) ObjCImplementationAttr(*name, AtLoc, range));
+    bool isEarlyAdopter = (AttrName != "implementation");
+    Attributes.add(new (Context) ObjCImplementationAttr(*name, AtLoc, range,
+                                                        isEarlyAdopter));
     break;
   }
   case DeclAttrKind::ObjCRuntimeName: {
@@ -3900,7 +3904,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
   case DeclAttrKind::AllowFeatureSuppression: {
-    auto Attr = parseAllowFeatureSuppressionAttribute(AtLoc, Loc);
+    auto inverted = (AttrName == "_disallowFeatureSuppression");
+    auto Attr = parseAllowFeatureSuppressionAttribute(inverted, AtLoc, Loc);
     Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
@@ -4089,6 +4094,11 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
     Version = llvm::VersionTuple(major);
     Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
+    if (Version.empty()) {
+      // Versions cannot be empty (e.g. "0").
+      diagnose(Range.Start, D).warnUntilSwiftVersion(6);
+      return true;
+    }
     return false;
   }
 
@@ -4123,6 +4133,12 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
     Version = llvm::VersionTuple(major, minor, micro);
   } else {
     Version = llvm::VersionTuple(major, minor);
+  }
+
+  if (Version.empty()) {
+    // Versions cannot be empty (e.g. "0.0").
+    diagnose(Range.Start, D).warnUntilSwiftVersion(6);
+    return true;
   }
 
   return false;
@@ -5046,21 +5062,12 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   llvm_unreachable("bad attribute kind");
 }
 
-static std::optional<LifetimeDependenceKind>
-getLifetimeDependenceKind(const Token &T) {
-  if (T.isContextualKeyword("_copy")) {
-    return LifetimeDependenceKind::Copy;
+static ParsedLifetimeDependenceKind getSILLifetimeDependenceKind(const Token &T) {
+  if (T.isContextualKeyword("_inherit")) {
+    return ParsedLifetimeDependenceKind::Inherit;
   }
-  if (T.isContextualKeyword("_consume")) {
-    return LifetimeDependenceKind::Consume;
-  }
-  if (T.isContextualKeyword("_borrow")) {
-    return LifetimeDependenceKind::Borrow;
-  }
-  if (T.isContextualKeyword("_mutate")) {
-    return LifetimeDependenceKind::Mutate;
-  }
-  return std::nullopt;
+  assert(T.isContextualKeyword("_scope"));
+  return ParsedLifetimeDependenceKind::Scope;
 }
 
 ParserStatus Parser::parseLifetimeDependenceSpecifiers(
@@ -5068,12 +5075,20 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
   ParserStatus status;
   // TODO: Add fixits for diagnostics in this function.
   do {
-    auto lifetimeDependenceKind = getLifetimeDependenceKind(Tok);
-    if (!lifetimeDependenceKind.has_value()) {
+    if (!isLifetimeDependenceToken()) {
       break;
     }
-    // consume the lifetime dependence kind
-    consumeToken();
+
+    auto lifetimeDependenceKind = ParsedLifetimeDependenceKind::Default;
+
+    if (!isInSILMode()) {
+      // consume dependsOn
+      consumeToken();
+    } else {
+      lifetimeDependenceKind = getSILLifetimeDependenceKind(Tok);
+      // consume _inherit or _scope
+      consumeToken();
+    }
 
     if (!Tok.isFollowingLParen()) {
       diagnose(Tok, diag::expected_lparen_after_lifetime_dependence);
@@ -5082,6 +5097,16 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
     }
     // consume the l_paren
     auto lParenLoc = consumeToken();
+
+    if (!isInSILMode()) {
+      // look for optional "scoped"
+      if (Tok.isContextualKeyword("scoped")) {
+        lifetimeDependenceKind = ParsedLifetimeDependenceKind::Scope;
+        // consume scoped
+        consumeToken();
+      }
+    }
+
     SourceLoc rParenLoc;
     bool foundParamId = false;
     status = parseList(
@@ -5097,7 +5122,7 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
             specifierList.push_back(
                 LifetimeDependenceSpecifier::
                     getNamedLifetimeDependenceSpecifier(
-                        paramLoc, *lifetimeDependenceKind, paramName));
+                        paramLoc, lifetimeDependenceKind, paramName));
             break;
           }
           case tok::integer_literal: {
@@ -5112,14 +5137,14 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
             specifierList.push_back(
                 LifetimeDependenceSpecifier::
                     getOrderedLifetimeDependenceSpecifier(
-                        paramLoc, *lifetimeDependenceKind, paramNum));
+                        paramLoc, lifetimeDependenceKind, paramNum));
             break;
           }
           case tok::kw_self: {
             auto paramLoc = consumeToken(tok::kw_self);
             specifierList.push_back(
                 LifetimeDependenceSpecifier::getSelfLifetimeDependenceSpecifier(
-                    paramLoc, *lifetimeDependenceKind));
+                    paramLoc, lifetimeDependenceKind));
             break;
           }
           default:
@@ -5454,7 +5479,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       continue;
     }
 
-    if (Tok.isLifetimeDependenceToken()) {
+    if (P.isLifetimeDependenceToken()) {
       if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
@@ -5600,7 +5625,9 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
       tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
 
     HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
-                                             tok::kw_enum);
+                                             tok::kw_enum, tok::kw_typealias,
+                                             tok::kw_protocol)
+                              || P.Tok.isContextualKeyword("actor");
 
     // HACK: Bail if we encounter what could potentially be a regex literal.
     // This is necessary as:
@@ -6691,32 +6718,6 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   return DCC.fixupParserResult(ID);
 }
 
-static void addMoveOnlyAttrIf(SourceLoc const &parsedTildeCopyable,
-                              ASTContext &Context,
-                              Decl *decl) {
-  if (parsedTildeCopyable.isInvalid())
-    return;
-
-  if (Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    llvm_unreachable("unexpected use of legacy ~Copyable parsing");
-
-  auto &attrs = decl->getAttrs();
-
-  // Don't add if it's already explicitly written on the decl, but error about
-  // the duplication and point to the `~Copyable`.
-  if (auto attr = attrs.getAttribute<MoveOnlyAttr>()) {
-    const bool sayModifier = false;
-    Context.Diags.diagnose(attr->getLocation(), diag::duplicate_attribute,
-                           sayModifier)
-        .fixItRemove(attr->getRange());
-    Context.Diags.diagnose(parsedTildeCopyable, diag::previous_attribute,
-                           sayModifier);
-    return;
-  }
-
-  attrs.add(new(Context) MoveOnlyAttr(/*IsImplicit=*/true));
-}
-
 /// Parse an inheritance clause.
 ///
 /// \verbatim
@@ -6731,14 +6732,12 @@ static void addMoveOnlyAttrIf(SourceLoc const &parsedTildeCopyable,
 ParserStatus Parser::parseInheritance(
     SmallVectorImpl<InheritedEntry> &Inherited,
     bool allowClassRequirement,
-    bool allowAnyObject,
-    SourceLoc *parseTildeCopyable) {
+    bool allowAnyObject) {
   consumeToken(tok::colon);
 
   SourceLoc classRequirementLoc;
 
   ParserStatus Status;
-  SourceLoc TildeCopyableLoc;
   SourceLoc prevComma;
   bool HasNextType;
   do {
@@ -6790,49 +6789,6 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    if (!EnabledNoncopyableGenerics && Tok.isTilde()) {
-      ErrorTypeRepr *error = nullptr;
-      if (parseTildeCopyable) {
-        const auto &nextTok = peekToken(); // lookahead
-        if (isIdentifier(nextTok, Context.Id_Copyable.str())) {
-          auto tildeLoc = consumeToken();
-          consumeToken(); // the 'Copyable' token
-
-          if (TildeCopyableLoc)
-            Inherited.push_back(InheritedEntry(
-                ErrorTypeRepr::create(Context, tildeLoc,
-                                      diag::already_suppressed_copyable)));
-          else
-            TildeCopyableLoc = tildeLoc;
-
-          continue; // success
-        }
-
-        if (nextTok.is(tok::code_complete)) {
-          consumeToken(); // consume '~'
-          Status.setHasCodeCompletionAndIsError();
-          if (CodeCompletionCallbacks) {
-            CodeCompletionCallbacks->completeWithoutConstraintType();
-          }
-          consumeToken(tok::code_complete);
-        }
-
-        // can't suppress whatever is between '~' and ',' or '{'.
-        error = ErrorTypeRepr::create(Context, consumeToken(),
-                                      diag::only_suppress_copyable);
-      } else {
-        // Otherwise, a suppression isn't allowed here unless noncopyable
-        // generics is enabled, so record a delayed error diagnostic and
-        // eat the token to prevent further parsing errors.
-        error = ErrorTypeRepr::create(Context, consumeToken(),
-                                      diag::cannot_suppress_here);
-      }
-
-      // Record the error parsing ~Copyable, but continue on to parseType.
-      if (error)
-        Inherited.push_back(InheritedEntry(error));
-    }
-
     auto ParsedTypeResult = parseType();
     Status |= ParsedTypeResult;
 
@@ -6840,9 +6796,6 @@ ParserStatus Parser::parseInheritance(
     if (ParsedTypeResult.isNonNull())
       Inherited.push_back(InheritedEntry(ParsedTypeResult.get()));
   } while (HasNextType);
-
-  if (parseTildeCopyable)
-    *parseTildeCopyable = TildeCopyableLoc;
 
   return Status;
 }
@@ -7761,6 +7714,7 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
 static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
   case AccessorKind::Set:
     return true;
 
@@ -9137,14 +9091,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    SourceLoc parsedTildeCopyable;
     Status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false,
-                               &parsedTildeCopyable);
+                               /*allowAnyObject=*/false);
     ED->setInherited(Context.AllocateCopy(Inherited));
-
-    addMoveOnlyAttrIf(parsedTildeCopyable, Context, ED);
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -9403,14 +9353,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    SourceLoc parsedTildeCopyable;
     Status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false,
-                               &parsedTildeCopyable);
+                               /*allowAnyObject=*/false);
     SD->setInherited(Context.AllocateCopy(Inherited));
-
-    addMoveOnlyAttrIf(parsedTildeCopyable, Context, SD);
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);

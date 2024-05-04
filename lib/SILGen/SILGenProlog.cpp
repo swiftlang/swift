@@ -59,30 +59,19 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   // owned, lets mark them as needing to be no implicit copy checked so they
   // cannot escape.
   if (selfType.isMoveOnly() && !selfType.isAnyClassReferenceType()) {
-    if (getASTContext().LangOpts.hasFeature(
-            Feature::MoveOnlyPartialConsumption)) {
-      SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
-      addr = B.createMarkUnresolvedNonCopyableValueInst(
-          selfDecl, addr,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
-      if (selfValue->getType().isObject()) {
-        B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
-      } else {
-        B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
-      }
-      // drop_deinit invalidates any user-defined struct/enum deinit
-      // before the individual members are destroyed.
-      addr = B.createDropDeinit(selfDecl, addr);
-      selfValue = addr;
+    SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
+    addr = B.createMarkUnresolvedNonCopyableValueInst(
+        selfDecl, addr,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+    if (selfValue->getType().isObject()) {
+      B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
     } else {
-      if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
-        selfValue = B.createMarkUnresolvedNonCopyableValueInst(
-            selfDecl, selfValue,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                ConsumableAndAssignable);
-      }
+      B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
     }
+    // drop_deinit invalidates any user-defined struct/enum deinit
+    // before the individual members are destroyed.
+    addr = B.createDropDeinit(selfDecl, addr);
+    selfValue = addr;
   }
 
   VarLocs[selfDecl] = VarLoc::get(selfValue);
@@ -1235,9 +1224,6 @@ void SILGenFunction::emitProlog(
     SourceLoc throwsLoc) {
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  assert(captureInfo.hasBeenComputed() &&
-         "can't emit prolog of function with uncomputed captures");
-
   bool hasErasedIsolation =
     (TypeContext && TypeContext->ExpectedLoweredType->hasErasedIsolation());
 
@@ -1297,7 +1283,7 @@ void SILGenFunction::emitProlog(
 
   emitExpectedExecutor();
 
-  // IMPORTANT: This block should be the last one in `emitProlog`, 
+  // IMPORTANT: This block should be the last one in `emitProlog`,
   // since it terminates BB and no instructions should be insterted after it.
   // Emit an unreachable instruction if a parameter type is
   // uninhabited
@@ -1499,6 +1485,19 @@ uint16_t SILGenFunction::emitBasicProlog(
     if (throwsLoc.isValid())
       loc = throwsLoc;
     B.createDebugValue(loc, undef.getValue(), dbgVar);
+  }
+
+  for (auto &i : *B.getInsertionBB()) {
+    auto *alloc = dyn_cast<AllocStackInst>(&i);
+    if (!alloc)
+      continue;
+    auto varInfo = alloc->getVarInfo();
+    if (!varInfo || varInfo->ArgNo)
+      continue;
+    // The allocation has a varinfo but no argument number, which should not
+    // happen in the prolog. Unfortunately, some copies can generate wrong
+    // debug info, so we have to fix it here, by invalidating it.
+    alloc->invalidateVarInfo();
   }
 
   return ArgNo;

@@ -289,6 +289,10 @@ extension Instruction {
       if bi.id == .OnFastPath {
         return false
       }
+    case is UncheckedEnumDataInst:
+      // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
+      // for consuming an enum value.
+      return !parentFunction.hasOwnership
     default:
       break
     }
@@ -622,7 +626,7 @@ extension InstructionRange {
         case let endBorrow as EndBorrowInst:
           self.insert(endBorrow)
         case let branch as BranchInst:
-          worklist.pushIfNotVisited(branch.getArgument(for: use))
+          worklist.pushIfNotVisited(branch.getArgument(for: use).lookThroughBorrowedFromUser)
         default:
           break
         }
@@ -694,4 +698,24 @@ func getGlobalInitialization(
     return (allocInst: allocInst!, storeToGlobal: store)
   }
   return nil
+}
+
+func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+  switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
+    case .willSucceed: return true
+    case .maySucceed:  return nil
+    case .willFail:    return false
+    default: fatalError("unknown result from classifyDynamicCastBridged")
+  }
+}
+
+extension CheckedCastAddrBranchInst {
+  var dynamicCastResult: Bool? {
+    switch classifyDynamicCastBridged(bridged) {
+      case .willSucceed: return true
+      case .maySucceed:  return nil
+      case .willFail:    return false
+      default: fatalError("unknown result from classifyDynamicCastBridged")
+    }
+  }
 }

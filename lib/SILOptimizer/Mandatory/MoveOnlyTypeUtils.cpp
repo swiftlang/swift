@@ -105,7 +105,25 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
       // The only possible child of Optional is the wrapped type.
       return {{ancestorOffsetSize, ancestorType.getOptionalObjectType()}};
     }
-    llvm_unreachable("Cannot find child type of enum!\n");
+    unsigned elementOffset = ancestorOffsetSize.startOffset;
+    for (auto *element : enumDecl->getAllElements()) {
+      if (!element->hasAssociatedValues()) {
+        continue;
+      }
+      SILType elementTy = ancestorType.getEnumElementType(element, fn);
+      unsigned elementSize = TypeSubElementCount(elementTy, fn);
+      // iterOffset + size(tupleChild) is the offset of the next tuple
+      // element. If our target offset is less than that, then we know that
+      // the target type must be a child of this tuple element type.
+      if (elementOffset + elementSize > startOffset) {
+        return {{{elementOffset, elementSize}, elementTy}};
+      }
+
+      // Otherwise, add the new size of this field to iterOffset so we visit
+      // our sibling type next.
+      elementOffset += elementSize;
+    }
+    llvm_unreachable("Not a child of this enum?!");
   }
 
   llvm_unreachable("Hit a leaf type?! Should have handled it earlier");
@@ -317,11 +335,35 @@ void TypeOffsetSizePair::constructPathString(
     }
 
     if (auto *enumDecl = iterType.getEnumOrBoundGenericEnum()) {
+      unsigned childOffset = iterPair.startOffset;
+      bool foundValue = false;
       if (enumDecl == fn->getASTContext().getOptionalDecl()) {
         os << '!';
         continue;
       }
-      llvm_unreachable("Cannot find child type of enum!\n");
+      for (auto *element : enumDecl->getAllElements()) {
+        if (!element->hasAssociatedValues()) {
+          continue;
+        }
+        SILType elementTy = ancestorType.getEnumElementType(element, fn);
+        unsigned elementSize = TypeSubElementCount(elementTy, fn);
+
+        if (childOffset + elementSize > startOffset) {
+          os << '.';
+          os << element->getBaseName().userFacingName();
+          iterPair = {childOffset, elementSize};
+          iterType = elementTy;
+          foundValue = true;
+          break;
+        }
+
+        childOffset += elementSize;
+      }
+
+      if (foundValue)
+        continue;
+
+      llvm_unreachable("Not a child of this type?!");
     }
 
     llvm_unreachable("Hit a leaf type?! Should have handled it earlier");

@@ -17,6 +17,7 @@
 // RUN: %target-swift-frontend -emit-module %t/ExtendedDefinitionNonPublic.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedPackageImport.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/ExtendedPackageTypeImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportNotUseFromAPI.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportUsedInPackage.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ExportedUnused.swift -o %t -I %t
@@ -25,10 +26,12 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify \
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify \
 // RUN:   -experimental-spi-only-imports
 // RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
-// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 -verify
 
@@ -96,6 +99,9 @@ public struct NonPublicExtendedType {}
 //--- UnusedImport.swift
 
 //--- UnusedPackageImport.swift
+//--- ExtendedPackageTypeImport.swift
+
+public struct ExtendedPackageType {}
 
 //--- ImportNotUseFromAPI.swift
 public struct NotAnAPIType {}
@@ -118,6 +124,7 @@ public struct Extended {
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
 import UnusedImport // expected-error {{ambiguous implicit access level for import of 'UnusedImport'; it is imported as 'public' elsewhere}}
+// expected-note @-1 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
 public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
 // expected-note @-1 {{imported 'public' here}}
 
@@ -143,6 +150,7 @@ package import UnusedImport // expected-warning {{package import of 'UnusedImpor
 // expected-warning @-1 {{module 'UnusedImport' is imported as 'public' from the same file; this 'package' access level will be ignored}}
 
 package import UnusedPackageImport // expected-warning {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
+package import ExtendedPackageTypeImport
 public import ImportNotUseFromAPI // expected-warning {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
 public import ImportUsedInPackage // expected-warning {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
 
@@ -171,7 +179,7 @@ public func useConformance(_ a: any Proto = ConformingType()) {}
 // expected-remark @-3 {{struct 'ConformingType' is imported via 'ConformanceBaseTypes'}}
 // expected-remark @-4 {{initializer 'init()' is imported via 'ConformanceBaseTypes'}}
 
-@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {} // expected-remark {{struct 'TypeUsedInSignature' is imported via 'DepUsedInSignature'}}
+@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {}
 
 @inlinable
 public func publicFuncUsesPrivate() {
@@ -239,6 +247,10 @@ public protocol Countable {
 }
 
 extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
+}
+
+extension ExtendedPackageType { // expected-remark {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
+  package func useExtendedPackageType() { }
 }
 
 /// Tests for imports of clang modules.

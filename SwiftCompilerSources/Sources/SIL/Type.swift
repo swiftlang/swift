@@ -57,6 +57,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
+  public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
   public var canBeClass: BridgedType.TraitResult { bridged.canBeClass() }
@@ -141,9 +142,13 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return idx >= 0 ? idx : nil
   }
 
+// compiling bridged.getFunctionTypeWithNoEscape crashes the 5.10 Windows compiler
+#if !os(Windows)
+  // TODO: https://github.com/apple/swift/issues/73253
   public func getFunctionType(withNoEscape: Bool) -> Type {
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
   }
+#endif
 
   public var description: String {
     String(taking: bridged.getDebugDescription())

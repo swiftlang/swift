@@ -161,7 +161,7 @@ SIMPLE_LOCATOR_PATH_ELT(ParentType)
 
 /// The requirement that we're matching during protocol conformance
 /// checking.
-CUSTOM_LOCATOR_PATH_ELT(ProtocolRequirement)
+SIMPLE_LOCATOR_PATH_ELT(ProtocolRequirement)
 
 /// Type parameter requirements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyRequirement)
@@ -286,6 +286,11 @@ SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
 
 /// A fallback type for some AST location (i.e. key path literal).
 SIMPLE_LOCATOR_PATH_ELT(FallbackType)
+
+/// An implicit conversion (upcast) associated with an existential member access
+/// performed to abstract the member reference type away from context-specific
+/// types like `Self` that are not well-formed in the access context.
+SIMPLE_LOCATOR_PATH_ELT(ExistentialMemberAccessConversion)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

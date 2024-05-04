@@ -14,7 +14,7 @@ import SILBridging
 
 /// An operand of an instruction.
 public struct Operand : CustomStringConvertible, NoReflectionChildren {
-  fileprivate let bridged: BridgedOperand
+  public let bridged: BridgedOperand
 
   public init(bridged: BridgedOperand) {
     self.bridged = bridged
@@ -148,6 +148,10 @@ extension Sequence where Element == Operand {
 
   public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is I) }
+  }
+
+  public func ignore(user: Instruction) -> LazyFilterSequence<Self> {
+    self.lazy.filter { !($0.instruction == user) }
   }
 
   public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {

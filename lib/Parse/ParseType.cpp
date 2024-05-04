@@ -311,13 +311,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
 
   // Wrap in an InverseTypeRepr if needed.
   if (tildeLoc) {
-    TypeRepr *repr;
-    if (EnabledNoncopyableGenerics)
-      repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
-    else
-      repr =
-          ErrorTypeRepr::create(Context, tildeLoc, diag::cannot_suppress_here);
-
+    TypeRepr *repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
     ty = makeParserResult(ty, repr);
   }
 
@@ -1564,6 +1558,15 @@ bool Parser::canParseType() {
   case tok::kw_Any:
   case tok::identifier:
   case tok::code_complete:
+    if (!canParseTypeIdentifier())
+      return false;
+    break;
+  case tok::oper_prefix:
+    if (Tok.getText() != "~") {
+      return false;
+    }
+
+    consumeToken();
     if (!canParseTypeIdentifier())
       return false;
     break;

@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 

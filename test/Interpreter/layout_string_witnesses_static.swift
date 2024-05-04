@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -I %S/Inputs/CTypes -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
 
 // NOTE: We have to build this as dylib to turn private external symbols into local symbols, so we can observe potential issues with linkage
-// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -I %S/Inputs/CTypes -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
 // RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
 // RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
@@ -1179,6 +1179,49 @@ func testMultiPayloadError() {
 }
 
 testMultiPayloadError()
+
+func testCTypeAligned() {
+    let ptr = UnsafeMutablePointer<CTypeAligned>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = CTypeAligned(SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = CTypeAligned(SimpleClass(x: 1))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = CTypeAligned(SimpleClass(x: 5))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testCTypeAligned()
 
 #if os(macOS)
 func testObjc() {

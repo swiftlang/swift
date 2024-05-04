@@ -9,6 +9,8 @@
 // RUN:     -Xllvm -sil-print-function='$s4main1CCACycfc' \
 // RUN:     2>&1 | %FileCheck %s
 
+// REQUIRES: CPU=x86_64
+
 // This test expects the stdlib to be in its properly optimized form.
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 

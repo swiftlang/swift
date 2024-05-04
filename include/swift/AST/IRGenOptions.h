@@ -642,6 +642,10 @@ public:
   bool hasMultipleIRGenThreads() const { return !UseSingleModuleLLVMEmission && NumThreads > 1; }
   bool shouldPerformIRGenerationInParallel() const { return !UseSingleModuleLLVMEmission && NumThreads != 0; }
   bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
+
+  bool isDebugInfoCodeView() const {
+    return DebugInfoFormat == IRGenDebugInfoFormat::CodeView;
+  }
 };
 
 } // end namespace swift

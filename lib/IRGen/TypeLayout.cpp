@@ -1471,7 +1471,8 @@ void ScalarTypeLayoutEntry::initWithTake(IRGenFunction &IGF, Address dest,
                  storageTy, alignment);
   src = Address(Builder.CreateBitCast(src.getAddress(), addressType), storageTy,
                 alignment);
-  typeInfo.initializeWithTake(IGF, dest, src, representative, true);
+  typeInfo.initializeWithTake(IGF, dest, src, representative, true,
+                              /*zeroizeIfSensitive=*/ true);
 }
 
 llvm::Value *ScalarTypeLayoutEntry::getEnumTagSinglePayload(
@@ -1632,6 +1633,11 @@ bool AlignedGroupEntry::isSingleRetainablePointer() const { return false; }
 std::optional<Size> AlignedGroupEntry::fixedSize(IRGenModule &IGM) const {
   if (_fixedSize.has_value())
     return *_fixedSize;
+
+  if (fixedTypeInfo) {
+    return *(_fixedSize = (*fixedTypeInfo)->getFixedSize());
+  }
+
   Size currentSize(0);
   for (auto *entry : entries) {
     if (!entry->fixedSize(IGM) || !entry->fixedAlignment(IGM)) {
@@ -1739,6 +1745,11 @@ bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                                        GenericSignature genericSig) const {
   if (!isFixedSize(IGM) || ty.isMoveOnly()) {
     return false;
+  }
+
+  if (isTriviallyDestroyable()) {
+    B.addSkip(fixedSize(IGM)->getValue());
+    return true;
   }
 
   uint64_t offset = 0;
@@ -3775,7 +3786,8 @@ void TypeInfoBasedTypeLayoutEntry::initWithTake(IRGenFunction &IGF,
       Address(Builder.CreateBitCast(src.getAddress(),
                                     addressType->getPointerTo()),
               addressType, alignment);
-  typeInfo.initializeWithTake(IGF, dest, src, representative, true);
+  typeInfo.initializeWithTake(IGF, dest, src, representative, true,
+                              /*zeroizeIfSensitive=*/ true);
 }
 
 llvm::Value *TypeInfoBasedTypeLayoutEntry::getEnumTagSinglePayload(

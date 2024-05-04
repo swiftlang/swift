@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend                           \
-// RUN:     %s                                           \
-// RUN:     -emit-silgen                                 \
-// RUN:     -disable-availability-checking               \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
+// RUN: %target-swift-frontend                                  \
+// RUN:     %s                                                  \
+// RUN:     -emit-silgen                                        \
+// RUN:     -disable-availability-checking                      \
+// RUN:     -enable-experimental-feature ConformanceSuppression \
+// RUN:     -enable-experimental-feature BitwiseCopyable        \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts
@@ -47,3 +48,17 @@ public enum E : _BitwiseCopyable {
 func take<T : _BitwiseCopyable>(_ t: T) {}
 
 func pass(_ e: E) { take(e) }
+
+func opacify() -> some _BitwiseCopyable {
+    return Int()
+}
+
+struct NeverGoingToBeBitwiseCopyable {
+  var a: AnyObject
+}
+
+@available(*, unavailable)
+extension NeverGoingToBeBitwiseCopyable : _BitwiseCopyable {
+}
+
+struct AlsoNotBitwiseCopyable : ~_BitwiseCopyable {}

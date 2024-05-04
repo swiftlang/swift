@@ -754,7 +754,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                                            {selfDecl->getTypeInContext()},
                                            LookUpConformanceInModule(module)),
                       selfLV.getLValueAddress());
-    } else if (isa<StructDecl>(nominal) && !nominal->canBeCopyable()
+    } else if (isa<StructDecl>(nominal)
+               && lowering.getLoweredType().isMoveOnly()
                && nominal->getStoredProperties().empty()) {
       auto *si = B.createStruct(ctor, lowering.getLoweredType(), {});
       B.emitStoreValueOperation(ctor, si, selfLV.getLValueAddress(),
@@ -1635,7 +1636,8 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
 
     if (needsConvertingInit) {
       Conversion conversion =
-          Conversion::getSubstToOrig(origType, substType, loweredResultTy);
+          Conversion::getSubstToOrig(origType, substType,
+                                     loweredSubstTy, loweredResultTy);
 
       ConvertingInitialization convertingInit(conversion,
                                               SGFContext(memberInit.get()));

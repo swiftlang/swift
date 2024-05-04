@@ -2,7 +2,7 @@
 // and frozen structs.
 
 // RUN: %empty-directory(%t)
-// RUN: split-file %s %t
+// RUN: split-file %s %t --leading-lines
 
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t \
@@ -177,42 +177,51 @@ public struct GenericType<T, U> {}
 
 @frozen public struct BadFields1 {
   private var field: PrivateImportType // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PrivateImportType' is imported by this file as 'private' from 'PrivateLib'}}
 }
 
 @_fixed_layout public struct FixedBadFields1 {
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   private var field: PrivateImportType // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PrivateImportType' is imported by this file as 'private' from 'PrivateLib'}}
 }
 
 @frozen public struct BadFields2 {
   private var field: PrivateImportType? // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PrivateImportType' is imported by this file as 'private' from 'PrivateLib'}}
 }
 
 @_fixed_layout public struct FixedBadFields2 {
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   private var field: PrivateImportType? // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PrivateImportType' is imported by this file as 'private' from 'PrivateLib'}}
 }
 
 @frozen public struct BadFields3 {
   internal var field: PackageImportType? // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PackageImportType' is imported by this file as 'package' from 'PackageLib'}}
 }
 
 @_fixed_layout public struct FixedBadFields3 {
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   internal var field: PackageImportType? // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PackageImportType' is imported by this file as 'package' from 'PackageLib'}}
 }
 
 @frozen @usableFromInline struct BadFields4 {
   internal var field: InternalImportType? // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'InternalImportType' is imported by this file as 'internal' from 'InternalLib'}}
 }
 
 @_fixed_layout @usableFromInline struct FixedBadFields4 {
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   internal var field: InternalImportType? // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'InternalImportType' is imported by this file as 'internal' from 'InternalLib'}}
 }
 
 @frozen public struct BadFields5 {
   private var field: PrivateImportType? { // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PrivateImportType' is imported by this file as 'private' from 'PrivateLib'}}
     didSet {}
   }
 }
@@ -220,12 +229,14 @@ public struct GenericType<T, U> {}
 @_fixed_layout public struct FixedBadFields5 {
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   private var field: PrivateImportType? { // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'PrivateImportType' is imported by this file as 'private' from 'PrivateLib'}}
     didSet {}
   }
 }
 
 @frozen public struct BadFields6 {
   private var field: InternalImportFrozenType? { // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'InternalImportFrozenType' is imported by this file as 'internal' from 'InternalLib'}}
     didSet {}
   }
 }
@@ -233,12 +244,14 @@ public struct GenericType<T, U> {}
 @_fixed_layout public struct FixedBadFields6 {
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   private var field: InternalImportFrozenType? { // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+  // expected-note @-1 {{struct 'InternalImportFrozenType' is imported by this file as 'internal' from 'InternalLib'}}
     didSet {}
   }
 }
 
 // expected-error@+1 {{the result of a '@usableFromInline' function must be '@usableFromInline' or public}}
 @usableFromInline func notReallyUsableFromInline() -> InternalImportType? { return nil }
+  // expected-note @-1 {{struct 'InternalImportType' is imported by this file as 'internal' from 'InternalLib'}}
 @frozen public struct BadFields7 {
   private var field = notReallyUsableFromInline() // expected-error {{type referenced from a stored property with inferred type 'InternalImportType?' in a '@frozen' struct must be '@usableFromInline' or public}}
 }

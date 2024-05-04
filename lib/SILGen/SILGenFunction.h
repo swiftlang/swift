@@ -2452,6 +2452,34 @@ public:
   // Distributed Actors
   //===---------------------------------------------------------------------===//
 
+  /// Determine if the target `func` should be replaced with a
+  /// 'distributed thunk'.
+  ///
+  /// This only applies to distributed functions when calls are made cross-actor
+  /// isolation. One notable exception is a distributed thunk calling the "real
+  /// underlying method", in which case (to avoid the thunk calling into itself,
+  /// the real method must be called).
+  ///
+  /// Witness calls which may need to be replaced with a distributed thunk call
+  /// happen either when the target type is generic, or if we are inside an
+  /// extension on a protocol. This method checks if we are in a context
+  /// where we should be calling the distributed thunk of the `func` or not.
+  /// Notably, if we are inside a distributed thunk already and are trying to
+  /// apply distributed method calls, all those must be to the "real" method,
+  /// because the thunks' responsibility is to call the real method, so this
+  /// replacement cannot be applied (or we'd recursively keep calling the same
+  /// thunk via witness).
+  ///
+  /// In situations which do not use a witness call, distributed methods are always
+  /// invoked Direct, and never ClassMethod, because distributed are effectively
+  /// final.
+  ///
+  /// \param func the target func that we are trying to "apply"
+  /// \return true when the function should be considered for replacement
+  ///         with distributed thunk when applying it
+  bool
+  shouldReplaceConstantForApplyWithDistributedThunk(FuncDecl *func) const;
+
   /// Initializes the implicit stored properties of a distributed actor that correspond to
   /// its transport and identity.
   void emitDistributedActorImplicitPropertyInits(

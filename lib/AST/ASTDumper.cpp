@@ -1084,6 +1084,16 @@ namespace {
 
       printFlag(D->isImplicit(), "implicit", DeclModifierColor);
       printFlag(D->isHoisted(), "hoisted", DeclModifierColor);
+
+      if (auto implAttr = D->getAttrs().getAttribute<ObjCImplementationAttr>()) {
+        StringRef label =
+            implAttr->isEarlyAdopter() ? "objc_impl" : "clang_impl";
+        if (implAttr->CategoryName.empty())
+          printFlag(label);
+        else
+          printFieldQuoted(implAttr->CategoryName.str(), label);
+      }
+
       printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
                 DeclModifierColor);
@@ -1392,9 +1402,10 @@ namespace {
         printField(PD->getDefaultArgumentKind(), "default_arg");
       }
       if (PD->hasDefaultExpr() &&
-          !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
+          PD->getCachedDefaultArgumentCaptureInfo() &&
+          !PD->getCachedDefaultArgumentCaptureInfo()->isTrivial()) {
         printFieldRaw([&](raw_ostream &OS) {
-          PD->getDefaultArgumentCaptureInfo().print(OS);
+          PD->getCachedDefaultArgumentCaptureInfo()->print(OS);
         }, "", CapturesColor);
       }
       
@@ -1478,10 +1489,12 @@ namespace {
 
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type, StringRef Label) {
       printCommon(D, Type, Label, FuncColor);
-      if (!D->getCaptureInfo().isTrivial()) {
-        printFlagRaw([&](raw_ostream &OS) {
-          D->getCaptureInfo().print(OS);
-        });
+      if (auto captureInfo = D->getCachedCaptureInfo()) {
+        if (!captureInfo->isTrivial()) {
+          printFlagRaw([&](raw_ostream &OS) {
+            captureInfo->print(OS);
+          });
+        }
       }
 
       if (auto *attr = D->getAttrs().getAttribute<NonisolatedAttr>()) {
@@ -2816,10 +2829,12 @@ public:
       break;
     }
 
-    if (!E->getCaptureInfo().isTrivial()) {
-      printFieldRaw([&](raw_ostream &OS) {
-        E->getCaptureInfo().print(OS);
-      }, "", CapturesColor);
+    if (auto captureInfo = E->getCachedCaptureInfo()) {
+      if (!captureInfo->isTrivial()) {
+        printFieldRaw([&](raw_ostream &OS) {
+          captureInfo->print(OS);
+        }, "", CapturesColor);
+      }
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
@@ -3535,8 +3550,7 @@ public:
     for (auto &dep : T->getLifetimeDependencies()) {
       printFieldRaw(
           [&](raw_ostream &out) {
-            out << dep.getLifetimeDependenceKindString() << "(";
-            out << dep.getParamString() << ")";
+            out << " " << dep.getLifetimeDependenceSpecifierString() << " ";
           },
           "");
     }

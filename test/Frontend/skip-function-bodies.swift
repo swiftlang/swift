@@ -2,9 +2,9 @@
 
 // Check skipped function bodies are neither typechecked nor SILgen'd when the
 // -experimental-skip-*-function-bodies-* flags are specified.
-// RUN: %target-swift-frontend -emit-sil %s > %t/NoSkip.sil
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-abi-5.10-triple %s > %t/NoSkip.sil
 // RUN: %target-swift-frontend -emit-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s > %t/Skip.noninlinable.sil
-// RUN: %target-swift-frontend -emit-sil -experimental-skip-non-inlinable-function-bodies-without-types -debug-forbid-typecheck-prefix NEVERTYPECHECK %s > %t/Skip.withouttypes.sil
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-abi-5.10-triple -experimental-skip-non-inlinable-function-bodies-without-types -debug-forbid-typecheck-prefix NEVERTYPECHECK %s > %t/Skip.withouttypes.sil
 
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-NO-SKIP --input-file %t/NoSkip.sil
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES,CHECK-SIL-SKIP-NONINLINE --input-file %t/Skip.noninlinable.sil
@@ -14,16 +14,16 @@
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-SKIP-ALL --input-file %t/Skip.all.sil
 
 // Emit module interfaces and check their contents, too.
-// RUN: %target-swift-emit-module-interface(%t/Skip.noninlinable.swiftinterface) %s -module-name Skip -experimental-skip-non-inlinable-function-bodies
+// RUN: %target-swift-emit-module-interface(%t/Skip.noninlinable.swiftinterface) %s -target %target-swift-abi-5.10-triple -module-name Skip -experimental-skip-non-inlinable-function-bodies
 // RUN: %target-swift-typecheck-module-from-interface(%t/Skip.noninlinable.swiftinterface) -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.noninlinable.swiftinterface
-// RUN: %target-swift-emit-module-interface(%t/Skip.all.swiftinterface) %s -module-name Skip -experimental-skip-all-function-bodies
+// RUN: %target-swift-emit-module-interface(%t/Skip.all.swiftinterface) %s -target %target-swift-abi-5.10-triple -module-name Skip -experimental-skip-all-function-bodies
 // RUN: %target-swift-typecheck-module-from-interface(%t/Skip.all.swiftinterface) -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.all.swiftinterface
 
 // Verify that the emitted interfaces match an interface emitted without any
 // body skipping flags.
-// RUN: %target-swift-emit-module-interface(%t/NoSkip.swiftinterface) %s  -module-name Skip
+// RUN: %target-swift-emit-module-interface(%t/NoSkip.swiftinterface) %s -target %target-swift-abi-5.10-triple -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/NoSkip.swiftinterface
 // RUN: diff -u %t/Skip.noninlinable.swiftinterface %t/NoSkip.swiftinterface
 // RUN: diff -u %t/Skip.all.swiftinterface %t/NoSkip.swiftinterface
@@ -158,19 +158,20 @@ func funcPublicWithDefer() {
 // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithDefer()"
 
 public func funcPublicWithNestedFuncAndTypealias() {
-  let NEVERTYPECHECK_outerLocal = "funcPublicWithNestedFuncAndTypealias()"
-  _blackHole(NEVERTYPECHECK_outerLocal)
+  let INLINENOTYPECHECK_outerLocal = "funcPublicWithNestedFuncAndTypealias()"
+  _blackHole(INLINENOTYPECHECK_outerLocal)
 
   typealias LocalType = Int
   func takesLocalType(_ x: LocalType) {
-    let NEVERTYPECHECK_innerLocal = "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
-    _blackHole(NEVERTYPECHECK_innerLocal)
+    let INLINENOTYPECHECK_innerLocal = "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
+    _blackHole(INLINENOTYPECHECK_innerLocal)
   }
   takesLocalType(0)
 }
 // CHECK-TEXTUAL-NOT: "funcPublicWithNestedFuncAndTypealias()"
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedFuncAndTypealias()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithNestedFuncAndTypealias()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedFuncAndTypealias()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedFuncAndTypealias()"
 
 // CHECK-TEXTUAL-NOT: "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
@@ -195,6 +196,36 @@ public func funcPublicWithNestedTypeEnum() {
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeEnum()"
 // CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeEnum()"
 // CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeEnum()"
+
+public func funcPublicWithNestedTypealias() {
+  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypealias()"
+  _blackHole(INLINENOTYPECHECK_local)
+  typealias TA = Int
+}
+// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypealias()"
+// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypealias()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypealias()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypealias()"
+
+public func funcPublicWithNestedTypeActor() {
+  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeActor()"
+  _blackHole(INLINENOTYPECHECK_local)
+  actor A {}
+}
+// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeActor()"
+// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeActor()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeActor()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeActor()"
+
+public func funcPublicWithNestedTypeProtocol() {
+  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeProtocol()"
+  _blackHole(INLINENOTYPECHECK_local)
+  protocol P {}
+}
+// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeProtocol()"
+// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeProtocol()"
+// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeProtocol()"
+// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeProtocol()"
 
 public func funcPublicWithNestedTypeStruct() {
   let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeStruct()"

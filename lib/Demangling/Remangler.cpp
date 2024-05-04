@@ -59,54 +59,8 @@ bool SubstitutionEntry::identifierEquals(Node *lhs, Node *rhs) {
   return true;
 }
 
-void SubstitutionEntry::deepHash(Node *node) {
-  if (treatAsIdentifier) {
-    combineHash((size_t) Node::Kind::Identifier);
-    assert(node->hasText());
-    switch (node->getKind()) {
-    case Node::Kind::InfixOperator:
-    case Node::Kind::PrefixOperator:
-    case Node::Kind::PostfixOperator:
-      for (char c : node->getText()) {
-        combineHash((unsigned char)translateOperatorChar(c));
-      }
-      return;
-    default:
-      break;
-    }
-  } else {
-    combineHash((size_t) node->getKind());
-  }
-  if (node->hasIndex()) {
-    combineHash(node->getIndex());
-  } else if (node->hasText()) {
-    for (char c : node->getText()) {
-      combineHash((unsigned char) c);
-    }
-  }
-  for (Node *child : *node) {
-    deepHash(child);
-  }
-}
-
 bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
-  if (lhs->getKind() != rhs->getKind())
-    return false;
-  if (lhs->hasIndex()) {
-    if (!rhs->hasIndex())
-      return false;
-    if (lhs->getIndex() != rhs->getIndex())
-      return false;
-  } else if (lhs->hasText()) {
-    if (!rhs->hasText())
-      return false;
-    if (lhs->getText() != rhs->getText())
-      return false;
-  } else if (rhs->hasIndex() || rhs->hasText()) {
-    return false;
-  }
-
-  if (lhs->getNumChildren() != rhs->getNumChildren())
+  if (!lhs->isSimilarTo(rhs))
     return false;
 
   for (auto li = lhs->begin(), ri = rhs->begin(), le = lhs->end();
@@ -114,8 +68,106 @@ bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
     if (!deepEquals(*li, *ri))
       return false;
   }
-  
+
   return true;
+}
+
+static inline size_t combineHash(size_t currentHash, size_t newValue) {
+  return 33 * currentHash + newValue;
+}
+
+/// Calculate the hash for a node.
+size_t RemanglerBase::hashForNode(Node *node,
+                                  bool treatAsIdentifier) {
+  size_t hash = 0;
+
+  if (treatAsIdentifier) {
+    hash = combineHash(hash, (size_t)Node::Kind::Identifier);
+    assert(node->hasText());
+    switch (node->getKind()) {
+    case Node::Kind::InfixOperator:
+    case Node::Kind::PrefixOperator:
+    case Node::Kind::PostfixOperator:
+      for (char c : node->getText()) {
+        hash = combineHash(hash, (unsigned char)translateOperatorChar(c));
+      }
+      return hash;
+    default:
+      break;
+    }
+  } else {
+    hash = combineHash(hash, (size_t) node->getKind());
+  }
+  if (node->hasIndex()) {
+    hash = combineHash(hash, node->getIndex());
+  } else if (node->hasText()) {
+    for (char c : node->getText()) {
+      hash = combineHash(hash, (unsigned char) c);
+    }
+  }
+  for (Node *child : *node) {
+    SubstitutionEntry entry = entryForNode(child, treatAsIdentifier);
+    hash = combineHash(hash, entry.hash());
+  }
+
+  return hash;
+}
+
+/// Rotate a size_t by N bits
+static inline size_t rotate(size_t value, size_t shift) {
+  const size_t bits = sizeof(size_t) * 8;
+  return (value >> shift) | (value << (bits - shift));
+}
+
+/// Compute a hash value from a node *pointer*.
+/// Used for look-ups in HashHash.  The numbers in here were determined
+/// experimentally.
+static inline size_t nodeHash(Node *node) {
+  // Multiply by a magic number
+  const size_t nodePrime = ((size_t)node) * 2043;
+
+  // We rotate by a different amount because the alignment of Node
+  // changes depending on the machine's pointer size
+  switch (sizeof(size_t)) {
+  case 4:
+    return rotate(nodePrime, 11);
+  case 8:
+    return rotate(nodePrime, 12);
+  case 16:
+    return rotate(nodePrime, 13);
+  default:
+    return rotate(nodePrime, 12);
+  }
+}
+
+/// Construct a SubstitutionEntry for a given node.
+/// This will look in the HashHash to see if we already know the hash
+/// (which avoids recursive hashing on the Node tree).
+SubstitutionEntry RemanglerBase::entryForNode(Node *node,
+                                              bool treatAsIdentifier) {
+  const size_t ident = treatAsIdentifier ? 4 : 0;
+  const size_t hash = nodeHash(node) + ident;
+
+  // Use linear probing with a limit
+  for (size_t n = 0; n < HashHashMaxProbes; ++n) {
+    const size_t ndx = (hash + n) & (HashHashCapacity - 1);
+    SubstitutionEntry entry = HashHash[ndx];
+
+    if (entry.isEmpty()) {
+      size_t entryHash = hashForNode(node, treatAsIdentifier);
+      entry.setNode(node, treatAsIdentifier, entryHash);
+      HashHash[ndx] = entry;
+      return entry;
+    } else if (entry.matches(node, treatAsIdentifier)) {
+      return entry;
+    }
+  }
+
+  // Hash table is full at this hash value
+  SubstitutionEntry entry;
+  size_t entryHash = hashForNode(node, treatAsIdentifier);
+  entry.setNode(node, treatAsIdentifier, entryHash);
+  return entry;
 }
 
 // Find a substitution and return its index.
@@ -356,7 +408,7 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
     return true;
 
   // Go ahead and initialize the substitution entry.
-  entry.setNode(node, treatAsIdentifier);
+  entry = entryForNode(node, treatAsIdentifier);
 
   int Idx = findSubstitution(entry);
   if (Idx < 0)
@@ -1059,24 +1111,23 @@ ManglingError Remangler::mangleDependentGenericInverseConformanceRequirement(
   DEMANGLER_ASSERT(
       NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
 
-  // Determine the invertible protocol's mangling
-  const char* invertibleKind = nullptr; // INVERTIBLE-KIND
-  {
-    auto typeNode = node->getChild(1);
-    auto *identNode = typeNode->findByKind(Node::Kind::Identifier, 2);
-    DEMANGLER_ASSERT(identNode, node);
-    DEMANGLER_ASSERT(identNode->hasText(), node);
-
-    auto name = identNode->getText();
-    if (name.equals("Copyable"))
-      invertibleKind = "c";
-    else if (name.equals("Escapable"))
-      invertibleKind = "e";
-    else
-      return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
+  switch (NumMembersAndParamIdx.first) {
+  case -1:
+    Buffer << "RI";
+    mangleIndex(node->getChild(1)->getIndex());
+    return ManglingError::Success; // substitution
+  case 0:
+    Buffer << "Ri";
+    break;
+  case 1:
+    Buffer << "Rj";
+    break;
+  default:
+    Buffer << "RJ";
+    break;
   }
 
-  Buffer << "Ri" << invertibleKind;
+  mangleIndex(node->getChild(1)->getIndex());
   mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
   return ManglingError::Success;
 }
@@ -1918,6 +1969,12 @@ ManglingError Remangler::mangleImplPatternSubstitutions(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError Remangler::mangleImplCoroutineKind(Node *node,
+                                                 unsigned depth) {
+  // handled inline
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
   const char *PseudoGeneric = "";
   Node *GenSig = nullptr;
@@ -2016,10 +2073,21 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         RETURN_IF_ERROR(mangleImplFunctionConvention(Child, depth + 1));
         break;
       }
+      case Node::Kind::ImplCoroutineKind: {
+        char CoroAttr = llvm::StringSwitch<char>(Child->getText())
+                        .Case("yield_once", 'A')
+                        .Case("yield_many", 'G')
+                        .Default(0);
+
+        if (!CoroAttr) {
+          return MANGLING_ERROR(ManglingError::InvalidImplCoroutineKind,
+                                Child);
+        }
+        Buffer << CoroAttr;
+        break;
+      }
       case Node::Kind::ImplFunctionAttribute: {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
-                        .Case("@yield_once", 'A')
-                        .Case("@yield_many", 'G')
                         .Case("@Sendable", 'h')
                         .Case("@async", 'H')
                         .Default(0);
@@ -2615,6 +2683,14 @@ ManglingError Remangler::mangleConcreteProtocolConformance(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::manglePackProtocolConformance(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleAnyProtocolConformanceList(node->getChild(0), depth + 1));
+  Buffer << "HX";
+  return ManglingError::Success;
+}
+
 ManglingError
 Remangler::mangleDependentProtocolConformanceRoot(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
@@ -2664,6 +2740,8 @@ ManglingError Remangler::mangleAnyProtocolConformance(Node *node,
   switch (node->getKind()) {
   case Node::Kind::ConcreteProtocolConformance:
     return mangleConcreteProtocolConformance(node, depth + 1);
+  case Node::Kind::PackProtocolConformance:
+    return manglePackProtocolConformance(node, depth + 1);
   case Node::Kind::DependentProtocolConformanceRoot:
     return mangleDependentProtocolConformanceRoot(node, depth + 1);
   case Node::Kind::DependentProtocolConformanceInherited:

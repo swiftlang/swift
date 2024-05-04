@@ -617,7 +617,6 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
   if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeInitializer(initContext, init);
-    (void)binding->getInitializerIsolation(i);
     TypeChecker::checkInitializerEffects(initContext, init);
   }
 }
@@ -2191,6 +2190,7 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return synthesizeGetterBody(accessor, ctx);
 
   case AccessorKind::Set:
@@ -2491,6 +2491,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return createGetterPrototype(storage, ctx);
 
   case AccessorKind::Set:
@@ -2669,6 +2670,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
     break;
+  case AccessorKind::DistributedGet:
+    return false;
 
   case AccessorKind::Set:
 

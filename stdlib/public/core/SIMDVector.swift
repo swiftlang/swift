@@ -850,7 +850,11 @@ extension SIMD where Scalar: FixedWidthInteger {
   /// Equivalent to `indices.reduce(into: 0) { $0 &+= self[$1] }`.
   @_alwaysEmitIntoClient
   public func wrappedSum() -> Scalar {
-    return indices.reduce(into: 0) { $0 &+= self[$1] }
+    var result: Scalar = 0
+    for i in indices {
+      result &+= self[i]
+    }
+    return result
   }
 }
 
@@ -927,7 +931,13 @@ extension SIMD where Scalar: FloatingPoint {
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
     // coding the tree sum is problematic, we probably need to define a
     // Swift Builtin to support it.
-    return indices.reduce(into: 0) { $0 += self[$1] }
+    //
+    // Use -0 so that LLVM can optimize away initial value + self[0].
+    var result = -Scalar.zero
+    for i in indices {
+      result += self[i]
+    }
+    return result
   }
 }
 

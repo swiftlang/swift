@@ -908,7 +908,7 @@ private:
                         bool lookThroughAutoclosure) const {
     auto param = fnTy->getParams()[ParamIdx];
     auto paramTy = param.getPlainType();
-    if (lookThroughAutoclosure && param.isAutoClosure())
+    if (lookThroughAutoclosure && param.isAutoClosure() && paramTy->is<FunctionType>())
       paramTy = paramTy->castTo<FunctionType>()->getResult();
     return paramTy;
   }
@@ -2229,6 +2229,10 @@ private:
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
+  /// Maps closures and local functions to the pack expansion expressions they
+  /// capture.
+  llvm::MapVector<AnyFunctionRef, SmallVector<PackExpansionExpr *, 1>> CapturedExpansions;
+
   /// Maps expressions for implied results (e.g implicit 'then' statements,
   /// implicit 'return' statements in single expression body closures) to their
   /// result kind.
@@ -3162,6 +3166,19 @@ public:
     if (result != ClosureTypes.end())
       return result->second;
     return nullptr;
+  }
+
+  SmallVector<PackExpansionExpr *, 1> getCapturedExpansions(AnyFunctionRef func) const {
+    auto result = CapturedExpansions.find(func);
+    if (result == CapturedExpansions.end())
+      return {};
+
+    return result->second;
+  }
+
+  void setCapturedExpansions(AnyFunctionRef func, SmallVector<PackExpansionExpr *, 1> exprs) {
+    assert(CapturedExpansions.count(func) == 0 && "Cannot reset captured expansions");
+    CapturedExpansions.insert({func, exprs});
   }
 
   TypeVariableType *getKeyPathValueType(const KeyPathExpr *keyPath) const {
@@ -4370,8 +4387,8 @@ public:
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
-  AnyFunctionType *adjustFunctionTypeForConcurrency(
-      AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+  FunctionType *adjustFunctionTypeForConcurrency(
+      FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
       OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
 
@@ -4442,8 +4459,7 @@ public:
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
       Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
-      ConstraintLocator *locator, bool hasAppliedSelf,
-      bool isStaticMemberRefOnProtocol, bool isDynamicResult,
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
       OpenedTypeMap &replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
@@ -4453,16 +4469,14 @@ public:
   /// this routine "opens up" the type by replacing each instance of a generic
   /// parameter with a fresh type variable.
   ///
-  /// \param isDynamicResult Indicates that this declaration was found via
+  /// \param isDynamicLookup Indicates that this declaration was found via
   /// dynamic lookup.
   ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
-                          Type baseTy, ValueDecl *decl, DeclContext *useDC,
-                          bool isDynamicResult,
-                          FunctionRefKind functionRefKind,
-                          ConstraintLocator *locator,
-                          OpenedTypeMap *replacements = nullptr);
+      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
+      FunctionRefKind functionRefKind, ConstraintLocator *locator,
+      OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.

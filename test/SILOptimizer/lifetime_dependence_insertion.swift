@@ -2,15 +2,14 @@
 // RUN:   -Xllvm -sil-print-after=lifetime-dependence-insertion \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
@@ -26,7 +25,7 @@ struct NC : ~Copyable {
   let i: Int
 
   // Requires a borrow.
-  borrowing func getBV() -> _borrow(self) BV {
+  borrowing func getBV() -> dependsOn(self) BV {
     BV(p, i)
   }
 }

@@ -432,7 +432,9 @@ final public class DebugStepInst : Instruction {}
 
 final public class SpecifyTestInst : Instruction {}
 
-final public class UnconditionalCheckedCastAddrInst : Instruction {
+final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAddrInstruction {
+  public var isTakeOfSrc: Bool { true }
+  public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
 }
 
@@ -526,9 +528,6 @@ final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocatio
     return operand.value as! AllocStackInst
   }
 }
-
-final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
-final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
@@ -700,12 +699,6 @@ class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class OpenPackElementInst : SingleValueInstruction {}
-final public class PackLengthInst : SingleValueInstruction {}
-final public class DynamicPackIndexInst : SingleValueInstruction {}
-final public class PackPackIndexInst : SingleValueInstruction {}
-final public class ScalarPackIndexInst : SingleValueInstruction {}
 
 final public class ObjCProtocolInst : SingleValueInstruction {}
 
@@ -963,6 +956,18 @@ final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruct
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
 
+final public class BorrowedFromInst : SingleValueInstruction, BorrowIntroducingInstruction {
+  public var borrowedValue: Value { operands[0].value }
+  public var borrowedPhi: Phi { Phi(borrowedValue)! }
+  public var enclosingOperands: OperandArray {
+    let ops = operands
+    return ops[1..<ops.count]
+  }
+  public var enclosingValues: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
+    enclosingOperands.values
+  }
+}
+
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
   public var box: Value { operand.value }
   public var fieldIndex: Int { bridged.ProjectBoxInst_fieldIndex() }
@@ -1011,7 +1016,21 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
+
+  /// WARNING: isOnStack incorrectly returns false for all closures prior to ClosureLifetimeFixup, even if they need to
+  /// be diagnosed as on-stack closures. Use has mayEscape instead.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
+
+  public var mayEscape: Bool { !isOnStack && !hasNoescapeCapture }
+
+  /// True if this closure captures anything nonescaping.
+  public var hasNoescapeCapture: Bool {
+    if operandConventions.contains(.indirectInoutAliasable) {
+      return true
+    }
+    return arguments.contains { $0.type.containsNoEscapeFunction }
+  }
+
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
 }
 
@@ -1079,20 +1098,6 @@ final public class ObjectInst : SingleValueInstruction {
 final public class VectorInst : SingleValueInstruction {
 }
 
-final public class TuplePackExtractInst: SingleValueInstruction {
-  public var indexOperand: Operand { operands[0] }
-  public var tupleOperand: Operand { operands[1] }
-}
-
-final public class TuplePackElementAddrInst: SingleValueInstruction {
-  public var indexOperand: Operand { operands[0] }
-  public var tupleOperand: Operand { operands[1] }
-}
-
-final public class PackElementGetInst: SingleValueInstruction {}
-
-final public class PackElementSetInst: SingleValueInstruction {}
-
 final public class DifferentiableFunctionInst: SingleValueInstruction {}
 
 final public class LinearFunctionInst: SingleValueInstruction {}
@@ -1125,9 +1130,6 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
 final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
   public var capacity: Value { operand.value }
 }
-
-final public class AllocPackInst : SingleValueInstruction, Allocation {}
-final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
   final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
@@ -1216,7 +1218,15 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
 
 final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
 
-final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction { }
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
+  var allocStack: AllocStackInst {
+    var dest = destination
+    if let mark = dest as? MarkUnresolvedNonCopyableValueInst {
+      dest = mark.operand.value
+    }
+    return dest as! AllocStackInst
+  }
+}
 
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   // The raw values must match SILAccessKind.
@@ -1338,6 +1348,36 @@ final public class DestructureStructInst : MultipleValueInstruction, UnaryInstru
 final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruction {
   public var `tuple`: Value { operand.value }
 }
+
+//===----------------------------------------------------------------------===//
+//                           parameter pack instructions
+//===----------------------------------------------------------------------===//
+
+final public class AllocPackInst : SingleValueInstruction, Allocation {}
+final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
+
+final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
+final public class DeallocPackMetadataInst : Instruction, Deallocation {}
+
+final public class OpenPackElementInst : SingleValueInstruction {}
+final public class PackLengthInst : SingleValueInstruction {}
+final public class DynamicPackIndexInst : SingleValueInstruction {}
+final public class PackPackIndexInst : SingleValueInstruction {}
+final public class ScalarPackIndexInst : SingleValueInstruction {}
+
+final public class TuplePackExtractInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
+}
+
+final public class TuplePackElementAddrInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
+}
+
+final public class PackElementGetInst: SingleValueInstruction {}
+
+final public class PackElementSetInst: Instruction {}
 
 //===----------------------------------------------------------------------===//
 //                            terminator instructions
@@ -1481,5 +1521,35 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
 }
 
-final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {
+final public class CheckedCastAddrBranchInst : TermInst {
+  public var source: Value { operands[0].value }
+  public var destination: Value { operands[1].value }
+
+  public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
+  public var failureBlock: BasicBlock { bridged.CheckedCastAddrBranch_getFailureBlock().block }
+
+  public enum CastConsumptionKind {
+    /// The source value is always taken, regardless of whether the cast
+    /// succeeds.  That is, if the cast fails, the source value is
+    /// destroyed.
+    case TakeAlways
+
+    /// The source value is taken only on a successful cast; otherwise,
+    /// it is left in place.
+    case TakeOnSuccess
+
+    /// The source value is always left in place, and the destination
+    /// value is copied into on success.
+    case CopyOnSuccess
+  }
+
+  public var consumptionKind: CastConsumptionKind {
+    switch bridged.CheckedCastAddrBranch_getConsumptionKind() {
+    case .TakeAlways:    return .TakeAlways
+    case .TakeOnSuccess: return .TakeOnSuccess
+    case .CopyOnSuccess: return .CopyOnSuccess
+    default:
+      fatalError("invalid cast consumption kind")
+    }
+  }
 }

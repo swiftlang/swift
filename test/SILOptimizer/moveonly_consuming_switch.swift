@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BorrowingSwitch -enable-experimental-feature MoveOnlyPartialConsumption -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BorrowingSwitch -verify %s
 
 // TODO: Remove this and just use the real `UnsafeMutablePointer` when
 // noncopyable type support has been upstreamed.
@@ -57,7 +57,7 @@ extension List {
     }
         
     mutating func pop() -> Element {
-        switch self {
+        switch consume self {
         case .node(let element, let box):
             self = box.move()
             return element

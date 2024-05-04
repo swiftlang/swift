@@ -3,14 +3,13 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
 
@@ -35,7 +34,7 @@ struct NC : ~Copyable {
 struct NE {
   var bv: BV
 
-  init(_ bv: consuming BV) -> _consume(bv) Self {
+  init(_ bv: consuming BV) -> dependsOn(bv) Self {
     self.bv = bv
     return self
   }

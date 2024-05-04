@@ -274,7 +274,7 @@ static void validateSearchPathArgs(DiagnosticEngine &diags,
                                    const ArgList &args) {
   for (const Arg *A : args.filtered(options::OPT_F, options::OPT_Fsystem)) {
     StringRef name = A->getValue();
-    if (name.endswith(".framework") || name.endswith(".framework/"))
+    if (name.ends_with(".framework") || name.ends_with(".framework/"))
       diags.diagnose(SourceLoc(),
                      diag::framework_search_path_includes_framework_extension,
                      name);
@@ -340,6 +340,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   }
 
   switch (target.getOS()) {
+  case llvm::Triple::XROS:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
@@ -1830,7 +1831,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         if (auto *IA = dyn_cast<InputAction>(A)) {
           StringRef ObjectName = IA->getInputArg().getValue();
           if (Triple.getObjectFormat() == llvm::Triple::ELF &&
-              ObjectName.endswith(".so"))
+              ObjectName.ends_with(".so"))
             continue;
         }
         AutolinkExtractInputs.push_back(A);

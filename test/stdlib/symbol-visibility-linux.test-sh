@@ -254,6 +254,8 @@
 // RUN:             -e _ZSt27__throw_bad_optional_accessv \
 // RUN:             -e _ZNSt8__detail9__variant13__erased_ctorIRSt9monostateOS2_EEvPvS5_ \
 // RUN:             -e _ZNSt8__detail9__variant15__erased_assignIRSt9monostateOS2_EEvPvS5_ \
+// RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE15_M_replace_coldEPcmPKcmm \
+// RUN:             -e _ZSt12__str_concatINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEET_PKNS6_10value_typeENS6_9size_typeES9_SA_RKNS6_14allocator_typeE \
 // RUN:   > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
 // RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt
@@ -512,6 +514,8 @@
 // RUN:             -e _ZNSt10_HashtableImSt4pairIKmSt8optionalISsEESaIS4_ENSt8__detail10_Select1stESt8equal_toImESt4hashImENS6_18_Mod_range_hashingENS6_20_Default_ranged_hashENS6_20_Prime_rehash_policyENS6_17_Hashtable_traitsILb0ELb0ELb1EEEE10_M_emplaceIJS0_ImS3_EEEES0_INS6_14_Node_iteratorIS4_Lb0ELb0EEEbESt17integral_constantIbLb1EEDpOT_ \
 // RUN:             -e _ZNSt10_HashtableImSt4pairIKmSt8optionalISsEESaIS4_ENSt8__detail10_Select1stESt8equal_toImESt4hashImENS6_18_Mod_range_hashingENS6_20_Default_ranged_hashENS6_20_Prime_rehash_policyENS6_17_Hashtable_traitsILb0ELb0ELb1EEEE10_M_emplaceIJS0_ImSsEEEES0_INS6_14_Node_iteratorIS4_Lb0ELb0EEEbESt17integral_constantIbLb1EEDpOT_ \
 // RUN:             -e _ZNSt10_HashtableImSt4pairIKmSt8optionalISsEESaIS4_ENSt8__detail10_Select1stESt8equal_toImESt4hashImENS6_18_Mod_range_hashingENS6_20_Default_ranged_hashENS6_20_Prime_rehash_policyENS6_17_Hashtable_traitsILb0ELb0ELb1EEEE13_M_rehash_auxEmSt17integral_constantIbLb1EE \
+// RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE15_M_replace_coldEPcmPKcmm \
+// RUN:             -e _ZSt12__str_concatINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEET_PKNS6_10value_typeENS6_9size_typeES9_SA_RKNS6_14allocator_typeE \
 // RUN:   > %t/swiftRemoteMirror-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
 // RUN: diff -u %t/swiftRemoteMirror-all.txt %t/swiftRemoteMirror-no-weak.txt

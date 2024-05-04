@@ -173,11 +173,13 @@ enum class DescriptiveDeclKind : uint8_t {
   Struct,
   Class,
   Actor,
+  DistributedActor,
   Protocol,
   GenericEnum,
   GenericStruct,
   GenericClass,
   GenericActor,
+  GenericDistributedActor,
   GenericType,
   Subscript,
   StaticSubscript,
@@ -598,7 +600,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -624,6 +626,9 @@ protected:
 
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
+
+    /// Whether we have computed a requirement signature.
+    HasRequirementSignature : 1,
 
     /// Whether we have a lazy-loaded requirement signature.
     HasLazyRequirementSignature : 1,
@@ -692,7 +697,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -751,7 +756,10 @@ protected:
     HasCxxInteroperability : 1,
 
     /// Whether this module has been built with -experimental-allow-non-resilient-access.
-    AllowNonResilientAccess : 1
+    AllowNonResilientAccess : 1,
+
+    /// Whether this module has been built with -experimental-package-cmo.
+    SerializePackageEnabled : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1303,6 +1311,11 @@ public:
   std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
 
+  /// Returns true if code associated with this declaration should be considerd
+  /// unreachable at runtime because the declaration is unavailable in all
+  /// execution contexts in which the code may run.
+  bool isUnreachableAtRuntime() const;
+
   /// Returns true if this declaration should be considered available during
   /// SIL/IR lowering. A declaration would not be available during lowering if,
   /// for example, it is annotated as unavailable with `@available` and
@@ -1618,17 +1631,29 @@ private:
   /// Whether there was an @preconcurrency attribute.
   bool IsPreconcurrency : 1;
 
+  /// Whether there was a ~ indicating suppression.
+  ///
+  /// This is true in cases like ~Copyable but not (P & ~Copyable).
+  bool IsSuppressed : 1;
+
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
   InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
-                 bool isPreconcurrency)
+                 bool isPreconcurrency, bool isSuppressed = false)
       : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
-        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency) {}
+        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency),
+        IsSuppressed(isSuppressed) {}
 
   bool isUnchecked() const { return IsUnchecked; }
   bool isRetroactive() const { return IsRetroactive; }
   bool isPreconcurrency() const { return IsPreconcurrency; }
+  bool isSuppressed() const { return IsSuppressed; }
+
+  void setSuppressed() {
+    assert(!IsSuppressed && "setting suppressed again!?");
+    IsSuppressed = true;
+  }
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -1860,6 +1885,32 @@ public:
   /// Determine whether this extension context is in the same defining module as
   /// the original nominal type context.
   bool isInSameDefiningModule() const;
+
+  /// Determine whether this extension is equivalent to one that requires at
+  /// at least some constraints to be written in the source.
+  ///
+  /// This result will differ from `isConstrainedExtension()` when any of
+  /// the generic parameters of the type are invertible, e.g.,
+  /// \code
+  /// struct X<T: ~Copyable>: ~Copyable { }
+  ///
+  /// // Implies `T: Copyable`. This extension `!isWrittenWithConstraints()`
+  /// // and `isConstrainedExtension()`.
+  /// extension X { }
+  ///
+  /// // This extension `isWrittenWithConstraints()`
+  /// // and `!isConstrainedExtension()`.
+  /// extension X where T: ~Copyable { }
+  ///
+  /// // Implies `T: Copyable`. This extension `isWrittenWithConstraints()`
+  /// // and `isConstrainedExtension()`.
+  /// extension X where T: P { }
+  ///
+  /// // This extension `isWrittenWithConstraints()`
+  /// // and `isConstrainedExtension()`.
+  /// extension X where T: Q, T: ~Copyable { }
+  /// \endcode
+  bool isWrittenWithConstraints() const;
 
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid or
@@ -2752,7 +2803,7 @@ protected:
 public:
   /// Find the import that makes the given declaration available.
   std::optional<AttributedImport<ImportedModule>>
-  findImport(const DeclContext *fromDC);
+  findImport(const DeclContext *fromDC) const;
 
   /// Return true if this protocol member is a protocol requirement.
   ///
@@ -2784,6 +2835,12 @@ public:
   /// Only member methods and computed properties of a `distributed actor`
   /// can be distributed.
   bool isDistributed() const;
+
+  /// Is this a '_distributed_get' accessor?
+  ///
+  /// These are special accessors used by distributed thunks, implementing
+  /// `distributed var get { }` accessors.
+  bool isDistributedGetAccessor() const;
 
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
@@ -4370,6 +4427,10 @@ public:
   /// Returns null if the type is a class, or does not have a declared `deinit`.
   DestructorDecl *getValueTypeDestructor();
 
+  /// Does a conformance for a given invertible protocol exist for this
+  /// type declaration.
+  CanBeInvertible::Result canConformTo(InvertibleProtocolKind kind) const;
+
   /// "Does a conformance for Copyable exist for this type declaration?"
   ///
   /// This doesn't mean that all instance of this type are Copyable, because
@@ -4389,6 +4450,8 @@ public:
   /// If you need a more precise answer, ask this Decl's corresponding
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
+
+  bool suppressesConformance(KnownProtocolKind kp) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5122,15 +5185,11 @@ class ProtocolDecl final : public NominalTypeDecl {
     /// The superclass decl and a bit to indicate whether the
     /// superclass was computed yet or not.
     llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
-
-    /// The superclass type and a bit to indicate whether the
-    /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  std::optional<RequirementSignature> RequirementSig;
+  RequirementSignature RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
@@ -5217,15 +5276,9 @@ public:
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
-  /// Retrieve the superclass of this protocol, or null if there is no superclass.
-  Type getSuperclass() const;
-
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
-
-  /// Set the superclass of this protocol.
-  void setSuperclass(Type superclass);
 
   /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
   /// saves loading the set of members in cases where there's no possibility of
@@ -5445,7 +5498,7 @@ public:
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSig.has_value();
+    return Bits.ProtocolDecl.HasRequirementSignature;
   }
 
   void setRequirementSignature(RequirementSignature requirementSig);
@@ -6620,8 +6673,15 @@ public:
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
 
-  /// Create a new ParamDecl identical to the first except without the interface type.
-  static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
+  /// Create a new `ParamDecl` identical to the given one except without the
+  /// interface type.
+  ///
+  /// \param PD The parameter to clone.
+  /// \param defaultArgKind The default argument kind for the cloned parameter.
+  ///        If \c std::nullopt, use the default argument kind of \p PD.
+  static ParamDecl *cloneWithoutType(
+      const ASTContext &Ctx, ParamDecl *PD,
+      std::optional<DefaultArgumentKind> defaultArgKind = std::nullopt);
 
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
@@ -6638,6 +6698,13 @@ public:
                  Identifier parameterName, Type interfaceType,
                  DeclContext *Parent,
                  ParamSpecifier specifier = ParamSpecifier::Default);
+
+  static ParamDecl *createParsed(ASTContext &Context, SourceLoc specifierLoc,
+                                 SourceLoc argumentNameLoc,
+                                 Identifier argumentName,
+                                 SourceLoc parameterNameLoc,
+                                 Identifier parameterName, Expr *defaultValue,
+                                 DeclContext *dc);
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
@@ -6679,9 +6746,8 @@ public:
   bool isDefaultArgument() const {
     return getDefaultArgumentKind() != DefaultArgumentKind::None;
   }
-  void setDefaultArgumentKind(DefaultArgumentKind K) {
-    Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
-  }
+
+  void setDefaultArgumentKind(DefaultArgumentKind K);
 
   void setDefaultArgumentKind(ArgumentAttrs K) {
     setDefaultArgumentKind(K.argumentKind);
@@ -6727,13 +6793,19 @@ public:
   }
 
   /// Sets a new default argument expression for this parameter. This should
-  /// only be called internally by ParamDecl and AST walkers.
+  /// only be called internally by `ParamDecl` and `ASTWalker`.
   ///
   /// \param E The new default argument.
-  /// \param isTypeChecked Whether this argument should be used as the
-  /// parameter's fully type-checked default argument.
-  void setDefaultExpr(Expr *E, bool isTypeChecked);
+  void setDefaultExpr(Expr *E);
 
+  // FIXME: private:
+  /// Sets a type-checked default argument expression for this parameter. This
+  /// should only be called by the `DefaultArgumentExprRequest` request.
+  ///
+  /// \param E The type-checked default argument.
+  void setTypeCheckedDefaultExpr(Expr *E);
+
+public:
   /// Sets a type of default expression associated with this parameter.
   /// This should only be called by deserialization.
   void setDefaultExprType(Type type);
@@ -6745,9 +6817,14 @@ public:
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 
-  CaptureInfo getDefaultArgumentCaptureInfo() const {
+  CaptureInfo getDefaultArgumentCaptureInfo() const;
+
+  std::optional<CaptureInfo> getCachedDefaultArgumentCaptureInfo() const {
     assert(DefaultValueAndFlags.getPointer());
-    return DefaultValueAndFlags.getPointer()->Captures;
+    const auto &captures = DefaultValueAndFlags.getPointer()->Captures;
+    if (!captures.hasBeenComputed())
+      return std::nullopt;
+    return captures;
   }
 
   void setDefaultArgumentCaptureInfo(CaptureInfo captures);
@@ -7265,6 +7342,7 @@ public:
 
   /// Add the given derivative function configuration.
   void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
+  std::optional<LifetimeDependenceInfo> getLifetimeDependenceInfo() const;
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -7684,8 +7762,18 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const;
+
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+    return Captures;
+  }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    assert(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
@@ -7982,10 +8070,6 @@ public:
   /// prior to type checking.
   bool isBinaryOperator() const;
 
-  void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
-    return getCaptureInfo().getLocalCaptures(Result);
-  }
-
   ParamDecl **getImplicitSelfDeclStorage();
 
   /// Get the supertype method this method overrides, if any.
@@ -8057,7 +8141,7 @@ class AccessorDecl final : public FuncDecl {
                  throws, throwsLoc, thrownTy, hasImplicitSelfDecl,
                  /*genericParams*/ nullptr, parent),
         AccessorKeywordLoc(accessorKeywordLoc), Storage(storage) {
-    assert(!async || accessorKind == AccessorKind::Get
+    assert(!async || (accessorKind == AccessorKind::Get || accessorKind == AccessorKind::DistributedGet)
            && "only get accessors can be async");
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
   }
@@ -8089,6 +8173,14 @@ public:
          TypeLoc thrownType, ParameterList *parameterList, Type fnRetType,
          DeclContext *parent, ClangNode clangNode = ClangNode());
 
+  static AccessorDecl *createImplicit(ASTContext &Context,
+                                  AccessorKind accessorKind,
+                                  AbstractStorageDecl *storage,
+                                  bool async,
+                                  bool throws, TypeLoc thrownType,
+                                  Type fnRetType,
+                                  DeclContext *parent);
+
   /// Create a parsed accessor.
   ///
   /// \param paramList A parameter list for e.g \c set(newValue), or \c nullptr
@@ -8117,6 +8209,7 @@ public:
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
+  bool isDistributedGetter() const { return getAccessorKind() == AccessorKind::DistributedGet; }
   bool isSetter() const { return getAccessorKind() == AccessorKind::Set; }
   bool isAnyAddressor() const {
     auto kind = getAccessorKind();

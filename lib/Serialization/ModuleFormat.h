@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 865; // removal of noncopyable generics control block
+const uint16_t SWIFTMODULE_VERSION_MINOR = 872; // SerializePackageEnabled
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -335,6 +335,7 @@ enum AccessorKind : uint8_t {
   Read,
   Modify,
   Init,
+  DistributedGet,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -940,6 +941,7 @@ namespace options_block {
     PLUGIN_SEARCH_OPTION,
     HAS_CXX_INTEROPERABILITY_ENABLED,
     ALLOW_NON_RESILIENT_ACCESS,
+    SERIALIZE_PACKAGE_ENABLED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1025,6 +1027,10 @@ namespace options_block {
 
   using AllowNonResilientAccess = BCRecordLayout<
     ALLOW_NON_RESILIENT_ACCESS
+  >;
+
+  using SerializePackageEnabled = BCRecordLayout<
+    SERIALIZE_PACKAGE_ENABLED
   >;
 }
 
@@ -1535,7 +1541,7 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
-    TypeIDField,            // superclass
+    DeclIDField,            // superclass decl
     AccessLevelField,       // access level
     BCArray<TypeIDField>    // dependency types
     // Trailed by the inherited protocols, the generic parameters (if any),
@@ -2137,12 +2143,6 @@ namespace decls_block {
     BCArray<IdentifierIDField> // name components
   >;
 
-  using AllowFeatureSuppressionDeclAttrLayout = BCRecordLayout<
-    AllowFeatureSuppression_DECL_ATTR,
-    BCFixed<1>,   // implicit flag
-    BCArray<IdentifierIDField>  // feature names
-  >;
-
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<
     SPIAccessControl_DECL_ATTR,
     BCArray<IdentifierIDField>  // SPI names
@@ -2253,6 +2253,8 @@ namespace decls_block {
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
+  using AllowFeatureSuppressionDeclAttrLayout =
+      BCRecordLayout<AllowFeatureSuppression_DECL_ATTR>;
   using ProjectedValuePropertyDeclAttrLayout = BCRecordLayout<
       ProjectedValueProperty_DECL_ATTR,
       BCFixed<1>,        // isImplicit
@@ -2317,6 +2319,7 @@ namespace decls_block {
     ObjCImplementation_DECL_ATTR,
     BCFixed<1>,                // implicit flag
     BCFixed<1>,                // category name invalid
+    BCFixed<1>,                // is early adopter
     IdentifierIDField          // category name
   >;
 

@@ -359,6 +359,7 @@ static bool usesFeatureExpressionMacroDefaultArguments(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinStoreRaw)
+UNINTERESTING_FEATURE(BuiltinAddressOfRawLayout)
 
 // ----------------------------------------------------------------------------
 // MARK: - Upcoming Features
@@ -448,10 +449,8 @@ static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
 
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 
-static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
-  // Partial consumption does not affect declarations directly.
-  return false;
-}
+// Partial consumption does not affect declarations directly.
+UNINTERESTING_FEATURE(MoveOnlyPartialConsumption)
 
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
 
@@ -504,19 +503,14 @@ static bool usesFeatureRawLayout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(Embedded)
+UNINTERESTING_FEATURE(Volatile)
+UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
+    return true;
+
   if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
-    if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
-      auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
-
-      InvertibleProtocolSet inverses;
-      bool anyObject = false;
-      getDirectlyInheritedNominalTypeDecls(nominalDecl, inverses, anyObject);
-      if (!inverses.empty())
-        return true;
-    }
-
     if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
       auto reqSig = proto->getRequirementSignature();
 
@@ -568,6 +562,8 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   return !inverseReqs.empty();
 }
 
+UNINTERESTING_FEATURE(NoncopyableGenerics2)
+
 static bool usesFeatureStructLetDestructuring(Decl *decl) {
   auto sd = dyn_cast<StructDecl>(decl);
   if (!sd)
@@ -617,55 +613,85 @@ UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
 static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
-  if (auto *pd = dyn_cast<ParamDecl>(decl))
-    if (pd->isTransferring())
-      return true;
+  auto functionTypeUsesTransferring = [](Decl *decl) {
+    return usesTypeMatching(decl, [](Type type) {
+      auto fnType = type->getAs<AnyFunctionType>();
+      if (!fnType)
+        return false;
 
-  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
-    auto fnTy = fDecl->getInterfaceType();
-    bool hasTransferring = false;
-    if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    } else if (auto *ft =
-                   llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    }
-    if (hasTransferring)
-      return true;
-  }
+      if (fnType->hasExtInfo() && fnType->hasTransferringResult())
+        return true;
 
-  return false;
-}
-
-static bool usesFeatureDynamicActorIsolation(Decl *decl) {
-  auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
-    return llvm::any_of(
-        inherited.getEntries(),
-        [](const InheritedEntry &entry) { return entry.isPreconcurrency(); });
+      return llvm::any_of(fnType->getParams(),
+                          [](AnyFunctionType::Param param) {
+                            return param.getParameterFlags().isTransferring();
+                          });
+    });
   };
 
-  if (auto *T = dyn_cast<TypeDecl>(decl))
-    return usesPreconcurrencyConformance(T->getInherited());
-
-  if (auto *E = dyn_cast<ExtensionDecl>(decl)) {
-    // If type has `@preconcurrency` conformance(s) all of its
-    // extensions have to be guarded by the flag too.
-    if (auto *T = dyn_cast<TypeDecl>(E->getExtendedNominal())) {
-      if (usesPreconcurrencyConformance(T->getInherited()))
-        return true;
+  if (auto *pd = dyn_cast<ParamDecl>(decl)) {
+    if (pd->isTransferring()) {
+      return true;
     }
 
-    return usesPreconcurrencyConformance(E->getInherited());
+    if (functionTypeUsesTransferring(pd))
+      return true;
+  }
+
+  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
+    // First check for param decl results.
+    if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
+          return usesFeatureTransferringArgsAndResults(pd);
+        }))
+      return true;
+    if (functionTypeUsesTransferring(decl))
+      return true;
   }
 
   return false;
 }
+
+UNINTERESTING_FEATURE(DynamicActorIsolation)
 
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
 UNINTERESTING_FEATURE(ClosureIsolation)
+
+static bool usesFeatureConformanceSuppression(Decl *decl) {
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominal)
+    return false;
+
+  auto inherited = InheritedTypes(nominal);
+  for (auto index : indices(inherited.getEntries())) {
+    // Ensure that InheritedTypeRequest has set the isSuppressed bit if
+    // appropriate.
+    auto resolvedTy = inherited.getResolvedType(index);
+    (void)resolvedTy;
+
+    auto entry = inherited.getEntry(index);
+
+    if (!entry.isSuppressed())
+      continue;
+
+    auto ty = entry.getType();
+
+    if (!ty)
+      continue;
+
+    auto kp = ty->getKnownProtocol();
+    if (!kp)
+      continue;
+
+    auto rpk = getRepressibleProtocolKind(*kp);
+    if (!rpk)
+      continue;
+
+    return true;
+  }
+
+  return false;
+}
 
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {
@@ -675,6 +701,23 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
     return false;
   });
 }
+
+UNINTERESTING_FEATURE(MemberImportVisibility)
+UNINTERESTING_FEATURE(IsolatedAny2)
+
+static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
+  return false;
+}
+
+UNINTERESTING_FEATURE(ObjCImplementation)
+UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
+UNINTERESTING_FEATURE(CImplementation)
+
+static bool usesFeatureSensitive(Decl *decl) {
+  return decl->getAttrs().hasAttribute<SensitiveAttr>();
+}
+
+UNINTERESTING_FEATURE(DebugDescriptionMacro)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
@@ -691,9 +734,14 @@ void FeatureSet::collectSuppressibleFeature(Feature feature,
                               operation == Insert);
 }
 
-static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
+static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
+                                           bool inverted) {
   auto attr = decl->getAttrs().getAttribute<AllowFeatureSuppressionAttr>();
-  if (!attr) return false;
+  if (!attr)
+    return false;
+
+  if (attr->getInverted() != inverted)
+    return false;
 
   for (auto suppressedFeature : attr->getSuppressedFeatures()) {
     if (suppressedFeature.is(featureName))
@@ -701,6 +749,14 @@ static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
   }
 
   return false;
+}
+
+static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, true);
+}
+
+static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
+  return hasFeatureSuppressionAttribute(decl, featureName, false);
 }
 
 /// Go through all the features used by the given declaration and
@@ -712,11 +768,15 @@ void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
   if (usesFeature##FeatureName(decl))                                          \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl))                                          \
-    collectSuppressibleFeature(Feature::FeatureName, operation);
+  if (usesFeature##FeatureName(decl)) {                                        \
+    if (disallowFeatureSuppression(#FeatureName, decl))                        \
+      collectRequiredFeature(Feature::FeatureName, operation);                 \
+    else                                                                       \
+      collectSuppressibleFeature(Feature::FeatureName, operation);             \
+  }
 #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
   if (usesFeature##FeatureName(decl)) {                                        \
-    if (shouldSuppressFeature(#FeatureName, decl))                             \
+    if (allowFeatureSuppression(#FeatureName, decl))                           \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
     else                                                                       \
       collectRequiredFeature(Feature::FeatureName, operation);                 \

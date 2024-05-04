@@ -34,6 +34,11 @@
 // imply the existence of earlier features.  (This only needs to apply to
 // suppressible features.)
 //
+// Sometimes, certain declarations will conflict with existing declarations
+// when printed with a suppressible feature disabled. The attribute
+// @_disallowFeatureSuppression can be used to suppress feature suppression on
+// a particular declaration.
+//
 // If suppressing a feature in general is problematic, but it's okay to
 // suppress it for specific declarations, the feature can be made
 // conditionally suppressible.  Declarations opt in to suppression with
@@ -170,6 +175,8 @@ LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as call
 LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
 SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
+LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
+LANGUAGE_FEATURE(MoveOnlyPartialConsumption, 429, "Partial consumption of noncopyable values")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -179,15 +186,16 @@ UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
-UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
 UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
 UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
+UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
+UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -211,7 +219,6 @@ EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
 EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
 EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
-EXPERIMENTAL_FEATURE(MoveOnlyPartialConsumption, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
@@ -311,8 +318,17 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
+/// Enables importing the Volatile module
+EXPERIMENTAL_FEATURE(Volatile, true)
+
 /// Enables noncopyable generics
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+
+// Alias for NoncopyableGenerics
+EXPERIMENTAL_FEATURE(NoncopyableGenerics2, true)
+
+// Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
+EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
@@ -330,6 +346,9 @@ EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 /// Enable bitwise-copyable feature.
 EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
 
+/// Enable the suppression of inferred, non-invertible, protocols via ~.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ConformanceSuppression, true)
+
 /// Enables the FixedArray data type.
 EXPERIMENTAL_FEATURE(FixedArrays, true)
 
@@ -337,12 +356,7 @@ EXPERIMENTAL_FEATURE(FixedArrays, true)
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
 // Allow for the 'transferring' keyword to be applied to arguments and results.
-EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
-
-// Enable `@preconcurrency` attribute on protocol conformances and runtime checks
-// of actor isolation in @obj thunks and arguments of APIs that haven't yet adopted
-// strict concurrency checking.
-EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
 
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
@@ -352,6 +366,32 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
 // Enable isolated(any) attribute on function types.
 CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedAny, true)
+
+// Whether lookup of members respects the enclosing file's imports.
+EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true)
+
+// Alias for IsolatedAny
+EXPERIMENTAL_FEATURE(IsolatedAny2, true)
+
+// Enable usability improvements for global-actor-isolated types.
+EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
+
+// Enable @implementation on extensions of ObjC classes.
+EXPERIMENTAL_FEATURE(ObjCImplementation, true)
+
+// Enable @implementation on extensions of ObjC classes with non-fixed layout
+// due to resilient stored properties. Requires OS support; this flag exists for
+// staging purposes.
+EXPERIMENTAL_FEATURE(ObjCImplementationWithResilientStorage, true)
+
+// Enable @implementation on @_cdecl functions.
+EXPERIMENTAL_FEATURE(CImplementation, true)
+
+// Enable @sensitive attribute.
+EXPERIMENTAL_FEATURE(Sensitive, true)
+
+// Enable the stdlib @DebugDescription macro.
+EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

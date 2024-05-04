@@ -269,6 +269,9 @@ private:
   /// @_dynamicReplacement(for:) function.
   SILFunction *ReplacedFunction = nullptr;
 
+  /// The SILDeclRef that this function was created for by SILGen if one exists.
+  SILDeclRef DeclRef = SILDeclRef();
+
   /// This SILFunction REFerences an ad-hoc protocol requirement witness in
   /// order to keep it alive, such that it main be obtained in IRGen. Without
   /// this explicit reference, the witness would seem not-used, and not be
@@ -294,7 +297,7 @@ private:
   /// A monotonically increasing ID which is incremented whenever a
   /// BasicBlockBitfield, NodeBitfield, or OperandBitfield is constructed.  For
   /// details see SILBitfield::bitfieldID;
-  int64_t currentBitfieldID = 1;
+  uint64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
   /// May be reused when zombie functions are recovered.
@@ -346,6 +349,9 @@ private:
   /// This counter is incremented every time a BasicBlockData re-assigns new
   /// block indices.
   unsigned BlockListChangeIdx = 0;
+
+  /// The isolation of this function.
+  ActorIsolation actorIsolation = ActorIsolation::forUnspecified();
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -1111,6 +1117,12 @@ public:
   /// Get the source location of the function.
   const SILDebugScope *getDebugScope() const { return DebugScope; }
 
+  /// Return the SILDeclRef for this SILFunction if one was assigned by SILGen.
+  SILDeclRef getDeclRef() const { return DeclRef; }
+
+  /// Set the SILDeclRef for this SILFunction. Used mainly by SILGen.
+  void setDeclRef(SILDeclRef declRef) { DeclRef = declRef; }
+
   /// Get this function's bare attribute.
   IsBare_t isBare() const { return IsBare_t(Bare); }
   void setBare(IsBare_t isB) { Bare = isB; }
@@ -1351,6 +1363,20 @@ public:
     WasmImportModuleAndField = std::make_pair(module, field);
   }
 
+  bool isExternForwardDeclaration() const {
+    if (isExternalDeclaration()) {
+      if (auto declContext = getDeclContext()) {
+        if (auto decl = declContext->getAsDecl()) {
+          if (decl->getAttrs().hasAttribute<ExternAttr>())
+            return true;
+          if (decl->getAttrs().hasAttribute<SILGenNameAttr>())
+            return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Returns true if this function belongs to a declaration that returns
   /// an opaque result type with one or more availability conditions that are
   /// allowed to produce a different underlying type at runtime.
@@ -1366,6 +1392,15 @@ public:
 
     return false;
   }
+
+  void setActorIsolation(ActorIsolation newActorIsolation) {
+    actorIsolation = newActorIsolation;
+  }
+
+  ActorIsolation getActorIsolation() const { return actorIsolation; }
+
+  /// Return the source file that this SILFunction belongs to if it exists.
+  SourceFile *getSourceFile() const;
 
   //===--------------------------------------------------------------------===//
   // Block List Access

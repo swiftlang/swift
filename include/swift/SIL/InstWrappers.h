@@ -140,6 +140,7 @@ struct ConversionOperation {
     case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
     case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
     case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+    case SILInstructionKind::DropDeinitInst:
       return true;
     default:
       return false;
@@ -278,6 +279,8 @@ public:
         &forwardingInst->getOperandRef(RefToBridgeObjectInst::ConvertedOperand);
     case SILInstructionKind::TuplePackExtractInst:
       return &forwardingInst->getOperandRef(TuplePackExtractInst::TupleOperand);
+    case SILInstructionKind::BorrowedFromInst:
+      return &forwardingInst->getOperandRef(0);
     default:
       int numRealOperands = forwardingInst->getNumRealOperands();
       if (numRealOperands == 0) {

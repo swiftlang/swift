@@ -40,7 +40,7 @@ This status table describes which of the following standard library features can
 | Hashable, Equatable, Comparable protocols                  | Yes    |
 | InputStream, OutputStream                                  | No     |
 | Integer parsing                                            | No     |
-| KeyPaths                                                   | No     |
+| KeyPaths                                                   | Partial (only compile-time constant key paths to stored properties supported, only usable in MemoryLayout and UnsafePointer APIs)     |
 | Lazy collections                                           | No     |
 | Mirror (runtime reflection)                                | No, intentionally unsupported long-term |
 | Objective-C bridging                                       | No, intentionally unsupported long-term |

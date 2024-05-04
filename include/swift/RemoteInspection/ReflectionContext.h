@@ -1989,6 +1989,9 @@ private:
   /// \param Builder Used to obtain offsets of elements known so far.
   bool isMetadataSourceReady(const MetadataSource *MS,
                              const RecordTypeInfoBuilder &Builder) {
+    if (!MS)
+      return false;
+
     switch (MS->getKind()) {
     case MetadataSourceKind::ClosureBinding:
       return true;

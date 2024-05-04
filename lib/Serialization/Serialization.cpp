@@ -55,6 +55,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Index/USRGeneration.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -854,6 +855,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
+  BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1091,6 +1093,11 @@ void Serializer::writeHeader() {
         AllowNonResAcess.emit(ScratchRecord);
       }
 
+      if (M->serializePackageEnabled()) {
+        options_block::SerializePackageEnabled SerializePkgEnabled(Out);
+        SerializePkgEnabled.emit(ScratchRecord);
+      }
+
       if (allowCompilerErrors()) {
         options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
             AllowErrors(Out);
@@ -1146,7 +1153,7 @@ void Serializer::writeHeader() {
             // module defined in the framework.
             auto Next = std::next(Arg);
             if (Next != E &&
-                StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
+                StringRef(*Next).ends_with("unextended-module-overlay.yaml")) {
               ++Arg;
               continue;
             }
@@ -1320,21 +1327,25 @@ void Serializer::writeInputBlock() {
     time_t importedHeaderModTime = 0;
     std::string contents;
     auto importedHeaderPath = Options.ImportedHeader;
+    std::string pchIncludeTree;
     // We do not want to serialize the explicitly-specified .pch path if one was
     // provided. Instead we write out the path to the original header source so
     // that clients can consume it.
     if (Options.ExplicitModuleBuild &&
         llvm::sys::path::extension(importedHeaderPath)
-            .endswith(file_types::getExtension(file_types::TY_PCH)))
-      importedHeaderPath = clangImporter->getClangInstance()
-                               .getASTReader()
-                               ->getModuleManager()
-                               .lookupByFileName(importedHeaderPath)
-                               ->OriginalSourceFileName;
+            .ends_with(file_types::getExtension(file_types::TY_PCH))) {
+      auto *pch = clangImporter->getClangInstance()
+                      .getASTReader()
+                      ->getModuleManager()
+                      .lookupByFileName(importedHeaderPath);
+      pchIncludeTree = pch->IncludeTreeID;
+      importedHeaderPath = pch->OriginalSourceFileName;
+    }
 
     if (!importedHeaderPath.empty()) {
       contents = clangImporter->getBridgingHeaderContents(
-          importedHeaderPath, importedHeaderSize, importedHeaderModTime);
+          importedHeaderPath, importedHeaderSize, importedHeaderModTime,
+          pchIncludeTree);
     }
     assert(publicImportSet.count(bridgingHeaderImport));
     ImportedHeader.emit(ScratchRecord,
@@ -2060,6 +2071,22 @@ getStableClangDeclPathComponentKind(
   llvm_unreachable("bad kind");
 }
 
+static Identifier getClangTemplateSpecializationXRefDiscriminator(
+    ASTContext &ctx, Identifier &name,
+    const clang::ClassTemplateSpecializationDecl *ctsd) {
+  auto it = name.str().find("<");
+  if (it == StringRef::npos)
+    return Identifier();
+  // Serialize a C++ class template specialization name as original
+  // class template name, and use its USR as the discriminator, that
+  // will let Swift find the correct specialization when this cross
+  // reference is deserialized.
+  name = ctx.getIdentifier(name.str().substr(0, it));
+  llvm::SmallString<128> buffer;
+  clang::index::generateUSRForDecl(ctsd, buffer);
+  return ctx.getIdentifier(buffer.str());
+}
+
 void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   using namespace decls_block;
 
@@ -2116,11 +2143,19 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
     bool isProtocolExt = DC->getParent()->getExtendedProtocolDecl();
 
+    Identifier name = generic->getName();
+    if (generic->hasClangNode()) {
+      if (auto *ctsd = dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+              generic->getClangDecl())) {
+        assert(discriminator.empty());
+        discriminator = getClangTemplateSpecializationXRefDiscriminator(
+            getASTContext(), name, ctsd);
+      }
+    }
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addDeclBaseNameRef(generic->getName()),
+                                        addDeclBaseNameRef(name),
                                         addDeclBaseNameRef(discriminator),
-                                        isProtocolExt,
-                                        generic->hasClangNode());
+                                        isProtocolExt, generic->hasClangNode());
     break;
   }
 
@@ -2290,10 +2325,19 @@ void Serializer::writeCrossReference(const Decl *D) {
       discriminator = containingFile->getDiscriminatorForPrivateDecl(type);
     }
 
-    XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addDeclBaseNameRef(type->getName()),
-                                        addDeclBaseNameRef(discriminator),
-                                        isProtocolExt, D->hasClangNode());
+    Identifier name = type->getName();
+    if (type->hasClangNode()) {
+      if (auto *ctsd = dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+              type->getClangDecl())) {
+        assert(discriminator.empty());
+        discriminator = getClangTemplateSpecializationXRefDiscriminator(
+            getASTContext(), name, ctsd);
+      }
+    }
+
+    XRefTypePathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclBaseNameRef(name),
+        addDeclBaseNameRef(discriminator), isProtocolExt, D->hasClangNode());
     return;
   }
 
@@ -2518,10 +2562,7 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
 }
 
 void Serializer::writeLifetimeDependenceInfo(
-    LifetimeDependenceInfo lifetimeDependenceInfo, bool skipImplicit) {
-  if (skipImplicit && !lifetimeDependenceInfo.isExplicitlySpecified()) {
-    return;
-  }
+    LifetimeDependenceInfo lifetimeDependenceInfo) {
   using namespace decls_block;
   SmallVector<bool> paramIndices;
   lifetimeDependenceInfo.getConcatenatedData(paramIndices);
@@ -2717,6 +2758,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::RestatedObjCConformance:
     case DeclAttrKind::ClangImporterSynthesizedType:
     case DeclAttrKind::PrivateImport:
+    case DeclAttrKind::AllowFeatureSuppression:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -2766,20 +2808,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                       theAttr->isImplicit(),
                                       theAttr->Name);
-      return;
-    }
-
-    case DeclAttrKind::AllowFeatureSuppression: {
-      auto *theAttr = cast<AllowFeatureSuppressionAttr>(DA);
-      auto abbrCode =
-        S.DeclTypeAbbrCodes[AllowFeatureSuppressionDeclAttrLayout::Code];
-
-      SmallVector<IdentifierID> ids;
-      for (auto id : theAttr->getSuppressedFeatures())
-        ids.push_back(S.addUniquedStringRef(id.str()));
-
-      AllowFeatureSuppressionDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), ids);
       return;
     }
 
@@ -2960,7 +2988,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.DeclTypeAbbrCodes[ObjCImplementationDeclAttrLayout::Code];
       ObjCImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
           abbrCode, theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
-          categoryNameID);
+          theAttr->isEarlyAdopter(), categoryNameID);
       return;
     }
 
@@ -3903,6 +3931,8 @@ public:
       typeRef = (typeRef << 1) | (inherited.isUnchecked() ? 0x01 : 0x00);
       // Encode "preconcurrency" in the low bit.
       typeRef = (typeRef << 1) | (inherited.isPreconcurrency() ? 0x01 : 0x00);
+      // Encode "suppressed" in the next bit.
+      typeRef = (typeRef << 1) | (inherited.isSuppressed() ? 0x01 : 0x00);
 
       result.push_back(typeRef);
     }
@@ -4353,7 +4383,7 @@ public:
                                  ->requiresClass(),
                                proto->isObjC(),
                                proto->hasSelfOrAssociatedTypeRequirements(),
-                               S.addTypeRef(proto->getSuperclass()),
+                               S.addDeclRef(proto->getSuperclassDecl()),
                                rawAccessLevel,
                                dependencyTypeIDs);
 
@@ -4548,8 +4578,7 @@ public:
     if (fnType) {
       if (auto *lifetimeDependenceInfo =
               fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
-                                      /*skipImplicit*/ true);
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
       }
     }
 
@@ -4676,8 +4705,7 @@ public:
     if (fnType) {
       if (auto *lifetimeDependenceInfo =
               fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
-                                      /*skipImplicit*/ true);
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
       }
     }
 
@@ -4847,8 +4875,7 @@ public:
     if (fnType) {
       if (auto *lifetimeDependenceInfo =
               fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo,
-                                      /*skipImplicit*/ true);
+        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
       }
     }
 

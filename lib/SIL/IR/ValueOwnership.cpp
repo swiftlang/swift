@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -71,6 +72,7 @@ CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 #include "swift/AST/ReferenceStorage.def"
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
+CONSTANT_OWNERSHIP_INST(Guaranteed, BorrowedFrom)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, FunctionExtractIsolation)
 CONSTANT_OWNERSHIP_INST(None, GlobalValue)
@@ -348,14 +350,18 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
   return Arg->getOwnershipKind();
 }
 
-ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
-  auto *f = ai->getFunction();
-  bool isTrivial = ai->getType().isTrivial(*f);
+// We have to separate out ResultType here as `begin_apply` does not produce
+// normal results, `end_apply` does and there might be multiple `end_apply`'s
+// that correspond to a single `begin_apply`.
+static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
+                                             SILType ResultType) {
+  auto *f = fai->getFunction();
+  bool isTrivial = ResultType.isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
     return OwnershipKind::None;
 
-  SILFunctionConventions fnConv(ai->getSubstCalleeType(), f->getModule());
+  SILFunctionConventions fnConv(fai.getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())
@@ -364,7 +370,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(*f, ai->getSubstCalleeType());
+        return info.getOwnershipKind(*f, fai.getSubstCalleeType());
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {
@@ -372,6 +378,14 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   }
 
   return mergedOwnershipKind;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
+  return visitFullApplySite(ai, ai->getType());
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitEndApplyInst(EndApplyInst *eai) {
+  return visitFullApplySite(eai->getBeginApply(), eai->getType());
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
@@ -620,6 +634,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(None, InjectEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
+CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

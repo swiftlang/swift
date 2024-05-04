@@ -509,6 +509,26 @@ namespace {
         return importFunctionPointerLikeType(*type, pointeeType);
       }
 
+      // If non-copyable generics are disabled, we cannot specify
+      // UnsafePointer<T> with a non-copyable type T.
+      // We cannot use `ty->isNoncopyable()` here because that would create a
+      // cyclic dependency between ModuleQualifiedLookupRequest and
+      // LookupConformanceInModuleRequest, so we check for the presence of
+      // move-only attribute that is implicitly added to non-copyable C++ types
+      // by ClangImporter.
+      if (pointeeType && pointeeType->getAnyNominal() &&
+          pointeeType->getAnyNominal()
+              ->getAttrs()
+              .hasAttribute<MoveOnlyAttr>() &&
+          !Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::NoncopyableGenerics)) {
+        auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
+        if (!opaquePointerDecl)
+          return Type();
+        return {opaquePointerDecl->getDeclaredInterfaceType(),
+                ImportHint::OtherPointer};
+      }
+
       PointerTypeKind pointerKind;
       if (quals.hasConst()) {
         pointerKind = PTK_UnsafePointer;
@@ -1916,7 +1936,13 @@ private:
     auto composition =
         ProtocolCompositionType::get(ctx, members, inverses, explicitAnyObject);
 
-    return { composition, true };
+    // If we started from a protocol or a composition we should already
+    // be in an existential context. Otherwise we'd have to wrap a new
+    // composition into an existential.
+    if (isa<ProtocolType>(ty) || isa<ProtocolCompositionType>(ty))
+      return {composition, true};
+
+    return {ExistentialType::get(composition), true};
   }
 
   /// Visitor action: Recurse into the children of this type and try to add
@@ -2571,6 +2597,18 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
       param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
       impl->importSourceLoc(param->getLocation()), bodyName,
       impl->ImportedHeaderUnit);
+
+  // If TransferringArgsAndResults are enabled and we have a transferring
+  // argument, set that the param was transferring.
+  if (paramInfo->getASTContext().LangOpts.hasFeature(
+          Feature::TransferringArgsAndResults)) {
+    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+      if (attr->getAttribute() == "transferring") {
+        paramInfo->setTransferring();
+      }
+    }
+  }
+
   // Foreign references are already references so they don't need to be passed
   // as inout.
   paramInfo->setSpecifier(isInOut && !swiftParamTy->isForeignReferenceType()
@@ -2585,13 +2623,12 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // (https://github.com/apple/swift/issues/70124)
   if (param->hasDefaultArg() && !isInOut &&
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
-      impl->isCxxInteropCompatVersionAtLeast(6) &&
       impl->isDefaultArgSafeToImport(param)) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {
       paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
-      paramInfo->setDefaultExpr(defaultArgExpr, /*isTypeChecked*/ true);
+      paramInfo->setTypeCheckedDefaultExpr(defaultArgExpr);
       paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");
     }
   }

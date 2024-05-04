@@ -1410,7 +1410,10 @@ private:
   /// Print C or C++ trailing attributes for a function declaration.
   void printFunctionClangAttributes(FuncDecl *FD, AnyFunctionType *funcTy) {
     if (funcTy->getResult()->isUninhabited()) {
-      os << " SWIFT_NORETURN";
+      if (funcTy->isThrowing())
+        os << " SWIFT_NORETURN_EXCEPT_ERRORS";
+      else
+        os << " SWIFT_NORETURN";
     } else if (!funcTy->getResult()->isVoid() &&
                !FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
       os << " SWIFT_WARN_UNUSED_RESULT";
@@ -1489,8 +1492,13 @@ private:
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
-    if (!funcTy->isThrowing())
+    if (!funcTy->isThrowing()) {
       os << " SWIFT_NOEXCEPT";
+      // Lowered Never-returning functions *are* considered to return when they
+      // throw, so only use SWIFT_NORETURN on non-throwing functions.
+      if (funcTy->getResult()->isUninhabited())
+        os << " SWIFT_NORETURN";
+    }
     if (!funcABI.useCCallingConvention())
       os << " SWIFT_CALL";
     printAvailability(FD);
@@ -1707,6 +1715,9 @@ public:
       case PlatformKind::watchOS:
         plat = "watchos";
         break;
+      case PlatformKind::visionOS:
+        plat = "visionos";
+        break;
       case PlatformKind::macOSApplicationExtension:
         plat = "macos_app_extension";
         break;
@@ -1721,6 +1732,9 @@ public:
         break;
       case PlatformKind::watchOSApplicationExtension:
         plat = "watchos_app_extension";
+        break;
+      case PlatformKind::visionOSApplicationExtension:
+        plat = "visionos_app_extension";
         break;
       case PlatformKind::OpenBSD:
         plat = "openbsd";
@@ -2971,7 +2985,7 @@ DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
       sourceMgr.getImmediateExpansionRange(loc).getBegin();
   clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
 
-  if (!sourceMgr.getFilename(spellingLoc).endswith("/os/object.h"))
+  if (!sourceMgr.getFilename(spellingLoc).ends_with("/os/object.h"))
     return StringRef();
 
   return name;

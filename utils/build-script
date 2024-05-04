@@ -96,7 +96,8 @@ def initialize_runtime_environment():
             'MACOSX_DEPLOYMENT_TARGET',
             'IPHONEOS_DEPLOYMENT_TARGET',
             'TVOS_DEPLOYMENT_TARGET',
-            'WATCHOS_DEPLOYMENT_TARGET']:
+            'WATCHOS_DEPLOYMENT_TARGET',
+            'XROS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
 
     # Provide a default NINJA_STATUS to format ninja output.
@@ -296,6 +297,12 @@ def default_stdlib_deployment_targets(args):
                            .AppleWatchSimulator.targets)
         if args.build_watchos and args.build_watchos_device:
             targets.extend(StdlibDeploymentTarget.AppleWatch.targets)
+        if StdlibDeploymentTarget.XROSSimulator and \
+           args.build_xros and args.build_xros_simulator:
+            targets.extend(StdlibDeploymentTarget.XROSSimulator.targets)
+        if StdlibDeploymentTarget.XROS and \
+           args.build_xros and args.build_xros_device:
+            targets.extend(StdlibDeploymentTarget.XROS.targets)
         return targets
     else:
         # All other machines only configure their host stdlib by default.

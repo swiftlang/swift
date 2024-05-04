@@ -31,6 +31,7 @@ __all__ = [
     'DARWIN_DEPLOYMENT_VERSION_IOS',
     'DARWIN_DEPLOYMENT_VERSION_TVOS',
     'DARWIN_DEPLOYMENT_VERSION_WATCHOS',
+    'DARWIN_DEPLOYMENT_VERSION_XROS',
     'UNIX_INSTALL_PREFIX',
     'DARWIN_INSTALL_PREFIX',
     'LLVM_MAX_PARALLEL_LTO_LINK_JOBS',
@@ -55,6 +56,7 @@ DARWIN_DEPLOYMENT_VERSION_OSX = '10.13'
 DARWIN_DEPLOYMENT_VERSION_IOS = '11.0'
 DARWIN_DEPLOYMENT_VERSION_TVOS = '11.0'
 DARWIN_DEPLOYMENT_VERSION_WATCHOS = '4.0'
+DARWIN_DEPLOYMENT_VERSION_XROS = '1.0'
 
 UNIX_INSTALL_PREFIX = '/usr'
 DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
@@ -119,11 +121,10 @@ def llvm_install_components():
     platforms.
     """
     components = ['llvm-ar', 'llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
-                  'clang-resource-headers', 'compiler-rt', 'clangd', 'LTO']
+                  'clang-resource-headers', 'compiler-rt', 'clangd', 'LTO',
+                  'lld']
     if os.sys.platform == 'darwin':
         components.extend(['dsymutil'])
-    else:
-        components.extend(['lld'])
     return ';'.join(components)
 
 

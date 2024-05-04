@@ -727,7 +727,7 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? self-lifetime-dependence? // results and parameters
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -966,6 +966,7 @@ Property behaviors are implemented using private protocol conformances.
 
   any-protocol-conformance ::= concrete-protocol-conformance
   any-protocol-conformance ::= dependent-protocol-conformance
+  any-protocol-conformance ::= pack-protocol-conformance
 
   any-protocol-conformance-list ::= any-protocol-conformance '_' any-protocol-conformance-list
   any-protocol-conformance-list ::= empty-list
@@ -979,6 +980,8 @@ Property behaviors are implemented using private protocol conformances.
 
   dependent-associated-conformance ::= type protocol
   dependent-protocol-conformance ::= dependent-protocol-conformance opaque-type 'HO'
+
+  pack-protocol-conformance ::= any-protocol-conformance-list 'HX'
 
 A compact representation used to represent mangled protocol conformance witness
 arguments at runtime. The ``module`` is only specified for conformances that
@@ -1011,9 +1014,6 @@ now codified into the ABI; the index 0 is therefore reserved.
 
   generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
 
-  INVERTIBLE-KIND ::= 'c'  // Copyable
-  INVERTIBLE-KIND ::= 'e'  // Escapable
-
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters
 
@@ -1022,7 +1022,10 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= protocol assoc-type-list 'RP' GENERIC-PARAM-INDEX // protocol requirement on associated type at depth
   requirement ::= protocol substitution 'RQ'                        // protocol requirement with substitution
 #if SWIFT_RUNTIME_VERSION >= 6.0
-  requirement ::= 'Ri' INVERTIBLE-KIND GENERIC-PARAM-INDEX          // inverse requirement
+  requirement ::= 'Ri' INDEX GENERIC-PARAM-INDEX                    // inverse requirement on generic parameter where INDEX is the bit number
+  requirement ::= substitution 'RI' INDEX                           // inverse requirement with substitution
+  requirement ::= assoc-type-name 'Rj' INDEX GENERIC-PARAM-INDEX    // inverse requirement on associated type
+  requirement ::= assoc-type-list 'RJ' INDEX GENERIC-PARAM-INDEX    // inverse requirement on associated type at depth
 #endif
   requirement ::= type 'Rb' GENERIC-PARAM-INDEX                     // base class requirement
   requirement ::= type assoc-type-name 'Rc' GENERIC-PARAM-INDEX     // base class requirement on associated type

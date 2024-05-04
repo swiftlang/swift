@@ -1016,7 +1016,9 @@ static Type substOpaqueTypesWithUnderlyingTypesRec(
     llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
-  return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+  return ty.subst(replacer, replacer,
+                  SubstFlags::SubstituteOpaqueArchetypes |
+                  SubstFlags::PreservePackExpansionLevel);
 }
 
 /// Checks that \p dc has access to \p ty for the purposes of an opaque
@@ -1162,6 +1164,23 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   return substTy;
 }
 
+CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
+                                                   TypeExpansionContext context,
+                                                   bool allowLoweredTypes) {
+  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
+      !ty->hasOpaqueArchetype())
+    return ty;
+
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  SubstOptions flags = (SubstFlags::SubstituteOpaqueArchetypes |
+                        SubstFlags::PreservePackExpansionLevel);
+  if (allowLoweredTypes)
+    flags |= SubstFlags::AllowLoweredTypes;
+  return ty.subst(replacer, replacer, flags)->getCanonicalType();
+}
+
 static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
     ProtocolConformanceRef ref, Type origType, const DeclContext *inContext,
     ResilienceExpansion contextExpansion, bool isWholeModuleContext,
@@ -1169,7 +1188,8 @@ static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
   return ref.subst(origType, replacer, replacer,
-                   SubstFlags::SubstituteOpaqueArchetypes);
+                   SubstFlags::SubstituteOpaqueArchetypes |
+                   SubstFlags::PreservePackExpansionLevel);
 }
 
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(

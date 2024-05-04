@@ -101,10 +101,12 @@ function(get_test_dependencies SDK result_var_name)
   if(("${SDK}" STREQUAL "IOS") OR
      ("${SDK}" STREQUAL "TVOS") OR
      ("${SDK}" STREQUAL "WATCHOS") OR
+     ("${SDK}" STREQUAL "XROS") OR
      ("${SDK}" STREQUAL "OSX") OR
      ("${SDK}" STREQUAL "IOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
+     ("${SDK}" STREQUAL "XROS_SIMULATOR") OR
      ("${SDK}" STREQUAL "FREESTANDING") OR
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
@@ -192,7 +194,6 @@ normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
-normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
@@ -327,6 +328,9 @@ foreach(SDK ${SWIFT_SDKS})
         if(TARGET "embedded-synchronization")
           list(APPEND test_dependencies "embedded-synchronization")
         endif()
+        if(TARGET "embedded-volatile")
+          list(APPEND test_dependencies "embedded-volatile")
+        endif()
       endif()
 
       if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -341,7 +345,7 @@ foreach(SDK ${SWIFT_SDKS})
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)
-      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
+      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS" OR "${SDK}" STREQUAL "XROS")
         # These are supported testing SDKs, but their implementation of
         # `command_upload_stdlib` is hidden.
       elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
@@ -405,10 +409,6 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
           list(APPEND LIT_ARGS "--param" "distributed")
-        endif()
-
-        if(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
-          list(APPEND LIT_ARGS "--param" "noncopyable_generics")
         endif()
 
         if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)

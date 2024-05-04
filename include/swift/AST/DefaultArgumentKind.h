@@ -27,8 +27,6 @@ class StringRef;
 
 namespace swift {
 
-class Expr;
-
 /// Describes the kind of default argument a tuple pattern element has.
 enum class DefaultArgumentKind : uint8_t {
   /// No default argument.
@@ -55,11 +53,6 @@ enum class DefaultArgumentKind : uint8_t {
   ExpressionMacro
 };
 enum { NumDefaultArgumentKindBits = 4 };
-
-/// Determine the kind of a default argument given a parsed expression that has
-/// not yet been type-checked.
-/// FIXME: Requestify/internalize the computation of the default arg expr and its kind (given a parsed expr) once the old parser no longer needs this.
-DefaultArgumentKind getDefaultArgKind(Expr *init);
 
 struct ArgumentAttrs {
   DefaultArgumentKind argumentKind;

@@ -271,14 +271,8 @@ extension FunctionConvention {
       return nil
     }
 
-    // In Sema's LifetimeDependenceInfo, 'self' is always index zero,
-    // whether it exists or not. In SILFunctionType, 'self' is the
-    // last parameter if it exists.
     private func bridgedIndex(parameterIndex: Int) -> Int {
-      if hasSelfParam, parameterIndex == (paramCount - 1) {
-        return 0
-      }
-      return parameterIndex + 1
+      return parameterIndex
     }
 
     public var description: String {

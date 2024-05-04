@@ -31,11 +31,13 @@ endfunction()
 #   DEPLOYMENT_VERSION_IOS version
 #   DEPLOYMENT_VERSION_TVOS version
 #   DEPLOYMENT_VERSION_WATCHOS version
+#   DEPLOYMENT_VERSION_XROS version
 #
 # )
 function(_add_target_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
     MACCATALYST_BUILD_FLAVOR
   )
   cmake_parse_arguments(CFLAGS
@@ -63,6 +65,8 @@ function(_add_target_variant_c_compile_link_flags)
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_TVOS})
     elseif("${CFLAGS_SDK}" STREQUAL "WATCHOS" OR "${CFLAGS_SDK}" STREQUAL "WATCHOS_SIMULATOR")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_WATCHOS})
+    elseif("${CFLAGS_SDK}" STREQUAL "XROS" OR "${CFLAGS_SDK}" STREQUAL "XROS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_XROS})
     endif()
 
     if("${DEPLOYMENT_VERSION}" STREQUAL "")
@@ -154,6 +158,7 @@ endfunction()
 function(_add_target_variant_c_compile_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
     RESULT_VAR_NAME ENABLE_LTO
     MACCATALYST_BUILD_FLAVOR)
   cmake_parse_arguments(CFLAGS
@@ -189,6 +194,7 @@ function(_add_target_variant_c_compile_flags)
     DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${CFLAGS_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${CFLAGS_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
@@ -469,6 +475,7 @@ endfunction()
 function(_add_target_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+  DEPLOYMENT_VERSION_XROS
   RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
   MACCATALYST_BUILD_FLAVOR
   )
@@ -497,6 +504,7 @@ function(_add_target_variant_link_flags)
     DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${LFLAGS_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${LFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${LFLAGS_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
@@ -783,6 +791,7 @@ function(add_swift_target_library_single target name)
         DEPLOYMENT_VERSION_OSX
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
+        DEPLOYMENT_VERSION_XROS
         INSTALL_IN_COMPONENT
         DARWIN_INSTALL_NAME_DIR
         SDK
@@ -791,7 +800,8 @@ function(add_swift_target_library_single target name)
         BACK_DEPLOYMENT_LIBRARY
         ENABLE_LTO
         MODULE_DIR
-        BOOTSTRAPPING)
+        BOOTSTRAPPING
+        INSTALL_BINARY_SWIFTMODULE)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -852,6 +862,10 @@ function(add_swift_target_library_single target name)
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
+  if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
+    set(SWIFTLIB_INSTALL_BINARY_SWIFTMODULE TRUE)
+  endif()
+
   # Determine the subdirectory where this library will be installed.
   set(SWIFTLIB_SINGLE_SUBDIR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
@@ -876,6 +890,7 @@ function(add_swift_target_library_single target name)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+       "${SWIFTLIB_SINGLE_SDK}" STREQUAL "XROS" OR
        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
@@ -1010,7 +1025,8 @@ function(add_swift_target_library_single target name)
       DEPLOYMENT_VERSION_TVOS ${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}
       DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
-      ${BOOTSTRAPPING_arg})
+      ${BOOTSTRAPPING_arg}
+      INSTALL_BINARY_SWIFTMODULE ${SWIFTLIB_INSTALL_BINARY_SWIFTMODULE})
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
   # If there were any swift sources, then a .swiftmodule may have been created.
@@ -1397,6 +1413,7 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
@@ -1419,6 +1436,7 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
@@ -1497,6 +1515,7 @@ function(add_swift_target_library_single target name)
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
       if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
          "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+         "${SWIFTLIB_SINGLE_SDK}" STREQUAL "XROS" OR
          "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
         # Please note that using a generator expression to fit
         # this in a single target_link_options does not work
@@ -1653,6 +1672,7 @@ endfunction()
 #     DEPLOYMENT_VERSION_IOS version
 #     DEPLOYMENT_VERSION_TVOS version
 #     DEPLOYMENT_VERSION_WATCHOS version
+#     DEPLOYMENT_VERSION_XROS version
 #     MACCATALYST_BUILD_FLAVOR flavor
 #     BACK_DEPLOYMENT_LIBRARY version
 #     source1 [source2 source3 ...])
@@ -1694,6 +1714,9 @@ endfunction()
 #
 # SWIFT_MODULE_DEPENDS_WATCHOS
 #   Swift modules this library depends on when built for watchOS.
+#
+# SWIFT_MODULE_DEPENDS_XROS
+#   Swift modules this library depends on when built for xrOS.
 #
 # SWIFT_MODULE_DEPENDS_FREESTANDING
 #   Swift modules this library depends on when built for Freestanding.
@@ -1771,6 +1794,9 @@ endfunction()
 # DEPLOYMENT_VERSION_WATCHOS
 #   The minimum deployment version to build for if this is an WATCHOS library.
 #
+# DEPLOYMENT_VERSION_XROS
+#   The minimum deployment version to build for if this is an XROS library.
+#
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
@@ -1800,7 +1826,9 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_OSX
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
+        DEPLOYMENT_VERSION_XROS
         INSTALL_IN_COMPONENT
+        INSTALL_BINARY_SWIFTMODULE
         DARWIN_INSTALL_NAME_DIR
         DEPLOYMENT_VERSION_MACCATALYST
         MACCATALYST_BUILD_FLAVOR
@@ -1831,6 +1859,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_OSX
         SWIFT_COMPILE_FLAGS_TVOS
         SWIFT_COMPILE_FLAGS_WATCHOS
+        SWIFT_COMPILE_FLAGS_XROS
         SWIFT_COMPILE_FLAGS_LINUX
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_CYGWIN
@@ -1844,6 +1873,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WATCHOS
+        SWIFT_MODULE_DEPENDS_XROS
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS
@@ -1923,6 +1953,10 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
+  endif()
+
+  if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
+    set(SWIFTLIB_INSTALL_BINARY_SWIFTMODULE TRUE)
   endif()
 
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND
@@ -2015,6 +2049,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "WATCHOS" OR sdk STREQUAL "WATCHOS_SIMULATOR")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
+    elseif("${sdk}" STREQUAL "XROS" OR "${sdk}" STREQUAL "XROS_SIMULATOR")
+        list(APPEND swiftlib_module_depends_flattened
+            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_XROS})
     elseif(sdk STREQUAL "FREESTANDING")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREESTANDING})
@@ -2066,6 +2103,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "WATCHOS" OR sdk STREQUAL "WATCHOS_SIMULATOR")
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+    elseif("${sdk}" STREQUAL "XROS" OR "${sdk}" STREQUAL "XROS_SIMULATOR")
+        list(APPEND swiftlib_swift_compile_flags_all
+            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_XROS})
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX})
@@ -2315,11 +2355,13 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+        DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
         MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
         ${back_deployment_library_option}
         ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
         PREFIX_INCLUDE_DIRS ${SWIFTLIB_PREFIX_INCLUDE_DIRS}
+        INSTALL_BINARY_SWIFTMODULE ${SWIFTLIB_INSTALL_BINARY_SWIFTMODULE}
       )
     if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
       add_dependencies(${VARIANT_NAME} clang)

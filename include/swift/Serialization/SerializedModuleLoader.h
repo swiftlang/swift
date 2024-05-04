@@ -16,6 +16,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/TargetParser/Triple.h"
@@ -23,19 +24,11 @@
 namespace swift {
 class ModuleFile;
 class PathObfuscator;
+class ModuleFileSharedCore;
 enum class ModuleLoadingBehavior;
 namespace file_types {
   enum ID : uint8_t;
 }
-
-/// Specifies how to load modules when both a module interface and serialized
-/// AST are present, or whether to disallow one format or the other altogether.
-enum class ModuleLoadingMode {
-  PreferInterface,
-  PreferSerialized,
-  OnlyInterface,
-  OnlySerialized
-};
 
 /// How a dependency should be loaded.
 ///
@@ -170,22 +163,18 @@ protected:
   }
 
   /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencyInfo> scanModuleFile(Twine modulePath, bool isFramework);
+  llvm::ErrorOr<ModuleDependencyInfo>
+  scanModuleFile(Twine modulePath, bool isFramework, bool isTestableImport);
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
     std::string headerImport;
   };
 
-  static llvm::ErrorOr<BinaryModuleImports>
-  getImportsOfModule(Twine modulePath,
+  static BinaryModuleImports
+  getImportsOfModule(const ModuleFileSharedCore &loadedModule,
                      ModuleLoadingBehavior transitiveBehavior,
-                     bool isFramework,
-                     bool isRequiredOSSAModules,
-                     StringRef SDKName,
-                     StringRef packageName,
-                     llvm::vfs::FileSystem *fileSystem,
-                     PathObfuscator &recoverer);
+                     StringRef packageName, bool isTestableImport);
 
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
@@ -313,6 +302,9 @@ public:
 class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 
   struct MemoryBufferInfo {
+    MemoryBufferInfo(std::unique_ptr<llvm::MemoryBuffer> &&buffer,
+                     llvm::VersionTuple userVersion)
+        : buffer(std::move(buffer)), userVersion(userVersion) {}
     std::unique_ptr<llvm::MemoryBuffer> buffer;
     llvm::VersionTuple userVersion;
   };
@@ -361,11 +353,16 @@ public:
   /// discovered in the __swift_ast section of a Mach-O file (or the .swift_ast
   /// section of an ELF file) to the search path.
   ///
+  /// If a module is inserted twice, the first one wins, and the return value is
+  /// false.
+  ///
   /// FIXME: make this an actual import *path* once submodules are designed.
-  void registerMemoryBuffer(StringRef importPath,
+  bool registerMemoryBuffer(StringRef importPath,
                             std::unique_ptr<llvm::MemoryBuffer> input,
                             llvm::VersionTuple version) {
-    MemoryBuffers[importPath] = {std::move(input), version};
+    return MemoryBuffers
+        .insert({importPath, MemoryBufferInfo(std::move(input), version)})
+        .second;
   }
 
   void collectVisibleTopLevelModuleNames(

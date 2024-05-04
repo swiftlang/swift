@@ -90,6 +90,12 @@ public:
 
   ConstraintLocator *getLocator() const { return Locator; }
 
+  SourceLoc getBestAddImportFixItLocation(const Decl *Member,
+                                          SourceFile *sourceFile) const {
+    auto &engine = Member->getASTContext().Diags;
+    return engine.getBestAddImportFixItLoc(Member, sourceFile);
+  }
+
   Type getType(ASTNode node, bool wantRValue = true) const;
 
   /// Get type associated with a given ASTNode without resolving it,
@@ -1317,17 +1323,18 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose cases where a member only accessible on generic constraints
-/// requiring conformance to a protocol is used on a value of the
-/// existential protocol type e.g.
+/// Diagnose cases where a protocol member cannot be accessed with an
+/// existential, e.g. due to occurrences of `Self` in non-covariant position in
+/// the type of the member reference:
 ///
 /// ```swift
+/// struct G<T> {}
 /// protocol P {
-///   var foo: Self { get }
+///   func foo() -> G<Self>
 /// }
 ///
-/// func bar<X : P>(p: X) {
-///   p.foo
+/// func bar(p: any P) {
+///   p.foo()
 /// }
 /// ```
 class InvalidMemberRefOnExistential final : public InvalidMemberRefFailure {

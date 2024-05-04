@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift -enable-experimental-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -enable-experimental-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted- -enable-experimental-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns- -enable-experimental-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns- -enable-experimental-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -285,14 +285,14 @@ func barSync() {
 
 @OtherGlobalActor
 struct Observed {
-  var thing: Int = 0 { // expected-note {{property declared here}}
+  var thing: Int = 0 {
     didSet {}
     willSet {}
   }
 }
 
-func checkObserved(_ o: Observed) { // expected-note {{add '@OtherGlobalActor' to make global function 'checkObserved' part of global actor 'OtherGlobalActor'}}
-  _ = o.thing // expected-error {{global actor 'OtherGlobalActor'-isolated property 'thing' can not be referenced from a non-isolated context}}
+func checkObserved(_ o: Observed) {
+  _ = o.thing // okay
 }
 
 // ----------------------------------------------------------------------
@@ -376,13 +376,13 @@ actor WrapperActor<Wrapped: Sendable> {
 
 struct HasWrapperOnActor {
   @WrapperOnActor var synced: Int = 0
-  // expected-note@-1 3{{property declared here}}
+  // expected-note@-1 2{{property declared here}}
 
-  // expected-note@+1 3{{to make instance method 'testErrors()'}}
+  // expected-note@+1 2{{to make instance method 'testErrors()'}}
   func testErrors() {
     _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
     _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
-    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
+    _ = _synced // okay
   }
 
   @MainActor mutating func testOnMain() {
@@ -566,22 +566,21 @@ struct HasWrapperOnUnsafeActor {
 // expected-complete-tns-warning@-2 {{default initializer for 'HasWrapperOnUnsafeActor' cannot be both nonisolated and global actor 'OtherGlobalActor'-isolated; this is an error in the Swift 6 language mode}}
 
   @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-tns-note 2 {{initializer for property '_synced' is global actor 'OtherGlobalActor'-isolated}}
-  // expected-note @-1 3{{property declared here}}
-  // expected-complete-tns-note @-2 3{{property declared here}}
+  // expected-note @-1 2{{property declared here}}
+  // expected-complete-tns-note @-2 2{{property declared here}}
 
   func testUnsafeOkay() {
-    // expected-complete-tns-note @-1 {{add '@OtherGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'OtherGlobalActor'}}
-    // expected-complete-tns-note @-2 {{add '@SomeGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'SomeGlobalActor'}}
-    // expected-complete-tns-note @-3 {{add '@MainActor' to make instance method 'testUnsafeOkay()' part of global actor 'MainActor'}}
+    // expected-complete-tns-note @-1 {{add '@SomeGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'SomeGlobalActor'}}
+    // expected-complete-tns-note @-2 {{add '@MainActor' to make instance method 'testUnsafeOkay()' part of global actor 'MainActor'}}
     _ = synced // expected-complete-tns-warning {{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
     _ = $synced // expected-complete-tns-warning {{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
-    _ = _synced // expected-complete-tns-warning {{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
+    _ = _synced // okay
   }
 
   nonisolated func testErrors() {
     _ = synced // expected-warning{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
     _ = $synced // expected-warning{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
-    _ = _synced // expected-warning{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
+    _ = _synced // okay
   }
 
   @MainActor mutating func testOnMain() {

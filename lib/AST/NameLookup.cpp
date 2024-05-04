@@ -1087,7 +1087,8 @@ static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                             TypeRepr *typeRepr, DeclContext *dc,
                             bool allowUsableFromInline,
-                            bool rhsOfSelfRequirement);
+                            bool rhsOfSelfRequirement,
+                            bool allowProtocolMembers);
 
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given type.
@@ -1148,7 +1149,8 @@ SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
       rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
                                              const_cast<DeclContext *>(dc),
                                              /*allowUsableFromInline=*/false,
-                                             /*rhsOfSelfRequirement=*/true);
+                                             /*rhsOfSelfRequirement=*/true,
+                                             /*allowProtocolMembers=*/true);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
@@ -1212,7 +1214,8 @@ TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   auto resolve = [&](TypeRepr *typeRepr) {
     auto decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext,
                                              /*allowUsableFromInline=*/false,
-                                             /*rhsOfSelfRequirement=*/false);
+                                             /*rhsOfSelfRequirement=*/false,
+                                             /*allowProtocolMembers=*/true);
     result.first.insert(result.first.end(),
                         decls.first.begin(),
                         decls.first.end());
@@ -2259,6 +2262,48 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   vec.push_back(method);
 }
 
+static bool missingExplicitImportForMemberDecl(const DeclContext *dc,
+                                               ValueDecl *decl) {
+  // Only require explicit imports for members when MemberImportVisibility is
+  // enabled.
+  if (!dc->getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility))
+    return false;
+
+  // If the decl is in the same module, no import is required.
+  auto declModule = decl->getDeclContext()->getParentModule();
+  if (declModule == dc->getParentModule())
+    return false;
+
+  // Source files are not expected to contain an import for the clang header
+  // module.
+  if (auto *loader = dc->getASTContext().getClangModuleLoader()) {
+    if (declModule == loader->getImportedHeaderModule())
+      return false;
+  }
+
+  // Only require an import in the context of user authored source file.
+  auto sf = dc->getParentSourceFile();
+  if (!sf)
+    return false;
+
+  switch (sf->Kind) {
+  case SourceFileKind::SIL:
+  case SourceFileKind::Interface:
+  case SourceFileKind::MacroExpansion:
+  case SourceFileKind::DefaultArgument:
+    return false;
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    break;
+  }
+
+  // If we've found an import, we're done.
+  if (decl->findImport(dc))
+    return false;
+
+  return true;
+}
+
 /// Determine whether the given declaration is an acceptable lookup
 /// result when searching from the given DeclContext.
 static bool isAcceptableLookupResult(const DeclContext *dc,
@@ -2285,8 +2330,14 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   if (!(options & NL_IgnoreAccessControl) &&
       !dc->getASTContext().isAccessControlDisabled()) {
     bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
-    return decl->isAccessibleFrom(dc, /*forConformance*/ false,
-                                  allowUsableFromInline);
+    if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
+                                allowUsableFromInline))
+      return false;
+
+    // Check that there is some import in the originating context that
+    // makes this decl visible.
+    if (missingExplicitImportForMemberDecl(dc, decl))
+      return false;
   }
 
   return true;
@@ -2782,10 +2833,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
         // Type version: an empty class-bound existential.
-        if (typealias->hasInterfaceType()) {
-          if (auto type = typealias->getUnderlyingType())
-            if (type->isAnyObject())
-              anyObject = true;
+        if (auto type = typealias->getUnderlyingType()) {
+          if (type->isAnyObject())
+            anyObject = true;
         }
         // TypeRepr version: Builtin.AnyObject
         else if (auto *qualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
@@ -2834,10 +2884,11 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
                                          SourceLoc loc, DeclContext *dc,
                                          LookupOuterResults lookupOuter,
                                          bool allowUsableFromInline,
-                                         bool rhsOfSelfRequirement) {
-  UnqualifiedLookupOptions options =
-      UnqualifiedLookupFlags::TypeLookup |
-      UnqualifiedLookupFlags::AllowProtocolMembers;
+                                         bool rhsOfSelfRequirement,
+                                         bool allowProtocolMembers) {
+  UnqualifiedLookupOptions options = UnqualifiedLookupFlags::TypeLookup;
+  if (allowProtocolMembers)
+      options |= UnqualifiedLookupFlags::AllowProtocolMembers;
   if (lookupOuter == LookupOuterResults::Included)
     options |= UnqualifiedLookupFlags::IncludeOuterResults;
 
@@ -2951,11 +3002,12 @@ static DirectlyReferencedTypeDecls
 directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                    DeclRefTypeRepr *repr, DeclContext *dc,
                                    bool allowUsableFromInline,
-                                   bool rhsOfSelfRequirement) {
+                                   bool rhsOfSelfRequirement,
+                                   bool allowProtocolMembers) {
   if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(repr)) {
     auto result = directReferencesForTypeRepr(
         evaluator, ctx, qualIdentTR->getBase(), dc,
-        allowUsableFromInline, rhsOfSelfRequirement);
+        allowUsableFromInline, rhsOfSelfRequirement, allowProtocolMembers);
 
     // For a qualified identifier, perform qualified name lookup.
     result.first = directReferencesForQualifiedTypeLookup(
@@ -2968,14 +3020,15 @@ directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   // For an unqualified identifier, perform unqualified name lookup.
   return directReferencesForUnqualifiedTypeLookup(
       repr->getNameRef(), repr->getLoc(), dc, LookupOuterResults::Excluded,
-      allowUsableFromInline, rhsOfSelfRequirement);
+      allowUsableFromInline, rhsOfSelfRequirement, allowProtocolMembers);
 }
 
 static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator,
                             ASTContext &ctx, TypeRepr *typeRepr,
                             DeclContext *dc, bool allowUsableFromInline,
-                            bool rhsOfSelfRequirement) {
+                            bool rhsOfSelfRequirement,
+                            bool allowProtocolMembers) {
   DirectlyReferencedTypeDecls result;
 
   switch (typeRepr->getKind()) {
@@ -2988,7 +3041,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return directReferencesForTypeRepr(evaluator, ctx,
                                        attributed->getTypeRepr(), dc,
                                        allowUsableFromInline,
-                                       rhsOfSelfRequirement);
+                                       rhsOfSelfRequirement,
+                                       allowProtocolMembers);
   }
 
   case TypeReprKind::Composition: {
@@ -2997,7 +3051,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
       auto componentResult =
           directReferencesForTypeRepr(evaluator, ctx, component, dc,
                                       allowUsableFromInline,
-                                      rhsOfSelfRequirement);
+                                      rhsOfSelfRequirement,
+                                      allowProtocolMembers);
       result.first.insert(result.first.end(),
                           componentResult.first.begin(),
                           componentResult.first.end());
@@ -3013,7 +3068,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return directReferencesForDeclRefTypeRepr(evaluator, ctx,
                                               cast<DeclRefTypeRepr>(typeRepr),
                                               dc, allowUsableFromInline,
-                                              rhsOfSelfRequirement);
+                                              rhsOfSelfRequirement,
+                                              allowProtocolMembers);
 
   case TypeReprKind::Dictionary:
     result.first.push_back(ctx.getDictionaryDecl());
@@ -3025,7 +3081,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
       result = directReferencesForTypeRepr(evaluator, ctx,
                                            tupleRepr->getElementType(0), dc,
                                            allowUsableFromInline,
-                                           rhsOfSelfRequirement);
+                                           rhsOfSelfRequirement,
+                                           allowProtocolMembers);
     } else {
       result.first.push_back(ctx.getBuiltinTupleDecl());
     }
@@ -3037,7 +3094,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return directReferencesForTypeRepr(evaluator, ctx,
                                        packExpansionRepr->getElementType(), dc,
                                        allowUsableFromInline,
-                                       rhsOfSelfRequirement);
+                                       rhsOfSelfRequirement,
+                                       allowProtocolMembers);
   }
 
   case TypeReprKind::PackExpansion: {
@@ -3045,7 +3103,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return directReferencesForTypeRepr(evaluator, ctx,
                                        packExpansionRepr->getPatternType(), dc,
                                        allowUsableFromInline,
-                                       rhsOfSelfRequirement);
+                                       rhsOfSelfRequirement,
+                                       allowProtocolMembers);
   }
 
   case TypeReprKind::PackElement: {
@@ -3053,7 +3112,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return directReferencesForTypeRepr(evaluator, ctx,
                                        packReferenceRepr->getPackType(), dc,
                                        allowUsableFromInline,
-                                       rhsOfSelfRequirement);
+                                       rhsOfSelfRequirement,
+                                       allowProtocolMembers);
   }
 
   case TypeReprKind::Inverse: {
@@ -3063,7 +3123,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     auto innerResult = directReferencesForTypeRepr(evaluator, ctx,
                                                    inverseRepr->getConstraint(), dc,
                                                    allowUsableFromInline,
-                                                   rhsOfSelfRequirement);
+                                                   rhsOfSelfRequirement,
+                                                   allowProtocolMembers);
     if (innerResult.first.size() == 1) {
       if (auto *proto = dyn_cast<ProtocolDecl>(innerResult.first[0])) {
         if (auto ip = proto->getInvertibleProtocolKind()) {
@@ -3164,7 +3225,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     unsigned index) const {
 
   // Prefer syntactic information when we have it.
-  const TypeLoc &typeLoc = InheritedTypes(decl).getEntry(index);
+  const InheritedEntry &typeLoc = InheritedTypes(decl).getEntry(index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
@@ -3173,10 +3234,16 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     else
       dc = (DeclContext *)decl.get<const ExtensionDecl *>();
 
+    // If looking at a protocol's inheritance list,
+    // do not look at protocol members to avoid circularity.
+    // Protocols cannot inherit from any protocol members anyway.
+    bool allowProtocolMembers = (dc->getSelfProtocolDecl() == nullptr);
+
     return directReferencesForTypeRepr(evaluator, dc->getASTContext(), typeRepr,
                                        const_cast<DeclContext *>(dc),
                                        /*allowUsableFromInline=*/false,
-                                       /*rhsOfSelfRequirement=*/false);
+                                       /*rhsOfSelfRequirement=*/false,
+                                       allowProtocolMembers);
   }
 
   // Fall back to semantic types.
@@ -3197,7 +3264,8 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
     return directReferencesForTypeRepr(evaluator, typealias->getASTContext(),
                                        typeRepr, typealias,
                                        /*allowUsableFromInline=*/false,
-                                       /*rhsOfSelfRequirement=*/false);
+                                       /*rhsOfSelfRequirement=*/false,
+                                       /*allowProtocolMembers=*/true);
   }
 
   // Fall back to semantic types.
@@ -3219,16 +3287,8 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
   // Protocols may get their superclass bound from a `where Self : Superclass`
   // clause.
   if (auto *proto = dyn_cast<ProtocolDecl>(subject)) {
-    // If the protocol came from a serialized module, compute the superclass via
-    // its generic signature.
-    if (proto->wasDeserialized()) {
-      auto superTy = proto->getGenericSignature()
-          ->getSuperclassBound(proto->getSelfInterfaceType());
-      if (superTy)
-        return superTy->getClassOrBoundGenericClass();
-    }
+    assert(!proto->wasDeserialized());
 
-    // Otherwise check the where clause.
     auto selfBounds = getSelfBoundsFromWhereClause(proto);
     for (auto inheritedNominal : selfBounds.decls)
       if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
@@ -3312,7 +3372,7 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   }
 
   if (!skipInverses) {
-    for (auto ip : InvertibleProtocolSet::full()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
       // Unless the user wrote ~P in the syntactic inheritance clause, the
       // semantic inherited list includes P.
       if (!inverses.contains(ip))
@@ -3364,7 +3424,8 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   DirectlyReferencedTypeDecls referenced =
     directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext->getParent(),
                                 ext->isInSpecializeExtensionContext(),
-                                /*rhsOfSelfRequirement=*/false);
+                                /*rhsOfSelfRequirement=*/false,
+                                /*allowProtocolMembers=*/true);
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
@@ -3414,7 +3475,8 @@ bool TypeRepr::isProtocolOrProtocolComposition(DeclContext *dc) {
   auto &ctx = dc->getASTContext();
   auto references = directReferencesForTypeRepr(ctx.evaluator, ctx, this, dc,
                                                 /*allowUsableFromInline=*/false,
-                                                /*rhsOfSelfRequirement=*/false);
+                                                /*rhsOfSelfRequirement=*/false,
+                                                /*allowProtocolMembers=*/true);
   return declsAreProtocols(references.first);
 }
 
@@ -3449,7 +3511,8 @@ createTupleExtensionGenericParams(ASTContext &ctx,
                                 extendedTypeRepr,
                                 ext->getParent(),
                                 /*allowUsableFromInline=*/false,
-                                /*rhsOfSelfRequirement=*/false);
+                                /*rhsOfSelfRequirement=*/false,
+                                /*allowProtocolMembers=*/true);
   assert(referenced.second.empty() && "Implement me");
   if (referenced.first.size() != 1 || !isa<TypeAliasDecl>(referenced.first[0]))
     return nullptr;
@@ -3724,7 +3787,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
     decls = directReferencesForTypeRepr(
         evaluator, ctx, typeRepr, dc,
         /*allowUsableFromInline=*/false,
-        /*rhsOfSelfRequirement=*/false);
+        /*rhsOfSelfRequirement=*/false,
+        /*allowProtocolMembers=*/true);
   } else if (Type type = attr->getType()) {
     decls = directReferencesForType(type);
   }
@@ -3755,7 +3819,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
         decls = directReferencesForUnqualifiedTypeLookup(
             name, loc, dc, LookupOuterResults::Included,
             /*allowUsableFromInline=*/false,
-            /*rhsOfSelfRequirement=*/false);
+            /*rhsOfSelfRequirement=*/false,
+            /*allowProtocolMembers*/true);
         nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                              ResolveToNominalOptions(),
                                              modulesFound, anyObject);
@@ -3821,6 +3886,7 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   SourceLoc uncheckedLoc;
   SourceLoc preconcurrencyLoc;
   auto inheritedTypes = InheritedTypes(decl);
+  bool isSuppressed = inheritedTypes.getEntry(i).isSuppressed();
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
     uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
@@ -3829,7 +3895,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc, uncheckedLoc, preconcurrencyLoc});
+    result.push_back(
+        {nominal, loc, uncheckedLoc, preconcurrencyLoc, isSuppressed});
   }
 }
 
@@ -3859,9 +3926,9 @@ swift::getDirectlyInheritedNominalTypeDecls(
   for (auto attr :
        protoDecl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     auto loc = attr->getLocation();
-    result.push_back({attr->getProtocol(), loc,
-                      attr->isUnchecked() ? loc : SourceLoc(),
-                      /*preconcurrencyLoc=*/SourceLoc()});
+    result.push_back(
+        {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc(),
+         /*preconcurrencyLoc=*/SourceLoc(), /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -3872,7 +3939,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(), SourceLoc());
+    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(), SourceLoc(),
+                        /*isSuppressed=*/false);
 
   return result;
 }
@@ -3990,7 +4058,8 @@ ProtocolDecl *ImplementsAttrProtocolRequest::evaluate(
   DirectlyReferencedTypeDecls referenced =
     directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc,
                                 /*allowUsableFromInline=*/false,
-                                /*rhsOfSelfRequirement=*/false);
+                                /*rhsOfSelfRequirement=*/false,
+                                /*allowProtocolMembers=*/true);
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;

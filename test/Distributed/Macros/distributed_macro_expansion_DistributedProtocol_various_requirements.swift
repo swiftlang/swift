@@ -12,7 +12,7 @@
 
 import Distributed
 
-@_DistributedProtocol
+@Resolvable
 protocol Greeter: DistributedActor where ActorSystem == FakeActorSystem {
   distributed func greet(name: String) -> String
 }
@@ -24,7 +24,7 @@ protocol Greeter: DistributedActor where ActorSystem == FakeActorSystem {
 
 // CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -32,7 +32,7 @@ protocol Greeter: DistributedActor where ActorSystem == FakeActorSystem {
 // CHECK:   }
 // CHECK: }
 
-@_DistributedProtocol
+@Resolvable
 protocol Greeter2: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func greet(name: String) -> String
 }
@@ -44,7 +44,7 @@ protocol Greeter2: DistributedActor where ActorSystem: DistributedActorSystem<an
 
 // CHECK: extension Greeter2 where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -57,7 +57,7 @@ extension String: CustomSerializationProtocol {
   public static func fromBytes(_ bytes: [UInt8]) throws -> Self { "" }
 }
 
-@_DistributedProtocol
+@Resolvable
 protocol Greeter3: DistributedActor where ActorSystem: DistributedActorSystem<any CustomSerializationProtocol> {
   distributed func greet(name: String) -> String
 }
@@ -69,7 +69,7 @@ protocol Greeter3: DistributedActor where ActorSystem: DistributedActorSystem<an
 
 // CHECK: extension Greeter3 where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -77,7 +77,7 @@ protocol Greeter3: DistributedActor where ActorSystem: DistributedActorSystem<an
 // CHECK:   }
 // CHECK: }
 
-@_DistributedProtocol
+@Resolvable
 public protocol Greeter4: DistributedActor where ActorSystem == FakeActorSystem {
   distributed func greet(name: String) -> String
 }
@@ -89,7 +89,51 @@ public protocol Greeter4: DistributedActor where ActorSystem == FakeActorSystem 
 
 // CHECK: extension Greeter4 where Self: Distributed._DistributedActorStub {
 // CHECK:   public distributed func greet(name: String) -> String {
-// CHECK:     if #available (SwiftStdlib 6.0, *) {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
+
+@Resolvable
+public protocol GreeterMore: DistributedActor where ActorSystem == FakeActorSystem {
+  distributed var name: String { get }
+  distributed func greet(name: String) -> String
+  distributed func another(string: String, int: Int) async throws -> Double
+  distributed func generic<T: Codable>(value: T, int: Int) async throws -> T
+}
+// CHECK: public distributed actor $GreeterMore: GreeterMore,
+// CHECK:    Distributed._DistributedActorStub
+// CHECK: {
+// CHECK:   public typealias ActorSystem = FakeActorSystem
+// CHECK: }
+
+// CHECK: extension GreeterMore where Self: Distributed._DistributedActorStub {
+// CHECK:   public distributed var  name : String {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK:   public distributed func greet(name: String) -> String {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK:   public distributed func another(string: String, int: Int) async throws -> Double {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
+// CHECK:   public distributed func generic<T: Codable>(value: T, int: Int) async throws -> T {
+// CHECK:     if #available(SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()

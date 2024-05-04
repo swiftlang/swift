@@ -41,10 +41,11 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
     if (isa<EndApplyInst>(user)) {
       if (hasEndApply) return false;
       hasEndApply = true;
-    } else {
-      assert(isa<AbortApplyInst>(user));
+    } else if (isa<AbortApplyInst>(user)) {
       if (hasAbortApply) return false;
       hasAbortApply = true;
+    } else {
+      assert(isa<EndBorrowInst>(user));
     }
   }
 
@@ -95,6 +96,8 @@ class BeginApplySite {
   SILBasicBlock *AbortApplyBB = nullptr;
   SILBasicBlock *AbortApplyReturnBB = nullptr;
 
+  SmallVector<EndBorrowInst *, 2> EndBorrows;
+
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
                  SILBuilder *Builder)
@@ -112,7 +115,8 @@ public:
                   SmallVectorImpl<SILInstruction *> &endBorrowInsertPts) {
     SmallVector<EndApplyInst *, 1> endApplyInsts;
     SmallVector<AbortApplyInst *, 1> abortApplyInsts;
-    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts);
+    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts,
+                                      &EndBorrows);
     while (!endApplyInsts.empty()) {
       auto *endApply = endApplyInsts.pop_back_val();
       collectEndApply(endApply);
@@ -207,13 +211,16 @@ public:
     // instructions in the caller.  That means this entire path is
     // unreachable.
     if (isa<ReturnInst>(terminator) || isa<UnwindInst>(terminator)) {
-      bool isNormal = isa<ReturnInst>(terminator);
-      auto returnBB = isNormal ? EndApplyReturnBB : AbortApplyReturnBB;
+      ReturnInst *retInst = dyn_cast<ReturnInst>(terminator);
+      auto *returnBB = retInst ? EndApplyReturnBB : AbortApplyReturnBB;
+      if (retInst && EndApply)
+        EndApply->replaceAllUsesWith(getMappedValue(retInst->getOperand()));
       if (returnBB) {
         Builder->createBranch(Loc, returnBB);
       } else {
         Builder->createUnreachable(Loc);
       }
+
       return true;
     }
 
@@ -254,6 +261,8 @@ public:
       EndApply->eraseFromParent();
     if (AbortApply)
       AbortApply->eraseFromParent();
+    for (auto *EndBorrow : EndBorrows)
+      EndBorrow->eraseFromParent();
 
     assert(!BeginApply->hasUsesOfAnyResult());
   }
@@ -886,6 +895,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::DynamicFunctionRefInst:

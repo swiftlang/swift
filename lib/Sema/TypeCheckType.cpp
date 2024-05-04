@@ -30,6 +30,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
@@ -170,6 +171,7 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::ImmediateOptionalTypeArgument:
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::CustomAttr:
+  case TypeResolverContext::Inverted:
     break;
   }
 
@@ -1363,8 +1365,14 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
-      diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                     first, first->getFormalAccess());
+      auto formalAccess = first->getFormalAccess();
+      auto nameLoc = repr->getNameLoc();
+      if (formalAccess >= AccessLevel::Public &&
+          diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
+        return ErrorType::get(ctx);
+
+      diags.diagnose(nameLoc, diag::candidate_inaccessible, first,
+                     formalAccess);
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
@@ -1453,8 +1461,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
     const TypeDecl *first = inaccessibleMembers.front().Member;
-    diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                   first, first->getFormalAccess());
+    auto formalAccess = first->getFormalAccess();
+    auto nameLoc = repr->getNameLoc();
+    if (formalAccess >= AccessLevel::Public &&
+        diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
+      return ErrorType::get(ctx);
+
+    diags.diagnose(nameLoc, diag::candidate_inaccessible, first, formalAccess);
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
@@ -3316,28 +3329,21 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   }
 
   if (auto preconcurrencyAttr = claim<PreconcurrencyTypeAttr>(attrs)) {
-    auto &ctx = getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
-      if (ty->hasError())
-        return ty;
+    if (ty->hasError())
+      return ty;
 
-      if (!options.is(TypeResolverContext::Inherited) ||
-          getDeclContext()->getSelfProtocolDecl()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_inheritance_clause);
-        ty = ErrorType::get(getASTContext());
-      } else if (!ty->isConstraintType()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_existential, ty);
-        ty = ErrorType::get(getASTContext());
-      }
-
-      // Nothing to record in the type.
-    } else {
+    if (!options.is(TypeResolverContext::Inherited) ||
+        getDeclContext()->getSelfProtocolDecl()) {
       diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_attr_disabled);
+                      diag::preconcurrency_not_inheritance_clause);
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->isConstraintType()) {
+      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
+                      diag::preconcurrency_not_existential, ty);
       ty = ErrorType::get(getASTContext());
     }
+
+    // Nothing to record in the type.
   }
 
   if (auto retroactiveAttr = claim<RetroactiveTypeAttr>(attrs)) {
@@ -4026,7 +4032,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
-  // TODO: Handle LifetimeDependenceInfo here.
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
@@ -4237,7 +4242,6 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  // TODO: Handle LifetimeDependenceInfo here.
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
       isolation, diffKind, clangFnType, LifetimeDependenceInfo());
@@ -4410,6 +4414,18 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
   }
 
+  std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
+  if (auto *lifetimeDependentTypeRepr =
+          dyn_cast<LifetimeDependentReturnTypeRepr>(
+              repr->getResultTypeRepr())) {
+    lifetimeDependenceInfo = LifetimeDependenceInfo::fromTypeRepr(
+        lifetimeDependentTypeRepr, params, getDeclContext());
+    if (lifetimeDependenceInfo.has_value()) {
+      extInfoBuilder =
+          extInfoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    }
+  }
+
   return SILFunctionType::get(genericSig.getCanonicalSignature(),
                               extInfoBuilder.build(), coroutineKind,
                               callee, params, yields, results, errorResult,
@@ -4522,6 +4538,14 @@ bool TypeResolver::resolveSingleSILResult(
   SILResultInfo::Options resultInfoOptions;
 
   options.setContext(TypeResolverContext::FunctionResult);
+
+  // Look through LifetimeDependentReturnTypeRepr.
+  // LifetimeDependentReturnTypeRepr will be processed separately when building
+  // SILFunctionType.
+  if (auto *lifetimeDependentTypeRepr =
+          dyn_cast<LifetimeDependentReturnTypeRepr>(repr)) {
+    repr = lifetimeDependentTypeRepr->getBase();
+  }
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     TypeAttrSet attrs(getASTContext());
@@ -4745,6 +4769,21 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
 
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
+
+    // Gate the 'Escapable' type behind a specific flag for now.
+    //
+    // NOTE: we do not return an ErrorType, though! We're just artificially
+    // preventing people from referring to the type without the feature.
+    if (auto proto = result->getAs<ProtocolType>()) {
+      if (auto known = proto->getKnownProtocol()) {
+        if (*known == KnownProtocolKind::Escapable
+            && !isSILSourceFile()
+            && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escapable_requires_feature_flag);
+        }
+      }
+    }
 
     if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) &&
         options.isConstraintImplicitExistential()) {
@@ -5131,6 +5170,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::GenericParameterInherited:
   case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
+  case TypeResolverContext::Inverted:
     doDiag = true;
     break;
   }
@@ -5721,25 +5761,47 @@ NeverNullType TypeResolver::buildMetatypeType(
 
 NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
                                                TypeResolutionOptions options) {
-  auto ty = resolveType(repr->getConstraint(), options);
+  auto subOptions = options.withoutContext(true)
+      .withContext(TypeResolverContext::Inverted);
+  auto ty = resolveType(repr->getConstraint(), subOptions);
   if (ty->hasError())
     return ErrorType::get(getASTContext());
+
+  // If the inverted type is an existential metatype, unwrap the existential
+  // metatype so we can look at the instance type. We'll re-wrap at the end.
+  ExistentialMetatypeType *existentialTy =
+      dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
+  if (existentialTy) {
+    ty = existentialTy->getInstanceType();
+  }
+
+  auto wrapInExistential = [existentialTy](Type type) -> Type {
+    if (!existentialTy)
+      return type;
+
+    std::optional<MetatypeRepresentation> repr;
+    if (existentialTy->hasRepresentation())
+      repr = existentialTy->getRepresentation();
+    return ExistentialMetatypeType::get(type, repr);
+  };
 
   if (auto kp = ty->getKnownProtocol()) {
     if (auto kind = getInvertibleProtocolKind(*kp)) {
 
       // Gate the '~Escapable' type behind a specific flag for now.
+      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
       if (*kind == InvertibleProtocolKind::Escapable &&
           !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        diagnoseInvalid(repr, repr->getLoc(),
-                        diag::escapable_requires_feature_flag);
-        return ErrorType::get(getASTContext());
+        return wrapInExistential(ErrorType::get(getASTContext()));
       }
 
-      return ProtocolCompositionType::getInverseOf(getASTContext(), *kind);
+      return wrapInExistential(
+          ProtocolCompositionType::getInverseOf(getASTContext(), *kind));
     }
   }
 
+  // Rewrap for diagnostic purposes.
+  ty = wrapInExistential(ty);
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());
 }
@@ -5897,6 +5959,23 @@ public:
     // Arbitrary protocol constraints are okay for 'any' types.
     if (isa<ExistentialTypeRepr>(T))
       return Action::SkipNode();
+
+    // Suppressed conformance needs to be within any/some.
+    if (auto inverse = dyn_cast<InverseTypeRepr>(T)) {
+      // Find an enclosing protocol composition, if there is one, so we
+      // can insert 'any' before that.
+      SourceLoc anyLoc = inverse->getTildeLoc();
+      if (!reprStack.empty()) {
+        if (isa<CompositionTypeRepr>(reprStack.back())) {
+          anyLoc = reprStack.back()->getStartLoc();
+        }
+      }
+
+      Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
+        .highlight(inverse->getConstraint()->getSourceRange())
+        .fixItInsert(anyLoc, "any ");
+      return Action::SkipNode();
+    }
 
     reprStack.push_back(T);
 

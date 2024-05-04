@@ -175,7 +175,6 @@ TailAllocatedDebugVariable::TailAllocatedDebugVariable(
   Bits.Data.HasValue = true;
   Bits.Data.Constant = Var->Constant;
   Bits.Data.ArgNo = Var->ArgNo;
-  Bits.Data.Implicit = Var->Implicit;
   Bits.Data.NameLength = Var->Name.size();
   assert(Bits.Data.ArgNo == Var->ArgNo && "Truncation");
   assert(Bits.Data.NameLength == Var->Name.size() && "Truncation");
@@ -256,10 +255,6 @@ AllocStackInst::AllocStackInst(
   assert(sharedUInt32().AllocStackInst.numOperands ==
              TypeDependentOperands.size() &&
          "Truncation");
-  auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
-  if (Var && VD) {
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
-  }
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
 }
@@ -454,8 +449,6 @@ DebugValueInst::DebugValueInst(
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
-  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
   setPoisonRefs(poisonRefs);
   if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
     setUsesMoveableValueDebugInfo();
@@ -700,29 +693,41 @@ BeginApplyInst *BeginApplyInst::create(
 
 void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<EndApplyInst *> &endApplyInsts,
-    SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const {
+    SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
+    SmallVectorImpl<EndBorrowInst *> *endBorrowInsts) const {
   for (auto *tokenUse : getTokenResult()->getUses()) {
     auto *user = tokenUse->getUser();
     if (auto *end = dyn_cast<EndApplyInst>(user)) {
       endApplyInsts.push_back(end);
       continue;
     }
-
-    abortApplyInsts.push_back(cast<AbortApplyInst>(user));
+    if (auto *abort = dyn_cast<AbortApplyInst>(user)) {
+      abortApplyInsts.push_back(abort);
+      continue;
+    }
+    auto *end = cast<EndBorrowInst>(user);
+    if (endBorrowInsts) {
+      endBorrowInsts->push_back(end);
+    }
   }
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<Operand *> &endApplyInsts,
-    SmallVectorImpl<Operand *> &abortApplyInsts) const {
+    SmallVectorImpl<Operand *> &abortApplyInsts,
+    SmallVectorImpl<Operand *> *endBorrowInsts) const {
   for (auto *tokenUse : getTokenResult()->getUses()) {
     auto *user = tokenUse->getUser();
     if (isa<EndApplyInst>(user)) {
       endApplyInsts.push_back(tokenUse);
       continue;
     }
+    if (isa<AbortApplyInst>(user)) {
+      abortApplyInsts.push_back(tokenUse);
+      continue;
+    }
 
-    assert(isa<AbortApplyInst>(user));
+    assert(isa<EndBorrowInst>(user));
     abortApplyInsts.push_back(tokenUse);
   }
 }
@@ -1484,6 +1489,24 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
+BorrowedFromInst *BorrowedFromInst::create(SILDebugLocation DebugLoc, SILValue borrowedValue,
+                                           ArrayRef<SILValue> enclosingValues, SILModule &M) {
+  auto Size = totalSizeToAlloc<swift::Operand>(enclosingValues.size() + 1);
+  auto Buffer = M.allocateInst(Size, alignof(StructInst));
+  SmallVector<SILValue, 8> operands;
+  operands.push_back(borrowedValue);
+  for (SILValue ev : enclosingValues) {
+    operands.push_back(ev);
+  }
+  return ::new (Buffer) BorrowedFromInst(DebugLoc, operands);
+}
+
+BorrowedFromInst::BorrowedFromInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> operands)
+    : InstructionBaseWithTrailingOperands(operands, DebugLoc, operands[0]->getType(),
+                                          operands[0]->getOwnershipKind()) {
+  assert(operands[0]->getOwnershipKind() != OwnershipKind::Owned);
+}
+
 ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements,
                                unsigned NumBaseElements, SILModule &M) {
@@ -2185,14 +2208,24 @@ ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                        Member, Ty);
 }
 
+static void checkExistentialPreconditions(SILType ExistentialType,
+                                          CanType ConcreteType,
+                                ArrayRef<ProtocolConformanceRef> Conformances) {
+#ifndef NDEBUG
+  auto layout = ExistentialType.getASTType().getExistentialLayout();
+  assert(layout.getProtocols().size() == Conformances.size());
+
+  for (auto conformance : Conformances) {
+    assert(!conformance.isAbstract() || isa<ArchetypeType>(ConcreteType));
+  }
+#endif
+}
+
 InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILDebugLocation Loc, SILValue Existential, CanType ConcreteType,
     SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
-#ifndef NDEBUG
-  auto layout = Existential->getType().getASTType().getExistentialLayout();
-  assert(layout.getProtocols().size() == Conformances.size());
-#endif
+  checkExistentialPreconditions(Existential->getType(), ConcreteType, Conformances);
 
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -2212,10 +2245,7 @@ InitExistentialValueInst *InitExistentialValueInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
-#ifndef NDEBUG
-  auto layout = ExistentialType.getASTType().getExistentialLayout();
-  assert(layout.getProtocols().size() == Conformances.size());
-#endif
+  checkExistentialPreconditions(ExistentialType, ConcreteType, Conformances);
 
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -2233,10 +2263,7 @@ InitExistentialRefInst *InitExistentialRefInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F, ValueOwnershipKind forwardingOwnershipKind) {
-#ifndef NDEBUG
-  auto layout = ExistentialType.getASTType().getExistentialLayout();
-  assert(layout.getProtocols().size() == Conformances.size());
-#endif
+  checkExistentialPreconditions(ExistentialType, ConcreteType, Conformances);
 
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;

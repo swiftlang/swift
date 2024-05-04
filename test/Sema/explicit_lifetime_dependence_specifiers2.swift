@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BitwiseCopyable
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BitwiseCopyable
 // REQUIRES: asserts
-// REQUIRES: noncopyable_generics
 // REQUIRES: nonescapable_types
 
 struct AnotherBufferView : ~Escapable, _BitwiseCopyable {
@@ -13,9 +12,14 @@ struct AnotherBufferView : ~Escapable, _BitwiseCopyable {
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
-  init(_ bv: borrowing AnotherBufferView) -> _borrow(bv) Self {
+  init(_ bv: borrowing AnotherBufferView) -> dependsOn(bv) Self {
     self.ptr = bv.ptr
     return self
   }
 }
 
+struct NonescapableType: ~Escapable {}
+
+func f<T: ~Escapable & _BitwiseCopyable>(arg: T) -> NonescapableType {
+  NonescapableType()
+}

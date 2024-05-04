@@ -659,6 +659,11 @@ public:
     return Core->Bits.AllowNonResilientAccess;
   }
 
+  /// Whether this module was built with -experimental-package-cmo.
+  bool serializePackageEnabled() const {
+    return Core->Bits.SerializePackageEnabled;
+  }
+
   /// Whether this module is compiled with implicit dynamic.
   bool isImplicitDynamicEnabled() const {
     return Core->Bits.IsImplicitDynamicEnabled;
@@ -1076,7 +1081,7 @@ public:
   // Reads lifetime dependence specifier from decl if present
   bool maybeReadLifetimeDependenceSpecifier(
       SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
-      unsigned numDeclParams);
+      unsigned numDeclParams, bool hasSelf);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadInlinableBodyText();

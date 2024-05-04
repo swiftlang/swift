@@ -361,7 +361,7 @@ void synthesizeDefaultArgumentFromExpr(SynthesisContext &SC, const S &s,
   // to render the default argument if you mess up the call.
   auto expr = synthesizeExpr(SC, s);
   param->setDefaultArgumentKind(DefaultArgumentKind::Normal);
-  param->setDefaultExpr(expr, /*type checked*/ false);
+  param->setDefaultExpr(expr);
 }
 
 /// Default arguments.
@@ -545,7 +545,7 @@ inline void synthesizeDefaultArgument(SynthesisContext &SC,
   case _nil: {
     auto expr = synthesizeExpr(SC, s);
     param->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
-    param->setDefaultExpr(expr, /*type checked*/ false);
+    param->setDefaultExpr(expr);
     return;
   }
 

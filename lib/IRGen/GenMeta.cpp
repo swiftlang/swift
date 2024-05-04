@@ -266,6 +266,7 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
+    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
@@ -424,6 +425,7 @@ namespace {
     unsigned NumGenericKeyArguments = 0;
     SmallVector<CanType, 2> ShapeClasses;
     SmallVector<GenericPackArgument, 2> GenericPackArguments;
+    InvertibleProtocolSet ConditionalInvertedProtocols;
 
     GenericSignatureHeaderBuilder(IRGenModule &IGM,
                                   ConstantStructBuilder &builder)
@@ -464,7 +466,10 @@ namespace {
                                NumGenericKeyArguments + ShapeClasses.size());
 
       bool hasTypePacks = !GenericPackArguments.empty();
-      GenericContextDescriptorFlags flags(hasTypePacks);
+      bool hasConditionalInvertedProtocols =
+          !ConditionalInvertedProtocols.empty();
+      GenericContextDescriptorFlags flags(
+          hasTypePacks, hasConditionalInvertedProtocols);
       b.fillPlaceholderWithInt(FlagsPP, IGM.Int16Ty,
                                flags.getIntValue());
     }
@@ -497,7 +502,7 @@ namespace {
         ContextDescriptorFlags(asImpl().getContextKind(),
                                !asImpl().getGenericSignature().isNull(),
                                asImpl().isUniqueDescriptor(),
-                               asImpl().getVersion(),
+                               !asImpl().getInvertedProtocols().empty(),
                                asImpl().getKindSpecificFlags())
           .getIntValue());
     }
@@ -519,6 +524,7 @@ namespace {
       asImpl().addGenericParameters();
       asImpl().addGenericRequirements();
       asImpl().addGenericPackShapeDescriptors();
+      asImpl().addConditionalInvertedProtocols();
       asImpl().finishGenericParameters();
     }
     
@@ -545,10 +551,27 @@ namespace {
     
     void addGenericRequirements() {
       auto metadata =
-        irgen::addGenericRequirements(IGM, B,
-                            asImpl().getGenericSignature(),
-                            asImpl().getGenericSignature().getRequirements());
+        irgen::addGenericRequirements(IGM, B, asImpl().getGenericSignature());
       SignatureHeader->add(metadata);
+    }
+
+    /// Adds the set of suppressed protocols, which must be explicitly called
+    /// by the concrete subclasses.
+    void addInvertedProtocols() {
+      auto protocols = asImpl().getInvertedProtocols();
+      if (protocols.empty())
+        return;
+
+      B.addInt(IGM.Int16Ty, protocols.rawBits());
+    }
+
+    InvertibleProtocolSet getConditionalInvertedProtocols() {
+      return InvertibleProtocolSet();
+    }
+
+    void addConditionalInvertedProtocols() {
+      assert(asImpl().getConditionalInvertedProtocols().empty() &&
+             "Subclass must implement this operation");
     }
 
     void finishGenericParameters() {
@@ -577,10 +600,11 @@ namespace {
       irgen::addGenericPackShapeDescriptors(IGM, B, shapes, packArgs);
     }
 
-    uint8_t getVersion() {
-      return 0;
+    /// Retrieve the set of protocols that are suppressed in this context.
+    InvertibleProtocolSet getInvertedProtocols() {
+      return InvertibleProtocolSet();
     }
-    
+
     uint16_t getKindSpecificFlags() {
       return 0;
     }
@@ -852,10 +876,13 @@ namespace {
     }
 
     void addRequirementSignature() {
-      auto requirements = Proto->getRequirementSignature().getRequirements();
+      SmallVector<Requirement, 2> requirements;
+      SmallVector<InverseRequirement, 2> inverses;
+      Proto->getRequirementSignature().getRequirementsWithInverses(
+          Proto, requirements, inverses);
       auto metadata =
         irgen::addGenericRequirements(IGM, B, Proto->getGenericSignature(),
-                                      requirements);
+                                      requirements, inverses);
 
       B.fillPlaceholderWithInt(*NumRequirementsInSignature, IGM.Int32Ty,
                                metadata.NumRequirements);
@@ -919,7 +946,7 @@ namespace {
       {
         auto *requirement = cast<AbstractFunctionDecl>(func.getDecl());
         if (requirement->isDistributedThunk()) {
-          // when thunk, because in protocol we want accessof for the thunk
+          // when thunk, because in protocol we want access of for the thunk
           IGM.emitDistributedTargetAccessor(requirement);
         }
       }
@@ -990,6 +1017,13 @@ namespace {
             IGM.defineMethodDescriptor(func, Proto, descriptor,
                                        IGM.ProtocolRequirementStructTy);
           }
+        }
+
+        if (entry.isFunction() &&
+            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
+          // We avoid emitting _distributed_get accessors, as they cannot be
+          // referred to anyway
+          continue;
         }
 
         if (entry.isAssociatedType()) {
@@ -1226,6 +1260,110 @@ namespace {
       asImpl().maybeAddMetadataInitialization();
     }
 
+    /// Retrieve the set of protocols that are suppressed by this type.
+    InvertibleProtocolSet getInvertedProtocols() {
+      InvertibleProtocolSet result;
+      auto nominal = dyn_cast<NominalTypeDecl>(Type);
+      if (!nominal)
+        return result;
+
+      auto checkProtocol = [&](InvertibleProtocolKind kind) {
+        switch (nominal->canConformTo(kind)) {
+        case TypeDecl::CanBeInvertible::Never:
+        case TypeDecl::CanBeInvertible::Conditionally:
+          result.insert(kind);
+          break;
+
+        case TypeDecl::CanBeInvertible::Always:
+          break;
+        }
+      };
+
+      for (auto kind : InvertibleProtocolSet::allKnown())
+        checkProtocol(kind);
+
+      return result;
+    }
+
+    /// Retrieve the set of invertible protocols to which this type
+    /// conditionally conforms.
+    InvertibleProtocolSet getConditionalInvertedProtocols() {
+      InvertibleProtocolSet result;
+      auto nominal = dyn_cast<NominalTypeDecl>(Type);
+      if (!nominal)
+        return result;
+
+      auto checkProtocol = [&](InvertibleProtocolKind kind) {
+        switch (nominal->canConformTo(kind)) {
+        case TypeDecl::CanBeInvertible::Never:
+        case TypeDecl::CanBeInvertible::Always:
+          break;
+
+        case TypeDecl::CanBeInvertible::Conditionally:
+          result.insert(kind);
+          break;
+        }
+      };
+
+      for (auto kind : InvertibleProtocolSet::allKnown())
+        checkProtocol(kind);
+
+      return result;
+    }
+
+    void addConditionalInvertedProtocols() {
+      auto protocols = asImpl().getConditionalInvertedProtocols();
+      if (protocols.empty())
+        return;
+
+      // Note the conditional suppressed protocols.
+      this->SignatureHeader->ConditionalInvertedProtocols = protocols;
+
+      // The suppressed protocols with conditional conformances.
+      B.addInt(IGM.Int16Ty, protocols.rawBits());
+
+      // Create placeholders for the counts of the conditional requirements
+      // for each conditional conformance to a supressible protocol.
+      unsigned numProtocols = countBitsUsed(protocols.rawBits());
+      using PlaceholderPosition =
+          ConstantAggregateBuilderBase::PlaceholderPosition;
+      SmallVector<PlaceholderPosition, 2> countPlaceholders;
+      for (unsigned i : range(0, numProtocols)) {
+        (void)i;
+        countPlaceholders.push_back(
+            B.addPlaceholderWithSize(IGM.Int16Ty));
+      }
+
+      // Emit the generic requirements for the conditional conformance
+      // to each invertible protocol.
+      auto nominal = cast<NominalTypeDecl>(Type);
+      auto genericSig = nominal->getGenericSignatureOfContext();
+      ASTContext &ctx = nominal->getASTContext();
+      unsigned index = 0;
+      unsigned totalNumRequirements = 0;
+      for (auto kind : protocols) {
+        auto proto = ctx.getProtocol(getKnownProtocolKind(kind));
+        SmallVector<ProtocolConformance *, 1> conformances;
+        (void)nominal->lookupConformance(proto, conformances);
+        auto conformance = conformances.front();
+
+        SmallVector<InverseRequirement, 2> inverses;
+        if (auto conformanceSig =
+                conformance->getDeclContext()->getGenericSignatureOfContext()) {
+          SmallVector<Requirement, 2> scratchReqs;
+          conformanceSig->getRequirementsWithInverses(scratchReqs, inverses);
+        }
+
+        auto metadata = irgen::addGenericRequirements(
+            IGM, B, genericSig, conformance->getConditionalRequirements(),
+            inverses);
+
+        totalNumRequirements += metadata.NumRequirements;
+        B.fillPlaceholderWithInt(countPlaceholders[index++], IGM.Int16Ty,
+                                 totalNumRequirements);
+      }
+    }
+
     /// Fill out all the aspects of the type identity.
     void computeIdentity() {
       // Remember the user-facing name.
@@ -1335,6 +1473,17 @@ namespace {
       return Type->getGenericSignature();
     }
     
+    bool hasInvertibleProtocols() {
+      auto genericSig = asImpl().getGenericSignature();
+      if (!genericSig)
+        return false;
+
+      SmallVector<Requirement, 2> requirements;
+      SmallVector<InverseRequirement, 2> inverses;
+      genericSig->getRequirementsWithInverses(requirements, inverses);
+      return !inverses.empty();
+    }
+      
     /// Fill in the fields of a TypeGenericContextDescriptorHeader.
     void addGenericParametersHeader() {
       asImpl().addMetadataInstantiationCache();
@@ -1555,6 +1704,7 @@ namespace {
     void layout() {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
+      addInvertedProtocols();
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1628,6 +1778,7 @@ namespace {
     void layout() {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
+      addInvertedProtocols();
     }
     
     ContextDescriptorKind getContextKind() {
@@ -1760,6 +1911,7 @@ namespace {
       addOverrideTable();
       addObjCResilientClassStubInfo();
       maybeAddCanonicalMetadataPrespecializations();
+      addInvertedProtocols();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -2598,8 +2750,7 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   auto &ti = IGM.getTypeInfo(lowered);
   auto *typeLayoutEntry =
       ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-      IGM.getOptions().EnableLayoutStringValueWitnesses) {
+  if (layoutStringsEnabled(IGM)) {
 
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
@@ -2797,37 +2948,40 @@ IRGenModule::getAddrOfOriginalModuleContextDescriptor(StringRef Name) {
                                           .first->getValue());
 }
 
-static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
-                                            SILType T,
-                                            llvm::Value *metadata,
-                                            bool isVWTMutable,
-                                       MetadataDependencyCollector *collector) {
-  auto &IGM = IGF.IGM;
-
+void IRGenFunction::
+emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
+                                bool isVWTMutable,
+                                MetadataDependencyCollector *collector) {
   auto *target = T.getNominalOrBoundGenericNominal();
-  llvm::Value *fieldVector
-    = emitAddressOfFieldOffsetVector(IGF, metadata, target)
+
+  llvm::Value *fieldVector = nullptr;
+  // @objc @implementation classes don't actually have a field vector; for them,
+  // we're just trying to update the direct field offsets.
+  if (!isa<ClassDecl>(target)
+        || !cast<ClassDecl>(target)->getObjCImplementationDecl()) {
+    fieldVector = emitAddressOfFieldOffsetVector(*this, metadata, target)
       .getAddress();
-  
+  }
+
   // Collect the stored properties of the type.
   unsigned numFields = getNumFields(target);
 
   // Fill out an array with the field type metadata records.
-  Address fields = IGF.createAlloca(
-                   llvm::ArrayType::get(IGM.Int8PtrPtrTy, numFields),
-                   IGM.getPointerAlignment(), "classFields");
-  IGF.Builder.CreateLifetimeStart(fields, IGM.getPointerSize() * numFields);
-  fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
+  Address fields = createAlloca(
+                     llvm::ArrayType::get(IGM.Int8PtrPtrTy, numFields),
+                     IGM.getPointerAlignment(), "classFields");
+  Builder.CreateLifetimeStart(fields, IGM.getPointerSize() * numFields);
+  fields = Builder.CreateStructGEP(fields, 0, Size(0));
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
     assert(field.isConcrete() &&
            "initializing offset vector for type with missing member?");
     SILType propTy = field.getType(IGM, T);
-    llvm::Value *fieldLayout = emitTypeLayoutRef(IGF, propTy, collector);
+    llvm::Value *fieldLayout = emitTypeLayoutRef(*this, propTy, collector);
     Address fieldLayoutAddr =
-      IGF.Builder.CreateConstArrayGEP(fields, index, IGM.getPointerSize());
-    IGF.Builder.CreateStore(fieldLayout, fieldLayoutAddr);
+      Builder.CreateConstArrayGEP(fields, index, IGM.getPointerSize());
+    Builder.CreateStore(fieldLayout, fieldLayoutAddr);
     ++index;
   });
   assert(index == numFields);
@@ -2853,29 +3007,41 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
       llvm_unreachable("Emitting metadata init for fixed class metadata?");
     }
 
-    llvm::Value *dependency;
-    
+    llvm::Value *dependency = nullptr;
+
     switch (IGM.getClassMetadataStrategy(classDecl)) {
     case ClassMetadataStrategy::Resilient:
     case ClassMetadataStrategy::Singleton:
       // Call swift_initClassMetadata().
-      dependency = IGF.Builder.CreateCall(
-          IGM.getInitClassMetadata2FunctionPointer(),
-          {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
-           fields.getAddress(), fieldVector});
+      assert(fieldVector && "Singleton/Resilient strategies not supported for "
+                            "objcImplementation");
+      dependency = Builder.CreateCall(
+            IGM.getInitClassMetadata2FunctionPointer(),
+            {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
+             fields.getAddress(), fieldVector});
       break;
 
     case ClassMetadataStrategy::Update:
     case ClassMetadataStrategy::FixedOrUpdate:
       assert(IGM.Context.LangOpts.EnableObjCInterop);
 
-      // Call swift_updateClassMetadata(). Note that the static metadata
-      // already references the superclass in this case, but we still want
-      // to ensure the superclass metadata is initialized first.
-      dependency = IGF.Builder.CreateCall(
-          IGM.getUpdateClassMetadata2FunctionPointer(),
-          {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
-           fields.getAddress(), fieldVector});
+      if (fieldVector) {
+        // Call swift_updateClassMetadata(). Note that the static metadata
+        // already references the superclass in this case, but we still want
+        // to ensure the superclass metadata is initialized first.
+        dependency = Builder.CreateCall(
+              IGM.getUpdateClassMetadata2FunctionPointer(),
+              {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
+               fields.getAddress(), fieldVector});
+      } else {
+        // If we don't have a field vector, we must be updating an
+        // @objc @implementation class layout. Call
+        // swift_updatePureObjCClassMetadata() instead.
+        Builder.CreateCall(
+              IGM.getUpdatePureObjCClassMetadataFunctionPointer(),
+              {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
+               fields.getAddress()});
+      }
       break;
 
     case ClassMetadataStrategy::Fixed:
@@ -2884,8 +3050,8 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 
     // Collect any possible dependency from initializing the class; generally
     // this involves the superclass.
-    assert(collector);
-    collector->collect(IGF, dependency);
+    if (collector && dependency)
+      collector->collect(*this, dependency);
 
   } else {
     assert(isa<StructDecl>(target));
@@ -2896,12 +3062,12 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
       flags |= StructLayoutFlags::IsVWTMutable;
 
     // Call swift_initStructMetadata().
-    IGF.Builder.CreateCall(IGM.getInitStructMetadataFunctionPointer(),
-                           {metadata, IGM.getSize(Size(uintptr_t(flags))),
-                            numFieldsV, fields.getAddress(), fieldVector});
+    Builder.CreateCall(IGM.getInitStructMetadataFunctionPointer(),
+                       {metadata, IGM.getSize(Size(uintptr_t(flags))),
+                        numFieldsV, fields.getAddress(), fieldVector});
   }
 
-  IGF.Builder.CreateLifetimeEnd(fields, IGM.getPointerSize() * numFields);
+  Builder.CreateLifetimeEnd(fields, IGM.getPointerSize() * numFields);
 }
 
 static void emitInitializeFieldOffsetVectorWithLayoutString(
@@ -3126,11 +3292,11 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   auto loweredTy = IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
-  bool useLayoutStrings = IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.Context.LangOpts.hasFeature(
-            Feature::LayoutStringValueWitnessesInstantiation) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses &&
-        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
+  bool useLayoutStrings =
+      layoutStringsEnabled(IGM) &&
+      IGM.Context.LangOpts.hasFeature(
+          Feature::LayoutStringValueWitnessesInstantiation) &&
+      IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation;
 
   if (auto sd = dyn_cast<StructDecl>(nominalDecl)) {
     auto &fixedTI = IGM.getTypeInfo(loweredTy);
@@ -3163,8 +3329,8 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
       emitInitializeFieldOffsetVectorWithLayoutString(IGF, loweredTy, metadata,
                                                       isVWTMutable, collector);
     } else {
-      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
-                                      collector);
+      IGF.emitInitializeFieldOffsetVector(loweredTy, metadata, isVWTMutable,
+                                          collector);
     }
   } else {
     assert(isa<EnumDecl>(nominalDecl));
@@ -3196,9 +3362,9 @@ static void emitInitializeClassMetadata(IRGenFunction &IGF,
 
   // Set the superclass, fill out the field offset vector, and copy vtable
   // entries, generic requirements and field offsets from superclasses.
-  emitInitializeFieldOffsetVector(IGF, loweredTy,
-                                  metadata, /*VWT is mutable*/ false,
-                                  collector);
+  IGF.emitInitializeFieldOffsetVector(loweredTy,
+                                      metadata, /*VWT is mutable*/ false,
+                                      collector);
 
   // Realizing the class with the ObjC runtime will copy back to the
   // field offset globals for us; but if ObjC interop is disabled, we
@@ -3281,8 +3447,7 @@ namespace {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -3363,9 +3528,7 @@ namespace {
         if (HasDependentMetadata)
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
 
-        if (IGM.Context.LangOpts.hasFeature(
-                Feature::LayoutStringValueWitnesses) &&
-            IGM.getOptions().EnableLayoutStringValueWitnesses) {
+        if (layoutStringsEnabled(IGM)) {
           if (auto *layoutString = getLayoutString()) {
             auto layoutStringCast = IGF.Builder.CreateBitCast(layoutString,
                                                               IGM.Int8PtrTy);
@@ -3573,6 +3736,25 @@ createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
                                           [&](IRGenFunction &IGF,
                                               DynamicMetadataRequest request,
                                               llvm::Constant *cacheVariable) {
+    if (auto CD = dyn_cast<ClassDecl>(typeDecl)) {
+      if (CD->getObjCImplementationDecl()) {
+        // Use the Objective-C runtime symbol instead of the Swift one.
+        llvm::Value *descriptor =
+          IGF.IGM.getAddrOfObjCClass(CD, NotForDefinition);
+
+        // Make the ObjC runtime initialize the class.
+        llvm::Value *initializedDescriptor =
+          IGF.Builder.CreateCall(IGF.IGM.getFixedClassInitializationFn(),
+                                 {descriptor});
+
+        // Turn the ObjC class into a valid Swift metadata pointer.
+        auto response =
+          IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassMetadataFunctionPointer(),
+                                 {initializedDescriptor});
+        return MetadataResponse::forComplete(response);
+      }
+    }
+
     llvm::Value *descriptor =
       IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
     auto responsePair =
@@ -3806,6 +3988,7 @@ namespace {
 
   public:
     const ClassLayout &getFieldLayout() const { return FieldLayout; }
+    using super::isPureObjC;
 
     SILType getLoweredType() {
       return IGM.getLoweredType(Target->getDeclaredTypeInContext());
@@ -3819,9 +4002,7 @@ namespace {
     ClassFlags getClassFlags() { return ::getClassFlags(Target); }
 
     void addClassFlags() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.addInt32((uint32_t)asImpl().getClassFlags());
     }
 
@@ -3857,9 +4038,7 @@ namespace {
     }
 
     void addValueWitnessTable() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.add(asImpl().getValueWitnessTable(false).getValue());
     }
 
@@ -3960,8 +4139,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -3978,9 +4156,7 @@ namespace {
     }
 
     void addLayoutStringPointer() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       if (auto *layoutString = getLayoutString()) {
         B.addSignedPointer(layoutString,
                            IGM.getOptions().PointerAuth.TypeLayoutString,
@@ -4005,8 +4181,7 @@ namespace {
         return;
       }
 
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
+      assert(!isPureObjC());
 
       if (auto ptr = getAddrOfDestructorFunction(IGM, Target)) {
         B.addSignedPointer(*ptr,
@@ -4020,8 +4195,24 @@ namespace {
     }
 
     void addIVarDestroyer() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        llvm::Constant *ptr = nullptr;
+        for (const SILVTable::Entry &entry : VTable->getEntries()) {
+          if (entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer) {
+            ptr = IGM.getAddrOfSILFunction(entry.getImplementation(), NotForDefinition);
+            break;
+          }
+        }
+        if (ptr) {
+          B.addSignedPointer(ptr, IGM.getOptions().PointerAuth.HeapDestructors,
+                             PointerAuthEntity::Special::HeapDestructor);
+        } else {
+          B.addNullPointer(IGM.FunctionPtrTy);
+        }
         return;
+      }
+
+      assert(!isPureObjC());
 
       auto dtorFunc = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
@@ -4045,9 +4236,7 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.addSignedPointer(asImpl().getNominalTypeDescriptor(),
                          IGM.getOptions().PointerAuth.TypeDescriptors,
                          PointerAuthEntity::Special::TypeDescriptor);
@@ -4062,9 +4251,7 @@ namespace {
     }
 
     void addInstanceAddressPoint() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       // Right now, we never allocate fields before the address point.
       B.addInt32(0);
     }
@@ -4074,9 +4261,7 @@ namespace {
     const ClassLayout &getFieldLayout() { return FieldLayout; }
 
     void addInstanceSize() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       if (asImpl().hasFixedLayout()) {
         B.addInt32(asImpl().getFieldLayout().getSize().getValue());
       } else {
@@ -4086,9 +4271,7 @@ namespace {
     }
     
     void addInstanceAlignMask() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       if (asImpl().hasFixedLayout()) {
         B.addInt16(asImpl().getFieldLayout().getAlignMask().getValue());
       } else {
@@ -4098,24 +4281,18 @@ namespace {
     }
 
     void addRuntimeReservedBits() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       B.addInt16(0);
     }
 
     void addClassSize() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       auto size = MetadataLayout.getSize();
       B.addInt32(size.FullSize.getValue());
     }
 
     void addClassAddressPoint() {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       // FIXME: Wrong
       auto size = MetadataLayout.getSize();
       B.addInt32(size.AddressPoint.getValue());
@@ -4132,6 +4309,9 @@ namespace {
     llvm::Constant *getROData() { return emitClassPrivateData(IGM, Target); }
 
     uint64_t getClassDataPointerHasSwiftMetadataBits() {
+      // objcImpl classes should not have the Swift bit set.
+      if (isPureObjC())
+        return 0;
       return IGM.UseDarwinPreStableABIBit ? 1 : 2;
     }
 
@@ -4147,15 +4327,13 @@ namespace {
       // Derive the RO-data.
       llvm::Constant *data = asImpl().getROData();
 
-      if (!asImpl().getFieldLayout().hasObjCImplementation()) {
-        // Set a low bit to indicate this class has Swift metadata.
-        auto bit = llvm::ConstantInt::get(
-            IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
+      // Set a low bit to indicate this class has Swift metadata.
+      auto bit = llvm::ConstantInt::get(
+          IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
 
-        // Emit data + bit.
-        data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
-        data = llvm::ConstantExpr::getAdd(data, bit);
-      }
+      // Emit data + bit.
+      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
+      data = llvm::ConstantExpr::getAdd(data, bit);
 
       B.add(data);
     }
@@ -4226,6 +4404,9 @@ namespace {
       if (IGM.getClassMetadataStrategy(Target) == ClassMetadataStrategy::Fixed)
         return;
 
+      if (isPureObjC())
+        return;
+
       emitMetadataCompletionFunction(
           IGM, Target,
           [&](IRGenFunction &IGF, llvm::Value *metadata,
@@ -4266,15 +4447,14 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout, vtable) {}
 
     void addFieldOffset(VarDecl *var) {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       addFixedFieldOffset(IGM, B, var, [](DeclContext *dc) {
         return dc->getDeclaredTypeInContext();
       });
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      assert(!isPureObjC());
       llvm_unreachable("Fixed class metadata cannot have missing members");
     }
 
@@ -4300,18 +4480,14 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout) {}
 
     void addFieldOffset(VarDecl *var) {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       // Field offsets are either copied from the superclass or calculated
       // at runtime.
       B.addInt(IGM.SizeTy, 0);
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       for (unsigned i = 0,
                     e = placeholder->getNumberOfFieldOffsetVectorEntries();
            i < e; ++i) {
@@ -4352,12 +4528,12 @@ namespace {
       : IGM(IGM), Target(theClass), B(builder), FieldLayout(fieldLayout) {}
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      if (FieldLayout.hasObjCImplementation())
-        return nullptr;
       return ClassContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
     }
 
     void layout() {
+      assert(!FieldLayout.hasObjCImplementation()
+                && "Resilient class metadata not supported for @objcImpl");
       emitNominalTypeDescriptor();
 
       addRelocationFunction();
@@ -4380,17 +4556,11 @@ namespace {
     }
 
     void addDestructorFunction() {
-      if (FieldLayout.hasObjCImplementation())
-        return;
-
       auto function = getAddrOfDestructorFunction(IGM, Target);
       B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     void addIVarDestroyer() {
-      if (FieldLayout.hasObjCImplementation())
-        return;
-
       auto function = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
@@ -4399,9 +4569,6 @@ namespace {
     }
 
     void addClassFlags() {
-      if (FieldLayout.hasObjCImplementation())
-        return;
-
       B.addInt32((uint32_t) getClassFlags(Target));
     }
 
@@ -4464,7 +4631,7 @@ namespace {
       // @_objcImplementation on true (non-ObjC) generic classes doesn't make
       // much sense, and we haven't updated this builder to handle it.
       assert(!FieldLayout.hasObjCImplementation()
-             && "@_objcImplementation class with generic metadata?");
+             && "Generic metadata not supported for @objcImpl");
 
       super::layoutHeader();
 
@@ -4681,7 +4848,7 @@ namespace {
     SILType getLoweredType() { return SILType::getPrimitiveObjectType(type); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredType();
       auto &ti = IGM.getTypeInfo(lowered);
@@ -4708,7 +4875,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -4816,14 +4983,13 @@ namespace {
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      assert(!isPureObjC());
       llvm_unreachable(
           "Prespecialized generic class metadata cannot have missing members");
     }
 
     void addFieldOffset(VarDecl *var) {
-      if (asImpl().getFieldLayout().hasObjCImplementation())
-        return;
-
+      assert(!isPureObjC());
       addFixedFieldOffset(IGM, B, var, [&](DeclContext *dc) {
         return dc->mapTypeIntoContext(type);
       });
@@ -4846,6 +5012,7 @@ namespace {
     }
 
     uint64_t getClassDataPointerHasSwiftMetadataBits() {
+      assert(!isPureObjC());
       return super::getClassDataPointerHasSwiftMetadataBits() | 2;
     }
 
@@ -4890,12 +5057,87 @@ static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
       .to(alias, link.isForDefinition());
 }
 
+/// Check whether the metadata update strategy requires runtime support that is
+/// not guaranteed available by the minimum deployment target, and diagnose if
+/// so.
+static void
+diagnoseUnsupportedObjCImplLayout(IRGenModule &IGM, ClassDecl *classDecl,
+                                  const ClassLayout &fragileLayout) {
+  if (!fragileLayout.hasObjCImplementation())
+    return;
+
+  auto strategy = IGM.getClassMetadataStrategy(classDecl);
+
+  switch (strategy) {
+  case ClassMetadataStrategy::Fixed:
+    // Fixed is just fine; no special support needed.
+    break;
+
+  case ClassMetadataStrategy::FixedOrUpdate:
+  case ClassMetadataStrategy::Update: {
+    auto &ctx = IGM.Context;
+
+    // Update and FixedOrUpdate require support in both the Swift and ObjC
+    // runtimes.
+    auto requiredAvailability=ctx.getUpdatePureObjCClassMetadataAvailability();
+    // FIXME: Take the class's availability into account
+    auto currentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+    if (currentAvailability.isContainedIn(requiredAvailability))
+      break;
+
+    // We don't have the support we need. Find and diagnose the variable-size
+    // stored properties.
+    auto &diags = ctx.Diags;
+
+    bool diagnosed = false;
+    forEachField(IGM, classDecl, [&](Field field) {
+      auto elemLayout = fragileLayout.getFieldAccessAndElement(field).second;
+      if (field.getKind() != Field::Kind::Var ||
+            elemLayout.getType().isFixedSize())
+        return;
+
+      if (ctx.LangOpts.hasFeature(
+                    Feature::ObjCImplementationWithResilientStorage))
+        diags.diagnose(
+            field.getVarDecl(),
+            diag::attr_objc_implementation_resilient_property_deployment_target,
+            prettyPlatformString(targetPlatform(ctx.LangOpts)),
+            currentAvailability.getOSVersion().getLowerEndpoint(),
+            requiredAvailability.getOSVersion().getLowerEndpoint());
+      else
+        diags.diagnose(
+            field.getVarDecl(),
+            diag::attr_objc_implementation_resilient_property_not_supported);
+
+      diagnosed = true;
+    });
+
+    // We should have found at least one property to complain about.
+    if (diagnosed)
+      break;
+
+    LLVM_FALLTHROUGH;
+  }
+
+  case ClassMetadataStrategy::Singleton:
+  case ClassMetadataStrategy::Resilient:
+    // This isn't supposed to happen, but just in case, let's give some sort of
+    // vaguely legible output instead of using llvm_unreachable().
+    IGM.error(classDecl->getLoc(),
+              llvm::Twine("class '") + classDecl->getBaseIdentifier().str() +
+              "' needs a metadata strategy not supported by @implementation");
+    break;
+  }
+}
+
 /// Emit the type metadata or metadata template for a class.
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const ClassLayout &fragileLayout,
                               const ClassLayout &resilientLayout) {
   assert(!classDecl->isForeign());
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
+
+  diagnoseUnsupportedObjCImplLayout(IGM, classDecl, fragileLayout);
 
   emitFieldOffsetGlobals(IGM, classDecl, fragileLayout, resilientLayout);
 
@@ -5291,8 +5533,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5336,8 +5577,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -5484,9 +5724,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
       return !!getLayoutString() ||
@@ -5768,9 +6006,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -5778,8 +6014,7 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses)
+      if (!layoutStringsEnabled(IGM))
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
@@ -6005,9 +6240,7 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses) ||
-          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      if (!layoutStringsEnabled(IGM)) {
         return false;
       }
 
@@ -6753,8 +6986,18 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
 
 GenericArgumentMetadata irgen::addGenericRequirements(
                                    IRGenModule &IGM, ConstantStructBuilder &B,
+                                   GenericSignature sig) {
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverses;
+  sig->getRequirementsWithInverses(reqs, inverses);
+  return addGenericRequirements(IGM, B, sig, reqs, inverses);
+}
+
+GenericArgumentMetadata irgen::addGenericRequirements(
+                                   IRGenModule &IGM, ConstantStructBuilder &B,
                                    GenericSignature sig,
-                                   ArrayRef<Requirement> requirements) {
+                                   ArrayRef<Requirement> requirements,
+                                   ArrayRef<InverseRequirement> inverses) {
   assert(sig);
 
   GenericArgumentMetadata metadata;
@@ -6807,6 +7050,27 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     case RequirementKind::Conformance: {
       auto protocol = requirement.getProtocolDecl();
 
+      // If this is an invertible protocol, encode it as an inverted protocol
+      // check with all but this protocol masked off.
+      if (auto invertible = protocol->getInvertibleProtocolKind()) {
+        ++metadata.NumRequirements;
+
+        InvertibleProtocolSet mask(0xFFFF);
+        mask.remove(*invertible);
+
+        auto flags = GenericRequirementFlags(
+            GenericRequirementKind::InvertedProtocols,
+            /*key argument*/ false,
+            /* is parameter pack */false);
+        addGenericRequirement(IGM, B, metadata, sig, flags,
+                              requirement.getFirstType(),
+         [&]{
+          B.addInt16(0xFFFF);
+          B.addInt16(mask.rawBits());
+        });
+        break;
+      }
+
       // Marker protocols do not record generic requirements at all.
       if (protocol->isMarkerProtocol()) {
         break;
@@ -6856,6 +7120,47 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       break;
     }
     }
+  }
+
+  if (inverses.empty())
+    return metadata;
+
+  // Collect the inverse requirements on each of the generic parameters.
+  SmallVector<InvertibleProtocolSet, 2>
+      suppressed(sig.getGenericParams().size(), { });
+  for (const auto &inverse : inverses) {
+    // Determine which generic parameter this constraint applies to.
+    auto genericParam =
+        sig.getReducedType(inverse.subject)->getAs<GenericTypeParamType>();
+    if (!genericParam)
+      continue;
+
+    // Insert this suppression into the set for that generic parameter.
+    auto invertibleKind = inverse.getKind();
+    unsigned index = sig->getGenericParamOrdinal(genericParam);
+    suppressed[index].insert(invertibleKind);
+  }
+
+  // Go through the generic parameters, emitting a requirement for each
+  // that suppresses checking of some protocols.
+  for (unsigned index : indices(suppressed)) {
+    if (suppressed[index].empty())
+      continue;
+
+    // Encode the suppressed protocols constraint.
+    auto genericParam = sig.getGenericParams()[index];
+    auto flags = GenericRequirementFlags(
+        GenericRequirementKind::InvertedProtocols,
+        /*key argument*/ false,
+        genericParam->isParameterPack());
+    addGenericRequirement(IGM, B, metadata, sig, flags,
+                          Type(genericParam),
+     [&]{ 
+      B.addInt16(index);
+      B.addInt16(suppressed[index].rawBits());
+    });
+
+    ++metadata.NumRequirements;
   }
 
   return metadata;
@@ -7152,16 +7457,19 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     addPaddingAfterGenericParamDescriptors(IGM, b, totalParamDescriptors);
 
     auto addRequirementDescriptors = [&](CanGenericSignature sig,
-                                      GenericSignatureHeaderBuilder &header) {
-      auto info = addGenericRequirements(IGM, b, sig, sig.getRequirements());
+                                         GenericSignatureHeaderBuilder &header,
+                                         bool suppressInverses) {
+      auto info = suppressInverses
+        ? addGenericRequirements(IGM, b, sig, sig.getRequirements(), { })
+        : addGenericRequirements(IGM, b, sig);
       header.add(info);
       header.finish(IGM, b);
     };
 
     // GenericRequirementDescriptor GenericRequirements[*];
-    addRequirementDescriptors(reqSig, reqHeader);
+    addRequirementDescriptors(reqSig, reqHeader, /*suppressInverses=*/false);
     if (genSig) {
-      addRequirementDescriptors(genSig, *genHeader);
+      addRequirementDescriptors(genSig, *genHeader, /*suppressInverses=*/true);
     }
 
     // The 'Self' parameter in an existential is not variadic

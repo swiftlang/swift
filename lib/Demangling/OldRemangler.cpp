@@ -242,7 +242,7 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
     return true;
 
   // Go ahead and initialize the substitution entry.
-  entry.setNode(node, /*treatAsIdentifier=*/ false);
+  entry = entryForNode(node);
 
   int Idx = findSubstitution(entry);
   if (Idx < 0)
@@ -514,6 +514,12 @@ Remangler::mangleProtocolConformanceRefInOtherModule(Node *node,
 ManglingError Remangler::mangleConcreteProtocolConformance(Node *node,
                                                            unsigned depth) {
   // Concrete conformances aren't in the old mangling
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::manglePackProtocolConformance(Node *node,
+                                                       unsigned depth) {
+  // Pack conformances aren't in the old mangling
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
@@ -1652,14 +1658,23 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplCoroutineKind(Node *node,
+                                                 unsigned depth) {
+  StringRef text = node->getText();
+  if (text == "yield_once") {
+    Buffer << "A";
+  } else if (text == "yield_many") {
+    Buffer << "G";
+  } else {
+    return MANGLING_ERROR(ManglingError::InvalidImplCoroutineKind, node);
+  }
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplFunctionAttribute(Node *node,
                                                      unsigned depth) {
   StringRef text = node->getText();
-  if (text == "@yield_once") {
-    Buffer << "A";
-  } else if (text == "@yield_many") {
-    Buffer << "G";
-  } else if (text == "@Sendable") {
+   if (text == "@Sendable") {
     Buffer << "h";
   } else if (text == "@async") {
     Buffer << "H";

@@ -251,6 +251,123 @@ static bool isBetterThan(const AvailableAttr *newAttr,
                                           prevAttr->Platform);
 }
 
+static const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
+getFallbackVersionMapping(const ASTContext &Ctx,
+                          clang::DarwinSDKInfo::OSEnvPair Kind) {
+  auto *SDKInfo = Ctx.getDarwinSDKInfo();
+  if (SDKInfo)
+    return SDKInfo->getVersionMapping(Kind);
+
+  return Ctx.getAuxiliaryDarwinPlatformRemapInfo(Kind);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedIntroducedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapIntroducedAvailabilityVersion(Version);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
+}
+
+bool AvailabilityInference::updateIntroducedPlatformForFallback(
+    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
+    llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> IntroducedVersion = attr->Introduced;
+  if (attr->Platform == PlatformKind::iOS && IntroducedVersion.has_value() &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
+    // We re-map the iOS introduced version to the corresponding visionOS version
+    auto PotentiallyRemappedIntroducedVersion =
+        getRemappedIntroducedVersionForFallbackPlatform(Ctx,
+                                                        *IntroducedVersion);
+    if (PotentiallyRemappedIntroducedVersion.has_value()) {
+      Platform = swift::prettyPlatformString(PlatformKind::visionOS);
+      PlatformVer = PotentiallyRemappedIntroducedVersion.value();
+      return true;
+    }
+  }
+  return false;
+}
+
+bool AvailabilityInference::updateDeprecatedPlatformForFallback(
+    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
+    llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> DeprecatedVersion = attr->Deprecated;
+  if (attr->Platform == PlatformKind::iOS && DeprecatedVersion.has_value() &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
+    // We re-map the iOS deprecated version to the corresponding visionOS version
+    auto PotentiallyRemappedDeprecatedVersion =
+        getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
+            Ctx, *DeprecatedVersion);
+    if (PotentiallyRemappedDeprecatedVersion.has_value()) {
+      Platform = swift::prettyPlatformString(PlatformKind::visionOS);
+      PlatformVer = PotentiallyRemappedDeprecatedVersion.value();
+      return true;
+    }
+  }
+  return false;
+}
+
+bool AvailabilityInference::updateObsoletedPlatformForFallback(
+    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
+    llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> ObsoletedVersion = attr->Obsoleted;
+  if (attr->Platform == PlatformKind::iOS && ObsoletedVersion.has_value() &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
+    // We re-map the iOS obsoleted version to the corresponding visionOS version
+    auto PotentiallyRemappedObsoletedVersion =
+        getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
+            Ctx, *ObsoletedVersion);
+    if (PotentiallyRemappedObsoletedVersion.has_value()) {
+      Platform = swift::prettyPlatformString(PlatformKind::visionOS);
+      PlatformVer = PotentiallyRemappedObsoletedVersion.value();
+      return true;
+    }
+  }
+  return false;
+}
+
+void AvailabilityInference::updatePlatformStringForFallback(
+    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform) {
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
+    Platform = swift::prettyPlatformString(PlatformKind::visionOS);
+  }
+}
+
+bool AvailabilityInference::updateBeforePlatformForFallback(
+    const BackDeployedAttr *attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer) {
+  auto BeforeVersion = attr->Version;
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
+    // We re-map the iOS before version to the corresponding visionOS version
+    auto PotentiallyRemappedIntroducedVersion =
+        getRemappedIntroducedVersionForFallbackPlatform(Ctx, BeforeVersion);
+    if (PotentiallyRemappedIntroducedVersion.has_value()) {
+      Platform = swift::prettyPlatformString(PlatformKind::visionOS);
+      PlatformVer = PotentiallyRemappedIntroducedVersion.value();
+      return true;
+    }
+  }
+  return false;
+}
+
 const AvailableAttr *
 AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D,
                                                       ASTContext &Ctx) {
@@ -332,13 +449,13 @@ Decl::getSemanticUnavailableAttr(bool ignoreAppExtensions) const {
       std::nullopt);
 }
 
-static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
+bool Decl::isUnreachableAtRuntime() const {
   // Don't trust unavailability on declarations from clang modules.
-  if (isa<ClangModuleUnit>(D->getDeclContext()->getModuleScopeContext()))
+  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
     return false;
 
   auto unavailableAttrAndDecl =
-      D->getSemanticUnavailableAttr(/*ignoreAppExtensions=*/true);
+      getSemanticUnavailableAttr(/*ignoreAppExtensions=*/true);
   if (!unavailableAttrAndDecl)
     return false;
 
@@ -350,6 +467,17 @@ static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
   if (!unavailableAttr->isUnconditionallyUnavailable())
     return false;
 
+  // Universally unavailable declarations are always unreachable.
+  if (unavailableAttr->Platform == PlatformKind::none)
+    return true;
+
+  // FIXME: Support zippered frameworks (rdar://125371621)
+  // If we have a target variant (e.g. we're building a zippered macOS
+  // framework) then the decl is only unreachable if it is unavailable for both
+  // the primary target and the target variant.
+  if (getASTContext().LangOpts.TargetVariant.has_value())
+    return false;
+
   return true;
 }
 
@@ -357,6 +485,14 @@ static UnavailableDeclOptimization
 getEffectiveUnavailableDeclOptimization(ASTContext &ctx) {
   if (ctx.LangOpts.UnavailableDeclOptimizationMode.has_value())
     return *ctx.LangOpts.UnavailableDeclOptimizationMode;
+
+  // FIXME: Allow unavailable decl optimization on visionOS.
+  // visionOS must be ABI compatible with iOS. Enabling unavailable declaration
+  // optimizations naively would break compatibility since declarations marked
+  // unavailable on visionOS would be optimized regardless of whether they are
+  // available on iOS. rdar://116742214
+  if (ctx.LangOpts.Target.isXROS())
+    return UnavailableDeclOptimization::None;
 
   return UnavailableDeclOptimization::None;
 }
@@ -368,7 +504,7 @@ bool Decl::isAvailableDuringLowering() const {
       UnavailableDeclOptimization::Complete)
     return true;
 
-  return !shouldStubOrSkipUnavailableDecl(this);
+  return !isUnreachableAtRuntime();
 }
 
 bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
@@ -378,7 +514,7 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
       UnavailableDeclOptimization::Stub)
     return false;
 
-  return shouldStubOrSkipUnavailableDecl(this);
+  return isUnreachableAtRuntime();
 }
 
 bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
@@ -445,7 +581,15 @@ AvailabilityContext
 AvailabilityInference::availableRange(const AvailableAttr *attr,
                                       ASTContext &Ctx) {
   assert(attr->isActivePlatform(Ctx));
-  return AvailabilityContext{VersionRange::allGTE(attr->Introduced.value()),
+
+  llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
+  StringRef Platform = attr->prettyPlatformString();
+  llvm::VersionTuple RemappedIntroducedVersion;
+  if (AvailabilityInference::updateIntroducedPlatformForFallback(
+      attr, Ctx, Platform, RemappedIntroducedVersion))
+    IntroducedVersion = RemappedIntroducedVersion;
+
+  return AvailabilityContext{VersionRange::allGTE(IntroducedVersion),
                              attr->IsSPI};
 }
 
@@ -522,6 +666,7 @@ ASTContext::getSwiftAvailability(unsigned major, unsigned minor) const {
 #define PLATFORM_TEST_macOS     target.isMacOSX()
 #define PLATFORM_TEST_iOS       target.isiOS()
 #define PLATFORM_TEST_watchOS   target.isWatchOS()
+#define PLATFORM_TEST_xrOS      target.isXROS()
 
 #define _SECOND(A, B) B
 #define SECOND(T) _SECOND T
@@ -536,6 +681,7 @@ ASTContext::getSwiftAvailability(unsigned major, unsigned minor) const {
 #undef PLATFORM_TEST_macOS
 #undef PLATFORM_TEST_iOS
 #undef PLATFORM_TEST_watchOS
+#undef PLATFORM_TEST_xrOS
 #undef _SECOND
 #undef SECOND
 

@@ -116,7 +116,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
   }
 
   // Record all uses that aren't transitively followed. These are either
-  // instanteneous uses of the addres, or cause a pointer escape.
+  // instantaneous uses of the address, or cause a pointer escape.
   auto transitiveResultUses = [&](Operand *use) {
     auto *svi = cast<SingleValueInstruction>(use->getUser());
     if (svi->use_empty()) {
@@ -276,6 +276,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         case BuiltinValueKind::ZeroInitializer:
         case BuiltinValueKind::GetEnumTag:
         case BuiltinValueKind::InjectEnumTag:
+        case BuiltinValueKind::AddressOfRawLayout:
           callVisitUse(op);
           continue;
         default:

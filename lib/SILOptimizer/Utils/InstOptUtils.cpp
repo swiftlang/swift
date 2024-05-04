@@ -36,6 +36,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -175,6 +176,10 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<DebugValueInst>(inst))
     return false;
 
+  // A dead borrowed-from can only be removed if the argument (= operand) is also removed.
+  if (isa<BorrowedFromInst>(inst))
+    return false;
+
   // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
   if (isa<UncheckedTakeEnumDataAddrInst>(inst))
@@ -238,11 +243,7 @@ bool swift::hasOnlyEndOfScopeOrEndOfLifetimeUses(SILInstruction *inst) {
       // Include debug uses only in Onone mode.
       if (isDebugUser && inst->getFunction()->getEffectiveOptimizationMode() <=
                              OptimizationMode::NoOptimization)
-        if (auto DbgVarInst = DebugVarCarryingInst(user)) {
-          auto VarInfo = DbgVarInst.getVarInfo();
-          if (VarInfo && !VarInfo->Implicit)
-            return false;
-        }
+        return false;
     }
   }
   return true;
@@ -590,7 +591,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// handle all cases recognized by SILFunctionType::isABICompatibleWith (see
 /// areABICompatibleParamsOrReturns()).
 std::pair<SILValue, bool /* changedCFG */>
-swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
+swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
+                                    SILLocation loc,
                                     SILValue value, SILType srcTy,
                                     SILType destTy,
                                     ArrayRef<SILInstruction *> usePoints) {
@@ -673,7 +675,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     // Cast the unwrapped value.
     SILValue castedUnwrappedValue;
     std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
-      builder, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
+      builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
     // Wrap into optional. An owned value is forwarded through the cast and into
     // the Optional. A borrowed value will have a nested borrow for the
     // rewrapped Optional.
@@ -687,7 +689,9 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 
-    return {phi, true};
+    updateBorrowedFromPhis(pm, { phi });
+
+    return {lookThroughBorrowedFromUser(phi), true};
   }
 
   // Src is not optional, but dest is optional.
@@ -701,7 +705,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     SILValue wrappedValue =
         builder->createOptionalSome(loc, value, loweredOptionalSrcType);
     // Cast the wrapped value.
-    return castValueToABICompatibleType(builder, loc, wrappedValue,
+    return castValueToABICompatibleType(builder, pm, loc, wrappedValue,
                                         wrappedValue->getType(), destTy,
                                         usePoints);
   }
@@ -715,7 +719,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
       // Cast the value if necessary.
       bool neededCFGChange;
       std::tie(element, neededCFGChange) = castValueToABICompatibleType(
-          builder, loc, element, srcTy.getTupleElementType(idx),
+          builder, pm, loc, element, srcTy.getTupleElementType(idx),
           destTy.getTupleElementType(idx), usePoints);
       changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
@@ -1822,6 +1826,44 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+/// Create a new debug value from a store and a debug variable.
+static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
+                                    SILInstruction *SI,
+                                    SILValue original) {
+  auto VarInfo = DefiningInst.getVarInfo();
+  if (!VarInfo)
+    return;
+  // Transfer the location and scope of the debug value to the debug variable,
+  // unless they are the same, in which case we don't need to store it twice.
+  // That way, the variable will point to its declaration, and the debug_value
+  // will point to the assignment point.
+  if (!VarInfo->Loc && !SI->getLoc().hasSameSourceLocation(DefiningInst->getLoc()))
+    VarInfo->Loc = DefiningInst->getLoc();
+  if (!VarInfo->Scope && SI->getDebugScope() != DefiningInst->getDebugScope())
+    VarInfo->Scope = DefiningInst->getDebugScope();
+  // Fix the op_deref.
+  if (!isa<CopyAddrInst>(SI) && VarInfo->DIExpr.startsWithDeref())
+    VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
+  else if (isa<CopyAddrInst>(SI) && !VarInfo->DIExpr.startsWithDeref())
+    VarInfo->DIExpr.prependElements({
+      SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+  // Note: The instruction should logically be in the SI's scope.
+  // However, LLVM does not support variables and stores in different scopes,
+  // so we use the variable's scope.
+  SILBuilder(SI, DefiningInst->getDebugScope())
+    .createDebugValue(SI->getLoc(), original, *VarInfo);
+}
+
+void swift::salvageStoreDebugInfo(SILInstruction *SI,
+                                  SILValue SrcVal, SILValue DestVal) {
+  if (auto *ASI = dyn_cast_or_null<AllocStackInst>(
+          DestVal.getDefiningInstruction())) {
+    transferStoreDebugValue(ASI, SI, SrcVal);
+    for (Operand *U : getDebugUses(ASI))
+      transferStoreDebugValue(U->getUser(), SI, SrcVal);
+  }
+}
+
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
 //
 // TODO: whenever a debug_value is inserted at a new location, check that no
@@ -1833,23 +1875,18 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     if (SILValue DestVal = SI->getDest())
-      if (auto *ASI = dyn_cast_or_null<AllocStackInst>(
-              DestVal.getDefiningInstruction())) {
-        if (auto VarInfo = ASI->getVarInfo()) {
-          // Always propagate destination location for incoming arguments (as
-          // their location must be unique) as well as when store source
-          // location is compiler-generated.
-          bool UseDestLoc = VarInfo->ArgNo || SI->getLoc().isAutoGenerated();
-          SILBuilder(SI, ASI->getDebugScope())
-            .createDebugValue(UseDestLoc ? ASI->getLoc() : SI->getLoc(),
-                              SI->getSrc(), *VarInfo);
-        }
-      }
+      salvageStoreDebugInfo(SI, SI->getSrc(), DestVal);
+  }
+  if (auto *SI = dyn_cast<StoreBorrowInst>(I)) {
+    if (SILValue DestVal = SI->getDest())
+      salvageStoreDebugInfo(SI, SI->getSrc(), DestVal);
+    for (Operand *U : getDebugUses(SI))
+      transferStoreDebugValue(U->getUser(), SI, SI->getSrc());
   }
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,
-  // we need to make sure any of its related `debug_value` instruction
-  // is preserved.
+  // we need to make sure any of its related `debug_value` instructions
+  // are preserved.
   if (auto *STI = dyn_cast<StructInst>(I)) {
     auto STVal = STI->getResult(0);
     llvm::ArrayRef<VarDecl *> FieldDecls =
@@ -1872,6 +1909,31 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         // Create a new debug_value
         SILBuilder(STI, DbgInst->getDebugScope())
           .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+      }
+    }
+  }
+  // Similarly, if a `tuple` SIL instruction is "unwrapped" and removed,
+  // we need to make sure any of its related `debug_value` instructions
+  // are preserved.
+  if (auto *TTI = dyn_cast<TupleInst>(I)) {
+    auto TTVal = TTI->getResult(0);
+    for (Operand *U : getDebugUses(TTVal)) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      auto VarInfo = DbgInst->getVarInfo();
+      if (!VarInfo)
+        continue;
+      TupleType *TT = TTI->getTupleType();
+      for (auto i : indices(TT->getElements())) {
+        SILDebugVariable NewVarInfo = *VarInfo;
+        auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(TT, i);
+        NewVarInfo.DIExpr.append(FragDIExpr);
+
+        if (!NewVarInfo.Type)
+          NewVarInfo.Type = TTI->getType();
+
+        // Create a new debug_value
+        SILBuilder(TTI, DbgInst->getDebugScope())
+          .createDebugValue(DbgInst->getLoc(), TTI->getElement(i), NewVarInfo);
       }
     }
   }
@@ -1901,6 +1963,25 @@ void swift::salvageDebugInfo(SILInstruction *I) {
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
         }
       }
+  }
+
+  if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
+    APInt value = IL->getValue();
+    const SILDIExprElement ExprElements[2] = {
+      SILDIExprElement::createOperator(value.isNegative() ?
+        SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
+      SILDIExprElement::createConstInt(value.getLimitedValue()),
+    };
+    for (Operand *U : getDebugUses(IL)) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      auto VarInfo = DbgInst->getVarInfo();
+      if (!VarInfo)
+        continue;
+      VarInfo->DIExpr.prependElements(ExprElements);
+      // Create a new debug_value, with undef, and the correct const int
+      SILBuilder(DbgInst, DbgInst->getDebugScope())
+        .createDebugValue(DbgInst->getLoc(), SILUndef::get(IL), *VarInfo);
+    }
   }
 }
 
@@ -2008,4 +2089,22 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
   }
   assert(!noUndef);
   return SILUndef::get(insertionPoint->getFunction(), ty);
+}
+
+bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
+                                       SILFunction *func) {
+  if (decl->hasUnreferenceableStorage()) {
+    return true;
+  }
+  // Check if any fields have unreferenceable stoage
+  for (auto *field : decl->getStoredProperties()) {
+    TypeExpansionContext tec = *func;
+    auto fieldTy = structType.getFieldType(field, func->getModule(), tec);
+    if (auto *fieldStructDecl = fieldTy.getStructOrBoundGenericStruct()) {
+      if (findUnreferenceableStorage(fieldStructDecl, fieldTy, func)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }

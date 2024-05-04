@@ -481,7 +481,13 @@ public:
   bool hasParameterizedExistential() const {
     return getASTType()->hasParameterizedExistential();
   }
-  
+
+  bool isSensitive() const {
+    if (auto *nom = getNominalOrBoundGenericNominal())
+      return nom->getAttrs().hasAttribute<SensitiveAttr>();
+    return false;
+  }
+
   /// Returns the representation used by an existential type. If the concrete
   /// type is provided, this may return a specialized representation kind that
   /// can be used for that type. Otherwise, returns the most general
@@ -532,6 +538,22 @@ public:
       return fTy->isNoEscape();
     }
     return false;
+  }
+
+  bool containsNoEscapeFunction() const {
+    auto ty = getASTType();
+    if (auto *fTy = ty->getAs<SILFunctionType>()) {
+      return fTy->isNoEscape();
+    }
+    // Look through box types to handle mutable 'var' bindings.
+    if (auto boxType = dyn_cast<SILBoxType>(ty)) {
+      for (auto field : boxType->getLayout()->getFields()) {
+        if (field.getLoweredType()->isNoEscape())
+          return true;
+      }
+    }
+    // Handle whatever AST types are known to hold functions. Namely tuples.
+    return ty->isNoEscape();
   }
 
   bool isAsyncFunction() const {
@@ -895,7 +917,15 @@ public:
 
   bool isMarkedAsImmortal() const;
 
+  /// Returns true if this type is an actor type. Returns false if this is any
+  /// other type. This includes distributed actors. To check for distributed
+  /// actors and actors, use isAnyActor().
   bool isActor() const { return getASTType()->isActorType(); }
+
+  bool isDistributedActor() const { return getASTType()->isDistributedActor(); }
+
+  /// Returns true if this type is an actor or a distributed actor.
+  bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
   bool isSendable(SILFunction *fn) const;

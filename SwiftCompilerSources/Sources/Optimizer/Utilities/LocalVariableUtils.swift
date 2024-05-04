@@ -25,7 +25,7 @@
 
 import SIL
 
-private let verbose = true
+private let verbose = false
 
 private func log(_ message: @autoclosure () -> String) {
   if verbose {
@@ -188,8 +188,8 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   }
 
   var description: String {
-    return "\(access)" +
-      "\n    fully-assigned: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!))"
+    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)) "
+      + "\(access)"
   }
 }
 
@@ -200,7 +200,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
 /// map.
 ///
 /// TODO: In addition to isFullyAssigned, consider adding a lazily computed access path if any need arises.
-struct LocalVariableAccessMap: Collection, FormattedLikeArray {
+struct LocalVariableAccessMap: Collection, CustomStringConvertible {
   let context: Context
   let allocation: Value
 
@@ -279,6 +279,10 @@ struct LocalVariableAccessMap: Collection, FormattedLikeArray {
   subscript(_ accessIndex: Int) -> LocalVariableAccessInfo { accessList[accessIndex] }
 
   subscript(instruction: Instruction) -> LocalVariableAccessInfo? { accessMap[instruction] }
+
+  public var description: String {
+    "Access map:\n" + map({String(describing: $0)}).joined(separator: "\n")
+  }
 }
 
 /// Gather the accesses of a local allocation: alloc_box, alloc_stack, @in, @inout.
@@ -361,12 +365,19 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   // Handle storage type projections, like MarkUninitializedInst. Path projections should not be visited. They only
   // occur inside the access.
+  //
+  // Exception: stack-allocated temporaries may be treated like local variables for the purpose of finding all
+  // uses. Such temporaries do not have access scopes, so we need to walk down any projection that may be used to
+  // initialize the temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
     // TODO: we need an abstraction for path projections. For local variables, these cannot occur outside of an access.
     switch operand.instruction {
-    case is StructExtractInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst, is InitEnumDataAddrInst,
-         is UncheckedTakeEnumDataAddrInst, is InitExistentialAddrInst, is OpenExistentialAddrInst:
+    case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst,
+         is UncheckedTakeEnumDataAddrInst, is OpenExistentialAddrInst:
       return .abortWalk
+    // Projections used to initialize a temporary
+    case is InitEnumDataAddrInst, is InitExistentialAddrInst:
+      fallthrough
     default:
       return walkDownAddressUses(address: value)
     }
@@ -397,7 +408,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   mutating func leafAddressUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
-    case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst:
+    case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst, is DeinitExistentialAddrInst,
+         is InjectEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst, is PackElementSetInst:
+      // Handle instructions that initialize both temporaries and local variables.
       visit(LocalVariableAccess(.store, operand))
     case is DeallocStackInst:
       break
@@ -416,7 +429,7 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value) -> WalkResult {
     // Find all uses of partial_apply [on_stack].
-    if let pai = value as? PartialApplyInst, pai.isOnStack {
+    if let pai = value as? PartialApplyInst, !pai.mayEscape {
       var walker = NonEscapingClosureDefUseWalker(context)
       defer { walker.deinitialize() }
       if walker.walkDown(closure: pai) == .abortWalk {
@@ -441,7 +454,8 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
-    return .abortWalk
+    visit(LocalVariableAccess(.escape, operand))
+    return .continueWalk
   }
 
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
@@ -732,6 +746,8 @@ extension LocalVariableReachableAccess {
       forwardPropagateEffect(in: block, blockInfo: blockInfo, effect: currentEffect, blockList: &blockList,
                              accessStack: &accessStack)
     }
+    log("\(accessMap)")
+    log("Reachable access:\n\(accessStack.map({ String(describing: $0)}).joined(separator: "\n"))")
     return true
   }
 

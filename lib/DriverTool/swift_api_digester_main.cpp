@@ -294,7 +294,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     if (((StringRef)LL).starts_with((llvm::Twine("ns") + RR).str()) ||
         ((StringRef)RR).starts_with((llvm::Twine("ns") + LL).str()))
       return true;
-    if (((StringRef)LL).endswith(RR) || ((StringRef)RR).endswith(LL))
+    if (((StringRef)LL).ends_with(RR) || ((StringRef)RR).ends_with(LL))
       return true;
     return false;
   }
@@ -2177,6 +2177,8 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "linux.json";
   else if (Triple.isOSWindows())
     return "windows.json";
+  else if (Triple.isXROS())
+    return "xros.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);

@@ -1210,16 +1210,16 @@ static bool findEscapeOrMutationUses(Operand *op,
   }
 
   // A mark_dependence user on a partial_apply is safe.
-  if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
-    if (mdi->getBase() == op->get()) {
-      auto parent = mdi->getValue();
-      while ((mdi = dyn_cast<MarkDependenceInst>(parent))) {
-        parent = mdi->getValue();
+  if (auto *userMDI = dyn_cast<MarkDependenceInst>(user)) {
+    if (userMDI->getBase() == op->get()) {
+      auto parent = userMDI->getValue();
+      while (auto *parentMDI = dyn_cast<MarkDependenceInst>(parent)) {
+        parent = parentMDI->getValue();
       }
       if (isa<PartialApplyInst>(parent))
         return false;
       state.accumulatedEscapes.push_back(
-          &mdi->getOperandRef(MarkDependenceInst::Value));
+          &userMDI->getOperandRef(MarkDependenceInst::Value));
       return true;
     }
   }

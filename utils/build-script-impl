@@ -75,6 +75,7 @@ KNOWN_SETTINGS=(
     use-gold-linker                               ""                "Enable using the gold linker"
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
     dsymutil-jobs                                 "1"               "number of parallel invocations of dsymutil"
+    extra-dsymutil-args                           ""                "additional arguments to pass to dsymutil"
 
     ## Build Tools
     host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -98,6 +99,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-osx                 "10.13"           "minimum deployment target version for OS X"
     darwin-deployment-version-tvos                "11.0"            "minimum deployment target version for tvOS"
     darwin-deployment-version-watchos             "4.0"             "minimum deployment target version for watchOS"
+    darwin-deployment-version-xros                "1.0"             "minimum deployment target version for xrOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
     darwin-install-extract-symbols-use-just-built-dsymutil "1"       "whether we should extract symbols using the just built dsymutil"
     darwin-symroot-path-filters                   ""                "space-separated list of path patterns to consider for symbol generation"
@@ -151,7 +153,6 @@ KNOWN_SETTINGS=(
     build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
     build-swift-examples                          "1"               "set to 1 to build examples"
     build-swift-remote-mirror                     "1"               "set to 1 to build the Swift Remote Mirror library"
-    build-swift-external-generic-metadata-builder "1"               "set to 1 to build the Swift External Generic Metadata Builder library"
     build-swift-static-sdk-overlay                ""                "set to 1 to build static variants of the Swift SDK overlay"
     build-swift-static-stdlib                     ""                "set to 1 to build static variants of the Swift standard library"
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
@@ -499,6 +500,9 @@ function verify_host_is_supported() {
       | watchsimulator-arm64    \
       | watchos-armv7k          \
       | watchos-arm64_32        \
+      | xrsimulator-arm64  \
+      | xros-arm64         \
+      | xros-arm64e        \
       | wasi-wasm32             \
       | android-armv7           \
       | android-aarch64         \
@@ -586,7 +590,9 @@ function set_build_options_for_host() {
         appletvos-*         | \
         appletvsimulator-*  | \
         watchos-*           | \
-        watchsimulator-*)
+        watchsimulator-*    | \
+        xros-*              | \
+        xrsimulator-*)
             swift_cmake_options+=(
               -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
@@ -709,6 +715,27 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
                     cmake_osx_deployment_target=""
                     ;;
+                xrsimulator-arm64)
+                    SWIFT_HOST_TRIPLE="arm64-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}-simulator"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS_SIMULATOR"
+                    cmake_osx_deployment_target=""
+                    ;;
+                xros-arm64)
+                    SWIFT_HOST_TRIPLE="arm64-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                xros-arm64e)
+                    SWIFT_HOST_TRIPLE="arm64e-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS"
+                    cmake_osx_deployment_target=""
+                    ;;
             esac
 
             if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
@@ -734,6 +761,7 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_XROS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
@@ -766,6 +794,7 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                -DSWIFT_DARWIN_DEPLOYMENT_VERSION_XROS="${DARWIN_DEPLOYMENT_VERSION_XROS}"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 # This is needed to make sure to avoid using the wrong architecture
                 # in the compiler checks CMake performs
@@ -1365,6 +1394,12 @@ function common_cross_c_flags() {
         watchos-*)
             echo -n " -arch ${arch} -target ${arch}-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
+        xrsimulator-*)
+            echo -n " -arch ${arch}  -target ${arch}-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}-simulator"
+            ;;
+        xros-*)
+            echo -n " -arch ${arch}  -target ${arch}-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+            ;;
     esac
 
     local build_type=$2
@@ -1785,7 +1820,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_CLANG_OVERLAYS:BOOL=$(true_false "${BUILD_SWIFT_CLANG_OVERLAYS}")
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
-                    -DSWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER:BOOL=$(true_false "${BUILD_SWIFT_EXTERNAL_GENERIC_METADATA_BUILDER}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
                     -DSWIFT_ENABLE_ARRAY_COW_CHECKS:BOOL=$(true_false "${ENABLE_ARRAY_COW_CHECKS}")
@@ -3238,7 +3272,7 @@ for host in "${ALL_HOSTS[@]}"; do
             printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
-               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path})
+               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} ${EXTRA_DSYMUTIL_ARGS[@]})
             printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
@@ -3294,8 +3328,6 @@ function build_and_test_installable_package() {
           COMPATIBILITY_VERSION=2
           COMPATIBILITY_VERSION_DISPLAY_STRING="Xcode 8.0"
           DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
-          XCODE_DEFAULT_TOOLCHAIN_PLUGIN_SERVER_DESCRIPTOR='$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins#$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-plugin-server'
-          XCODE_DEFAULT_TOOLCHAIN_LOCAL_PLUGIN_SERVER_DESCRIPTOR='$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/local/lib/swift/host/plugins#$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-plugin-server'
 
           SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME="YES"
           if [[ "${DARWIN_TOOLCHAIN_REQUIRE_USE_OS_RUNTIME}" -eq "1" ]]; then
@@ -3330,8 +3362,6 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DEVELOPMENT_TOOLCHAIN string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME string '${SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-
-          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:OTHER_SWIFT_FLAGS string '\$(inherited) -Xfrontend -external-plugin-path -Xfrontend ${XCODE_DEFAULT_TOOLCHAIN_PLUGIN_SERVER_DESCRIPTOR} -Xfrontend -external-plugin-path -Xfrontend ${XCODE_DEFAULT_TOOLCHAIN_LOCAL_PLUGIN_SERVER_DESCRIPTOR}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
           call chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 

@@ -682,14 +682,9 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            // the protocol witness must always be a distributed thunk, as we
-            // may be crossing a remote boundary here.
-            auto thunk = func->getDistributedThunk();
-            constant = SILDeclRef(thunk).asDistributed();
-          }
+        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
+          auto thunk = func->getDistributedThunk();
+          constant = SILDeclRef(thunk).asDistributed();
         }
       }
 
@@ -755,6 +750,16 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::ClassMethod: {
+      if (auto func = dyn_cast_or_null<AccessorDecl>(constant->getFuncDecl())) {
+        if (func->getStorage()->isDistributed()) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            /// We must adjust the constant to use a distributed thunk.
+            constant = constant->asDistributed();
+          }
+        }
+      }
+
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(
           SGF.getTypeExpansionContext(), *constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -767,12 +772,8 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            /// We must adjust the constant to use a distributed thunk.
-            constant = constant->asDistributed();
-          }
+        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
+          constant = constant->asDistributed();
         }
       }
 
@@ -2000,7 +2001,13 @@ static void emitRawApply(SILGenFunction &SGF,
     options -= ApplyFlags::DoesNotThrow;
 
   // If we don't have an error result, we can make a simple 'apply'.
-  if (!substFnType->hasErrorResult()) {
+  if (substFnType->hasErrorResult() &&
+      SGF.F.isDistributed() &&
+      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) ) {
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    rawResults.push_back(result);
+
+  } else if (!substFnType->hasErrorResult()) {
     auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
     rawResults.push_back(result);
 
@@ -2017,8 +2024,9 @@ static void emitRawApply(SILGenFunction &SGF,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
-    SGF.B.createTryApply(loc, fnValue, subs, argValues,
-                         normalBB, errorBB, options);
+    SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
+                         options);
+
     SGF.B.emitBlock(normalBB);
   }
 }
@@ -3255,7 +3263,20 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
-      return nullptr;
+      
+      // Proceed if the storage references a global or static let.
+      // TODO: We should treat any storage reference as a borrow, it seems, but
+      // that currently disrupts what the move checker expects. It would also
+      // be valuable to borrow copyable global lets, but this is a targeted
+      // fix to allow noncopyable globals to work properly.
+      bool isGlobal = false;
+      if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
+        isGlobal = vd->isGlobalStorage();
+      }
+      
+      if (!isGlobal) {
+        return nullptr;
+      }
     }
   }
 
@@ -3826,6 +3847,7 @@ private:
         case SILFunctionLanguage::Swift:
           return Conversion::getSubstToOrig(origParamType,
                                             arg.getSubstRValueType(),
+                                            loweredSubstArgType,
                                             param.getSILStorageInterfaceType());
         case SILFunctionLanguage::C:
           return Conversion::getBridging(Conversion::BridgeToObjC,
@@ -4051,7 +4073,9 @@ private:
         convertingInit.emplace(
             Conversion::getSubstToOrig(
                 origExpansionType.getPackExpansionPatternType(),
-                substPatternType, expectedElementType),
+                substPatternType,
+                SILType::getPrimitiveObjectType(loweredPatternTy),
+                expectedElementType),
             SGFContext(innermostInit));
         innermostInit = &*convertingInit;
       }
@@ -4947,7 +4971,8 @@ public:
     if (forUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
-      SGF.B.createEndApply(l, ApplyToken);
+      SGF.B.createEndApply(l, ApplyToken,
+                           SILType::getEmptyTupleType(SGF.getASTContext()));
     }
   }
   
@@ -5525,7 +5550,7 @@ RValue SILGenFunction::emitApply(
     const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
     SGFContext evalContext,
     std::optional<ActorIsolation> implicitActorHopTarget) {
-  auto substFnType = calleeTypeInfo.substFnType;
+  auto substFnType = calleeTypeInfo.substFnType; // TODO: this has error but should not
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
@@ -5963,7 +5988,8 @@ void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc,
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
-  B.createEndApply(loc, token);
+  B.createEndApply(loc, token,
+                   SILType::getEmptyTupleType(getASTContext()));
 }
 
 void SILGenFunction::emitYield(SILLocation loc,
@@ -6661,6 +6687,16 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    if (!isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (accessor->isGetter()) {
+        if (accessor->getStorage()->isDistributed()) {
+          return Callee::forDirect(SGF, constant, subs, loc);
+        }
+      }
+    }
+  }
+
   bool isObjCReplacementSelfCall = false;
   if (isOnSelfParameter &&
       SGF.getOptions()
@@ -7273,6 +7309,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       origParamType);
   
   auto conversion = Conversion::getSubstToOrig(origParam, substParamType,
+                                     getLoweredType(asyncLetEntryPoint->getType()),
                                      getLoweredType(origParam, substParamType));
   auto taskFunction = emitConvertedRValue(asyncLetEntryPoint, conversion);
 

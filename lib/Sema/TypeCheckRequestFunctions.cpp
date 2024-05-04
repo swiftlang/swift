@@ -26,7 +26,7 @@
 
 using namespace swift;
 
-Type InheritedTypeRequest::evaluate(
+InheritedTypeResult InheritedTypeRequest::evaluate(
     Evaluator &evaluator,
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index, TypeResolutionStage stage) const {
@@ -71,42 +71,40 @@ Type InheritedTypeRequest::evaluate(
     break;
   }
 
-  const TypeLoc &typeLoc = InheritedTypes(decl).getEntry(index);
+  const InheritedEntry &inheritedEntry = InheritedTypes(decl).getEntry(index);
 
   Type inheritedType;
-  if (typeLoc.getTypeRepr())
-    inheritedType = resolution->resolveType(typeLoc.getTypeRepr());
-  else
-    inheritedType = typeLoc.getType();
+  if (auto *typeRepr = inheritedEntry.getTypeRepr()) {
+    // Check for suppressed inferrable conformances.
+    if (auto itr = dyn_cast<InverseTypeRepr>(typeRepr)) {
+      Type inheritedTy = resolution->resolveType(itr->getConstraint());
+      return InheritedTypeResult::forSuppressed(inheritedTy, itr);
+    }
+    inheritedType = resolution->resolveType(typeRepr);
+  } else {
+    auto ty = inheritedEntry.getType();
+    if (inheritedEntry.isSuppressed()) {
+      return InheritedTypeResult::forSuppressed(ty, nullptr);
+    }
+    inheritedType = ty;
+  }
 
-  return inheritedType ? inheritedType : ErrorType::get(dc->getASTContext());
+  return InheritedTypeResult::forInherited(
+      inheritedType ? inheritedType : ErrorType::get(dc->getASTContext()));
 }
 
 Type
 SuperclassTypeRequest::evaluate(Evaluator &evaluator,
-                                NominalTypeDecl *nominalDecl,
+                                ClassDecl *classDecl,
                                 TypeResolutionStage stage) const {
-  assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
+  if (!classDecl->getSuperclassDecl())
+    return Type();
 
-  // If this is a protocol that came from a serialized module, compute the
-  // superclass via its generic signature.
-  if (auto *proto = dyn_cast<ProtocolDecl>(nominalDecl)) {
-    if (proto->wasDeserialized()) {
-      return proto->getGenericSignature()
-          ->getSuperclassBound(proto->getSelfInterfaceType());
-    }
-
-    if (!proto->getSuperclassDecl())
-      return Type();
-  } else if (auto classDecl = dyn_cast<ClassDecl>(nominalDecl)) {
-    if (!classDecl->getSuperclassDecl())
-      return Type();
-  }
-
-  for (unsigned int idx : nominalDecl->getInherited().getIndices()) {
+  for (unsigned int idx : classDecl->getInherited().getIndices()) {
     auto result = evaluateOrDefault(evaluator,
-                                    InheritedTypeRequest{nominalDecl, idx, stage},
-                                    Type());
+                                    InheritedTypeRequest{classDecl, idx, stage},
+                                    InheritedTypeResult::forDefault())
+                      .getInheritedTypeOrNull(classDecl->getASTContext());
     if (!result)
       continue;
 
@@ -133,9 +131,12 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
 Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
                                   EnumDecl *enumDecl) const {
   for (unsigned int idx : enumDecl->getInherited().getIndices()) {
-    auto inheritedType = evaluateOrDefault(evaluator,
-        InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface},
-        Type());
+    auto inheritedType =
+        evaluateOrDefault(
+            evaluator,
+            InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface},
+            InheritedTypeResult::forDefault())
+            .getInheritedTypeOrNull(enumDecl->getASTContext());
     if (!inheritedType) continue;
 
     // Skip protocol conformances.
@@ -147,6 +148,30 @@ Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
 
   // No raw type.
   return Type();
+}
+
+bool SuppressesConformanceRequest::evaluate(Evaluator &evaluator,
+                                            NominalTypeDecl *nominal,
+                                            KnownProtocolKind kp) const {
+  auto inheritedTypes = InheritedTypes(nominal);
+  auto inheritedClause = inheritedTypes.getEntries();
+  for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
+    InheritedTypeRequest request{nominal, i, TypeResolutionStage::Interface};
+    auto result = evaluateOrDefault(evaluator, request,
+                                    InheritedTypeResult::forDefault());
+    if (result != InheritedTypeResult::Suppressed)
+      continue;
+    auto pair = result.getSuppressed();
+    auto ty = pair.first;
+    if (!ty)
+      continue;
+    auto other = ty->getKnownProtocol();
+    if (!other)
+      continue;
+    if (other == kp)
+      return true;
+  }
+  return false;
 }
 
 CustomAttr *

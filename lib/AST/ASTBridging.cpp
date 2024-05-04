@@ -433,12 +433,14 @@ BridgedAllowFeatureSuppressionAttr
 BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
                                                 BridgedSourceLoc cAtLoc,
                                                 BridgedSourceRange cRange,
+                                                bool inverted,
                                                 BridgedArrayRef cFeatures) {
   SmallVector<Identifier> features;
   for (auto elem : cFeatures.unbridged<BridgedIdentifier>())
     features.push_back(elem.unbridged());
-  return AllowFeatureSuppressionAttr::create(cContext.unbridged(),
-      cAtLoc.unbridged(), cRange.unbridged(), /*implicit*/ false, features);
+  return AllowFeatureSuppressionAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      /*implicit*/ false, inverted, features);
 }
 
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
@@ -660,9 +662,10 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
 
 BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cName) {
+    BridgedSourceRange cRange, BridgedIdentifier cName, bool isEarlyAdopter) {
   return new (cContext.unbridged()) ObjCImplementationAttr(
-      cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged());
+      cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      isEarlyAdopter);
 }
 
 BridgedObjCRuntimeNameAttr BridgedObjCRuntimeNameAttr_createParsed(
@@ -837,22 +840,10 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  auto *declContext = cDeclContext.unbridged();
-
-  auto *defaultValue = opaqueDefaultValue.unbridged();
-  DefaultArgumentKind defaultArgumentKind;
-
-  if (declContext->getParentSourceFile()->Kind == SourceFileKind::Interface &&
-      isa<SuperRefExpr>(defaultValue)) {
-    defaultValue = nullptr;
-    defaultArgumentKind = DefaultArgumentKind::Inherited;
-  } else {
-    defaultArgumentKind = getDefaultArgKind(defaultValue);
-  }
-
-  auto *paramDecl = new (cContext.unbridged()) ParamDecl(
-      cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(), cArgName.unbridged(),
-      cParamNameLoc.unbridged(), cParamName.unbridged(), declContext);
+  auto *paramDecl = ParamDecl::createParsed(
+      cContext.unbridged(), cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(),
+      cArgName.unbridged(), cParamNameLoc.unbridged(), cParamName.unbridged(),
+      opaqueDefaultValue.unbridged(), cDeclContext.unbridged());
 
   if (auto type = opaqueType.unbridged()) {
     paramDecl->setTypeRepr(type);
@@ -895,9 +886,6 @@ BridgedParamDecl BridgedParamDecl_createParsed(
       break;
     }
   }
-
-  paramDecl->setDefaultExpr(defaultValue, /*isTypeChecked*/ false);
-  paramDecl->setDefaultArgumentKind(defaultArgumentKind);
 
   return paramDecl;
 }

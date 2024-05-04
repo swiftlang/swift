@@ -1677,8 +1677,6 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
       Var.Constant = false;
     } else if (Key == "loc") {
       Var.Constant = false;
-    } else if (Key == "implicit") {
-      Var.Implicit = true;
     } else {
       P.diagnose(P.Tok, diag::sil_dbg_unknown_key, Key);
       return true;
@@ -2652,8 +2650,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseCallInstruction(InstLoc, Opcode, B, ResultVal))
       return true;
     break;
-  case SILInstructionKind::AbortApplyInst:
-  case SILInstructionKind::EndApplyInst: {
+  case SILInstructionKind::AbortApplyInst: {
     UnresolvedValueName argName;
     if (parseValueName(argName))
       return true;
@@ -2663,12 +2660,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     SILType expectedTy = SILType::getSILTokenType(P.Context);
     SILValue op = getLocalValue(argName, expectedTy, InstLoc, B);
+    ResultVal = B.createAbortApply(InstLoc, op);
+    break;
+  }
+  case SILInstructionKind::EndApplyInst: {
+    UnresolvedValueName argName;
+    SILType ResultTy;
 
-    if (Opcode == SILInstructionKind::AbortApplyInst) {
-      ResultVal = B.createAbortApply(InstLoc, op);
-    } else {
-      ResultVal = B.createEndApply(InstLoc, op);
-    }
+    if (parseValueName(argName) || parseVerbatim("as") ||
+        parseSILType(ResultTy) || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    SILType expectedTy = SILType::getSILTokenType(P.Context);
+    SILValue op = getLocalValue(argName, expectedTy, InstLoc, B);
+
+    ResultVal = B.createEndApply(InstLoc, op, ResultTy);
     break;
   }
   case SILInstructionKind::IntegerLiteralInst: {
@@ -3772,6 +3778,30 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                     fromVarDecl, fixed);
     break;
   }
+
+  case SILInstructionKind::BorrowedFromInst: {
+    SILValue guaranteedValue;
+    if (parseTypedValueRef(guaranteedValue, B))
+      return true;
+
+    if (parseVerbatim("from") ||
+        P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+      return true;
+
+    if (P.Tok.isNot(tok::r_paren)) {
+      do {
+        if (parseTypedValueRef(Val, B))
+          return true;
+        OpList.push_back(Val);
+      } while (P.consumeIf(tok::comma));
+    }
+    if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+      return true;
+
+    ResultVal = B.createBorrowedFrom(InstLoc, guaranteedValue, OpList);
+    break;
+  }
+
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
   case SILInstructionKind::Load##Name##Inst: {                                 \

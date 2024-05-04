@@ -262,10 +262,6 @@ public:
   void emitVTable() {
     PrettyStackTraceDecl("silgen emitVTable", theClass);
 
-    // Imported types don't have vtables right now.
-    if (theClass->hasClangNode())
-      return;
-
     // Populate our list of base methods and overrides.
     visitAncestor(theClass);
 
@@ -317,6 +313,10 @@ public:
   }
 
   void visitAncestor(ClassDecl *ancestor) {
+    // Imported types don't have vtables right now.
+    if (ancestor->hasClangNode())
+      return;
+
     auto *superDecl = ancestor->getSuperclassDecl();
     if (superDecl)
       visitAncestor(superDecl);
@@ -400,6 +400,14 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
+    // TODO: here the requirement is thunk_decl of the protocol; it is a FUNC
+    // detect here that it is a func dec + thunk.
+    // walk up to DC, and find storage.
+    // e  requirementRef->getDecl()->dump()
+    //(func_decl implicit "distributedVariable()" interface type="<Self where Self : WorkerProtocol> (Self) -> () async throws -> String" access=internal nonisolated distributed_thunk
+    //  (parameter "self")
+    //  (parameter_list))
+
     auto reqDecl = requirementRef.getDecl();
 
     // Static functions can be witnessed by enum cases with payload
@@ -415,32 +423,37 @@ public:
     }
 
     auto reqAccessor = dyn_cast<AccessorDecl>(reqDecl);
+    /// If it is an accessor, or distributed_thunk that is witnessing an
+    /// accessor, we need to use the storage to get the witness.
+    ValueDecl *storage = nullptr;
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (auto witness = asDerived().getWitness(reqDecl)) {
-        auto newDecl = requirementRef.withDecl(witness.getDecl());
-        // Only import C++ methods as foreign. If the following
-        // Objective-C function is imported as foreign:
-        //   () -> String
-        // It will be imported as the following type:
-        //   () -> NSString
-        // But the first is correct, so make sure we don't mark this witness
-        // as foreign.
-        if (dyn_cast_or_null<clang::CXXMethodDecl>(
-                witness.getDecl()->getClangDecl()))
-          newDecl = newDecl.asForeign();
-        return addMethodImplementation(
-            requirementRef, getWitnessRef(newDecl, witness),
-            witness);
-      }
-
-      return asDerived().addMissingMethod(requirementRef);
+      if (!storage) {
+        if (auto witness = asDerived().getWitness(reqDecl)) {
+          auto newDecl = requirementRef.withDecl(witness.getDecl());
+          // Only import C++ methods as foreign. If the following
+          // Objective-C function is imported as foreign:
+          //   () -> String
+          // It will be imported as the following type:
+          //   () -> NSString
+          // But the first is correct, so make sure we don't mark this witness
+          // as foreign.
+          if (dyn_cast_or_null<clang::CXXMethodDecl>(
+                  witness.getDecl()->getClangDecl()))
+            newDecl = newDecl.asForeign();
+          return addMethodImplementation(
+              requirementRef, getWitnessRef(newDecl, witness), witness);
+        }
+        return asDerived().addMissingMethod(requirementRef);
+      } // else, fallthrough to the usual accessor handling!
+    } else {
+      // Otherwise, we need to map the storage declaration and then get
+      // the appropriate accessor for it.
+      storage = reqAccessor->getStorage();
     }
 
-    // Otherwise, we need to map the storage declaration and then get
-    // the appropriate accessor for it.
-    auto witness = asDerived().getWitness(reqAccessor->getStorage());
+    auto witness = asDerived().getWitness(storage);
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
@@ -452,8 +465,18 @@ public:
     }
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
-    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
+    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation()) {
       return asDerived().addMissingMethod(requirementRef);
+    }
+
+    // Here we notice a `distributed var` thunk requirement,
+    // and witness it with the distributed thunk -- the "getter thunk".
+    if (requirementRef.isDistributedThunk()) {
+
+      return addMethodImplementation(
+          requirementRef, getWitnessRef(requirementRef, witnessStorage->getDistributedThunk()),
+          witness);
+    }
 
     auto witnessAccessor =
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
@@ -531,11 +554,7 @@ public:
     PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
 
-    // Check whether the conformance is valid first.
     Conformance->resolveValueWitnesses();
-    if (Conformance->isInvalid())
-      return nullptr;
-
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
 
@@ -596,13 +615,12 @@ public:
     return Conformance->getWitness(decl);
   }
 
-  void addPlaceholder(MissingMemberDecl *placeholder) {
-    llvm_unreachable("generating a witness table with placeholders in it");
-  }
-
-  void addMissingMethod(SILDeclRef requirement) {
-    llvm_unreachable("generating a witness table with placeholders in it");
-  }
+  // Treat placeholders and missing methods as no-ops. These may be encountered
+  // during lazy typechecking when SILGen triggers witness resolution and
+  // discovers and invalid conformance. The diagnostics emitted during witness
+  // resolution should cause compilation to fail.
+  void addPlaceholder(MissingMemberDecl *placeholder) {}
+  void addMissingMethod(SILDeclRef requirement) {}
 
   void addMethodImplementation(SILDeclRef requirementRef,
                                SILDeclRef witnessRef,
@@ -612,7 +630,12 @@ public:
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerialized = Serialized;
     if (witnessSerialized &&
-        fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+        // If package optimization is enabled, this is false;
+        // witness thunk should get a `shared` linkage in the
+        // else block below.
+        fixmeWitnessHasLinkageThatNeedsToBePublic(
+            witnessRef,
+            witnessRef.getASTContext().SILOpts.EnableSerializePackage)) {
       witnessLinkage = SILLinkage::Public;
       witnessSerialized = IsNotSerialized;
     } else {
@@ -1130,8 +1153,10 @@ public:
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
-      SILGenVTable genVTable(SGM, theClass);
-      genVTable.emitVTable();
+      if (!theClass->hasClangNode()) {
+        SILGenVTable genVTable(SGM, theClass);
+        genVTable.emitVTable();
+      }
     }
 
     // If this is a nominal type that is move only, emit a deinit table for it.
@@ -1246,7 +1271,6 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
-    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
@@ -1424,7 +1448,6 @@ public:
       }
     }
 
-    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 

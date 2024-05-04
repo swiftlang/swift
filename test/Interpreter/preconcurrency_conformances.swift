@@ -12,26 +12,27 @@
 // RUN:    -target %target-cpu-apple-macosx10.15 \
 // RUN:    -I %t -L %t -l Interface \
 // RUN:    -emit-module-interface-path %t/Types.swiftinterface \
-// RUN:    -Xfrontend -enable-experimental-feature -Xfrontend DynamicActorIsolation
+// RUN:    -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation
 
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash1.swift -o %t/crash1.out
+// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash1.swift -o %t/crash1.out
 // RUN: %target-codesign %t/crash1.out
 // RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift
 
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash2.swift -o %t/crash2.out
+// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash2.swift -o %t/crash2.out
 // RUN: %target-codesign %t/crash2.out
 // RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift
 
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash3.swift -o %t/crash3.out
+// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash3.swift -o %t/crash3.out
 // RUN: %target-codesign %t/crash3.out
 // RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift
 
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash4.swift -o %t/crash4.out
+// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash4.swift -o %t/crash4.out
 // RUN: %target-codesign %t/crash4.out
 // RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash4.out 2>&1 | %FileCheck %t/src/Crash4.swift
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
@@ -85,19 +86,19 @@ extension ActorTest : @preconcurrency P {
 //--- Crash1.swift
 import Types
 print(await runTest(Test.self))
-// CHECK: error: data race detected: @MainActor function at Types/Types.swift:16 was not called on the main thread
+// CHECK: Incorrect actor executor assumption; Expected MainActor executor
 
 //--- Crash2.swift
 import Types
 print(await runAccessors(Test.self))
-// CHECK: error: data race detected: @MainActor function at Types/Types.swift:15 was not called on the main thread
+// CHECK: Incorrect actor executor assumption; Expected MainActor executor
 
 //--- Crash3.swift
 import Types
 print(await runTest(ActorTest.self))
-// CHECK: error: data race detected: actor-isolated function at Types/Types.swift:33 was not called on the same actor
+// CHECK: Incorrect actor executor assumption
 
 //--- Crash4.swift
 import Types
 print(await runAccessors(ActorTest.self))
-// CHECK: error: data race detected: actor-isolated function at Types/Types.swift:30 was not called on the same actor
+// CHECK: Incorrect actor executor assumption

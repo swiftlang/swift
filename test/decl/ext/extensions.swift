@@ -398,6 +398,7 @@ extension B4 {
 extension Sendable {} // expected-error {{cannot extend protocol 'Sendable'}}
 extension Copyable {} // expected-error {{cannot extend protocol 'Copyable'}}
 extension Escapable {} // expected-error {{cannot extend protocol 'Escapable'}}
+// expected-error@-1 {{type 'Escapable' requires -enable-experimental-feature NonescapableTypes}}
 extension _BitwiseCopyable {} // expected-error {{cannot extend protocol '_BitwiseCopyable'}}
 
 @_marker protocol MyMarkerProto {}

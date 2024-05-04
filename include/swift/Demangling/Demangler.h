@@ -587,6 +587,7 @@ protected:
   NodePointer demangleRetroactiveProtocolConformanceRef();
   NodePointer popAnyProtocolConformance();
   NodePointer demangleConcreteProtocolConformance();
+  NodePointer demanglePackProtocolConformance();
   NodePointer popDependentProtocolConformance();
   NodePointer demangleDependentProtocolConformanceRoot();
   NodePointer demangleDependentProtocolConformanceInherited();

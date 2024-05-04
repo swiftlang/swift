@@ -580,6 +580,10 @@ def enable_single_module_llvm_emission: Flag<["-"], "enable-single-module-llvm-e
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit LLVM IR into a single LLVM module in multithreaded mode.">;
 
+def emit_empty_object_file : Flag<["-"], "emit-empty-object-file">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Produce a valid but dummy object file when building a library module">;
+
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 
@@ -1225,9 +1229,6 @@ def enable_move_inout_stack_protector :
   Flag<["-"], "enable-move-inout-stack-protector">,
   HelpText<"Enable the stack protector by moving values to temporaries">;
 
-def enable_import_ptrauth_field_function_pointers :
-  Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
-  HelpText<"Enable import of custom ptrauth qualified field function pointers">;
 def disable_import_ptrauth_field_function_pointers :
   Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
   HelpText<"Disable import of custom ptrauth qualified field function pointers">;
@@ -1319,6 +1320,16 @@ def experimental_spi_only_imports :
 def enable_ossa_complete_lifetimes :
   Flag<["-"], "enable-ossa-complete-lifetimes">,
   HelpText<"Require linear OSSA lifetimes after SILGen">;
+def disable_ossa_complete_lifetimes :
+  Flag<["-"], "disable-ossa-complete-lifetimes">,
+  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
+
+def enable_ossa_verify_complete :
+  Flag<["-"], "enable-ossa-verify-complete">,
+  HelpText<"Verify linear OSSA lifetimes after SILGen">;
+def disable_ossa_verify_complete :
+  Flag<["-"], "disable-ossa-verify-complete">,
+  HelpText<"Do not verify linear OSSA lifetimes after SILGen">;
 
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,
@@ -1331,5 +1342,20 @@ def platform_c_calling_convention_EQ :
 def disable_experimental_parser_round_trip : Flag<["-"],
   "disable-experimental-parser-round-trip">,
   HelpText<"Disable round trip through the new swift parser">;
+
+def disable_strict_concurrency_region_based_isolation : Flag<["-"],
+  "disable-region-based-isolation-with-strict-concurrency">,
+  HelpText<"Disable region based isolation when running with strict concurrency enabled. Only enabled with asserts">,
+  Flags<[HelpHidden]>;
+
+def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,
+    HelpText<"Do not validate binary modules in scanner and delegate the validation to swift-frontend">;
+def module_load_mode: Separate<["-"], "module-load-mode">,
+    MetaVarName<"only-interface|prefer-interface|prefer-serialized|only-serialized">,
+    HelpText<"Module loading mode">;
+
+def platform_availability_inheritance_map_path
+  : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,
+    HelpText<"Path of the platform inheritance platform map">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

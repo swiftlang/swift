@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BorrowingSwitch -enable-experimental-feature MoveOnlyPartialConsumption -parse-as-library -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BorrowingSwitch -parse-as-library -O -emit-sil -verify %s
 
 extension List {
     var peek: Element {
         _read {
             switch self.head {
             case .empty: fatalError()
-            case .more(_borrowing box):
+            case .more(let box):
                 yield box.wrapped.element
             }
             //yield head.peek
@@ -76,7 +76,7 @@ enum Link<Element>: ~Copyable {
         _read {
             switch self {
             case .empty: fatalError()
-            case .more(_borrowing box):
+            case .more(let box):
                 yield box.wrapped.element
             }
         }
@@ -103,7 +103,7 @@ extension List {
     
     mutating func pop() -> Element {
         let h = self.head
-        switch h {
+        switch consume h {
         case .empty: fatalError()
         case .more(let box):
             let node = box.move()

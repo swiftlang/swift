@@ -1,0 +1,25 @@
+{
+  "DisplayName": "visionOS 1.1",
+  "Version": "1.1",
+  "VersionMap": {
+    "xrOS_iOS": {
+      "1.0": "17.1",
+      "1.1": "17.4"
+    },
+    "iOS_visionOS": {
+      "17.1": "1.0",
+      "17.4": "1.1"
+    },
+    "iOS_xrOS": {
+      "17.1": "1.0",
+      "17.4": "1.1"
+    },
+    "visionOS_iOS": {
+      "1.0": "17.1",
+      "1.1": "17.4"
+    }
+  },
+  "DefaultDeploymentTarget": "1.1",
+  "MaximumDeploymentTarget": "1.1.99",
+  "CanonicalName": "xros1.1"
+}

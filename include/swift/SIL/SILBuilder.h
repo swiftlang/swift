@@ -262,7 +262,11 @@ public:
   /// scopes. To avoid a verification error later in the pipeline, drop all
   /// variables without a proper source location.
   bool shouldDropVariable(SILDebugVariable Var, SILLocation Loc) {
-    return !Var.ArgNo && Loc.isSynthesizedAST();
+    if (Var.ArgNo)
+      return false;
+    if (Var.Loc)
+      return Var.Loc->isSynthesizedAST();
+    return Loc.isSynthesizedAST();
   }
 
 
@@ -589,11 +593,11 @@ public:
                                                    beginApply));
   }
 
-  EndApplyInst *createEndApply(SILLocation loc, SILValue beginApply) {
+  EndApplyInst *createEndApply(SILLocation loc, SILValue beginApply, SILType ResultType) {
     return insert(new (getModule()) EndApplyInst(getSILDebugLocation(loc),
-                                                 beginApply));
+                                                 beginApply, ResultType));
   }
-
+  
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {
@@ -835,6 +839,12 @@ public:
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical,
                                       hasPointerEscape, fromVarDecl, fixed));
+  }
+
+  BorrowedFromInst *createBorrowedFrom(SILLocation Loc, SILValue borrowedValue,
+                                       ArrayRef<SILValue> enclosingValues) {
+    return insert(BorrowedFromInst::create(getSILDebugLocation(Loc), borrowedValue,
+                                           enclosingValues, getModule()));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and

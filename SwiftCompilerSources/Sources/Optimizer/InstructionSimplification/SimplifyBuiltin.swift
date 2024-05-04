@@ -285,61 +285,21 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
   let typesAreExact = lhsExistential.metatype is MetatypeInst &&
                       rhsExistential.metatype is MetatypeInst
 
-  switch (lhsTy.typeKind, rhsTy.typeKind) {
-  case (_, .unknown), (.unknown, _):
-    return nil
-  case (let leftKind, let rightKind) where leftKind != rightKind:
-    // E.g. a function type is always different than a struct, regardless of what archetypes
-    // the two types may contain.
+  if typesAreExact {
+    if lhsTy == rhsTy {
+      return true
+    }
+    // Comparing types of different classes which are in a sub-class relation is not handled by the
+    // cast optimizer (below).
+    if lhsTy.isClass && rhsTy.isClass && lhsTy.nominal != rhsTy.nominal {
+      return false
+    }
+  }
+
+  // If casting in either direction doesn't work, the types cannot be equal.
+  if !(canDynamicallyCast(from: lhsTy, to: rhsTy, in: function, sourceTypeIsExact: typesAreExact) ?? true) ||
+     !(canDynamicallyCast(from: rhsTy, to: lhsTy, in: function, sourceTypeIsExact: typesAreExact) ?? true) {
     return false
-  case (.struct, .struct), (.enum, .enum):
-    // Two different structs/enums are always not equal, regardless of what archetypes
-    // the two types may contain.
-    if lhsTy.nominal != rhsTy.nominal {
-      return false
-    }
-  case (.class, .class):
-    // In case of classes this only holds if we know the exact types.
-    // Otherwise one class could be a sub-class of the other class.
-    if typesAreExact && lhsTy.nominal != rhsTy.nominal {
-      return false
-    }
-  default:
-    break
   }
-
-  if !typesAreExact {
-    // Types which e.g. come from type parameters may differ at runtime while the declared AST types are the same.
-    return nil
-  }
-
-  if lhsTy.hasArchetype || rhsTy.hasArchetype {
-    // We don't know anything about archetypes. They may be identical at runtime or not.
-    // We could do something more sophisticated here, e.g. look at conformances. But for simplicity,
-    // we are just conservative.
-    return nil
-  }
-
-  // Generic ObjectiveC class, which are specialized for different NSObject types have different AST types
-  // but the same runtime metatype.
-  if lhsTy.isOrContainsObjectiveCClass || rhsTy.isOrContainsObjectiveCClass {
-    return nil
-  }
-
-  return lhsTy == rhsTy
-}
-
-private extension Type {
-  enum TypeKind {
-    case `struct`, `class`, `enum`, tuple, function, unknown
-  }
-
-  var typeKind: TypeKind {
-    if isStruct  { return .struct }
-    if isClass  { return .class }
-    if isEnum  { return .enum }
-    if isTuple    { return .tuple }
-    if isFunction { return .function }
-    return .unknown
-  }
+  return nil
 }

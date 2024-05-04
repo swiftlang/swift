@@ -950,19 +950,6 @@ ERROR(layout_constraints_only_inside_specialize_attr,none,
       "layout constraints are only allowed inside '_specialize' attributes", ())
 
 //------------------------------------------------------------------------------
-// MARK: Conformance suppression diagnostics
-//------------------------------------------------------------------------------
-
-ERROR(cannot_suppress_here,none,
-      "cannot suppress conformances here", ())
-
-ERROR(only_suppress_copyable,none,
-      "can only suppress 'Copyable'", ())
-
-ERROR(already_suppressed_copyable,none,
-      "duplicate suppression of 'Copyable'", ())
-
-//------------------------------------------------------------------------------
 // MARK: Pattern parsing diagnostics
 //------------------------------------------------------------------------------
 
@@ -996,8 +983,10 @@ ERROR(extra_var_in_multiple_pattern_list,none,
       "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern cannot appear nested in an already immutable context", ())
+WARNING(borrowing_syntax_change,none,
+      "'_borrowing' spelling is deprecated; use 'borrowing' without the underscore", ())
 ERROR(borrowing_subpattern_unsupported,none,
-      "'_borrowing' pattern modifier must be directly applied to pattern variable name", ())
+      "'borrowing' pattern modifier must be directly applied to pattern variable name", ())
 ERROR(specifier_must_have_type,none,
       "%0 arguments must have a type specified", (StringRef))
 ERROR(expected_rparen_parameter,PointsToFirstBadToken,
@@ -1342,13 +1331,6 @@ ERROR(expected_identifier_after_dot_expr,none,
 ERROR(expected_identifier_after_super_dot_expr,
       PointsToFirstBadToken,
       "expected identifier or 'init' after super '.' expression", ())
-ERROR(expected_dot_or_subscript_after_super,PointsToFirstBadToken,
-      "expected '.' or '[' after 'super'", ())
-ERROR(super_in_closure_with_capture,none,
-      "using 'super' in a closure where 'self' is explicitly captured is "
-      "not yet supported", ())
-NOTE(super_in_closure_with_capture_here,none,
-     "'self' explicitly captured here", ())
 
 WARNING(await_before_try,none, "'try' must precede 'await'", ())
 
@@ -1945,7 +1927,7 @@ ERROR(platform_condition_expected_argument,none,
       "expected argument to platform condition",
       ())
 ERROR(platform_condition_expected_one_argument,none,
-      "expected only one argument to platform condition",
+      "expected only one unlabeled argument to platform condition",
       ())
 ERROR(unsupported_platform_runtime_condition_argument,none,
       "unexpected argument for the '_runtime' condition; "

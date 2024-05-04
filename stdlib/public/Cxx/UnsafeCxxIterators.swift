@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@ public protocol UnsafeCxxInputIterator: Equatable {
   ///
   /// Generally, Swift creates this property automatically for C++ types that
   /// define `operator*()`.
+  @_borrowed
   var pointee: Pointee { get }
 
   /// Returns an iterator pointing to the next item in the sequence.
@@ -58,6 +59,7 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
 }
 
 public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
+  @_borrowed
   override var pointee: Pointee { get set }
 }
 
@@ -81,6 +83,7 @@ extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
 
 extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
 
-public protocol UnsafeCxxMutableRandomAccessIterator: UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
+public protocol UnsafeCxxMutableRandomAccessIterator:
+UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
 
 extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}

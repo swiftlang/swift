@@ -21,7 +21,6 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   //
   let count = input.count
   var ptr = UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
-  var i = 0
 
   let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
   let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
@@ -63,7 +62,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   }
 
   if ptr < end {
-    let value = ptr.loadUnaligned(fromByteOffset: i, as: UInt8.self)
+    let value = ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
     guard value & asciiMask8 == 0 else { return false }
   }
   _internalInvariant(ptr == end || ptr + 1 == end)

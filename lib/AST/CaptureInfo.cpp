@@ -13,9 +13,20 @@
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+
+ArrayRef<CapturedValue>
+CaptureInfo::CaptureInfoStorage::getCaptures() const {
+  return llvm::ArrayRef(this->getTrailingObjects<CapturedValue>(), NumCapturedValues);
+}
+
+ArrayRef<GenericEnvironment *>
+CaptureInfo::CaptureInfoStorage::getGenericEnvironments() const {
+  return llvm::ArrayRef(this->getTrailingObjects<GenericEnvironment *>(), NumGenericEnvironments);
+}
 
 //===----------------------------------------------------------------------===//
 //                             MARK: CaptureInfo
@@ -24,69 +35,56 @@ using namespace swift;
 CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
-                         bool genericParamCaptures) {
+                         bool genericParamCaptures,
+                         ArrayRef<GenericEnvironment *> genericEnv) {
   static_assert(IsTriviallyDestructible<CapturedValue>::value,
                 "Capture info is alloc'd on the ASTContext and not destroyed");
   static_assert(IsTriviallyDestructible<CaptureInfo::CaptureInfoStorage>::value,
                 "Capture info is alloc'd on the ASTContext and not destroyed");
 
+  // This is the only kind of local generic environment we can capture right now.
+#ifndef NDEBUG
+  for (auto *env : genericEnv) {
+    assert(env->getKind() == GenericEnvironment::Kind::OpenedElement);
+  }
+#endif
+
   OptionSet<Flags> flags;
   if (genericParamCaptures)
     flags |= Flags::HasGenericParamCaptures;
 
-  if (captures.empty() && !dynamicSelf && !opaqueValue) {
+  if (captures.empty() && genericEnv.empty() && !dynamicSelf && !opaqueValue) {
     *this = CaptureInfo::empty();
     StorageAndFlags.setInt(flags);
     return;
   }
 
   size_t storageToAlloc =
-      CaptureInfoStorage::totalSizeToAlloc<CapturedValue>(captures.size());
+      CaptureInfoStorage::totalSizeToAlloc<CapturedValue,
+                                           GenericEnvironment *>(captures.size(),
+                                                                 genericEnv.size());
   void *storageBuf = ctx.Allocate(storageToAlloc, alignof(CaptureInfoStorage));
-  auto *storage = new (storageBuf) CaptureInfoStorage(captures.size(),
-                                                      dynamicSelf,
-                                                      opaqueValue);
+  auto *storage = new (storageBuf) CaptureInfoStorage(dynamicSelf,
+                                                      opaqueValue,
+                                                      captures.size(),
+                                                      genericEnv.size());
   StorageAndFlags.setPointerAndInt(storage, flags);
   std::uninitialized_copy(captures.begin(), captures.end(),
                           storage->getTrailingObjects<CapturedValue>());
+  std::uninitialized_copy(genericEnv.begin(), genericEnv.end(),
+                          storage->getTrailingObjects<GenericEnvironment *>());
 }
 
 CaptureInfo CaptureInfo::empty() {
-  static const CaptureInfoStorage empty{0, /*dynamicSelf*/nullptr,
-                                        /*opaqueValue*/nullptr};
+  static const CaptureInfoStorage empty{/*dynamicSelf*/nullptr,
+                                        /*opaqueValue*/nullptr,
+                                        0, 0};
   CaptureInfo result;
   result.StorageAndFlags.setPointer(&empty);
   return result;
 }
 
-bool CaptureInfo::hasLocalCaptures() const {
-  for (auto capture : getCaptures()) {
-    if (capture.isLocalCapture())
-      return true;
-  }
-  return false;
-}
-
-
-void CaptureInfo::
-getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
-  if (!hasLocalCaptures()) return;
-
-  Result.reserve(getCaptures().size());
-
-  // Filter out global variables.
-  for (auto capture : getCaptures()) {
-    if (!capture.isLocalCapture())
-      continue;
-
-    Result.push_back(capture);
-  }
-}
-
 VarDecl *CaptureInfo::getIsolatedParamCapture() const {
-  if (!hasLocalCaptures())
-    return nullptr;
-
   for (const auto &capture : getCaptures()) {
     // NOTE: isLocalCapture() returns false if we have dynamic self metadata
     // since dynamic self metadata is never an isolated capture. So we can just
@@ -136,6 +134,13 @@ void CaptureInfo::print(raw_ostream &OS) const {
                  OS << "<noescape>";
              },
              [&] { OS << ", "; });
+
+  interleave(getGenericEnvironments(),
+             [&](GenericEnvironment *genericEnv) {
+               OS << " shape_class=";
+               OS << genericEnv->getOpenedElementShapeClass();
+             },
+             [&] { OS << ","; });
   OS << ')';
 }
 

@@ -48,11 +48,6 @@ LangOptions::LangOptions() {
 
   // Note: Introduce default-on language options here.
 
-  // Default-on NoncopyableGenerics when the build-script setting is enabled.
-  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
-    Features.insert(Feature::NoncopyableGenerics);
-  }
-
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \
@@ -77,6 +72,8 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "tvOS",
   "watchOS",
   "iOS",
+  "visionOS",
+  "xrOS",
   "Linux",
   "FreeBSD",
   "OpenBSD",
@@ -116,6 +113,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationPointerBit
 static const SupportedConditionalValue SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
+  "_multithreaded",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationTargetEnvironments[] = {
@@ -405,6 +403,16 @@ void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
   }
 }
 
+static bool isMultiThreadedRuntime(llvm::Triple triple) {
+  if (triple.getOS() == llvm::Triple::WASI) {
+    return triple.getEnvironmentName() == "threads";
+  }
+  if (triple.getOSName() == "none") {
+    return false;
+  }
+  return true;
+}
+
 std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   clearAllPlatformConditionValues();
   clearAtomicBitWidths();
@@ -444,6 +452,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::IOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
+    break;
+  case llvm::Triple::XROS:
+    addPlatformConditionValue(PlatformConditionKind::OS, "xrOS");
+    addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
     break;
   case llvm::Triple::Linux:
     if (Target.getEnvironment() == llvm::Triple::Android)
@@ -576,6 +588,11 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   if (tripleIsMacCatalystEnvironment(Target))
     addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
                               "macabi");
+
+  if (isMultiThreadedRuntime(Target)) {
+    addPlatformConditionValue(PlatformConditionKind::Runtime,
+                              "_multithreaded");
+  }
 
   // Set the "_hasHasAtomicBitWidth" platform condition.
   setHasAtomicBitWidth(triple);

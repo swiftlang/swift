@@ -343,6 +343,8 @@ public:
 
   void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
 
+  void visitSensitiveAttr(SensitiveAttr *attr);
+
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
@@ -448,6 +450,13 @@ void AttributeChecker::visitExtractConstantsFromMembersAttr(ExtractConstantsFrom
   if (!Ctx.LangOpts.hasFeature(Feature::ExtractConstantsFromMembers)) {
     diagnoseAndRemoveAttr(attr,
                           diag::attr_extractConstantsFromMembers_experimental);
+  }
+}
+
+void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Sensitive)) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_sensitive_experimental);
   }
 }
 
@@ -705,6 +714,9 @@ static bool iswatchOS(ASTContext &ctx) {
 }
 
 static bool isRelaxedIBAction(ASTContext &ctx) {
+  if (ctx.LangOpts.Target.isXROS())
+    return true;
+
   return isiOS(ctx) || iswatchOS(ctx);
 }
 
@@ -1271,7 +1283,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     if (importedModule) {
       auto path = importedModule->getModuleFilename();
       if (llvm::sys::path::extension(path) == ".swiftinterface" &&
-          !(path.endswith(".private.swiftinterface") || path.endswith(".package.swiftinterface"))) {
+          !(path.ends_with(".private.swiftinterface") || path.ends_with(".package.swiftinterface"))) {
         // If the module was built from the public swiftinterface, it can't
         // have any SPI.
         diagnose(attr->getLocation(),
@@ -1516,9 +1528,31 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   }
 }
 
+static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
+                                         Feature requiredFeature) {
+  if (D->getASTContext().LangOpts.hasFeature(requiredFeature))
+    return true;
+
+  // Allow the use of @_objcImplementation *without* Feature::ObjCImplementation
+  // as long as you're using the early adopter syntax. (Avoids breaking existing
+  // adopters.)
+  if (requiredFeature == Feature::ObjCImplementation && attr->isEarlyAdopter())
+    return true;
+
+  // Either you're using Feature::ObjCImplementation without the early adopter
+  // syntax, or you're using Feature::CImplementation. Either way, no go.
+  swift::diagnoseAndRemoveAttr(D, attr, diag::requires_experimental_feature,
+                               attr->getAttrName(), attr->isDeclModifier(),
+                               getFeatureName(requiredFeature));
+  return false;
+}
+
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
+      return;
+
     if (ED->isConstrainedExtension())
       diagnoseAndRemoveAttr(attr,
                             diag::attr_objc_implementation_must_be_unconditional);
@@ -1573,8 +1607,22 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
 
       return;
     }
+
+    // While it's possible that @objc @implementation would function with
+    // pre-stable runtimes, this isn't a configuration that's been tested or
+    // supported.
+    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(Ctx);
+    if (!deploymentAvailability.isContainedIn(Ctx.getSwift50Availability())) {
+      diagnose(attr->getLocation(),
+               diag::attr_objc_implementation_raise_minimum_deployment_target,
+               prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+               Ctx.getSwift50Availability().getOSVersion().getLowerEndpoint());
+    }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
+      return;
+
     if (!attr->CategoryName.empty()) {
       auto diagnostic =
           diagnose(attr->getLocation(),
@@ -2025,6 +2073,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // an iOS attribute while building for macCatalyst.
   if (attr->Platform == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
+
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
       return;
     }
@@ -3143,7 +3198,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (VD->getFormalAccess() < AccessLevel::Public &&
+  if (VD->getFormalAccess() < AccessLevel::Package &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
                           VD->getName(), VD->getFormalAccess());
@@ -3202,7 +3257,8 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
     return;
   }
 
-  // @inlinable can only be applied to public or internal declarations.
+  // @inlinable can only be applied to public, package, or
+  // internal declarations.
   auto access = VD->getFormalAccess();
   if (access < AccessLevel::Internal) {
     diagnoseAndRemoveAttr(attr, diag::inlinable_decl_not_public,
@@ -3909,7 +3965,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
       return;
     }
 
-    if (ED->getFormalAccess() < AccessLevel::Public &&
+    if (ED->getFormalAccess() < AccessLevel::Package &&
         !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
       diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
       return;
@@ -3918,7 +3974,9 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (VD->getFormalAccess() < AccessLevel::Public &&
+  // @frozen attribute is allowed for public, package, or
+  // usableFromInline decls.
+  if (VD->getFormalAccess() < AccessLevel::Package &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
                           VD->getName(), VD->getFormalAccess());
@@ -4560,6 +4618,11 @@ void AttributeChecker::checkBackDeployedAttrs(
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
 
+        llvm::VersionTuple ignoredVersion;
+
+        AvailabilityInference::updateBeforePlatformForFallback(
+            Attr, Ctx, platformString, ignoredVersion);
+
         diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                  platformString);
         diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
@@ -4578,6 +4641,11 @@ void AttributeChecker::checkBackDeployedAttrs(
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr->Introduced.value();
       StringRef introPlatformString = availableAttr->prettyPlatformString();
+
+      AvailabilityInference::updateBeforePlatformForFallback(
+          Attr, Ctx, beforePlatformString, beforeVersion);
+      AvailabilityInference::updateIntroducedPlatformForFallback(
+          availableAttr, Ctx, introPlatformString, introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
@@ -5115,6 +5183,7 @@ static IndexSubset *computeDifferentiabilityParameters(
 static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return DescriptiveDeclKind::Getter;
   case AccessorKind::Set:
     return DescriptiveDeclKind::Setter;
@@ -7076,20 +7145,25 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
   if (!proto)
     return;
 
-  // A marker protocol cannot inherit a non-marker protocol.
-  for (auto inheritedProto : proto->getInheritedProtocols()) {
-    if (!inheritedProto->isMarkerProtocol()) {
-      proto->diagnose(
-          diag::marker_protocol_inherit_nonmarker,
-          proto->getName(), inheritedProto->getName());
-      inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
-    }
-  }
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
+    if (!req.getFirstType()->isEqual(proto->getSelfInterfaceType()))
+      continue;
 
-  if (Type superclass = proto->getSuperclass()) {
-    proto->diagnose(
+    if (req.getKind() == RequirementKind::Superclass) {
+      // A marker protocol cannot have a superclass requirement.
+      proto->diagnose(
         diag::marker_protocol_inherit_class,
-        proto->getName(), superclass);
+        proto->getName(), req.getSecondType());
+    } else if (req.getKind() == RequirementKind::Conformance) {
+      // A marker protocol cannot inherit a non-marker protocol.
+      auto inheritedProto = req.getProtocolDecl();
+      if (!inheritedProto->isMarkerProtocol()) {
+        proto->diagnose(
+            diag::marker_protocol_inherit_nonmarker,
+            proto->getName(), inheritedProto->getName());
+        inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
+      }
+    }
   }
 
   // A marker protocol cannot have any requirements.

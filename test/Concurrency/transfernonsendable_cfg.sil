@@ -47,7 +47,7 @@ bb3:
   // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %useKlass = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %useKlass(%klass) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
-  // expected-note @-1 {{access here could race}}
+  // expected-note @-1 {{use here could race}}
   destroy_value %klass : $NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()

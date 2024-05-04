@@ -158,11 +158,6 @@ public:
   // Note: This doesn't affect anything in non-SWIFT_BUILD_SWIFT_SYNTAX envs.
   bool IsForASTGen = false;
 
-  // A cached answer to
-  //     Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)
-  // to ensure there's no parsing performance regression.
-  bool EnabledNoncopyableGenerics;
-
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;
@@ -1157,7 +1152,8 @@ public:
                                       std::optional<AccessLevel> &Visibility);
 
   ParserResult<AllowFeatureSuppressionAttr>
-  parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc);
+  parseAllowFeatureSuppressionAttribute(bool inverted, SourceLoc atLoc,
+                                        SourceLoc loc);
 
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.
@@ -1212,7 +1208,7 @@ public:
       return true;
     if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
         (Tok.isContextualKeyword("_resultDependsOn") ||
-         Tok.isLifetimeDependenceToken()))
+         isLifetimeDependenceToken()))
       return true;
     return false;
   }
@@ -1224,23 +1220,33 @@ public:
     consumeToken();
   }
 
+  bool isLifetimeDependenceToken() {
+    if (!isInSILMode()) {
+      return Tok.isContextualKeyword("dependsOn");
+    }
+    return Tok.isContextualKeyword("_inherit") ||
+           Tok.isContextualKeyword("_scope");
+  }
+
   bool canHaveParameterSpecifierContextualKeyword() {
     // The parameter specifiers like `isolated`, `consuming`, `borrowing` are
     // also valid identifiers and could be the name of a type. Check whether
     // the following token is something that can introduce a type. Thankfully
     // none of these tokens overlap with the set of tokens that can follow an
     // identifier in a type production.
-    return Tok.is(tok::identifier)
-      && peekToken().isAny(tok::at_sign,
-                           tok::kw_inout,
-                           tok::l_paren,
-                           tok::identifier,
-                           tok::l_square,
-                           tok::kw_Any,
-                           tok::kw_Self,
-                           tok::kw__,
-                           tok::kw_var,
-                           tok::kw_let);
+    if (Tok.is(tok::identifier)) {
+      auto next = peekToken();
+      if (next.isAny(tok::at_sign, tok::kw_inout, tok::l_paren,
+                     tok::identifier, tok::l_square, tok::kw_Any,
+                     tok::kw_Self, tok::kw__, tok::kw_var,
+                     tok::kw_let))
+        return true;
+
+      if (next.is(tok::oper_prefix) && next.getText() == "~")
+        return true;
+    }
+
+    return isLifetimeDependenceToken();
   }
 
   struct ParsedTypeAttributeList {
@@ -1292,13 +1298,9 @@ public:
   ///
   /// \param allowClassRequirement whether to permit parsing of 'class'
   /// \param allowAnyObject whether to permit parsing of 'AnyObject'
-  /// \param parseTildeCopyable if non-null, permits parsing of `~Copyable`
-  ///   and writes out a valid source location if it was parsed. If null, then a
-  ///   parsing error will be emitted upon the appearance of `~` in the clause.
   ParserStatus parseInheritance(SmallVectorImpl<InheritedEntry> &Inherited,
                                 bool allowClassRequirement,
-                                bool allowAnyObject,
-                                SourceLoc *parseTildeCopyable = nullptr);
+                                bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              llvm::function_ref<void(Decl *)> handler);
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
@@ -1577,9 +1579,6 @@ public:
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
 
-    /// True if this parameter inherits a default argument via '= super'
-    bool hasInheritedDefaultArg = false;
-    
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
 

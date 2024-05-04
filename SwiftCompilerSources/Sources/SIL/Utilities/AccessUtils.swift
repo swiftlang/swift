@@ -69,6 +69,12 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   /// An indirect result of a `begin_apply`.
   case yield(MultipleValueInstructionResult)
 
+  /// store_borrow is never the base of a formal access, but calling Value.enclosingScope on an arbitrary address will
+  /// return it as the accessBase. A store_borrow always stores into an alloc_stack, but it is handled separately
+  /// because it may be useful for clients to know which value was stored in the temporary stack location for the
+  /// duration of this borrow scope.
+  case storeBorrow(StoreBorrowInst)
+
   /// An address which is derived from a `Builtin.RawPointer`.
   case pointer(PointerToAddressInst)
 
@@ -90,6 +96,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       } else {
         self = .unidentified
       }
+    case let sb as StoreBorrowInst:
+      self = .storeBorrow(sb)
     default:
       self = .unidentified
     }
@@ -105,6 +113,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       case .tail(let rta):     return "tail - \(rta.instance)"
       case .argument(let arg): return "argument - \(arg)"
       case .yield(let result): return "yield - \(result)"
+      case .storeBorrow(let sb): return "storeBorrow - \(sb)"
       case .pointer(let p):    return "pointer - \(p)"
     }
   }
@@ -114,7 +123,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class, .tail:
         return true
-      case .box, .stack, .global, .argument, .yield, .pointer, .unidentified:
+      case .box, .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
         return false
     }
   }
@@ -125,7 +134,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       case .box(let pbi):      return pbi.box
       case .class(let rea):    return rea.instance
       case .tail(let rta):     return rta.instance
-      case .stack, .global, .argument, .yield, .pointer, .unidentified:
+      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
         return nil
     }
   }
@@ -153,7 +162,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class(let rea):    return rea.fieldIsLet
       case .global(let g):     return g.isLet
-      case .box, .stack, .tail, .argument, .yield, .pointer, .unidentified:
+      case .box, .stack, .tail, .argument, .yield, .storeBorrow, .pointer, .unidentified:
         return false
     }
   }
@@ -164,7 +173,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case .box(let pbi):      return pbi.box.referenceRoot is AllocBoxInst
     case .class(let rea):    return rea.instance.referenceRoot is AllocRefInstBase
     case .tail(let rta):     return rta.instance.referenceRoot is AllocRefInstBase
-    case .stack:             return true
+    case .stack, .storeBorrow: return true
     case .global, .argument, .yield, .pointer, .unidentified:
       return false
     }
@@ -173,7 +182,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   /// True, if the kind of storage of the access is known (e.g. a class property, or global variable).
   public var hasKnownStorageKind: Bool {
     switch self {
-      case .box, .class, .tail, .stack, .global:
+      case .box, .class, .tail, .stack, .storeBorrow, .global:
         return true
       case .argument, .yield, .pointer, .unidentified:
         return false
@@ -203,6 +212,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       return arg1 == arg2
     case (.yield(let baResult1), .yield(let baResult2)):
       return baResult1 == baResult2
+    case (.storeBorrow(let sb1), .storeBorrow(let sb2)):
+      return sb1 == sb2
     case (.pointer(let p1), .pointer(let p2)):
       return p1 == p2
     default:
@@ -259,6 +270,15 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       return argIsDistinct(arg, from: other)
     case (_, .argument(let otherArg)):
       return argIsDistinct(otherArg, from: self)
+
+    case (.storeBorrow(let arg), .storeBorrow(let otherArg)):
+      return arg.allocStack != otherArg.allocStack
+
+    // A StoreBorrow location can only be used by other StoreBorrows.
+    case (.storeBorrow, _):
+      return true
+    case (_, .storeBorrow):
+      return true
 
     default:
       // As we already handled pairs of the same kind, here we handle pairs with different kinds.
@@ -591,7 +611,7 @@ extension ValueUseDefWalker where Path == SmallProjectionPath {
         return walkUp(value: rea.instance, path: path.push(.classField, index: rea.fieldIndex)) != .abortWalk
       case .tail(let rta):
         return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0)) != .abortWalk
-      case .stack, .global, .argument, .yield, .pointer, .unidentified:
+      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
         return false
     }
   }

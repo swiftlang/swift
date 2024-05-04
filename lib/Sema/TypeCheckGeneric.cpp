@@ -302,6 +302,8 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
+      static_assert((unsigned)RequirementKind::LAST_KIND == 4,
+                    "update %select in diagnostic!");
       ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
                          req.getFirstType().getString(),
                          static_cast<unsigned>(req.getKind()),
@@ -792,18 +794,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       parentSig = extendedNominal->getGenericSignatureOfContext();
       genericParams = nullptr;
     }
-
-    // Re-use the signature of the type being extended by default.
-    // For tuple extensions, always build a new signature to get
-    // the right sugared types, since we don't want to expose the
-    // name of the generic parameter of BuiltinTupleDecl itself.
-    if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
-        !isa<BuiltinTupleDecl>(extendedNominal) &&
-        false/*!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)*/) {
-      // FIXME: Recover this optimization even with NoncopyableGenerics on.
-      return parentSig;
-    }
-
   } else {
     llvm_unreachable("Unknown generic declaration kind");
   }

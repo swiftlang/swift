@@ -14,9 +14,9 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    print((prefix ? "### " : "") + message())
   }
 }
 
@@ -29,10 +29,7 @@ private func log(_ message: @autoclosure () -> String) {
 let lifetimeDependenceDiagnosticsPass = FunctionPass(
   name: "lifetime-dependence-diagnostics")
 { (function: Function, context: FunctionPassContext) in
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-  log(" --- Diagnosing lifetime dependence in \(function.name)")
+  log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
 
   for argument in function.arguments
@@ -45,7 +42,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     }
   }
   for instruction in function.instructions {
-    if let markDep = instruction as? MarkDependenceInst {
+    if let markDep = instruction as? MarkDependenceInst, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
         analyze(dependence: lifetimeDep, context)
       }
@@ -124,7 +121,10 @@ private struct DiagnoseDependence {
   }
 
   func reportUnknown(operand: Operand) {
+#if !os(Windows)
+    // TODO: https://github.com/apple/swift/issues/73252
     standardError.write("Unknown use: \(operand)\n\(function)")
+#endif
     reportEscaping(operand: operand)
   }
 
@@ -297,6 +297,8 @@ private struct LifetimeVariable {
       // TODO: bridge VarDecl for FunctionConvention.Yields
       self.varDecl = nil
       self.sourceLoc = result.parentInstruction.location.sourceLoc
+    case .storeBorrow(let sb):
+      self = .init(dependent: sb.source, context)
     case .pointer(let ptrToAddr):
       self.varDecl = nil
       self.sourceLoc = ptrToAddr.location.sourceLoc

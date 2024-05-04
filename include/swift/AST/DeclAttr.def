@@ -188,9 +188,10 @@ SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
 DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   OnProtocol | UserInaccessible | LongAttribute | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   70)
-DECL_ATTR(_objcImplementation, ObjCImplementation,
+DECL_ATTR(implementation, ObjCImplementation,
   OnExtension | OnAbstractFunction | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   72)
+DECL_ATTR_ALIAS(_objcImplementation, ObjCImplementation)
 DECL_ATTR(_optimize, Optimize,
   OnAbstractFunction | OnSubscript | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   73)
@@ -371,7 +372,7 @@ SIMPLE_DECL_ATTR(_nonescapable, NonEscapable,
   OnNominalType | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   148)
 SIMPLE_DECL_ATTR(_unsafeNonescapableResult, UnsafeNonEscapableResult,
-  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnAbstractFunction | OnSubscript | OnAccessor | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   149)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
   OnClass | OnFunc | OnAccessor | OnVar | OnSubscript | DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
@@ -489,9 +490,19 @@ SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
 DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
   157)
+DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
 SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
   OnAbstractFunction | OnSubscript | OnVar | OnExtension | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   158)
+
+// Declares that a struct contains "sensitive" data. It enforces that the contents of such a struct value
+// is zeroed out at the end of its lifetime. In other words: the content of such a value is not observable
+// in memory after the value's lifetime.
+// TODO: enable @sensitive also for other nominal types than structs, e.g. for enums
+SIMPLE_DECL_ATTR(sensitive, Sensitive,
+  OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  159)
+
 LAST_DECL_ATTR(PreInverseGenerics)
 
 #undef DECL_ATTR_ALIAS

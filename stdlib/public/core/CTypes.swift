@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -69,7 +69,7 @@ public typealias CFloat = Float
 public typealias CDouble = Double
 
 /// The C 'long double' type.
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
@@ -150,24 +150,40 @@ public struct OpaquePointer {
   internal init(_ v: Builtin.RawPointer) {
     self._rawValue = v
   }
+}
 
-  /// Creates an `OpaquePointer` from a given address in memory.
+@available(*, unavailable)
+extension OpaquePointer: Sendable {}
+
+extension OpaquePointer {
+  /// Creates a new `OpaquePointer` from the given address, specified as a bit
+  /// pattern.
+  ///
+  /// - Parameter bitPattern: A bit pattern to use for the address of the new
+  ///   pointer. If `bitPattern` is zero, the result is `nil`.
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Creates an `OpaquePointer` from a given address in memory.
+  /// Creates a new `OpaquePointer` from the given address, specified as a bit
+  /// pattern.
+  ///
+  /// - Parameter bitPattern: A bit pattern to use for the address of the new
+  ///   pointer. If `bitPattern` is zero, the result is `nil`.
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
+}
 
+extension OpaquePointer {
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(@_nonEphemeral _ from: UnsafePointer<T>) {
+  @_preInverseGenerics
+  public init<T: ~Copyable>(@_nonEphemeral _ from: UnsafePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -175,14 +191,18 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(@_nonEphemeral _ from: UnsafePointer<T>?) {
+  @_preInverseGenerics
+  public init?<T: ~Copyable>(@_nonEphemeral _ from: UnsafePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
+}
 
+extension OpaquePointer {
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
+  @_preInverseGenerics
+  public init<T: ~Copyable>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -190,7 +210,8 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>?) {
+  @_preInverseGenerics
+  public init?<T: ~Copyable>(@_nonEphemeral _ from: UnsafeMutablePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -214,9 +235,6 @@ extension OpaquePointer: Hashable {
     hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
-
-@available(*, unavailable)
-extension OpaquePointer : Sendable { }
 
 @_unavailableInEmbedded
 extension OpaquePointer: CustomDebugStringConvertible {
@@ -255,7 +273,7 @@ extension UInt {
 }
 
 /// A wrapper around a C `va_list` pointer.
-#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
+#if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) ||  os(Windows))
 @frozen
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance

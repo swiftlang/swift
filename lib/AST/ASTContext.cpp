@@ -130,6 +130,39 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << getProtocolName(getKnownProtocolKind(value));
 }
 
+std::optional<RepressibleProtocolKind>
+swift::getRepressibleProtocolKind(KnownProtocolKind kp) {
+  switch (kp) {
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name)                               \
+  case KnownProtocolKind::Id:                                                  \
+    return RepressibleProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  default:
+    return std::nullopt;
+  }
+}
+
+/// Returns the KnownProtocolKind corresponding to an RepressibleProtocolKind.
+KnownProtocolKind swift::getKnownProtocolKind(RepressibleProtocolKind ip) {
+  switch (ip) {
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name)                               \
+  case RepressibleProtocolKind::Id:                                            \
+    return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const RepressibleProtocolKind &value) {
+  out << getProtocolName(getKnownProtocolKind(value));
+}
+
+// Metadata stores a 16-bit field for invertible protocols. Trigger a build
+// error when we assign the 15th bit so we can think about what to do.
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+  static_assert(Bit < 15);
+#include "swift/ABI/InvertibleProtocols.def"
+
 namespace {
 enum class SearchPathKind : uint8_t {
   Import = 1 << 0,
@@ -623,6 +656,8 @@ struct ASTContext::Implementation {
 
   /// The scratch context used to allocate intrinsic data on behalf of \c swift::IntrinsicInfo
   std::unique_ptr<llvm::LLVMContext> IntrinsicScratchContext;
+
+  mutable std::optional<std::unique_ptr<clang::DarwinSDKInfo>> SDKInfo;
 
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
@@ -2513,6 +2548,14 @@ ModuleDecl *ASTContext::getModuleByName(StringRef ModuleName) {
 ModuleDecl *ASTContext::getModuleByIdentifier(Identifier ModuleID) {
   ImportPath::Module::Builder builder(ModuleID);
   return getModule(builder.get());
+}
+
+ModuleDecl *ASTContext::getLoadedModuleByABIName(StringRef ModuleName) {
+  for (auto &[_, module] : getLoadedModules()) {
+    if (ModuleName == module->getABIName().str())
+      return module;
+  }
+  return nullptr;
 }
 
 ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
@@ -4524,29 +4567,29 @@ SILFunctionType::SILFunctionType(
       !ext.getLifetimeDependenceInfo().empty();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
-  if (coroutineKind == SILCoroutineKind::None) {
-    assert(yields.empty());
-    NumAnyResults = normalResults.size();
-    NumAnyIndirectFormalResults = 0;
-    NumPackResults = 0;
-    for (auto &resultInfo : normalResults) {
-      if (resultInfo.isFormalIndirect())
-        NumAnyIndirectFormalResults++;
-      if (resultInfo.isPack())
-        NumPackResults++;
-    }
-    memcpy(getMutableResults().data(), normalResults.data(),
-           normalResults.size() * sizeof(SILResultInfo));
-  } else {
-    assert(normalResults.empty());
-    NumAnyResults = yields.size();
-    NumAnyIndirectFormalResults = 0;
+  assert((coroutineKind == SILCoroutineKind::None && yields.empty()) ||
+         coroutineKind != SILCoroutineKind::None);
+
+  NumAnyResults = normalResults.size();
+  NumAnyIndirectFormalResults = 0;
+  NumPackResults = 0;
+  for (auto &resultInfo : normalResults) {
+    if (resultInfo.isFormalIndirect())
+      NumAnyIndirectFormalResults++;
+    if (resultInfo.isPack())
+      NumPackResults++;
+  }
+  memcpy(getMutableResults().data(), normalResults.data(),
+         normalResults.size() * sizeof(SILResultInfo));
+  if (coroutineKind != SILCoroutineKind::None) {
+    NumAnyYieldResults = yields.size();
+    NumAnyIndirectFormalYieldResults = 0;
     NumPackResults = 0;
     for (auto &yieldInfo : yields) {
       if (yieldInfo.isFormalIndirect())
-        NumAnyIndirectFormalResults++;
+        NumAnyIndirectFormalYieldResults++;
       if (yieldInfo.isPack())
-        NumPackResults++;
+        NumPackYieldResults++;
     }
     memcpy(getMutableYields().data(), yields.data(),
            yields.size() * sizeof(SILYieldInfo));
@@ -4718,7 +4761,6 @@ CanSILFunctionType SILFunctionType::get(
     std::optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs, const ASTContext &ctx,
     ProtocolConformanceRef witnessMethodConformance) {
-  assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
   assert(!ext.isPseudogeneric() || genericSig ||
          coroutineKind != SILCoroutineKind::None);
@@ -5861,18 +5903,6 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
   assert(parentSig || !constraint->hasTypeParameter() &&
          "Interface type here requires a parent signature");
 
-  // The opened archetype signature for a protocol type is identical
-  // to the protocol's own canonical generic signature if there aren't any
-  // outer generic parameters to worry about.
-  if (parentSig.isNull()) {
-    if (const auto protoTy = dyn_cast<ProtocolType>(constraint)) {
-      return protoTy->getDecl()->getGenericSignature().getCanonicalSignature();
-    }
-  }
-
-  // Otherwise we need to build a generic signature that captures any outer
-  // generic parameters. This ensures that we keep e.g. generic superclass
-  // existentials contained in a well-formed generic context.
   auto canParentSig = parentSig.getCanonicalSignature();
   auto key = std::make_pair(constraint, canParentSig.getPointer());
   auto found = getImpl().ExistentialSignatures.find(key);
@@ -5880,7 +5910,7 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
     return found->second;
 
   auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      canParentSig, type->getASTContext())
+      canParentSig, *this)
     ->castTo<GenericTypeParamType>();
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           constraint);
@@ -6376,6 +6406,44 @@ bool ASTContext::isASCIIString(StringRef s) const {
     }
   }
   return true;
+}
+
+clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
+  if (!getImpl().SDKInfo) {
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
+            *llvm::vfs::getRealFileSystem(),
+            SearchPathOpts.SDKPath);
+    if (!SDKInfoOrErr) {
+      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
+                            [](const llvm::ErrorInfoBase &) {
+                              // Ignore the error for now..
+                            });
+      getImpl().SDKInfo.emplace();
+    } else if (!*SDKInfoOrErr) {
+      getImpl().SDKInfo.emplace();
+    } else {
+      getImpl().SDKInfo.emplace(std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
+    }
+  }
+
+  return getImpl().SDKInfo->get();
+}
+
+const clang::DarwinSDKInfo::RelatedTargetVersionMapping
+*ASTContext::getAuxiliaryDarwinPlatformRemapInfo(clang::DarwinSDKInfo::OSEnvPair Kind) const {
+  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
+            *llvm::vfs::getRealFileSystem(),
+            *SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
+    if (!SDKInfoOrErr || !*SDKInfoOrErr) {
+      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
+                            [](const llvm::ErrorInfoBase &) {
+        // Ignore the error for now..
+      });
+    }
+    return (*SDKInfoOrErr)->getVersionMapping(Kind);
+  }
+  return nullptr;
 }
 
 /// The special Builtin.TheTupleType, which parents tuple extensions and

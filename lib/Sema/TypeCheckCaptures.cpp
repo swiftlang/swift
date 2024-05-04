@@ -26,6 +26,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -37,6 +38,16 @@ class FindCapturedVars : public ASTWalker {
   ASTContext &Context;
   SmallVector<CapturedValue, 4> Captures;
   llvm::SmallDenseMap<ValueDecl*, unsigned, 4> captureEntryNumber;
+
+  /// A stack of pack element environments we're currently walking into.
+  /// A reference to an element archetype defined by one of these is not
+  /// a capture.
+  llvm::SetVector<GenericEnvironment *> VisitingEnvironments;
+
+  /// A set of pack element environments we've encountered that were not
+  /// in the above stack; those are the captures.
+  llvm::SetVector<GenericEnvironment *> CapturedEnvironments;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
@@ -64,8 +75,9 @@ public:
         dynamicSelfToRecord = DynamicSelf;
     }
 
-    return CaptureInfo(Context, Captures, dynamicSelfToRecord, OpaqueValue,
-                       HasGenericParamCaptures);
+    return CaptureInfo(Context, Captures, dynamicSelfToRecord,
+                       OpaqueValue, HasGenericParamCaptures,
+                       CapturedEnvironments.getArrayRef());
   }
 
   bool hasGenericParamCaptures() const {
@@ -147,9 +159,17 @@ public:
     // perform it accurately.
     if (type->hasArchetype() || type->hasTypeParameter()) {
       type.walk(TypeCaptureWalker(ObjC, [&](Type t) {
-        if ((t->is<ArchetypeType>() ||
+        // Record references to element archetypes that were bound
+        // outside the body of the current closure.
+        if (auto *element = t->getAs<ElementArchetypeType>()) {
+          auto *env = element->getGenericEnvironment();
+          if (VisitingEnvironments.count(env) == 0)
+            CapturedEnvironments.insert(env);
+        }
+
+        if ((t->is<PrimaryArchetypeType>() ||
+             t->is<PackArchetypeType>() ||
              t->is<GenericTypeParamType>()) &&
-            !t->isOpenedExistential() &&
             !HasGenericParamCaptures) {
           GenericParamCaptureLoc = loc;
           HasGenericParamCaptures = true;
@@ -393,8 +413,13 @@ public:
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
+    // Don't walk into extensions because they only appear nested inside other
+    // things in invalid code, and we'll find all kinds of weird stuff inside.
+    if (isa<ExtensionDecl>(D)) {
+      return Action::SkipNode();
+    }
+
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      TypeChecker::computeCaptures(AFD);
       propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
       return Action::SkipNode();
     }
@@ -613,66 +638,51 @@ public:
       }
     }
 
+    if (auto expansion = dyn_cast<PackExpansionExpr>(E)) {
+      if (auto *env = expansion->getGenericEnvironment()) {
+        assert(VisitingEnvironments.count(env) == 0);
+        VisitingEnvironments.insert(env);
+      }
+    }
+
+    return Action::Continue(E);
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (auto expansion = dyn_cast<PackExpansionExpr>(E)) {
+      if (auto *env = expansion->getGenericEnvironment()) {
+        assert(env == VisitingEnvironments.back());
+        VisitingEnvironments.pop_back();
+        (void) env;
+      }
+    }
+
     return Action::Continue(E);
   }
 };
 
 } // end anonymous namespace
 
-void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
-  if (AFR.getCaptureInfo().hasBeenComputed())
-    return;
+CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
+                                         AbstractFunctionDecl *AFD) const {
+  auto type = AFD->getInterfaceType();
+  if (type->is<ErrorType>())
+    return CaptureInfo::empty();
 
-  if (!AFR.getBody())
-    return;
+  bool isNoEscape = type->castTo<AnyFunctionType>()->isNoEscape();
+  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape,
+                          AFD->isObjC(), AFD->isGeneric());
 
-  PrettyStackTraceAnyFunctionRef trace("computing captures for", AFR);
+  if (auto *body = AFD->getTypecheckedBody())
+    body->walk(finder);
 
-  // A generic function always captures outer generic parameters.
-  bool isGeneric = false;
-  auto *AFD = AFR.getAbstractFunctionDecl();
-  if (AFD)
-    isGeneric = (AFD->getGenericParams() != nullptr);
-
-  auto &Context = AFR.getAsDeclContext()->getASTContext();
-  FindCapturedVars finder(AFR.getLoc(),
-                          AFR.getAsDeclContext(),
-                          AFR.isKnownNoEscape(),
-                          AFR.isObjC(),
-                          isGeneric);
-  AFR.getBody()->walk(finder);
-
-  if (AFR.hasType() && !AFR.isObjC()) {
-    finder.checkType(AFR.getType(), AFR.getLoc());
-  }
-
-  AFR.setCaptureInfo(finder.getCaptureInfo());
-
-  // Compute captures for default argument expressions.
-  if (auto *AFD = AFR.getAbstractFunctionDecl()) {
-    for (auto *P : *AFD->getParameters()) {
-      if (auto E = P->getTypeCheckedDefaultExpr()) {
-        FindCapturedVars finder(E->getLoc(),
-                                AFD,
-                                /*isNoEscape=*/false,
-                                /*isObjC=*/false,
-                                /*IsGeneric*/isGeneric);
-        E->walk(finder);
-
-        if (!AFD->getDeclContext()->isLocalContext() &&
-            finder.getDynamicSelfCaptureLoc().isValid()) {
-          Context.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
-                                 diag::dynamic_self_default_arg);
-        }
-
-        P->setDefaultArgumentCaptureInfo(finder.getCaptureInfo());
-      }
-    }
+  if (!AFD->isObjC()) {
+    finder.checkType(type, AFD->getLoc());
   }
 
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.
-  if (AFD && finder.hasGenericParamCaptures()) {
+  if (finder.hasGenericParamCaptures()) {
     if (auto clazz = AFD->getParent()->getSelfClassDecl()) {
       if (clazz->isTypeErasedGenericClass()) {
         AFD->diagnose(diag::objc_generic_extension_using_type_parameter);
@@ -688,12 +698,64 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");
         }
 
-        Context.Diags.diagnose(
+        AFD->getASTContext().Diags.diagnose(
             finder.getGenericParamCaptureLoc(),
             diag::objc_generic_extension_using_type_parameter_here);
       }
     }
   }
+
+  return finder.getCaptureInfo();
+}
+
+void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
+  if (ACE->getCachedCaptureInfo())
+    return;
+
+  BraceStmt *body = ACE->getBody();
+
+  auto type = ACE->getType();
+  if (!type || type->is<ErrorType>() || body == nullptr) {
+    ACE->setCaptureInfo(CaptureInfo::empty());
+    return;
+  }
+
+  bool isNoEscape = type->castTo<FunctionType>()->isNoEscape();
+  FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
+                          /*isObjC=*/false, /*isGeneric=*/false);
+  body->walk(finder);
+
+  finder.checkType(type, ACE->getLoc());
+
+  auto info = finder.getCaptureInfo();
+  ACE->setCaptureInfo(info);
+}
+
+CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
+                                              ParamDecl *P) const {
+  auto E = P->getTypeCheckedDefaultExpr();
+  if (E == nullptr)
+    return CaptureInfo::empty();
+
+  auto *DC = P->getDeclContext();
+
+  // A generic function always captures outer generic parameters.
+  bool isGeneric = DC->isInnermostContextGeneric();
+
+  FindCapturedVars finder(E->getLoc(),
+                          DC,
+                          /*isNoEscape=*/false,
+                          /*isObjC=*/false,
+                          /*IsGeneric*/isGeneric);
+  E->walk(finder);
+
+  if (!DC->getParent()->isLocalContext() &&
+      finder.getDynamicSelfCaptureLoc().isValid()) {
+    P->getASTContext().Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                                      diag::dynamic_self_default_arg);
+  }
+
+  return finder.getCaptureInfo();
 }
 
 static bool isLazy(PatternBindingDecl *PBD) {

@@ -25,6 +25,7 @@
 
 #include "swift/ABI/KeyPath.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
+#include "swift/ABI/InvertibleProtocols.h"
 
 // FIXME: this include shouldn't be here, but removing it causes symbol
 // mangling mismatches on Windows for some reason?
@@ -1198,6 +1199,10 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values if we have a transferring result.
     HasTransferringResult  = 0x00000010U,
+
+    /// A InvertibleProtocolSet in the high bits.
+    InvertedProtocolshift = 16,
+    InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
   int_type Data;
 
@@ -1229,6 +1234,13 @@ public:
         (newValue ? HasTransferringResult : 0));
   }
 
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withInvertedProtocols(InvertibleProtocolSet inverted) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~InvertedProtocolMask) |
+        (inverted.rawBits() << InvertedProtocolshift));
+  }
+  
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
@@ -1241,6 +1253,10 @@ public:
 
   int_type getIntValue() const {
     return Data;
+  }
+
+  InvertibleProtocolSet getInvertedProtocols() const {
+    return InvertibleProtocolSet(Data >> InvertedProtocolshift);
   }
 
   static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
@@ -1688,13 +1704,15 @@ public:
   constexpr ContextDescriptorFlags(ContextDescriptorKind kind,
                                    bool isGeneric,
                                    bool isUnique,
-                                   uint8_t version,
+                                   bool hasInvertibleProtocols,
                                    uint16_t kindSpecificFlags)
     : ContextDescriptorFlags(ContextDescriptorFlags()
                                .withKind(kind)
                                .withGeneric(isGeneric)
                                .withUnique(isUnique)
-                               .withVersion(version)
+                               .withInvertibleProtocols(
+                                 hasInvertibleProtocols
+                               )
                                .withKindSpecificFlags(kindSpecificFlags))
   {}
 
@@ -1713,10 +1731,10 @@ public:
     return (Value & 0x40u) != 0;
   }
 
-  /// The format version of the descriptor. Higher version numbers may have
-  /// additional fields that aren't present in older versions.
-  constexpr uint8_t getVersion() const {
-    return (Value >> 8u) & 0xFFu;
+  /// Whether the context has information about invertible protocols, which
+  /// will show up as a trailing field in the context descriptor.
+  constexpr bool hasInvertibleProtocols() const {
+    return (Value & 0x20u) != 0;
   }
 
   /// The most significant two bytes of the flags word, which can have
@@ -1740,8 +1758,11 @@ public:
                                   | (isUnique ? 0x40u : 0));
   }
 
-  constexpr ContextDescriptorFlags withVersion(uint8_t version) const {
-    return ContextDescriptorFlags((Value & 0xFFFF00FFu) | (version << 8u));
+  constexpr ContextDescriptorFlags withInvertibleProtocols(
+      bool hasInvertibleProtocols
+  ) const {
+    return ContextDescriptorFlags((Value & ~0x20u)
+                                  | (hasInvertibleProtocols ? 0x20u : 0));
   }
 
   constexpr ContextDescriptorFlags
@@ -1981,10 +2002,13 @@ public:
   explicit constexpr GenericContextDescriptorFlags(uint16_t value)
     : Value(value) {}
 
-  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
-    : GenericContextDescriptorFlags(
+  constexpr GenericContextDescriptorFlags(
+      bool hasTypePacks, bool hasConditionalInvertedProtocols
+  ) : GenericContextDescriptorFlags(
         GenericContextDescriptorFlags((uint16_t)0)
-          .withHasTypePacks(hasTypePacks)) {}
+          .withHasTypePacks(hasTypePacks)
+          .withConditionalInvertedProtocols(
+            hasConditionalInvertedProtocols)) {}
 
   /// Whether this generic context has at least one type parameter
   /// pack, in which case the generic context will have a trailing
@@ -1993,10 +2017,23 @@ public:
     return (Value & 0x1) != 0;
   }
 
+  /// Whether this generic context has any conditional conformances to
+  /// inverted protocols, in which case the generic context will have a
+  /// trailing InvertibleProtocolSet and conditional requirements.
+  constexpr bool hasConditionalInvertedProtocols() const {
+    return (Value & 0x2) != 0;
+  }
+
   constexpr GenericContextDescriptorFlags
   withHasTypePacks(bool hasTypePacks) const {
     return GenericContextDescriptorFlags((uint16_t)(
       (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
+  }
+
+  constexpr GenericContextDescriptorFlags
+  withConditionalInvertedProtocols(bool value) const {
+    return GenericContextDescriptorFlags((uint16_t)(
+      (Value & ~0x2) | (value ? 0x2 : 0)));
   }
 
   constexpr uint16_t getIntValue() const {
@@ -2095,6 +2132,12 @@ enum class GenericRequirementKind : uint8_t {
   SameConformance = 3,
   /// A same-shape requirement between generic parameter packs.
   SameShape = 4,
+  /// A requirement stating which invertible protocol checks are
+  /// inverted.
+  ///
+  /// This is more of an "anti-requirement", specifing which checks don't need
+  /// to happen for a given type.
+  InvertedProtocols = 5,
   /// A layout requirement.
   Layout = 0x1F,
 };

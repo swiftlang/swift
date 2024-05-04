@@ -29,6 +29,14 @@ struct AddressWalkerState {
 static SILValue
 findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
                                        AddressWalkerState &state) {
+  // These are instructions which we are ok with looking through when
+  // identifying our allocation. It must always refer to the entire allocation.
+  auto isAlloc = [&](SILValue value) -> bool {
+    if (auto *ieai = dyn_cast<InitExistentialAddrInst>(value))
+      value = ieai->getOperand();
+    return value == SILValue(allocInst);
+  };
+
   // Walk from our allocation to one of our writes. Then make sure that the
   // write writes to our entire value.
   for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
@@ -38,17 +46,22 @@ findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
       continue;
 
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
-      if (copyAddr->getDest() == allocInst &&
+      if (isAlloc(copyAddr->getDest()) &&
           copyAddr->isInitializationOfDest()) {
         return copyAddr->getSrc();
       }
     }
 
     if (auto *si = dyn_cast<StoreInst>(&inst)) {
-      if (si->getDest() == allocInst &&
+      if (isAlloc(si->getDest()) &&
           si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
         return si->getSrc();
       }
+    }
+
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst)) {
+      if (isAlloc(sbi->getDest()))
+        return sbi->getSrc();
     }
 
     // If we do not identify the write... return SILValue(). We weren't able
@@ -128,6 +141,57 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
     if (auto *si = dyn_cast<StoreInst>(&inst)) {
       if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        // Check if we are updating the entire tuple value.
+        if (si->getDest() == allocInst) {
+          // If we already found a root address (meaning we were processing
+          // tuple_elt_addr), bail. We have some sort of unhandled mix of
+          // copy_addr and store.
+          if (foundRootAddress)
+            return SILValue();
+
+          // If we already found a destructure, return SILValue(). We are
+          // initializing twice.
+          if (foundDestructure)
+            return SILValue();
+
+          // We are looking for a pattern where we construct a tuple from
+          // destructured parts.
+          if (auto *ti = dyn_cast<TupleInst>(si->getSrc())) {
+            for (auto p : llvm::enumerate(ti->getOperandValues())) {
+              SILValue value = lookThroughOwnershipInsts(p.value());
+              if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+                      value->getDefiningInstruction())) {
+                // We should always go through the same dti.
+                if (foundDestructure && foundDestructure != dti)
+                  return SILValue();
+                if (!foundDestructure)
+                  foundDestructure = dti;
+
+                // If we have a mixmatch of indices, we cannot look through.
+                if (p.index() != dti->getIndexOfResult(value))
+                  return SILValue();
+                if (tupleValues[p.index()])
+                  return SILValue();
+                tupleValues[p.index()] = value;
+
+                // If we have completely covered the tuple, break.
+                --numEltsLeft;
+                if (!numEltsLeft)
+                  break;
+              }
+            }
+
+            // If we haven't completely covered the tuple, return SILValue(). We
+            // should completely cover the tuple.
+            if (numEltsLeft)
+              return SILValue();
+
+            // Otherwise, break since we are done.
+            break;
+          }
+        }
+
+        // If we store to a tuple_element_addr, update for a single value.
         if (auto *tei = dyn_cast<TupleElementAddrInst>(si->getDest())) {
           if (tei->getOperand() == allocInst) {
             unsigned i = tei->getFieldIndex();
@@ -183,7 +247,7 @@ static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
 
 SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     AllocationInst *allocInst) {
-  struct AddressWalker : public TransitiveAddressWalker<AddressWalker> {
+  struct AddressWalker final : public TransitiveAddressWalker<AddressWalker> {
     AddressWalkerState &state;
 
     AddressWalker(AddressWalkerState &state) : state(state) {}
@@ -192,6 +256,12 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
       if (use->getUser()->mayWriteToMemory())
         state.writes.insert(use->getUser());
       return true;
+    }
+
+    TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+        return TransitiveUseVisitation::OnlyUser;
+      return TransitiveUseVisitation::OnlyUses;
     }
 
     void onError(Operand *use) { state.foundError = true; }
@@ -250,6 +320,27 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
   return SILValue();
 }
 
+static BeginBorrowInst *hasOnlyBorrowingNonDestroyUse(SILValue searchValue) {
+  BeginBorrowInst *result = nullptr;
+  for (auto *use : searchValue->getUses()) {
+    if (isIncidentalUse(use->getUser()))
+      continue;
+    if (use->isConsuming()) {
+      if (!isa<DestroyValueInst>(use->getUser()))
+        return nullptr;
+      continue;
+    }
+
+    auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser());
+    if (!bbi || !bbi->isFromVarDecl())
+      return nullptr;
+    if (result)
+      return nullptr;
+    result = bbi;
+  }
+  return result;
+}
+
 SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     SILValue searchValue, ValueSet &visitedValues) {
   assert(searchValue);
@@ -264,6 +355,56 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       return SILValue();
 
     LLVM_DEBUG(llvm::dbgs() << "Value: " << *searchValue);
+
+    // Before we do anything, lets see if we have an explicit match due to a
+    // debug_value use.
+    if (auto *use = getAnyDebugUse(searchValue)) {
+      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
+        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+        variableNamePath.push_back(use->getUser());
+
+        // We return the value, not the debug_info.
+        return searchValue;
+      }
+    }
+
+    // If we are in Ownership SSA, see if we have an owned value that has one
+    // use, a move_value [var decl]. In such a case, check the move_value [var
+    // decl] for a debug_value.
+    //
+    // This pattern comes up if we are asked to get a name for an apply that is
+    // used to initialize a value. The name will not yet be associated with the
+    // value so we have to compensate.
+    //
+    // NOTE: This is a heuristic. Feel free to tweak accordingly.
+    if (auto *singleUse = searchValue->getSingleUse()) {
+      if (auto *mvi = dyn_cast<MoveValueInst>(singleUse->getUser())) {
+        if (mvi->isFromVarDecl()) {
+          if (auto *debugUse = getAnyDebugUse(mvi)) {
+            if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
+              assert(debugVar.getKind() ==
+                     DebugVarCarryingInst::Kind::DebugValue);
+              variableNamePath.push_back(debugUse->getUser());
+
+              // We return the value, not the debug_info.
+              return searchValue;
+            }
+          }
+        }
+      }
+    }
+
+    if (auto *bbi = hasOnlyBorrowingNonDestroyUse(searchValue)) {
+      if (auto *debugUse = getAnyDebugUse(bbi)) {
+        if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
+          assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+          variableNamePath.push_back(debugUse->getUser());
+
+          // We return the value, not the debug_info.
+          return searchValue;
+        }
+      }
+    }
 
     if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
       // If the instruction itself doesn't carry any variable info, see
@@ -286,6 +427,13 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
       variableNamePath.push_back(allocInst);
       return allocInst;
+    }
+
+    // If we have a store_borrow, always look at the dest. We are going to see
+    // if we can determine if dest is a temporary alloc_stack.
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(searchValue)) {
+      searchValue = sbi->getDest();
+      continue;
     }
 
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
@@ -466,18 +614,6 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
     }
 
-    // If we do not do an exact match, see if we can find a debug_var inst. If
-    // we do, we always break since we have a root value.
-    if (auto *use = getAnyDebugUse(searchValue)) {
-      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
-        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-        variableNamePath.push_back(use->getUser());
-
-        // We return the value, not the debug_info.
-        return searchValue;
-      }
-    }
-
     // Otherwise, try to see if we have a single value instruction we can look
     // through.
     if (isa<BeginBorrowInst>(searchValue) || isa<LoadInst>(searchValue) ||
@@ -487,7 +623,9 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperAddrInst>(searchValue) ||
-        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue)) {
+        isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
+        isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
+        isa<CopyableToMoveOnlyWrapperValueInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
@@ -618,6 +756,34 @@ void VariableNameInferrer::drainVariableNamePath() {
 
     resultingString += '.';
   }
+}
+
+std::optional<Identifier> VariableNameInferrer::inferName(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  if (!inferrer.inferByWalkingUsesToDefsReturningRoot(value))
+    return {};
+  return fn->getASTContext().getIdentifier(resultingName);
+}
+
+std::optional<std::pair<Identifier, SILValue>>
+VariableNameInferrer::inferNameAndRoot(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  SILValue rootValue = inferrer.inferByWalkingUsesToDefsReturningRoot(value);
+  if (!rootValue)
+    return {};
+  return {{fn->getASTContext().getIdentifier(resultingName), rootValue}};
 }
 
 //===----------------------------------------------------------------------===//

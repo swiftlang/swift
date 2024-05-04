@@ -715,6 +715,9 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformWatchOS; break;
       case PlatformKind::iOSApplicationExtension:
         PlatformUID = PlatformIOSAppExt; break;
+      case PlatformKind::visionOS:
+        // FIXME: Formal platform support in SourceKit is needed.
+        PlatformUID = UIdent(); break;
       case PlatformKind::macCatalystApplicationExtension:
         PlatformUID = PlatformMacCatalystAppExt; break;
       case PlatformKind::macOSApplicationExtension:
@@ -723,6 +726,9 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformtvOSAppExt; break;
       case PlatformKind::watchOSApplicationExtension:
         PlatformUID = PlatformWatchOSAppExt; break;
+      case PlatformKind::visionOSApplicationExtension:
+        // FIXME: Formal platform support in SourceKit is needed.
+        PlatformUID = UIdent(); break;
       case PlatformKind::OpenBSD:
         PlatformUID = PlatformOpenBSD; break;
       case PlatformKind::Windows:

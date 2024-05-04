@@ -1,4 +1,5 @@
 import Swift
+import CTypes
 
 public class SimpleClass {
     public let x: Int
@@ -39,6 +40,15 @@ public struct Simple {
     }
 }
 
+public struct CTypeAligned {
+    let x = BigAlignment()
+    let y: SimpleClass
+
+    public init(_ y: SimpleClass) {
+        self.y = y
+    }
+}
+
 public struct GenericStruct<T> {
     let x: Int = 0
     let y: T
@@ -57,17 +67,17 @@ public class GenericClass<T> {
 }
 
 public struct GenericBig<T> {
-    let x: T   
-    let x1: T  
-    let x2: T  
-    let x3: T  
-    let x4: T  
-    let x5: T  
-    let x6: T  
-    let x7: T  
-    let x8: T  
-    let x9: T  
-    let x10: T 
+    let x: T
+    let x1: T
+    let x2: T
+    let x3: T
+    let x4: T
+    let x5: T
+    let x6: T
+    let x7: T
+    let x8: T
+    let x9: T
+    let x10: T
 
     public init(x: T) {
         self.x = x
@@ -345,6 +355,11 @@ public struct ContainsSinglePayloadSimpleClassEnum {
         self.x = x
         self.y = y
     }
+}
+
+public enum TestOptional<T> {
+    case empty
+    case nonEmpty(T)
 }
 
 public enum SinglePayloadEnum<T> {

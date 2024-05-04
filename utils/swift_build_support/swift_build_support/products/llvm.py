@@ -295,17 +295,13 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.build_clang_tools_extra:
             llvm_enable_projects.append('clang-tools-extra')
 
-        # On non-Darwin platforms, build lld so we can always have a
+        # Always build lld -- on non-Darwin so we can always have a
         # linker that is compatible with the swift we are using to
-        # compile the stdlib.
+        # compile the stdlib, but on Darwin too for Embedded Swift use cases.
         #
         # This makes it easier to build target stdlibs on systems that
         # have old toolchains without more modern linker features.
-
-        target = targets.StdlibDeploymentTarget.get_target_for_name(host_target)
-
-        if not target.platform.is_darwin or self.args.build_lld:
-            llvm_enable_projects.append('lld')
+        llvm_enable_projects.append('lld')
 
         llvm_cmake_options.define('LLVM_ENABLE_PROJECTS',
                                   ';'.join(llvm_enable_projects))

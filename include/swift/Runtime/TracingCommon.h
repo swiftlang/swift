@@ -33,7 +33,9 @@ static inline bool shouldEnableTracing() {
     return false;
   if (__progname && (strcmp(__progname, "logd") == 0 ||
                      strcmp(__progname, "diagnosticd") == 0 ||
-                     strcmp(__progname, "notifyd") == 0))
+                     strcmp(__progname, "notifyd") == 0 ||
+                     strcmp(__progname, "xpcproxy") == 0 ||
+                     strcmp(__progname, "logd_helper") == 0))
     return false;
   return true;
 }

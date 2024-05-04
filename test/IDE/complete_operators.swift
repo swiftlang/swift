@@ -1,5 +1,8 @@
 // RUN: %batch-code-completion
 
+// temporarily disabled for build stability (rdar://124942971)
+// UNSUPPORTED: OS=linux-gnu
+
 struct S {}
 postfix operator ++ {}
 postfix func ++(x: inout S) -> S { return x }

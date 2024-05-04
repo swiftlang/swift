@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil  -enable-builtin-module -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip
+// RUN: %target-swift-frontend %s -emit-sil  -enable-builtin-module -enable-experimental-feature NonescapableTypes
 // REQUIRES: asserts
 
 import Builtin

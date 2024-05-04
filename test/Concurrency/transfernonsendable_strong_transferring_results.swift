@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature TransferringArgsAndResults -verify -enable-upcoming-feature RegionBasedIsolation %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -disable-availability-checking -enable-experimental-feature TransferringArgsAndResults -verify -enable-upcoming-feature RegionBasedIsolation %s -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -83,29 +83,29 @@ func simpleTest() async {
 // emit the first seen error on a path, so if we were to emit an error on
 // useValue(y), we would have emitted that error.
 func simpleTest2() async {
-  let x = NonSendableKlass() // expected-note {{variable defined here}}
+  let x = NonSendableKlass()
   let y = transferResultWithArg(x)
-  await transferToMainDirect(x) // expected-warning {{transferring 'x' may cause a race}}
-  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  await transferToMainDirect(x) // expected-warning {{transferring 'x' may cause a data race}}
+  // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
   useValue(y)
-  useValue(x) // expected-note {{access here could race}}
+  useValue(x) // expected-note {{use here could race}}
 }
 
 // Make sure that later errors with y can happen.
 func simpleTest3() async {
   let x = NonSendableKlass()
-  let y = transferResultWithArg(x) // expected-note {{variable defined here}}
+  let y = transferResultWithArg(x)
   await transferToMainDirect(x)
-  await transferToMainDirect(y) // expected-warning {{transferring 'y' may cause a race}}
-  // expected-note @-1 {{'y' is transferred from nonisolated caller to main actor-isolated callee}}
-  useValue(y) // expected-note {{access here could race}}
+  await transferToMainDirect(y) // expected-warning {{transferring 'y' may cause a data race}}
+  // expected-note @-1 {{transferring disconnected 'y' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  useValue(y) // expected-note {{use here could race}}
 }
 
 func transferResult() async -> transferring NonSendableKlass {
-  let x = NonSendableKlass() // expected-note {{variable defined here}}
-  await transferToMainDirect(x) // expected-warning {{transferring 'x' may cause a race}}
-  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
-  return x // expected-note {{access here could race}}
+  let x = NonSendableKlass()
+  await transferToMainDirect(x) // expected-warning {{transferring 'x' may cause a data race}}
+  // expected-note @-1 {{transferring disconnected 'x' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  return x // expected-note {{use here could race}}
 }
 
 func transferInAndOut(_ x: transferring NonSendableKlass) -> transferring NonSendableKlass {
@@ -114,14 +114,14 @@ func transferInAndOut(_ x: transferring NonSendableKlass) -> transferring NonSen
 
 
 func transferReturnArg(_ x: NonSendableKlass) -> transferring NonSendableKlass {
-  return x // expected-warning {{transferring 'x' may cause a race}}
+  return x // expected-warning {{transferring 'x' may cause a data race}}
   // expected-note @-1 {{task-isolated 'x' cannot be a transferring result. task-isolated uses may race with caller uses}}
 }
 
 // TODO: This will be fixed once I represent @MainActor on func types.
 @MainActor func transferReturnArgMainActor(_ x: NonSendableKlass) -> transferring NonSendableKlass {
-  return x // expected-warning {{transferring 'x' may cause a race}}
-  // expected-note @-1 {{task-isolated 'x' cannot be a transferring result. task-isolated uses may race with caller uses}}
+  return x // expected-warning {{transferring 'x' may cause a data race}}
+  // expected-note @-1 {{main actor-isolated 'x' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
 // This is safe since we are returning the whole tuple fresh. In contrast,
@@ -141,7 +141,7 @@ func useTransferredResult() async {
 
 extension MainActorIsolatedStruct {
   func testNonSendableErrorReturnWithTransfer() -> transferring NonSendableKlass {
-    return ns // expected-warning {{transferring 'self.ns' may cause a race}}
+    return ns // expected-warning {{transferring 'self.ns' may cause a data race}}
     // expected-note @-1 {{main actor-isolated 'self.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
   }
   func testNonSendableErrorReturnNoTransfer() -> NonSendableKlass {
@@ -157,7 +157,7 @@ extension MainActorIsolatedEnum {
     case .second(let ns):
       return ns
     }
-  } // expected-warning {{transferring 'ns.some' may cause a race}}
+  } // expected-warning {{transferring 'ns.some' may cause a data race}}
   // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 
   func testSwitchReturnNoTransfer() -> NonSendableKlass? {
@@ -174,7 +174,7 @@ extension MainActorIsolatedEnum {
       return ns // TODO: The error below should be here.
     }
     return nil
-  } // expected-warning {{transferring 'ns.some' may cause a race}}
+  } // expected-warning {{transferring 'ns.some' may cause a data race}}
   // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}} 
 
   func testIfLetReturnNoTransfer() -> NonSendableKlass? {

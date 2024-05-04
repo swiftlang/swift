@@ -3,14 +3,13 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
@@ -20,18 +19,17 @@ struct BV {
     self.i = i
   }
 
-  consuming func derive() -> _consume(self) BV {
+  consuming func derive() -> dependsOn(self) BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
     return BV(self.p, self.i)
   }
 }
 
-@_nonescapable
-struct NE {
+struct NE : ~Escapable {
   var bv: BV
 
-  init(_ bv: consuming BV) -> _consume(bv) Self {
+  init(_ bv: consuming BV) -> dependsOn(bv) Self {
     self.bv = bv
     return self
   }

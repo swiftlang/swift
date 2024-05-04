@@ -503,9 +503,29 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
                                   VarDecl *var,
                                   const ActorIsolation &varIsolation,
                                   ActorReferenceResult::Options &options) {
-  // must be immutable
-  if (!var->isLet())
+
+  bool accessWithinModule =
+      (fromModule == var->getDeclContext()->getParentModule());
+
+  if (varIsolation.getKind() == ActorIsolation::NonisolatedUnsafe)
+    return true;
+
+  if (!var->isLet()) {
+    ASTContext &ctx = var->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+      // A mutable storage of a value type accessed from within the module is
+      // okay.
+      if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
+          !var->isStatic() && 
+          var->hasStorage() &&
+          var->getTypeInContext()->isSendableType() &&
+          accessWithinModule) {
+        return true;
+      }
+    }
+    // Otherwise, must be immutable.
     return false;
+  }
 
   switch (varIsolation) {
   case ActorIsolation::Nonisolated:
@@ -537,9 +557,6 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
       if (nominalParent->isDistributedActor())
         return false;
     }
-
-    bool accessWithinModule =
-        (fromModule == var->getDeclContext()->getParentModule());
 
     // If the type is not 'Sendable', it's unsafe
     if (!var->getTypeInContext()->isSendableType()) {
@@ -675,10 +692,6 @@ static bool isSendableClosure(
     if (forActorIsolation && explicitClosure->inheritsActorContext()) {
       return false;
     }
-
-    if (explicitClosure->isIsolatedByPreconcurrency() &&
-        !shouldDiagnoseExistingDataRaces(closure->getParent()))
-      return false;
   }
 
   if (auto type = closure->getType()) {
@@ -779,8 +792,8 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 
 /// Determine whether the given nominal type has an explicit Sendable
 /// conformance (regardless of its availability).
-static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
-                                           bool applyModuleDefault = true) {
+bool swift::hasExplicitSendableConformance(NominalTypeDecl *nominal,
+                                           bool applyModuleDefault) {
   ASTContext &ctx = nominal->getASTContext();
   auto nominalModule = nominal->getParentModule();
 
@@ -1907,7 +1920,7 @@ bool swift::isAsyncDecl(ConcreteDeclRef declRef) {
 /// \param ty a function type where \c globalActor was removed from it.
 /// \return true if it is safe to drop the global-actor qualifier.
 static bool safeToDropGlobalActor(
-    DeclContext *dc, Type globalActor, Type ty) {
+    DeclContext *dc, Type globalActor, Type ty, ApplyExpr *call) {
   auto funcTy = ty->getAs<AnyFunctionType>();
   if (!funcTy)
     return false;
@@ -1931,6 +1944,12 @@ static bool safeToDropGlobalActor(
   // in light of SE-338.
   if (funcTy->isAsync())
     return true;
+
+  // If the argument is passed over an isolation boundary, it's not
+  // safe to erase actor isolation, because the callee can call the
+  // function synchronously from outside the isolation domain.
+  if (call && call->getIsolationCrossing())
+    return false;
 
   // fundamentally cannot be sendable if we want to drop isolation info
   if (funcTy->isSendable())
@@ -2354,7 +2373,8 @@ namespace {
               return;
 
             auto dc = const_cast<DeclContext*>(getDeclContext());
-            if (!safeToDropGlobalActor(dc, fromActor, toType)) {
+            if (!safeToDropGlobalActor(dc, fromActor, toType,
+                                       getImmediateApply())) {
               // otherwise, it's not a safe cast.
               dc->getASTContext()
                   .Diags
@@ -2461,9 +2481,9 @@ namespace {
 
     /// Check closure captures for Sendable violations.
     void checkLocalCaptures(AnyFunctionRef localFunc) {
-      SmallVector<CapturedValue, 2> captures;
-      localFunc.getCaptureInfo().getLocalCaptures(captures);
-      for (const auto &capture : captures) {
+      for (const auto &capture : localFunc.getCaptureInfo().getCaptures()) {
+        if (!capture.isLocalCapture())
+          continue;
         if (capture.isDynamicSelfMetadata())
           continue;
         if (capture.isOpaqueValue())
@@ -2607,9 +2627,23 @@ namespace {
       return MacroWalking::Expansion;
     }
 
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+      // Walking into patterns leads to nothing good because then we
+      // end up visiting the AccessorDecls of a top-level
+      // PatternBindingDecl twice.
+      return Action::SkipNode(pattern);
+    }
+
     PreWalkAction walkToDeclPre(Decl *decl) override {
+      // Don't walk into local types because nothing in them can
+      // change the outcome of our analysis, and we don't want to
+      // assume things there have been type checked yet.
+      if (isa<TypeDecl>(decl)) {
+        return Action::SkipChildren();
+      }
+
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (func->isLocalContext()) {
+        if (func->getDeclContext()->isLocalContext()) {
           checkLocalCaptures(func);
         }
 
@@ -3692,12 +3726,15 @@ namespace {
     bool checkLocalCapture(
         ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
       auto value = valueRef.getDecl();
+      auto *dc = getDeclContext();
 
       // Check whether we are in a context that will not execute concurrently
       // with the context of 'self'. If not, it's safe.
-      if (!mayExecuteConcurrentlyWith(
-              getDeclContext(), findCapturedDeclContext(value)))
+      if (!mayExecuteConcurrentlyWith(dc, findCapturedDeclContext(value)))
         return false;
+
+      SendableCheckContext sendableBehavior(dc);
+      auto limit = sendableBehavior.defaultDiagnosticBehavior();
 
       // Check whether this is a local variable, in which case we can
       // determine whether it was safe to access concurrently.
@@ -3738,7 +3775,7 @@ namespace {
             loc, diag::concurrent_access_of_local_capture,
             parent.dyn_cast<LoadExpr *>(),
             var)
-          .warnUntilSwiftVersion(6);
+          .limitBehaviorUntilSwiftVersion(limit, 6);
         return true;
       }
 
@@ -3748,7 +3785,7 @@ namespace {
 
         func->diagnose(diag::local_function_executed_concurrently, func)
           .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ")
-          .warnUntilSwiftVersion(6);
+          .limitBehaviorUntilSwiftVersion(limit, 6);
 
         // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
@@ -4161,15 +4198,21 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     if (useIsolation == defIsolation)
       return false;
 
+    auto &ctx = useContext->getASTContext();
+    bool regionIsolationEnabled =
+        ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
+    
+    // Globally-isolated closures may never be executed concurrently.
+    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
+        regionIsolationEnabled && useIsolation.isGlobalActor())
+      return false;
+
     // If the local function is not Sendable, its isolation differs
     // from that of the context, and both contexts are actor isolated,
     // then capturing non-Sendable values allows the closure to stash
     // those values into actor isolated state. The original context
     // may also stash those values into isolated state, enabling concurrent
     // access later on.
-    auto &ctx = useContext->getASTContext();
-    bool regionIsolationEnabled =
-        ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
     isolatedStateMayEscape =
         (!regionIsolationEnabled &&
         useIsolation.isActorIsolated() && defIsolation.isActorIsolated());
@@ -4223,7 +4266,9 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);
-    if(ctx.LangOpts.hasFeature(Feature::GroupActorErrors)){ checker.diagnoseIsolationErrors(); }
+    if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
+      checker.diagnoseIsolationErrors();
+    }
   }
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     if (auto superInit = ctor->getSuperInitCall())
@@ -5075,17 +5120,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
         llvm_unreachable("cannot infer erased isolation");
 
       case ActorIsolation::GlobalActor: {
-        // Stored properties of a struct don't need global-actor isolation.
-        if (ctx.isSwiftVersionAtLeast(6))
-          if (auto *var = dyn_cast<VarDecl>(value))
-            if (!var->isStatic() && var->isOrdinaryStoredProperty())
-              if (auto *varDC = var->getDeclContext())
-                if (auto *nominal = varDC->getSelfNominalTypeDecl())
-                  if (isa<StructDecl>(nominal) &&
-                      !isWrappedValueOfPropWrapper(var))
-                    return ActorIsolation::forUnspecified().withPreconcurrency(
-                        inferred.preconcurrency());
-
         auto typeExpr =
             TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
         auto attr =
@@ -5132,9 +5166,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
         llvm_unreachable("context cannot have erased isolation");
 
       case ActorIsolation::ActorInstance:
-        if (auto param = func->getCaptureInfo().getIsolatedParamCapture())
-          return inferredIsolation(enclosingIsolation);
-        break;
+        return inferredIsolation(enclosingIsolation);
 
       case ActorIsolation::GlobalActor:
         return inferredIsolation(enclosingIsolation);
@@ -5263,6 +5295,14 @@ bool HasIsolatedSelfRequest::evaluate(
 
   // For accessors, consider the storage declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
+    // distributed thunks are nonisolated, although the attached to storage
+    // will be 'distributed var' and therefore isolated to the distributed
+    // actor. Therefore, if we're a thunk, don't look at the storage for
+    // deciding about isolation of this function.
+    if (accessor->isDistributedThunk()) {
+      return false;
+    }
+
     value = accessor->getStorage();
   }
 
@@ -5341,11 +5381,9 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
       return ActorIsolation::forUnspecified();
 
     auto i = pbd->getPatternEntryIndexForVarDecl(var);
-    if (!pbd->isInitializerChecked(i))
-      TypeChecker::typeCheckPatternBinding(pbd, i);
 
     dc = cast<Initializer>(pbd->getInitContext(i));
-    initExpr = pbd->getInit(i);
+    initExpr = pbd->getCheckedAndContextualizedInit(i);
     enclosingIsolation = getActorIsolation(var);
   } else if (auto *param = dyn_cast<ParamDecl>(var)) {
     // If this parameter corresponds to a stored property for a
@@ -6051,6 +6089,7 @@ swift::isDispatchQueueOperationName(StringRef name) {
       .Case("sync", DispatchQueueOperation::Normal)
       .Case("async", DispatchQueueOperation::Sendable)
       .Case("asyncAndWait", DispatchQueueOperation::Normal)
+      .Case("asyncUnsafe", DispatchQueueOperation::Normal)
       .Case("asyncAfter", DispatchQueueOperation::Sendable)
       .Case("concurrentPerform", DispatchQueueOperation::Sendable)
       .Default(std::nullopt);
@@ -6148,8 +6187,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     // @MainActor occurs in concurrency contexts or those where we have an
     // application.
     bool addSendable = knownUnsafeParams && inConcurrencyContext;
-    bool addMainActor =
-        (isMainDispatchQueue && knownUnsafeParams) &&
+    bool addMainActor = isMainDispatchQueue &&
         (inConcurrencyContext || numApplies >= 1);
     Type newParamType = param.getPlainType();
     if (addSendable || addMainActor) {
@@ -6392,8 +6430,8 @@ bool swift::isPotentiallyIsolatedActor(
 
 /// Determine the actor isolation used when we are referencing the given
 /// declaration.
-static ActorIsolation getActorIsolationForReference(
-    ValueDecl *decl, const DeclContext *fromDC) {
+static ActorIsolation getActorIsolationForReference(ValueDecl *decl,
+                                                    const DeclContext *fromDC) {
   auto declIsolation = getActorIsolation(decl);
 
   // If the isolation is preconcurrency global actor, adjust it based on
@@ -6430,12 +6468,19 @@ static ActorIsolation getActorIsolationForReference(
     // Fall through to treat initializers like any other declaration.
   }
 
-  // A 'nonisolated let' within an actor is treated as isolated from the
-  // perspective of the referencer.
+  // A 'nonisolated let' within an actor is treated as isolated if
+  // the access is outside the module or if the property type is not
+  // 'Sendable'.
   //
   // FIXME: getActorIsolation(decl) should treat these as isolated.
   // FIXME: Expand this out to local variables?
   if (auto var = dyn_cast<VarDecl>(decl)) {
+    auto *fromModule = fromDC->getParentModule();
+    ActorReferenceResult::Options options = std::nullopt;
+    if (varIsSafeAcrossActors(fromModule, var, declIsolation, options) &&
+        var->getTypeInContext()->isSendableType())
+      return ActorIsolation::forNonisolated(/*unsafe*/false);
+
     if (var->isLet() && isStoredProperty(var) &&
         declIsolation.isNonisolated()) {
       if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {

@@ -2570,7 +2570,9 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
       // Today if we promote, this is always a store, since we would have
       // blown up the copy_addr otherwise. Given that, always make sure we
       // clean up the src as appropriate after we optimize.
-      auto *si = cast<StoreInst>(pmoMemUse.Inst);
+      auto *si = dyn_cast<StoreInst>(pmoMemUse.Inst);
+      if (!si)
+        return false;
       auto src = si->getSrc();
 
       // Bail if src has any uses that are forwarding unowned uses. This

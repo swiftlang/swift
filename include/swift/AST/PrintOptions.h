@@ -382,8 +382,17 @@ struct PrintOptions {
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
+  /// Suppress 'transferring' on arguments and results.
+  bool SuppressTransferringArgsAndResults = false;
+
   /// Suppress Noncopyable generics.
   bool SuppressNoncopyableGenerics = false;
+
+  /// Suppress printing of `borrowing` and `consuming`.
+  bool SuppressNoncopyableOwnershipModifiers = false;
+
+  /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
+  bool SuppressConformanceSuppression = false;
 
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
@@ -447,7 +456,7 @@ struct PrintOptions {
   bool PrintInSILBody = false;
 
   /// Whether to use an empty line to separate two members in a single decl.
-  bool EmptyLineBetweenMembers = false;
+  bool EmptyLineBetweenDecls = false;
 
   /// Whether to print empty members of a declaration on a single line, e.g.:
   /// ```
@@ -501,9 +510,6 @@ struct PrintOptions {
   /// Note that this may print documentation comments from related declarations
   /// (e.g. the overridden method in the superclass) if such comment is found.
   bool PrintDocumentationComments = false;
-
-  /// Whether to print regular comments from clang module headers.
-  bool PrintRegularClangComments = false;
 
   /// When true, printing interface from a source file will print the original
   /// source text for applicable declarations, in order to preserve the
@@ -645,7 +651,6 @@ struct PrintOptions {
     result.TypeDefinitions = true;
     result.VarInitializers = true;
     result.PrintDocumentationComments = true;
-    result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
     return result;
@@ -696,7 +701,7 @@ struct PrintOptions {
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipUnsafeCXXMethods = true;
     result.SkipDeinit = true;
-    result.EmptyLineBetweenMembers = true;
+    result.EmptyLineBetweenDecls = true;
     result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
@@ -759,7 +764,7 @@ struct PrintOptions {
   static PrintOptions printSwiftFileInterface(bool printFullConvention) {
     PrintOptions result = printInterface(printFullConvention);
     result.AccessFilter = AccessLevel::Internal;
-    result.EmptyLineBetweenMembers = true;
+    result.EmptyLineBetweenDecls = true;
     return result;
   }
 

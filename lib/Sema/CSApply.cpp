@@ -98,8 +98,15 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
     auto type = getFixedType(opened.second);
-    if (opened.first->isParameterPack() && !type->is<PackType>())
-      type = PackType::getSingletonPackExpansion(type);
+    if (opened.first->isParameterPack()) {
+      if (type->is<PlaceholderType>()) {
+        auto &ctx = type->getASTContext();
+        type =
+        PackType::get(ctx, {PackExpansionType::get(ctx.TheUnresolvedType,
+                                                   ctx.TheUnresolvedType)});
+      } else if (!type->is<PackType>())
+        type = PackType::getSingletonPackExpansion(type);
+    }
     subs[opened.first] = type;
   }
 
@@ -6688,13 +6695,24 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   Type fromInstanceType = fromType;
   Type toInstanceType = toType;
 
-  // Look through metatypes
+  // For existential-to-existential coercions, open the source existential.
+  Type openedFromType;
+  if (fromType->isAnyExistentialType()) {
+    openedFromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
+                                                 dc->getGenericSignatureOfContext());
+  }
+
+  Type openedFromInstanceType = openedFromType;
+
+  // Look through metatypes.
   while ((fromInstanceType->is<UnresolvedType>() ||
           fromInstanceType->is<AnyMetatypeType>()) &&
          toInstanceType->is<ExistentialMetatypeType>()) {
     if (!fromInstanceType->is<UnresolvedType>())
-      fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getExistentialInstanceType();
+      fromInstanceType = fromInstanceType->getMetatypeInstanceType();
+    if (openedFromInstanceType && !openedFromInstanceType->is<UnresolvedType>())
+      openedFromInstanceType = openedFromInstanceType->getMetatypeInstanceType();
+    toInstanceType = toInstanceType->getMetatypeInstanceType();
   }
 
   ASTContext &ctx = cs.getASTContext();
@@ -6758,20 +6776,13 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   }
 
   // For existential-to-existential coercions, open the source existential.
-  if (fromType->isAnyExistentialType()) {
-    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
-                                           dc->getGenericSignatureOfContext());
-
+  if (openedFromType) {
     auto *archetypeVal = cs.cacheType(
-        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
-
-    fromInstanceType = fromType;
-    while (auto *metatypeType = fromInstanceType->getAs<MetatypeType>())
-      fromInstanceType = metatypeType->getInstanceType();
+        new (ctx) OpaqueValueExpr(expr->getSourceRange(), openedFromType));
 
     auto conformances =
         dc->getParentModule()
-          ->collectExistentialConformances(fromInstanceType->getCanonicalType(),
+          ->collectExistentialConformances(openedFromInstanceType->getCanonicalType(),
                                            toInstanceType->getCanonicalType(),
                                            /*allowMissing=*/true);
 
@@ -7451,7 +7462,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
+    if (ctx.LangOpts.isDynamicActorIsolationCheckingEnabled()) {
       // Passing a synchronous global actor-isolated function value and
       // parameter that expects a synchronous non-isolated function type could
       // require a runtime check to ensure that function is always called in
@@ -8325,6 +8336,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
 bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
+
   if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
     return false;
 

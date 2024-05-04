@@ -229,15 +229,22 @@ void BitwiseCopyableStorageVisitor::emitNonconformingMemberTypeDiagnostic(
 static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
                                                 DeclContext *dc,
                                                 BitwiseCopyableCheck check) {
-  assert(dc->getParentModule()->getASTContext().getProtocol(
-      KnownProtocolKind::BitwiseCopyable));
-
-  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isNoncopyable()) {
+  auto *conformanceDecl = dc->getAsDecl() ? dc->getAsDecl() : nominal;
+  if (nominal->suppressesConformance(KnownProtocolKind::BitwiseCopyable)) {
     if (!isImplicit(check)) {
-      nominal->diagnose(diag::non_bitwise_copyable_type_noncopyable);
+      conformanceDecl->diagnose(diag::non_bitwise_copyable_type_suppressed);
     }
     return true;
   }
+
+  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
+          ->isNoncopyable()) {
+    // Already separately diagnosed when explicit.
+    return true;
+  }
+
+  assert(dc->getParentModule()->getASTContext().getProtocol(
+      KnownProtocolKind::BitwiseCopyable));
 
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {

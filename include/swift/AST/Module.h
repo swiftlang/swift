@@ -721,6 +721,16 @@ public:
     Bits.ModuleDecl.AllowNonResilientAccess = flag;
   }
 
+  /// Returns true if -experimental-package-cmo was passed, which
+  /// enables serialization of package, public, and inlinable decls in a
+  /// package. This requires -experimental-allow-non-resilient-access.
+  bool serializePackageEnabled() const {
+    return Bits.ModuleDecl.SerializePackageEnabled;
+  }
+  void setSerializePackageEnabled(bool flag = true) {
+    Bits.ModuleDecl.SerializePackageEnabled = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///
@@ -1268,6 +1278,11 @@ void collectParsedExportedImports(const ModuleDecl *M,
                                   SmallPtrSetImpl<ModuleDecl *> &Imports,
                                   llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
                                   llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
+
+/// If the import that would make the given declaration visibile is absent,
+/// emit a diagnostic and a fix-it suggesting adding the missing import.
+bool diagnoseMissingImportForMember(const ValueDecl *decl,
+                                    const DeclContext *dc, SourceLoc loc);
 
 } // end namespace swift
 

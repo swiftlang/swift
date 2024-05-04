@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "swift/Option/Options.h"
+#include "swift/SIL/SILBridging.h"
 
 using namespace swift::dependencies;
 
@@ -129,7 +131,11 @@ void swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner) {
 //=== Scanner Functions ---------------------------------------------------===//
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {
+  static std::mutex initializationMutex;
+  std::lock_guard<std::mutex> lock(initializationMutex);
   INITIALIZE_LLVM();
+  if (!swiftModulesInitialized())
+    initializeSwiftModules();
   return wrap(new DependencyScanningTool());
 }
 
@@ -357,6 +363,12 @@ swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_header_dependency(
     swiftscan_module_details_t details) {
   return details->swift_binary_details.header_dependency;
+}
+
+swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_header_dependency_module_dependencies(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.header_dependencies_module_dependnecies;
 }
 
 bool swiftscan_swift_binary_detail_get_is_framework(

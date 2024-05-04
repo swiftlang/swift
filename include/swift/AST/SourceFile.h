@@ -418,6 +418,11 @@ public:
     ImportedUnderlyingModule = module;
   }
 
+  /// Finds the import declaration that effectively imports a given module in
+  /// this source file.
+  std::optional<AttributedImport<ImportedModule>>
+  findImport(const ModuleDecl *mod) const;
+
   /// Whether the given import has used @preconcurrency.
   bool hasImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import) const;
@@ -451,6 +456,9 @@ public:
   /// Does this source file have any imports with \c flag?
   /// If not, we can fast-path module checks.
   bool hasImportsWithFlag(ImportFlags flag) const;
+
+  /// Returns the import flags that are active on imports of \p module.
+  ImportFlags getImportFlags(const ModuleDecl *module) const;
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
@@ -623,6 +631,11 @@ public:
   /// because it describes a macro expansion, return the source file it was
   /// enclosed in.
   SourceFile *getEnclosingSourceFile() const;
+
+  /// If this file has an enclosing source file (because it is the result of
+  /// expanding a macro or default argument), returns the node in the enclosing
+  /// file that this file's contents were expanded from.
+  ASTNode getNodeInEnclosingSourceFile() const;
 
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.

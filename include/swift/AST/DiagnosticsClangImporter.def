@@ -42,6 +42,8 @@ WARNING(could_not_rewrite_bridging_header,none,
 ERROR(bridging_header_pch_error,Fatal,
    "failed to emit precompiled header '%0' for bridging header '%1'",
    (StringRef, StringRef))
+ERROR(err_rewrite_bridging_header,none,
+  "failed to serialize bridging header: '%0'", (StringRef))
 
 ERROR(emit_pcm_error,Fatal,
    "failed to emit precompiled module '%0' for module map '%1'",
@@ -244,10 +246,6 @@ ERROR(conforms_to_ambiguous,none,
 
 ERROR(conforms_to_not_protocol,none,
       "%0 %1 referenced in protocol conformance '%2' is not a protocol", (DescriptiveDeclKind, ValueDecl *, StringRef))
-
-ERROR(move_only_requires_move_only,none,
-      "use of noncopyable C++ type '%0' requires -enable-experimental-move-only",
-      (StringRef))
 
 ERROR(failed_base_method_call_synthesis,none,
       "failed to synthesize call to the base method %0 of type %0",

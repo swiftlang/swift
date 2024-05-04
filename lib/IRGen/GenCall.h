@@ -247,6 +247,8 @@ namespace irgen {
                        SILType funcResultTypeInContext,
                        CanSILFunctionType fnType, Explosion &result,
                        Explosion &error);
+  void emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
+                                    SILType funcResultType, SILType returnResultType);
 
   Address emitAutoDiffCreateLinearMapContextWithType(
       IRGenFunction &IGF, llvm::Value *topLevelSubcontextMetatype);

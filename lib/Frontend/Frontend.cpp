@@ -276,10 +276,8 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 }
 
 bool CompilerInstance::setUpASTContextIfNeeded() {
-  if ((Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::CompileModuleFromInterface ||
-      Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::TypecheckModuleFromInterface) &&
+  if (FrontendOptions::doesActionBuildModuleFromInterface(
+          Invocation.getFrontendOptions().RequestedAction) &&
       !Invocation.getFrontendOptions().ExplicitInterfaceBuild) {
     // Compiling a module interface from source uses its own CompilerInstance
     // with options read from the input file. Don't bother setting up an
@@ -564,6 +562,23 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   return false;
 }
 
+bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
+                                      std::string &Error,
+                                      ArrayRef<const char *> Args) {
+  // This is the fast path for setup an instance for replay but cannot run
+  // regular compilation.
+  Invocation = Invoke;
+
+  if (setupCASIfNeeded(Args)) {
+    Error = "Setting up CAS failed";
+    return true;
+  }
+
+  setupOutputBackend();
+  setupCachingDiagnosticsProcessorIfNeeded();
+  return false;
+}
+
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   if (Invocation.getCASOptions().requireCASFS()) {
     const auto &Opts = getInvocation().getCASOptions();
@@ -711,26 +726,7 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                   enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
-  auto MLM = ModuleLoadingMode::PreferSerialized;
-  if (auto forceModuleLoadingMode =
-      llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
-    if (*forceModuleLoadingMode == "prefer-interface" ||
-        *forceModuleLoadingMode == "prefer-parseable")
-      MLM = ModuleLoadingMode::PreferInterface;
-    else if (*forceModuleLoadingMode == "prefer-serialized")
-      MLM = ModuleLoadingMode::PreferSerialized;
-    else if (*forceModuleLoadingMode == "only-interface" ||
-             *forceModuleLoadingMode == "only-parseable")
-      MLM = ModuleLoadingMode::OnlyInterface;
-    else if (*forceModuleLoadingMode == "only-serialized")
-      MLM = ModuleLoadingMode::OnlySerialized;
-    else {
-      Diagnostics.diagnose(SourceLoc(),
-                           diag::unknown_forced_module_loading_mode,
-                           *forceModuleLoadingMode);
-      return true;
-    }
-  }
+  auto MLM = Invocation.getSearchPathOptions().ModuleLoadMode;
   auto IgnoreSourceInfoFile =
     Invocation.getFrontendOptions().IgnoreSwiftSourceInfo;
   if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
@@ -747,18 +743,18 @@ bool CompilerInstance::setUpModuleLoaders() {
   bool ExplicitModuleBuild =
       Invocation.getFrontendOptions().DisableImplicitModules;
   if (ExplicitModuleBuild ||
-      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
+      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
     if (Invocation.getCASOptions().EnableCaching)
       ESML = ExplicitCASModuleLoader::create(
           *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
-          MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath,
           Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
           IgnoreSourceInfoFile);
     else
       ESML = ExplicitSwiftModuleLoader::create(
           *Context, getDependencyTracker(), MLM,
-          Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath,
           Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
           IgnoreSourceInfoFile);
   }
@@ -869,7 +865,7 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
 
 static inline bool isPCHFilenameExtension(StringRef path) {
   return llvm::sys::path::extension(path)
-    .endswith(file_types::getExtension(file_types::TY_PCH));
+    .ends_with(file_types::getExtension(file_types::TY_PCH));
 }
 
 std::string CompilerInstance::getBridgingHeaderPath() const {
@@ -1403,6 +1399,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setHasCxxInteroperability();
     if (Invocation.getLangOptions().AllowNonResilientAccess)
       MainModule->setAllowNonResilientAccess();
+    if (Invocation.getSILOptions().EnableSerializePackage)
+      MainModule->setSerializePackageEnabled();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);

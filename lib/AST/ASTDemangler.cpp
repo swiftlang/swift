@@ -571,17 +571,33 @@ getResultOptions(ImplResultInfoOptions implOptions) {
   return result;
 }
 
+static SILCoroutineKind
+getCoroutineKind(ImplCoroutineKind kind) {
+  switch (kind) {
+  case ImplCoroutineKind::None:
+    return SILCoroutineKind::None;
+  case ImplCoroutineKind::YieldOnce:
+    return SILCoroutineKind::YieldOnce;
+  case ImplCoroutineKind::YieldMany:
+    return SILCoroutineKind::YieldMany;
+  }
+  llvm_unreachable("unknown coroutine kind");
+}
+
 Type ASTBuilder::createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,
+    Demangle::ImplCoroutineKind coroutineKind,
     ArrayRef<Demangle::ImplFunctionParam<Type>> params,
+    ArrayRef<Demangle::ImplFunctionYield<Type>> yields,
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     std::optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
   GenericSignature genericSig;
 
-  SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
     getParameterConvention(calleeConvention);
+  SILCoroutineKind funcCoroutineKind =
+    getCoroutineKind(coroutineKind);
 
   SILFunctionTypeRepresentation representation;
   switch (flags.getRepresentation()) {
@@ -641,6 +657,13 @@ Type ASTBuilder::createImplFunctionType(
     auto type = param.getType()->getCanonicalType();
     auto conv = getParameterConvention(param.getConvention());
     auto options = *getParameterOptions(param.getOptions());
+    funcParams.emplace_back(type, conv, options);
+  }
+
+  for (const auto &yield : yields) {
+    auto type = yield.getType()->getCanonicalType();
+    auto conv = getParameterConvention(yield.getConvention());
+    auto options = *getParameterOptions(yield.getOptions());
     funcParams.emplace_back(type, conv, options);
   }
 
@@ -1082,16 +1105,15 @@ ASTBuilder::createTypeDecl(NodePointer node,
   return dyn_cast<GenericTypeDecl>(DC);
 }
 
-ModuleDecl *
-ASTBuilder::findModule(NodePointer node) {
+ModuleDecl *ASTBuilder::findModule(NodePointer node) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
   const auto moduleName = node->getText();
-  // Respect the main module's ABI name when we're trying to resolve
+  // Respect the module's ABI name when we're trying to resolve
   // mangled names. But don't touch anything under the Swift stdlib's
-  // umbrella. 
-  if (Ctx.MainModule && Ctx.MainModule->getABIName().is(moduleName))
-    if (!Ctx.MainModule->getABIName().is(STDLIB_NAME))
-      return Ctx.MainModule;
+  // umbrella.
+  if (moduleName != STDLIB_NAME)
+    if (auto *Module = Ctx.getLoadedModuleByABIName(moduleName))
+      return Module;
 
   return Ctx.getModuleByName(moduleName);
 }
@@ -1268,22 +1290,52 @@ ASTBuilder::findDeclContext(NodePointer node) {
       return nullptr;
 
     CanGenericSignature genericSig;
-    if (node->getNumChildren() > 2)
+    bool genericSigMatchesNominal = false;
+    if (node->getNumChildren() > 2) {
       genericSig = demangleGenericSignature(nominalDecl, node->getChild(2));
+
+      // If the generic signature are equivalent to that of the nominal type,
+      // we're either in another module or the nominal type is generic and
+      // involves inverse requirements on its generic parameters.
+      genericSigMatchesNominal = genericSig &&
+        genericSig == nominalDecl->getGenericSignatureOfContext().getCanonicalSignature();
+
+      // If the generic signature is equivalent to that of the nominal type,
+      // and we're in the same module, it's due to inverse requirements.
+      // Just return the nominal declaration.
+      if (genericSigMatchesNominal &&
+          nominalDecl->getParentModule() == moduleDecl) {
+        return nominalDecl;
+      }
+    }
 
     for (auto *ext : nominalDecl->getExtensions()) {
       if (ext->getParentModule() != moduleDecl)
         continue;
 
       if (!ext->isConstrainedExtension()) {
-        if (!genericSig ||
-            genericSig->isEqual(nominalDecl->getGenericSignature()))
+        if (!genericSig || genericSigMatchesNominal)
           return ext;
+
         continue;
       }
 
-      if (ext->getGenericSignature().getCanonicalSignature() == genericSig) {
+      if (!ext->isWrittenWithConstraints() && !genericSig)
         return ext;
+
+      auto extSig = ext->getGenericSignature().getCanonicalSignature();
+      if (extSig == genericSig) {
+        return ext;
+      }
+
+      // If the extension mangling doesn't include a generic signature, it
+      // might be because the nominal type suppresses conformance.
+      if (!genericSig) {
+        SmallVector<Requirement, 2> requirements;
+        SmallVector<InverseRequirement, 2> inverses;
+        extSig->getRequirementsWithInverses(requirements, inverses);
+        if (requirements.empty())
+          return ext;
       }
     }
 

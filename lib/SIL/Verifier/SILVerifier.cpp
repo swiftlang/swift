@@ -153,13 +153,28 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
 
 namespace {
 
-/// When resilience is bypassed, direct access is legal, but the decls are still
-/// resilient.
+/// When resilience is bypassed for debugging or package serialization is enabled,
+/// direct access is legal, but the decls are still resilient.
 template <typename DeclType>
 bool checkResilience(DeclType *D, ModuleDecl *M,
                      ResilienceExpansion expansion) {
-  return !D->getModuleContext()->getBypassResilience() &&
-         D->isResilient(M, expansion);
+  auto refDeclModule = D->getModuleContext();
+  // Explicitly bypassed for debugging with `bypass-resilience-checks`
+  if (refDeclModule->getBypassResilience())
+    return false;
+
+  // If package serialization is enabled with `experimental-package-cmo`,
+  // decls can be serialized in a resiliently built module. In such case,
+  // a direct access should be allowed.
+  auto packageSerialized = expansion == ResilienceExpansion::Minimal &&
+                           refDeclModule->isResilient() &&
+                           refDeclModule->allowNonResilientAccess() &&
+                           refDeclModule->serializePackageEnabled() &&
+                           refDeclModule->inSamePackage(M);
+  if (packageSerialized)
+    return false;
+
+  return D->isResilient(M, expansion);
 }
 
 bool checkTypeABIAccessible(SILFunction const &F, SILType ty) {
@@ -556,6 +571,17 @@ struct ImmutableAddressUseVerifier {
     return false;
   }
 
+  /// Handle instructions that move a value from one address into another
+  /// address.
+  bool isConsumingOrMutatingMoveAddrUse(Operand *use) {
+    assert(use->getUser()->getNumOperands() == 2);
+    auto opIdx = use->getOperandNumber();
+    if (opIdx == CopyLikeInstruction::Dest)
+      return true;
+    assert(opIdx == CopyLikeInstruction::Src);
+    return false;
+  }
+
   bool isAddrCastToNonConsuming(SingleValueInstruction *i) {
     // Check if any of our uses are consuming. If none of them are consuming, we
     // are good to go.
@@ -598,6 +624,12 @@ struct ImmutableAddressUseVerifier {
 
           // Get enum tag borrows its operand address value.
           if (builtinKind == BuiltinValueKind::GetEnumTag) {
+            return false;
+          }
+
+          // The optimizer cannot reason about a raw layout type's address due
+          // to it not respecting formal access scopes.
+          if (builtinKind == BuiltinValueKind::AddressOfRawLayout) {
             return false;
           }
         }
@@ -679,6 +711,12 @@ struct ImmutableAddressUseVerifier {
         }
         return true;
       }
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+      case SILInstructionKind::UncheckedRefCastAddrInst:
+        if (isConsumingOrMutatingMoveAddrUse(use)) {
+          return true;
+        }
+        break;
       case SILInstructionKind::CheckedCastAddrBranchInst:
         switch (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind()) {
         case CastConsumptionKind::BorrowAlways:
@@ -819,6 +857,11 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
   llvm::DenseSet<std::pair<SILValue, const Operand *>> isOperandInValueUsesCache;
+
+  /// Used for checking all equivalent variables have the same type
+  using VarID = std::tuple<const SILDebugScope *, llvm::StringRef, SILLocation>;
+  llvm::DenseMap<VarID, SILType> DebugVarTypes;
+  llvm::StringSet<> VarNames;
 
   /// Check that this operand appears in the use-chain of the value it uses.
   bool isOperandInValueUses(const Operand *operand) {
@@ -1520,6 +1563,26 @@ public:
               "Scope of the debug variable should have the same parent function"
               " as that of instruction.");
 
+    // Check that every var info with the same name, scope and location, refer
+    // to a variable of the same type
+    llvm::StringRef UniqueName = VarNames.insert(varInfo->Name).first->getKey();
+    if (!varInfo->Loc)
+      varInfo->Loc = inst->getLoc();
+    if (!varInfo->Loc)
+      varInfo->Loc = SILLocation::invalid();
+    VarID Key(varInfo->Scope ? varInfo->Scope : debugScope,
+              UniqueName, *varInfo->Loc);
+    auto CachedVar = DebugVarTypes.insert({Key, DebugVarTy});
+    if (!CachedVar.second) {
+      auto lhs = CachedVar.first->second.removingMoveOnlyWrapper();
+      auto rhs = DebugVarTy.removingMoveOnlyWrapper();
+
+      require(lhs == rhs ||
+              (lhs.isAddress() && lhs.getObjectType() == rhs) ||
+              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()),
+              "Two variables with different type but same scope!");
+    }
+
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {
       bool HasFragment = false;
@@ -2006,6 +2069,13 @@ public:
   void checkEndApplyInst(EndApplyInst *AI) {
     require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of end_apply must be a begin_apply");
+
+    BeginApplyInst *bai = AI->getBeginApply();
+    SILFunctionConventions calleeConv(bai->getSubstCalleeType(), F.getModule());
+
+    requireSameType(
+      AI->getType(), calleeConv.getSILResultType(F.getTypeExpansionContext()),
+      "callee result type does not match end_apply result type");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
@@ -5195,9 +5265,8 @@ public:
   void checkSwitchValueInst(SwitchValueInst *SVI) {
     // TODO: Type should be either integer or function
     auto Ty = SVI->getOperand()->getType();
-    require(Ty.is<BuiltinIntegerType>() || Ty.is<SILFunctionType>(),
-            "switch_value operand should be either of an integer "
-            "or function type");
+    require(Ty.is<BuiltinIntegerType>(),
+            "switch_value operand should be an integer");
 
     auto ult = [](const SILValue &a, const SILValue &b) { 
       return a == b || a < b; 
@@ -6981,7 +7050,7 @@ public:
               "package-external function definition must be serialized");
       break;
     case SILLinkage::HiddenExternal:
-      require(F->isExternalDeclaration(),
+      require(F->isExternalDeclaration() || embedded,
               "hidden-external function cannot have a body");
       break;
     }
@@ -7045,7 +7114,7 @@ public:
   }
 
   void verify(bool isCompleteOSSA) {
-    if (!isCompleteOSSA || !F.getModule().getOptions().OSSACompleteLifetimes) {
+    if (!isCompleteOSSA || !F.getModule().getOptions().OSSAVerifyComplete) {
       DEBlocks = std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));

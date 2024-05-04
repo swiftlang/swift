@@ -433,6 +433,7 @@ private:
     case Node::Kind::ImplFunctionConvention:
     case Node::Kind::ImplFunctionConventionName:
     case Node::Kind::ImplFunctionType:
+    case Node::Kind::ImplCoroutineKind:
     case Node::Kind::ImplInvocationSubstitutions:
     case Node::Kind::ImplPatternSubstitutions:
     case Node::Kind::ImplicitClosure:
@@ -596,6 +597,7 @@ private:
     case Node::Kind::AnonymousContext:
     case Node::Kind::AnyProtocolConformanceList:
     case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::PackProtocolConformance:
     case Node::Kind::DependentAssociatedConformance:
     case Node::Kind::DependentProtocolConformanceAssociated:
     case Node::Kind::DependentProtocolConformanceInherited:
@@ -1344,6 +1346,23 @@ static bool needSpaceBeforeType(NodePointer Type) {
       return false;
     default:
       return true;
+  }
+}
+
+/// Determine whether to print an entity's type.
+static bool shouldShowEntityType(Node::Kind EntityKind,
+                                 const DemangleOptions &Options) {
+  switch (EntityKind) {
+  case Node::Kind::ExplicitClosure:
+  case Node::Kind::ImplicitClosure:
+    /// The signature of a closure (its `Type` node) can optionally be omitted.
+    /// Unlike functions which can have overloads, the signature of a closure is
+    /// not needed to be uniquely identified. A closure is uniquely identified
+    /// by its index and parent. Omitting the signature improves the readability
+    /// when long type names are in use.
+    return Options.ShowClosureSignature;
+  default:
+    return true;
   }
 }
 
@@ -2759,6 +2778,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
+    return nullptr;    
+  case Node::Kind::ImplCoroutineKind:
+    // Skip if text is empty.
+    if (Node->getText().empty())
+      return nullptr;
+    // Otherwise, print with leading @.
+    Printer << '@' << Node->getText();
     return nullptr;
   case Node::Kind::ImplTransferringResult:
     Printer << "transferring";
@@ -2865,10 +2891,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::DependentGenericInverseConformanceRequirement: {
     NodePointer type = Node->getChild(0);
-    NodePointer reqt = Node->getChild(1);
     print(type, depth + 1);
     Printer << ": ~";
-    print(reqt, depth + 1);
+    switch (Node->getChild(1)->getIndex()) {
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+    case Bit: Printer << "Swift." << #Name; break;
+#include "swift/ABI/InvertibleProtocols.def"
+    default:
+      Printer << "Swift.<bit " << Node->getChild(1)->getIndex() << ">";
+      break;
+    }
     return nullptr;
   }
   case Node::Kind::DependentGenericLayoutRequirement: {
@@ -3100,12 +3132,31 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     printChildren(Node, depth);
     return nullptr;
   case Node::Kind::AnyProtocolConformanceList:
-    printChildren(Node, depth);
+    if (Node->getNumChildren() > 0) {
+      Printer << "(";
+      for (unsigned i = 0; i < Node->getNumChildren(); ++i) {
+        if (i > 0)
+          Printer << ", ";
+        print(Node->getChild(i), depth + 1);
+      }
+      Printer << ")";
+    }
     return nullptr;
   case Node::Kind::ConcreteProtocolConformance:
     Printer << "concrete protocol conformance ";
     if (Node->hasIndex())
       Printer << "#" << Node->getIndex() << " ";
+    print(Node->getChild(0), depth + 1);
+    Printer << " to ";
+    print(Node->getChild(1), depth + 1);
+    if (Node->getNumChildren() > 2 &&
+        Node->getChild(2)->getNumChildren() > 0) {
+      Printer << " with conditional requirements: ";
+      print(Node->getChild(2), depth + 1);
+    }
+    return nullptr;
+  case Node::Kind::PackProtocolConformance:
+    Printer << "pack protocol conformance ";
     printChildren(Node, depth);
     return nullptr;
   case Node::Kind::DependentAssociatedConformance:
@@ -3116,18 +3167,21 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "dependent associated protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::DependentProtocolConformanceInherited:
     Printer << "dependent inherited protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::DependentProtocolConformanceRoot:
     Printer << "dependent root protocol conformance ";
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
+    Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::ProtocolConformanceRefInTypeModule:
@@ -3455,7 +3509,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
         Printer << " : ";
         printEntityType(Entity, type, genericFunctionTypeList, depth);
       }
-    } else {
+    } else if (shouldShowEntityType(Entity->getKind(), Options)) {
       assert(TypePr == TypePrinting::FunctionStyle);
       if (MultiWordName || needSpaceBeforeType(type))
         Printer << ' ';

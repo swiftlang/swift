@@ -1461,9 +1461,9 @@ func testVoidType() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch28addressOnlyFallthroughCalleeyyAA015MultipleAddressC8CaseEnumOyxGSzRzlF : $@convention(thin) <T where T : BinaryInteger> (@in_guaranteed MultipleAddressOnlyCaseEnum<T>) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[AB_PHI:%.*]] = alloc_stack $T, let, name "x"
-// CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T, let, name "x"
-// CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   [[AB_PHI:%.*]] = alloc_stack $T
+// CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T
+// CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T
 // CHECK:   [[SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
 // CHECK:   copy_addr [[ARG]] to [init] [[SWITCH_ENUM_ARG]]
 // CHECK:   switch_enum_addr [[SWITCH_ENUM_ARG]] : $*MultipleAddressOnlyCaseEnum<T>, case #MultipleAddressOnlyCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]

@@ -723,6 +723,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
   Bits.ModuleDecl.HasCxxInteroperability = 0;
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
+  Bits.ModuleDecl.SerializePackageEnabled = 0;
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {
@@ -1179,9 +1180,7 @@ ASTNode SourceFile::getMacroExpansion() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
-  return ASTNode::getFromOpaqueValue(genInfo.astNode);
+  return getNodeInEnclosingSourceFile();
 }
 
 SourceRange SourceFile::getMacroInsertionRange() const {
@@ -1231,6 +1230,16 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
       *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
   auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
+}
+
+ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
+  if (Kind != SourceFileKind::MacroExpansion &&
+      Kind != SourceFileKind::DefaultArgument)
+    return nullptr;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  return ASTNode::getFromOpaqueValue(genInfo.astNode);
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -2572,6 +2581,38 @@ SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   Imports = getASTContext().AllocateCopy(imports);
 }
 
+std::optional<AttributedImport<ImportedModule>>
+SourceFile::findImport(const ModuleDecl *module) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ImportDeclRequest{this, module}, std::nullopt);
+}
+
+std::optional<AttributedImport<ImportedModule>>
+ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
+                            const ModuleDecl *module) const {
+  auto &ctx = sf->getASTContext();
+  auto imports = sf->getImports();
+
+  // Look to see if the owning module was directly imported.
+  for (const auto &import : imports) {
+    if (import.module.importedModule == module)
+      return import;
+  }
+
+  // Now look for transitive imports.
+  auto &importCache = ctx.getImportCache();
+  for (const auto &import : imports) {
+    auto &importSet = importCache.getImportSet(import.module.importedModule);
+    for (const auto &transitive : importSet.getTransitiveImports()) {
+      if (transitive.importedModule == module) {
+        return import;
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
 bool SourceFile::hasImportUsedPreconcurrency(
     AttributedImport<ImportedModule> import) const {
   return PreconcurrencyImportsUsed.count(import) != 0;
@@ -2660,6 +2701,15 @@ bool SourceFile::hasImportsWithFlag(ImportFlags flag) const {
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(
       ctx.evaluator, HasImportsMatchingFlagRequest{mutableThis, flag}, false);
+}
+
+ImportFlags SourceFile::getImportFlags(const ModuleDecl *module) const {
+  unsigned flags = 0x0;
+  for (auto import : *Imports) {
+    if (import.module.importedModule == module)
+      flags |= import.options.toRaw();
+  }
+  return ImportFlags(flags);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -3419,6 +3469,7 @@ void SourceFile::typeCheckDelayedFunctions() {
     auto *AFD = DelayedFunctions[i];
     assert(!AFD->getDeclContext()->isLocalContext());
     AFD->getTypecheckedBody();
+    (void) AFD->getCaptureInfo();
   }
 
   DelayedFunctions.clear();
@@ -3960,4 +4011,63 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
   }
 
   return version::Version();
+}
+
+bool swift::diagnoseMissingImportForMember(const ValueDecl *decl,
+                                           const DeclContext *dc,
+                                           SourceLoc loc) {
+  if (decl->findImport(dc))
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  auto definingModule = decl->getModuleContext();
+  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
+                     decl->getDescriptiveKind(), decl->getName(),
+                     definingModule);
+
+  SourceLoc bestLoc =
+      ctx.Diags.getBestAddImportFixItLoc(decl, dc->getParentSourceFile());
+  if (!bestLoc.isValid())
+    return false;
+
+  llvm::SmallString<64> importText;
+
+  // Check other source files for import flags that should be applied to the
+  // fix-it for consistency with the rest of the imports in the module.
+  auto parentModule = dc->getParentModule();
+  OptionSet<ImportFlags> flags;
+  for (auto file : parentModule->getFiles()) {
+    if (auto sf = dyn_cast<SourceFile>(file))
+      flags |= sf->getImportFlags(definingModule);
+  }
+
+  if (flags.contains(ImportFlags::Exported) ||
+      parentModule->isClangOverlayOf(definingModule))
+    importText += "@_exported ";
+  if (flags.contains(ImportFlags::ImplementationOnly))
+    importText += "@_implementationOnly ";
+  if (flags.contains(ImportFlags::WeakLinked))
+    importText += "@_weakLinked ";
+  if (flags.contains(ImportFlags::SPIOnly))
+    importText += "@_spiOnly ";
+
+  // FIXME: Access level should be considered, too.
+
+  // @_spi imports.
+  if (decl->isSPI()) {
+    auto spiGroups = decl->getSPIGroups();
+    if (!spiGroups.empty()) {
+      importText += "@_spi(";
+      importText += spiGroups[0].str();
+      importText += ") ";
+    }
+  }
+
+  importText += "import ";
+  importText += definingModule->getName().str();
+  importText += "\n";
+  ctx.Diags.diagnose(bestLoc, diag::candidate_add_import, definingModule)
+      .fixItInsert(bestLoc, importText);
+
+  return true;
 }

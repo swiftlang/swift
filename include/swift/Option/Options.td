@@ -246,7 +246,7 @@ def windows_sdk_root : Separate<["-"], "windows-sdk-root">,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Windows SDK Root">, MetaVarName<"<root>">;
 def windows_sdk_version : Separate<["-"], "windows-sdk-version">,
-  Flags<[ArgumentIsPath, FrontendOption, SwiftAPIExtractOption,
+  Flags<[FrontendOption, SwiftAPIExtractOption,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Windows SDK Version">, MetaVarName<"<version>">;
 def visualc_tools_root : Separate<["-"], "visualc-tools-root">,
@@ -254,7 +254,7 @@ def visualc_tools_root : Separate<["-"], "visualc-tools-root">,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"VisualC++ Tools Root">, MetaVarName<"<root>">;
 def visualc_tools_version : Separate<["-"], "visualc-tools-version">,
-  Flags<[ArgumentIsPath, FrontendOption, SwiftAPIExtractOption,
+  Flags<[FrontendOption, SwiftAPIExtractOption,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"VisualC++ ToolSet Version">, MetaVarName<"<version>">;
 
@@ -816,6 +816,11 @@ def disable_actor_data_race_checks :
   Flag<["-"], "disable-actor-data-race-checks">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable runtime checks for actor data races">;
+
+def disable_dynamic_actor_isolation :
+  Flag<["-"], "disable-dynamic-actor-isolation">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable dynamic actor isolation checks">;
 
 def enable_bare_slash_regex : Flag<["-"], "enable-bare-slash-regex">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,

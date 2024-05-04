@@ -191,6 +191,13 @@ bool ValueBase::isGuaranteedForwarding() const {
   return phi->isGuaranteedForwarding();
 }
 
+bool ValueBase::isBeginApplyToken() const {
+  auto *result = isaResultOf<BeginApplyInst>(this);
+  if (!result)
+    return false;
+  return result->isBeginApplyToken();
+}
+
 bool ValueBase::hasDebugTrace() const {
   for (auto *op : getUses()) {
     if (auto *debugValue = dyn_cast<DebugValueInst>(op->getUser())) {
@@ -421,6 +428,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 //===----------------------------------------------------------------------===//
 //                                  Operand
 //===----------------------------------------------------------------------===//
+
+void Operand::verify() const {
+  if (isa<BorrowedFromInst>(getUser()) && getOperandNumber() == 0) {
+    assert(isa<SILArgument>(get()) || isa<SILUndef>(get()));
+  }
+}
 
 SILBasicBlock *Operand::getParentBlock() const {
   auto *self = const_cast<Operand *>(this);

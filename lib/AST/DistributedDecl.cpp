@@ -1289,6 +1289,16 @@ bool ValueDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
+bool ValueDecl::isDistributedGetAccessor() const {
+  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+    if (accessor->getAccessorKind() == AccessorKind::DistributedGet) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 ConstructorDecl *
 NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
@@ -1349,10 +1359,22 @@ AbstractFunctionDecl::getDistributedThunk() const {
   if (isDistributedThunk())
     return const_cast<FuncDecl *>(dyn_cast<FuncDecl>(this));
 
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+
+  // For an accessor, get the Storage (VarDecl) and get the thunk off it.
+  //
+  // Since only 'get' computed distributed properties are allowed, we know
+  // this will be the equivalent 'get' thunk for this AccessorDecl.
+  //
+  // The AccessorDecl is not marked distributed, but the VarDecl will be.
+  if (auto accessor = dyn_cast<AccessorDecl>(mutableThis)) {
+    auto Storage = accessor->getStorage();
+    return Storage->getDistributedThunk();
+  }
+
   if (!isDistributed())
     return nullptr;
 
-  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedThunkRequest{mutableThis},

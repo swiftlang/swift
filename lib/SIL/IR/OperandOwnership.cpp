@@ -421,6 +421,12 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
   return OperandOwnership::Borrow;
 }
 
+OperandOwnership
+OperandOwnershipClassifier::visitBorrowedFromInst(BorrowedFromInst *bfi) {
+  return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
+                                : OperandOwnership::InstantaneousUse;
+}
+
 // MARK: Instructions whose use ownership depends on the operand in question.
 
 OperandOwnership OperandOwnershipClassifier::
@@ -892,6 +898,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DistributedActorAsAnyActor)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AddressOfRawLayout)
 OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
                                                               StringRef) {
   if (bi->getFunction()->getConventions().useLoweredAddresses()) {

@@ -1,4 +1,8 @@
 // REQUIRES: no_asan
+//
+// LC_DYLD_CHAINED_FIXUPS decode not currently supported (default on visionOS)
+// UNSUPPORTED: OS=xros
+//
 // XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 

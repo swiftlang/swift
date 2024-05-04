@@ -593,8 +593,24 @@ namespace swift {
     /// type-checking, SIL verification, and IR emission,
     bool BypassResilienceChecks = false;
 
+    /// Disables `DynamicActorIsolation` feature.
+    bool DisableDynamicActorIsolation = false;
+
+    /// Whether or not to allow experimental features that are only available
+    /// in "production".
+#ifdef NDEBUG
+    bool RestrictNonProductionExperimentalFeatures = true;
+#else
+    bool RestrictNonProductionExperimentalFeatures = false;
+#endif
+
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
+    }
+
+    bool isDynamicActorIsolationCheckingEnabled() const {
+      return !DisableDynamicActorIsolation &&
+             hasFeature(Feature::DynamicActorIsolation);
     }
 
     LangOptions();
@@ -618,6 +634,8 @@ namespace swift {
       } else if (Target.isiOS()) {
         return Target.getiOSVersion();
       } else if (Target.isWatchOS()) {
+        return Target.getOSVersion();
+      } else if (Target.isXROS()) {
         return Target.getOSVersion();
       }
       return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
