@@ -3389,11 +3389,6 @@ protected:
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
-    case BuiltinValueKind::Copy: {
-      SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(0, opAddr);
-      break;
-    }
     case BuiltinValueKind::AddressOfBorrowOpaque:
       visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/true);
       break;
@@ -4084,14 +4079,6 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
-    case BuiltinValueKind::Copy: {
-      SILValue addr = addrMat.materializeAddress(bi);
-      builder.createBuiltin(
-          bi->getLoc(), bi->getName(),
-          SILType::getEmptyTupleType(bi->getType().getASTContext()),
-          bi->getSubstitutions(), {addr, bi->getOperand(0)});
-      break;
-    }
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");

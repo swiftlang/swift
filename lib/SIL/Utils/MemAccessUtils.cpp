@@ -2592,11 +2592,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       visitor(&builtin->getAllOperands()[0]);
       return;
 
-    // These effect both operands.
-    case BuiltinValueKind::Copy:
-      visitor(&builtin->getAllOperands()[1]);
-      return;
-
     // These consume values out of their second operand.
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:

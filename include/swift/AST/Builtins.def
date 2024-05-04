@@ -537,6 +537,14 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
+/// TODO: Remove.  Only exists to avoid a reverse condfail.
+///       rdar://127516085 (Complete removal of Builtin.copy)
+///
+/// copy: <T>(T) -> T
+///
+/// Creates a copy of the source at the destination.
+BUILTIN_SIL_OPERATION(Copy, "copy", Special)
+
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
 // These functions accept a single argument of any type.
 #ifndef BUILTIN_RUNTIME_CALL
@@ -803,24 +811,6 @@ BUILTIN_MISC_OPERATION(CreateTaskGroupWithFlags,
 /// Destroy a task group.
 BUILTIN_MISC_OPERATION(DestroyTaskGroup,
                        "destroyTaskGroup", "", Special)
-
-/// A builtin that can only be called from a transparent generic function. Takes
-/// two operands, the first operand the result address, the second operand the
-/// input address. Transforms into
-///
-///   %input = load [take] %inputAddr
-///   %result = explicit_copy_value %input
-///   store %result to [init] %resultAddr
-///   store %input to [init] %inputAddr
-///
-/// transparently inlined into a caller that has the generic of the callee
-/// specialized into a loadable type. If the transparent inlining does not
-/// specialize the type (due to being inlined into a non-generic context, the
-/// SILVerifier will abort).
-///
-/// Illegal to call except for in Swift._copy in the stdlib. This is enforced by
-/// the SILVerifier.
-BUILTIN_MISC_OPERATION(Copy, "copy", "", Special)
 
 /// Unchecked pointer alignment assertion. Allows the compiler to assume
 /// alignment of the pointer to emit more efficient code.

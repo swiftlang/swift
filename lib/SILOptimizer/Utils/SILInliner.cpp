@@ -320,7 +320,6 @@ protected:
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
 
   void visitTerminator(SILBasicBlock *BB);
-  void visitBuiltinInst(BuiltinInst *BI);
 
   /// This hook is called after either of the top-level visitors:
   /// cloneReachableBlocks or cloneSILFunction.
@@ -818,51 +817,6 @@ template <typename... T, typename... U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
-}
-
-void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
-  if (IKind == InlineKind::MandatoryInline) {
-    if (auto kind = Inst->getBuiltinKind()) {
-      if (*kind == BuiltinValueKind::Copy) {
-        auto otherResultAddr = getOpValue(Inst->getOperand(0));
-        auto otherSrcAddr = getOpValue(Inst->getOperand(1));
-        auto otherType = otherSrcAddr->getType();
-
-        if (!otherType.isLoadable(*Inst->getFunction())) {
-          // If otherType is not loadable, emit a diagnostic since it was used
-          // on a generic or existential value.
-          diagnose(Inst->getModule().getASTContext(),
-                   getOpLocation(Inst->getLoc()).getSourceLoc(),
-                   diag::copy_operator_used_on_generic_or_existential_value);
-          return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
-        }
-
-        getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-        // We stash otherValue in originalOtherValue in case we need to
-        // perform a writeback.
-        auto opLoc = getOpLocation(Inst->getLoc());
-
-        assert(otherType.isAddress());
-
-        // Perform a load_borrow and then copy that.
-        SILValue otherValue =
-            getBuilder().emitLoadBorrowOperation(opLoc, otherSrcAddr);
-
-        auto *mvi = getBuilder().createExplicitCopyValue(opLoc, otherValue);
-
-        getBuilder().emitStoreValueOperation(opLoc, mvi, otherResultAddr,
-                                             StoreOwnershipQualifier::Init);
-        // End the borrowed value.
-        getBuilder().emitEndBorrowOperation(opLoc, otherValue);
-
-        // We know that Inst returns a tuple value that isn't used by anything
-        // else, so this /should/ be safe.
-        return recordClonedInstruction(Inst, mvi);
-      }
-    }
-  }
-
-  return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
 }
 
 //===----------------------------------------------------------------------===//

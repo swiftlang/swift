@@ -1437,16 +1437,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::Copy) {
-    auto input = args.claimNext();
-    auto result = args.claimNext();
-    SILType addrTy = argTypes[0];
-    const TypeInfo &addrTI = IGF.getTypeInfo(addrTy);
-    Address inputAttr = addrTI.getAddressForPointer(input);
-    Address resultAttr = addrTI.getAddressForPointer(result);
-    addrTI.initializeWithCopy(IGF, resultAttr, inputAttr, addrTy, false);
-    return;
-  }
   if (Builtin.ID == BuiltinValueKind::AssumeAlignment) {
     // A no-op pointer cast that passes on its first value. Common occurrences of
     // this builtin should already be removed with the alignment guarantee moved
