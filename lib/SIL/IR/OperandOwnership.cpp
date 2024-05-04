@@ -899,14 +899,6 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DistributedActorAsAnyActor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AddressOfRawLayout)
-OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
-                                                              StringRef) {
-  if (bi->getFunction()->getConventions().useLoweredAddresses()) {
-    return OperandOwnership::UnownedInstantaneousUse;
-  } else {
-    return OperandOwnership::DestroyingConsume;
-  }
-}
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, EndAsyncLetLifetime)

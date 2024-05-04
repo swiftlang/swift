@@ -3,5 +3,5 @@
 import Swift
 
 func addressOnlyCopy<T>(t: T) -> T {
-    _copy(t) // expected-error {{copy() used on a generic or existential value}}
+    copy t
 }

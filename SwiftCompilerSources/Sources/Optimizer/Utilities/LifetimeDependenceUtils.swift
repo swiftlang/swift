@@ -909,12 +909,6 @@ extension LifetimeDependenceDefUseWalker {
     case let tai as TupleAddrConstructorInst:
       return visitStoredUses(of: operand, into: tai.destinationOperand.value)
 
-    case let bi as BuiltinInst where bi.id == .Copy:  
-      // This must be a non-address-lowered form of Builtin.Copy that
-      // produces an owned value.
-      assert(bi.ownership == .owned)
-      return walkDownUses(of: bi, using: operand)
-
     default:
       return nonForwardingUse(of: operand)
     }
