@@ -165,12 +165,6 @@ extension AddressUseVisitor {
 
     case let builtin as BuiltinInst:
       switch builtin.id {
-      case .Copy where builtin.operands[1] == operand: // source
-        return loadedAddressUse(of: operand, into: builtin.operands[0])
-
-      case .Copy where builtin.operands[0] == operand: // dest
-        return leafAddressUse(of: operand)
-
       // Builtins that cannot load a nontrivial value.
       case .TSanInoutAccess, .ResumeThrowingContinuationReturning,
            .ResumeNonThrowingContinuationReturning, .GenericAdd,

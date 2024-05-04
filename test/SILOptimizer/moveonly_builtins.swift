@@ -13,9 +13,6 @@ struct NC: ~Copyable {}
 
 func checkPointerBuiltins(_ ptr: Builtin.RawPointer, _ value: consuming NC) {
   Builtin.initialize(value, ptr)
-#if ILLEGAL
-  Builtin.copy(value) // expected-illegal-error {{noncopyable type 'NC' cannot be substituted for copyable generic parameter 'T' in 'copy'}}
-#endif
 }
 
 func checkArrayBuiltins(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {

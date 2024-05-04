@@ -251,7 +251,6 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         case BuiltinValueKind::TSanInoutAccess:
         case BuiltinValueKind::ResumeThrowingContinuationReturning:
         case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
-        case BuiltinValueKind::Copy:
         case BuiltinValueKind::GenericAdd:
         case BuiltinValueKind::GenericFAdd:
         case BuiltinValueKind::GenericAnd:
