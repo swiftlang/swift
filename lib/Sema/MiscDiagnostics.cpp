@@ -2075,7 +2075,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
       if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
-               .isKnownNoEscape())
+              .isKnownNoEscape())
         return false;
 
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
@@ -2128,122 +2128,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return Action::Continue(E);
       }
 
-      // Until Swift 6, only emit a warning when we get this with an
-      // explicit capture, since we used to not diagnose this at all.
-      auto shouldOnlyWarn = [&](Expr *selfRef) {
-        auto DRE = dyn_cast_or_null<DeclRefExpr>(selfRef);
-        if (!DRE) {
-          return false;
-        }
-        
-        auto selfDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-        auto ty = DRE->getType();
-        if (!selfDecl || !ty) {
-          return false;
-        }
-        
-        // Implicit self was always allowed in structs and metadata types
-        // even if the self capture was invalid.
-        if (!ty->hasReferenceSemantics() || ty->is<MetatypeType>()) {
-          return true;
-        }
-        
-        // If this implicit self decl is from a closure that captured self
-        // weakly, then we should always emit an error, since implicit self was
-        // only allowed starting in Swift 5.8 and later.
-        if (auto weakSelfDecl = weakSelfCapture(ACE)) {
-          // However implicit self was incorrectly permitted for weak self
-          // captures in non-escaping closures in Swift 5.7, so in that case we
-          // can only warn until Swift 6.
-          if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(ACE))
-              .isKnownNoEscape()) {
-                return true;
-              }
-          
-          // If this is a capture like `[weak self = somethingElse]`,
-          // this unintentionally permitted implicit self in Swift 5.8 - 5.10,
-          // so we have to only warn until Swift 6.
-          if (!isSimpleSelfCapture(weakSelfDecl)) {
-            return true;
-          }
-          
-          if (auto conditionalStmt = parentConditionalStmt(selfDecl)) {
-            auto isValidSelfRebinding =
-            hasValidSelfRebinding(conditionalStmt, ACE);
-            
-            if (isValidSelfRebinding) {
-              // In Swift 5.8 - 5.10 we unintentionally permitted implicit
-              // self without validating any parent closures. To preserve
-              // source compatibility, in this case we only warn until Swift 6.
-              if (implicitSelfDisallowedDueToInvalidParent(selfDecl, ty, ACE)) {
-                return true;
-              }
-            }
-            
-            // In Swift 5.8 - 5.10 we used `requiresLoadExpr` instead
-            // of `requiresCaptureListRef` to validate self unwrap
-            // conditions. For source compatibility, if the legacy check
-            // succeeds but the current check fails, we should only warn
-            // until Swift 6.
-            auto legacyRebindsSelfResult =
-            conditionalStmt->rebindsSelf(ACE->getASTContext(),
-                                         /*requiresCaptureListRef*/ false,
-                                         /*requiresLoadExpr*/ true);
-            
-            if (!isValidSelfRebinding && legacyRebindsSelfResult) {
-              return true;
-            }
-          }
-        }
-        
-        // If the self decl refers to a weak self unwrapping
-        // condition in some parent closure, then there is no
-        // source-compatibility requirement to avoid an error.
-        if (hasValidSelfRebinding(parentConditionalStmt(selfDecl), ACE)) {
-          return false;
-        }
-        
-        // In Swift 5 mode we didn't validate the outermost capture in
-        // nonescaping closures, so if only the outermost capture is invalid
-        // then we must only warn.
-        if (!isClosureRequiringSelfQualification(ACE, Ctx)) {
-          auto invalidParentClosure = parentClosureDisallowingImplicitSelf(selfDecl, ty, ACE);
-          
-          if (invalidParentClosure) {
-            auto excludingOutermostCapture = parentClosureDisallowingImplicitSelf(selfDecl, ty, ACE, /*validateOutermostCapture:*/ false);
-            
-            if (invalidParentClosure != excludingOutermostCapture) {
-              return true;
-            }
-          }
-        }
-        
-        // Implicit self was accidentially allowed in examples like this
-        // in Swift 5.3-5.5, so check for this case and emit a warning
-        // instead of an error:
-        //
-        //   withEscaping { [self] in
-        //     withEscaping {
-        //       x += 1
-        //     }
-        //   }
-        //
-        bool isEscapingClosureWithExplicitSelfCapture = false;
-        if (isClosureRequiringSelfQualification(ACE, Ctx)) {
-          if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
-            if (closureExpr->getCapturedSelfDecl()) {
-              isEscapingClosureWithExplicitSelfCapture = true;
-            }
-          }
-        }
-
-        if (!selfDecl->isSelfParameter() && !isEscapingClosureWithExplicitSelfCapture) {
-          return true;
-        }
-        
-        return false;
-      };
-
       SourceLoc memberLoc = SourceLoc();
       const DeclRefExpr *selfDRE = nullptr;
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
@@ -2255,7 +2139,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
               .diagnose(memberLoc,
                         diag::property_use_in_closure_without_explicit_self,
                         baseName.getIdentifier())
-              .warnUntilSwiftVersionIf(shouldOnlyWarn(MRE->getBase()), 6);
+              .warnUntilSwiftVersionIf(
+                  invalidImplicitSelfShouldOnlyWarn(MRE->getBase(), ACE), 6);
         }
 
       // Handle method calls with a specific diagnostic + fixit.
@@ -2269,7 +2154,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
               .diagnose(DSCE->getLoc(),
                         diag::method_call_in_closure_without_explicit_self,
                         MethodExpr->getDecl()->getBaseIdentifier())
-              .warnUntilSwiftVersionIf(shouldOnlyWarn(DSCE->getBase()), 6);
+              .warnUntilSwiftVersionIf(
+                  invalidImplicitSelfShouldOnlyWarn(DSCE->getBase(), ACE), 6);
         }
 
       if (memberLoc.isValid()) {
@@ -2285,7 +2171,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       if (!selfDeclAllowsImplicitSelf(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
-             .warnUntilSwiftVersionIf(shouldOnlyWarn(E), 6);
+            .warnUntilSwiftVersionIf(invalidImplicitSelfShouldOnlyWarn(E, ACE),
+                                     6);
 
       return Action::Continue(E);
     }
@@ -2444,9 +2331,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // insert 'self,'. If it wasn't a valid entry, then we will at least not
       // be introducing any new errors/warnings...
       const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-      const auto nextAfterBracket =
-          Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
-                                    CommentRetentionMode::None);
+      const auto nextAfterBracket = Lexer::getTokenAtLocation(
+          Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
       if (nextAfterBracket.getLoc() != brackets.End)
         diag.fixItInsertAfter(brackets.Start, "self, ");
       else
@@ -2473,6 +2359,133 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       std::string trailing = next.getLoc() == nextLoc ? " " : "";
 
       diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+    }
+
+    /// Whether or not this invalid usage of implicit self should be a warning
+    /// in Swift 5 mode, to preserve source compatibility.
+    bool invalidImplicitSelfShouldOnlyWarn(Expr *selfRef,
+                                           AbstractClosureExpr *ACE) {
+      auto DRE = dyn_cast_or_null<DeclRefExpr>(selfRef);
+      if (!DRE) {
+        return false;
+      }
+
+      auto selfDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+      auto ty = DRE->getType();
+      if (!selfDecl) {
+        return false;
+      }
+
+      if (isInTypePreviouslyLackingValidation(ty)) {
+        return true;
+      }
+
+      if (isPreviouslyPermittedWeakSelfUsage(ACE, selfDecl, ty)) {
+        return true;
+      }
+
+      if (isUsageAlwaysPreviouslyRejected(selfDecl, ACE)) {
+        return false;
+      }
+
+      if (isPreviouslyPermittedStrongSelfUsage(selfDecl, ACE)) {
+        return true;
+      }
+
+      return false;
+    }
+
+    bool isInTypePreviouslyLackingValidation(Type ty) {
+      // We previously didn't validate captures at all in structs or metadata
+      // types, so we must only warn in this case.
+      return !ty->hasReferenceSemantics() || ty->is<MetatypeType>();
+    }
+
+    /// Checks if this usage of implicit self in a weak self closure
+    /// was previously permitted in Swift 5.8.
+    bool isPreviouslyPermittedWeakSelfUsage(AbstractClosureExpr *ACE,
+                                            ValueDecl *selfDecl, Type ty) {
+      auto weakSelfDecl = weakSelfCapture(ACE);
+      if (!weakSelfDecl) {
+        return false;
+      }
+
+      // Implicit self was permitted for weak self captures in
+      // non-escaping closures in Swift 5.7, so we must only warn.
+      if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(ACE))
+              .isKnownNoEscape()) {
+        return true;
+      }
+
+      // Invalid captures like `[weak self = somethingElse]`
+      // were permitted in Swift 5.8, so we must only warn.
+      if (!isSimpleSelfCapture(weakSelfDecl)) {
+        return true;
+      }
+
+      if (auto condStmt = parentConditionalStmt(selfDecl)) {
+        auto isValidSelfRebinding = hasValidSelfRebinding(condStmt, ACE);
+
+        // Swfit 5.8 permitted implicit self without validating any
+        // parent closures. If implicit self is only disallowed due to
+        // an invalid parent, we must only warn.
+        if (isValidSelfRebinding &&
+            implicitSelfDisallowedDueToInvalidParent(selfDecl, ty, ACE)) {
+          return true;
+        }
+
+        // Swift 5.8 used `requiresLoadExpr` to validate self bindings.
+        // If the binding is valid when only checking for a load expr,
+        // then we must only warn.
+        auto usesLoadExpr =
+            condStmt->rebindsSelf(ACE->getASTContext(),
+                                  /*requiresCaptureListRef*/ false,
+                                  /*requireLoadExpr*/ true);
+
+        if (!isValidSelfRebinding && usesLoadExpr) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    /// Checks if this implicit self usage was always previously rejected as
+    /// invalid, so can continue to be treated an error.
+    bool isUsageAlwaysPreviouslyRejected(ValueDecl *selfDecl,
+                                         AbstractClosureExpr *ACE) {
+      // If the self decl refers to a weak self unwrap condition
+      // in some parent closure, then there is no source-compatibility
+      // requirement to avoid an error.
+      return hasValidSelfRebinding(parentConditionalStmt(selfDecl), ACE);
+    }
+
+    /// Checks if this is a usage of implicit self in a strong self closure
+    /// that was previously permitted in older versions like Swift 5.3.
+    bool isPreviouslyPermittedStrongSelfUsage(VarDecl *selfDecl,
+                                              AbstractClosureExpr *ACE) {
+      // Implicit self was accidentially allowed in examples like this
+      // in Swift 5.3-5.5, so check for this case and emit a warning
+      // instead of an error:
+      //
+      //   withEscaping { [self] in
+      //     withEscaping {
+      //       x += 1
+      //     }
+      //   }
+      //
+      bool isEscapingClosureWithExplicitSelfCapture = false;
+      if (!AnyFunctionRef(const_cast<AbstractClosureExpr *>(ACE))
+               .isKnownNoEscape()) {
+        if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
+          if (closureExpr->getCapturedSelfDecl()) {
+            isEscapingClosureWithExplicitSelfCapture = true;
+          }
+        }
+      }
+
+      return !selfDecl->isSelfParameter() &&
+             !isEscapingClosureWithExplicitSelfCapture;
     }
   };
 
