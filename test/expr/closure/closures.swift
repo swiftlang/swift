@@ -1234,7 +1234,7 @@ class TestGithubIssue70089 {
           self.x += 1
 
           doVoidStuff {
-            x += 1  // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            x += 1  // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
             self.x += 1
           }
 
@@ -1300,7 +1300,7 @@ class TestGithubIssue70089 {
         }
 
         doVoidStuffNonEscaping {
-          x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          x += 1 // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self.x += 1
         }
       }
@@ -1309,6 +1309,24 @@ class TestGithubIssue70089 {
         doVoidStuff { [self] in
           x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self.x += 1
+        }
+      }
+
+      doVoidStuff { [self] in
+        doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+          doVoidStuff {
+            x += 1 // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+            self.x += 1
+          }
+        }
+      }
+
+      doVoidStuffNonEscaping { [self] in
+        doVoidStuffNonEscaping {
+          doVoidStuffNonEscaping {
+            x += 1
+            self.x += 1
+          }
         }
       }
     }
@@ -1357,7 +1375,7 @@ class TestGithubIssue69911 {
         }
 
         doVoidStuffNonEscaping { [self = TestGithubIssue69911()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
-           x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+           x += 1 // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
            self.x += 1
 
            doVoidStuff { [self] in
@@ -1366,7 +1384,7 @@ class TestGithubIssue69911 {
            }
 
            doVoidStuffNonEscaping {
-             x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+             x += 1 // expected-warning{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
              self.x += 1
            }
         }
@@ -1382,39 +1400,46 @@ class TestGithubIssue69911 {
         guard let self = self ?? TestGithubIssue69911.staticOptional else { return }
 
         doVoidStuffNonEscaping {
-          x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          x += 1 // expected-warning{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self.x += 1
         }
 
         doVoidStuffNonEscaping {
           doVoidStuffNonEscaping {
-            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            x += 1 // expected-warning{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
             self.x += 1
           }
         }
 
         doVoidStuff { [self] in
           doVoidStuffNonEscaping {
-            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            x += 1 // expected-warning{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
             self.x += 1
           }
         }
 
         doVoidStuffNonEscaping { [self] in
           doVoidStuffNonEscaping { [self] in
-            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            x += 1 // expected-warning{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
             self.x += 1
           }
         }
 
         doVoidStuffNonEscaping { [self = TestGithubIssue69911()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
-           x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+           x += 1 // expected-warning{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
            self.x += 1
         }
         
         doVoidStuffNonEscaping { [weak self] in
           x += 1 // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self?.x += 1
+        }
+
+        doVoidStuffNonEscaping { [self = TestGithubIssue69911()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+          doVoidStuffNonEscaping { [self] in
+            x += 1 // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            self.x += 1
+          }
         }
 
         doVoidStuff { [self] in
@@ -1697,6 +1722,15 @@ struct TestInvalidSelfCaptureInStruct {
     doVoidStuffNonEscaping { [self = TestInvalidSelfCaptureInStruct()] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
       method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
       self.method()
+    }
+  }
+}
+
+struct TestAsyncLet {
+  func bar() -> Int { 0 }
+  func foo() async {
+    let _ = {
+      async let _ = bar()
     }
   }
 }
