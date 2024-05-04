@@ -690,3 +690,19 @@ do {
   _ = Test2(q: "some question") // Ok `a` is default initialized to `nil`
   _ = Test2(q: "ultimate question", a: 42)
 }
+
+struct Test2ForExtension {
+  var _x: Int
+}
+
+extension Test2ForExtension {
+  var extendedX: Int {
+    @storageRestrictions(initializes: _x)
+    init {
+    // expected-error@-1 {{init accessors could only be declared in the primary declaration}}
+      self._x = newValue
+    }
+    get { _x }
+    set { _x = newValue }
+  }
+}
