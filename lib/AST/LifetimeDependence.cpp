@@ -173,9 +173,6 @@ static LifetimeDependenceKind getLifetimeDependenceKindFromDecl(
 }
 
 static bool isBitwiseCopyable(Type type, ModuleDecl *mod, ASTContext &ctx) {
-  if (!ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-    return false;
-  }
   auto *bitwiseCopyableProtocol =
       ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol) {

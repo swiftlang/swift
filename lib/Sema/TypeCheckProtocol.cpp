@@ -6117,11 +6117,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         break;
       }
       case KnownProtocolKind::BitwiseCopyable: {
-        if (Context.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-          checkBitwiseCopyableConformance(
-              conformance, /*isImplicit=*/conformance->getSourceKind() ==
-                               ConformanceEntryKind::Synthesized);
-        }
+        checkBitwiseCopyableConformance(
+            conformance, /*isImplicit=*/conformance->getSourceKind() ==
+                             ConformanceEntryKind::Synthesized);
         break;
       }
       default:

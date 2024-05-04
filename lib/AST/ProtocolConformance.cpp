@@ -1284,10 +1284,7 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
     for (auto ip : InvertibleProtocolSet::allKnown())
       trySynthesize(getKnownProtocolKind(ip));
 
-    if (nominal->getASTContext().LangOpts.hasFeature(
-            Feature::BitwiseCopyable)) {
-      trySynthesize(KnownProtocolKind::BitwiseCopyable);
-    }
+    trySynthesize(KnownProtocolKind::BitwiseCopyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
