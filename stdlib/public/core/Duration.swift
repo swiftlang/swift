@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -108,9 +108,13 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of seconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(seconds).multiplied(by: 1_000_000_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: seconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: seconds)
+    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000_000)
+    var highScaled = high * 1_000_000_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
   
   /// Construct a `Duration` given a duration and scale, taking care so that
@@ -148,11 +152,15 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of milliseconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(milliseconds).multiplied(by: 1_000_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: milliseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: milliseconds)
+    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000)
+    var highScaled = high * 1_000_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
   /// Construct a `Duration` given a number of seconds milliseconds as a 
@@ -173,11 +181,15 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of microseconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(microseconds).multiplied(by: 1_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: microseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: microseconds)
+    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000)
+    var highScaled = high * 1_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
   /// Construct a `Duration` given a number of seconds microseconds as a 
@@ -198,11 +210,15 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of nanoseconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(nanoseconds).multiplied(by: 1_000_000_000))
+    guard let high = Int64(exactly: nanoseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: nanoseconds)
+    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000)
+    var highScaled = high * 1_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 }
 

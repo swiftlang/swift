@@ -61,8 +61,9 @@ extension SuspendingClock: Clock {
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.suspending.rawValue)
-    return SuspendingClock.Instant(_value:
-      .seconds(seconds) + .nanoseconds(nanoseconds))
+    return Instant(
+      _value: Duration(_seconds: seconds, nanoseconds: nanoseconds)
+    )
   }
 
   /// The minimum non-zero resolution between any two calls to `now`.
@@ -74,7 +75,7 @@ extension SuspendingClock: Clock {
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.suspending.rawValue)
-    return .seconds(seconds) + .nanoseconds(nanoseconds)
+    return Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
