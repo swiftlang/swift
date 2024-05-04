@@ -1799,9 +1799,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // Implicit self is always allowed in autoclosure thunks generated
         // during type checking. An example of this is when storing an instance
         // method as a closure (e.g. `let closure = someInstanceMethodOnSelf`).
-        auto isThunk =
-            autoclosure->getThunkKind() != AutoClosureExpr::Kind::None;
-        if (isThunk) {
+        auto thunkKind = autoclosure->getThunkKind();
+        if (thunkKind == AutoClosureExpr::Kind::SingleCurryThunk ||
+            thunkKind == AutoClosureExpr::Kind::DoubleCurryThunk) {
           return true;
         }
 

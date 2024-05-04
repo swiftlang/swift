@@ -1726,7 +1726,17 @@ struct TestInvalidSelfCaptureInStruct {
   }
 }
 
-struct TestAsyncLet {
+class TestAsyncLetInClass {
+  init() { }
+  func bar() -> Int { 0 }
+  func foo() async {
+    let _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+      async let _ = bar() // expected-error{{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}}
+    }
+  }
+}
+
+struct TestAsyncLetInStruct {
   func bar() -> Int { 0 }
   func foo() async {
     let _ = {
