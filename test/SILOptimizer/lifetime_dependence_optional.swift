@@ -28,7 +28,7 @@ extension Nillable: Escapable where Wrapped: ~Copyable /* & Escapable */ {}
 
 extension Nillable: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable { }
 
-extension Nillable: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }
+extension Nillable: BitwiseCopyable where Wrapped: BitwiseCopyable { }
 
 extension Nillable: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapable {
   @_transparent

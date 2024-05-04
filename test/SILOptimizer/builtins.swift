@@ -2,7 +2,7 @@
 
 import Builtin
 
-// CHECK-LABEL: sil @storeBytes_BitwiseCopyable : {{.*}} {
+// CHECK-LABEL: sil @storeBytesBitwiseCopyable : {{.*}} {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^,]+]] : $UnsafeMutableRawPointer, 
 // CHECK-SAME:      [[VALUE:%[^,]+]] : $*T, 
@@ -14,9 +14,9 @@ import Builtin
 // CHECK:         [[DESTINATION_POINTER:%[^,]+]] = index_raw_pointer [[SELF_RAW_VALUE]] : $Builtin.RawPointer, [[OFFSET_WORD]]
 // CHECK:         [[DESTINATION:%[^,]+]] = pointer_to_address [[DESTINATION_POINTER]] : $Builtin.RawPointer to [align=1]
 // CHECK:         copy_addr [[VALUE]] to [[DESTINATION]]
-// CHECK-LABEL: } // end sil function 'storeBytes_BitwiseCopyable'
-@_silgen_name("storeBytes_BitwiseCopyable")
-public func storeBytes<T : _BitwiseCopyable>(
+// CHECK-LABEL: } // end sil function 'storeBytesBitwiseCopyable'
+@_silgen_name("storeBytesBitwiseCopyable")
+public func storeBytes<T : BitwiseCopyable>(
   _ self: UnsafeMutableRawPointer,
   of value: T, toByteOffset offset: Int = 0, as type: T.Type
 ) {
