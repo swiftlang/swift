@@ -1778,6 +1778,19 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
     loc = declRef.getDecl();
   };
   
+  if (auto conv = dyn_cast<FunctionConversionExpr>(semanticExpr)) {
+    // There might be an intermediate conversion adding or removing @Sendable.
+#ifndef NDEBUG
+    {
+      auto ty1 = conv->getType()->castTo<AnyFunctionType>();
+      auto ty2 = conv->getSubExpr()->getType()->castTo<AnyFunctionType>();
+      assert(ty1->withExtInfo(ty1->getExtInfo().withSendable(false))
+             ->isEqual(ty2->withExtInfo(ty2->getExtInfo().withSendable(false))));
+    }
+#endif
+    semanticExpr = conv->getSubExpr()->getSemanticsProvidingExpr();
+  }
+  
   if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(declRef->getDeclRef());
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {

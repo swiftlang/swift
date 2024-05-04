@@ -6418,6 +6418,17 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
       }
     };
     
+    // Look through a function conversion that only adds or removes
+    // `@Sendable`.
+    if (auto conv = dyn_cast<FunctionConversionExpr>(semanticExpr)) {
+      auto ty1 = conv->getType()->castTo<AnyFunctionType>();
+      auto ty2 = conv->getSubExpr()->getType()->castTo<AnyFunctionType>();
+      if (ty1->withExtInfo(ty1->getExtInfo().withSendable(false))
+             ->isEqual(ty2->withExtInfo(ty2->getExtInfo().withSendable(false)))){
+        semanticExpr = conv->getSubExpr()->getSemanticsProvidingExpr();
+      }
+    }
+    
     if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
       if (auto fn = dyn_cast<FuncDecl>(declRef->getDecl())) {
         return maybeDiagnoseFunctionRef(fn);
