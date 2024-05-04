@@ -2072,9 +2072,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
-      if (auto funcTy = CE->getType()->getAs<FunctionType>()) {
-        if (funcTy->isNoEscape())
-          return false;
+      if (isNonEscaping(CE)) {
+        return false;
       }
 
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
@@ -2090,6 +2089,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       }
 
       return true;
+    }
+
+    static bool isNonEscaping(const AbstractClosureExpr *ACE) {
+      if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
+        return funcTy->isNoEscape();
+      }
+
+      return false;
     }
 
     /// The closure that is a parent of this closure, if present
@@ -2411,8 +2418,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // Implicit self was permitted for weak self captures in
       // non-escaping closures in Swift 5.7, so we must only warn.
-      if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(ACE))
-              .isKnownNoEscape()) {
+      if (isNonEscaping(ACE)) {
         return true;
       }
 
@@ -2474,8 +2480,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //   }
       //
       bool isEscapingClosureWithExplicitSelfCapture = false;
-      if (!AnyFunctionRef(const_cast<AbstractClosureExpr *>(ACE))
-               .isKnownNoEscape()) {
+      if (!isNonEscaping(ACE)) {
         if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
           if (closureExpr->getCapturedSelfDecl()) {
             isEscapingClosureWithExplicitSelfCapture = true;
