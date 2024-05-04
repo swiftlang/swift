@@ -112,14 +112,6 @@ Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change fro
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 2 type change from Swift.String to (any _Concurrency.Actor)?
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 3 type change from Swift.UInt to Swift.String
 
-// The method is actually still there: '__abi_next' silgen_name("$sScG4nextxSgyYaF")
-Func TaskGroup.next() has been renamed to Func next(isolation:)
-Func TaskGroup.next() has mangled name changing from 'Swift.TaskGroup.next() async -> Swift.Optional<A>' to 'Swift.TaskGroup.next(isolation: isolated Swift.Optional<Swift.Actor>) async -> Swift.Optional<A>'
-
-// The method is actually still there: '__abi_next' silgen_name("$sScg4nextxSgyYaKF")
-Func ThrowingTaskGroup.next() has been renamed to Func next(isolation:)
-Func ThrowingTaskGroup.next() has mangled name changing from 'Swift.ThrowingTaskGroup.next() async throws -> Swift.Optional<A>' to 'Swift.ThrowingTaskGroup.next(isolation: isolated Swift.Optional<Swift.Actor>) async throws -> Swift.Optional<A>'
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 
