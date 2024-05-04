@@ -574,10 +574,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
   }
 
-  @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  @_silgen_name("$sScG4nextxSgyYaF")
-  internal mutating func __abi_next() async -> ChildTaskResult? {
+  @_disfavoredOverload
+  public mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
     return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
@@ -1035,10 +1034,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     return try await _taskGroupWaitNext(group: _group)
   }
 
-  @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  @_silgen_name("$sScg4nextxSgyYaKF")
-  internal mutating func __abi_next() async throws -> ChildTaskResult? {
+  @_disfavoredOverload
+  public mutating func next() async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
 
