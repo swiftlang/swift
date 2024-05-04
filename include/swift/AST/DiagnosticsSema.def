@@ -7740,12 +7740,14 @@ NOTE(note_non_bitwise_copyable_type_indirect_enum_element,none,
      "indirect case is here", ())
 ERROR(non_bitwise_copyable_type_suppressed,none,
       "cannot both conform to and suppress conformance to 'BitwiseCopyable'", ())
+ERROR(non_bitwise_copyable_type_sensitive,none,
+      "a @sensitive type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_cxx_nontrivial,none,
       "non-trivial C++ type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_c_type_nontrivial,none,
       "type with unrepresentable fields cannot derive conformance to 'BitwiseCopyable'", ())
 NOTE(note_non_bitwise_copyable_c_type_add_attr,none,
-     "annotate the type __attribute__((__swift_attr__(\"_BitwiseCopyable\")))",())
+     "annotate the type __attribute__((__swift_attr__(\"BitwiseCopyable\")))",())
 ERROR(non_bitwise_copyable_type_member,none,
       "%select{stored property %2|associated value %2}1 of "
       "'BitwiseCopyable'-conforming %kind3 has non-bitwise-copyable type %0",

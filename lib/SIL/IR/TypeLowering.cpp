@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
@@ -28,6 +29,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -3041,8 +3043,6 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                                           AbstractionPattern origType,
                                           CanType substType,
                                           TypeExpansionContext forExpansion) {
-  if (!Context.LangOpts.hasFeature(Feature::BitwiseCopyable))
-    return;
   auto *bitwiseCopyableProtocol =
       Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol)
@@ -3057,10 +3057,20 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   if (auto *nominal = substType.getAnyNominal()) {
     auto *module = nominal->getModuleContext();
-    if (module && module->isBuiltFromInterface()) {
-      // Don't verify for types in modules built from interfaces; the feature
-      // may not have been enabled in them.
-      return;
+    if (module) {
+      if (module->isBuiltFromInterface()) {
+        // Don't verify for types in modules built from interfaces; the feature
+        // may not have been enabled in them.
+        return;
+      }
+      auto *file = dyn_cast_or_null<FileUnit>(module->getModuleScopeContext());
+      if (file && file->getKind() == FileUnitKind::Source) {
+        auto sourceFile = nominal->getParentSourceFile();
+        if (sourceFile && sourceFile->Kind == SourceFileKind::SIL) {
+          // Don't verify for types in SIL files.
+          return;
+        }
+      }
     }
   }
 
@@ -3086,6 +3096,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //     unconditionally but does in this case
     // (8) being or containing the error type
     // (9) explicitly suppressing conformance
+    // (10) a layout constrained archetype
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3155,7 +3166,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // ModuleTypes are trivial but don't warrant being given a
           // conformance to BitwiseCopyable (case (3)).
-          if (isa<ModuleType, SILTokenType>(ty)) {
+          if (isa<ModuleType>(ty) || isa<SILTokenType>(ty)) {
             // These types should never appear within aggregates.
             assert(isTopLevel && "aggregate containing marker type!?");
             // If they did, though, they would not justify the aggregate's
@@ -3174,13 +3185,21 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return !isTopLevel;
           }
 
+          // Case (10): a layout-constrained archetype.
+          if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
+            auto constraint = archetype->getLayoutConstraint();
+            if (constraint && constraint->isTrivial()) {
+              return false;
+            }
+          }
+
           auto *nominal = ty.getAnyNominal();
 
           // Non-nominal types (besides case (3) handled above) are trivial iff
           // conforming.
           if (!nominal) {
             llvm::errs()
-                << "Non-nominal type without conformance to _BitwiseCopyable:\n"
+                << "Non-nominal type without conformance to BitwiseCopyable:\n"
                 << ty << "\n"
                 << "within " << substType << "\n"
                 << "of " << origType << "\n";
@@ -3291,7 +3310,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           return true;
         });
     if (hasNoConformingArchetypeNode) {
-      llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
+      llvm::errs() << "Non-trivial type with BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
       llvm::errs() << "\n"
