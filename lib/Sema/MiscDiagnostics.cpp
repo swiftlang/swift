@@ -1837,8 +1837,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     static const AbstractClosureExpr *
     parentClosureDisallowingImplicitSelf(const ValueDecl *selfDecl,
                                          const Type captureType,
-                                         const AbstractClosureExpr *inClosure,
-                                         bool validateOutermostCapture = true) {
+                                         const AbstractClosureExpr *inClosure) {
       // Find the outer decl that determines what self refers to in this
       // closure.
       //  - If this is an escaping closure that captured self, then `selfDecl`
@@ -1861,7 +1860,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // potentially also validating all intermediate closures.
       auto outerClosure = inClosure;
       bool validateIntermediateParents = true;
-      do {
+      while (true) {
         // We have to validate all intermediate parent closures
         // to prevent cases like this from succeeding, which is
         // invalid because the outer closure doesn't have an
@@ -1894,8 +1893,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           }
         }
 
-        auto parent = parentClosure(outerClosure);
-        if (!parent) {
+        outerClosure = parentClosure(outerClosure);
+
+        if (!outerClosure) {
           // Once we reach a parent context that isn't a closure,
           // the only valid self capture is the self parameter.
           // This disallows cases like:
@@ -1905,26 +1905,22 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           //     method()
           //   }
           //
-          if (validateOutermostCapture) {
-            auto VD = dyn_cast<VarDecl>(outerSelfDecl);
-            if (!VD) {
-              return inClosure;
-            }
+          auto VD = dyn_cast<VarDecl>(outerSelfDecl);
+          if (!VD) {
+            return inClosure;
+          }
 
-            if (!VD->isSelfParameter()) {
-              return inClosure;
-            }
+          if (!VD->isSelfParameter()) {
+            return inClosure;
           }
 
           return nullptr;
         }
 
-        outerClosure = parent;
-
         // Check if this closure contains the self decl.
         //  - If the self decl is defined in the closure's body, its
         //    decl context will be the closure itself.
-        //  - If the self decl is defined in the closure's capture list, =
+        //  - If the self decl is defined in the closure's capture list,
         //    its parent capture list will reference the closure.
         auto selfDeclInOuterClosureContext =
             outerSelfDecl->getDeclContext() == outerClosure;
@@ -1938,7 +1934,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         }
 
         // We can stop searching because we found the first outer closure
-        // that contains the outer self decl.
+        // that contains the outer self decl. Otherwise we continue searching
+        // any parent closures in the next loop iteration.
         if (selfDeclInOuterClosureContext ||
             selfDeclInOuterClosureCaptureList) {
           // Check whether implicit self is disallowed due to this specific
@@ -1952,8 +1949,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           }
 
           return parentClosureDisallowingImplicitSelf(
-              outerSelfDecl, captureType, outerClosure,
-              /*validateOutermostCapture:*/ validateOutermostCapture);
+              outerSelfDecl, captureType, outerClosure);
         }
 
         // Optionally validate this intermediate closure before continuing
@@ -1966,7 +1962,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
             return outerClosure;
           }
         }
-      } while (true);
+      }
     }
 
     static bool
