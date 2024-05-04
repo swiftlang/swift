@@ -901,14 +901,6 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
-static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable),
-                                      _conformsTo(_typeparam(0), _escapable)),
-                            _parameters(_typeparam(0)), _typeparam(0));
-}
-
 static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
   // This is always "(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer"
   return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
@@ -2785,11 +2777,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::EndUnpairedAccess:
     if (!Types.empty()) return nullptr;
     return getEndUnpairedAccessOperation(Context, Id);
-
-  case BuiltinValueKind::Copy:
-    if (!Types.empty())
-      return nullptr;
-    return getCopyOperation(Context, Id);
 
   case BuiltinValueKind::AssumeAlignment:
     if (!Types.empty())

@@ -140,7 +140,6 @@ LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in t
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup, 0, "Task create in discarding task group builtin, accounting for the Void return type")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create builtin with extra executor preference")
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
-BASELINE_LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()")
 BASELINE_LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
 LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
 LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
