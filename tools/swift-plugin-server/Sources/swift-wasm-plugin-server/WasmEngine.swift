@@ -14,12 +14,12 @@ import WASI
 import WasmTypes
 import SystemPackage
 
+typealias WasmFunction = ([UInt32]) throws -> [UInt32]
+
 protocol WasmEngine {
   init(path: FilePath, imports: WASIBridgeToHost) async throws
 
-  func customSections(named name: String) throws -> [ArraySlice<UInt8>]
-
-  func invoke(_ method: String, _ args: [UInt32]) throws -> [UInt32]
+  func function(named name: String) throws -> WasmFunction?
 }
 
 typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
@@ -28,6 +28,7 @@ typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
 struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
   private let hostToPlugin: FileDescriptor
   private let pluginToHost: FileDescriptor
+  private let pumpFunction: WasmFunction
   let engine: Engine
 
   init(path: FilePath) async throws {
@@ -42,39 +43,17 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
       stderr: .standardError
     )
     engine = try await Engine(path: path, imports: bridge)
-    try checkABIVersion()
-    _ = try engine.invoke("_start", [])
-  }
 
-  private func checkABIVersion() throws {
-    let abiVersion = try abiVersion()
-    guard abiVersion == 1 else {
-      throw WasmEngineError(message: "Wasm plugin has unsupported ABI version: \(abiVersion)")
+    let exportName = "swift_wasm_macro_v1_pump"
+    guard let pump = try engine.function(named: exportName) else {
+      throw WasmEngineError(message: "Wasm plugin has an unknown ABI (could not find '\(exportName)')")
     }
-  }
+    self.pumpFunction = pump
 
-  private func abiVersion() throws -> UInt32 {
-    let sectionName = "swift_wasm_macro_abi"
-    let sections = try engine.customSections(named: sectionName)
-    switch sections.count {
-    case 0:
-      throw WasmEngineError(message: "Wasm macro is missing a '\(sectionName)' section")
-    case 1:
-      break
-    default:
-      throw WasmEngineError(message: "Wasm macro has too many '\(sectionName)' sections. Expected one, got \(sections.count)")
+    guard let start = try engine.function(named: "_start") else {
+      throw WasmEngineError(message: "Wasm plugin does not have a '_start' entrypoint")
     }
-    let section = sections[0]
-    guard section.count == 4 else {
-      throw WasmEngineError(message: """
-      Wasm macro has incorrect '\(sectionName)' section length. Expected 4 bytes, got \(section.count).
-      """)
-    }
-    return section.withUnsafeBufferPointer { buffer in
-      buffer.withMemoryRebound(to: UInt32.self) {
-        UInt32(littleEndian: $0.baseAddress!.pointee)
-      }
-    }
+    _ = try start([])
   }
 
   func handleMessage(_ json: [UInt8]) async throws -> [UInt8] {
@@ -83,7 +62,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     }
     try hostToPlugin.writeAll(json)
 
-    _ = try engine.invoke("swift_wasm_macro_pump", [])
+    _ = try pumpFunction([])
 
     let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
       let lengthCount = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))

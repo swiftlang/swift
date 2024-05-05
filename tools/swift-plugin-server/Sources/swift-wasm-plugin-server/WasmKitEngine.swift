@@ -32,12 +32,11 @@ struct WasmKitEngine: WasmEngine {
     instance = try runtime.instantiate(module: module)
   }
 
-  func customSections(named name: String) throws -> [ArraySlice<UInt8>] {
-    module.customSections.filter { $0.name == name }.map(\.bytes)
-  }
-
-  func invoke(_ method: String, _ args: [UInt32]) throws -> [UInt32] {
-    try runtime.invoke(instance, function: method, with: args.map(Value.i32)).map(\.i32)
+  func function(named name: String) throws -> WasmFunction? {
+    guard case let .function(function) = instance.exportInstances.first(where: { $0.name == name })?.value else {
+      return nil
+    }
+    return { args in try function.invoke(args.map(Value.i32), runtime: runtime).map(\.i32) }
   }
 }
 
