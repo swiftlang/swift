@@ -122,7 +122,11 @@ extension Collection {
       } else {
         result += ", "
       }
+      #if !$Embedded
       debugPrint(item, terminator: "", to: &result)
+      #else
+      "(cannot print value in embedded Swift)".write(to: &result)
+      #endif
     }
     result += type != nil ? "])" : "]"
     return result

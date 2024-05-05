@@ -566,6 +566,7 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
 #endif
 }
 
+#if !$Embedded
 @usableFromInline
 @_effects(releasenone) // @opaque
 internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
@@ -639,6 +640,7 @@ extension String {
     self._guts = _bridgeCocoaString(_cocoaString)
   }
 }
+#endif
 
 @_effects(releasenone)
 private func _createNSString(
@@ -664,6 +666,7 @@ private func _createCFString(
   )
 }
 
+#if !$Embedded
 extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
@@ -766,6 +769,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     as: UTF8.self
   )._bridgeToObjectiveCImpl()
 }
+#endif
 
 #else // !_runtime(_ObjC)
 
