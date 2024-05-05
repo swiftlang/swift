@@ -27,7 +27,6 @@ async (wasmData, imports) => {
   const api = instance.exports;
   return {
     api,
-    customSections: (name) => WebAssembly.Module.customSections(mod, name),
     read: (off, size) => new Uint8Array(new Uint8Array(api.memory.buffer, off, size)).buffer,
     write: (buf, off, size) => new Uint8Array(api.memory.buffer, off, size).set(new Uint8Array(buf)),
   };
@@ -79,20 +78,18 @@ final class JSCWasmEngine: WasmEngine {
     memory = JSCGuestMemory(getMemory: getMemory, setMemory: setMemory)
   }
 
-  func customSections(named name: String) throws -> [ArraySlice<UInt8>] {
-    guard let array = runner.invokeMethod("customSections", withArguments: [name]),
-          let length = array.objectForKeyedSubscript("length")?.toUInt32() else { return [] }
-    return (0..<length)
-      .compactMap { array.objectAtIndexedSubscript(Int($0)) }
-      .map { $0.withUnsafeArrayBuffer { Array($0)[...] } }
-  }
-
-  func invoke(_ method: String, _ args: [UInt32]) throws -> [UInt32] {
-    let result = api.invokeMethod(method, withArguments: args)!
-    if let exception = api.context.exception {
-      throw JSCWasmError(message: "Call to \(method) failed", value: exception)
+  func function(named name: String) throws -> WasmFunction? {
+    guard let export = api.objectForKeyedSubscript(name), export.isObject else {
+      return nil
     }
-    return result.isUndefined ? [] : [result.toUInt32()]
+    return { [api] args in
+      let result = export.call(withArguments: args)
+      if let exception = api.context.exception {
+        throw JSCWasmError(message: "Call to '\(name)' failed", value: exception)
+      }
+      guard let result else { return [] }
+      return result.isUndefined ? [] : [result.toUInt32()]
+    }
   }
 }
 
