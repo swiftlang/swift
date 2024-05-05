@@ -5,7 +5,6 @@
 // RUN:     %t/Downstream.swift                              \
 // RUN:     -typecheck -verify                               \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
-// RUN:     -enable-experimental-feature BitwiseCopyable     \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names                          \
 // RUN:     -import-objc-header %t/Library.h
@@ -58,7 +57,7 @@ struct IntsTrailing3 {
   double d;
   float f;
   int is[];
-} __attribute__((__swift_attr__("_BitwiseCopyable")));
+} __attribute__((__swift_attr__("BitwiseCopyable")));
 
 enum E {
   foo,
@@ -67,7 +66,7 @@ enum E {
 
 //--- Downstream.swift
 
-func take<T : _BitwiseCopyable>(_ t: T) {}
+func take<T : BitwiseCopyable>(_ t: T) {}
 
 func passTenple(_ t: Tenple) { take(t) }
 func passInts128(_ t: Ints128) {
@@ -83,7 +82,7 @@ func passIntsTrailing(_ t: IntsTrailing) {
   take(t) // expected-error{{type_does_not_conform_decl_owner}}
           // expected-note@-14{{where_requirement_failure_one_subst}}
 }
-extension IntsTrailing2 : _BitwiseCopyable {} //expected-error{{bitwise_copyable_outside_module}}
+extension IntsTrailing2 : BitwiseCopyable {} //expected-error{{bitwise_copyable_outside_module}}
 func passIntsTrailing2(_ t: IntsTrailing2) {
   take(t)
 }

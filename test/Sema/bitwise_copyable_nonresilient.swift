@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend                           \
 // RUN:     %t/Library.swift                             \
 // RUN:     -emit-module                                 \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -module-name Library                         \
 // RUN:     -emit-module-path %t/Library.swiftmodule
 
@@ -12,7 +11,6 @@
 // RUN:     %t/Downstream.swift                          \
 // RUN:     -typecheck -verify                           \
 // RUN:     -debug-diagnostic-names                      \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -I %t
 
 //--- Library.swift
@@ -29,9 +27,9 @@ case noone
 //--- Downstream.swift
 import Library
 
-func take<T: _BitwiseCopyable>(_ t: T) {}
+func take<T: BitwiseCopyable>(_ t: T) {}
 
-struct S_Explicit_With_Oopsional<T> : _BitwiseCopyable {
+struct S_Explicit_With_Oopsional<T> : BitwiseCopyable {
   var o: Oopsional<T> // expected-error{{non_bitwise_copyable_type_member}}
 }
 
@@ -39,7 +37,7 @@ func passOopsional<T>(_ t: Oopsional<T>) { take(t) } // expected-error{{type_doe
                                                      // expected-note@-7{{where_requirement_failure_one_subst}}
 
 
-struct S_Explicit_With_Woopsional<T> : _BitwiseCopyable {
+struct S_Explicit_With_Woopsional<T> : BitwiseCopyable {
   var o: Woopsional<T> // expected-error{{non_bitwise_copyable_type_member}}
 }
 

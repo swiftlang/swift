@@ -243,10 +243,21 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
                                               sei->getStructDecl());
   }
 
+  if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
+    return SILIsolationInfo::getActorIsolated(seai, SILValue(),
+                                              seai->getStructDecl());
+  }
+
   // See if we have an unchecked_enum_data from a global actor isolated type.
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
     return SILIsolationInfo::getActorIsolated(uedi, SILValue(),
                                               uedi->getEnumDecl());
+  }
+
+  // See if we have an unchecked_enum_data from a global actor isolated type.
+  if (auto *utedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
+    return SILIsolationInfo::getActorIsolated(utedi, SILValue(),
+                                              utedi->getEnumDecl());
   }
 
   // Check if we have an unsafeMutableAddressor from a global actor, mark the

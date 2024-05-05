@@ -187,5 +187,5 @@ func frob(x: MyAssortment) -> Int {
     return MemoryLayout.size(ofValue: x)
 }
 
-extension MyEnum: _BitwiseCopyable
-    where T: Copyable & _BitwiseCopyable {}
+extension MyEnum: BitwiseCopyable
+    where T: Copyable & BitwiseCopyable {}

@@ -417,6 +417,11 @@ static bool visitScopeEndsRequiringInit(
     llvm_unreachable("invalid check!?");
   }
 
+  // Look through wrappers.
+  if (auto m = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
+    operand = m->getOperand();
+  }
+
   // Check for inout types of arguments that are marked with consumable and
   // assignable.
   if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
@@ -1007,6 +1012,7 @@ void UseState::initializeLiveness(
   // Then check if our markedValue is from an argument that is in,
   // in_guaranteed, inout, or inout_aliasable, consider the marked address to be
   // the initialization point.
+  bool beginsInitialized = false;
   {
     SILValue operand = address->getOperand();
     if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand))
@@ -1025,8 +1031,7 @@ void UseState::initializeLiveness(
                "an init... adding mark_unresolved_non_copyable_value as "
                "init!\n");
         // We cheat here slightly and use our address's operand.
-        recordInitUse(address, address, liveness.getTopLevelSpan());
-        liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+        beginsInitialized = true;
         break;
       case swift::SILArgumentConvention::Indirect_Out:
         llvm_unreachable("Should never have out addresses here");
@@ -1039,6 +1044,22 @@ void UseState::initializeLiveness(
       case swift::SILArgumentConvention::Pack_Out:
         llvm_unreachable("Working with addresses");
       }
+    }
+  }
+
+  // A read or write access always begins on an initialized value.
+  if (auto access = dyn_cast<BeginAccessInst>(address->getOperand())) {
+    switch (access->getAccessKind()) {
+    case SILAccessKind::Deinit:
+    case SILAccessKind::Read:
+    case SILAccessKind::Modify:
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found move only arg closure box use... "
+                    "adding mark_unresolved_non_copyable_value as init!\n");
+      beginsInitialized = true;
+      break;
+    case SILAccessKind::Init:
+      break;
     }
   }
 
@@ -1057,16 +1078,14 @@ void UseState::initializeLiveness(
         LLVM_DEBUG(llvm::dbgs()
                    << "Found move only arg closure box use... "
                       "adding mark_unresolved_non_copyable_value as init!\n");
-        recordInitUse(address, address, liveness.getTopLevelSpan());
-        liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+        beginsInitialized = true;
       }
     } else if (auto *box = dyn_cast<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found move only var allocbox use... "
                     "adding mark_unresolved_non_copyable_value as init!\n");
-      recordInitUse(address, address, liveness.getTopLevelSpan());
-      liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+      beginsInitialized = true;
     }
   }
 
@@ -1077,8 +1096,7 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found ref_element_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
 
   // Check if our address is from a global_addr. In such a case, we treat the
@@ -1088,8 +1106,7 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found global_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
 
   if (auto *ptai = dyn_cast<PointerToAddressInst>(
@@ -1098,24 +1115,21 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found pointer to address use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
   
   if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
         stripAccessMarkers(address->getOperand())->getDefiningInstruction())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding accessor coroutine begin_apply as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
   
   if (auto *eai = dyn_cast<UncheckedTakeEnumDataAddrInst>(
           stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
 
   // Assume a strict check of a temporary or formal access is initialized
@@ -1125,32 +1139,33 @@ void UseState::initializeLiveness(
       asi && address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding strict-marked alloc_stack as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
 
   // Assume a strict-checked value initialized before the check.
   if (address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding strict marker as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
 
   // Assume a value whose deinit has been dropped has been initialized.
   if (auto *ddi = dyn_cast<DropDeinitInst>(address->getOperand())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
-    recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+    beginsInitialized = true;
   }
 
   // Assume a value wrapped in a MoveOnlyWrapper is initialized.
   if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address->getOperand())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
+    beginsInitialized = true;
+  }
+  
+  if (beginsInitialized) {
     recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());    
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
 
   // Now that we have finished initialization of defs, change our multi-maps
@@ -3998,6 +4013,10 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
+        if (llvm::any_of(result->getUsers(),
+                         [](auto *user) { return isa<BranchInst>(user); })) {
+          continue;
+        }
         if (completion.completeOSSALifetime(result) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
@@ -4005,7 +4024,9 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
       }
     }
     for (SILArgument *arg : block->getArguments()) {
-      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
+      if (arg->isReborrow()) {
+        continue;
+      }
       if (completion.completeOSSALifetime(arg) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;

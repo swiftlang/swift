@@ -79,7 +79,7 @@ ArrayRef<GenericTypeParamType *>
 GenericSignatureImpl::getInnermostGenericParams() const {
   const auto params = getGenericParams();
 
-  const unsigned maxDepth = params.back()->getDepth();
+  const unsigned maxDepth = getMaxDepth();
   if (params.front()->getDepth() == maxDepth)
     return params;
 
@@ -93,6 +93,16 @@ GenericSignatureImpl::getInnermostGenericParams() const {
   }
 
   return params.slice(sliceCount);
+}
+
+unsigned GenericSignatureImpl::getMaxDepth() const {
+  return getGenericParams().back()->getDepth();
+}
+
+unsigned GenericSignature::getNextDepth() const {
+  if (!getPointer())
+    return 0;
+  return getPointer()->getMaxDepth() + 1;
 }
 
 void GenericSignatureImpl::forEachParam(

@@ -4,6 +4,7 @@
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// UNSUPPORTED: OS=windows-msvc
 
 import _Differentiation
 #if canImport(Glibc)

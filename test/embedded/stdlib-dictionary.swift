@@ -4,6 +4,9 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 
+// https://github.com/apple/swift/issues/73249
+// UNSUPPORTED: OS=windows-msvc
+
 public func test() {
   var d: [Int:Int] = [1: 2, 3: 4, 5: 6]
   d[8] = 9

@@ -782,6 +782,13 @@ swift_updateClassMetadata2(ClassMetadata *self,
                            size_t numFields,
                            const TypeLayout * const *fieldTypes,
                            size_t *fieldOffsets);
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+Class
+swift_updatePureObjCClassMetadata(Class self,
+                                  ClassLayoutFlags flags,
+                                  size_t numFields,
+                                  const TypeLayout * const *fieldTypes);
 #endif
 
 /// Given class metadata, a class descriptor and a method descriptor, look up

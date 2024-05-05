@@ -277,10 +277,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
   params.append(FTy->getParameters().begin(), FTy->getParameters().end());
 
   /// Determine the existing generic parameter depth.
-  int Depth = 0;
-  if (OrigGenericSig != nullptr) {
-    Depth = OrigGenericSig.getGenericParams().back()->getDepth() + 1;
-  }
+  int Depth = OrigGenericSig.getNextDepth();
 
   /// Index of the Generic Parameter.
   int GPIdx = 0;
@@ -514,10 +511,7 @@ void ExistentialTransform::populateThunkBody() {
     }
   }
 
-  unsigned int OrigDepth = 0;
-  if (F->getLoweredFunctionType()->isPolymorphic()) {
-    OrigDepth = OrigCalleeGenericSig.getGenericParams().back()->getDepth() + 1;
-  }
+  unsigned int OrigDepth = OrigCalleeGenericSig.getNextDepth();
   SubstitutionMap OrigSubMap = F->getForwardingSubstitutionMap();
 
   /// Create substitutions for Apply instructions.

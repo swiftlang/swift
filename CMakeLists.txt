@@ -736,6 +736,18 @@ option(SWIFT_ENABLE_BACKTRACING
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "14.5" CACHE STRING
   "Minimum deployment target version for macCatalyst")
 
+# A tempoarary hack: force enabling HOSTTOOLS mode on Windows.
+# Right now, SwiftCompilerSources cannot be enabled for lldb because on Windows
+# swift and lldb are built in a unified build and there is a missing dependency
+# on swiftrt.
+# Swift and lldb are configured with the same cmake invocation and therefore
+# enabling bootstrapping for swift and disabling it for lldb only works by
+# hardcoding the bootstrapping mode in the cmake file.
+# https://github.com/apple/swift/issues/73322
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(BOOTSTRAPPING_MODE "HOSTTOOLS")
+endif()
+
 #
 # End of user-configurable options.
 #
@@ -904,6 +916,10 @@ if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   # This is the normal case. We are not cross-compiling.
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
+  if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
+    message(WARNING "BOOSTRAPPING set to OFF because no Swift compiler is defined")
+    set(BOOTSTRAPPING_MODE "OFF")
+  endif()
 elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   # If cross-compiling, we don't have to bootstrap. We can just use the previously
   # built native swiftc to build the swift compiler modules.
@@ -983,6 +999,8 @@ endif()
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)
 # build environment.
+include(GoldVersion)
+
 if(LLVM_USE_LINKER)
   set(SWIFT_USE_LINKER_default "${LLVM_USE_LINKER}")
 elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
@@ -994,7 +1012,17 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 elseif(DISTRO_NAME STREQUAL "Amazon Linux 2023")
   set(SWIFT_USE_LINKER_default "lld")
 else()
-  set(SWIFT_USE_LINKER_default "gold")
+  get_gold_version(gold_version)
+  if(NOT gold_version)
+    message(STATUS "GNU Gold not found; using lld instead")
+    set(SWIFT_USE_LINKER_default "lld")
+  elseif(gold_version VERSION_LESS "2.36")
+    message(STATUS "GNU Gold is too old (${gold_version}); using lld instead")
+    set(SWIFT_USE_LINKER_default "lld")
+  else()
+    message(STATUS "Using GNU Gold ${gold_version}")
+    set(SWIFT_USE_LINKER_default "gold")
+  endif()
 endif()
 set(SWIFT_USE_LINKER ${SWIFT_USE_LINKER_default} CACHE STRING
     "Build Swift with a non-default linker")

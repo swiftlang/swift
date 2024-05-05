@@ -280,6 +280,10 @@ llvm::Value *irgen::emitArgumentPackShapeRef(IRGenFunction &IGF,
 Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                               llvm::Value *metadata,
                                               NominalTypeDecl *decl) {
+  assert(!isa<ClassDecl>(decl)
+            || !cast<ClassDecl>(decl)->getObjCImplementationDecl()
+                && "objcImpl classes don't have a field offset vector");
+
   auto &layout = IGF.IGM.getMetadataLayout(decl);
   auto offset = [&]() {
     if (isa<ClassDecl>(decl)) {

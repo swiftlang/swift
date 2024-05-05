@@ -5,6 +5,9 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
 
+// https://github.com/apple/swift/issues/73249
+// UNSUPPORTED: OS=windows-msvc
+
 public func test() {
   var s: Set<Int> = [1, 2, 3]
   s.insert(42)

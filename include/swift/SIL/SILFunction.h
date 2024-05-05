@@ -1276,8 +1276,10 @@ public:
   GenericEnvironment *getGenericEnvironment() const {
     return GenericEnv;
   }
-  void setGenericEnvironment(GenericEnvironment *env) {
+  void setGenericEnvironment(GenericEnvironment *env,
+                             SubstitutionMap forwardingSubs=SubstitutionMap()) {
     GenericEnv = env;
+    ForwardingSubMap = forwardingSubs;
   }
 
   /// Retrieve the generic signature from the generic environment of this

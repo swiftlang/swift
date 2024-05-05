@@ -163,6 +163,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     }
   }
 
+  SmallVector<StringRef, 4> AllowedRexports;
+  if (auto *A =
+          ParsedArgs.getLastArg(OPT_experimental_allowed_reexported_modules)) {
+    for (const auto *val : A->getValues())
+      AllowedRexports.emplace_back(val);
+  }
+
   symbolgraphgen::SymbolGraphOptions Options;
   Options.OutputDir = OutputDir;
   Options.Target = Target;
@@ -175,6 +182,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Options.EmitExtensionBlockSymbols =
       ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
                          OPT_omit_extension_block_symbols, /*default=*/false);
+  Options.AllowedReexportedModules = AllowedRexports;
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
     Options.MinimumAccessLevel =

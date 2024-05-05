@@ -1054,6 +1054,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
                                  uint16_t ArgNo) {
 
   auto *VD = cast<VarDecl>(capture.getDecl());
+  
   SILLocation Loc(VD);
   Loc.markAsPrologue();
 
@@ -1072,16 +1073,34 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     isPack = true;
   }
 
-  // Local function to get the captured variable type within the capturing
-  // context.
-  auto getVarTypeInCaptureContext = [&]() -> Type {
-    return SGF.F.mapTypeIntoContext(interfaceType);
-  };
-
-  auto type = getVarTypeInCaptureContext();
-  auto &lowering = SGF.getTypeLowering(getVarTypeInCaptureContext());
+  auto type = SGF.F.mapTypeIntoContext(interfaceType);
+  auto &lowering = SGF.getTypeLowering(type);
   SILType ty = lowering.getLoweredType();
 
+  bool isNoImplicitCopy;
+  
+  if (ty.isTrivial(SGF.F) || ty.isMoveOnly()) {
+    isNoImplicitCopy = false;
+  } else if (VD->isNoImplicitCopy()) {
+    isNoImplicitCopy = true;
+  } else if (auto pd = dyn_cast<ParamDecl>(VD)) {
+    switch (pd->getSpecifier()) {
+    case ParamSpecifier::Borrowing:
+    case ParamSpecifier::Consuming:
+      isNoImplicitCopy = true;
+      break;
+    case ParamSpecifier::ImplicitlyCopyableConsuming:
+    case ParamSpecifier::Default:
+    case ParamSpecifier::InOut:
+    case ParamSpecifier::LegacyOwned:
+    case ParamSpecifier::LegacyShared:
+      isNoImplicitCopy = false;
+      break;
+    }
+  } else {
+    isNoImplicitCopy = false;
+  }
+    
   SILValue arg;
   SILFunctionArgument *box = nullptr;
 
@@ -1116,6 +1135,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       addr->finishInitialization(SGF);
       val = addr->getManagedAddress();
     }
+    
+    if (isNoImplicitCopy && !val.getType().isMoveOnly()) {
+      val = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, val);
+    }
 
     // If this constant is a move only type, we need to add no_consume_or_assign checking to
     // ensure that we do not consume this captured value in the function. This
@@ -1149,6 +1172,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
     arg = SGF.B.createProjectBox(VD, box, 0);
+    if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
+      arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
+    }
     break;
   }
   case CaptureKind::StorageAddress:
@@ -1169,6 +1195,33 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
     arg = SILValue(fArg);
+    
+    if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
+      switch (argConv) {
+      case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
+      case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_In_Guaranteed:
+      case SILArgumentConvention::Pack_Inout:
+      case SILArgumentConvention::Pack_Owned:
+      case SILArgumentConvention::Pack_Guaranteed:
+        arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
+        break;
+        
+      case SILArgumentConvention::Direct_Owned:
+        arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(VD, arg);
+        break;
+      
+      case SILArgumentConvention::Direct_Guaranteed:
+        arg = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, arg);
+        break;
+      
+      case SILArgumentConvention::Direct_Unowned:
+      case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Pack_Out:
+        llvm_unreachable("should be impossible");
+      }
+    }
 
     // If we have an inout noncopyable parameter, insert a consumable and
     // assignable.
@@ -1177,7 +1230,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // in SIL since it is illegal to capture an inout value in an escaping
     // closure. The later code knows how to handle that we have the
     // mark_unresolved_non_copyable_value here.
-    if (isInOut && ty.isMoveOnly(/*orWrapped=*/false)) {
+    if (isInOut && arg->getType().isMoveOnly()) {
       arg = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           Loc, arg,
           MarkUnresolvedNonCopyableValueInst::CheckKind::

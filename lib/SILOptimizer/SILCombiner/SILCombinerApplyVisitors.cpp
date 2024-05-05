@@ -157,6 +157,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto context = AI.getFunction()->getTypeExpansionContext();
   auto oldOpRetTypes = substConventions.getIndirectSILResultTypes(context);
   auto newOpRetTypes = convertConventions.getIndirectSILResultTypes(context);
+  auto oldIndirectErrorResultType =
+      substConventions.getIndirectErrorResultType(context);
+  auto newIndirectErrorResultType =
+      convertConventions.getIndirectErrorResultType(context);
   auto oldOpParamTypes = substConventions.getParameterSILTypes(context);
   auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
@@ -186,7 +190,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
        ++OpI, ++newRetI, ++oldRetI) {
     convertOp(Ops[OpI], *oldRetI, *newRetI);
   }
-  
+
+  if (oldIndirectErrorResultType) {
+    assert(newIndirectErrorResultType);
+    convertOp(Ops[OpI], oldIndirectErrorResultType, newIndirectErrorResultType);
+    ++OpI;
+  }
+
   auto newParamI = newOpParamTypes.begin();
   auto oldParamI = oldOpParamTypes.begin();
   for (auto e = newOpParamTypes.end(); newParamI != e;
@@ -1448,6 +1458,16 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   return false;
 }
 
+static bool canBeRemovedIfResultIsNotUsed(SILFunction *f) {
+  if (f->getEffectsKind() < EffectsKind::ReleaseNone)
+    return true;
+
+  if (f->hasSemanticsAttr("string.init_empty_with_capacity"))
+    return true;
+
+  return false;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
@@ -1469,7 +1489,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunctionOrNull();
-  if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
+  if (SF && canBeRemovedIfResultIsNotUsed(SF)) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       if (eraseApply(AI, Users))

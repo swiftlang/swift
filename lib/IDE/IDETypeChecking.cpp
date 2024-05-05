@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Sema/IDETypeChecking.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -25,20 +26,30 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
-#include "swift/Sema/IDETypeChecking.h"
-#include "swift/Sema/IDETypeCheckingRequests.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/IDERequests.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeCheckingRequests.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 
-void
-swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
-                                  SmallVectorImpl<Decl*> &Results,
-                                  bool Recursive) {
+void swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
+                                       SmallVectorImpl<Decl *> &Results,
+                                       bool Recursive) {
+  auto getDisplayDeclsForModule =
+      [Recursive](ModuleDecl *M, SmallVectorImpl<Decl *> &Results) {
+        M->getDisplayDecls(Results, Recursive);
+      };
+  getTopLevelDeclsForDisplay(M, Results, std::move(getDisplayDeclsForModule));
+}
+
+void swift::getTopLevelDeclsForDisplay(
+    ModuleDecl *M, SmallVectorImpl<Decl *> &Results,
+    llvm::function_ref<void(ModuleDecl *, SmallVectorImpl<Decl *> &)>
+        getDisplayDeclsForModule) {
   auto startingSize = Results.size();
-  M->getDisplayDecls(Results, Recursive);
+  getDisplayDeclsForModule(M, Results);
 
   // Force Sendable on all public types, which might synthesize some extensions.
   // FIXME: We can remove this if @_nonSendable stops creating extensions.
@@ -48,20 +59,20 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
       // Restrict this logic to public and package types. Non-public types
       // may refer to implementation details and fail at deserialization.
       auto accessScope = NTD->getFormalAccessScope();
-      if (!M->isMainModule() &&
-          !accessScope.isPublic() && !accessScope.isPackage())
+      if (!M->isMainModule() && !accessScope.isPublic() &&
+          !accessScope.isPackage())
         continue;
 
       auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
       if (proto)
-        (void) M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+        (void)M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 
   // Remove what we fetched and fetch again, possibly now with additional
   // extensions.
   Results.resize(startingSize);
-  M->getDisplayDecls(Results, Recursive);
+  getDisplayDeclsForModule(M, Results);
 }
 
 static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {

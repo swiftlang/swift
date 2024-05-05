@@ -313,6 +313,7 @@ public:
                                       bool AllowInputs = true);
 
   void removeCachedAST(SwiftInvocationRef Invok);
+  void cancelBuildsForCachedAST(SwiftInvocationRef Invok);
 
   struct Implementation;
   Implementation &Impl;
