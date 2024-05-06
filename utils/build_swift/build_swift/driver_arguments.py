@@ -56,6 +56,10 @@ def _apply_default_arguments(args):
        args.lldb_build_with_xcode is not None:
         args.build_lldb = True
 
+    # Build libc++ if fully static Linux was specified.
+    if args.build_linux_static and args.build_libcxx is None:
+        args.build_libcxx = True
+
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
@@ -201,6 +205,7 @@ def _apply_default_arguments(args):
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
+        args.test_linux_static = False
         args.test_freebsd = False
         args.test_cygwin = False
         args.test_osx = False
@@ -1099,6 +1104,8 @@ def create_argument_parser():
            help='skip testing Swift stdlibs for Mac OS X')
     option('--skip-test-linux', toggle_false('test_linux'),
            help='skip testing Swift stdlibs for Linux')
+    option('--skip-test-linux-static', toggle_false('test_linux_static'),
+           help='skip testing Swift stdlibs for fully static Linux')
     option('--skip-test-freebsd', toggle_false('test_freebsd'),
            help='skip testing Swift stdlibs for FreeBSD')
     option('--skip-test-cygwin', toggle_false('test_cygwin'),
@@ -1151,8 +1158,12 @@ def create_argument_parser():
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 
+    option('--build-linux-static', toggle_true,
+           help='build Swift stdlibs for fully static Linux')
+
     option('--skip-build-linux', toggle_false('build_linux'),
            help='skip building Swift stdlibs for Linux')
+
     option('--skip-build-freebsd', toggle_false('build_freebsd'),
            help='skip building Swift stdlibs for FreeBSD')
     option('--skip-build-cygwin', toggle_false('build_cygwin'),
@@ -1384,6 +1395,28 @@ def create_argument_parser():
            help='The target architecture when building for Android. '
                 'Currently, only armv7, aarch64, and x86_64 are supported. '
                 '%(default)s is the default.')
+
+    # -------------------------------------------------------------------------
+    in_group('Build settings for Linux')
+
+    option('--linux-archs', store,
+           type=argparse.ShellSplitType(),
+           default=None,
+           help='Comma-separated list of architectures to use when '
+           'building for Linux.')
+
+    # -------------------------------------------------------------------------
+    in_group('Build settings for fully static Linux')
+
+    option('--musl-path', store_path,
+           default='/usr/local/musl',
+           help='The path to the Musl headers and libraries.')
+
+    option('--linux-static-archs', store,
+           type=argparse.ShellSplitType(),
+           default=['x86_64', 'aarch64'],
+           help='Comma-separated list of architectures to use when '
+           'building for fully static Linux.')
 
     # -------------------------------------------------------------------------
     in_group('Experimental language features')
