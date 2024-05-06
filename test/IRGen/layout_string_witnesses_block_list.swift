@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -emit-ir -module-name Foo %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -emit-ir -module-name Foo %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -module-name Foo %s | %FileCheck %s --check-prefix=CHECK-DISABLED
 
 // RUN: echo "---" > %t/blocklist.yml
@@ -20,4 +20,11 @@
 public struct Bar {
     let x: Int
     let y: AnyObject
+}
+
+// CHECK-BLOCKED-NOT: swift_enumFn_getEnumTag
+public enum Foo {
+    case a(AnyObject)
+    case b(Int, AnyObject)
+    case c
 }
