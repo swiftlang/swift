@@ -33,7 +33,7 @@ distributed actor MyDistributedActor {
     actorSystem = system
     _ = { @MainActor in
       // TODO: This should error saying 'y' is actor isolated.
-      print(y) // expected-error {{transferring 'y' may cause a data race}}
+      print(y) // expected-error {{sending 'y' risks causing data races}}
       // expected-note @-1 {{task-isolated 'y' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -42,26 +42,26 @@ distributed actor MyDistributedActor {
     x = y2
     actorSystem = system
     _ = { @MainActor in
-      print(y2) // expected-error {{transferring 'y2' may cause a data race}}
+      print(y2) // expected-error {{sending 'y2' risks causing data races}}
       // expected-note @-1 {{'self'-isolated 'y2' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
   distributed func transferActorField() async {
-    await transferToMain(x) // expected-error {{transferring 'self.x' may cause a data race}}
-    // expected-note @-1 {{transferring 'self'-isolated 'self.x' to main actor-isolated callee could cause races between main actor-isolated and 'self'-isolated uses}}
+    await transferToMain(x) // expected-error {{sending 'self.x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'self.x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 
   distributed func transferActorIsolatedArg(_ x: NonSendableKlass) async {
-    await transferToMain(x) // expected-error {{transferring 'x' may cause a data race}}
-    // expected-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
+    await transferToMain(x) // expected-error {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending actor-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and actor-isolated uses}}
   }
 
   distributed func transferActorIsolatedArgIntoClosure(_ x: NonSendableKlass) async {
     _ = { @MainActor in
       // TODO: In 2nd part of message should say actor-isolated instead of later
       // nonisolated uses in the case of a closure.
-      print(x) // expected-error {{transferring 'x' may cause a data race}}
+      print(x) // expected-error {{sending 'x' risks causing data races}}
       // expected-note @-1 {{actor-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
