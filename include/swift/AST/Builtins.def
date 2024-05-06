@@ -537,14 +537,6 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
-/// TODO: Remove.  Only exists to avoid a reverse condfail.
-///       rdar://127516085 (Complete removal of Builtin.copy)
-///
-/// copy: <T>(T) -> T
-///
-/// Creates a copy of the source at the destination.
-BUILTIN_SIL_OPERATION(Copy, "copy", Special)
-
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
 // These functions accept a single argument of any type.
 #ifndef BUILTIN_RUNTIME_CALL

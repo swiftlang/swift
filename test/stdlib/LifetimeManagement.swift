@@ -26,19 +26,3 @@ suite.test("move") {
 }
 
 runAllTests()
-
-// TODO: Remove.  Only exists to avoid a reverse condfail.
-//       rdar://127516085 (Complete removal of Builtin.copy)
-func _oldCopy<T>(_ value: T) -> T {
-  #if $BuiltinCopy
-    Builtin.copy(value)
-  #else
-    value
-  #endif
-}
-
-suite.test("_oldCopy") {
-  let k = Klass()
-  expectTrue(k === _oldCopy(k))
-}
-
