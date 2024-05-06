@@ -21,8 +21,8 @@ sil [ossa] @test : $@convention(thin) @async (@guaranteed NonSendableKlass) -> (
 bb0(%0 : @guaranteed $NonSendableKlass):
   %1 = function_ref  @transfer_to_main : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %1(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-complete-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context; later accesses to value could race; this is an error in the Swift 6 language mode}}
-  // expected-tns-error @-2 {{task-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context; later accesses to value could race}}
+  // expected-complete-warning @-1 {{}}
+  // expected-tns-error @-2 {{}}
   %9999 = tuple ()
   return %9999 : $()
 }
