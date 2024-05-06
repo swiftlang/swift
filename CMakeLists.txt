@@ -351,9 +351,8 @@ option(SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
     debugging Swift)"
     FALSE)
 
-option(BOOTSTRAPPING_MODE [=[
+set(BOOTSTRAPPING_MODE HOSTTOOLS CACHE STRING [=[
 How to build the swift compiler modules. Possible values are
-    OFF:           build without swift modules
     HOSTTOOLS:     build with a pre-installed toolchain
     BOOTSTRAPPING: build with a 2-stage bootstrapping process
     BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
@@ -362,7 +361,7 @@ How to build the swift compiler modules. Possible values are
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
     CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
                                    compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
-]=] OFF)
+]=])
 
 option(BRIDGING_MODE [=[
 How swift-C++ bridging code is compiled:
