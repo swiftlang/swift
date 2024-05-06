@@ -101,7 +101,7 @@ extension NonSendableGlobalActorIsolatedStruct {
 
   mutating func test3() -> transferring NonSendableKlass {
     self.k
-  } // expected-error {{transferring 'self.k' may cause a data race}}
+  } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 
   mutating func test4() -> (any GlobalActorIsolatedProtocol)? {
@@ -166,7 +166,7 @@ extension NonSendableGlobalActorIsolatedEnum {
       return nil
     }
     return x
-  } // expected-error {{transferring 'x.some' may cause a data race}}
+  } // expected-error {{sending 'x.some' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'x.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -181,7 +181,7 @@ extension NonSendableGlobalActorIsolatedKlass {
 
   func test3() -> transferring NonSendableKlass {
     self.k
-  } // expected-error {{transferring 'self.k' may cause a data race}}
+  } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 
   func test4() -> (any GlobalActorIsolatedProtocol)? {
@@ -214,7 +214,7 @@ extension FinalNonSendableGlobalActorIsolatedKlass {
 
   func test3() -> transferring NonSendableKlass {
     self.k
-  } // expected-error {{transferring 'self.k' may cause a data race}}
+  } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 
   func test4() -> (any GlobalActorIsolatedProtocol)? {
@@ -247,7 +247,7 @@ extension GlobalActorIsolatedProtocol {
 
   mutating func test3() -> transferring NonSendableKlass {
     self.k
-  } // expected-error {{transferring 'self.k' may cause a data race}}
+  } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 
   mutating func test4() -> (any GlobalActorIsolatedProtocol)? {
