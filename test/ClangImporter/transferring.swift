@@ -28,7 +28,7 @@ func funcTestTransferringResult() async {
   let x2 = NonSendableCStruct()
   let y2 = returnUserDefinedFromGlobalFunction(x2)
   await transferToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
-  // expected-note @-1 {{sending disconnected 'x2' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(y2) // expected-note {{risks concurrent access}}
 }
 
