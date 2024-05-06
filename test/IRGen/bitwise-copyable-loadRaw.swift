@@ -1,10 +1,10 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature BuiltinModule -enable-experimental-feature BitwiseCopyable -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature BuiltinModule -Xfrontend -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: executable_test
 
 // Execute an unaligned load of SIMD16<UInt8> which retroactively conforms directly to BitwiseCopyable.
 
-extension SIMD16 : @retroactive _BitwiseCopyable where Scalar.SIMD16Storage : _BitwiseCopyable {}
+extension SIMD16 : @retroactive BitwiseCopyable where Scalar.SIMD16Storage : BitwiseCopyable {}
 
 func doit() {
   let bytes: [UInt8] = Array(repeating: 0, count: 64)

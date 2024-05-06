@@ -682,9 +682,9 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
                                            ProtocolDecl *decl) const {
   // Marker protocols always self-conform.
   if (decl->isMarkerProtocol()) {
-    // Except for BitwiseCopyable an existential of which is non-trivial.
-    if (decl->getASTContext().LangOpts.hasFeature(Feature::BitwiseCopyable) &&
-        decl->getKnownProtocolKind() == KnownProtocolKind::BitwiseCopyable) {
+    // Except for BitwiseCopyable an existential of which is not bitwise
+    // copyable.
+    if (decl->getKnownProtocolKind() == KnownProtocolKind::BitwiseCopyable) {
       return false;
     }
     return true;

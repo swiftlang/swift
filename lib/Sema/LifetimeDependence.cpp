@@ -205,14 +205,12 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
     // error.
     // TODO: Diagnose ~Escapable types are always non-trivial in SIL.
     if (paramType->isEscapable()) {
-      if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-        auto *bitwiseCopyableProtocol =
-            ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
-        if (bitwiseCopyableProtocol &&
-            mod->checkConformance(paramType, bitwiseCopyableProtocol)) {
-          diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
-          return true;
-        }
+      auto *bitwiseCopyableProtocol =
+          ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+      if (bitwiseCopyableProtocol &&
+          mod->checkConformance(paramType, bitwiseCopyableProtocol)) {
+        diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
+        return true;
       }
     }
 
@@ -425,16 +423,14 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
   if (!cd && afd->hasImplicitSelfDecl()) {
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->isEscapable()) {
-      if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-        auto *bitwiseCopyableProtocol =
-            ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
-        if (bitwiseCopyableProtocol &&
-            mod->checkConformance(selfTypeInContext, bitwiseCopyableProtocol)) {
-          diags.diagnose(
-              returnLoc,
-              diag::lifetime_dependence_method_escapable_bitwisecopyable_self);
-          return std::nullopt;
-        }
+      auto *bitwiseCopyableProtocol =
+          ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+      if (bitwiseCopyableProtocol &&
+          mod->checkConformance(selfTypeInContext, bitwiseCopyableProtocol)) {
+        diags.diagnose(
+            returnLoc,
+            diag::lifetime_dependence_method_escapable_bitwisecopyable_self);
+        return std::nullopt;
       }
     }
     auto kind = getLifetimeDependenceKindFromType(selfTypeInContext);
