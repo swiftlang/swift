@@ -3002,6 +3002,9 @@ public:
   }
 
   void checkAssignOrInitInst(AssignOrInitInst *AI) {
+    if (F.getASTContext().hadError())
+      return;
+
     SILValue Src = AI->getSrc();
     require(AI->getModule().getStage() == SILStage::Raw,
             "assign_or_init can only exist in raw SIL");
@@ -6620,6 +6623,9 @@ public:
   ///  the task, or exiting the function
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
+    if (F->getASTContext().hadError())
+      return;
+
     // Do a traversal of the basic blocks.
     // Note that we intentionally don't verify these properties in blocks
     // that can't be reached from the entry block.
