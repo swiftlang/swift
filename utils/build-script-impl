@@ -1446,6 +1446,16 @@ function swift_c_flags() {
     esac
 }
 
+function maybe_lfts() {
+    local host=$1
+
+    case $host in
+        linux-static-*)
+            echo -n "-lfts"
+            ;;
+    esac
+}
+
 function common_swift_flags() {
     if [ "${module_cache}" == "" ] ; then
         echo "error: a module cache path has not been set"
@@ -2524,7 +2534,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DENABLE_TESTING:BOOL=NO
 
                   -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
-                  -DCMAKE_C_FLAGS="$(swift_c_flags ${host}) -lfts"
+                  -DCMAKE_C_FLAGS="$(swift_c_flags ${host}) $(maybe_lfts ${host})"
                 )
 
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
