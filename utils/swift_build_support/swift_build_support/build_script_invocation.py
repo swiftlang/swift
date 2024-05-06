@@ -520,6 +520,24 @@ class BuildScriptInvocation(object):
                     shlex.quote(opt) for opt in args.extra_dsymutil_args)
             ]
 
+        if args.musl_path:
+            impl_args += [
+                "--musl-path=%s" % (args.musl_path, )
+            ]
+        if args.linux_static_archs:
+            impl_args += [
+                "--linux-static-archs=%s" % ';'.join(args.linux_static_archs)
+            ]
+        if args.linux_archs:
+            impl_args += [
+                "--linux-archs=%s" % ';'.join(args.linux_archs)
+            ]
+
+        if not args.build_linux:
+            impl_args += ["--skip-build-linux"]
+        if args.build_linux_static:
+            impl_args += ["--build-linux-static"]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
