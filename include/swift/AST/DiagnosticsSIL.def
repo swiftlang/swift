@@ -941,7 +941,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===----------------------------------------------------------------------===//
 
 NOTE(regionbasedisolation_maybe_race, none,
-     "use here could race", ())
+     "risks concurrent access", ())
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
@@ -977,7 +977,7 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 //
 
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
-      "sending %0 may cause a data race",
+      "sending %0 risks causing data races",
       (Identifier))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
