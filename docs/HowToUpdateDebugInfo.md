@@ -16,6 +16,11 @@ merge drop and copy locations, since all the same considerations apply. Helpers
 like `SILBuilderWithScope` make it easy to copy source locations when expanding
 SIL instructions.
 
+> [!Warning]
+> Don't use `SILBuilderWithScope` when replacing a single instruction of type
+> `AllocStackInst` or `DebugValueInst`. These meta instructions are skipped,
+> so the wrong scope will be inferred.
+
 ## Variables
 
 Each `debug_value` (and variable-carrying instruction) defines an update point
@@ -254,12 +259,37 @@ debug_value %1 : $Int, var, name "pair", type $Pair, expr op_fragment:#Pair.a //
 ```
 
 ## Rules of thumb
-- Optimization passes may never drop a variable entirely. If a variable is
-  entirely optimized away, an `undef` debug value should still be kept.
-- A `debug_value` must always describe a correct value for that source variable
-  at that source location. If a value is only correct on some paths through that
-  instruction, it must be replaced with `undef`. Debug info never speculates.
-- When a SIL instruction is deleted, call salvageDebugInfo(). It will try to
-  capture the effect of the deleted instruction in a debug expression, so the
-  location can be preserved. You can also use an `InstructionDeleter` which will
-  automatically call `salvageDebugInfo`.
+
+### Correctness
+A `debug_value` must always describe a correct value for that source variable
+at that source location. If a value is only correct on some paths through that
+instruction, it must be replaced with `undef`. Debug info never speculates.
+
+### Don't drop debug info
+
+Optimization passes may never drop a variable entirely. If a variable is
+entirely optimized away, an `undef` debug value should still be kept. The only
+exception is when the variable is in an unreachable function or scope, where it
+can be removed with the rest of the instructions.
+
+### Instruction Deletion
+
+When a SIL instruction is deleted, call `salvageDebugInfo`. It will try to
+capture the effect of the deleted instruction in a debug expression, so the
+location can be preserved.
+
+Alternatively, you can use an `InstructionDeleter`, which will automatically
+call `salvageDebugInfo`.
+
+If the debug info cannot be salvaged by `salvageDebugInfo`, and the pass has a
+special knowledge of the value, the pass can directly replace the debug value
+with the known value.
+
+If an instruction is being replaced by another, use `replaceAllUsesWith`. It
+will also update debug values to use the new instruction.
+
+> [!Tip]
+> To detect when a pass drops a variable, you can use the
+> `-Xllvm -sil-stats-lost-variables` to print when a variable is lost by a pass.
+> More information about this option is available in
+> [Optimizer Counter Analysis](OptimizerCountersAnalysis.md)

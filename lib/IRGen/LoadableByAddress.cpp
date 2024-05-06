@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/MapVector.h"
@@ -1777,7 +1778,7 @@ static void rewriteUsesOfSscalar(StructLoweringState &pass,
       createOutlinedCopyCall(copyBuilder, address, dest, pass);
       storeUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
-      SILBuilderWithScope dbgBuilder(dbgInst);
+      SILBuilder dbgBuilder(dbgInst, dbgInst->getDebugScope());
       // Rewrite the debug_value to point to the variable in the alloca.
       dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), address,
                                       *dbgInst->getVarInfo());
@@ -2150,9 +2151,8 @@ static void rewriteFunction(StructLoweringState &pass,
       } else {
         assert(currOperand->getType().isAddress() &&
                "Expected an address type");
-        SILBuilderWithScope debugBuilder(instr);
         // SILBuilderWithScope skips over metainstructions.
-        debugBuilder.setCurrentDebugScope(instr->getDebugScope());
+        SILBuilder debugBuilder(instr, instr->getDebugScope());
         debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
                                           *instr->getVarInfo());
         instr->getParent()->erase(instr);
@@ -3637,6 +3637,7 @@ protected:
 
     builder.createCopyAddr(load->getLoc(), load->getOperand(), addr, IsTake,
                            IsInitialization);
+    swift::salvageLoadDebugInfo(load);
     assignment.markForDeletion(load);
   }
 
