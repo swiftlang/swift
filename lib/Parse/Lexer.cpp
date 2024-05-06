@@ -1832,6 +1832,12 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
       OutputPtr = Ptr;
       // Escape double quotes.
       replacement.append("\\\"");
+    } else if (Ptr[-1] == 0) {
+      // The string literal might contain a null byte if the code completion
+      // position is inside the string literal. Don't include the null byte in
+      // the replacement string.
+      replacement.append(OutputPtr, Ptr - 1);
+      OutputPtr = Ptr;
     }
   }
   assert(Ptr == TokEnd && Ptr[-1] == '\'');
