@@ -537,8 +537,11 @@ public:
     // Then emit the note with greater context.
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      namedValuesIsolationInfo.printForDiagnostics(os);
+      if (!namedValuesIsolationInfo.isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        namedValuesIsolationInfo.printForDiagnostics(os);
+        os << ' ';
+      }
     }
 
     if (auto calleeInfo = getTransferringCalleeInfo()) {
@@ -619,8 +622,11 @@ public:
 
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      namedValuesIsolationInfo.printForDiagnostics(os);
+      if (!namedValuesIsolationInfo.isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        namedValuesIsolationInfo.printForDiagnostics(os);
+        os << ' ';
+      }
     }
 
     diagnoseNote(
@@ -1081,8 +1087,7 @@ public:
       getIsolationRegionInfo().printForDiagnostics(os);
     }
     diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
-                  StringRef(descriptiveKindStr), type,
-                  crossing.getCalleeIsolation())
+                  descriptiveKindStr, type, crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
   }
@@ -1092,8 +1097,11 @@ public:
     emitNamedOnlyError(loc, name);
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        getIsolationRegionInfo().printForDiagnostics(os);
+        os << ' ';
+      }
     }
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
@@ -1127,20 +1135,29 @@ public:
                           ApplyIsolationCrossing isolationCrossing) {
     emitNamedOnlyError(loc, name);
     SmallString<64> descriptiveKindStr;
+    SmallString<64> descriptiveKindStrWithSpace;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        {
+          llvm::raw_svector_ostream os(descriptiveKindStr);
+          getIsolationRegionInfo().printForDiagnostics(os);
+        }
+        descriptiveKindStrWithSpace = descriptiveKindStr;
+        descriptiveKindStrWithSpace.push_back(' ');
+      }
     }
     if (auto calleeInfo = getTransferringCalleeInfo()) {
       diagnoseNote(
           loc,
           diag::regionbasedisolation_named_transfer_non_transferrable_callee,
-          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-          calleeInfo->first, calleeInfo->second);
+          name, descriptiveKindStrWithSpace,
+          isolationCrossing.getCalleeIsolation(), calleeInfo->first,
+          calleeInfo->second, descriptiveKindStr);
     } else {
-      diagnoseNote(
-          loc, diag::regionbasedisolation_named_transfer_non_transferrable,
-          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation());
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_named_transfer_non_transferrable,
+                   name, descriptiveKindStrWithSpace,
+                   isolationCrossing.getCalleeIsolation(), descriptiveKindStr);
     }
   }
 
@@ -1149,8 +1166,11 @@ public:
     emitNamedOnlyError(loc, varName);
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        getIsolationRegionInfo().printForDiagnostics(os);
+        os << ' ';
+      }
     }
     auto diag =
         diag::regionbasedisolation_named_transfer_into_transferring_param;
@@ -1160,13 +1180,21 @@ public:
   void emitNamedTransferringReturn(SILLocation loc, Identifier varName) {
     emitNamedOnlyError(loc, varName);
     SmallString<64> descriptiveKindStr;
+    SmallString<64> descriptiveKindStrWithSpace;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        {
+          llvm::raw_svector_ostream os(descriptiveKindStr);
+          getIsolationRegionInfo().printForDiagnostics(os);
+        }
+        descriptiveKindStrWithSpace = descriptiveKindStr;
+        descriptiveKindStrWithSpace.push_back(' ');
+      }
     }
     auto diag =
         diag::regionbasedisolation_named_notransfer_transfer_into_result;
-    diagnoseNote(loc, diag, descriptiveKindStr, varName);
+    diagnoseNote(loc, diag, descriptiveKindStrWithSpace, varName,
+                 descriptiveKindStr);
   }
 
 private:

@@ -57,7 +57,7 @@ func initActorWithSyncNonIsolatedInit() {
   let k = NonSendableKlass()
   // TODO: This should say actor isolated.
   _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{sending 'k' may cause a data race}}
-  // expected-note @-1 {{sending disconnected 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
   let _ = { @MainActor in // expected-note {{use here could race}}
     print(k)
   }
@@ -86,7 +86,7 @@ func initActorWithAsyncIsolatedInit() async {
   let k = NonSendableKlass()
   // TODO: This should say actor isolated.
   _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' may cause a data race}}
-  // expected-note @-1 {{sending disconnected 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
   let _ = { @MainActor in // expected-note {{use here could race}}
     print(k)
   }
@@ -154,7 +154,7 @@ func initClassWithAsyncIsolatedInit() async {
   // is MainActor isolated. The actual capture is initially not isolated to
   // MainActor.
   _ = await ClassWithAsyncIsolatedInit(k) // expected-error {{sending 'k' may cause a data race}}
-  // expected-note @-1 {{sending disconnected 'k' to global actor 'CustomActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'CustomActor'-isolated and local nonisolated uses}}
+  // expected-note @-1 {{sending 'k' to global actor 'CustomActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'CustomActor'-isolated and local nonisolated uses}}
   let _ = { @MainActor in // expected-note {{use here could race}}
     print(k)
   }
