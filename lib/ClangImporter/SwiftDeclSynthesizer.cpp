@@ -1692,7 +1692,16 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
                              : rawElementTy;
 
   auto &ctx = ImporterImpl.SwiftContext;
-  auto bodyParams = getterImpl->getParameters();
+
+  assert(getterImpl->getParameters()->size() == 1 &&
+         "subscript can only have 1 parameter");
+  auto bodyParam = ParamDecl::clone(ctx, getterImpl->getParameters()->get(0));
+  // If the subscript parameter is unnamed, give it a name to make sure SILGen
+  // creates a variable for it.
+  if (bodyParam->getName().empty())
+    bodyParam->setName(ctx.getIdentifier("__index"));
+
+  auto bodyParams = ParameterList::create(ctx, bodyParam);
   DeclName name(ctx, DeclBaseName::createSubscript(), bodyParams);
   auto dc = getterImpl->getDeclContext();
 
