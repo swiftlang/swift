@@ -58,7 +58,7 @@ func initActorWithSyncNonIsolatedInit() {
   // TODO: This should say actor isolated.
   _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
   // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{risks concurrent access}}
+  let _ = { @MainActor in // expected-note {{potential concurrent access}}
     print(k)
   }
 }
@@ -87,7 +87,7 @@ func initActorWithAsyncIsolatedInit() async {
   // TODO: This should say actor isolated.
   _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
   // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{risks concurrent access}}
+  let _ = { @MainActor in // expected-note {{potential concurrent access}}
     print(k)
   }
 }
@@ -155,7 +155,7 @@ func initClassWithAsyncIsolatedInit() async {
   // MainActor.
   _ = await ClassWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
   // expected-note @-1 {{sending 'k' to global actor 'CustomActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'CustomActor'-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{risks concurrent access}}
+  let _ = { @MainActor in // expected-note {{potential concurrent access}}
     print(k)
   }
 }
