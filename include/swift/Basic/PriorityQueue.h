@@ -22,21 +22,6 @@
 
 namespace swift {
 
-/// A simple linked list of nodes.
-template <class Node, class NodeTraits>
-class SimpleQueue {
-public:
-  Node head;
-
-  SimpleQueue() : head() {}
-
-  void prepend(Node newNode) {
-    assert(newNode && "inserting a null node");
-    NodeTraits::setNext(newNode, head);
-    head = newNode;
-  }
-};
-
 /// A class for priority FIFO queue with a fixed number of priorities.
 ///
 /// The `Node` type parameter represents a reference to a list node.
@@ -104,23 +89,25 @@ public:
 
   /// Add a chain of nodes of mixed priorities to this queue.
   void enqueueContentsOf(Node otherHead) {
+    if (!otherHead) return;
     Node runHead = otherHead;
-    while (runHead) {
-      int priorityIndex = NodeTraits::getPriorityIndex(runHead);
-
+    int priorityIndex = NodeTraits::getPriorityIndex(runHead);
+    do {
       // Find run of jobs of the same priority
       Node runTail = runHead;
       Node next = NodeTraits::getNext(runTail);
-      while (true) {
-        if (!next) break;
-        if (NodeTraits::getPriorityIndex(next) != priorityIndex) break;
+      int nextRunPriorityIndex = badIndex;
+      while (next) {
+        nextRunPriorityIndex = NodeTraits::getPriorityIndex(next);
+        if (nextRunPriorityIndex != priorityIndex) break;
         runTail = next;
         next = NodeTraits::getNext(runTail);
       }
 
       enqueueRun(priorityIndex, runHead, runTail);
       runHead = next;
-    }
+      priorityIndex = nextRunPriorityIndex;
+    } while(runHead);
   }
 
   Node dequeue() {
@@ -139,6 +126,11 @@ public:
   Node peek() const { return head; }
   bool empty() const { return !head; }
 private:
+  // Use large negative value to increase chance of causing segfault if this
+  // value ends up being used for indexing. Using -1 would cause accessing
+  // `head`, which is less noticeable.
+  static const int badIndex = std::numeric_limits<int>::min();
+
   void enqueueRun(int priorityIndex, Node runHead, Node runTail) {
     for (int i = priorityIndex;; i--) {
       if (i < 0) {

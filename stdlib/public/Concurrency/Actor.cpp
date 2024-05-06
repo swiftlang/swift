@@ -975,7 +975,6 @@ protected:
 class DefaultActorImplFooter {
 protected:
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-  using SimpleQueue = swift::SimpleQueue<Job *, JobQueueTraits>;
   using PriorityQueue = swift::PriorityQueue<Job *, JobQueueTraits>;
 
   // When enqueued, jobs are atomically added to a linked list with the head
@@ -1080,9 +1079,13 @@ public:
   /// new priority
   void enqueueStealer(Job *job, JobPriority priority);
 
-  /// Dequeues one job from `prioritizedJobs`.
+  /// Dequeues one job from `prioritisedJobs`.
   /// The calling thread must be holding the actor lock while calling this
   Job *drainOne();
+
+  /// Atomically claims incoming jobs from ActiveActorStatus, and calls `handleUnprioritizedJobs()`.
+  /// Called with actor lock held on current thread.
+  void processIncomingQueue();
 #endif
 
   /// Check if the actor is actually a distributed *remote* actor.
@@ -1119,14 +1122,10 @@ private:
   /// when actor gets a priority override and we schedule a stealer.
   void scheduleActorProcessJob(JobPriority priority);
 
-  /// Atomically takes a list of jobs from ActiveActorStatus, reversing them in
-  /// the process. Returns jobs of mixed priorities in FIFO order.
-  SimpleQueue collectJobs();
-
-  /// Check for new jobs in the incoming queue and move them to the
-  /// processing queue.
+  /// Processes claimed incoming jobs into `prioritizedJobs`.
+  /// Incoming jobs are of mixed priorities and in LIFO order.
   /// Called with actor lock held on current thread.
-  void processJobs();
+  void handleUnprioritizedJobs(Job *head);
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
 
   void deallocateUnconditional();
@@ -1372,13 +1371,12 @@ void DefaultActorImpl::enqueueStealer(Job *job, JobPriority priority) {
 
 }
 
-DefaultActorImpl::SimpleQueue DefaultActorImpl::collectJobs() {
+void DefaultActorImpl::processIncomingQueue() {
   // Pairs with the store release in DefaultActorImpl::enqueue
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
   auto oldState = _status().load(SWIFT_MEMORY_ORDER_CONSUME);
   _swift_tsan_consume(this);
 
-  SimpleQueue result;
   // We must ensure that any jobs not seen by collectJobs() don't have any
   // dangling references to the jobs that have been collected. For that we must
   // atomically set head pointer to NULL. If it fails because more jobs have
@@ -1387,7 +1385,7 @@ DefaultActorImpl::SimpleQueue DefaultActorImpl::collectJobs() {
     // If there aren't any new jobs in the incoming queue, we can return
     // immediately without updating the status.
     if (!oldState.getFirstUnprioritisedJob()) {
-      return result;
+      return;
     }
     assert(oldState.isAnyRunning());
 
@@ -1405,28 +1403,26 @@ DefaultActorImpl::SimpleQueue DefaultActorImpl::collectJobs() {
     }
   }
 
-  // Collect jobs, reversing them in the process
-  auto job = oldState.getFirstUnprioritisedJob();
-  while (job) {
-    auto next = getNextJob(job);
-    result.prepend(job);
-    job = next;
-  }
-
-  return result;
+  handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
 }
 
 // Called with actor lock held on current thread
-void DefaultActorImpl::processJobs() {
-  SimpleQueue jobs = collectJobs();
-  prioritizedJobs.enqueueContentsOf(jobs.head);
+void DefaultActorImpl::handleUnprioritizedJobs(Job *head) {
+  // Reverse jobs from LIFO to FIFO order
+  Job *reversed = nullptr;
+  while (head) {
+    auto next = getNextJob(head);
+    setNextJob(head, reversed);
+    reversed = head;
+    head = next;
+  }
+  prioritizedJobs.enqueueContentsOf(reversed);
 }
 
 // Called with actor lock held on current thread
 Job *DefaultActorImpl::drainOne() {
   SWIFT_TASK_DEBUG_LOG("Draining one job from default actor %p", this);
 
-  processJobs();
   traceJobQueue(this, prioritizedJobs.peek());
   auto firstJob = prioritizedJobs.dequeue();
   if (!firstJob) {
@@ -1490,39 +1486,40 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
       TaskExecutorRef::undefined());
 
   while (true) {
+    Job *job = currentActor->drainOne();
+    if (job == NULL) {
+      // No work left to do, try unlocking the actor. This may fail if there is
+      // work concurrently enqueued in which case, we'd try again in the loop
+      if (currentActor->unlock(false)) {
+        break;
+      }
+    } else {
+      if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
+        auto taskExecutor = task->getPreferredTaskExecutor();
+        trackingInfo.setTaskExecutor(taskExecutor);
+      }
+
+      // This thread is now going to follow the task on this actor. It may hop off
+      // the actor
+      runJobInEstablishedExecutorContext(job);
+
+      // We could have come back from the job on a generic executor and not as
+      // part of a default actor. If so, there is no more work left for us to do
+      // here.
+      auto currentExecutor = trackingInfo.getActiveExecutor();
+      if (!currentExecutor.isDefaultActor()) {
+        currentActor = nullptr;
+        break;
+      }
+      currentActor = asImpl(currentExecutor.getDefaultActor());
+    }
+
     if (shouldYieldThread()) {
       currentActor->unlock(true);
       break;
     }
 
-    Job *job = currentActor->drainOne();
-    if (job == NULL) {
-      // No work left to do, try unlocking the actor. This may fail if there is
-      // work concurrently enqueued in which case, we'd try again in the loop
-      if (!currentActor->unlock(false)) {
-        continue;
-      }
-      break;
-    }
-
-    if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-      auto taskExecutor = task->getPreferredTaskExecutor();
-      trackingInfo.setTaskExecutor(taskExecutor);
-    }
-
-    // This thread is now going to follow the task on this actor. It may hop off
-    // the actor
-    runJobInEstablishedExecutorContext(job);
-
-    // We could have come back from the job on a generic executor and not as
-    // part of a default actor. If so, there is no more work left for us to do
-    // here.
-    auto currentExecutor = trackingInfo.getActiveExecutor();
-    if (!currentExecutor.isDefaultActor()) {
-      currentActor = nullptr;
-      break;
-    }
-    currentActor = asImpl(currentExecutor.getDefaultActor());
+    currentActor->processIncomingQueue();
   }
 
   // Leave the tracking info.
@@ -1668,6 +1665,17 @@ retry:;
     auto newState = oldState.withRunning();
     newState = newState.withoutEscalatedPriority();
 
+    // Claim incoming jobs when obtaining lock as a drainer, to save one
+    // round of atomic load and compare-exchange.
+    // This is not useful when obtaining lock for assuming thread during actor
+    // switching, because arbitrary use code can run between locking and
+    // draining the next job. So we still need to call processIncomingQueue() to
+    // check for higher priority jobs that could have been scheduled in the
+    // meantime. And processing is more efficient when done in larger batches.
+    if (asDrainer) {
+      newState = newState.withFirstUnprioritisedJob(nullptr);
+    }
+
     // This needs an acquire since we are taking a lock
     if (_status().compare_exchange_weak(oldState, newState,
                                  std::memory_order_acquire,
@@ -1677,6 +1685,9 @@ retry:;
         assert(prioritizedJobs.empty());
       }
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
+      if (asDrainer) {
+        handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
+      }
       return true;
     }
   }

@@ -10,8 +10,6 @@ using namespace swift;
 
 namespace {
 
-enum EntryOrder { priorityOrder, reverseCreationOrder };
-
 struct Entry {
   unsigned id;
   unsigned value;
@@ -42,24 +40,18 @@ public:
   /// \param reverseCreationOrder - if true, then order equal-value
   ///   nodes in the reverse of creation order; otherwise
   ///   creator order of creation order
-  void sort(EntryOrder order) {
-    if (order == priorityOrder) {
-      std::sort(entries.begin(), entries.end(),
-                [=](const std::unique_ptr<Entry> &lhs,
-                    const std::unique_ptr<Entry> &rhs) {
-                  if (lhs->value != rhs->value)
-                    return lhs->value < rhs->value;
-                  return lhs->id < rhs->id;
-                });
-    } else {
-      std::sort(
-          entries.begin(), entries.end(),
-          [=](const std::unique_ptr<Entry> &lhs,
-              const std::unique_ptr<Entry> &rhs) { return lhs->id > rhs->id; });
-    }
+  void sort() {
+    std::sort(entries.begin(), entries.end(),
+              [=](const std::unique_ptr<Entry> &lhs,
+                  const std::unique_ptr<Entry> &rhs) {
+                if (lhs->value != rhs->value)
+                  return lhs->value < rhs->value;
+                return lhs->id < rhs->id;
+              });
   }
 
-  void checkSameAs(Entry *list) {
+  void checkSameAs(Entry *list, unsigned line) {
+    std::cout << " <<<  check " << line << std::endl;
     for (auto &entry : entries) {
       std::cout << "  " << list->value << " (" << list->id << ")\n";
       assert(list == entry.get());
@@ -79,34 +71,29 @@ struct EntryListTraits {
   }
 };
 
-using EntrySimpleQueue = SimpleQueue<Entry *, EntryListTraits>;
 using EntryPriorityQueue = PriorityQueue<Entry *, EntryListTraits>;
 
-static void runPrependTest() {
-  std::cout << "runPrependTest()" << std::endl;
-  EntryFactory entries;
-  EntrySimpleQueue queue;
-  assert(!queue.head);
-  assert(!queue.tail);
+struct ListBuilder {
+  Entry *head;
+  Entry **pTail;
 
-  auto first = entries.create(3);
-  queue.prepend(first);
-  assert(queue.head == first);
-  assert(queue.tail == first);
+  ListBuilder(): head(), pTail(&head) {}
+  ListBuilder(ListBuilder const &) = delete;
+  ListBuilder(ListBuilder &&) = delete;
 
-  auto second = entries.create(0);
-  queue.prepend(second);
-  assert(queue.head == second);
-  assert(queue.tail == first);
+  void append(Entry *e) {
+    *pTail = e;
+    e->next = nullptr;
+    pTail = &e->next;
+  }
 
-  auto third = entries.create(2);
-  queue.prepend(third);
-  assert(queue.head == third);
-  assert(queue.tail == first);
-
-  entries.sort(reverseCreationOrder);
-  entries.checkSameAs(queue.head);
-}
+  Entry *take() {
+    Entry* result = head;
+    head = nullptr;
+    pTail = &head;
+    return result;
+  }
+};
 
 static void runEnqueueDequeueTest() {
   std::cout << "runEnqueueDequeueTest()" << std::endl;
@@ -150,15 +137,15 @@ static void runEnqueueDequeueTest() {
   assert(queue.tails[2] == fourth);
   assert(queue.tails[3] == second);
 
-  entries.sort(priorityOrder);
-  entries.checkSameAs(queue.head);
+  entries.sort();
+  entries.checkSameAs(queue.head, __LINE__);
 
   auto pop = [&](Entry *expected) {
     auto e = queue.dequeue();
     assert(e == expected);
     entries.remove(e);
-    entries.sort(priorityOrder);
-    entries.checkSameAs(queue.head);
+    entries.sort();
+    entries.checkSameAs(queue.head, __LINE__);
   };
 
   pop(third);
@@ -197,24 +184,73 @@ static void runEnqueueDequeueTest() {
   assert(!queue.tails[3]);
 }
 
-static void runConcreteTests() {
-  runPrependTest();
-  runEnqueueDequeueTest();
+static void runEnqueueContentsOfTest() {
+  std::cout << "runEnqueueContentsOfTest()" << std::endl;
+  EntryFactory entries;
+  EntryPriorityQueue queue;
+  ListBuilder builder;
+  assert(!queue.head);
+  assert(!queue.tails[0]);
+  assert(!queue.tails[1]);
+  assert(!queue.tails[2]);
+  assert(!queue.tails[3]);
+
+  queue.enqueueContentsOf(builder.take());
+  assert(!queue.head);
+  assert(!queue.tails[0]);
+  assert(!queue.tails[1]);
+  assert(!queue.tails[2]);
+  assert(!queue.tails[3]);
+
+  auto first = entries.create(3);
+  builder.append(first);
+  auto second = entries.create(3);
+  builder.append(second);
+  auto third = entries.create(1);
+  builder.append(third);
+  auto fourth = entries.create(2);
+  builder.append(fourth);
+  auto fifth = entries.create(2);
+  builder.append(fifth);
+  auto sixth = entries.create(1);
+  builder.append(sixth);
+
+  queue.enqueueContentsOf(builder.take());
+  assert(queue.head == third);
+  assert(!queue.tails[0]);
+  assert(queue.tails[1] == sixth);
+  assert(queue.tails[2] == fifth);
+  assert(queue.tails[3] == second);
+  entries.sort();
+  entries.checkSameAs(queue.head, __LINE__);
+
+  auto seventh = entries.create(0);
+  builder.append(seventh);
+  auto eighth = entries.create(0);
+  builder.append(eighth);
+  auto ninth = entries.create(0);
+  builder.append(ninth);
+  auto tenth = entries.create(3);
+  builder.append(tenth);
+  queue.enqueueContentsOf(builder.take());
+
+  assert(queue.head == seventh);
+  assert(queue.tails[0] == ninth);
+  assert(queue.tails[1] == sixth);
+  assert(queue.tails[2] == fifth);
+  assert(queue.tails[3] == tenth);
+  entries.sort();
+  entries.checkSameAs(queue.head, __LINE__);
 }
 
-struct TestConfig {
-  unsigned numTests;
-  unsigned maxEntries;
-};
-
-static void runEnqueueDequeueTests(const TestConfig &config) {
+static void runEnqueueDequeueTests(unsigned numTests, unsigned maxEntries) {
   std::random_device randomDevice;
   std::default_random_engine e(randomDevice());
   std::uniform_int_distribution<unsigned> valueDist(
       0, EntryListTraits::prioritiesCount - 1);
-  std::uniform_int_distribution<unsigned> numEntriesDist(0, config.maxEntries);
+  std::uniform_int_distribution<unsigned> numEntriesDist(0, maxEntries);
 
-  for (unsigned testN = 0; testN < config.numTests; ++testN) {
+  for (unsigned testN = 0; testN < numTests; ++testN) {
     std::cout << "runEnqueueDequeueTests() #" << testN << std::endl;
     EntryFactory entries;
     EntryPriorityQueue queue;
@@ -225,14 +261,54 @@ static void runEnqueueDequeueTests(const TestConfig &config) {
       std::cout << "-- " << value << std::endl;
       queue.enqueue(entries.create(value));
     }
-    entries.sort(priorityOrder);
-    entries.checkSameAs(queue.head);
+    entries.sort();
+    entries.checkSameAs(queue.head, __LINE__);
     for (unsigned i = 0; i < numEntries; ++i) {
       auto e = queue.dequeue();
       std::cout << "pop " << e->value << std::endl;
       entries.remove(e);
-      entries.sort(priorityOrder);
-      entries.checkSameAs(queue.head);
+      entries.sort();
+      entries.checkSameAs(queue.head, __LINE__);
+    }
+  }
+}
+
+static void runEnqueueContentsOfTests(unsigned numTests, unsigned maxChains, unsigned maxEntries) {
+  std::random_device randomDevice;
+  std::default_random_engine e(randomDevice());
+  std::uniform_int_distribution<unsigned> valueDist(
+      0, EntryListTraits::prioritiesCount - 1);
+  std::uniform_int_distribution<unsigned> numChainsDist(1, maxChains);
+  std::uniform_int_distribution<unsigned> numEntriesDist(0, maxEntries);
+
+  for (unsigned testN = 0; testN < numTests; ++testN) {
+    std::cout << "runEnqueueContentsOfTests() #" << testN << std::endl;
+    EntryFactory entries;
+    EntryPriorityQueue queue;
+    unsigned totalEntries = 0;
+    unsigned numChains = numChainsDist(e);
+    std::cout << "numChains = " << numChains << std::endl;
+    for (unsigned i = 0; i < numChains; ++i) {
+      unsigned numEntries = numEntriesDist(e);
+      std::cout << "numEntries = " << numEntries << std::endl;
+      totalEntries += numEntries;
+
+      ListBuilder builder;
+      for (unsigned j = 0; j < numEntries; ++j) {
+        auto value = valueDist(e);
+        std::cout << "-- " << value << std::endl;
+        builder.append(entries.create(value));
+      }
+      queue.enqueueContentsOf(builder.take());
+    }
+    entries.sort();
+    entries.checkSameAs(queue.head, __LINE__);
+    for (unsigned i = 0; i < totalEntries; ++i) {
+      auto e = queue.dequeue();
+      std::cout << "pop " << e->value << std::endl;
+      entries.remove(e);
+      entries.sort();
+      entries.checkSameAs(queue.head, __LINE__);
     }
   }
 }
@@ -240,7 +316,8 @@ static void runEnqueueDequeueTests(const TestConfig &config) {
 } // namespace
 
 int main() {
-  runConcreteTests();
-  TestConfig config = {.numTests = 1000, .maxEntries = 20};
-  runEnqueueDequeueTests(config);
+  runEnqueueDequeueTest();
+  runEnqueueContentsOfTest();
+  runEnqueueDequeueTests(1000, 20);
+  runEnqueueContentsOfTests(1000, 10, 20);
 }
