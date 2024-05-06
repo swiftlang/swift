@@ -19,10 +19,10 @@ actor Bar {
   }
   func bar() async {
     let ns = NonSendable()
-    _ = Bar(ns) // expected-warning {{sending 'ns' may cause a data race}}
+    _ = Bar(ns) // expected-warning {{sending 'ns' risks causing data races}}
     // TODO: This needs to be:
     // 'ns' is transferred to actor-isolated callee. Later local uses could race with uses in callee.
     // expected-note @-3 {{sending 'ns' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local actor-isolated uses}}
-    ns.foo() // expected-note {{use here could race}}
+    ns.foo() // expected-note {{risks concurrent access}}
   }
 }
