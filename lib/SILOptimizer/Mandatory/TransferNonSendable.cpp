@@ -41,8 +41,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
-#pragma clang optimize off
-
 using namespace swift;
 using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
