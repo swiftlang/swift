@@ -943,7 +943,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===----------------------------------------------------------------------===//
 
 NOTE(regionbasedisolation_maybe_race, none,
-     "risks concurrent access", ())
+     "potential concurrent access", ())
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
@@ -953,10 +953,10 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 //
 
 ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
-      "sending value of non-Sendable type %0; later accesses could race",
+      "sending value of non-Sendable type %0 with later accesses risks causing data races",
       (Type))
 ERROR(regionbasedisolation_transfer_yields_race_with_isolation, none,
-      "sending value of non-Sendable type %0 from %1 context to %2 context; later accesses could race",
+      "sending value of non-Sendable type %0 with later accesses from %1 context to %2 context risks causing data races",
       (Type, ActorIsolation, ActorIsolation))
 ERROR(regionbasedisolation_isolated_capture_yields_race, none,
       "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
@@ -965,7 +965,7 @@ ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, non
       "value of non-Sendable type %0 accessed after being transferred; later accesses could race",
       (Type))
 ERROR(regionbasedisolation_arg_transferred, none,
-      "sending %0 value of type %1 to %2 context; later accesses to value could race",
+      "sending %0 value of type %1 with later accesses to %2 context risks causing data races",
       (StringRef, Type, ActorIsolation))
 ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
       "%0 value of type %1 passed as a strongly transferred parameter; later accesses could race",
