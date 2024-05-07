@@ -1128,13 +1128,13 @@ namespace {
       // Decide whether we want an error or a warning.
       std::optional<decltype(diag::non_exhaustive_switch)> mainDiagType =
           diag::non_exhaustive_switch;
+      bool downgrade = false;
       if (unknownCase) {
         switch (defaultReason) {
         case RequiresDefault::EmptySwitchBody:
           llvm_unreachable("there's an @unknown case; the body can't be empty");
         case RequiresDefault::No:
-          if (!uncovered.isEmpty())
-            mainDiagType = diag::non_exhaustive_switch_warn;
+          downgrade = !uncovered.isEmpty();
           break;
         case RequiresDefault::UncoveredSwitch:
         case RequiresDefault::SpaceTooLarge: {
@@ -1157,7 +1157,7 @@ namespace {
       case DowngradeToWarning::ForUnknownCase: {
         if (Context.LangOpts.DebuggerSupport ||
             Context.LangOpts.Playground ||
-            !Context.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics) {
+            !Context.LangOpts.hasFeature(Feature::NonfrozenEnumExhaustivity)) {
           // Don't require covering unknown cases in the debugger or in
           // playgrounds.
           return;
@@ -1170,7 +1170,8 @@ namespace {
               theEnum->getParentModule()->isSystemModule();
         }
         DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
-                    subjectType, shouldIncludeFutureVersionComment);
+                    subjectType, shouldIncludeFutureVersionComment)
+          .warnUntilSwiftVersion(6);
         mainDiagType = std::nullopt;
       }
         break;
@@ -1187,7 +1188,8 @@ namespace {
         return;
       case RequiresDefault::UncoveredSwitch: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
-        DE.diagnose(startLoc, mainDiagType.value());
+        DE.diagnose(startLoc, mainDiagType.value())
+          .warnUntilSwiftVersionIf(downgrade, 6);
         DE.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
@@ -1205,8 +1207,10 @@ namespace {
       if (uncovered.isEmpty()) return;
 
       // Check if we still have to emit the main diagnostic.
-      if (mainDiagType.has_value())
-        DE.diagnose(startLoc, mainDiagType.value());
+      if (mainDiagType.has_value()) {
+        DE.diagnose(startLoc, mainDiagType.value())
+          .warnUntilSwiftVersionIf(downgrade, 6);
+      }
 
       // Add notes to explain what's missing.
       auto processUncoveredSpaces =
@@ -1255,7 +1259,7 @@ namespace {
               // will later decompose the space into cases.
               continue;
             }
-            if (!Context.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics)
+            if (!Context.LangOpts.hasFeature(Feature::NonfrozenEnumExhaustivity))
               continue;
 
             // This can occur if the switch is empty and the subject type is an

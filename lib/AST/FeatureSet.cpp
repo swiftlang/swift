@@ -653,6 +653,8 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 
+UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
+
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
 UNINTERESTING_FEATURE(ClosureIsolation)

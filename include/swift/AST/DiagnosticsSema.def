@@ -7082,10 +7082,9 @@ WARNING(redundant_particular_literal_case,none,
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
-WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
-WARNING(non_exhaustive_switch_unknown_only,none,
-        "switch covers known cases, but %0 may have additional unknown values"
-        "%select{|, possibly added in future versions}1", (Type, bool))
+ERROR(non_exhaustive_switch_unknown_only,none,
+      "switch covers known cases, but %0 may have additional unknown values"
+      "%select{|, possibly added in future versions}1", (Type, bool))
 
 ERROR(override_nsobject_hashvalue_error,none,
       "'NSObject.hashValue' is not overridable; "
