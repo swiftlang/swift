@@ -282,7 +282,7 @@ func testNonSendableBaseArg() async {
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
-  // expected-tns-note@-2 {{risks concurrent access}}
+  // expected-tns-note@-2 {{potential concurrent access}}
 }
 
 @available(SwiftStdlib 5.1, *)
