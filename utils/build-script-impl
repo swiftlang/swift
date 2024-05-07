@@ -386,24 +386,6 @@ function true_false() {
     esac
 }
 
-function to_bootstrapping_mode() {
-    case "$1" in
-        false | FALSE | 0)
-            echo "OFF"
-            ;;
-        true | TRUE | 1 | "")
-            if [[ "$(uname -s)" == "Darwin" ]] ; then
-              echo "BOOTSTRAPPING-WITH-HOSTLIBS"
-            else
-              echo "BOOTSTRAPPING"
-            fi
-            ;;
-        *)
-            echo `toupper $1`
-            ;;
-    esac
-}
-
 function to_varname() {
     # Uses `tr` because it is orders of magnitude faster than ${1//-/_} on long
     # strings, which happens when translating KNOWN_SETTINGS.
@@ -1655,6 +1637,13 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
+    if [[ "${BOOTSTRAPPING}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DBOOTSTRAPPING_MODE:STRING=`toupper ${BOOTSTRAPPING}`
+        )
+    fi
+
     if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
         CLANG_BIN="${NATIVE_CLANG_TOOLS_PATH}"
         if [[ ! -f "${CLANG_BIN}/clang" ]] ; then
@@ -1827,7 +1816,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
-                    -DBOOTSTRAPPING_MODE:STRING=$(to_bootstrapping_mode "${BOOTSTRAPPING}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
