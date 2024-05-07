@@ -22,7 +22,7 @@ func testIsolationError() async {
   let x = NonSendableType()
   await transferToMain(x) // expected-error {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-  useValue(x) // expected-note {{risks concurrent access}}
+  useValue(x) // expected-note {{potential concurrent access}}
 }
 
 func testTransferArgumentError(_ x: NonSendableType) async {
@@ -52,7 +52,7 @@ func testIsolationCrossingDueToCapture() async {
     print(x) // expected-error {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
-  useValue(x) // expected-note {{risks concurrent access}}
+  useValue(x) // expected-note {{potential concurrent access}}
 }
 
 func testIsolationCrossingDueToCaptureParameter(_ x: NonSendableType) async {
