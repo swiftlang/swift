@@ -82,6 +82,7 @@ namespace swift {
   class SerializedTopLevelCodeDecl;
   class StructDecl;
   class AccessorDecl;
+  class ClosureExpr;
 
   template <typename T>
   struct AvailableDuringLoweringDeclFilter;
@@ -502,6 +503,14 @@ public:
   const DeclContext *getInnermostSkippedFunctionContext() const {
     return
         const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
+  }
+
+  /// Returns the innermost context that is a ClosureExpr, which defines how
+  /// self behaves, unless within a type context that redefines self.
+  LLVM_READONLY
+  ClosureExpr *getInnermostClosureForSelfCapture();
+  const ClosureExpr *getInnermostClosureForSelfCapture() const {
+    return const_cast<DeclContext *>(this)->getInnermostClosureForSelfCapture();
   }
 
   /// Returns the semantic parent of this context.  A context has a
