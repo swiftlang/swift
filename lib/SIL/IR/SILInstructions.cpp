@@ -286,6 +286,9 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
 }
 
 VarDecl *AllocationInst::getDecl() const {
+  if (auto ASI = dyn_cast<AllocStackInst>(this)) {
+    return ASI->getVarLoc().getAsASTNode<VarDecl>();
+  }
   return getLoc().getAsASTNode<VarDecl>();
 }
 
@@ -505,7 +508,7 @@ bool DebugValueInst::exprStartsWithDeref() const {
 }
 
 VarDecl *DebugValueInst::getDecl() const {
-  return getLoc().getAsASTNode<VarDecl>();
+  return getVarLoc().getAsASTNode<VarDecl>();
 }
 
 VarDecl *SILDebugVariable::getDecl() const {

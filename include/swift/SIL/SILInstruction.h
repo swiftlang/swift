@@ -2083,6 +2083,13 @@ public:
   /// VarDecl.
   void setIsFromVarDecl() { sharedUInt8().AllocStackInst.fromVarDecl = true; }
 
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc();
+  }
+
   /// Return the debug variable information attached to this instruction.
   std::optional<SILDebugVariable> getVarInfo() const {
     // If we used to have debug info attached but our debug info is now
@@ -5373,6 +5380,13 @@ public:
   /// Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
+
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc();
+  }
 
   /// Return the debug variable information attached to this instruction.
   std::optional<SILDebugVariable> getVarInfo() const {
