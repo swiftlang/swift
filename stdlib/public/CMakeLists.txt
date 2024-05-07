@@ -219,6 +219,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     )
   endif()
 
+  if("Mips" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "mips    mips-none-none    mips-none-none"
+      "mips64  mips64-none-none  mips64-none-none"
+    )
+  endif()
+
   if (SWIFT_HOST_VARIANT STREQUAL "linux")
     set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
       "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"

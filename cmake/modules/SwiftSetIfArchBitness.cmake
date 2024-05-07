@@ -20,6 +20,7 @@ function(set_if_arch_bitness var_name)
      "${SIA_ARCH}" STREQUAL "armv7em" OR
      "${SIA_ARCH}" STREQUAL "armv7s" OR
      "${SIA_ARCH}" STREQUAL "m68k" OR
+     "${SIA_ARCH}" STREQUAL "mips" OR
      "${SIA_ARCH}" STREQUAL "riscv32" OR
      "${SIA_ARCH}" STREQUAL "wasm32" OR
      "${SIA_ARCH}" STREQUAL "powerpc")
@@ -31,6 +32,7 @@ function(set_if_arch_bitness var_name)
          "${SIA_ARCH}" STREQUAL "aarch64" OR
          "${SIA_ARCH}" STREQUAL "powerpc64" OR
          "${SIA_ARCH}" STREQUAL "powerpc64le" OR
+         "${SIA_ARCH}" STREQUAL "mips64" OR
          "${SIA_ARCH}" STREQUAL "s390x" OR
          "${SIA_ARCH}" STREQUAL "riscv64" OR
          "${SIA_ARCH}" STREQUAL "wasm64")
