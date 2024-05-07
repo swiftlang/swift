@@ -105,6 +105,7 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
     auto *fn = invocation.get<NativeSwiftInvocation>();
     Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
                                            {getSwiftPassInvocation()});
+    fflush(stdout);
   }
   this->pass = nullptr;
   this->function = nullptr;
