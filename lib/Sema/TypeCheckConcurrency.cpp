@@ -4805,9 +4805,14 @@ static bool checkClassGlobalActorIsolation(
   switch (superIsolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::NonisolatedUnsafe: {
+    auto &ctx = classDecl->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability))
+      return false;
+
     downgradeToWarning = true;
     break;
+  }
 
   case ActorIsolation::Erased:
     llvm_unreachable("class cannot have erased isolation");
@@ -6045,6 +6050,13 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
               nominal->getDeclaredInterfaceType(),
               inheritedConformance.getConcrete());
         }
+      }
+
+      // Classes that add global actor isolation to non-Sendable
+      // superclasses cannot be 'Sendable'.
+      if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
+          nominal->getGlobalActorAttr()) {
+        return nullptr;
       }
     }
   }
