@@ -45,7 +45,7 @@ extension DistributedResolvableMacro {
       return []
     }
 
-    let accessModifiers: String = proto.accessModifiersString
+    let accessModifiers = proto.accessControlModifiers
 
     let requirementStubs =
       proto.memberBlock.members // requirements
@@ -71,7 +71,7 @@ extension DistributedResolvableMacro {
     return [extensionDecl.cast(ExtensionDeclSyntax.self)]
   }
 
-  static func stubMethodDecl(access: String, _ requirement: MemberBlockItemListSyntax.Element) -> String {
+  static func stubMethodDecl(access: DeclModifierListSyntax, _ requirement: MemberBlockItemListSyntax.Element) -> String {
     // do we need to stub a computed variable?
     if let variable = requirement.decl.as(VariableDeclSyntax.self) {
       var accessorStubs: [String] = []
@@ -142,7 +142,7 @@ extension DistributedResolvableMacro {
                  """, id: .invalidApplication)
     }
 
-    let accessModifiers = proto.accessModifiersString
+    let accessModifiers = proto.accessControlModifiers
 
     for req in proto.genericWhereClause?.requirements ?? [] {
       switch req.requirement {
@@ -198,30 +198,15 @@ extension DistributedResolvableMacro {
     }
   }
 
-  private static func typealiasActorSystem(access: String, _ proto: ProtocolDeclSyntax, _ type: TypeSyntax) -> DeclSyntax {
-    "\(raw: access)typealias ActorSystem = \(type)"
+  private static func typealiasActorSystem(access: DeclModifierListSyntax,
+                                           _ proto: ProtocolDeclSyntax,
+                                           _ type: TypeSyntax) -> DeclSyntax {
+    "\(access)typealias ActorSystem = \(type)"
   }
 }
 
 // ===== -----------------------------------------------------------------------
 // MARK: Convenience Extensions
-
-extension ProtocolDeclSyntax {
-  var accessModifiersString: String {
-    let modifiers = modifiers.filter { modifier in
-        modifier.isAccessControl
-      }
-
-    guard !modifiers.isEmpty else {
-      return ""
-    }
-
-    let string = modifiers
-      .map { "\($0.trimmed)" }
-      .joined(separator: " ")
-    return "\(string) "
-  }
-}
 
 extension TypeSyntax {
   fileprivate var isActorSystem: Bool {
