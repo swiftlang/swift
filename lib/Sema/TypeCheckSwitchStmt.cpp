@@ -1157,7 +1157,7 @@ namespace {
       case DowngradeToWarning::ForUnknownCase: {
         if (Context.LangOpts.DebuggerSupport ||
             Context.LangOpts.Playground ||
-            !Context.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics) {
+            !Context.LangOpts.hasFeature(Feature::NonfrozenEnumExhaustivity)) {
           // Don't require covering unknown cases in the debugger or in
           // playgrounds.
           return;
@@ -1259,7 +1259,7 @@ namespace {
               // will later decompose the space into cases.
               continue;
             }
-            if (!Context.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics)
+            if (!Context.LangOpts.hasFeature(Feature::NonfrozenEnumExhaustivity))
               continue;
 
             // This can occur if the switch is empty and the subject type is an
