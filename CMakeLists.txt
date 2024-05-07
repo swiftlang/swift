@@ -341,9 +341,8 @@ option(SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
     debugging Swift)"
     FALSE)
 
-option(BOOTSTRAPPING_MODE [=[
+set(BOOTSTRAPPING_MODE HOSTTOOLS CACHE STRING [=[
 How to build the swift compiler modules. Possible values are
-    OFF:           build without swift modules
     HOSTTOOLS:     build with a pre-installed toolchain
     BOOTSTRAPPING: build with a 2-stage bootstrapping process
     BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
@@ -352,7 +351,7 @@ How to build the swift compiler modules. Possible values are
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
     CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
                                    compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
-]=] OFF)
+]=])
 
 option(BRIDGING_MODE [=[
 How swift-C++ bridging code is compiled:
@@ -751,18 +750,6 @@ option(SWIFT_ENABLE_BACKTRACING
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "14.5" CACHE STRING
   "Minimum deployment target version for macCatalyst")
 
-# A tempoarary hack: force enabling HOSTTOOLS mode on Windows.
-# Right now, SwiftCompilerSources cannot be enabled for lldb because on Windows
-# swift and lldb are built in a unified build and there is a missing dependency
-# on swiftrt.
-# Swift and lldb are configured with the same cmake invocation and therefore
-# enabling bootstrapping for swift and disabling it for lldb only works by
-# hardcoding the bootstrapping mode in the cmake file.
-# https://github.com/apple/swift/issues/73322
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  set(BOOTSTRAPPING_MODE "HOSTTOOLS")
-endif()
-
 #
 # End of user-configurable options.
 #
@@ -924,6 +911,10 @@ set(SWIFT_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
 set(SWIFT_SHIMS_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/stdlib/public/SwiftShims")
 set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
+
+if (NOT BOOTSTRAPPING_MODE)
+  message(FATAL_ERROR "turning off bootstrapping is not supported anymore")
+endif()
 
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")

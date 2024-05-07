@@ -47,7 +47,7 @@ bb3:
   // expected-warning @-1 {{}}
   %useKlass = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %useKlass(%klass) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
-  // expected-note @-1 {{potential concurrent access}}
+  // expected-note @-1 {{access can happen concurrently}}
   destroy_value %klass : $NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()
