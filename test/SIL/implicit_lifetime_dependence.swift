@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  -disable-availability-checking \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
+// RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
 // REQUIRES: asserts
 
 struct BufferView : ~Escapable {
