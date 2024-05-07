@@ -25,9 +25,9 @@ func methodTestTransferringResult() async {
 func methodTestTransferringArg() async {
   let x = MyType()
   let s = NSObject()
-  let _ = x.getResultWithTransferringArgument(s)  // expected-error {{transferring 's' may cause a data race}}
+  let _ = x.getResultWithTransferringArgument(s)  // expected-error {{sending 's' risks causing data races}}
   // expected-note @-1 {{'s' used after being passed as a transferring parameter; Later uses could race}}
-  useValue(s) // expected-note {{use here could race}}
+  useValue(s) // expected-note {{access can happen concurrently}}
 }
 
 // Make sure we just ignore the swift_attr if it is applied to something like a
@@ -45,14 +45,14 @@ func funcTestTransferringResult() async {
   // Just to show that without the transferring param, we generate diagnostics.
   let x2 = NSObject()
   let y2 = returnNSObjectFromGlobalFunction(x2)
-  await transferToMain(x2) // expected-error {{transferring 'x2' may cause a data race}}
-  // expected-note @-1 {{transferring disconnected 'x2' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  useValue(y2) // expected-note {{use here could race}}
+  await transferToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
+  // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestTransferringArg() async {
   let x = NSObject()
-  transferNSObjectToGlobalFunction(x) // expected-error {{transferring 'x' may cause a data race}}
+  transferNSObjectToGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a transferring parameter; Later uses could race}}
-  useValue(x) // expected-note {{use here could race}}
+  useValue(x) // expected-note {{access can happen concurrently}}
 }

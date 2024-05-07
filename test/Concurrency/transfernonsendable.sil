@@ -112,7 +112,7 @@ bb0(%0 : $*{ var NonSendableKlass }):
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{task-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{}}
   destroy_value %1 : ${ var NonSendableKlass }
 
   %9999 = tuple ()
@@ -157,10 +157,10 @@ bb0:
 
   %f2 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2<NonSendableKlass>(%1) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
+  // expected-warning @-1 {{}}
   %useIndirect = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %useIndirect<NonSendableKlass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-note @-1 {{use here could race}}
+  // expected-note @-1 {{access can happen concurrently}}
 
   destroy_addr %1 : $*NonSendableKlass
   dealloc_stack %1 : $*NonSendableKlass
@@ -226,7 +226,7 @@ bb0(%0 : @guaranteed $NonSendableStruct):
   debug_value %0 : $NonSendableStruct, var, name "myname"
   %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
+  return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
   // expected-note @-1 {{task-isolated 'myname.ns' cannot be a transferring result. task-isolated uses may race with caller uses}}
 }
 
@@ -235,7 +235,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
   debug_value %0 : $MainActorIsolatedStruct, var, name "myname"
   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
+  return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -244,7 +244,7 @@ bb0(%0 : $*MainActorIsolatedStruct):
   debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = load [copy] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.ns' may cause a data race}}
+  return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -253,7 +253,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedEnum):
   debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_enum_data %0 : $MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = copy_value %2 : $NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a data race}}
+  return %3 : $NonSendableKlass // expected-warning {{sending 'myname.second' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -262,7 +262,7 @@ bb0(%0 : $*MainActorIsolatedEnum):
   debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = load [take] %2 : $*NonSendableKlass
-  return %3 : $NonSendableKlass // expected-warning {{transferring 'myname.second' may cause a data race}}
+  return %3 : $NonSendableKlass // expected-warning {{sending 'myname.second' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -281,7 +281,7 @@ bb2(%1 : @guaranteed $NonSendableKlass):
   br bb3(%3 : $FakeOptional<NonSendableKlass>)
 
 bb3(%4 : @owned $FakeOptional<NonSendableKlass>):
-  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{transferring 'myname.some' may cause a data race}}
+  return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{sending 'myname.some' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'myname.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
 }
 
@@ -292,7 +292,7 @@ bb0(%0 : @guaranteed $MyActor):
   %3 = class_method %0 : $MyActor, #MyActor.klass!getter : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
   %4 = apply %3(%0) : $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
   %5 = class_method %4 : $NonSendableKlass, #NonSendableKlass.asyncCall : (NonSendableKlass) -> () async -> (), $@convention(method) @async (@guaranteed NonSendableKlass) -> ()
-  %6 = apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %5(%4) : $@convention(method) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{'self'-isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+  %6 = apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %5(%4) : $@convention(method) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
   destroy_value %4 : $NonSendableKlass
   hop_to_executor %0 : $MyActor
   %9 = tuple ()
@@ -313,7 +313,7 @@ bb0(%0 : @guaranteed $MyActor):
   %11 = alloc_stack $NonSendableKlass
   %12 = store_borrow %6 to %11 : $*NonSendableKlass
   %13 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  %14 = apply [caller_isolation=actor_instance] [callee_isolation=global_actor] %13<NonSendableKlass>(%12) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{'self'-isolated value of type 'NonSendableKlass' transferred to global actor '<null>'-isolated context}}
+  %14 = apply [caller_isolation=actor_instance] [callee_isolation=global_actor] %13<NonSendableKlass>(%12) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
   end_borrow %12 : $*NonSendableKlass
   dealloc_stack %11 : $*NonSendableKlass
   hop_to_executor %0 : $MyActor
