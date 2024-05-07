@@ -206,23 +206,6 @@ extension DistributedResolvableMacro {
 // ===== -----------------------------------------------------------------------
 // MARK: Convenience Extensions
 
-extension ProtocolDeclSyntax {
-  var accessModifiersString: String {
-    let modifiers = modifiers.filter { modifier in
-        modifier.isAccessControl
-      }
-
-    guard !modifiers.isEmpty else {
-      return ""
-    }
-
-    let string = modifiers
-      .map { "\($0.trimmed)" }
-      .joined(separator: " ")
-    return "\(string) "
-  }
-}
-
 extension TypeSyntax {
   fileprivate var isActorSystem: Bool {
     self.trimmedDescription == "ActorSystem"
