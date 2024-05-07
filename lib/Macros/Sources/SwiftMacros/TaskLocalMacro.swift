@@ -69,6 +69,9 @@ extension TaskLocalMacro: PeerMacro {
         message: "'@TaskLocal' property must have default value, or be optional", id: .mustBeVar)
     }
 
+    // Copy access modifiers
+    let access = varDecl.accessControlModifiers
+
     // If the property is global, do not prefix the synthesised decl with 'static'
     let isGlobal = context.lexicalContext.isEmpty
     let staticKeyword: TokenSyntax?
@@ -80,7 +83,7 @@ extension TaskLocalMacro: PeerMacro {
 
     return [
       """
-      \(staticKeyword)let $\(name)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
+      \(access)\(staticKeyword)let $\(name)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
       """
     ]
   }
