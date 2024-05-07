@@ -1350,7 +1350,7 @@ function Build-ICU([Platform]$Platform, $Arch) {
 
 function Build-Runtime([Platform]$Platform, $Arch) {
   Isolate-EnvVars {
-    $env:Path = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+    $env:Path = "$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
     $CompilersBinaryCache = if ($IsCrossCompiling) {
       Get-BuildProjectBinaryCache Compilers
