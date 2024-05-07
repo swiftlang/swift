@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -37,7 +37,15 @@ enum TL {
 }
 
 @TaskLocal
+@available(SwiftStdlib 5.1, *)
 var globalTaskLocal: StringLike = StringLike("<not-set>")
+
+@available(SwiftStdlib 5.10, *)
+struct LessAvailable {}
+
+@TaskLocal
+@available(SwiftStdlib 5.10, *)
+var globalLessAvailable: LessAvailable?
 
 @available(SwiftStdlib 5.1, *)
 final class ClassTaskLocal: Sendable {
