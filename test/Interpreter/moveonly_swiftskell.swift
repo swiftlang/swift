@@ -6,7 +6,6 @@
 // RUN:    -module-name Swiftskell \
 // RUN:    -parse-as-library \
 // RUN:    %S/../Inputs/Swiftskell.swift -c -o %t/Swiftskell.o \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature BorrowingSwitch
 

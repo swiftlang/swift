@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   2>&1 | %FileCheck %s
 

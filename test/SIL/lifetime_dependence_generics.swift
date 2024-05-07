@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:   -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypes | %FileCheck %s
 
 
 protocol P {

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -sil-verify-all -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -sil-verify-all -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil
 
 import Swift
 
