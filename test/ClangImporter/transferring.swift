@@ -29,12 +29,12 @@ func funcTestTransferringResult() async {
   let y2 = returnUserDefinedFromGlobalFunction(x2)
   await transferToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
   // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-  useValue(y2) // expected-note {{potential concurrent access}}
+  useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestTransferringArg() async {
   let x = NonSendableCStruct()
   transferUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a transferring parameter}}
-  useValue(x) // expected-note {{potential concurrent access}}
+  useValue(x) // expected-note {{access can happen concurrently}}
 }

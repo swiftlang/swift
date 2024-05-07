@@ -88,7 +88,7 @@ func simpleTest2() async {
   await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(y)
-  useValue(x) // expected-note {{potential concurrent access}}
+  useValue(x) // expected-note {{access can happen concurrently}}
 }
 
 // Make sure that later errors with y can happen.
@@ -98,14 +98,14 @@ func simpleTest3() async {
   await transferToMainDirect(x)
   await transferToMainDirect(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local nonisolated uses}}
-  useValue(y) // expected-note {{potential concurrent access}}
+  useValue(y) // expected-note {{access can happen concurrently}}
 }
 
 func transferResult() async -> transferring NonSendableKlass {
   let x = NonSendableKlass()
   await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local nonisolated uses}}
-  return x // expected-note {{potential concurrent access}}
+  return x // expected-note {{access can happen concurrently}}
 }
 
 func transferInAndOut(_ x: transferring NonSendableKlass) -> transferring NonSendableKlass {
