@@ -60,7 +60,7 @@ private:
     memset(mask, 0xff, size);
   }
 
-public:  
+public:
   static BitMask zeroMask(unsigned sizeInBytes) {
     auto mask = BitMask(sizeInBytes);
     mask.makeZero();
@@ -260,7 +260,7 @@ public:
       size = n;
     }
   }
-  
+
   unsigned numBits() const {
     return size * 8;
   }
