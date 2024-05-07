@@ -943,7 +943,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===----------------------------------------------------------------------===//
 
 NOTE(regionbasedisolation_maybe_race, none,
-     "potential concurrent access", ())
+     "access can happen concurrently", ())
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())

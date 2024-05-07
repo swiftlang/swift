@@ -68,8 +68,8 @@ func testPreconcurrencyExplicitlyNonSendable() async {
   // expected-swift-6-warning @-4 {{sending 'x' risks causing data races}}
   // expected-swift-6-note @-5 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(x)
-  // expected-swift-5-note @-1 {{potential concurrent access}}
-  // expected-swift-6-note @-2 {{potential concurrent access}}
+  // expected-swift-5-note @-1 {{access can happen concurrently}}
+  // expected-swift-6-note @-2 {{access can happen concurrently}}
 }
 
 // In swift 5 this is a warning and in swift 6 this is an error.
@@ -80,8 +80,8 @@ func testNormal() async {
   // expected-swift-6-error @-2 {{sending 'x' risks causing data races}}
   // expected-swift-5-note @-3 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-swift-6-note @-4 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-  useValue(x) // expected-swift-5-note {{potential concurrent access}}
-  // expected-swift-6-note @-1 {{potential concurrent access}}
+  useValue(x) // expected-swift-5-note {{access can happen concurrently}}
+  // expected-swift-6-note @-1 {{access can happen concurrently}}
 }
 
 func testOnlyErrorOnExactValue() async {
@@ -96,8 +96,8 @@ func testOnlyErrorOnExactValue() async {
   // expected-swift-6-error @-4 {{sending 'y' risks causing data races}}
   // expected-swift-6-note @-5 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(x)
-  // expected-swift-5-note @-1 {{potential concurrent access}}
-  // expected-swift-6-note @-2 {{potential concurrent access}}
+  // expected-swift-5-note @-1 {{access can happen concurrently}}
+  // expected-swift-6-note @-2 {{access can happen concurrently}}
 }
 
 func testNoErrorIfUseInSameRegionLater() async {
