@@ -180,7 +180,7 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
 
 static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
   return triple.isOSGlibc() || triple.isOSOpenBSD() || triple.isOSFreeBSD() ||
-         triple.isAndroid() || triple.isOSWASI();
+         triple.isAndroid() || triple.isMusl() || triple.isOSWASI();
 }
 
 static SmallVector<std::pair<std::string, std::string>, 2>
@@ -254,8 +254,9 @@ static void getLibStdCxxFileMapping(
   // We currently only need this when building for Linux.
   if (!triple.isOSLinux())
     return;
-  // Android uses libc++.
-  if (triple.isAndroid())
+  // Android uses libc++, as does our fully static Linux config.
+  if (triple.isAndroid()
+      || (triple.isMusl() && triple.getVendor() == llvm::Triple::Swift))
     return;
 
   // Extract the libstdc++ installation path from Clang driver.
@@ -529,30 +530,44 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
   const llvm::Triple &triple = ctx.LangOpts.Target;
 
+  // For modulemaps that have all the C standard library headers together in
+  // a single module, we end up with module cycles with the clang _Builtin_
+  // modules.  e.g. <inttypes.h> includes <stdint.h> on these platforms. The
+  // clang builtin <stdint.h> include-nexts <stdint.h>. When both of those
+  // platform headers are in the SwiftLibc module, there's a module cycle
+  // SwiftLibc -> _Builtin_stdint -> SwiftLibc (i.e. inttypes.h (platform) ->
+  // stdint.h (builtin) -> stdint.h (platform)).
+  //
+  // Until these modulemaps can be fixed, the builtin headers need to join
+  // the system modules to avoid the cycle.
+  //
+  // Note that this does nothing to fix the same problem with C++ headers,
+  // and that this is generally a fragile solution.
+  //
+  // We start by assuming we do *not* need to do this, then enable it for
+  // affected modulemaps.
+  result.requiresBuiltinHeadersInSystemModules = false;
+
   SmallVector<std::pair<std::string, std::string>, 2> libcFileMapping;
   if (triple.isOSWASI()) {
     // WASI Mappings
     libcFileMapping =
         getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs);
+
+    // WASI's module map needs fixing
+    result.requiresBuiltinHeadersInSystemModules = true;
+  } else if (triple.isMusl()) {
+    libcFileMapping =
+        getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs);
   } else {
     // Android/BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs);
+
+    // glibc.modulemap needs fixing
+    result.requiresBuiltinHeadersInSystemModules = true;
   }
   result.redirectedFiles.append(libcFileMapping);
-  // Both libc module maps have the C standard library headers all together in a
-  // SwiftLibc module. That leads to module cycles with the clang _Builtin_
-  // modules. e.g. <inttypes.h> includes <stdint.h> on these platforms. The
-  // clang builtin <stdint.h> include-nexts <stdint.h>. When both of those
-  // platform headers are in the SwiftLibc module, there's a module cycle
-  // SwiftLibc -> _Builtin_stdint -> SwiftLibc (i.e. inttypes.h (platform) ->
-  // stdint.h (builtin) -> stdint.h (platform)). Until this can be fixed in
-  // these module maps, the clang builtin headers need to join the "system"
-  // modules (SwiftLibc). i.e. when the clang builtin stdint.h is in the
-  // SwiftLibc module too, the cycle goes away. Note that
-  // -fbuiltin-headers-in-system-modules does nothing to fix the same problem
-  // with C++ headers, and is generally fragile.
-  result.requiresBuiltinHeadersInSystemModules = !libcFileMapping.empty();
 
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs);
