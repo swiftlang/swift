@@ -291,16 +291,16 @@ void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
     if (!available) {
       continue;
     }
-    auto hasUnreachableSuccessor = [&]() {
+    auto hasUnavailableSuccessor = [&]() {
       // Use a lambda to avoid checking if possible.
       return llvm::any_of(block->getSuccessorBlocks(), [&result](auto *block) {
         return result.getState(block) == State::Unavailable;
       });
     };
-    if (!block->succ_empty() && !hasUnreachableSuccessor()) {
+    if (!block->succ_empty() && !hasUnavailableSuccessor()) {
       continue;
     }
-    assert(hasUnreachableSuccessor() ||
+    assert(hasUnavailableSuccessor() ||
            isa<UnreachableInst>(block->getTerminator()));
     visit(block->getTerminator());
   }
