@@ -75,6 +75,22 @@ extension __EmptyArrayStorage: Sendable {}
 // non-writable memory (can't be a let, Builtin.addressof below requires a var).
 public var _swiftEmptyArrayStorage: (Int, Int, Int, Int) =
     (/*isa*/0, /*refcount*/-1, /*count*/0, /*flags*/1)
+
+/// The empty array prototype.  We use the same object for all empty
+/// `[Native]Array<Element>`s.
+@inlinable
+internal var _emptyArrayStorage: __EmptyArrayStorage {
+  Builtin.bridgeFromRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
+}
+#else
+/// The empty array prototype.  We use the same object for all empty
+/// `[Native]Array<Element>`s.
+@inlinable
+internal var _emptyArrayStorage: __EmptyArrayStorage {
+  Builtin.bridgeFromRawPointer(
+    _swift_stdlib_getEmptyArrayStorage()._rawValue
+  )
+}
 #endif
 
 /// The storage for static read-only arrays.
@@ -122,15 +138,6 @@ internal final class __StaticArrayStorage
 
 @available(*, unavailable)
 extension __StaticArrayStorage: Sendable {}
-
-/// The empty array prototype.  We use the same object for all empty
-/// `[Native]Array<Element>`s.
-@inlinable
-internal var _emptyArrayStorage: __EmptyArrayStorage {
-  Builtin.bridgeFromRawPointer(
-    _swift_stdlib_getEmptyArrayStorage()._rawValue
-  )
-}
 
 // The class that implements the storage for a ContiguousArray<Element>
 @_fixed_layout
