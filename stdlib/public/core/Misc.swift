@@ -174,6 +174,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 @_documentation(visibility: internal)
 @_marker public protocol Escapable {}
 
+#if $BitwiseCopyable2
 #if $NoncopyableGenerics && $NonescapableTypes
 @_marker public protocol BitwiseCopyable: ~Escapable { }
 #else
@@ -182,3 +183,11 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 
 @available(*, deprecated, message: "Use BitwiseCopyable")
 public typealias _BitwiseCopyable = BitwiseCopyable
+#else
+#if $NoncopyableGenerics && $NonescapableTypes
+@_marker public protocol _BitwiseCopyable: ~Escapable { }
+#else
+@_marker public protocol _BitwiseCopyable { }
+#endif
+public typealias BitwiseCopyable = _BitwiseCopyable
+#endif
