@@ -25,6 +25,7 @@ namespace index {
 void indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer);
 void indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer);
 void indexModule(ModuleDecl *module, IndexDataConsumer &consumer);
+bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
 } // end namespace index
 } // end namespace swift
