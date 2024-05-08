@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -parse-stdlib -module-name Swift \
-// RUN:   -enable-experimental-feature MoveOnlyClasses \
-// RUN:   -enable-experimental-feature NoncopyableGenerics
+// RUN:   -enable-experimental-feature MoveOnlyClasses
 
 // NOTE: -parse-stdlib is a transitional workaround and should not be required.
 

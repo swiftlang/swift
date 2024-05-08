@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  \
 // RUN: -enable-builtin-module \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
+// RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
 
 import Builtin

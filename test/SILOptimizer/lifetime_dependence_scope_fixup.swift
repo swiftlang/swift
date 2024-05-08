@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -enable-experimental-feature NoncopyableGenerics
+// RUN: -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 

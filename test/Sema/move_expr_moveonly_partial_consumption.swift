@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift                              \
 // RUN:     -disable-availability-checking                          \
 // RUN:     -enable-experimental-feature NoImplicitCopy             \
-// RUN:     -enable-experimental-feature NoncopyableGenerics        \
 // RUN:     -debug-diagnostic-names
 
 @_silgen_name("get")

@@ -1,15 +1,13 @@
 // RUN: %target-sil-opt                                      \
 // RUN:     %s                                               \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN: |                                                    \
 // RUN: %target-sil-opt                                      \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN: |                                                    \
 // RUN: %FileCheck %s
 
-// For -enable-experimental-feature NoncopyableGenerics/NonescapableTypes
+// For -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // TODO: Once NoncopyableGenerics/NonescapableTypes is no longer behind a feature flag, merge this into basic2.

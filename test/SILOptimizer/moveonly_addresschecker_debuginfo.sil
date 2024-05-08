@@ -1,6 +1,4 @@
 // RUN: %target-sil-opt -module-name moveonly_addresschecker -emit-verbose-sil -sil-move-only-checker -enable-sil-verify-all %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -module-name moveonly_addresschecker -emit-verbose-sil -sil-move-only-checker -enable-sil-verify-all %s | %FileCheck %s
-
 
 sil_stage raw
 
