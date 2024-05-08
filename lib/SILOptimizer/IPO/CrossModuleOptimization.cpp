@@ -258,9 +258,8 @@ bool CrossModuleOptimization::canSerializeFunction(
 /// Returns true if \p inst can be serialized.
 ///
 /// If \p inst is a function_ref, recursively visits the referenced function.
-bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
-                      FunctionFlags &canSerializeFlags, int maxDepth) {
-
+bool CrossModuleOptimization::canSerializeInstruction(
+    SILInstruction *inst, FunctionFlags &canSerializeFlags, int maxDepth) {
   // First check if any result or operand types prevent serialization.
   for (SILValue result : inst->getResults()) {
     if (!canSerializeType(result->getType()))
