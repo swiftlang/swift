@@ -188,8 +188,8 @@ bool ProtocolConformance::isRetroactive() const {
   
   auto isSameRetroactiveContext = 
     [](ModuleDecl *moduleA, ModuleDecl *moduleB) -> bool {
-      return moduleA->isSameModuleLookingThroughOverlays(moduleB)) ||
-        moduleA->inSamePackage(moduleB));
+      return moduleA->isSameModuleLookingThroughOverlays(moduleB) ||
+        moduleA->inSamePackage(moduleB);
     };
   
   if (isSameRetroactiveContext(extensionModule, protocolModule)) {
