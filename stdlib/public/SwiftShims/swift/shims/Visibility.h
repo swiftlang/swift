@@ -178,8 +178,7 @@
 # define SWIFT_ATTRIBUTE_FOR_EXPORTS __declspec(dllexport)
 # define SWIFT_ATTRIBUTE_FOR_IMPORTS __declspec(dllimport)
 
-// FIXME: Is there such section on Windows?
-# define SWIFT_CONSTANT_RELOCATABLE_DATA
+# define SWIFT_CONSTANT_RELOCATABLE_DATA __attribute__((section(".rdata")))
 
 #endif
 
