@@ -30,6 +30,7 @@
 #include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/DispatchShims.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Thread.h"
@@ -352,8 +353,8 @@ static void checkIsCurrentExecutorMode(void *context) {
   // Potentially, override the platform detected mode, primarily used in tests.
 #if SWIFT_STDLIB_HAS_ENVIRON
   if (const char *modeStr =
-          getenv("SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE")) {
-    if (modeStr && *modeStr) {
+          runtime::environment::concurrencyIsCurrentExecutorLegacyModeOverride()) {
+    if (modeStr) {
       if (strcmp(modeStr, "nocrash") == 0) {
         useLegacyMode = true;
       } else if (strcmp(modeStr, "crash") == 0) {
