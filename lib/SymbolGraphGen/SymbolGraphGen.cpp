@@ -10,12 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/Path.h"
+#include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/Import.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/SymbolGraphGen/SymbolGraphGen.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/JSON.h"
+#include "llvm/Support/Path.h"
 
 #include "SymbolGraphASTWalker.h"
 
@@ -54,25 +58,36 @@ int serializeSymbolGraph(SymbolGraph &SG,
 // MARK: - Main Entry Point
 
 /// Emit a symbol graph JSON file for a `ModuleDecl`.
-int
-symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
-                                         const SymbolGraphOptions &Options) {
+int symbolgraphgen::emitSymbolGraphForModule(
+    ModuleDecl *M, const SymbolGraphOptions &Options) {
+  ModuleDecl::ImportCollector importCollector(Options.MinimumAccessLevel);
+
+  auto importFilter = [&Options](const ModuleDecl *module) {
+      if (!module)
+        return false;
+
+      for (const auto &allowedModuleName : *Options.AllowedReexportedModules)
+        if (allowedModuleName == module->getNameStr())
+          return true;
+
+       return false;
+    };
+
+  if (Options.AllowedReexportedModules.has_value())
+    importCollector.importFilter = std::move(importFilter);
+
   SmallVector<Decl *, 64> ModuleDecls;
-  swift::getTopLevelDeclsForDisplay(M, ModuleDecls, /*recursive*/true);
-  
-  SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
-  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
-  auto shouldIncludeImport = [&](AttributedImport<ImportedModule> import) {
-    auto docVisibility = import.docVisibility.value_or(AccessLevel::Public);
-    return docVisibility >= Options.MinimumAccessLevel;
-  };
-  swift::collectParsedExportedImports(M, ExportedImportedModules, QualifiedImports, shouldIncludeImport);
+  swift::getTopLevelDeclsForDisplay(
+      M, ModuleDecls, [&importCollector](ModuleDecl *M, SmallVectorImpl<Decl *> &results) {
+        M->getDisplayDeclsRecursivelyAndImports(results, importCollector);
+      });
 
   if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()
         << " top-level declarations in this module.\n";
-    
-  SymbolGraphASTWalker Walker(*M, ExportedImportedModules, QualifiedImports, Options);
+
+  SymbolGraphASTWalker Walker(*M, importCollector.imports,
+                              importCollector.qualifiedImports, Options);
 
   for (auto *Decl : ModuleDecls) {
     Walker.walk(Decl);
@@ -109,8 +124,7 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
 
   llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
   ModuleDecl *MD = D->getModuleContext();
-  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
-  SymbolGraphASTWalker Walker(*MD, {}, QualifiedImports, Options);
+  SymbolGraphASTWalker Walker(*MD, Options);
   markup::MarkupContext MarkupCtx;
   SymbolGraph Graph(Walker, *MD, std::nullopt, MarkupCtx, std::nullopt,
                     /*IsForSingleNode=*/true);

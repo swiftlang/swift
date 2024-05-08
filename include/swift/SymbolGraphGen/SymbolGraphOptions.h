@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/ADT/ArrayRef.h"
+
 #include "swift/AST/AttrKind.h"
 
 #ifndef SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHOPTIONS_H
@@ -63,6 +65,10 @@ struct SymbolGraphOptions {
   /// but SourceKit should be able to load the information when pulling symbol
   /// information for individual queries.
   bool PrintPrivateStdlibSymbols = false;
+
+  /// If this has a value specifies an explicit allow list of reexported module
+  /// names that should be included symbol graph.
+  std::optional<llvm::ArrayRef<StringRef>> AllowedReexportedModules = {};
 };
 
 } // end namespace symbolgraphgen
