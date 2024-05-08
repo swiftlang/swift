@@ -3283,10 +3283,7 @@ namespace {
                             bool zeroizeIfSensitive) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasParameterizedExistential() ||
-                 (getPayloadTypeInfo().isFixedSize() && // can use memcpy
-                  getPayloadTypeInfo().
-                  isBitwiseTakable(ResilienceExpansion::Maximal))) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
