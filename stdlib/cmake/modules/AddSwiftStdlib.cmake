@@ -549,13 +549,16 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "dl" "log")
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
-    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26")
-        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
-      else()
-        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+      # The Android resource dir is specified from build.ps1 on windows.
+      if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+        if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26")
+          file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
+        else()
+          file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+        endif()
+        list(APPEND result "-resource-dir=${RESOURCE_DIR}")
       endif()
-      list(APPEND result "-resource-dir=${RESOURCE_DIR}")
     endif()
 
     # link against the custom C++ library
@@ -1752,6 +1755,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_WASI
 #   Swift modules this library depends on when built for WASI.
 #
+# SWIFT_MODULE_DEPENDS_ANDROID
+#   Swift modules this library depends on when built for Android.
+#
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
 #
@@ -1875,6 +1881,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_XROS
         SWIFT_COMPILE_FLAGS_LINUX
         SWIFT_MODULE_DEPENDS
+        SWIFT_MODULE_DEPENDS_ANDROID
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
         SWIFT_MODULE_DEPENDS_FREESTANDING
@@ -2086,12 +2093,15 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "OPENBSD")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OPENBSD})
-    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
+    elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftlib_module_depends_flattened
           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
@@ -2905,6 +2915,7 @@ function(add_swift_target_executable name)
     DEPENDS
     LINK_LIBRARIES
     SWIFT_MODULE_DEPENDS
+    SWIFT_MODULE_DEPENDS_ANDROID
     SWIFT_MODULE_DEPENDS_CYGWIN
     SWIFT_MODULE_DEPENDS_FREEBSD
     SWIFT_MODULE_DEPENDS_FREESTANDING
@@ -3015,12 +3026,15 @@ function(add_swift_target_executable name)
     elseif(sdk STREQUAL "OPENBSD")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_OPENBSD})
-    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
+    elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_LINUX})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftexe_module_depends_flattened
+        ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_CYGWIN})
@@ -3118,9 +3132,14 @@ function(add_swift_target_executable name)
       # it tries to build swift-backtrace it fails because *the compiler*
       # refers to a libswiftCore.so that can't be found.
 
+      if(SWIFTEXE_TARGET_NOSWIFTRT)
+        set(NOSWIFTRT_KEYWORD "NOSWIFTRT")
+      else()
+        set(NOSWIFTRT_KEYWORD "")
+      endif()
       _add_swift_target_executable_single(
           ${VARIANT_NAME}
-          ${SWIFTEXE_TARGET_NOSWIFTRT_keyword}
+          ${NOSWIFTRT_KEYWORD}
           ${SWIFTEXE_TARGET_SOURCES}
           DEPENDS
             ${SWIFTEXE_TARGET_DEPENDS_with_suffix}

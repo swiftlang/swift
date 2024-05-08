@@ -175,6 +175,8 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   auto sdkPath = ctx.SearchPathOpts.getSDKPath();
   if (!sdkPath.empty())
     clangDriver.SysRoot = sdkPath.str();
+  if (auto sysroot = ctx.SearchPathOpts.getSysRoot())
+    clangDriver.SysRoot = sysroot->str();
   return clangDriverArgs;
 }
 
@@ -185,7 +187,7 @@ static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
 
 static SmallVector<std::pair<std::string, std::string>, 2>
 getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
-                   std::optional<StringRef> maybeHeaderFileName,
+                   std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
                    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
   if (!shouldInjectLibcModulemap(triple))
@@ -227,18 +229,20 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
   SmallVector<std::pair<std::string, std::string>, 2> vfsMappings{
       {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)}};
 
-  if (maybeHeaderFileName) {
-    // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
-    // directly from the modulemap.
-    Path actualHeaderPath = actualModuleMapPath;
-    llvm::sys::path::remove_filename(actualHeaderPath);
-    llvm::sys::path::append(actualHeaderPath, maybeHeaderFileName.value());
+  if (maybeHeaderFileNames) {
+    for (const auto &filename : *maybeHeaderFileNames) {
+      // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
+      // directly from the modulemap.
+      Path actualHeaderPath = actualModuleMapPath;
+      llvm::sys::path::remove_filename(actualHeaderPath);
+      llvm::sys::path::append(actualHeaderPath, filename);
 
-    Path injectedHeaderPath(libcDir);
-    llvm::sys::path::append(injectedHeaderPath, maybeHeaderFileName.value());
+      Path injectedHeaderPath(libcDir);
+      llvm::sys::path::append(injectedHeaderPath, filename);
 
-    vfsMappings.push_back(
-        {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
+      vfsMappings.push_back(
+          {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
+    }
   }
 
   return vfsMappings;
@@ -559,8 +563,13 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   } else if (triple.isMusl()) {
     libcFileMapping =
         getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs);
+  } else if (triple.isAndroid()) {
+    // Android uses the android-specific module map that overlays the NDK.
+    StringRef headerFiles[] = {"SwiftAndroidNDK.h", "SwiftBionic.h"};
+    libcFileMapping =
+        getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs);
   } else {
-    // Android/BSD/Linux Mappings
+    // BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs);
 
