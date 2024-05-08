@@ -423,6 +423,9 @@ public:
 #else
     (void)skipVarDeclAssert;
 #endif
+    // Don't apply location overrides on variables.
+    if (Var && !Var->Loc)
+      Var->Loc = Loc;
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
         substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical,
