@@ -16,7 +16,7 @@ func globalThrowingFn() throws {}
 struct Basics: ~Copyable {
   consuming func test1(_ b: Bool) {
     guard b else {
-      fatalError("bah!") // expected-error {{must consume 'self' before exiting method that discards self}}
+      return // expected-error {{must consume 'self' before exiting method that discards self}}
     }
     discard self // expected-note {{discarded self here}}
   }
@@ -24,7 +24,7 @@ struct Basics: ~Copyable {
   consuming func test1_fixed(_ b: Bool) {
     guard b else {
       _ = consume self
-      fatalError("bah!")
+      return
     }
     discard self
   }
@@ -33,7 +33,7 @@ struct Basics: ~Copyable {
     repeat {
       switch c {
       case .red:
-        fatalError("bah!")
+        return
       case .blue:
         throw E.someError
       case .green:
@@ -49,7 +49,7 @@ struct Basics: ~Copyable {
       switch c {
       case .red:
         discard self
-        fatalError("bah!")
+        return
       case .blue:
         discard self
         throw E.someError
@@ -145,7 +145,7 @@ struct Basics: ~Copyable {
     if case .red = c {
       discard self // expected-note {{discarded self here}}
     }
-    fatalError("oh no") // expected-error {{must consume 'self' before exiting method that discards self}}
+    return // expected-error {{must consume 'self' before exiting method that discards self}}
   }
 
   consuming func test7_fixed(_ c: Color) throws {
@@ -154,7 +154,7 @@ struct Basics: ~Copyable {
       return
     }
     _ = consume self
-    fatalError("oh no")
+    return
   }
 
   consuming func test8(_ c: Color) throws {
@@ -162,9 +162,9 @@ struct Basics: ~Copyable {
       discard self // expected-note {{discarded self here}}
     }
     if case .blue = c {
-      fatalError("hi") // expected-error {{must consume 'self' before exiting method that discards self}}
+      return
     }
-  }
+  } // expected-error {{must consume 'self' before exiting method that discards self}}
 
   consuming func test8_stillMissingAConsume1(_ c: Color) throws {
     if case .red = c {
@@ -173,7 +173,7 @@ struct Basics: ~Copyable {
     }
     if case .blue = c {
       _ = consume self
-      fatalError("hi")
+      return
     }
   } // expected-error {{must consume 'self' before exiting method that discards self}}
 
@@ -183,7 +183,7 @@ struct Basics: ~Copyable {
       return
     }
     if case .blue = c {
-      fatalError("hi") // expected-error {{must consume 'self' before exiting method that discards self}}
+      return // expected-error {{must consume 'self' before exiting method that discards self}}
     }
     _ = consume self
   }
@@ -195,7 +195,7 @@ struct Basics: ~Copyable {
     }
     if case .blue = c {
       _ = consume self
-      fatalError("hi")
+      return
     }
     _ = consume self
   }
@@ -407,7 +407,7 @@ struct Basics: ~Copyable {
     case 2:
       return // expected-error {{must consume 'self' before exiting method that discards self}}
     case 3:
-      fatalError("no") // expected-error {{must consume 'self' before exiting method that discards self}}
+      return // expected-error {{must consume 'self' before exiting method that discards self}}
     case 4:
       globalConsumingFn(self)
     default:
@@ -568,7 +568,7 @@ struct Money: ~Copyable {
 
   consuming func spend(_ charge: Int) throws -> Money {
     guard charge > 0 else {
-      fatalError("can't charge a negative amount!") // expected-error {{must consume 'self' before exiting method that discards self}}
+      return Money(balance: balance) // expected-error {{must consume 'self' before exiting method that discards self}}
     }
 
     if balance < charge  {

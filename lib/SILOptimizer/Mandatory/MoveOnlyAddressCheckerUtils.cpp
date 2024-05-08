@@ -1712,9 +1712,6 @@ struct CopiedLoadBorrowEliminationVisitor
             useWorklist.push_back(use);
         }
 
-        // If we have a switch_enum, we always need to convert it to a load
-        // [copy] since we need to destructure through it.
-        shouldConvertToLoadCopy |= isa<SwitchEnumInst>(nextUse->getUser());
         continue;
       }
       case OperandOwnership::Borrow:
