@@ -134,7 +134,7 @@ actor MyActor {
   func canTransferWithTransferringMethodArg(_ x: transferring Klass, _ y: Klass) async {
     await transferToMain(x)
     await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
-    // expected-note @-1 {{sending actor-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and actor-isolated uses}}
+    // expected-note @-1 {{sending 'self'-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {

@@ -812,6 +812,26 @@ func testActorWithInitAccessorInit() {
       print(a) // Ok (nonisolated)
     }
   }
+
+  class NonSendableKlass {
+    init(_ x: NonSendableKlass? = nil) {
+
+    }
+  }
+  
+  @available(SwiftStdlib 5.1, *)
+  actor NonSendableInit {
+    var first: NonSendableKlass
+    var second: NonSendableKlass? = nil {
+      @storageRestrictions(initializes: first)
+      init(initialValue)  {
+        first = initialValue!
+      }
+
+      get { fatalError() }
+      set { fatalError() }
+    }
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
