@@ -372,10 +372,10 @@ private:
                            FrameworkSearchPaths.size() - 1);
   }
 
-  std::optional<StringRef> WinSDKRoot = std::nullopt;
-  std::optional<StringRef> WinSDKVersion = std::nullopt;
-  std::optional<StringRef> VCToolsRoot = std::nullopt;
-  std::optional<StringRef> VCToolsVersion = std::nullopt;
+  std::optional<std::string> WinSDKRoot = std::nullopt;
+  std::optional<std::string> WinSDKVersion = std::nullopt;
+  std::optional<std::string> VCToolsRoot = std::nullopt;
+  std::optional<std::string> VCToolsVersion = std::nullopt;
 
 public:
   StringRef getSDKPath() const { return SDKPath; }
