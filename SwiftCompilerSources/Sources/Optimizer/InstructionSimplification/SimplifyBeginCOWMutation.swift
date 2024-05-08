@@ -127,6 +127,14 @@ private func isEmptyCOWSingleton(_ value: Value) -> Bool {
         return name == "_swiftEmptyArrayStorage" ||
                name == "_swiftEmptyDictionarySingleton" ||
                name == "_swiftEmptySetSingleton"
+      case let apply as ApplyInst:
+        guard let name = apply.referencedFunction?.name else {
+          return false
+        }
+
+        return name == "_swift_stdlib_getEmptyArrayStorage" ||
+               name == "_swift_stdlib_getEmptyDictionarySingleton" ||
+               name == "_swift_stdlib_getEmptySetSingleton"
       default:
         return false
     }
