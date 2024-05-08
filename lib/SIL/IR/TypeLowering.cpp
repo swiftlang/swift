@@ -2324,17 +2324,25 @@ namespace {
       if (D->isResilient()) {
         // If the type is resilient and defined in our module, make a note of
         // that, since our lowering now depends on the resilience expansion.
-        bool sameModule = (D->getModuleContext() == &TC.M);
+        auto declModule = D->getModuleContext();
+        bool sameModule = (declModule == &TC.M);
         if (sameModule)
           properties.addSubobject(RecursiveProperties::forResilient());
 
         // If the type is in a different module, or if we're using a minimal
         // expansion, the type is address only and completely opaque to us.
+        // However, this is not true if the different module is in the same
+        // package and package serialization is enabled (resilience expansion
+        // is maximal), e.g. in case of package-cmo.
         //
         // Note: if the type is in a different module, the lowering does
         // not depend on the resilience expansion, so we do not need to set
         // the isResilient() flag above.
-        if (!sameModule || Expansion.getResilienceExpansion() ==
+        bool serializedPackage = declModule->inSamePackage(&TC.M) &&
+                                 declModule->isResilient() &&
+                                 declModule->serializePackageEnabled();
+        if ((!sameModule && !serializedPackage) ||
+            Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
           return true;

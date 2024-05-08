@@ -779,11 +779,7 @@ public:
     return getLoweredFunctionType()->getRepresentation();
   }
 
-  ResilienceExpansion getResilienceExpansion() const {
-    return (isSerialized()
-            ? ResilienceExpansion::Minimal
-            : ResilienceExpansion::Maximal);
-  }
+  ResilienceExpansion getResilienceExpansion() const;
 
   // Returns the type expansion context to be used inside this function.
   TypeExpansionContext getTypeExpansionContext() const {
