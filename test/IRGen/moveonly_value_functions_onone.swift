@@ -1,5 +1,4 @@
 // RUN: %target-swift-emit-irgen -Onone                      \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     %s                                               \
 // RUN: |                                                    \
 // RUN: %IRGenFileCheck %s

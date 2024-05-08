@@ -2,7 +2,6 @@
 // RUN:     -swift-version 5 \
 // RUN:     -enable-library-evolution \
 // RUN:     -emit-module -module-name Swift -parse-stdlib \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -o %t/Swift.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swift.swiftinterface
 

@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-ir -o - %s -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
