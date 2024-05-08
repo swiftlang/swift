@@ -27,7 +27,10 @@ __attribute__((swift_attr("release:LCRelease"))) LocalCount {
 
 }
 
-inline void LCRetain(NS::LocalCount *x) { x->value++; }
+inline void LCRetain(NS::LocalCount *x) {
+  x->value++;
+  finalLocalRefCount = x->value;
+}
 inline void LCRelease(NS::LocalCount *x) {
   x->value--;
   finalLocalRefCount = x->value;
@@ -45,6 +48,21 @@ __attribute__((swift_attr("release:GCRelease"))) GlobalCount {
 
 inline void GCRetain(GlobalCount *x) { globalCount++; }
 inline void GCRelease(GlobalCount *x) { globalCount--; }
+
+struct __attribute__((swift_attr("import_as_ref")))
+__attribute__((swift_attr("retain:GCRetainNullableInit")))
+__attribute__((swift_attr("release:GCReleaseNullableInit")))
+GlobalCountNullableInit {
+  static GlobalCountNullableInit *_Nullable create(bool wantNullptr) {
+    if (wantNullptr)
+      return nullptr;
+    return new (malloc(sizeof(GlobalCountNullableInit)))
+        GlobalCountNullableInit();
+  }
+};
+
+inline void GCRetainNullableInit(GlobalCountNullableInit *x) { globalCount++; }
+inline void GCReleaseNullableInit(GlobalCountNullableInit *x) { globalCount--; }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
