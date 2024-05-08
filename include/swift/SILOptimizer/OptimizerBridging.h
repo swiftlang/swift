@@ -388,6 +388,9 @@ void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
 #ifndef PURE_BRIDGING_MODE
 // In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore inluded in the header file.
 #include "OptimizerBridgingImpl.h"
+#else
+// For fflush and stdout
+#include <stdio.h>
 #endif
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
