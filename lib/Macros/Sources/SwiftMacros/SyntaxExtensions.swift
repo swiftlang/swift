@@ -18,7 +18,7 @@ import SwiftDiagnostics
 
 extension DeclGroupSyntax {
   internal var accessControlModifiers: DeclModifierListSyntax {
-      modifiers.filter { modifier in
+    modifiers.filter { modifier in
       modifier.isAccessControl
     }
   }
