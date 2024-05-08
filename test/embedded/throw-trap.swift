@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-IR
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 enum MyError : Error {
   case a

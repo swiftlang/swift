@@ -10,7 +10,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 public struct MyType {
     var x, y: Int

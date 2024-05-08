@@ -4,7 +4,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 public class X {} // expected-error {{cannot use allocating type 'X' in -no-allocations mode}}
 public func use_a_class() -> X {

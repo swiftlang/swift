@@ -3,7 +3,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 struct User {
   let o: BaseClass

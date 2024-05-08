@@ -1,8 +1,7 @@
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || OS=windows-msvc
 
 protocol Proto { }
 
