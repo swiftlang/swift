@@ -158,22 +158,9 @@ namespace {
 template <typename DeclType>
 bool checkResilience(DeclType *D, ModuleDecl *M,
                      ResilienceExpansion expansion) {
-  auto refDeclModule = D->getModuleContext();
   // Explicitly bypassed for debugging with `bypass-resilience-checks`
-  if (refDeclModule->getBypassResilience())
+  if (D->getModuleContext()->getBypassResilience())
     return false;
-
-  // If package serialization is enabled with `experimental-package-cmo`,
-  // decls can be serialized in a resiliently built module. In such case,
-  // a direct access should be allowed.
-  auto packageSerialized = expansion == ResilienceExpansion::Minimal &&
-                           refDeclModule->isResilient() &&
-                           refDeclModule->allowNonResilientAccess() &&
-                           refDeclModule->serializePackageEnabled() &&
-                           refDeclModule->inSamePackage(M);
-  if (packageSerialized)
-    return false;
-
   return D->isResilient(M, expansion);
 }
 

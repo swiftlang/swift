@@ -84,7 +84,7 @@ private:
 
   bool canSerializeGlobal(SILGlobalVariable *global);
 
-  bool canSerializeType(SILType type, TypeExpansionContext typeExpCtx);
+  bool canSerializeType(SILType type);
 
   bool canUseFromInline(DeclContext *declCtxt);
 
@@ -331,14 +331,12 @@ bool CrossModuleOptimization::canSerializeFunction(
 bool CrossModuleOptimization::canSerializeInstruction(
     SILInstruction *inst, FunctionFlags &canSerializeFlags, int maxDepth) {
   // First check if any result or operand types prevent serialization.
-  auto typeExpCtx = inst->getFunction()->getTypeExpansionContext();
-
   for (SILValue result : inst->getResults()) {
-    if (!canSerializeType(result->getType(), typeExpCtx))
+    if (!canSerializeType(result->getType()))
       return false;
   }
   for (Operand &op : inst->getAllOperands()) {
-    if (!canSerializeType(op.get()->getType(), typeExpCtx))
+    if (!canSerializeType(op.get()->getType()))
       return false;
   }
 
@@ -437,22 +435,10 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
   return true;
 }
 
-bool CrossModuleOptimization::canSerializeType(SILType type,
-                                               TypeExpansionContext typeExpCtx) {
+bool CrossModuleOptimization::canSerializeType(SILType type) {
   auto iter = typesChecked.find(type);
   if (iter != typesChecked.end())
     return iter->getSecond();
-
-  if (M.getSwiftModule()->isResilient()) {
-    auto minResilientCtx = TypeExpansionContext(ResilienceExpansion::Minimal,
-                                                typeExpCtx.getContext(),
-                                                typeExpCtx.isWholeModuleContext());
-    auto loadableInMinResilientCtx = M.Types.getTypeLowering(type, minResilientCtx).isLoadable();
-    if (!loadableInMinResilientCtx) {
-      typesChecked[type] = false;
-      return false;
-    }
-  }
 
   bool success = !type.getASTType().findIf(
     [this](Type rawSubType) {

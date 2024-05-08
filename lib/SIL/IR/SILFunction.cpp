@@ -517,6 +517,23 @@ bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
       .isNoReturnFunction(getModule(), context);
 }
 
+ResilienceExpansion SILFunction::getResilienceExpansion() const {
+  // If package serialization is enabled, we can safely
+  // assume that the defining .swiftmodule is built from
+  // source and is never used outside of its package;
+  // Even if the module is built resiliently, return
+  // maximal expansion here so aggregate types can be
+  // loadable in the same resilient domain (from a client
+  // module in the same package.
+  if (getModule().getSwiftModule()->serializePackageEnabled() &&
+      getModule().getSwiftModule()->isResilient())
+    return ResilienceExpansion::Maximal;
+
+  return (isSerialized()
+          ? ResilienceExpansion::Minimal
+          : ResilienceExpansion::Maximal);
+}
+
 const TypeLowering &
 SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
   return getModule().Types.getTypeLowering(orig, subst,
