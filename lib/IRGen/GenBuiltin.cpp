@@ -637,6 +637,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // Don't generate any code for the builtin.
     return out.add(v);
   }
+  if (Builtin.ID == BuiltinValueKind::Freeze) {
+    return out.add(IGF.Builder.CreateFreeze(args.claimNext()));
+  }
   
   if (Builtin.ID == BuiltinValueKind::AllocRaw) {
     auto size = args.claimNext();
