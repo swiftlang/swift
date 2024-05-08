@@ -427,11 +427,6 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
 
   if (const auto binding = propertyDecl->getParentPatternBinding()) {
     if (const auto originalInit = binding->getInit(0)) {
-      if (propertyDecl->hasAttachedPropertyWrapper()) {
-        return {propertyDecl, extractCompileTimeValue(originalInit),
-                propertyWrapperValues};
-      }
-
       return {propertyDecl, extractCompileTimeValue(originalInit),
               propertyWrapperValues};
     }
