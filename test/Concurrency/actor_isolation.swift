@@ -1308,8 +1308,14 @@ actor Counter {
 class C2 { }
 
 @SomeGlobalActor
-class C3: C2 { }
-// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'C3' has different actor isolation from nonisolated superclass 'C2'; this is an error in the Swift 6 language mode}}
+class C3: C2 { // expected-note {{class 'C3' does not conform to the 'Sendable' protocol}}
+  func requireSendableSelf() {
+    Task.detached {
+      _ = self
+      // expected-warning@-1 {{capture of 'self' with non-sendable type 'C3' in a `@Sendable` closure; this is an error in the Swift 6 language mode}}
+    }
+  }
+}
 
 @GenericGlobalActor<U>
 class GenericSuper<U> { }
@@ -1489,7 +1495,6 @@ class None {
 // try to add inferred isolation while overriding
 @MainActor
 class MA_None1: None {
-// expected-warning@-1 {{main actor-isolated class 'MA_None1' has different actor isolation from nonisolated superclass 'None'; this is an error in the Swift 6 language mode}}
 
   // FIXME: bad note, since the problem is a mismatch in overridden vs inferred isolation; this wont help.
   // expected-note@+1 {{add '@MainActor' to make instance method 'method()' part of global actor 'MainActor'}}
@@ -1520,7 +1525,6 @@ class None_MADirect: MADirect {
 
 @SomeGlobalActor
 class SGA_MADirect: MADirect {
-// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'SGA_MADirect' has different actor isolation from nonisolated superclass 'MADirect'; this is an error in the Swift 6 language mode}}
 
   // inferred-SomeGlobalActor vs overridden-MainActor = mainactor
   override func method1() { beets_ma() }
