@@ -15,7 +15,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 45{{}}
+class NonSendableKlass { // expected-complete-note 46{{}}
   // expected-typechecker-only-note @-1 4{{}}
   // expected-tns-note @-2 2{{}}
   var field: NonSendableKlass? = nil
@@ -36,6 +36,7 @@ actor MyActor {
 
   func useSendableFunction(_: @Sendable () -> Void) {}
   func useNonSendableFunction(_: () -> Void) {}
+  func doSomething() {}
 }
 
 final actor FinalActor {
@@ -1621,5 +1622,27 @@ actor DictionaryActorTest {
   // We used to crash on this due to isolation merging.
   func doSomething(_ key: Int) {
     assert(self.data[key] == 0)
+  }
+}
+
+extension MyActor {
+  // Make sure that we properly infer information from isolated parameters that
+  // aren't self.
+  func isolationInferenceFromNonSelfIsolatedParameters() {
+    useValue {
+      self.doSomething()
+    }
+  }
+
+  func isolationInferenceFromNonSelfIsolatedParameters2() {
+    useValue {
+      self.doSomething()
+      let x = NonSendableKlass()
+      self.useKlass(x)
+      await transferToMain(x)
+      // expected-tns-warning @-1 {{sending 'x' risks causing data races}}
+      // expected-tns-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+      // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    }
   }
 }

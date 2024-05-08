@@ -124,8 +124,8 @@ private:
   /// derived isolatedValue from.
   SILValue actorInstance;
 
-  SILIsolationInfo(ActorIsolation actorIsolation, SILValue isolatedValue,
-                   SILValue actorInstance)
+  SILIsolationInfo(SILValue isolatedValue, SILValue actorInstance,
+                   ActorIsolation actorIsolation)
       : kind(Actor), actorIsolation(actorIsolation),
         isolatedValue(isolatedValue), actorInstance(actorInstance) {
     assert((!actorInstance ||
@@ -193,37 +193,78 @@ public:
 
   [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const;
 
-  SILIsolationInfo withActorIsolated(SILValue isolatedValue,
-                                     SILValue actorInstance,
-                                     ActorIsolation isolation) {
-    return SILIsolationInfo::getActorIsolated(isolatedValue, actorInstance,
-                                              isolation);
-  }
-
   static SILIsolationInfo getDisconnected() { return {Kind::Disconnected}; }
 
-  static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
-                                           SILValue actorInstance,
-                                           ActorIsolation actorIsolation) {
-    return {actorIsolation, isolatedValue, actorInstance};
+  /// Create an actor isolation for a value that we know is actor isolated to a
+  /// specific actor, but we do not know the specific instance yet.
+  ///
+  /// This can occur when closing over a closure with an isolated parameter or
+  /// if we are determining isolation of a function_ref that takes an isolated
+  /// parameter. In both cases, we cannot know what the actual isolation is
+  /// until we invoke the closure or function.
+  ///
+  /// TODO: This is just a stub currently until I implement the flow sensitive
+  /// part. We just treat all instances the same. There are tests that validate
+  /// this behavior.
+  static SILIsolationInfo
+  getFlowSensitiveActorIsolated(SILValue isolatedValue,
+                                ActorIsolation actorIsolation) {
+    return {isolatedValue, SILValue(), actorIsolation};
   }
 
-  static SILIsolationInfo getActorIsolated(SILValue isolatedValue,
-                                           SILValue actorInstance,
-                                           NominalTypeDecl *typeDecl) {
-    if (typeDecl->isAnyActor())
-      return {ActorIsolation::forActorInstanceSelf(typeDecl), isolatedValue,
-              actorInstance};
-    auto isolation = swift::getActorIsolation(typeDecl);
-    if (isolation.isGlobalActor())
-      return {isolation, isolatedValue, actorInstance};
+  /// Only use this as a fallback if we cannot find better information.
+  static SILIsolationInfo
+  getWithIsolationCrossing(ApplyIsolationCrossing crossing) {
+    if (crossing.getCalleeIsolation().isActorIsolated()) {
+      // SIL level, just let it through
+      return SILIsolationInfo(SILValue(), SILValue(),
+                              crossing.getCalleeIsolation());
+    }
+
     return {};
+  }
+
+  static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
+                                                   SILValue actorInstance,
+                                                   NominalTypeDecl *typeDecl) {
+    assert(actorInstance);
+    if (!typeDecl->isAnyActor()) {
+      assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
+             "Should have called getGlobalActorIsolated");
+      return {};
+    }
+    return {isolatedValue, actorInstance,
+            ActorIsolation::forActorInstanceSelf(typeDecl)};
+  }
+
+  /// A special actor instance isolated for partial apply cases where we do not
+  /// close over the isolated parameter and thus do not know the actual actor
+  /// instance that we are going to use.
+  static SILIsolationInfo
+  getPartialApplyActorInstanceIsolated(SILValue isolatedValue,
+                                       NominalTypeDecl *typeDecl) {
+    if (!typeDecl->isAnyActor()) {
+      assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
+             "Should have called getGlobalActorIsolated");
+      return {};
+    }
+    return {isolatedValue, SILValue(),
+            ActorIsolation::forActorInstanceSelf(typeDecl)};
   }
 
   static SILIsolationInfo getGlobalActorIsolated(SILValue value,
                                                  Type globalActorType) {
-    return getActorIsolated(value, SILValue() /*no actor instance*/,
-                            ActorIsolation::forGlobalActor(globalActorType));
+    return {value, SILValue() /*no actor instance*/,
+            ActorIsolation::forGlobalActor(globalActorType)};
+  }
+
+  static SILIsolationInfo getGlobalActorIsolated(SILValue value,
+                                                 ValueDecl *decl) {
+    auto isolation = swift::getActorIsolation(decl);
+    if (!isolation.isGlobalActor())
+      return {};
+    return SILIsolationInfo::getGlobalActorIsolated(value,
+                                                    isolation.getGlobalActor());
   }
 
   static SILIsolationInfo getTaskIsolated(SILValue value) {
@@ -242,6 +283,18 @@ public:
     if (auto *inst = dyn_cast<SingleValueInstruction>(value))
       return get(inst);
     return {};
+  }
+
+  /// A helper that is used to ensure that we treat certain builtin values as
+  /// non-Sendable that the AST level otherwise thinks are non-Sendable.
+  ///
+  /// E.x.: Builtin.RawPointer and Builtin.NativeObject
+  ///
+  /// TODO: Fix the type checker.
+  static bool isNonSendableType(SILType type, SILFunction *fn);
+
+  static bool isNonSendableType(SILValue value) {
+    return isNonSendableType(value->getType(), value->getFunction());
   }
 
   bool hasSameIsolation(ActorIsolation actorIsolation) const;
