@@ -180,5 +180,5 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 @_marker public protocol BitwiseCopyable { }
 #endif
 
-@available(*, unavailable)
-@_marker public protocol _BitwiseCopyable {}
+@available(*, deprecated, message: "Use BitwiseCopyable")
+public typealias _BitwiseCopyable = BitwiseCopyable
