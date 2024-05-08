@@ -1,5 +1,4 @@
 // RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
-// RUN: %target-swift-emit-sil  -enable-experimental-feature NoncopyableGenerics -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
 
 // Test diagnostics for partial-consumption without partial-reinitialization.
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=swift-6 -enable-experimental-feature NoncopyableGenerics %s -validate-tbd-against-ir=none | %FileCheck %s
-// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature NoncopyableGenerics %s -validate-tbd-against-ir=none | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=swift-6 %s -validate-tbd-against-ir=none | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %s -validate-tbd-against-ir=none | %FileCheck %s
 
 import MoveOnlyCxxValueType
 

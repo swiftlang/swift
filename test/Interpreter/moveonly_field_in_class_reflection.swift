@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only)
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -enable-experimental-move-only)
 
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -Xfrontend -enable-experimental-move-only)
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -O -Xfrontend -sil-verify-all -Xfrontend -enable-experimental-move-only)
-
 // REQUIRES: executable_test
 
 // Verify that iterating through the fields of an object whose class has

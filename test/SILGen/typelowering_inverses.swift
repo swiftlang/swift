@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -disable-availability-checking -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NonescapableTypes -disable-availability-checking -module-name main %s | %FileCheck %s
 
 protocol NoCopyP: ~Copyable {}
 

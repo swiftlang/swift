@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
 
 struct Payload: ~Copyable {
     var x: Int

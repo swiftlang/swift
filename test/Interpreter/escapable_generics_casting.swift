@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NonescapableTypes) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NonescapableTypes) | %FileCheck %s
 
 // REQUIRES: executable_test, asserts
 

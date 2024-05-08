@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny -enable-experimental-feature NoncopyableGenerics
 
 protocol HasSelfRequirements {
   func foo(_ x: Self)
