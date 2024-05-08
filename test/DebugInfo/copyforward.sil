@@ -17,7 +17,7 @@ bb0(%0 : $*Optional<Element>, %1 : $*CollectionOfOne<Element>.Iterator):
   %3 = alloc_stack [lexical] [var_decl] $Optional<Element>, let, name "result", loc "backward.swift":67:9, scope 2
   %4 = struct_element_addr %1 : $*CollectionOfOne<Element>.Iterator, #CollectionOfOne.Iterator._elements, loc "backward.swift":67:18, scope 1
 
-  // CHECK: debug_value %{{[0-9]+}} : $*Optional<Element>, let, (name "result", loc "backward.swift":67:9, scope 2), expr op_deref, loc "backward.swift":67:18, scope 2
+  // CHECK: debug_value %{{[0-9]+}} : $*Optional<Element>, let, (name "result", loc "backward.swift":67:9), expr op_deref, loc "backward.swift":67:18, scope 2
 
   copy_addr %4 to [init] %3 : $*Optional<Element>, loc "backward.swift":67:18, scope 1
   %6 = alloc_stack $Optional<Element>, loc "backward.swift":68:17, scope 2
