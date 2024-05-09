@@ -1040,6 +1040,81 @@ namespace {
       return tv;
     }
 
+    Type addMemberRefConstraints(
+        Expr *anchor, Type baseTy, ValueDecl *declOrNull, ArgumentList *argList,
+        ConstraintLocator *locator = nullptr,
+        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
+      // Locators used in this expression.
+      if (locator == nullptr)
+        locator = CS.getConstraintLocator(anchor);
+
+      auto fnLocator =
+          CS.getConstraintLocator(locator, ConstraintLocator::ApplyFunction);
+      auto memberLocator =
+          CS.getConstraintLocator(locator, ConstraintLocator::Member);
+      auto resultLocator =
+          CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult);
+
+      CS.associateArgumentList(memberLocator, argList);
+
+      Type outputTy;
+      if (outputTy.isNull()) {
+        outputTy = CS.createTypeVariable(
+            resultLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+        if (addedTypeVars)
+          addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
+      }
+
+      // FIXME: This can only happen when diagnostics successfully type-checked
+      // sub-expression of the subscript and mutated AST, but under normal
+      // circumstances subscript should never have InOutExpr as a direct child
+      // until type checking is complete and expression is re-written.
+      // Proper fix for such situation requires preventing diagnostics from
+      // re-writing AST after successful type checking of the sub-expressions.
+      if (auto inoutTy = baseTy->getAs<InOutType>()) {
+        baseTy = LValueType::get(inoutTy->getObjectType());
+      }
+
+      // Add the member constraint for a method declaration.
+      // FIXME: weak name!
+      auto memberTy = CS.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      if (addedTypeVars)
+        addedTypeVars->push_back(memberTy);
+
+      // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
+      // a known subscript here. This might be cleaner if we split off a new
+      // UnresolvedSubscriptExpr from SubscriptExpr.
+      if (auto decl = declOrNull) {
+        OverloadChoice choice =
+            OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
+        CS.addBindOverloadConstraint(memberTy, choice, memberLocator, CurDC);
+      } else {
+        CS.addValueMemberConstraint(baseTy, DeclNameRef::createSubscript(),
+                                    memberTy, CurDC,
+                                    FunctionRefKind::DoubleApply,
+                                    /*outerAlternatives=*/{}, memberLocator);
+      }
+
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      CS.addConstraint(ConstraintKind::ApplicableFunction,
+                       FunctionType::get(params, outputTy), memberTy,
+                       fnLocator);
+
+      Type fixedOutputType =
+          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
+      if (!fixedOutputType->isTypeVariableOrMember()) {
+        CS.setFavoredType(anchor, fixedOutputType.getPointer());
+        outputTy = fixedOutputType;
+      }
+
+      return outputTy;
+    }
+
     /// Add constraints for a subscript operation.
     Type addSubscriptConstraints(
         Expr *anchor, Type baseTy, ValueDecl *declOrNull, ArgumentList *argList,
@@ -3849,6 +3924,29 @@ namespace {
         case KeyPathExpr::Component::Kind::DictionaryKey:
           llvm_unreachable("DictionaryKey only valid in #keyPath");
           break;
+        case KeyPathExpr::Component::Kind::Method: {
+          auto *args = component.getComponentArgs();
+          base = addMemberRefConstraints(E, base, /*decl*/ nullptr, args,
+                                         memberLocator, &componentTypeVars);
+
+          auto &ctx = CS.getASTContext();
+          // All of the type variables that appear in method arguments
+          // need to be connected to a key path, otherwise it won't be
+          // possible to determine sendability of the key path type if
+          // the arguments are disconnected from it before being fully
+          // resolved.
+          if (args &&
+              ctx.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+            SmallPtrSet<TypeVariableType *, 2> referencedVars;
+            for (const auto &arg : *args) {
+              CS.getType(arg.getExpr())->getTypeVariables(referencedVars);
+            }
+
+            componentTypeVars.append(referencedVars.begin(),
+                                     referencedVars.end());
+          }
+          break;
+        }
         }
 
         // By now, `base` is the result type of this component. Set it in the

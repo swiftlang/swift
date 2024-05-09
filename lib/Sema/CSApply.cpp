@@ -343,6 +343,8 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("DictionaryKey only valid in #keyPath expressions.");
       return false;
+    case KeyPathExpr::Component::Kind::Method:
+      return false;
     }
   }
   
@@ -5118,6 +5120,9 @@ namespace {
           break;
         case KeyPathExpr::Component::Kind::DictionaryKey:
           llvm_unreachable("DictionaryKey only valid in #keyPath");
+          break;
+        case KeyPathExpr::Component::Kind::Method:
+          llvm_unreachable("already resolved");
           break;
         }
 
