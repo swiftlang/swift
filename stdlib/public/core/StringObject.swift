@@ -983,7 +983,7 @@ extension _StringObject {
     #if !$Embedded
     return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
     #else
-    return unsafeBitCast(_nativeObject(toNative: storage), to: __StringStorage.self)
+    return Builtin.castFromNativeObject(storage)
     #endif
 #else
 #error("Unknown platform")
@@ -1022,7 +1022,7 @@ extension _StringObject {
     #if !$Embedded
     return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
     #else
-    return unsafeBitCast(_nativeObject(toNative: storage), to: __SharedStringStorage.self)
+    return Builtin.castFromNativeObject(storage)
     #endif
 #else
 #error("Unknown platform")
