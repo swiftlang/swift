@@ -1672,11 +1672,24 @@ bool ClangImporter::Implementation::importHeader(
 
   // We can't do this as we're parsing because we may want to resolve naming
   // conflicts between the things we've parsed.
-  for (auto group : allParsedDecls)
-    for (auto *D : group)
-      if (auto named = dyn_cast<clang::NamedDecl>(D))
-        addEntryToLookupTable(*BridgingHeaderLookupTable, named,
+
+  std::function<void(clang::Decl *)> visit = [&](clang::Decl *decl) {
+    // Iterate into extern "C" {} type declarations.
+    if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
+      for (auto *decl : linkageDecl->noload_decls()) {
+        visit(decl);
+      }
+    }
+    if (auto named = dyn_cast<clang::NamedDecl>(decl)) {
+      addEntryToLookupTable(*BridgingHeaderLookupTable, named,
                               getNameImporter());
+    }
+  };
+  for (auto group : allParsedDecls) {
+    for (auto *D : group) {
+      visit(D);
+    }
+  }
 
   pp.EndSourceFile();
   bumpGeneration();
