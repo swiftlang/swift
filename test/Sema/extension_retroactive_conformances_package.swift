@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -swift-version 5 %t/OtherLibrary.swift -package-name Library -emit-module -module-name OtherLibrary -package-name Library -o %t
-// RUN: %target-swift-frontend -typecheck %t/Library.swift -module-name Library -package-name Library -verify -swift-version 5 -import-underlying-module -I %t
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -module-name Client -package-name Library -verify -swift-version 5 -I %t
+
+// RUN: %target-swift-frontend -swift-version 5 %t/Library.swift -emit-module -module-name Library -o %t -package-name Library 
+// RUN: %target-swift-frontend -swift-version 5 %t/OtherLibrary.swift -emit-module -module-name OtherLibrary -o %t -package-name Library
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -module-name Client -verify -swift-version 5 -I %t -package-name Library 
 
 //--- Library.swift
 
@@ -12,6 +13,7 @@ package class PackageLibraryClass {}
 package protocol PackageLibraryProtocol {}
 
 //--- OtherLibrary.swift
+
 public class OtherLibraryClass {}
 public protocol OtherLibraryProtocol {}
 package class PackageOtherLibraryClass {}
@@ -19,8 +21,8 @@ package protocol PackageOtherLibraryProtocol {}
 
 //--- Client.swift
 
-// package import Library
-// package import OtherLibrary
+package import Library
+package import OtherLibrary
 
 // These are all fine because all 3 of these modules are in the same package.
 
