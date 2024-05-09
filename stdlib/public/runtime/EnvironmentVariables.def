@@ -112,4 +112,16 @@ VARIABLE(SWIFT_BACKTRACE, string, "",
          "crash catching and backtracing support in the runtime. "
          "See docs/Backtracing.rst in the Swift repository for details.")
 
+VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
+         "Allows for suppressing 'is current executor' equality check crashes. "
+         "As since Swift 6.0 checking for current executor equality, may crash "
+         "and will never return 'false' because we are calling into library "
+         "implemented SerialExecutor.checkIsolation which should crash if the "
+         "isolation is not the expected one. Some old code may rely on the "
+         "non-crashing behavior. This flag enables temporarily restoring the "
+         "legacy 'nocrash' behavior until adopting code has been adjusted. "
+         "Legal values are: "
+         " 'nocrash' (Legacy behavior), "
+         " 'crash' (Swift 6.0+ behavior)")
+
 #undef VARIABLE
