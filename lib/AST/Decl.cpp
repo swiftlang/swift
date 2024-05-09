@@ -8144,7 +8144,7 @@ Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
     return Type();
 
   Type valueInterfaceTy = initInfo.getWrappedValuePlaceholder()->getType();
-  if (valueInterfaceTy->hasArchetype())
+  if (valueInterfaceTy->hasPrimaryArchetype())
     valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
 
   return valueInterfaceTy;

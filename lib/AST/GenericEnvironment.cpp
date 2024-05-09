@@ -404,12 +404,11 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
 
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
-  assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
-         "already have a contextual type");
-  assert((env || !type->hasTypeParameter()) &&
-         "no generic environment provided for type with type parameters");
+  assert(!type->hasPrimaryArchetype() && "already have a contextual type");
 
   if (!env) {
+    assert(!type->hasTypeParameter() &&
+           "no generic environment provided for type with type parameters");
     return type;
   }
 
@@ -632,8 +631,7 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
-  assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
-         "already have a contextual type");
+  assert(!type->hasPrimaryArchetype() && "already have a contextual type");
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
@@ -668,7 +666,7 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
   assert(getKind() == Kind::OpenedElement);
   assert(!type->hasTypeParameter() && "expected contextual type");
 
-  if (!type->hasArchetype()) return type;
+  if (!type->hasPackArchetype()) return type;
 
   auto sig = getGenericSignature();
   auto shapeClass = getOpenedElementShapeClass();
@@ -698,9 +696,9 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(CanType type) const 
 Type
 GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   assert(getKind() == Kind::OpenedElement);
-  assert(!type->hasArchetype());
+  assert(!type->hasPackArchetype());
 
-  if (!type->hasTypeParameter()) return type;
+  if (!type->hasParameterPack()) return type;
 
   // Get a contextual type in the original generic environment, not the
   // substituted one, which is what mapContextualPackTypeIntoElementContext()
