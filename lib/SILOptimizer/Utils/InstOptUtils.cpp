@@ -1833,14 +1833,6 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   auto VarInfo = DefiningInst.getVarInfo();
   if (!VarInfo)
     return;
-  // Transfer the location and scope of the debug value to the debug variable,
-  // unless they are the same, in which case we don't need to store it twice.
-  // That way, the variable will point to its declaration, and the debug_value
-  // will point to the assignment point.
-  if (!VarInfo->Loc && !SI->getLoc().hasSameSourceLocation(DefiningInst->getLoc()))
-    VarInfo->Loc = DefiningInst->getLoc();
-  if (!VarInfo->Scope && SI->getDebugScope() != DefiningInst->getDebugScope())
-    VarInfo->Scope = DefiningInst->getDebugScope();
   // Fix the op_deref.
   if (!isa<CopyAddrInst>(SI) && VarInfo->DIExpr.startsWithDeref())
     VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());

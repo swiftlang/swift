@@ -871,9 +871,6 @@ DeadObjectElimination::buildDIExpression(SILInstruction *current) {
       return {};
     if (!var->Type)
       var->Type = dvci->getElementType();
-    var->Loc = dvci->getVarLoc();
-    if (!var->Scope)
-      var->Scope = dvci->getDebugScope();
     return var;
   }
   if (auto *tupleAddr = dyn_cast<TupleElementAddrInst>(current)) {
