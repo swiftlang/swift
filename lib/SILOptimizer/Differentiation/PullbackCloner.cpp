@@ -664,6 +664,11 @@ private:
             }
             adjNameStream << " (scope #" << origBB->getDebugID() << ")";
             dv.Name = adjName;
+            // We have no meaningful debug location, and the type is different.
+            dv.Scope = nullptr;
+            dv.Loc = {};
+            dv.Type = {};
+            dv.DIExpr = {};
             return dv;
           }));
     return (insertion.first->getSecond() = newBuf);
