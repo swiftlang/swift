@@ -12,9 +12,9 @@ import Android
 #endif
 import StdlibUnittest
 
-var GlibcTests = TestSuite("GlibcTests")
+var LibcTests = TestSuite("LibcTests")
 
-GlibcTests.test("abs") {
+LibcTests.test("abs") {
   expectEqual(42, abs(-42))
 }
 

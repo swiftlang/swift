@@ -6,7 +6,7 @@
   import Glibc
 #elseif os(WASI)
   import WASILibc
-#elseif os(Android)
+#elseif CanImport(Android)
   import Android
 #elseif os(Windows)
   import CRT
