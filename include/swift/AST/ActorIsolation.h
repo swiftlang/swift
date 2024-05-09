@@ -205,6 +205,8 @@ public:
     return getKind() == GlobalActor;
   }
 
+  bool isActorInstanceIsolated() const { return getKind() == ActorInstance; }
+
   bool isMainActor() const;
 
   bool isDistributedActor() const;
@@ -262,29 +264,7 @@ public:
                               state.parameterIndex);
   }
 
-  void print(llvm::raw_ostream &os) const {
-    switch (getKind()) {
-    case Unspecified:
-      os << "unspecified";
-      return;
-    case ActorInstance:
-      os << "actor_instance";
-      return;
-    case Nonisolated:
-      os << "nonisolated";
-      return;
-    case NonisolatedUnsafe:
-      os << "nonisolated_unsafe";
-      return;
-    case GlobalActor:
-      os << "global_actor";
-      return;
-    case Erased:
-      os << "erased";
-      return;
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
-  }
+  void print(llvm::raw_ostream &os) const;
 
   void printForDiagnostics(llvm::raw_ostream &os,
                            StringRef openingQuotationMark = "'") const;

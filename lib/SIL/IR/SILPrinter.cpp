@@ -3328,6 +3328,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     P.printDebugScopeRef(getDebugScope(), SM);
   }
   OS << '\n';
+
+  if (auto functionIsolation = getActorIsolation()) {
+    OS << "// Isolation: ";
+    functionIsolation.print(OS);
+    OS << '\n';
+  }
   printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
 
   OS << "sil ";
