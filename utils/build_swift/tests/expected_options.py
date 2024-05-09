@@ -74,7 +74,7 @@ EXPECTED_DEFAULTS = {
     'build_libcxx': False,
     'build_linux_static': False,
     'build_ninja': False,
-    'build_lld': False,
+    'build_lld': True,
     'build_osx': True,
     'build_playgroundsupport': False,
     'build_runtime_with_host_compiler': False,
@@ -753,6 +753,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-build-zlib', dest='build_zlib'),
     DisableOption('--skip-build-curl', dest='build_curl'),
     DisableOption('--skip-build-compiler-rt', dest='build_compiler_rt'),
+    DisableOption('--skip-build-lld', dest='build_lld'),
 
     ChoicesOption('--compiler-vendor',
                   choices=['none', 'apple']),
