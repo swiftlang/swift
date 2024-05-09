@@ -3153,6 +3153,15 @@ suppressingFeatureConformanceSuppression(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
+static void
+suppressingFeatureBitwiseCopyable2(PrintOptions &options,
+                                   llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -3435,6 +3444,14 @@ void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
+  auto name = decl->getName();
+  bool suppressingBitwiseCopyable =
+      Options.SuppressBitwiseCopyable &&
+      decl->getModuleContext()->isStdlibModule() &&
+      (decl->getNameStr() == "_BitwiseCopyable");
+  if (suppressingBitwiseCopyable) {
+    name = decl->getASTContext().getIdentifier("BitwiseCopyable");
+  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
@@ -3442,10 +3459,14 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
-      Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
+      Printer.printName(name, getTypeMemberPrintNameContext(decl));
     }, [&]{ // Signature
       printGenericDeclGenericParams(decl);
     });
+  if (suppressingBitwiseCopyable) {
+    Printer << " = Swift._BitwiseCopyable";
+    return;
+  }
   bool ShouldPrint = true;
   Type Ty = decl->getUnderlyingType();
 
@@ -3626,6 +3647,12 @@ void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
 }
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
+  auto name = decl->getName();
+  if (Options.SuppressBitwiseCopyable &&
+      decl->getModuleContext()->isStdlibModule() &&
+      (decl->getNameStr() == "BitwiseCopyable")) {
+    name = decl->getASTContext().getIdentifier("_BitwiseCopyable");
+  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
@@ -3639,7 +3666,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
-        Printer.printName(decl->getName());
+        Printer.printName(name);
       });
 
     if (Options.PrintPrimaryAssociatedTypes) {
