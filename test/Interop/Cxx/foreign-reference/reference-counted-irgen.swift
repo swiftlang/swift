@@ -36,7 +36,7 @@ public func getNullable(wantNullptr: Bool) -> GlobalCountNullableInit? {
     return result
 }
 
-// CHECK:      define {{.*}}swiftcc i64 @"$s4main11getNullable11wantNullptrSo011GlobalCountC4InitVSgSb_tF"(i1 %0)
+// CHECK:      define {{.*}}swiftcc i{{.*}} @"$s4main11getNullable11wantNullptrSo011GlobalCountC4InitVSgSb_tF"(i1 %0)
 // CHECK-NEXT: entry:
 // CHECK:        %1 = call ptr @{{_ZN23GlobalCountNullableInit6createEb|"\?create\@GlobalCountNullableInit\@\@SAPEAU1\@_N\@Z"}}
 // CHECK-NEXT:   %2 = ptrtoint ptr %1 to i64
