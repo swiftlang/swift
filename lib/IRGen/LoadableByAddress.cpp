@@ -4079,8 +4079,8 @@ protected:
 
       SILBuilder caseBuilder = assignment.getBuilder(caseBB->begin());
       auto *caseAddr =
-          caseBuilder.createUncheckedTakeEnumDataAddr(loc, opdAddr, caseDecl);
-
+        caseBuilder.createUncheckedTakeEnumDataAddr(loc, opdAddr, caseDecl,
+                                                    caseArg->getType().getAddressType());
       if (assignment.isLargeLoadableType(caseArg->getType())) {
         assignment.mapValueToAddress(caseArg, caseAddr);
         assignment.markBlockArgumentForDeletion(caseBB);
