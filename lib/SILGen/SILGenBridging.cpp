@@ -1364,8 +1364,10 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   }
 
   // We don't know what to do with indirect results from the Objective-C side.
-  assert(objcFnTy->getNumIndirectFormalResults() == 0
-         && "Objective-C methods cannot have indirect results");
+  assert((SGF.F.getRepresentation() ==
+              SILFunctionType::Representation::CFunctionPointer ||
+          objcFnTy->getNumIndirectFormalResults() == 0) &&
+         "Objective-C methods cannot have indirect results");
 
   auto bridgedFormalTypes = getParameterTypes(objcFormalFnTy.getParams());
   bridgedFormalResultTy = objcFormalFnTy.getResult();
@@ -1620,12 +1622,18 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // stack allocation to hold the result(s), since Any is address-only.
   SmallVector<SILValue, 4> args;
   if (substConv.hasIndirectSILResults()) {
-    for (auto result : substConv.getResults()) {
-      if (!substConv.isSILIndirect(result)) {
-        continue;
+    if (F.getRepresentation() ==
+        SILFunctionType::Representation::CFunctionPointer) {
+      args.push_back(F.begin()->createFunctionArgument(
+          substConv.getSingleSILResultType(getTypeExpansionContext())));
+    } else {
+      for (auto result : substConv.getResults()) {
+        if (!substConv.isSILIndirect(result)) {
+          continue;
+        }
+        args.push_back(emitTemporaryAllocation(
+            loc, substConv.getSILType(result, getTypeExpansionContext())));
       }
-      args.push_back(emitTemporaryAllocation(
-                loc, substConv.getSILType(result, getTypeExpansionContext())));
     }
   }
 
@@ -1863,12 +1871,14 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     if (foreignAsync) {
       result = passResultToCompletionHandler(result);
     } else {
-      if (substConv.hasIndirectSILResults()) {
-        assert(substTy->getNumResults() == 1);
-        result = args[0];
+      if (F.getRepresentation() != SILFunctionType::Representation::CFunctionPointer) {
+        if (substConv.hasIndirectSILResults()) {
+          assert(substTy->getNumResults() == 1);
+          result = args[0];
+        }
+        result = emitBridgeReturnValue(*this, loc, result, nativeFormalResultType,
+                                       bridgedFormalResultType, objcResultTy);
       }
-      result = emitBridgeReturnValue(*this, loc, result, nativeFormalResultType,
-                                     bridgedFormalResultType, objcResultTy);
     }
   } else {
     SILBasicBlock *contBB = createBasicBlock();
