@@ -1733,6 +1733,33 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
   }
 }
 
+void ActorIsolation::print(llvm::raw_ostream &os) const {
+  switch (getKind()) {
+  case Unspecified:
+    os << "unspecified";
+    return;
+  case ActorInstance:
+    os << "actor_instance";
+    if (auto *vd = getActorInstance()) {
+      os << ". name: '" << vd->getBaseIdentifier() << "'";
+    }
+    return;
+  case Nonisolated:
+    os << "nonisolated";
+    return;
+  case NonisolatedUnsafe:
+    os << "nonisolated_unsafe";
+    return;
+  case GlobalActor:
+    os << "global_actor. type: " << getGlobalActor();
+    return;
+  case Erased:
+    os << "erased";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
 void ActorIsolation::dumpForDiagnostics() const {
   printForDiagnostics(llvm::dbgs());
   llvm::dbgs() << '\n';

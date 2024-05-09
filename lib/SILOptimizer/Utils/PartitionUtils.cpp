@@ -398,10 +398,26 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
     os << "disconnected";
     return;
   case Actor:
-    os << "actor";
+    if (SILValue instance = getActorInstance()) {
+      if (auto name = VariableNameInferrer::inferName(instance)) {
+        os << "'" << *name << "'-isolated\n";
+        os << "instance: " << *instance;
+        return;
+      }
+    }
+
+    if (getActorIsolation().getKind() == ActorIsolation::ActorInstance) {
+      if (auto *vd = getActorIsolation().getActorInstance()) {
+        os << "'" << vd->getBaseIdentifier() << "'-isolated";
+        return;
+      }
+    }
+
+    getActorIsolation().printForDiagnostics(os);
     return;
   case Task:
-    os << "task";
+    os << "task-isolated\n";
+    os << "instance: " << *getIsolatedValue();
     return;
   }
 }
