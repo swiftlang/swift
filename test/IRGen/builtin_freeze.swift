@@ -4,13 +4,13 @@ import Builtin
 
 func fptosi(_ x: Float) -> Int32 {
   Int32(Builtin.fptosi_FPIEEE32_Int32(x._value))
-  // CHECK: fptosi float %{{[0-9]+}} to i32
+  // CHECK: fptosi float %{{.+}} to i32
 }
 
 func fptosiWithFreeze(_ x: Float) -> Int32 {
   Int32(Builtin.freeze_Int32(Builtin.fptosi_FPIEEE32_Int32(x._value)))
-  // CHECK: fptosi float %{{[0-9]+}} to i32
-  // CHECK-NEXT: freeze i32 %{{[0-9]+}}
+  // CHECK: fptosi float %{{.+}} to i32
+  // CHECK-NEXT: freeze i32 %{{.+}}
 }
 
 func yuck() -> Int32 {
@@ -28,7 +28,7 @@ func fptosi(_ x: SIMD2<Float>) -> SIMD2<Int32> {
   var result = SIMD2<Int32>()
   result._storage._value = maybePoison
   return result
-  // CHECK: fptosi <2 x float> %{{[0-9]+}} to <2 x i32>
+  // CHECK: fptosi <2 x float> %{{.+}} to <2 x i32>
 }
 
 func fptosiWithFreeze(_ x: SIMD2<Float>) -> SIMD2<Int32> {
@@ -37,8 +37,8 @@ func fptosiWithFreeze(_ x: SIMD2<Float>) -> SIMD2<Int32> {
   var result = SIMD2<Int32>()
   result._storage._value = frozen
   return result
-  // CHECK: fptosi <2 x float> %{{[0-9]+}} to <2 x i32>
-  // CHECK-NEXT: freeze <2 x i32> %{{[0-9]+}}
+  // CHECK: fptosi <2 x float> %{{.+}} to <2 x i32>
+  // CHECK-NEXT: freeze <2 x i32> %{{.+}}
 }
 
 func doubleYuck(_ x: SIMD2<Float>) -> SIMD2<Int32> {
