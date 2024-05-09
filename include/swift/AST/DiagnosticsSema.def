@@ -3648,6 +3648,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances|"
+      "in an extension with public, package, or '@usableFromInline' members|"
       "in an extension with conditional conformances}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
