@@ -439,6 +439,20 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
         return SILIsolationInfo::getDisconnected();
       }
     }
+
+    if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
+      if (declRef.getDecl()) {
+        if (auto *accessor =
+                dyn_cast_or_null<AccessorDecl>(declRef.getFuncDecl())) {
+          if (accessor->isInitAccessor()) {
+            assert(functionIsolation.isActorInstanceIsolated());
+            return SILIsolationInfo::getActorInstanceIsolated(
+                fArg, ActorInstance::getForActorAccessorInit(),
+                functionIsolation.getActor());
+          }
+        }
+      }
+    }
   }
 
   // Otherwise, if we do not have an isolated argument and are not in an
@@ -463,10 +477,20 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
     os << "disconnected";
     return;
   case Actor:
-    if (SILValue instance = getActorInstance()) {
-      if (auto name = VariableNameInferrer::inferName(instance)) {
-        os << "'" << *name << "'-isolated\n";
-        os << "instance: " << *instance;
+    if (ActorInstance instance = getActorInstance()) {
+      switch (instance.getKind()) {
+      case ActorInstance::Kind::Value: {
+        SILValue value = instance.getValue();
+        if (auto name = VariableNameInferrer::inferName(value)) {
+          os << "'" << *name << "'-isolated\n";
+          os << "instance: " << *value;
+          return;
+        }
+        break;
+      }
+      case ActorInstance::Kind::ActorAccessorInit:
+        os << "'self'-isolated\n";
+        os << "instance: actor accessor init\n";
         return;
       }
     }
@@ -519,9 +543,9 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     return true;
   case Task:
     return getIsolatedValue() == other.getIsolatedValue();
-  case Actor:
-    auto actor1 = getActorInstance();
-    auto actor2 = other.getActorInstance();
+  case Actor: {
+    ActorInstance actor1 = getActorInstance();
+    ActorInstance actor2 = other.getActorInstance();
 
     // If either are non-null, and the actor instance doesn't match, return
     // false.
@@ -531,6 +555,7 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     auto lhsIsolation = getActorIsolation();
     auto rhsIsolation = other.getActorIsolation();
     return lhsIsolation == rhsIsolation;
+  }
   }
 }
 
@@ -579,9 +604,18 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
     os << "disconnected";
     return;
   case Actor:
-    if (SILValue instance = getActorInstance()) {
-      if (auto name = VariableNameInferrer::inferName(instance)) {
-        os << "'" << *name << "'-isolated";
+    if (auto instance = getActorInstance()) {
+      switch (instance.getKind()) {
+      case ActorInstance::Kind::Value: {
+        SILValue value = instance.getValue();
+        if (auto name = VariableNameInferrer::inferName(value)) {
+          os << "'" << *name << "'-isolated";
+          return;
+        }
+        break;
+      }
+      case ActorInstance::Kind::ActorAccessorInit:
+        os << "'self'-isolated";
         return;
       }
     }

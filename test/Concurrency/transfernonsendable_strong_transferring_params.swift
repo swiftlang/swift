@@ -384,3 +384,20 @@ func testMergeWithTaskIsolated(_ x: transferring Klass, y: Klass) async {
   await transferToCustom(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending main actor-isolated 'x' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
+
+
+@available(SwiftStdlib 5.1, *)
+actor NonSendableInit {
+  var first: Klass
+  var second: Klass? = nil {
+    @storageRestrictions(initializes: first)
+    init(initialValue)  {
+      transferArg(initialValue!) // expected-warning {{sending 'initialValue' risks causing data races}}
+      // expected-note @-1 {{'self'-isolated 'initialValue' is passed as a transferring parameter}}
+      first = initialValue!
+    }
+
+    get { fatalError() }
+    set { fatalError() }
+  }
+}

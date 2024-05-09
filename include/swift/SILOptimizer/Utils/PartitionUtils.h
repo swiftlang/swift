@@ -95,6 +95,65 @@ struct DenseMapInfo<swift::PartitionPrimitives::Region> {
 
 namespace swift {
 
+class ActorInstance {
+public:
+  enum class Kind : uint8_t {
+    Value,
+    ActorAccessorInit = 0x1,
+  };
+
+  llvm::PointerIntPair<SILValue, 1> value;
+
+  ActorInstance(SILValue value, Kind kind)
+      : value(value, std::underlying_type<Kind>::type(kind)) {}
+
+public:
+  ActorInstance() : ActorInstance(SILValue(), Kind::Value) {}
+
+  static ActorInstance getForValue(SILValue value) {
+    return ActorInstance(value, Kind::Value);
+  }
+
+  static ActorInstance getForActorAccessorInit() {
+    return ActorInstance(SILValue(), Kind::ActorAccessorInit);
+  }
+
+  explicit operator bool() const { return bool(value.getOpaqueValue()); }
+
+  Kind getKind() const { return Kind(value.getInt()); }
+
+  SILValue getValue() const {
+    assert(getKind() == Kind::Value);
+    return value.getPointer();
+  }
+
+  bool isValue() const { return getKind() == Kind::Value; }
+
+  bool isAccessorInit() const { return getKind() == Kind::ActorAccessorInit; }
+
+  bool operator==(const ActorInstance &other) const {
+    // If both are null, return true.
+    if (!bool(*this) && !bool(other))
+      return true;
+
+    // Otherwise, check if the kinds match.
+    if (getKind() != other.getKind())
+      return false;
+
+    // Now that we know that the kinds match, perform the kind specific check.
+    switch (getKind()) {
+    case Kind::Value:
+      return getValue() == other.getValue();
+    case Kind::ActorAccessorInit:
+      return true;
+    }
+  }
+
+  bool operator!=(const ActorInstance &other) const {
+    return !(*this == other);
+  }
+};
+
 class SILIsolationInfo {
 public:
   /// The lattice is:
@@ -122,16 +181,27 @@ private:
 
   /// If set this is the SILValue that represents the actor instance that we
   /// derived isolatedValue from.
-  SILValue actorInstance;
+  ///
+  /// If set to (SILValue(), 1), then we are in an
+  ActorInstance actorInstance;
 
   SILIsolationInfo(SILValue isolatedValue, SILValue actorInstance,
                    ActorIsolation actorIsolation)
       : kind(Actor), actorIsolation(actorIsolation),
-        isolatedValue(isolatedValue), actorInstance(actorInstance) {
+        isolatedValue(isolatedValue),
+        actorInstance(ActorInstance::getForValue(actorInstance)) {
     assert((!actorInstance ||
             (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
              actorInstance->getType().isAnyActor())) &&
            "actorInstance must be an actor if it is non-empty");
+  }
+
+  SILIsolationInfo(SILValue isolatedValue, ActorInstance actorInstance,
+                   ActorIsolation actorIsolation)
+      : kind(Actor), actorIsolation(actorIsolation),
+        isolatedValue(isolatedValue), actorInstance(actorInstance) {
+    assert(actorInstance);
+    assert(actorIsolation.getKind() == ActorIsolation::ActorInstance);
   }
 
   SILIsolationInfo(Kind kind, SILValue isolatedValue)
@@ -180,7 +250,7 @@ public:
 
   /// Return the specific SILValue for the actor that our isolated value is
   /// isolated to if one exists.
-  SILValue getActorInstance() const {
+  ActorInstance getActorInstance() const {
     assert(kind == Actor);
     return actorInstance;
   }
@@ -226,6 +296,19 @@ public:
 
   static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
                                                    SILValue actorInstance,
+                                                   NominalTypeDecl *typeDecl) {
+    assert(actorInstance);
+    if (!typeDecl->isAnyActor()) {
+      assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
+             "Should have called getGlobalActorIsolated");
+      return {};
+    }
+    return {isolatedValue, actorInstance,
+            ActorIsolation::forActorInstanceSelf(typeDecl)};
+  }
+
+  static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
+                                                   ActorInstance actorInstance,
                                                    NominalTypeDecl *typeDecl) {
     assert(actorInstance);
     if (!typeDecl->isAnyActor()) {
