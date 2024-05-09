@@ -653,8 +653,20 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI &&
       !IEI->getLoweredConcreteType().hasOpenedExistential()) {
     assert(!IEI->getLoweredConcreteType().isOpenedExistential());
+    Builder.setCurrentDebugScope(AS->getDebugScope());
+    auto varInfo = AS->getVarInfo();
+    if (varInfo) {
+      if (varInfo->Type == AS->getElementType()) {
+        varInfo->Type = {}; // Lower the variable's type too.
+      } else {
+        // Cannot salvage the variable, its type has changed and its expression
+        // cannot be rewritten.
+        Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
+        varInfo = {};
+      }
+    }
     auto *ConcAlloc = Builder.createAllocStack(
-        AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
+        AS->getLoc(), IEI->getLoweredConcreteType(), varInfo);
     IEI->replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
