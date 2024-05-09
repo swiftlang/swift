@@ -148,6 +148,8 @@ public enum _DebuggerSupport {
       return count == 1 ? "1 element" : "\(count) elements"
     case .`struct`?, .`enum`?, nil:
       switch value {
+      case let x as String:
+        return x.description
       case let x as CustomDebugStringConvertible:
         return x.debugDescription
       case let x as CustomStringConvertible:
