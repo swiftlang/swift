@@ -175,6 +175,8 @@ BUILTIN_UNARY_OPERATION(FNeg, "fneg", "n", FloatOrVector)
 BUILTIN_UNARY_OPERATION(AssumeNonNegative, "assumeNonNegative", "n", Integer)
 // It only works on i1.
 BUILTIN_UNARY_OPERATION(AssumeTrue, "assume", "", Integer)
+// Converts poison/undef to an indeterminate but valid value.
+BUILTIN_UNARY_OPERATION(Freeze, "freeze", "n", IntegerOrVector)
 
 // Binary predicates have type (T,T) -> i1 or (T, T) -> Vector<i1> for scalars
 // and vectors, respectively.
