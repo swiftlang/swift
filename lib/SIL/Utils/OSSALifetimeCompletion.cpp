@@ -350,11 +350,11 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
 
   bool changed = false;
   switch (boundary) {
-  case Boundary::Availability:
-    changed |= endLifetimeAtAvailabilityBoundary(value, liveness.getLiveness());
-    break;
   case Boundary::Liveness:
     changed |= endLifetimeAtLivenessBoundary(value, liveness.getLiveness());
+    break;
+  case Boundary::Availability:
+    changed |= endLifetimeAtAvailabilityBoundary(value, liveness.getLiveness());
     break;
   }
   // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently
