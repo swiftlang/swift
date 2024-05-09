@@ -585,7 +585,10 @@ void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
   if (inst->hasAddrVal())
     if (SILValue value = getProjectBoxMappedVal(inst->getOperand())) {
       getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
-      getBuilder().createDebugValue(inst->getLoc(), value, *inst->getVarInfo());
+      auto varInfo = *inst->getVarInfo();
+      if (varInfo.Scope)
+        varInfo.Scope = getOpScope(inst->getDebugScope());
+      getBuilder().createDebugValue(inst->getLoc(), value, varInfo);
       return;
     }
   SILCloner<ClosureCloner>::visitDebugValueInst(inst);
