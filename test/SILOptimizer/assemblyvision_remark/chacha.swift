@@ -43,9 +43,10 @@ public func run_ChaCha(_ N: Int) {
                             // expected-remark @-1:27 {{release of type '}}
   }
 } // expected-remark {{release of type '}}
-
+  // expected-note @-7 {{of 'plaintext}}
   // expected-remark @-2 {{release of type '}}
   // expected-note @-16 {{of 'nonce}}
   // expected-remark @-4 {{release of type '}}
   // expected-note @-19 {{of 'key}}
   // expected-remark @-6 {{release of type '}}
+  // expected-note @-18 {{of 'checkedtext}}

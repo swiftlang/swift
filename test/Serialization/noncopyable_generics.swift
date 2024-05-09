@@ -1,17 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/ncgenerics.swift                      \
-// RUN:     -enable-experimental-feature NoncopyableGenerics                   \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes             \
 // RUN:     -emit-module -module-name ncgenerics                               \
 // RUN:     -o %t
 
 // RUN: llvm-bcanalyzer %t/ncgenerics.swiftmodule | %FileCheck %s
 
-// *** Notice that we're checking when _not_ using NoncopyableGenerics! ***
 // RUN: %target-typecheck-verify-swift -I %t
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk)                  \
-// RUN:    -enable-experimental-feature NoncopyableGenerics                    \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes             \
 // RUN:    -print-module -module-to-print=ncgenerics                           \
 // RUN:    -I %t -source-filename=%s                                           \

@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -definite-init %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -definite-init %s | %FileCheck %s
 
 // Make sure that DI properly converts mark_unresolved_non_copyable_value
 // [assignable_but_not_consumable] -> mark_unresolved_non_copyable_value

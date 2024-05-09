@@ -582,7 +582,8 @@ public:
   void emitBlockRelease(llvm::Value *value);
 
   void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
-                                                 llvm::Value *value);
+                                                 llvm::Value *value,
+                                                 bool needsNullCheck = false);
 
   // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).

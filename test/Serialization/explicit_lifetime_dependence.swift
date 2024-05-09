@@ -1,14 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t  %S/Inputs/def_explicit_lifetime_dependence.swift \
 // RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -enable-experimental-feature NoncopyableGenerics \
 // RUN: -disable-lifetime-dependence-diagnostics
 
 // RUN: llvm-bcanalyzer %t/def_explicit_lifetime_dependence.swiftmodule 
 
 // RUN: %target-swift-frontend -module-name lifetime-dependence -emit-sil -I %t %s \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
+// RUN: -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
 import def_explicit_lifetime_dependence
 func testBasic() {

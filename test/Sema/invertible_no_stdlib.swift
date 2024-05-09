@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-builtin-module \
-// RUN:   -parse-stdlib -module-name Ghost \
-// RUN:   -enable-experimental-feature NoncopyableGenerics
+// RUN:   -parse-stdlib -module-name Ghost
 
 
 

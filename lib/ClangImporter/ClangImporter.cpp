@@ -1686,11 +1686,24 @@ bool ClangImporter::Implementation::importHeader(
 
   // We can't do this as we're parsing because we may want to resolve naming
   // conflicts between the things we've parsed.
-  for (auto group : allParsedDecls)
-    for (auto *D : group)
-      if (auto named = dyn_cast<clang::NamedDecl>(D))
-        addEntryToLookupTable(*BridgingHeaderLookupTable, named,
+
+  std::function<void(clang::Decl *)> visit = [&](clang::Decl *decl) {
+    // Iterate into extern "C" {} type declarations.
+    if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
+      for (auto *decl : linkageDecl->noload_decls()) {
+        visit(decl);
+      }
+    }
+    if (auto named = dyn_cast<clang::NamedDecl>(decl)) {
+      addEntryToLookupTable(*BridgingHeaderLookupTable, named,
                               getNameImporter());
+    }
+  };
+  for (auto group : allParsedDecls) {
+    for (auto *D : group) {
+      visit(D);
+    }
+  }
 
   pp.EndSourceFile();
   bumpGeneration();
@@ -5782,20 +5795,6 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   }
 
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    auto oldContext = var->getDeclContext();
-    auto oldTypeDecl = oldContext->getSelfNominalTypeDecl();
-    // If the base type is non-copyable, and non-copyable generics are disabled,
-    // we cannot synthesize the accessor, because its implementation would use
-    // `UnsafePointer<BaseTy>`.
-    // We cannot use `ty->isNoncopyable()` here because that would create a
-    // cyclic dependency between ModuleQualifiedLookupRequest and
-    // LookupConformanceInModuleRequest, so we check for the presence of
-    // move-only attribute that is implicitly added to non-copyable C++ types by
-    // ClangImporter.
-    if (oldTypeDecl->getAttrs().hasAttribute<MoveOnlyAttr>() &&
-        !context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-      return nullptr;
-
     auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
                                                     sizeof(VarDecl), false);
     auto out =

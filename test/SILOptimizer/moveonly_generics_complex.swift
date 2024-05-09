@@ -2,7 +2,6 @@
 // RUN:     -emit-sil -verify                                       \
 // RUN:     %s                                                      \
 // RUN:     -enable-experimental-feature BuiltinModule              \
-// RUN:     -enable-experimental-feature NoncopyableGenerics        \
 // RUN:     -sil-verify-all
 
 // REQUIRES: asserts

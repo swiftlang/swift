@@ -204,11 +204,20 @@ function(add_swift_compiler_modules_library name)
       endforeach()
     endif()
 
-    set(module_obj_file "${build_dir}/${module}.o")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      # swift-driver when non-optimizing in not Mach-O  platforms adds an extra
+      # job wrapmodule that uses the {module-name}.o as output, which clashes
+      # with the name chosen here. Use a different name in those cases.
+      set(module_obj_file "${build_dir}/${module}.object.o")
+      set(output_obj_files "${module_obj_file}" "${build_dir}/${module}.o")
+    else()
+      set(module_obj_file "${build_dir}/${module}.o")
+      set(output_obj_files "${module_obj_file}")
+    endif()
     set(module_file "${build_dir}/${module}.swiftmodule")
     list(APPEND all_module_files ${module_file})
 
-    set(all_obj_files ${all_obj_files} ${module_obj_file})
+    list(APPEND all_obj_files ${output_obj_files})
     set(c_include_paths
       # LLVM modules and headers.
       "${LLVM_MAIN_INCLUDE_DIR}"
@@ -237,7 +246,7 @@ function(add_swift_compiler_modules_library name)
         ${c_include_paths_args}
         # Generated swift modules.
         "-I" "${build_dir}"
-      OUTPUT ${module_obj_file}
+      OUTPUT ${output_obj_files}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
         importedHeaderDependencies
@@ -260,6 +269,9 @@ function(add_swift_compiler_modules_library name)
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   # Downstream linking should include the swiftmodule in debug builds to allow lldb to
   # work correctly. Only do this on Darwin since neither gold (currently used by default
