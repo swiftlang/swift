@@ -30,9 +30,9 @@ bb0(%0 : $UInt8):
   // The store below should be replaced by a debug_value with the same operand as the store (%0)
   // The fragment refers to the member being modified
   // CHECK-NOT: store
-  // CHECK: debug_value %0 : $UInt8, var, name "obj", type $*MyObject, expr op_fragment:#MyObject._storage:op_tuple_fragment:$(UInt8, UInt8):1
+  // CHECK: debug_value %0 : $UInt8, var, name "obj", type $MyObject, expr op_fragment:#MyObject._storage:op_tuple_fragment:$(UInt8, UInt8):1
   store %0 to %36 : $*UInt8
-  // CHECK: debug_value %{{[0-9]}} : $UInt8, var, name "obj", type $*MyObject, expr op_fragment:#MyObject._storage:op_tuple_fragment:$(UInt8, UInt8):0
+  // CHECK: debug_value %{{[0-9]}} : $UInt8, var, name "obj", type $MyObject, expr op_fragment:#MyObject._storage:op_tuple_fragment:$(UInt8, UInt8):0
   store %31 to %35 : $*UInt8
   dealloc_stack %2 : $*MyObject
   return %31 : $UInt8

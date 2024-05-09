@@ -421,8 +421,6 @@ struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
       return;
 
     llvm::StringRef UniqueName = VarNames.insert(varInfo->Name).first->getKey();
-    if (!varInfo->Loc)
-      varInfo->Loc = inst->getLoc();
     unsigned line = 0, col = 0;
     if (varInfo->Loc && varInfo->Loc->getSourceLoc().isValid()) {
       std::tie(line, col) = inst->getModule().getSourceManager()
