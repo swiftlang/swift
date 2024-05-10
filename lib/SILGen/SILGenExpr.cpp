@@ -4378,7 +4378,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   for (auto &component : E->getComponents()) {
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::Subscript: {
+    case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::Method: {
       auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
 
       unsigned numOperands = operands.size();
@@ -4390,9 +4391,11 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
           SGF.FunctionDC,
           /*for descriptor*/ false));
       baseTy = loweredComponents.back().getComponentType();
-      if (kind == KeyPathExpr::Component::Kind::Property)
+      if (kind == KeyPathExpr::Component::Kind::Property ||
+          kind == KeyPathExpr::Component::Kind::Method)
         break;
 
+      // Handle this for method and remove above check before break
       auto subscript = cast<SubscriptDecl>(decl);
       auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
           E, subscript, component.getDeclRef().getSubstitutions(),
