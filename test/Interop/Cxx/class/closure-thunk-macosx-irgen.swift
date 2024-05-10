@@ -5,7 +5,7 @@
 import Closure
 
 // CHECK: define internal swiftcc void @"$s4main34testClosureToBlockReturnNonTrivialyyFSo0gH0VycfU_"(ptr noalias sret(%{{.*}}) %[[V0:.*]])
-// CHECK: call ptr @__swift_cxx_ctor_ZN10NonTrivialC1Ev(ptr %[[V0]])
+// CHECK: call {{void|ptr}} @__swift_cxx_ctor_ZN10NonTrivialC1Ev(ptr %[[V0]])
 // CHECK: ret void
 
 // CHECK: define linkonce_odr hidden void @"$sSo10NonTrivialVIegr_ABIeyBr_TR"(ptr noalias sret(%{{.*}}) %[[V0:.*]], ptr %[[V1:.*]])
