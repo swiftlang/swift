@@ -122,14 +122,21 @@ class VisitUnreachableLifetimeEnds {
   /// The value whose dead-end block lifetime ends are to be visited.
   SILValue value;
 
+  /// Whether to allow leaks.
+  ///
+  /// Here, that entails allowing walks to reach non-unreachable terminators and
+  /// not creating lifetime ends before them.
+  OSSALifetimeCompletion::AllowLeaks_t allowLeaks;
+
   /// The non-lifetime-ending boundary of `value`.
   BasicBlockSet starts;
   /// The region between (inclusive) the `starts` and the unreachable blocks.
   BasicBlockSetVector region;
 
 public:
-  VisitUnreachableLifetimeEnds(SILValue value)
-      : value(value), starts(value->getFunction()),
+  VisitUnreachableLifetimeEnds(SILValue value,
+                               OSSALifetimeCompletion::AllowLeaks_t allowLeaks)
+      : value(value), allowLeaks(allowLeaks), starts(value->getFunction()),
         region(value->getFunction()) {}
 
   /// Region discovery.
@@ -232,9 +239,17 @@ void VisitUnreachableLifetimeEnds::computeRegion(
   // (3) Forward walk to find the region in which `value` might be available.
   while (auto *block = regionWorklist.pop()) {
     if (block->succ_empty()) {
-      // This assert will fail unless there is already a lifetime-ending
-      // instruction on each path to normal function exits.
-      assert(isa<UnreachableInst>(block->getTerminator()));
+      // This is a function-exiting block.
+      //
+      // In valid-but-lifetime-incomplete OSSA there must be a lifetime-ending
+      // instruction on each path from the def that exits the function normally.
+      // Thus finding a value available at the end of such a block means that
+      // the block does _not_ must not exits the function normally; in other
+      // words its terminator must be an UnreachableInst.
+      //
+      // In invalid OSSA, indicated by the `allowLeaks` flag, no such guarantee
+      // exists.
+      assert(isa<UnreachableInst>(block->getTerminator()) || allowLeaks);
     }
     for (auto *successor : block->getSuccessorBlocks()) {
       regionWorklist.pushIfNotVisited(successor);
@@ -291,16 +306,22 @@ void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
     if (!available) {
       continue;
     }
-    auto hasUnreachableSuccessor = [&]() {
+    auto hasUnavailableSuccessor = [&]() {
       // Use a lambda to avoid checking if possible.
       return llvm::any_of(block->getSuccessorBlocks(), [&result](auto *block) {
         return result.getState(block) == State::Unavailable;
       });
     };
-    if (!block->succ_empty() && !hasUnreachableSuccessor()) {
+    if (!block->succ_empty() && !hasUnavailableSuccessor()) {
       continue;
     }
-    assert(hasUnreachableSuccessor() ||
+    if (allowLeaks && block->succ_empty() &&
+        !isa<UnreachableInst>(block->getTerminator())) {
+      // Availability extends to the end of a function-exiting-normally block.
+      // If leaks are allowed, don't visit.
+      continue;
+    }
+    assert(hasUnavailableSuccessor() ||
            isa<UnreachableInst>(block->getTerminator()));
     visit(block->getTerminator());
   }
@@ -308,10 +329,10 @@ void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
 } // end anonymous namespace
 
 void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
-    SILValue value, const SSAPrunedLiveness &liveness,
+    SILValue value, AllowLeaks_t allowLeaks, const SSAPrunedLiveness &liveness,
     llvm::function_ref<void(SILInstruction *)> visit) {
 
-  VisitUnreachableLifetimeEnds visitor(value);
+  VisitUnreachableLifetimeEnds visitor(value, allowLeaks);
 
   visitor.computeRegion(liveness);
 
@@ -322,12 +343,12 @@ void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
   visitor.visitAvailabilityBoundary(result, visit);
 }
 
-static bool
-endLifetimeAtAvailabilityBoundary(SILValue value,
-                                  const SSAPrunedLiveness &liveness) {
+static bool endLifetimeAtAvailabilityBoundary(
+    SILValue value, OSSALifetimeCompletion::AllowLeaks_t allowLeaks,
+    const SSAPrunedLiveness &liveness) {
   bool changed = false;
   OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
-      value, liveness, [&](auto *unreachable) {
+      value, allowLeaks, liveness, [&](auto *unreachable) {
         SILBuilderWithScope builder(unreachable);
         endOSSALifetime(value, builder);
         changed = true;
@@ -342,19 +363,24 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
                                                       Boundary boundary) {
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
-  auto handleInnerScope = [this](SILValue innerBorrowedValue) {
-    completeOSSALifetime(innerBorrowedValue);
+  auto handleInnerScope = [this, boundary](SILValue innerBorrowedValue) {
+    completeOSSALifetime(innerBorrowedValue, boundary);
   };
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
 
   bool changed = false;
   switch (boundary) {
-  case Boundary::Availability:
-    changed |= endLifetimeAtAvailabilityBoundary(value, liveness.getLiveness());
-    break;
   case Boundary::Liveness:
     changed |= endLifetimeAtLivenessBoundary(value, liveness.getLiveness());
+    break;
+  case Boundary::Availability:
+    changed |= endLifetimeAtAvailabilityBoundary(value, DoNotAllowLeaks,
+                                                 liveness.getLiveness());
+    break;
+  case Boundary::AvailabilityWithLeaks:
+    changed |= endLifetimeAtAvailabilityBoundary(value, AllowLeaks,
+                                                 liveness.getLiveness());
     break;
   }
   // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently
@@ -371,16 +397,19 @@ namespace swift::test {
 // Dumps:
 // - function
 static FunctionTest OSSALifetimeCompletionTest(
-    "ossa-lifetime-completion",
+    "ossa_lifetime_completion",
     [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
-      std::optional<OSSALifetimeCompletion::Boundary> kind = std::nullopt;
-      if (arguments.hasUntaken()) {
-        kind = arguments.takeBool()
-                   ? OSSALifetimeCompletion::Boundary::Liveness
-                   : OSSALifetimeCompletion::Boundary::Availability;
-      }
-      llvm::outs() << "OSSA lifetime completion: " << value;
+      OSSALifetimeCompletion::Boundary kind =
+          llvm::StringSwitch<OSSALifetimeCompletion::Boundary>(
+              arguments.takeString())
+              .Case("liveness", OSSALifetimeCompletion::Boundary::Liveness)
+              .Case("availability",
+                    OSSALifetimeCompletion::Boundary::Availability)
+              .Case("availability_with_leaks",
+                    OSSALifetimeCompletion::Boundary::AvailabilityWithLeaks);
+      llvm::outs() << "OSSA lifetime completion on " << kind
+                   << " boundary: " << value;
       OSSALifetimeCompletion completion(&function, /*domInfo*/ nullptr);
       completion.completeOSSALifetime(value, kind);
       function.print(llvm::outs());
@@ -462,8 +491,9 @@ bool UnreachableLifetimeCompletion::completeLifetimes() {
 
   bool changed = false;
   for (auto value : incompleteValues) {
-    if (completion.completeOSSALifetime(value)
-        == LifetimeCompletion::WasCompleted) {
+    if (completion.completeOSSALifetime(
+            value, OSSALifetimeCompletion::Boundary::Availability) ==
+        LifetimeCompletion::WasCompleted) {
       changed = true;
     }
   }

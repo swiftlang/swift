@@ -57,24 +57,24 @@ public:
   // Availability: "As late as possible."  Consume the value in the last blocks
   //               beyond the non-consuming uses in which the value has been
   //               consumed on no incoming paths.
+  // AvailabilityWithLeaks: "As late as possible or later."  Consume the value
+  //                        in the last blocks beyond the non-consuming uses in
+  //                        which the value has been consumed on no incoming
+  //                        paths, unless that block's terminator isn't an
+  //                        unreachable, in which case, don't consume it there.
+  //
+  //                        This boundary works around bugs where SILGen emits
+  //                        illegal OSSA lifetimes.
   struct Boundary {
     enum Value : uint8_t {
       Liveness,
       Availability,
+      AvailabilityWithLeaks,
     };
     Value value;
 
     Boundary(Value value) : value(value){};
     operator Value() const { return value; }
-
-    static std::optional<Boundary> getForcingLiveness(bool force) {
-      if (!force)
-        return {};
-      return {Liveness};
-    }
-
-    bool isLiveness() { return value == Liveness; }
-    bool isAvailable() { return !isLiveness(); }
   };
 
   /// Insert a lifetime-ending instruction on every path to complete the OSSA
@@ -95,9 +95,7 @@ public:
   /// lifetime.
   ///
   /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
-  LifetimeCompletion
-  completeOSSALifetime(SILValue value,
-                       std::optional<Boundary> maybeBoundary = std::nullopt) {
+  LifetimeCompletion completeOSSALifetime(SILValue value, Boundary boundary) {
     if (value->getOwnershipKind() == OwnershipKind::None)
       return LifetimeCompletion::NoLifetime;
 
@@ -112,16 +110,19 @@ public:
     if (!completedValues.insert(value))
       return LifetimeCompletion::AlreadyComplete;
 
-    Boundary boundary = maybeBoundary.value_or(
-        value->isLexical() ? Boundary::Availability : Boundary::Liveness);
-
     return analyzeAndUpdateLifetime(value, boundary)
                ? LifetimeCompletion::WasCompleted
                : LifetimeCompletion::AlreadyComplete;
   }
 
+  enum AllowLeaks_t : bool {
+    AllowLeaks = true,
+    DoNotAllowLeaks = false,
+  };
+
   static void visitUnreachableLifetimeEnds(
-      SILValue value, const SSAPrunedLiveness &liveness,
+      SILValue value, AllowLeaks_t allowLeaks,
+      const SSAPrunedLiveness &liveness,
       llvm::function_ref<void(SILInstruction *)> visit);
 
 protected:
@@ -169,6 +170,22 @@ public:
   /// region that was previously destroyed in the unreachable region.
   bool completeLifetimes();
 };
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &OS, OSSALifetimeCompletion::Boundary boundary) {
+  switch (boundary) {
+  case OSSALifetimeCompletion::Boundary::Liveness:
+    OS << "liveness";
+    break;
+  case OSSALifetimeCompletion::Boundary::Availability:
+    OS << "availability";
+    break;
+  case OSSALifetimeCompletion::Boundary::AvailabilityWithLeaks:
+    OS << "availability_with_leaks";
+    break;
+  }
+  return OS;
+}
 
 } // namespace swift
 
