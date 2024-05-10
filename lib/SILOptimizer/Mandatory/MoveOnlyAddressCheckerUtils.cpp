@@ -4014,7 +4014,8 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
                          [](auto *user) { return isa<BranchInst>(user); })) {
           continue;
         }
-        if (completion.completeOSSALifetime(result) ==
+        if (completion.completeOSSALifetime(
+                result, OSSALifetimeCompletion::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
         }
@@ -4024,7 +4025,8 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
       if (arg->isReborrow()) {
         continue;
       }
-      if (completion.completeOSSALifetime(arg) ==
+      if (completion.completeOSSALifetime(
+              arg, OSSALifetimeCompletion::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
       }
