@@ -240,7 +240,7 @@ extension Value {
 
     useToDefRange.insert(destBlock)
 
-    // The value needs to be destroyed at every exit of the liferange.
+    // The value needs to be destroyed at every exit of the liverange.
     for exitBlock in useToDefRange.exits {
       let builder = Builder(before: exitBlock.instructions.first!, context)
       builder.createDestroyValue(operand: self)

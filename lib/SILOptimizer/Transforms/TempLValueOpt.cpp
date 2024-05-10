@@ -131,7 +131,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   //   first_use_of %temp // beginOfLiferange
   //   ... // no reads or writes from/to %destination
   //   copy_addr [take] %temp to %destination // copyInst
-  //   ... // no further uses of %temp (copyInst is the end of %temp liferange)
+  //   ... // no further uses of %temp (copyInst is the end of %temp liverange)
   //   dealloc_stack %temp
   //
   // All projections to %destination are hoisted above the first use of %temp.
@@ -184,7 +184,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
     bca = PM->getAnalysis<BasicCalleeAnalysis>();
   }
 
-  // Iterate over the liferange of the temporary and make some validity checks.
+  // Iterate over the liverange of the temporary and make some validity checks.
   AliasAnalysis *AA = nullptr;
   SILInstruction *beginOfLiferange = nullptr;
   bool endOfLiferangeReached = false;
@@ -200,9 +200,9 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
       if (endOfLiferangeReached)
         return;
 
-      // Find the first user of the temporary to get a more precise liferange.
+      // Find the first user of the temporary to get a more precise liverange.
       // It would be too conservative to treat the alloc_stack itself as the
-      // begin of the liferange.
+      // begin of the liverange.
       if (!beginOfLiferange)
         beginOfLiferange = inst;
 
@@ -210,7 +210,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
         endOfLiferangeReached = true;
     }
     if (beginOfLiferange && !endOfLiferangeReached) {
-      // If the root address of the destination is within the liferange of the
+      // If the root address of the destination is within the liverange of the
       // temporary, we cannot replace all uses of the temporary with the
       // destination (it would break the def-use dominance rule).
       if (inst == destRootInst)
@@ -218,8 +218,8 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
         
       if (!AA)
         AA = PM->getAnalysis<AliasAnalysis>(getFunction());
-  
-      // Check if the destination is not accessed within the liferange of
+
+      // Check if the destination is not accessed within the liverange of
       // the temporary.
       // This is unlikely, because the destination is initialized at the
       // copyInst. But still, the destination could contain an initialized value
@@ -235,7 +235,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   }
   assert(endOfLiferangeReached);
 
-  // Move all projections of the destination address before the liferange of
+  // Move all projections of the destination address before the liverange of
   // the temporary.
   for (auto iter = beginOfLiferange->getIterator();
        iter != copyInst->getIterator();) {
@@ -245,7 +245,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   }
 
   if (!copyInst->isInitializationOfDest()) {
-    // Make sure the destination is uninitialized before the liferange of
+    // Make sure the destination is uninitialized before the liverange of
     // the temporary.
     SILBuilderWithScope builder(beginOfLiferange);
     builder.createDestroyAddr(copyInst->getLoc(), destination);
