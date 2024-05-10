@@ -5,9 +5,11 @@
 
 func inferSendableFunctionType() {
   let closure: @MainActor () -> Void = {}
+  @MainActor func f() {}
 
   Task {
     await closure() // okay
+    await f() // okay
   }
 }
 
