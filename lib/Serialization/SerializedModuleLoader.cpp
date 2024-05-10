@@ -485,26 +485,25 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
                          Ctx.LangOpts.PackageName, isTestableImport);
 
   auto importedModuleSet = binaryModuleImports->moduleImports;
-  std::vector<std::string> importedModuleNames;
-  importedModuleNames.reserve(importedModuleSet.size());
-  llvm::transform(importedModuleSet.keys(),
-                  std::back_inserter(importedModuleNames),
-                  [](llvm::StringRef N) {
-                     return N.str();
-                  });
+  std::vector<ScannerImportStatementInfo> moduleImports;
+  moduleImports.reserve(importedModuleSet.size());
+  llvm::transform(
+      importedModuleSet.keys(), std::back_inserter(moduleImports),
+      [](llvm::StringRef N) { return ScannerImportStatementInfo(N.str()); });
 
   auto importedHeader = binaryModuleImports->headerImport;
   auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
-  std::vector<std::string> importedOptionalModuleNames;
+  std::vector<ScannerImportStatementInfo> optionalModuleImports;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))
-      importedOptionalModuleNames.push_back(optionalImportedModule.str());
+      optionalModuleImports.push_back(
+          ScannerImportStatementInfo(optionalImportedModule.str()));
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-       modulePath.str(), moduleDocPath, sourceInfoPath,
-       importedModuleNames, importedOptionalModuleNames,
-       importedHeader, isFramework, /*module-cache-key*/ "");
+      modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
+      optionalModuleImports, importedHeader, isFramework,
+      /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }
