@@ -266,6 +266,8 @@ public:
 
   void print(llvm::raw_ostream &os) const;
 
+  void printForSIL(llvm::raw_ostream &os) const;
+
   void printForDiagnostics(llvm::raw_ostream &os,
                            StringRef openingQuotationMark = "'") const;
 
