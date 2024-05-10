@@ -768,7 +768,11 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.addCapturePropagation();
 
   // Specialize closure.
-  P.addClosureSpecializer();
+  if (P.getOptions().EnableExperimentalSwiftBasedClosureSpecialization) {
+    P.addExperimentalSwiftBasedClosureSpecialization();
+  } else {
+    P.addClosureSpecializer();
+  }
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
