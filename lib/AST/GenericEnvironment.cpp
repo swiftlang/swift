@@ -718,26 +718,35 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
   // generic environment.
   assert(type->hasElementArchetype());
 
-  ElementArchetypeType *element = nullptr;
-  type.visit([&](Type type) {
-    auto archetype = type->getAs<ElementArchetypeType>();
-    if (!element && archetype)
-      element = archetype;
-  });
+  GenericEnvironment *elementEnv = nullptr;
+
+  // Map element archetypes to interface types in the element generic
+  // environment's signature.
+  type = type.subst(
+    [&](SubstitutableType *type) -> Type {
+      auto *archetype = cast<ArchetypeType>(type);
+
+      if (isa<OpenedArchetypeType>(archetype))
+        return archetype;
+
+      if (isa<ElementArchetypeType>(archetype)) {
+        assert(!elementEnv ||
+               elementEnv == archetype->getGenericEnvironment());
+        elementEnv = archetype->getGenericEnvironment();
+      }
+
+      return archetype->getInterfaceType();
+    },
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::AllowLoweredTypes |
+    SubstFlags::PreservePackExpansionLevel);
+
+  auto shapeClass = elementEnv->getOpenedElementShapeClass();
+
+  llvm::SmallVector<GenericTypeParamType *, 2> members;
+  auto elementDepth = elementEnv->getGenericSignature()->getMaxDepth();
 
   auto sig = getGenericSignature();
-  auto *elementEnv = element->getGenericEnvironment();
-  auto shapeClass = elementEnv->getOpenedElementShapeClass();
-  QueryInterfaceTypeSubstitutions substitutions(this);
-
-  type = type->mapTypeOutOfContext();
-
-  auto interfaceType = element->getInterfaceType();
-
-  llvm::SmallDenseMap<GenericParamKey, GenericTypeParamType *>
-      packParamForElement;
-  auto elementDepth = interfaceType->getRootGenericParam()->getDepth();
-
   for (auto *genericParam : sig.getGenericParams()) {
     if (!genericParam->isParameterPack())
       continue;
@@ -745,25 +754,22 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
     if (!sig->haveSameShape(genericParam, shapeClass))
       continue;
 
-    GenericParamKey elementKey(/*isParameterPack*/false,
-                               /*depth*/elementDepth,
-                               /*index*/packParamForElement.size());
-    packParamForElement[elementKey] = genericParam;
+    members.push_back(genericParam);
   }
 
-  // Map element archetypes to the pack archetypes by converting
-  // element types to interface types and adding the isParameterPack
-  // bit. Then, map type parameters to archetypes.
+  // Map element interface types to pack archetypes.
+  QueryInterfaceTypeSubstitutions mapIntoContext(this);
   return type.subst(
       [&](SubstitutableType *type) {
         auto *genericParam = type->getAs<GenericTypeParamType>();
         if (!genericParam)
           return Type();
 
-        if (auto *packParam = packParamForElement[{genericParam}])
-          return substitutions(packParam);
-
-        return substitutions(genericParam);
+        if (genericParam->getDepth() == elementDepth) {
+          genericParam = members[genericParam->getIndex()];
+          assert(genericParam->isParameterPack());
+        }
+        return mapIntoContext(genericParam);
       },
       LookUpConformanceInSignature(sig.getPointer()),
       SubstFlags::PreservePackExpansionLevel);
