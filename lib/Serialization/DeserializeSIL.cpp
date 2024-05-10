@@ -563,16 +563,16 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
-  unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
+  unsigned rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
+      isThunk, isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
-      scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
+      scratch, rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
+      isThunk, isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
@@ -656,13 +656,26 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     fn->setSerialized(IsSerialized_t(isSerialized));
 
+    // If fn was serialized in a module with package serialization
+    // enabled, a new attribute [serialized_for_package] was added
+    // to its definition. Preserve the attribute here if the current
+    // module is in the same package, and use it to determine the
+    // resilience expansion for this function.
+    auto loadedModule = getFile()->getParentModule();
+    if (isSerializedForPackage == IsSerializedForPackage &&
+        loadedModule->isResilient() &&
+        loadedModule != SILMod.getSwiftModule() &&
+        loadedModule->serializePackageEnabled() &&
+        loadedModule->inSamePackage(SILMod.getSwiftModule()))
+      fn->setSerializedForPackage(IsSerializedForPackage);
+
     // If the serialized function comes from the same module, we're merging
     // modules, and can update the linkage directly. This is needed to
     // correctly update the linkage for forward declarations to entities defined
     // in another file of the same module – we want to ensure the linkage
     // reflects the fact that the entity isn't really external and shouldn't be
     // dropped from the resulting merged module.
-    if (getFile()->getParentModule() == SILMod.getSwiftModule())
+    if (loadedModule == SILMod.getSwiftModule())
       fn->setLinkage(linkage);
 
     // Don't override the transparency or linkage of a function with
@@ -703,6 +716,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setLinkage(linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerialized(IsSerialized_t(isSerialized));
+    fn->setSerializedForPackage(IsSerializedForPackage_t(isSerializedForPackage));
     fn->setThunk(IsThunk_t(isThunk));
     fn->setWithoutActuallyEscapingThunk(bool(isWithoutActuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
@@ -3520,16 +3534,16 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
-  unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+  unsigned rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
+      isThunk, isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
-      scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+      scratch, rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
+      isThunk, isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
@@ -3981,7 +3995,7 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
   DeclID StorageID;
   ArrayRef<uint64_t> ComponentValues;
   PropertyLayout::readRecord(scratch, StorageID, Serialized, ComponentValues);
-  
+
   auto decl = cast<AbstractStorageDecl>(MF->getDecl(StorageID));
   unsigned ComponentValueIndex = 0;
   auto component = readKeyPathComponent(ComponentValues, ComponentValueIndex);
