@@ -572,8 +572,15 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
   }
 
   // Second step: replace the enum alloc_stack with a payload alloc_stack.
+  Builder.setCurrentDebugScope(AS->getDebugScope());
   auto *newAlloc = Builder.createAllocStack(
-      AS->getLoc(), payloadType, AS->getVarInfo(), AS->hasDynamicLifetime());
+      AS->getLoc(), payloadType, {}, AS->hasDynamicLifetime(), IsNotLexical,
+      IsNotFromVarDecl, DoesNotUseMoveableValueDebugInfo, true);
+  if (auto varInfo = AS->getVarInfo()) {
+    // TODO: Add support for op_enum_fragment
+    // For now, we can't represent this variable correctly, so we drop it.
+    Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
+  }
 
   while (!AS->use_empty()) {
     Operand *use = *AS->use_begin();
@@ -610,11 +617,9 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         break;
       }
       case SILInstructionKind::DebugValueInst:
-        if (DebugValueInst::hasAddrVal(user)) {
-          eraseInstFromFunction(*user);
-          break;
-        }
-        LLVM_FALLTHROUGH;
+        // TODO: Add support for op_enum_fragment
+        use->set(SILUndef::get(AS));
+        break;
       default:
         llvm_unreachable("unexpected alloc_stack user");
     }
