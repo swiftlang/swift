@@ -21,7 +21,7 @@ sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK: Error#: 0. End Error in Function: 'guaranteed_coroutine_caller'
 
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'guaranteed_coroutine_caller'
-// CHECK: Owned yield without life ending uses!
+// CHECK: Owned yield without lifetime ending uses!
 // CHECK: Value: (**%7**, %8) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass // user: %10
 // CHECK: Error#: 1. End Error in Function: 'guaranteed_coroutine_caller'
 
@@ -34,7 +34,7 @@ sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK: Error#: 2. End Error in Function: 'guaranteed_coroutine_caller'
 
 // CHECK-LABEL: Error#: 3. Begin Error in Function: 'guaranteed_coroutine_caller'
-// CHECK: Owned yield without life ending uses!
+// CHECK: Owned yield without lifetime ending uses!
 // CHECK: Value: (**%16**, %17) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass // user: %18
 // CHECK: Error#: 3. End Error in Function: 'guaranteed_coroutine_caller'
 
