@@ -363,6 +363,10 @@ private:
   /// The function's serialized attribute.
   bool Serialized : 1;
 
+  /// [serialized_for_package] attribute if package serialization
+  /// is enabled.
+  bool SerializedForPackage : 1;
+
   /// Specifies if this function is a thunk or a reabstraction thunk.
   ///
   /// The inliner uses this information to avoid inlining (non-trivial)
@@ -1136,6 +1140,22 @@ public:
     Serialized = isSerialized;
     assert(this->isSerialized() == isSerialized &&
            "too few bits for Serialized storage");
+  }
+
+  /// A [serialized_for_package] attribute is used to indicate that a function
+  /// is [serialized] because of package-cmo optimization.
+  /// Package-cmo allows serializing a function containing a loadable type in
+  /// a resiliently built module, which is normally illegal. During SIL deserialization,
+  /// this attribute can be used to check whether a loaded function that was serialized
+  /// can be allowed to have loadable types. This attribute is also used to determine
+  /// if a callee can be inlined into a caller that's serialized without package-cmo, for
+  /// example, by explicitly annotating the caller decl with `@inlinable`.
+  IsSerializedForPackage_t isSerializedForPackage() const {
+    return IsSerializedForPackage_t(SerializedForPackage);
+  }
+  void
+  setSerializedForPackage(IsSerializedForPackage_t isSerializedForPackage) {
+    SerializedForPackage = isSerializedForPackage;
   }
 
   /// Get this function's thunk attribute.
