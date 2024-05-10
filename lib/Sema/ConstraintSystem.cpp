@@ -657,6 +657,14 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::CodeCompletion:
       // These components don't have any callee associated, so just continue.
       break;
+    case ComponentKind::Method:
+      // For a method the callee is given by 'component -> member'.
+      return getConstraintLocator(anchor,
+                                  {*componentElt, ConstraintLocator::Member});
+      // OR
+      // For a method the callee is given by 'component -> apply function'.
+      //      return getConstraintLocator(anchor, {*componentElt,
+      //      ConstraintLocator::ApplyFunction});
     }
   }
 
@@ -7849,6 +7857,10 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
 
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("DictionaryKey only valid in #keyPath");
+      break;
+
+    case KeyPathExpr::Component::Kind::Method:
+      // need to handle this
       break;
     }
   }
