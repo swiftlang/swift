@@ -789,7 +789,7 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
-  std::vector<std::string> overlayFiles;
+  std::vector<std::pair<std::string, std::string>> overlayFiles;
   for (auto dep : allDependencies) {
     auto moduleName = dep.ModuleName;
     // Do not look for overlays of main module under scan
@@ -876,9 +876,15 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
                     mainDep.addModuleDependency(crossImportOverlayModID);
                 });
 
-  llvm::for_each(overlayFiles, [&mainDep](const std::string &file) {
-    mainDep.addAuxiliaryFile(file);
-  });
+  auto cmdCopy = mainDep.getCommandline();
+  cmdCopy.push_back("-disable-cross-import-overlay-search");
+  for (auto &entry : overlayFiles) {
+    mainDep.addAuxiliaryFile(entry.second);
+    cmdCopy.push_back("-swift-module-cross-import");
+    cmdCopy.push_back(entry.first);
+    cmdCopy.push_back(entry.second);
+  }
+  mainDep.updateCommandLine(cmdCopy);
 
   cache.updateDependency(
       {mainModuleName.str(), ModuleDependencyKind::SwiftSource}, mainDep);
