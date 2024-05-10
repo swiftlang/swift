@@ -1784,6 +1784,11 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
+void ActorIsolation::dump() const {
+  print(llvm::dbgs());
+  llvm::dbgs() << '\n';
+}
+
 void ActorIsolation::dumpForDiagnostics() const {
   printForDiagnostics(llvm::dbgs());
   llvm::dbgs() << '\n';

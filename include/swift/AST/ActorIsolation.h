@@ -271,10 +271,7 @@ public:
   void printForDiagnostics(llvm::raw_ostream &os,
                            StringRef openingQuotationMark = "'") const;
 
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
-    llvm::dbgs() << '\n';
-  }
+  SWIFT_DEBUG_DUMPER(dump());
 
   // Defined out of line to prevent linker errors since libswiftBasic would
   // include this header exascerbating a layering violation where libswiftBasic
