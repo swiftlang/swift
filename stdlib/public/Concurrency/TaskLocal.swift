@@ -260,7 +260,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
   @inlinable
   @discardableResult
-  @_unsafeInheritExecutor
+  @_unsafeInheritExecutor // internal for backwards compatibility; though may be able to be removed safely?
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 5.9)
   internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
