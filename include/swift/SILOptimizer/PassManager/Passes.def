@@ -146,6 +146,13 @@ PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
+
+// NOTE - ExperimentalSwiftBasedClosureSpecialization and AutodiffClosureSpecialization are a WIP
+SWIFT_FUNCTION_PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-closure-specialization",
+     "General closure-specialization pass written in Swift")
+SWIFT_FUNCTION_PASS(AutodiffClosureSpecialization, "autodiff-closure-specialization",
+     "Autodiff specific closure-specialization pass")
+
 PASS(ClosureLifetimeFixup, "closure-lifetime-fixup",
      "Closure Lifetime Fixup")
 PASS(CodeSinking, "code-sinking",

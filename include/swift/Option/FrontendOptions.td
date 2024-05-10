@@ -359,6 +359,10 @@ def enable_experimental_async_top_level :
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
+def enable_experimental_swift_based_closure_specialization : 
+  Flag<["-"], "experimental-swift-based-closure-specialization">,
+  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">; 
+
 def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
            "async calls from Swift to ObjC: 'on', 'off' ">;
