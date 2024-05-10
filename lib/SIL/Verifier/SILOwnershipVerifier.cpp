@@ -491,7 +491,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     return true;
 
   return !errorBuilder.handleMalformedSIL([&] {
-    llvm::errs() << "Owned function parameter without life ending uses!\n"
+    llvm::errs() << "Owned function parameter without lifetime ending uses!\n"
                  << "Value: " << *arg << '\n';
   });
 }
@@ -510,7 +510,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
       return true;
     }
     return !errorBuilder.handleMalformedSIL([&] {
-      llvm::errs() << "Owned yield without life ending uses!\n"
+      llvm::errs() << "Owned yield without lifetime ending uses!\n"
                    << "Value: " << *yield << '\n';
     });
   case OwnershipKind::Guaranteed:
@@ -607,7 +607,7 @@ bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
     return true;
 
   return errorBuilder.handleMalformedSIL([&] {
-    llvm::errs() << "Guaranteed function parameter with life ending uses!\n"
+    llvm::errs() << "Guaranteed function parameter with lifetime ending uses!\n"
                  << "Value: " << *arg;
     for (const auto *use : lifetimeEndingUsers) {
       llvm::errs() << "Lifetime Ending User: " << *use->getUser();
@@ -620,7 +620,7 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
     SILValue value,
     const llvm::SmallVectorImpl<Operand *> &lifetimeEndingUsers) const {
   return errorBuilder.handleMalformedSIL([&] {
-    llvm::errs() << "Subobject projection with life ending uses!\n"
+    llvm::errs() << "Subobject projection with lifetime ending uses!\n"
                  << "Value: " << *value;
     for (const auto *use : lifetimeEndingUsers) {
       llvm::errs() << "Lifetime Ending User: " << *use->getUser();
