@@ -7286,12 +7286,6 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getTypeInContext() const {
-  // If the variable is declared in context of a for-in loop over the elements
-  // of a parameter pack, its interface type must be mapped into context using
-  // the opened element environment of the pack expansion.
-  if (auto *env = getOpenedElementEnvironment())
-    return GenericEnvironment::mapTypeIntoContext(env, getInterfaceType());
-
   return getDeclContext()->mapTypeIntoContext(getInterfaceType());
 }
 
