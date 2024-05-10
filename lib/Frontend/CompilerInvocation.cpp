@@ -571,13 +571,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (const Arg*A = Args.getLastArg(OPT_bridging_header_pch_key))
     Opts.BridgingHeaderPCHCacheKey = A->getValue();
 
-  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
-      Opts.ClangIncludeTrees.empty() &&
-      FrontendOptions::supportCompilationCaching(
-          FrontendOpts.RequestedAction)) {
-    Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
-    return true;
-  }
+  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty())
+    Opts.HasImmutableFileSystem = true;
 
   return false;
 }
