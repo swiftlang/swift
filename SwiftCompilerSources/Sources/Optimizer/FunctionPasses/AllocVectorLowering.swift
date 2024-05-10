@@ -190,7 +190,7 @@ private extension StructInst {
 /// Lowers the allocateVector builtin either to an stack-allocated vector (`alloc_vector`)
 /// or to a statically initialized global.
 private func lower(allocVectorBuiltin: BuiltinInst, _ context: FunctionPassContext) {
-  let visitor = ComputeNonEscapingLiferange(of: allocVectorBuiltin, context)
+  let visitor = ComputeNonEscapingLiverange(of: allocVectorBuiltin, context)
 
   guard let result = allocVectorBuiltin.visit(using: visitor, context) else {
     if allocVectorBuiltin.parentFunction.isTransparent {
@@ -336,7 +336,7 @@ private func findInitStores(of address: Value, atIndex: Int, _ initStores: inout
 
 // This is very experimental and not ideal at all.
 // TODO: replace this with DiagnoseLifetimeDependence from https://github.com/apple/swift/pull/68682
-private struct ComputeNonEscapingLiferange : EscapeVisitorWithResult {
+private struct ComputeNonEscapingLiverange : EscapeVisitorWithResult {
 
   enum Result {
     case liverange(InstructionRange)

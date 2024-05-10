@@ -161,7 +161,7 @@ private extension LoadInst {
     _ context: FunctionPassContext
   ) -> DataflowResult {
 
-    var liverange = Liferange(endBlock: self.parentBlock, context)
+    var liverange = Liverange(endBlock: self.parentBlock, context)
     defer { liverange.deinitialize() }
     liverange.pushPredecessors(of: self.parentBlock)
 
@@ -184,7 +184,7 @@ private extension LoadInst {
     return .redundant(scanner.availableValues)
   }
 
-  func canReplaceWithoutInsertingCopies(liverange: Liferange,_ context: FunctionPassContext) -> Bool {
+  func canReplaceWithoutInsertingCopies(liverange: Liverange,_ context: FunctionPassContext) -> Bool {
     switch self.loadOwnership {
     case .trivial, .unqualified:
       return true
@@ -536,7 +536,7 @@ private struct InstructionScanner {
 ///   bb3:
 ///     %3 = load %addr     // end block
 ///
-private struct Liferange {
+private struct Liverange {
   private var worklist: BasicBlockWorklist
   private var containingBlocks: Stack<BasicBlock> // doesn't include the end-block
   private var beginBlocks: BasicBlockSet

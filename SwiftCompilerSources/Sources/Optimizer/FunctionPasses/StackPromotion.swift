@@ -146,7 +146,7 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
 
   // The "inner" liverange contains all use points which are dominated by the allocation block.
   // Note that this `visit` cannot fail because otherwise our initial `isEscaping` check would have failed already.
-  var innerRange = allocRef.visit(using: ComputeInnerLiferange(of: allocRef, domTree, context), context)!
+  var innerRange = allocRef.visit(using: ComputeInnerLiverange(of: allocRef, domTree, context), context)!
   defer { innerRange.deinitialize() }
 
   // The "outer" liverange contains all use points.
@@ -236,7 +236,7 @@ private func getDominatingBlockOfAllUsePoints(context: FunctionPassContext,
   return value.visit(using: FindDominatingBlock(result: value.parentBlock, domTree: domTree), context)!
 }
 
-private struct ComputeInnerLiferange : EscapeVisitorWithResult {
+private struct ComputeInnerLiverange : EscapeVisitorWithResult {
   var result: InstructionRange
   let domTree: DominatorTree
 
