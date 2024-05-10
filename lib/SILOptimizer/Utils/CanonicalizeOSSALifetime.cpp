@@ -265,7 +265,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   findDestroysOutsideBoundary(outsideDestroys);
 
   // OSSALifetimeCompletion: With complete lifetimes, creating completeLiveness
-  // and using it to visiti unreachable lifetime ends should be deleted.
+  // and using it to visit unreachable lifetime ends should be deleted.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks(this->discoveredBlocks);
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
 
