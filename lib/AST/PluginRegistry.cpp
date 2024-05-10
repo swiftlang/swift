@@ -172,11 +172,11 @@ LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
 #if defined(_WIN32)
   _close(input);
   _close(output);
-  CloseHandle(process.Process);
 #else
   close(input);
   close(output);
 #endif
+  llvm::sys::Wait(process, /*SecondsToWait=*/0);
 }
 
 LoadedExecutablePlugin::~LoadedExecutablePlugin() {
