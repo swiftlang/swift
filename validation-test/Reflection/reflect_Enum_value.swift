@@ -364,6 +364,13 @@ case leafE
 case leafF
 }
 
+reflect(enumValue: OneIndirectPayload.child(.child(.leafF)))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneIndirectPayload)
+// CHECK-NEXT: Value: .child(.child(.leafF))
+
 reflect(enumValue: OneIndirectPayload.child(.leafF))
 
 // CHECK: Reflecting an enum value.
@@ -377,6 +384,23 @@ reflect(enumValue: OneIndirectPayload.leafF)
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (enum reflect_Enum_value.OneIndirectPayload)
 // CHECK-NEXT: Value: .leafF
+
+enum ADT {
+  case A
+  case B(Int)
+}
+
+enum GuineaPig {
+    case a
+    indirect case b(ADT)
+}
+
+reflect(enumValue: GuineaPig.b(ADT.B(42)))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.GuineaPig)
+// CHECK-NEXT: Value: .b(.B(_))
 
 class SimpleSwiftClass {
   let value = 7
